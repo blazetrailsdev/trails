@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
   type ColumnType,
   type ColumnOptions,
@@ -90,8 +91,9 @@ export class SchemaCreation {
 
   /** @internal */
   protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
+    if (isSymbol(o)) return this.conn.quoteColumnName(symbolToS(o));
     if (typeof o === "string") return o;
-    return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
+    return o.map((c) => this.conn.quoteColumnName(isSymbol(c) ? symbolToS(c) : c)).join(", ");
   }
 
   /**

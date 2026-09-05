@@ -6,7 +6,14 @@ import { instantFrom } from "../../temporal.js";
 import { toTime } from "../date/conversions.js";
 import { Object } from "../object/acts-like.js";
 
-export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant | RubyTime;
+export type DateOrTime =
+  | Temporal.PlainDate
+  | Temporal.PlainDateTime
+  | Temporal.ZonedDateTime
+  | Date
+  | Temporal.Instant
+  | RubyTime
+  | TimeWithZone;
 
 /** @missingRailsArgs acts_like? — PERMANENT */
 export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
@@ -15,14 +22,23 @@ export function inTimeZone(
   zone?: unknown,
 ): TimeWithZone | Temporal.Instant;
 export function inTimeZone(dateOrTime: RubyTime, zone?: unknown): TimeWithZone | RubyTime;
+export function inTimeZone(dateOrTime: TimeWithZone, zone?: unknown): TimeWithZone;
+export function inTimeZone(
+  dateOrTime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+  zone?: unknown,
+): TimeWithZone | Temporal.Instant;
+export function inTimeZone(
+  dateOrTime: DateOrTime,
+  zone?: unknown,
+): TimeWithZone | Temporal.Instant | RubyTime;
 export function inTimeZone(
   dateOrTime: DateOrTime,
   zone: unknown = currentZone(),
 ): TimeWithZone | Temporal.Instant | RubyTime {
+  if (dateOrTime instanceof TimeWithZone) return dateOrTime.inTimeZone(zone);
+
   const timeZone = findZoneBang(zone);
-  const time = Object.actsLike(dateOrTime, "time")
-    ? (dateOrTime as Date | Temporal.Instant | RubyTime)
-    : null;
+  const time = Object.actsLike(dateOrTime, "time") ? (dateOrTime as TimeLike) : null;
 
   if (timeZone) {
     return timeWithZone(dateOrTime, time, timeZone);
@@ -31,11 +47,7 @@ export function inTimeZone(
 }
 
 /** @internal */
-function timeWithZone(
-  dateOrTime: DateOrTime,
-  time: Date | Temporal.Instant | RubyTime | null,
-  zone: TimeZone,
-): TimeWithZone {
+function timeWithZone(dateOrTime: DateOrTime, time: TimeLike | null, zone: TimeZone): TimeWithZone {
   if (time !== null) {
     return new TimeWithZone(asInstant(time), zone);
   }
@@ -43,9 +55,18 @@ function timeWithZone(
   return zone.local(date.year, date.month, date.day);
 }
 
-function asInstant(time: Date | Temporal.Instant | RubyTime): Temporal.Instant {
+function asInstant(time: TimeLike): Temporal.Instant {
   if (time instanceof RubyTime) {
     return (time.isUtc() ? time : time.getutc()).toTime().toInstant();
   }
+  if (time instanceof Temporal.ZonedDateTime) return time.toInstant();
+  if (time instanceof Temporal.PlainDateTime) return time.toZonedDateTime("UTC").toInstant();
   return time instanceof Temporal.Instant ? time : instantFrom(time);
 }
+
+type TimeLike =
+  | Date
+  | Temporal.Instant
+  | Temporal.PlainDateTime
+  | Temporal.ZonedDateTime
+  | RubyTime;
