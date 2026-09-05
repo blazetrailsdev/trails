@@ -177,17 +177,6 @@ describe("the PostgreSQL OID registrations", () => {
       expect(() => lookup(name, { adapter: "postgresql" })).not.toThrow();
     }
   });
-
-  it("resolve for a model carrying a directly-assigned postgres adapter", () => {
-    const model = {
-      _adapter: { typeRegistryKey: "postgresql" as const },
-      connectionDbConfig: () => {
-        throw new ConnectionNotDefined("No database connection defined.");
-      },
-    };
-    expect(adapterNameFrom(model)).toBe("postgresql");
-    expect(lookup("interval", { adapter: adapterNameFrom(model) })).toBeInstanceOf(Interval);
-  });
 });
 
 describe("attribute() resolves through the declaring model's adapter", () => {

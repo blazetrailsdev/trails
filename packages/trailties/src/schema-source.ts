@@ -6,7 +6,7 @@ function sqliteId(name: string): string {
 }
 
 function detectAdapter(adapter: DatabaseAdapter): "sqlite" | "postgres" | "mysql" {
-  const name = adapter.typeRegistryKey.toLowerCase();
+  const name = adapter.adapterName.toLowerCase();
   if (name.includes("postgres")) return "postgres";
   if (name.includes("mysql") || name.includes("maria")) return "mysql";
   return "sqlite";

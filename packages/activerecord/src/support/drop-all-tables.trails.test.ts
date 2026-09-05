@@ -4,17 +4,18 @@ import { dropAllTables, purgeToCanonicalTables, resetTestTables } from "./drop-a
 import { provisionSecondDatabase } from "./setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 let adapter: DatabaseAdapter;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
-  if (a.typeRegistryKey === "sqlite3") {
+  if (typeRegistryKeyFor(a) === "sqlite3") {
     return (
       (await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
       )) as Array<{ name: string }>
     ).map((r) => r.name);
-  } else if (a.typeRegistryKey === "postgresql") {
+  } else if (typeRegistryKeyFor(a) === "postgresql") {
     return (
       (await a.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
@@ -47,7 +48,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let executeCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgresql" as const,
+      adapterName: "PostgreSQL",
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
@@ -64,7 +65,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   it("rethrows when execute throws a non-connection error", async () => {
     const appErr = new Error("syntax error");
     const fakeAdapter = {
-      typeRegistryKey: "postgresql" as const,
+      adapterName: "PostgreSQL",
       execute: vi.fn(async () => {
         throw appErr;
       }),
@@ -83,7 +84,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let mutationCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgresql" as const,
+      adapterName: "PostgreSQL",
       execute: vi.fn(async (sql: string) => {
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
@@ -159,7 +160,7 @@ describe("dropAllTables", () => {
   });
 
   it("drops 3-table FK chain without error", async () => {
-    const int = dropAdapter.typeRegistryKey === "mysql2" ? "INT" : "INTEGER";
+    const int = typeRegistryKeyFor(dropAdapter) === "mysql2" ? "INT" : "INTEGER";
     await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
     await dropAdapter.executeMutation(
       `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,
@@ -196,12 +197,12 @@ describe("purge-only pre-snapshot path", () => {
   }
 
   const inertAdapter = {
-    typeRegistryKey: "none",
+    adapterName: "None",
     schemaCache: { clearBang() {} },
   } as unknown as DatabaseAdapter;
 
   const armOnlyAdapter = {
-    typeRegistryKey: "sqlite3",
+    adapterName: "SQLite",
     createTable: async () => {},
   } as unknown as DatabaseAdapter;
 

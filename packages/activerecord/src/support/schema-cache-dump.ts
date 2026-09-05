@@ -9,6 +9,7 @@ import { SchemaCache } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export const SCHEMA_CACHE_DUMP_ENV = "AR_TEST_SCHEMA_CACHE_DUMP";
 
@@ -122,8 +123,9 @@ const SHAPE_QUERIES: Record<AdapterName, string[]> = {
 };
 
 async function shapeQueriesFor(adapter: DatabaseAdapter): Promise<string[]> {
-  const queries = SHAPE_QUERIES[adapter.typeRegistryKey] ?? [];
-  if (adapter.typeRegistryKey !== "mysql2") return queries;
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
+  const queries: string[] = (typeRegistryKey && SHAPE_QUERIES[typeRegistryKey]) || [];
+  if (typeRegistryKey !== "mysql2") return queries;
   const expression = (await supportsExpressionIndex(adapter)) ? "COALESCE(EXPRESSION, '')" : "''";
   return queries.map((sql) => sql.replace("/*EXPRESSION*/''", expression));
 }

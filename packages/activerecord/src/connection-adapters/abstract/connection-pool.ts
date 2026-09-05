@@ -1,7 +1,6 @@
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import { Executor, synchronize, type MonitorMixin } from "@blazetrails/activesupport";
-import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
@@ -321,11 +320,6 @@ export class ConnectionPool implements ReapablePool {
       this._adapterProxy = new Proxy({} as DatabaseAdapter, {
         get(_target, prop) {
           if (prop === "pool") return pool;
-          if (prop === "typeRegistryKey")
-            return (
-              (pool.activeConnection ?? pool.connections[0])?.typeRegistryKey ??
-              adapterNameFromConfig(pool.dbConfig.adapter)
-            );
           if (typeof prop === "symbol") return undefined;
           const sample: object =
             pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;

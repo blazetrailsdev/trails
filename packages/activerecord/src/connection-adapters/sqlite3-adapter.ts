@@ -11,7 +11,6 @@ import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
-import type { AdapterName } from "./abstract-adapter.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -151,14 +150,6 @@ let sqlite3TypeMap: TypeMap | undefined;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override readonly ADAPTER_NAME = "SQLite";
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
-   */
-  override get typeRegistryKey(): AdapterName {
-    return "sqlite3";
-  }
 
   get schemaCreation(): SQLite3SchemaCreation {
     return new SQLite3SchemaCreation(this);

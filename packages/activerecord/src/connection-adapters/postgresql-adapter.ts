@@ -48,7 +48,6 @@ import { TimestampWithTimeZone } from "./postgresql/oid/timestamp-with-time-zone
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
-import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
   ActiveRecordError,
@@ -195,14 +194,6 @@ export class PostgreSQLAdapter
     SchemaNamespaceStatements
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
-   */
-  override get typeRegistryKey(): AdapterName {
-    return "postgresql";
-  }
 
   static columnNameMatcher(): RegExp {
     return pgColumnNameMatcher();

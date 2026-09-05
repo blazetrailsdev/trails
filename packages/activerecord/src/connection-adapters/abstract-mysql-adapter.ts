@@ -15,7 +15,6 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import { rubyInspect } from "../relation/ruby-inspect.js";
 import type { InsertBuilder } from "../insert-all.js";
-import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
@@ -197,14 +196,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   protected _statementLimit = 1000;
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
-   */
-  override get typeRegistryKey(): AdapterName {
-    return "mysql2";
-  }
 
   tableAliasLength(): number {
     return mysqlTableAliasLength();

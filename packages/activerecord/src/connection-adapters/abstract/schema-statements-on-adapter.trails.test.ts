@@ -3,6 +3,7 @@ import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { Result } from "../../result.js";
+import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
@@ -19,38 +20,11 @@ afterEach(async () => {
 });
 
 class StubAdapter extends AbstractAdapter {
-  override get typeRegistryKey() {
-    return "sqlite3" as const;
-  }
   execute(_sql: string) {
     return Promise.resolve([] as Record<string, unknown>[]);
   }
   executeMutation(_sql: string) {
     return Promise.resolve(0);
-  }
-}
-
-class CapturingAdapter extends AbstractAdapter {
-  lastSql = "";
-  lastParams: unknown[] = [];
-  constructor(private readonly dialect: "sqlite3" | "postgresql" | "mysql2") {
-    super();
-  }
-  override get typeRegistryKey() {
-    return this.dialect as any;
-  }
-  execute(sql: string) {
-    this.lastSql = sql;
-    this.lastParams = [];
-    return Promise.resolve([] as Record<string, unknown>[]);
-  }
-  executeMutation(_sql: string) {
-    return Promise.resolve(0);
-  }
-  override internalExecQuery(sql: string, _name?: string | null, binds?: unknown[]) {
-    this.lastSql = sql;
-    this.lastParams = binds ?? [];
-    return Promise.resolve(new Result([], []));
   }
 }
 
@@ -65,8 +39,8 @@ class SqliteCapturingAdapter extends AbstractAdapter {
   get lastSql() {
     return this.allSql.at(-1) ?? "";
   }
-  override get typeRegistryKey() {
-    return "sqlite3" as any;
+  override indexes(tableName: string) {
+    return sqliteIndexes(this as never, tableName);
   }
   execute(sql: string) {
     this.allSql.push(sql);

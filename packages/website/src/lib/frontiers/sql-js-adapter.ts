@@ -8,7 +8,6 @@ import { Collectors, Visitors } from "@blazetrails/arel";
 // implement `ActiveRecord::ConnectionAdapters::AbstractAdapter`.
 export class SqlJsAdapter {
   readonly adapterName = "SQLite";
-  readonly typeRegistryKey = "sqlite3" as const;
 
   /**
    * The `@pool` the CLI hands to `SchemaMigration` / `InternalMetadata`. The

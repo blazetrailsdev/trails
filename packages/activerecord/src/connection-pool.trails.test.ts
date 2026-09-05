@@ -12,7 +12,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { adapterType, rawTestAdapterConfiguration } from "./test-adapter.js";
+import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
@@ -989,12 +989,12 @@ describe("checkout/checkin callbacks", () => {
   it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
     const calls: string[] = [];
     AbstractAdapter.setCallback("checkout", "after", function () {
-      calls.push(this.typeRegistryKey);
+      calls.push(this.adapterName);
     });
     const pool = makeAmbientPool({ pool: 1 });
     try {
-      await pool.checkout();
-      expect(calls).toEqual([adapterNameFromConfig(adapterType)]);
+      const conn = await pool.checkout();
+      expect(calls).toEqual([conn.adapterName]);
     } finally {
       await closePoolConnections(pool);
       (

@@ -55,7 +55,6 @@ let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
 export interface AdapterNameSource {
   connectionDbConfig: () => { adapter?: string } | undefined;
-  _adapter?: { typeRegistryKey?: AdapterName } | null;
 }
 
 _registry.register("big_integer", BigIntegerType, { override: false });
@@ -123,9 +122,6 @@ export function defaultValue(): ValueType {
 }
 
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  const directTypeRegistryKey = model._adapter?.typeRegistryKey;
-  if (directTypeRegistryKey) return directTypeRegistryKey;
-
   let configAdapter: string | undefined;
   try {
     configAdapter = model.connectionDbConfig()?.adapter;
