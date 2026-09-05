@@ -51,7 +51,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
       });
     }
     await rm(dbDir, { recursive: true, force: true });
-    (Base as any)._shardKeys = undefined;
     (Base as any)._defaultShard = undefined;
     (Base as any).connectionClass = undefined;
   });
@@ -523,29 +522,19 @@ describe("ConnectionHandlersShardingDbTest", () => {
       declare shard_key: string;
     }
 
-    const makePool = (owner: string, shard: string) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", owner, { adapter: "sqlite3", database: ":memory:" }),
-        {
-          ownerName: owner,
-          role: "writing",
-          shard,
-        },
-      );
-
     try {
-      makePool("SecondaryBase", "one");
-      makePool("SomeOtherBase", "one");
-      (SecondaryBase as any).connectionClass = true;
-      (SomeOtherBase as any).connectionClass = true;
-      (SecondaryBase as any)._shardKeys = ["one"];
-      (SomeOtherBase as any)._shardKeys = ["one"];
+      SecondaryBase.connectsTo({
+        shards: { one: { writing: { database: ":memory:", adapter: "sqlite3" } } },
+      });
+      SomeOtherBase.connectsTo({
+        shards: { one: { writing: { database: ":memory:", adapter: "sqlite3" } } },
+      });
 
       await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
         await (
           await ShardConnectionTestModel.leaseConnection()
         )
-          // eslint-disable-next-line blazetrails/require-table-teardown
+          // eslint-disable-next-line blazetrails/require-table-teardown -- per-shard :memory: database, discarded by clearAllConnectionsBang() in the finally
           .execute(`CREATE TABLE "shard_connection_test_models" (shard_key VARCHAR (255))`);
         await ShardConnectionTestModel.loadSchema();
         await ShardConnectionTestModel.createBang({ shard_key: "test_model_default" });
@@ -553,7 +542,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         await (
           await ShardConnectionTestModelB.leaseConnection()
         )
-          // eslint-disable-next-line blazetrails/require-table-teardown
+          // eslint-disable-next-line blazetrails/require-table-teardown -- per-shard :memory: database, discarded by clearAllConnectionsBang() in the finally
           .execute(`CREATE TABLE "shard_connection_test_model_bs" (shard_key VARCHAR (255))`);
         await ShardConnectionTestModelB.loadSchema();
         await ShardConnectionTestModelB.createBang({ shard_key: "test_model_b_default" });
@@ -569,8 +558,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
       });
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
-      (SecondaryBase as any).connectionClass = undefined;
-      (SomeOtherBase as any).connectionClass = undefined;
     }
   });
 
@@ -584,22 +571,13 @@ describe("ConnectionHandlersShardingDbTest", () => {
       declare shard_key: string;
     }
 
-    const makePool = (shard: string) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", "SecondaryBase", { adapter: "sqlite3", database: ":memory:" }),
-        {
-          ownerName: "SecondaryBase",
-          role: "writing",
-          shard,
-        },
-      );
-
     try {
-      makePool("default");
-      makePool("one");
-      (SecondaryBase as any).connectionClass = true;
-      (SecondaryBase as any)._shardKeys = ["default", "one"];
-      (SecondaryBase as any)._defaultShard = "default";
+      SecondaryBase.connectsTo({
+        shards: {
+          default: { writing: { database: ":memory:", adapter: "sqlite3" } },
+          one: { writing: { database: ":memory:", adapter: "sqlite3" } },
+        },
+      });
 
       for (const shardName of ["default", "one"]) {
         await Base.connectedTo({ role: "writing", shard: shardName }, async () => {
@@ -627,7 +605,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
       expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeTruthy();
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
-      (SecondaryBase as any).connectionClass = undefined;
     }
   });
 });

@@ -181,30 +181,26 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     config: string | (mysql.PoolOptions & MysqlAdapterOptions) | mysql.Connection,
     deprecatedConfig?: Record<string, unknown> | null,
   ) {
-    super();
-    if (Mysql2Adapter._isDeprecatedRawConnectionArg(config)) {
-      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
-      this._acceptDeprecatedRawConnection(config, deprecatedConfig);
-      this._poolConfig = { flags: ["FOUND_ROWS"] };
-      this._isFakeConnection = true;
-      return;
-    }
-    if (deprecatedConfig != null) {
+    const deprecatedRawConnection = Mysql2Adapter._isDeprecatedRawConnectionArg(config);
+    if (!deprecatedRawConnection && deprecatedConfig != null) {
       throw new ArgumentError(
         "when initializing an Active Record adapter with a config hash, that should be the only argument",
       );
     }
-    if (typeof config === "object" && config !== null) {
-      this._config = { ...(config as Record<string, unknown>) };
+    super(
+      deprecatedRawConnection
+        ? { ...deprecatedConfig }
+        : typeof config === "object" && config !== null
+          ? { ...(config as Record<string, unknown>) }
+          : {},
+    );
+    if (deprecatedRawConnection) {
+      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
+      this._acceptDeprecatedRawConnection(config);
+      this._poolConfig = { flags: ["FOUND_ROWS"] };
+      this._isFakeConnection = true;
+      return;
     }
-    this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
-      Mysql2Adapter.typeCastConfigToBoolean(
-        "preparedStatements" in this._config
-          ? this._config.preparedStatements
-          : this.defaultPreparedStatements(),
-      );
-    this._defaultTimezone = Mysql2Adapter.validateDefaultTimezone(this._config.defaultTimezone);
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
       let uri = config;
@@ -234,9 +230,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (advisoryLocks !== undefined) {
-      this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;
-    }
     this._database =
       mysqlConfig.database ??
       (() => {

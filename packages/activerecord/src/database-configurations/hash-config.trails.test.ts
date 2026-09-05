@@ -26,6 +26,39 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("validate reports a registered adapter whose own path does not resolve", async () => {
+      register("trails_mispathed_adapter", async () => {
+        await import("./no-such-adapter.js" as string);
+        return null as never;
+      });
+      await expect(resolve("trails_mispathed_adapter")).rejects.toThrow(
+        "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+      );
+    });
+
+    it("validate reports a registered adapter whose package does not resolve", async () => {
+      register("trails_unpackaged_adapter", async () => {
+        await import("@blazetrails/no-such-adapter/index.js" as string);
+        return null as never;
+      });
+      await expect(resolve("trails_unpackaged_adapter")).rejects.toThrow(
+        "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+      );
+    });
+
+    it("validate reports a registered adapter whose own dependency does not resolve", async () => {
+      register("trails_depless_adapter", async () => {
+        await import("./hash-config.js");
+        throw Object.assign(
+          new Error("Cannot find package 'mysql2' imported from /adapters/mysql2-adapter.js"),
+          { code: "ERR_MODULE_NOT_FOUND" },
+        );
+      });
+      await expect(resolve("trails_depless_adapter")).rejects.toThrow(
+        "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a package it depends on? Cannot find package 'mysql2'",
+      );
+    });
+
     it("re-registering an adapter clears the recorded load failure", async () => {
       register("trails_refixed_adapter", () => Promise.reject(new Error("boom")));
       const config = new HashConfig("default_env", "primary", {

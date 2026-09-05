@@ -68,8 +68,15 @@ export function quoteString(s: string): string {
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "number" && !Number.isFinite(value)) return `'${String(value)}'`;
-  return abstractQuote.call(this, value);
+  if (typeof value === "number" || value instanceof BigDecimal) {
+    if (value instanceof BigDecimal ? value.isFinite() : Number.isFinite(value)) {
+      return abstractQuote.call(this, value);
+    } else {
+      return `'${toS(value)}'`;
+    }
+  } else {
+    return abstractQuote.call(this, value);
+  }
 }
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {

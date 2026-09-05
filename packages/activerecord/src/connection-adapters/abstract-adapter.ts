@@ -746,14 +746,29 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @missingRailsCall build_statement_pool — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
-   * @missingRailsCall fetch — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
-   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
-   * @missingRailsCall validate_default_timezone — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
+   * @missingRailsCall fetch — PERMANENT
    */
-  constructor() {
+  constructor(config?: unknown) {
     ensureAbstractAdapterMixinsApplied();
-    this._visitor = this.arelVisitor();
+    this._config = (config ?? {}) as Record<string, unknown>;
     this.pool = new NullPool();
+    this._visitor = this.arelVisitor();
+
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
+        "preparedStatements" in this._config
+          ? this._config.preparedStatements
+          : this.defaultPreparedStatements(),
+      );
+
+    this._advisoryLocksEnabled = (
+      this.constructor as typeof AbstractAdapter
+    ).typeCastConfigToBoolean("advisoryLocks" in this._config ? this._config.advisoryLocks : true);
+
+    this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
+      this._config.defaultTimezone,
+    );
   }
 
   protected _visitor!: Visitors.ToSql;
@@ -769,7 +784,7 @@ export class AbstractAdapter implements Quoting {
   protected _rawConnectionDirty = false;
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;
-  protected _advisoryLocksEnabled = true;
+  protected _advisoryLocksEnabled: unknown = true;
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
   _queryCache: Store | null = null;
@@ -1052,22 +1067,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  protected _acceptDeprecatedRawConnection(
-    rawConnection: unknown,
-    config: Record<string, unknown> | null = {},
-  ): void {
+  protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
     this._unconfiguredConnection = rawConnection as AbstractAdapter | null;
-    this._config = { ...config };
-    const configured =
-      "preparedStatements" in this._config
-        ? this._config.preparedStatements
-        : this.defaultPreparedStatements();
-    this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
-      (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(configured);
-    this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
-      this._config.defaultTimezone,
-    );
   }
 
   disconnectBang(): void {
@@ -1577,7 +1578,11 @@ export class AbstractAdapter implements Quoting {
   async dropVirtualTable(_name: string): Promise<void> {}
 
   isAdvisoryLocksEnabled(): boolean {
-    return this.supportsAdvisoryLocks() && this._advisoryLocksEnabled;
+    return (
+      this.supportsAdvisoryLocks() &&
+      this._advisoryLocksEnabled != null &&
+      this._advisoryLocksEnabled !== false
+    );
   }
 
   async getAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {

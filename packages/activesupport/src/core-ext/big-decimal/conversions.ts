@@ -66,6 +66,11 @@ export class BigDecimal {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  isFinite(): boolean {
+    return this.nonFinite === null;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   isInfinite(): number | null {
     if (this.nonFinite !== "Infinity") return null;
     return this.sign === "-" ? -1 : 1;
