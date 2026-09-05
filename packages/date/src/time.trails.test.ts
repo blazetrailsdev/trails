@@ -502,4 +502,24 @@ describe("Time", () => {
     );
     expect(Time.parse("Feb 24 72").xmlschema()).toBe("1972-02-24T00:00:00-05:00");
   });
+
+  it("Time.xmlschema honours the zone the timestamp carries", () => {
+    expect(Time.xmlschema("2011-10-05T22:26:12-04:00").toF()).toBe(1317867972);
+    expect(Time.xmlschema("2011-10-05T22:26:12.5Z").toF()).toBe(1317853572.5);
+  });
+
+  it("Time.xmlschema reads a zoneless timestamp as local", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    expect(Time.xmlschema("2011-10-05T22:26:12").toF()).toBe(1317867972);
+  });
+
+  it("Time.xmlschema raises ArgumentError on a malformed timestamp", () => {
+    expect(() => Time.xmlschema("nope")).toThrow(
+      new ArgumentError('invalid xmlschema format: "nope"'),
+    );
+  });
+
+  it("Time.iso8601 is an alias of Time.xmlschema", () => {
+    expect(Time.iso8601).toBe(Time.xmlschema);
+  });
 });
