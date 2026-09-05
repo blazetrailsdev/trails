@@ -141,12 +141,15 @@ describe("ParametersExpectTest", () => {
   });
 
   it("key: permitted scalar values", () => {
+    /** @noRailsEquivalent PERMANENT */
+    const STDOUT = File.open(thisFile, "r");
+
     let values: unknown[] = ["a", ":a"];
     values = values.concat([0, 1.0, 2n ** 128n, new BigDecimal(1)]);
     values = values.concat([true, false]);
     values = values.concat([Date.today(), Time.now(), DateTime.now()]);
     values = values.concat([
-      File.open(thisFile, "r"),
+      STDOUT,
       new StringIO(),
       new UploadedFile({ tempfile: thisFile }),
       new RackTestUploadedFile(thisFile),
