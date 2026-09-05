@@ -5,7 +5,7 @@ import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
-import { UnknownFormat } from "./metal/exceptions.js";
+import { MissingFile, UnknownFormat } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -59,7 +59,11 @@ import {
   authenticateWithHttpDigest,
   requestHttpDigestAuthentication,
 } from "./metal/http-authentication.js";
-import { sendFileHeadersBang, type SendFileHeadersOptions } from "./metal/data-streaming.js";
+import {
+  sendFileHeadersBang,
+  type SendDataOptions,
+  type SendFileOptions,
+} from "./metal/data-streaming.js";
 import { statusCode } from "@blazetrails/rack";
 import {
   Options as ParamsWrapperOptions,
@@ -764,26 +768,27 @@ export class Base extends Metal {
   /** @internal */
   declare haltedCallbackHook: typeof haltedCallbackHook;
 
-  sendFile(path: string, options: SendFileHeadersOptions = {}): void {
-    const content = Buffer.from(
-      File.open(path, "rb", (file) => file.read()),
-      "latin1",
-    );
-    const filename = options.filename ?? File.basename(path);
+  sendFile(path: string, options: SendFileOptions = {}): void {
+    if (!(File.isFile(path) && File.isReadable(path))) {
+      throw new MissingFile(`Cannot read file ${path}`);
+    }
 
-    this.sendFileHeadersBang({ ...options, filename });
-    this.body = content.toString();
-    this.setHeader("content-length", String(content.length));
-    this.markPerformed();
+    if (!options.urlBasedFilename) options.filename ??= File.basename(path);
+    this.sendFileHeadersBang(options);
+
+    this.status = options.status ?? 200;
+    if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
+    this.response.sendFile(path);
   }
 
-  sendData(data: string | Buffer, options: SendFileHeadersOptions = {}): void {
-    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-
+  /** @missingRailsCall merge — PERMANENT */
+  sendData(data: string | Buffer, options: SendDataOptions = {}): void {
     this.sendFileHeadersBang(options);
-    this.body = buf.toString();
-    this.setHeader("content-length", String(buf.length));
-    this.markPerformed();
+    this.render({
+      status: options.status,
+      contentType: options.contentType,
+      body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
+    });
   }
 
   get cookies(): Record<string, string> {

@@ -345,8 +345,8 @@ export class Metal extends AbstractController {
     return typeof body === "string" ? body : (body?.toString() ?? "");
   }
 
-  isPerformed(): boolean {
-    return this.performed || (this.response?.committed ?? false);
+  override get performed(): boolean {
+    return super.performed || (this.response?.committed ?? false);
   }
 
   toRackResponse(): RackResponse {

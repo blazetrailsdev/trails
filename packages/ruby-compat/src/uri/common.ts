@@ -23,6 +23,18 @@ export const RFC3986_PARSER = new RFC3986Parser();
 export const RFC2396_PARSER = new RFC2396Parser();
 
 /**
+ * `URI::DEFAULT_PARSER` (`vendor/ruby/lib/uri/common.rb:26`), `URI::Parser.new`
+ * — `Parser` is `RFC2396_Parser` (`common.rb:19`) — and the parser
+ * `URI::Generic#initialize` defaults to (`generic.rb:174`). MRI's `const_set`
+ * loop copying its tables onto `URI` (`common.rb:27-34`) has no port: nothing
+ * here reads `URI::ABS_URI`, and the tables hang off the parser.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::DEFAULT_PARSER`
+ * (`vendor/ruby/lib/uri/common.rb:26`) ships with the interpreter.
+ */
+export const DEFAULT_PARSER = new RFC2396Parser();
+
+/**
  * `URI::Error` (`vendor/ruby/lib/uri/common.rb:140`), the base class of every
  * URI exception. It extends `globalThis.Error` rather than a bare `Error`
  * because the class's own binding shadows the global inside its own heritage
@@ -76,7 +88,9 @@ export class BadURIError extends Error {
 
 /** The `URI::Generic` initializer every registered scheme class answers to
  *  (`vendor/ruby/lib/uri/generic.rb:169`). */
-export type GenericClass = new (...args: [...SplitComponents, RFC3986Parser?]) => Generic;
+export type GenericClass = new (
+  ...args: [...SplitComponents, (RFC2396Parser | RFC3986Parser)?]
+) => Generic;
 
 /** `URI::Schemes` (`vendor/ruby/lib/uri/common.rb:69`), the namespace
  *  `register_scheme` sets a constant on. A Map here: a JS module has no

@@ -43,6 +43,10 @@ export class Buffer {
     this._buf = this.buildQueue((this.constructor as typeof Buffer).queueSize);
   }
 
+  get body(): string {
+    return this._buf.join("");
+  }
+
   write(string: string): void {
     if (this._closed) throw new Error("closed stream");
 
@@ -170,7 +174,7 @@ export class Response extends DispatchResponse {
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     super(status, headers, body);
-    this.stream = new Buffer(this);
+    this.stream = this.buildBuffer(this, body);
   }
 
   close(): void {

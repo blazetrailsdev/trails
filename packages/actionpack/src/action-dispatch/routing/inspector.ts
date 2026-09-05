@@ -1,6 +1,7 @@
 import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import { RFC2396_PARSER, rbInspect } from "@blazetrails/ruby-compat";
+import type { Endpoint } from "./endpoint.js";
 import type { Route } from "./route.js";
 
 export interface InspectedRoute {
@@ -45,6 +46,10 @@ export class RouteWrapper {
     this.route = route;
   }
 
+  get app(): Endpoint {
+    return this.route.app!;
+  }
+
   /** @internal */
   isMatchesFilter(filter: string, value: RegExp | string): boolean {
     if (filter === "exact_path_match") {
@@ -57,16 +62,14 @@ export class RouteWrapper {
     return typeof target === "string" && re.test(target);
   }
 
-  /** @missingRailsCall app — CONVERGEABLE converge-routewrapper-endpoint-to-app-dispatcher */
   get endpoint(): string {
-    if (this.route.isRedirect) {
-      const t = this.route.redirectTarget;
-      if (typeof t === "string") return `redirect(301, ${t})`;
-      if (typeof t === "function") return "Inline handler (Proc/Lambda)";
-      if (t) return `redirect(${t.status ?? 301})`;
+    if (this.app.dispatcher()) {
+      return `${this.controller}#${this.action}`;
+    } else if (typeof this.rackApp === "function") {
+      return "Inline handler (Proc/Lambda)";
+    } else {
+      return rbInspect(this.rackApp);
     }
-    if (!this.route.controller && !this.route.action) return "";
-    return `${this.controller}#${this.action}`;
   }
 
   get constraints(): Record<string, unknown> {
@@ -83,9 +86,8 @@ export class RouteWrapper {
     return out;
   }
 
-  /** @internal */
   get rackApp(): unknown {
-    return undefined;
+    return this.app.rackApp();
   }
 
   get path(): string {
@@ -97,7 +99,7 @@ export class RouteWrapper {
     return this.route.name ?? "";
   }
   get verb(): string {
-    return this.route.verb;
+    return this.route.verb === "ALL" ? "" : this.route.verb;
   }
   get controller(): string {
     return this.route.pathParamNames.includes("controller")
@@ -124,9 +126,8 @@ export class RouteWrapper {
     return this.route.internal;
   }
 
-  /** @internal */
   isEngine(): boolean {
-    return false;
+    return this.app.engine();
   }
 
   /** @internal */

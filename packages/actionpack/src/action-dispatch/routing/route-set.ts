@@ -500,7 +500,7 @@ export class RouteSet {
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
   /** @internal */
-  private readonly _routeApps = new WeakMap<Route, RoutableApp>();
+  private readonly _routeApps = new WeakMap<Route, Endpoint>();
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     this._config = { ...config };
@@ -692,6 +692,7 @@ export class RouteSet {
     if (name && !ROUTE_NAME_RE.test(name)) {
       throw new Error(`Invalid route name: '${name}'`);
     }
+    mapping.app = this._app(mapping);
     this.routes.push(mapping);
     if (name) this.namedRoutes.add(name, mapping);
     this._urlHelpersWithPaths = undefined;
@@ -811,7 +812,9 @@ export class RouteSet {
 
   get journeyRouter(): JourneyRouter {
     if (!this._journeyRouter) {
-      this._journeyRouter = buildJourneyRouter(this.routes, { app: (r) => this._app(r) });
+      this._journeyRouter = buildJourneyRouter(this.routes, {
+        app: (r) => this._app(r) as unknown as RoutableApp,
+      });
     }
     return this._journeyRouter;
   }
@@ -821,15 +824,15 @@ export class RouteSet {
   }
 
   /** @internal */
-  private _app(route: Route): RoutableApp {
+  private _app(route: Route): Endpoint {
     let app = this._routeApps.get(route);
     if (!app) {
-      const to = route.app ?? route.redirectEndpoint;
+      const to = route.to ?? route.redirectEndpoint;
       if (to !== undefined) {
-        app = new Constraints(to, [], Constraints.CALL) as unknown as RoutableApp;
+        app = new Constraints(to, [], Constraints.CALL);
       } else {
         const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
-        app = new Dispatcher(raiseOnNameError) as unknown as RoutableApp;
+        app = new Dispatcher(raiseOnNameError);
       }
       this._routeApps.set(route, app);
     }

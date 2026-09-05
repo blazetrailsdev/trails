@@ -236,11 +236,12 @@ export class Response {
   }
 
   get body(): string {
-    return this._body.join("");
+    return (this._ensureStream() as { body: string }).body;
   }
 
   set body(value: string) {
     this._body = [value];
+    this.stream = null;
     this.setHeader("content-length", String(Buffer.byteLength(value, "utf-8")));
   }
 
@@ -255,6 +256,7 @@ export class Response {
       throw new Error("Response already committed");
     }
     this._body.push(data);
+    this.stream = null;
   }
 
   close(): void {
