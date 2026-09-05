@@ -10,10 +10,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import type {
-  AdapterName,
-  AbstractAdapter as DatabaseAdapter,
-} from "./connection-adapters/abstract-adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
@@ -51,9 +48,6 @@ function makePool(size: number = 5): ConnectionPool {
 }
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  override get typeRegistryKey(): AdapterName {
-    return "sqlite3";
-  }
   constructor() {
     super();
     this._connection = this;
@@ -568,13 +562,10 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
   const proxy = (
     pool as unknown as {
       _getAdapterProxy(): {
-        typeRegistryKey: string;
         quoteTableName(name: string): Promise<string>;
       };
     }
   )._getAdapterProxy();
-
-  expect(typeof proxy.typeRegistryKey).toBe("string");
 
   const quoted = await proxy.quoteTableName("people");
   expect(quoted).toContain("people");

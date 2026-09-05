@@ -3,7 +3,6 @@ import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
-import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -58,7 +57,7 @@ interface AliasingConnection {
 }
 
 interface CalculationConnection {
-  typeRegistryKey: AdapterName;
+  adapterName: string;
   visitor?: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
@@ -188,7 +187,7 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
 }
 
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return rel._conn().typeRegistryKey === "sqlite3";
+  return rel._conn().adapterName === "SQLite";
 }
 
 function wrapBigintAgg(

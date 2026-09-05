@@ -2,6 +2,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { ActiveRecordError } from "../errors.js";
 import { canonicalForeignKeyDependents } from "./canonical-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
   "schema_migrations",
@@ -73,7 +74,7 @@ async function resetTables(
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
-  switch (adapter.typeRegistryKey) {
+  switch (typeRegistryKeyFor(adapter)) {
     case "postgresql":
       await resetPgTables(adapter, mode, bootLaid);
       break;

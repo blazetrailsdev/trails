@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
@@ -10,6 +9,7 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
+import { typeRegistryKeyFor } from "../support/type-registry-key.js";
 
 registerModel(Post);
 registerModel(Comment);
@@ -202,8 +202,7 @@ describe("SelectTest", () => {
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
     const foo = post.readAttribute("foo");
     expect(Number(foo)).toBe(1.1);
-    const typeRegistryKey = (Post.connection as unknown as { typeRegistryKey: AdapterName })
-      .typeRegistryKey;
+    const typeRegistryKey = typeRegistryKeyFor(Post.connection);
     const expectsBigDecimal = typeRegistryKey === "postgresql" || typeRegistryKey === "mysql2";
     expect(foo instanceof BigDecimal).toBe(expectsBigDecimal);
   });

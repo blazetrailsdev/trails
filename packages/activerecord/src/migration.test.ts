@@ -20,7 +20,7 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapter = (td as any).conn;
-  const typeRegistryKey = adapter.typeRegistryKey;
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
   if (typeRegistryKey === "postgresql") return new PgSchemaCreation(adapter).accept(td);
   if (typeRegistryKey === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
@@ -35,6 +35,7 @@ import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
+import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -300,7 +301,7 @@ describe("MigrationTest", () => {
     expect(byName("my_house_population").precision).toBe(2);
 
     try {
-      const typeRegistryKey = adapter.typeRegistryKey;
+      const typeRegistryKey = typeRegistryKeyFor(adapter);
       const isPgOrSqlite = typeRegistryKey === "postgresql" || typeRegistryKey === "sqlite3";
       class BigNumber extends Base {
         static _tableName = "big_numbers";

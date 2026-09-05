@@ -23,6 +23,7 @@ import {
   serialIdType,
   supportsExpressionIndex,
 } from "./schema-types.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 interface ColOpts {
   limit?: number;
@@ -156,7 +157,9 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-    if (opts.adapters && !opts.adapters.includes(adapter.typeRegistryKey)) continue;
+    const typeRegistryKey = typeRegistryKeyFor(adapter);
+    if (opts.adapters && (typeRegistryKey === null || !opts.adapters.includes(typeRegistryKey)))
+      continue;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
       where: opts.where,
@@ -182,10 +185,11 @@ export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
   const ss = adapter as unknown as SchemaStatements;
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
   const typeMap =
-    adapter.typeRegistryKey === "postgresql"
+    typeRegistryKey === "postgresql"
       ? COLUMN_TYPE_MAP_PG
-      : adapter.typeRegistryKey === "mysql2"
+      : typeRegistryKey === "mysql2"
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
   return { ss, typeMap };
@@ -204,9 +208,15 @@ export async function runTable(
   } else if (meta.id === false || meta.serialPk !== undefined) {
     createOpts.id = false;
   }
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
+  if (typeRegistryKey === null) {
+    throw new ActiveRecordError(
+      `Cannot lay the canonical schema on adapter '${adapter.adapterName}' — it is none of the three trails ports.`,
+    );
+  }
   let builder!: TableBuilder;
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
-    builder = new TableBuilder(t, adapter.typeRegistryKey, typeMap, meta.serialPk ?? null);
+    builder = new TableBuilder(t, typeRegistryKey, typeMap, meta.serialPk ?? null);
     fn(builder);
   });
 

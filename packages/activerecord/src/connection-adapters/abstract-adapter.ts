@@ -998,14 +998,6 @@ export class AbstractAdapter implements Quoting {
     return (this.constructor as typeof AbstractAdapter).ADAPTER_NAME;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
-   */
-  get typeRegistryKey(): AdapterName {
-    return adapterNameFromConfig(this.pool.dbConfig.adapter ?? undefined);
-  }
-
   isConnected(): boolean {
     return this._connection !== null;
   }

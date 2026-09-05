@@ -405,7 +405,7 @@ async function canonicalIndexes(
     addIndex(table: string, columns: string | string[], options: AddIndexOptions): Promise<void>;
   };
   const fakeAdapter = {
-    typeRegistryKey: adapter,
+    adapterName: adapter,
     supportsExpressionIndex: () => supportsExpressionIndex,
     getDatabaseVersion: async () => {},
   } as unknown as AbstractAdapter;

@@ -48,7 +48,6 @@ import {
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect, rubyInspectHash } from "../../relation/ruby-inspect.js";
-import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import {
   globalPluralizeTableNames,
   globalTableNamePrefix,
@@ -169,7 +168,6 @@ export interface SchemaStatements
       | "supportsIndexSortOrder"
       | "supportsIndexesInCreate"
       | "tableAliasLength"
-      | "typeRegistryKey"
       | "visitor"
     >,
     SchemaQuoter {}
@@ -389,13 +387,9 @@ export class SchemaStatements {
 
     const indexName = await this.indexNameForRemove(tableName, column, options);
 
-    if (this.typeRegistryKey === "mysql2") {
-      await this.execute(
-        `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteColumnName(tableName)}`,
-      );
-    } else {
-      await this.execute(`DROP INDEX ${this.quoteColumnName(indexName)}`);
-    }
+    await this.execute(
+      `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteTableName(tableName)}`,
+    );
   }
 
   async changeColumn(
@@ -809,92 +803,9 @@ export class SchemaStatements {
     );
   }
 
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    switch (this.typeRegistryKey) {
-      case "sqlite3":
-        return sqliteIndexes(this as unknown as DatabaseAdapter, tableName);
-      case "postgresql": {
-        const rows = (
-          await this.internalExecQuery(
-            `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
-                  bool_or(ix.indexprs IS NOT NULL) AS has_expressions,
-                  pg_get_indexdef(i.oid) AS definition
-           FROM pg_index ix
-           JOIN pg_class t ON t.oid = ix.indrelid
-           JOIN pg_class i ON i.oid = ix.indexrelid
-           JOIN pg_namespace n ON n.oid = t.relnamespace
-           JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, n) ON true
-           LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
-           WHERE t.relname = '${tableName}' AND n.nspname = 'public' AND NOT ix.indisprimary
-           GROUP BY i.relname, ix.indisunique, i.oid`,
-            "SCHEMA",
-          )
-        ).toArray();
-        return rows.map((row: any) => {
-          const def = (row.definition as string) ?? "";
-          const defMatch = def.match(
-            / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
-          );
-          const expressions = defMatch?.[1] ?? "";
-          const where = defMatch?.[4]?.trim();
-          const hasExpressions = row.has_expressions === true;
-          const columns: string | string[] = hasExpressions
-            ? expressions
-            : Array.isArray(row.columns)
-              ? row.columns
-              : [row.columns];
-          const ordersMap: Record<string, string> = {};
-          const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-          if (!hasExpressions) {
-            for (const [, column, , desc, nulls] of expressions.matchAll(COL_RE)) {
-              if (nulls) {
-                ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
-              } else if (desc) {
-                ordersMap[column] = "desc";
-              }
-            }
-          }
-          return new IndexDefinition(tableName, row.name, row.unique === true, columns, {
-            where,
-            orders: ordersMap,
-          });
-        });
-      }
-      case "mysql2": {
-        const rows = (
-          await this.internalExecQuery(
-            `SHOW INDEX FROM ${this.quoteTableName(tableName)} WHERE Key_name != 'PRIMARY'`,
-            "SCHEMA",
-          )
-        ).toArray();
-        const indexMap = new Map<
-          string,
-          { unique: boolean; seqs: [number, string, string | null][] }
-        >();
-        for (const row of rows as any[]) {
-          const name = row.Key_name;
-          if (!indexMap.has(name)) {
-            indexMap.set(name, { unique: row.Non_unique === 0, seqs: [] });
-          }
-          indexMap
-            .get(name)!
-            .seqs.push([row.Seq_in_index, row.Column_name, row.Collation ?? row.COLLATION ?? null]);
-        }
-        return Array.from(indexMap.entries())
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, info]) => {
-            info.seqs.sort((a, b) => a[0] - b[0]);
-            const columns = info.seqs.map((s) => s[1]);
-            const ordersMap: Record<string, string> = {};
-            for (const [, column, collation] of info.seqs) {
-              if (collation === "D") ordersMap[column] = "desc";
-            }
-            return new IndexDefinition(tableName, name, info.unique, columns, {
-              orders: ordersMap,
-            });
-          });
-      }
-    }
+  async indexes(_tableName: string): Promise<IndexDefinition[]> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:81
+    throw new NotImplementedError("#indexes is not implemented");
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {

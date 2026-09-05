@@ -21,6 +21,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
+import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
@@ -762,7 +763,7 @@ describe("QueryCacheMutableParamTest", () => {
   registerModel(JsonObj);
 
   beforeEach(async () => {
-    const columnType = Base.connection.typeRegistryKey === "postgresql" ? "jsonb" : "json";
+    const columnType = typeRegistryKeyFor(Base.connection) === "postgresql" ? "jsonb" : "json";
     await Base.connection.createTable("json_objs", { force: true }, (t) => {
       (t as unknown as { column(name: string, type: string): void }).column("payload", columnType);
     });

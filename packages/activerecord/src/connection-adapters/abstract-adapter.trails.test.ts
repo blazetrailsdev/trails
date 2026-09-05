@@ -326,9 +326,6 @@ describe("DatabaseStatements#insert id extraction", () => {
 describe("per-adapter visitor isolation", () => {
   class SqliteAdapter extends AbstractAdapter {
     static override readonly ADAPTER_NAME = "SQLite";
-    override get typeRegistryKey() {
-      return "sqlite3" as const;
-    }
     override arelVisitor() {
       return new Visitors.SQLite(this);
     }
@@ -336,9 +333,6 @@ describe("per-adapter visitor isolation", () => {
 
   class MysqlAdapter extends AbstractAdapter {
     static override readonly ADAPTER_NAME = "MySQL";
-    override get typeRegistryKey() {
-      return "mysql2" as const;
-    }
     override arelVisitor() {
       return new Visitors.MySQL(this);
     }
@@ -413,7 +407,6 @@ describe("AbstractAdapter#adapterName", () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.adapterName).toBe("SQLite");
-      expect(adapter.typeRegistryKey).toBe("sqlite3");
     } finally {
       adapter.disconnectBang();
     }

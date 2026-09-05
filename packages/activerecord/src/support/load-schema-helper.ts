@@ -8,6 +8,7 @@ import { ActiveRecordError } from "../errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export async function createTestExclusionConstraintsTable(
   adapter: PostgreSQLAdapter,
@@ -475,7 +476,9 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
 }
 
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
-  const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.typeRegistryKey];
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
+  if (typeRegistryKey === null) return;
+  const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[typeRegistryKey];
   if (adapterSpecificSchema) {
     noteAdapterSpecificSchemaLoaded();
     await adapterSpecificSchema(adapter);
