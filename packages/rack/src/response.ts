@@ -13,6 +13,10 @@ import * as MediaTypeModule from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
 import { include } from "@blazetrails/ruby-compat";
 
+function downcaseKey(key: string): string {
+  return key.toLowerCase();
+}
+
 export abstract class Helpers {
   declare status: number;
   declare headers: Record<string, any>;
@@ -358,21 +362,21 @@ export class Response {
 
   hasHeader(key: string | null): boolean {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    return hasKey(this.headers, key);
+    return hasKey(this.headers, downcaseKey(key));
   }
   getHeader(key: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    return this.headers[key];
+    return this.headers[downcaseKey(key)];
   }
   setHeader(key: string | null, value: any): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    this.headers[key] = value;
+    this.headers[downcaseKey(key)] = value;
     return value;
   }
   deleteHeader(key: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    const val = this.headers[key];
-    delete this.headers[key];
+    const val = this.headers[downcaseKey(key)];
+    delete this.headers[downcaseKey(key)];
     return val ?? null;
   }
 }

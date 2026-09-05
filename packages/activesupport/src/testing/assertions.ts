@@ -446,5 +446,9 @@ function deepEqual(a: unknown, b: unknown): boolean {
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (value === null || value === undefined) return "nil";
-  return String(value);
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value) ?? Object.prototype.toString.call(value);
+  }
 }
