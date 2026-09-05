@@ -228,6 +228,12 @@ describe("File.fnmatch", () => {
     ["[ab]", "B", File.FNM_CASEFOLD, true],
     ["[b]", "B", File.FNM_CASEFOLD, false],
     ["app/views/*/*.tse", "app/views/users/index.tse", 0, true],
+    ["?", "\u{1F600}", 0, true],
+    ["[\u{1F600}]", "\u{1F600}", 0, true],
+    ["*\u{1F600}", "ab\u{1F600}", 0, true],
+    ["a?c", "a\u{1F600}c", 0, true],
+    ["[\u{1F600}-\u{1F602}]", "\u{1F601}", 0, true],
+    ["\u{1F600}*", "\u{1F600}bc", 0, true],
   ];
 
   cases.forEach(([pattern, path, flags, matches]) => {

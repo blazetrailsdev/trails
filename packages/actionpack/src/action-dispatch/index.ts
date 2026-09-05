@@ -58,7 +58,7 @@ export {
 } from "./middleware/host-authorization.js";
 export {
   MiddlewareStack,
-  type MiddlewareEntry,
+  Middleware,
   type RackApp,
   type RackAppObject,
 } from "./middleware/stack.js";

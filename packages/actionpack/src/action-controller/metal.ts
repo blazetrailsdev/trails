@@ -5,9 +5,11 @@ import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import { underscore } from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
-  type MiddlewareEntry,
+  Middleware as AbstractMiddleware,
+  type MiddlewareFactory,
   type RackApp,
   type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
@@ -30,38 +32,52 @@ import {
 export class MiddlewareStack extends AbstractMiddlewareStack {
   /** @internal */
   buildMiddleware(
-    klass: MiddlewareEntry["klass"],
+    klass: MiddlewareFactory,
     args: unknown[],
     block?: (app: RackApp) => RackApp,
-  ): MiddlewareEntry {
-    const middleware = Metal.buildMiddleware(klass, args);
-    return { klass: middleware.klass, args: middleware.args, block, valid: middleware.valid };
+  ): Middleware {
+    return Metal.buildMiddleware(klass, args, block);
   }
 
   build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
     if (typeof action !== "string") return super.build(action);
     let current: RackApp =
       typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
-    const middlewares = this.middlewares;
+    const middlewares = this.middlewares as Middleware[];
     for (let i = middlewares.length - 1; i >= 0; i--) {
       const middleware = middlewares[i];
-      if (middleware.valid && !middleware.valid(action)) continue;
-      const mw = new middleware.klass(current, ...middleware.args);
-      current = (env: RackEnv) => mw.call(env);
+      current = middleware.valid(action) ? middleware.build(current) : current;
     }
     return current;
   }
 }
 
-export class Middleware {
-  readonly klass: MiddlewareEntry["klass"];
-  readonly args: unknown[];
+export class Middleware extends AbstractMiddleware {
+  private actions: string[] | null;
+  private strategy: Strategy;
 
-  constructor(klass: MiddlewareEntry["klass"], args: unknown[] = []) {
-    this.klass = klass;
-    this.args = args;
+  constructor(
+    klass: MiddlewareFactory,
+    args: unknown[],
+    actions: string[] | null,
+    strategy: Strategy,
+    block?: (app: RackApp) => RackApp,
+  ) {
+    super(klass, args, block);
+    this.actions = actions;
+    this.strategy = strategy;
+  }
+
+  valid(action: string): boolean {
+    return this.strategy(this.actions, action);
   }
 }
+
+type Strategy = (list: string[] | null, action: string) => boolean;
+
+const INCLUDE: Strategy = (list, action) => (list ?? []).includes(action);
+const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
+const NULL: Strategy = () => true;
 
 const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 
@@ -131,7 +147,7 @@ export class Metal extends AbstractController {
   }
 
   static use(...args: unknown[]): void {
-    this.middleware().use(args[0] as MiddlewareEntry["klass"], ...(args.slice(1) as any));
+    this.middleware().use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
   static action(this: typeof Metal, name: string): RackApp {
@@ -247,7 +263,7 @@ export class Metal extends AbstractController {
 
   head(status: number | string | null, options?: Record<string, unknown>): true {
     if (status !== null && typeof status === "object") {
-      throw new Error(`${JSON.stringify(status)} is not a valid value for \`status\`.`);
+      throw new Error(`${rbInspect(status)} is not a valid value for \`status\`.`);
     }
     const resolvedStatus = status ?? "ok";
     let location: unknown;
@@ -319,10 +335,10 @@ export class Metal extends AbstractController {
 
   /** @internal */
   static buildMiddleware(
-    klass: MiddlewareEntry["klass"],
+    klass: MiddlewareFactory,
     args: unknown[],
-    _block?: unknown,
-  ): Middleware & { valid(action: string): boolean } {
+    block?: (app: RackApp) => RackApp,
+  ): Middleware {
     const next = [...args];
     const last = next[next.length - 1];
     const options: Record<string, unknown> =
@@ -335,20 +351,16 @@ export class Metal extends AbstractController {
     delete options.except;
     if (Object.keys(options).length > 0) next.push(options);
 
-    let strategy: (list: string[] | null, action: string) => boolean = () => true;
+    let strategy: Strategy = NULL;
     let list: string[] | null = null;
     if (only.length > 0) {
-      strategy = (l, a) => (l ?? []).includes(a);
+      strategy = INCLUDE;
       list = only;
     } else if (except.length > 0) {
-      strategy = (l, a) => !(l ?? []).includes(a);
+      strategy = EXCLUDE;
       list = except;
     }
-    const wrapped = new Middleware(klass, next) as Middleware & {
-      valid(action: string): boolean;
-    };
-    wrapped.valid = (action: string) => strategy(list, action);
-    return wrapped;
+    return new Middleware(klass, next, list, strategy, block);
   }
 
   /** @internal */

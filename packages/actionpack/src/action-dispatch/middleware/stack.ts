@@ -6,28 +6,39 @@ export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 export interface RackAppObject {
   call(env: RackEnv): Promise<RackResponse>;
 }
-type MiddlewareFactory = new (
+export type MiddlewareFactory = new (
   app: RackApp,
   ...args: any[]
 ) => { call(env: RackEnv): Promise<RackResponse> };
 
-export interface MiddlewareEntry {
-  klass: MiddlewareFactory;
-  args: unknown[];
-  block?: (app: RackApp) => RackApp;
-  valid?(action: string): boolean;
+export class Middleware {
+  constructor(
+    readonly klass: MiddlewareFactory,
+    readonly args: unknown[],
+    readonly block?: (app: RackApp) => RackApp,
+  ) {}
+
+  inspect(): string {
+    return this.klass.name;
+  }
+
+  build(app: RackApp): RackApp {
+    if (this.block) return this.block(app);
+    const mw = new this.klass(app, ...this.args);
+    return (env: RackEnv) => mw.call(env);
+  }
 }
 
-export class MiddlewareStack implements Iterable<MiddlewareEntry> {
-  private entries: MiddlewareEntry[] = [];
+export class MiddlewareStack implements Iterable<Middleware> {
+  private entries: Middleware[] = [];
 
   constructor() {}
 
-  get middlewares(): MiddlewareEntry[] {
+  get middlewares(): Middleware[] {
     return this.entries;
   }
 
-  set middlewares(value: MiddlewareEntry[]) {
+  set middlewares(value: Middleware[]) {
     this.entries = value;
   }
 
@@ -49,11 +60,11 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return this.entries.length > 0;
   }
 
-  each(callback: (entry: MiddlewareEntry) => void): void {
+  each(callback: (entry: Middleware) => void): void {
     for (const entry of this.entries) callback(entry);
   }
 
-  last(): MiddlewareEntry | undefined {
+  last(): Middleware | undefined {
     return this.entries[this.entries.length - 1];
   }
 
@@ -146,29 +157,23 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return this.findIndex(klass) !== -1;
   }
 
-  get(index: number): MiddlewareEntry | undefined {
+  get(index: number): Middleware | undefined {
     return this.entries[index];
   }
 
-  toArray(): MiddlewareEntry[] {
+  toArray(): Middleware[] {
     return [...this.entries];
   }
 
   /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): Iterator<MiddlewareEntry> {
+  [Symbol.iterator](): Iterator<Middleware> {
     return this.entries[Symbol.iterator]();
   }
 
   build(app: RackApp | RackAppObject): RackApp {
     let current: RackApp = typeof app === "function" ? app : (env: RackEnv) => app.call(env);
     for (let i = this.entries.length - 1; i >= 0; i--) {
-      const entry = this.entries[i];
-      if (entry.block) {
-        current = entry.block(current);
-      } else {
-        const mw = new entry.klass(current, ...entry.args);
-        current = (env: RackEnv) => mw.call(env);
-      }
+      current = this.entries[i].build(current);
     }
     return current;
   }
@@ -193,8 +198,8 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     klass: MiddlewareFactory,
     args: unknown[],
     block?: (app: RackApp) => RackApp,
-  ): MiddlewareEntry {
-    return { klass, args, block };
+  ): Middleware {
+    return new Middleware(klass, args, block);
   }
 
   /** @internal */

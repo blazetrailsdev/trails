@@ -58,6 +58,10 @@ function range(r: { start: Temporal.Instant; end: Temporal.Instant }): Temporal.
   return [toDate(asDate(r.start)), toDate(asDate(r.end))];
 }
 
+function rubyRange(r: { begin: unknown; end: unknown }): Temporal.PlainDate[] {
+  return [toDate(asDate(r.begin as Temporal.Instant)), toDate(asDate(r.end as Temporal.Instant))];
+}
+
 describe("DateExtBehaviorTest", () => {
   it("date acts like date", () => {
     assertPredicate(RubyDate.parse("2005-02-21"), (date) => ObjectExt.actsLike(date, "date"));
@@ -301,8 +305,8 @@ describe("DateExtCalculationsTest", () => {
   it.skip("all day when zone is set");
 
   it("all week", () => {
-    expect(range(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
-    expect(range(allWeek(d(2011, 6, 7), "sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
+    expect(rubyRange(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
+    expect(rubyRange(allWeek(d(2011, 6, 7), "sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
   });
 
   it("all month", () => {

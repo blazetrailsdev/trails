@@ -1,5 +1,6 @@
 import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment, rackEscape } from "../journey/router/utils.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
@@ -73,7 +74,7 @@ function normalizeProtocol(protocol: string | false | null | undefined): string 
     const m = protocol.match(PROTOCOL_REGEXP);
     if (m) return `${m[1]}://`;
   }
-  throw new Error(`Invalid :protocol option: ${JSON.stringify(protocol)}`);
+  throw new Error(`Invalid :protocol option: ${rbInspect(protocol)}`);
 }
 
 /** @internal */

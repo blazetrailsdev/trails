@@ -338,9 +338,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all_week", () => {
-    const { start, end } = allWeek(d(2023, 1, 11));
-    expect(asDate(start).getDay()).toBe(1);
-    expect(asDate(end).getDay()).toBe(0);
+    const { begin, end } = allWeek(d(2023, 1, 11));
+    expect(asDate(begin as Temporal.Instant).getDay()).toBe(1);
+    expect(asDate(end as Temporal.Instant).getDay()).toBe(0);
   });
 
   it("all_month", () => {
@@ -906,9 +906,9 @@ describe("DateExtCalculationsTest", () => {
 
   it("all week", () => {
     const date = d(2005, 2, 21);
-    const { start, end } = allWeek(date);
-    expect(asDate(start).getDay()).toBe(1);
-    expect(asDate(end).getDay()).toBe(0);
+    const { begin, end } = allWeek(date);
+    expect(asDate(begin as Temporal.Instant).getDay()).toBe(1);
+    expect(asDate(end as Temporal.Instant).getDay()).toBe(0);
   });
 
   it("all month", () => {

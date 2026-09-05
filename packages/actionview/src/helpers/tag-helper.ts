@@ -11,7 +11,7 @@ import {
   toSentence as _toSentence,
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
@@ -109,7 +109,7 @@ const METHOD_TO_TAG_NAME: Record<string, string> = {
 /** @internal */
 function ensureValidHtml5TagName(name: string): void {
   if (!/^[a-zA-Z][a-zA-Z0-9\-:.]*$/.test(name)) {
-    throw new ArgumentError(`Invalid HTML5 tag name: ${JSON.stringify(name)}`);
+    throw new ArgumentError(`Invalid HTML5 tag name: ${rbInspect(name)}`);
   }
 }
 
