@@ -1,4 +1,4 @@
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { ArgumentError, OpenSSL, rbObjClass } from "@blazetrails/ruby-compat";
 import type { Metal } from "../metal.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 
@@ -125,10 +125,12 @@ export function httpBasicAuthenticateWith(
   options: { name: string; password: string; realm?: string | null; [filter: string]: unknown },
 ): void {
   if (typeof options.name !== "string") {
-    throw new TypeError(`Expected name: to be a String, got ${typeof options.name}`);
+    throw new ArgumentError(`Expected name: to be a String, got ${rbObjClass(options.name)}`);
   }
   if (typeof options.password !== "string") {
-    throw new TypeError(`Expected password: to be a String, got ${typeof options.password}`);
+    throw new ArgumentError(
+      `Expected password: to be a String, got ${rbObjClass(options.password)}`,
+    );
   }
   const { name, password, realm = null, ...rest } = options;
   this.beforeAction(function (controller) {

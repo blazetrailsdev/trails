@@ -213,7 +213,7 @@ export class Session {
     }
 
     const nextLocation = URI.parse(this.lastRequest().url).merge(
-      URI.parse(String(this.lastResponse().getHeader("Location"))),
+      URI.parse(this.lastResponse().getHeader("Location")),
     );
 
     return this.customRequest(requestMethod, nextLocation.toString(), params, {

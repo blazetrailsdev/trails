@@ -767,7 +767,7 @@ describe("Rack::Test::Session#restore_state", () => {
     session.afterRequest(() => afterRequest.push(1));
 
     await session.get("/");
-    const request_ = lastRequest();
+    const request = lastRequest();
     const response = lastResponse();
     expect(session.cookieJar.get("simple")).toBeUndefined();
     expect(afterRequest).toEqual([1]);
@@ -777,12 +777,12 @@ describe("Rack::Test::Session#restore_state", () => {
       await session.get("/cookies/set-simple?value=foo");
       expect(session.cookieJar.get("simple")).toBe("foo");
 
-      expect(lastRequest()).not.toBe(request_);
+      expect(lastRequest()).not.toBe(request);
       expect(lastResponse()).not.toBe(response);
       expect(afterRequest).toEqual([1, 1, 2]);
     });
 
-    expect(lastRequest()).toBe(request_);
+    expect(lastRequest()).toBe(request);
     expect(lastResponse()).toBe(response);
     expect(session.cookieJar.get("simple")).toBeUndefined();
 
