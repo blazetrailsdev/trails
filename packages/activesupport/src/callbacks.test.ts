@@ -1898,7 +1898,7 @@ describe("Callbacks — async propagation", () => {
 });
 
 describe("CallbackObject dispatch", () => {
-  const callbackObject = <T extends object>(methods: T): T =>
+  const callbackObject = <T extends object>(methods: T & ThisType<T>): T =>
     Object.assign(new (class CallbackObject {})(), methods);
   it("before — calls the object's before method", () => {
     const target = { log: [] as string[] };
@@ -1955,7 +1955,7 @@ describe("CallbackObject dispatch", () => {
     const obj = callbackObject({
       label: "my-obj",
       before(t: typeof target) {
-        t.log.push(obj.label);
+        t.log.push(this.label);
       },
     });
     setCallback(target, "save", "before", obj);
@@ -1969,9 +1969,9 @@ describe("CallbackObject dispatch", () => {
     const obj = callbackObject({
       label: "around-obj",
       around(t: typeof target, next: () => void) {
-        t.log.push(`${obj.label}-pre`);
+        t.log.push(`${this.label}-pre`);
         next();
-        t.log.push(`${obj.label}-post`);
+        t.log.push(`${this.label}-post`);
       },
     });
     setCallback(target, "save", "around", obj);
