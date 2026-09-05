@@ -6,8 +6,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Base } from "./base.js";
 import { ActiveRecord } from "./ar-config.js";
 import { FixtureError, StatementInvalid } from "./errors.js";
-
-export { FixtureError };
 import { findStiClass } from "./inheritance.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
@@ -25,6 +23,8 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { defaultValue, type ValueType } from "@blazetrails/activemodel";
+
+export { FixtureError };
 
 /** @internal */
 export class FixtureSetPrimaryKeyError extends Error {

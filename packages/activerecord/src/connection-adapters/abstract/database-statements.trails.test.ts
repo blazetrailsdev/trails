@@ -981,7 +981,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
   type FixtureHost = DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
-      supportsVirtualColumns?: boolean;
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
     };
 
@@ -1108,9 +1108,16 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
 
     it("rejects virtual columns when the adapter supports them", async () => {
       const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
-      host.supportsVirtualColumns = true;
+      host.supportsVirtualColumns = async () => true;
       const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
       expect(sql).not.toContain('"upper"');
+    });
+
+    it("keeps a virtual column when the adapter's async predicate resolves false", async () => {
+      const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
+      host.supportsVirtualColumns = async () => false;
+      const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
+      expect(sql).toContain('"upper"');
     });
 
     it("raises FixtureError naming the unknown columns", async () => {

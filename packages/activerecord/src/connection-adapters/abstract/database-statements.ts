@@ -1217,14 +1217,15 @@ export async function buildFixtureSql(
   this: DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
-      supportsVirtualColumns?: boolean;
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
     },
   fixtures: Record<string, unknown>[],
   tableName: string,
 ): Promise<string> {
+  const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
   const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
-    ([, column]) => !(this.supportsVirtualColumns && (column as { virtual?: boolean }).virtual),
+    ([, column]) => !(supportsVirtualColumns && (column as { virtual?: boolean }).virtual),
   );
   const columnNames = columns.map(([name]) => name);
 
@@ -1272,7 +1273,7 @@ export function buildFixtureStatements(
   this: DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
-      supportsVirtualColumns?: boolean;
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
     },
   fixtureSet: Record<string, Record<string, unknown>[]>,

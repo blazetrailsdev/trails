@@ -1123,7 +1123,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
-    const columnOrIndex = wrap(options.column ?? options.usingIndex).map(String);
+    const column = options.column;
+    const columnOrIndex = wrap(
+      column != null && column !== false ? column : options.usingIndex,
+    ).map(String);
     const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
     const hashed = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
     return `uniq_rails_${hashed}`;

@@ -1,4 +1,10 @@
-import { IsolatedExecutionState, isPresent, type SafeBuffer } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  isPlainObject,
+  isPresent,
+  slice,
+  type SafeBuffer,
+} from "@blazetrails/activesupport";
 
 import type { OutputBuffer } from "../buffers.js";
 import { Digestor } from "../digestor.js";
@@ -36,28 +42,6 @@ export interface CacheFragmentNameOptions {
   digestPath?: string | null;
 }
 
-const ACTION_VIEW_CACHING = "action_view_caching";
-
-export const CachingRegistry = {
-  isCaching(): boolean {
-    const caching = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
-    return caching != null && caching !== false
-      ? caching
-      : IsolatedExecutionState.set(ACTION_VIEW_CACHING, false);
-  },
-
-  trackCaching<T>(block: () => T): T {
-    const cachingWas = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
-    IsolatedExecutionState.set(ACTION_VIEW_CACHING, true);
-
-    try {
-      return block();
-    } finally {
-      IsolatedExecutionState.set(ACTION_VIEW_CACHING, cachingWas);
-    }
-  },
-};
-
 export function cache(
   this: CacheHelperHost,
   name: unknown = {},
@@ -66,7 +50,7 @@ export function cache(
 ): null {
   if ("performCaching" in this.controller && this.controller.performCaching) {
     CachingRegistry.trackCaching(() => {
-      const nameOptions = { skipDigest: options.skipDigest };
+      const nameOptions = slice(options, "skipDigest");
       this.safeConcat(
         fragmentFor.call(this, this.cacheFragmentName(name, nameOptions), options, block),
       );
@@ -145,9 +129,9 @@ function fragmentNameWithDigest(
   name: unknown,
   digestPath: string | null | undefined,
 ): unknown {
-  if (isHash(name)) name = this.controller.urlFor(name).split("://").at(-1);
+  if (isPlainObject(name)) name = this.controller.urlFor(name).split("://").at(-1);
 
-  if (this.currentTemplate?.virtualPath || digestPath) {
+  if (this.currentTemplate?.virtualPath != null || digestPath != null) {
     digestPath ??= this.digestPathFromTemplate(this.currentTemplate as Template);
     return [digestPath, name];
   } else {
@@ -196,12 +180,24 @@ function writeFragmentFor(
   return this.controller.writeFragment(name, fragment, options ?? undefined);
 }
 
-/** @internal */
-function isHash(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
-}
+const ACTION_VIEW_CACHING = "action_view_caching";
+
+export const CachingRegistry = {
+  isCaching(): boolean {
+    const caching = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
+    return caching != null && caching !== false
+      ? caching
+      : IsolatedExecutionState.set(ACTION_VIEW_CACHING, false);
+  },
+
+  trackCaching<T>(block: () => T): T {
+    const cachingWas = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
+    IsolatedExecutionState.set(ACTION_VIEW_CACHING, true);
+
+    try {
+      return block();
+    } finally {
+      IsolatedExecutionState.set(ACTION_VIEW_CACHING, cachingWas);
+    }
+  },
+};
