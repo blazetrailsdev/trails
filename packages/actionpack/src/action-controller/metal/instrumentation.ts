@@ -1,4 +1,4 @@
-import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
+import { ExecutionContext, Notifications, toF } from "@blazetrails/activesupport";
 import {
   ExceptionWrapper,
   classNameOf,
@@ -78,7 +78,7 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
   const messages: string[] = [];
   const viewRuntime = payload.view_runtime;
   if (viewRuntime != null && viewRuntime !== false) {
-    messages.push(`Views: ${Number(viewRuntime).toFixed(1)}ms`);
+    messages.push(`Views: ${toF(String(viewRuntime)).toFixed(1)}ms`);
   }
   return messages;
 }

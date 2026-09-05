@@ -4,10 +4,7 @@
  */
 export let trails: { env: { "development?"(): boolean } } | null = null;
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @internal */
 export function _setTrails(value: { env: { "development?"(): boolean } } | null): void {
   trails = value;
 }
