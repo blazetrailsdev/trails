@@ -3,7 +3,7 @@ import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { loadViteManifest, setViteManifest, computeAssetPath } from "./vite-manifest.js";
 
 interface ViteAssetsHost {
-  resolvedRoot(): Promise<string>;
+  root(): Promise<string>;
 }
 
 interface ActionViewBaseLike {
@@ -22,7 +22,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("vite.manifest", async (app) => {
-      setViteManifest(await loadViteManifest(await (app as ViteAssetsHost).resolvedRoot()));
+      setViteManifest(await loadViteManifest(await (app as ViteAssetsHost).root()));
     });
   }
 }

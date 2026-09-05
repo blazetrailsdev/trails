@@ -1,6 +1,7 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { merge, mergeBang } from "../hash-utils.js";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 
 const HALF = new BigDecimal("0.5");
@@ -11,19 +12,6 @@ function powerOfTen(precision: number): BigDecimal {
 
 export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyOptions> {
   static override namespace = "currency";
-
-  protected override formatOptions(): Record<string, unknown> {
-    const defaults = this.defaultFormatOptions();
-    const i18n = this.i18nFormatOptions();
-    if (i18n.format && !i18n.negativeFormat) {
-      i18n.negativeFormat = `-${i18n.format}`;
-    }
-    const merged = { ...defaults, ...i18n };
-    if (this.opts.format) {
-      merged.negativeFormat = `-${this.opts.format}`;
-    }
-    return { ...merged, ...this.opts };
-  }
 
   protected convert(): string {
     const options = this.options;
@@ -49,5 +37,20 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
     }
 
     return format.replaceAll("%n", numberS).replaceAll("%u", options.unit as string);
+  }
+
+  protected override get options(): Record<string, unknown> {
+    if (!this._options) {
+      const defaults = merge(this.defaultFormatOptions(), this.i18nOpts());
+      if (this.opts.format) defaults.negativeFormat = `-${this.opts.format}`;
+      this._options = mergeBang(defaults, this.opts as Record<string, unknown>);
+    }
+    return this._options;
+  }
+
+  protected i18nOpts(): Record<string, unknown> {
+    const i18n = this.i18nFormatOptions();
+    if (i18n.format) i18n.negativeFormat ??= `-${i18n.format}`;
+    return i18n;
   }
 }

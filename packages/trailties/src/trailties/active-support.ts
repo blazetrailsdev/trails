@@ -63,9 +63,10 @@ export class Trailtie extends BaseTrailtie {
       }
     });
 
-    this.initializer("active_support.set_hash_digest_class", () => {
-      const klass = (this.config.get("activeSupport") as ActiveSupportConfig).hashDigestClass;
-      if (klass) {
+    this.initializer("active_support.set_hash_digest_class", (app) => {
+      const klass = ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig)
+        .hashDigestClass;
+      if (klass != null) {
         Digest.hashDigestClass = klass;
       }
     });

@@ -70,7 +70,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
   protected number: unknown;
   protected opts: TOptions;
-  private _options: Record<string, unknown> | undefined;
+  protected _options: Record<string, unknown> | undefined;
 
   static namespace: string | undefined;
 

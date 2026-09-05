@@ -90,8 +90,12 @@ export class Engine extends Trailtie {
   }
 
   async root(): Promise<string> {
-    const klass = this.constructor as typeof Engine;
-    return await klass.findRoot(klass.calledFrom() as string);
+    const cfg = this.config;
+    if (cfg.root === null) {
+      const klass = this.constructor as typeof Engine;
+      cfg.setRoot(await klass.findRoot(klass.calledFrom() as string));
+    }
+    return cfg.root as string;
   }
 
   override get config(): EngineConfiguration {
