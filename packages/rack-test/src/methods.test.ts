@@ -12,6 +12,7 @@ interface Spec extends Included<typeof Methods> {}
 class Spec implements MethodsHost {
   app: RackApp = FAKE_APP;
 
+  declare _rackTestCurrentSession: Session | undefined;
   declare buildRackMockSession?: () => Session;
   declare defaultHost?: string;
 }

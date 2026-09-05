@@ -2,6 +2,7 @@ import { defineModule } from "@blazetrails/activesupport";
 import type { RackApp } from "@blazetrails/rack";
 import { Session } from "./test.js";
 
+/** @noRailsEquivalent PERMANENT */
 export interface MethodsHost {
   app: RackApp;
   defaultHost?: string;
@@ -9,7 +10,9 @@ export interface MethodsHost {
   /** @internal */
   _rackTestSessions?: Map<unknown, Session>;
   /** @internal */
-  _rackTestCurrentSession?: Session | undefined;
+  get _rackTestCurrentSession(): Session | undefined;
+  /** @internal */
+  set _rackTestCurrentSession(value: Session | undefined);
 }
 
 function rackTestSession(this: MethodsHost, name: unknown = ":default"): Session {
