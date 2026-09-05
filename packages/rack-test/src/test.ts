@@ -1,11 +1,13 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { URI } from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, pack } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
   Request,
   parseNestedQuery,
+  release,
   type RackApp,
+  type RackEnv,
 } from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
 import type { Utils } from "./utils.js";
@@ -20,12 +22,8 @@ export const END_BOUNDARY = `--${MULTIPART_BOUNDARY}--\r\n`;
 
 export class Error extends globalThis.Error {}
 
-/** @internal */
-const DEFAULT_ENV: Record<string, unknown> = {
-  "rack.test": true,
-  REMOTE_ADDR: "127.0.0.1",
-  SERVER_PROTOCOL: "HTTP/1.0",
-};
+/** @noRailsEquivalent PERMANENT */
+export type ResponseBlock = (response: MockResponse) => void;
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`vendor/rack-test/lib/rack/test.rb:55`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Session extends Included<typeof Utils> {}
@@ -40,7 +38,10 @@ export class Session {
   private readonly app: RackApp;
 
   /** @internal */
-  private _env: Record<string, unknown> = {};
+  private _env: RackEnv = {};
+
+  /** @internal */
+  private _afterRequest: Array<() => void> = [];
 
   /** @internal */
   private _lastRequest: Request | null = null;
@@ -49,22 +50,92 @@ export class Session {
   private _lastResponse: MockResponse | null = null;
 
   static new(app: RackApp | Session, defaultHost: string = DEFAULT_HOST): Session {
-    if (app instanceof Session) return app;
-    return new Session(app, defaultHost);
+    if (app instanceof Session) {
+      return app;
+    } else {
+      return new Session(app, defaultHost);
+    }
   }
 
   constructor(app: RackApp, defaultHost: string = DEFAULT_HOST) {
+    this._env = {};
     this.app = app;
+    this._afterRequest = [];
     this.defaultHost = defaultHost;
+    this._lastRequest = null;
+    this._lastResponse = null;
     this.clearCookies();
+  }
+
+  get(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("GET", uri, params, env, block);
+  }
+
+  post(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("POST", uri, params, env, block);
+  }
+
+  put(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("PUT", uri, params, env, block);
+  }
+
+  patch(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("PATCH", uri, params, env, block);
+  }
+
+  delete(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("DELETE", uri, params, env, block);
+  }
+
+  options(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("OPTIONS", uri, params, env, block);
+  }
+
+  head(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    return this.customRequest("HEAD", uri, params, env, block);
   }
 
   clearCookies(): void {
     this.cookieJar = new CookieJar([], this.defaultHost);
   }
 
-  setCookie(cookie: string | string[] | null | undefined, uri: URL | null = null): void {
-    this.cookieJar.merge(cookie, uri && URI.parse(uri.toString()));
+  setCookie(cookie: unknown, uri: Generic | null = null): void {
+    this.cookieJar.merge(cookie as string, uri);
   }
 
   lastRequest(): Request {
@@ -77,28 +148,84 @@ export class Session {
     return this._lastResponse;
   }
 
-  async request(uri: string, env: Record<string, unknown> = {}): Promise<MockResponse> {
-    const parsed = this.parseUri(uri, env);
-    const requestEnv = this.envFor(parsed, env);
-    return this.processRequest(parsed, requestEnv);
+  async request(uri: string, env: RackEnv = {}, block?: ResponseBlock): Promise<MockResponse> {
+    const parsedUri = this.parseUri(uri, env);
+    env = this.envFor(parsedUri, env);
+    return this.processRequest(parsedUri, env, block);
   }
 
+  async customRequest(
+    verb: string,
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    const parsedUri = this.parseUri(uri, env);
+    env = this.envFor(parsedUri, {
+      ...env,
+      ":method": String(verb).toUpperCase(),
+      ":params": params,
+    });
+    return this.processRequest(parsedUri, env, block);
+  }
+
+  header(name: string, value: unknown): void {
+    name = name.toUpperCase();
+    name = name.replaceAll("-", "_");
+    if (name !== "CONTENT_TYPE" && name !== "CONTENT_LENGTH") name = `HTTP_${name}`;
+    this.env(name, value);
+  }
+
+  /** @missingRailsCall delete — PERMANENT */
+  env(name: string, value: unknown): void {
+    if (value == null) {
+      delete this._env[name];
+    } else {
+      this._env[name] = value;
+    }
+  }
+
+  basicAuthorize(username: unknown, password: unknown): void {
+    const encodedLogin = pack([`${String(username)}:${String(password)}`], "m0");
+    this.header("Authorization", `Basic ${encodedLogin}`);
+  }
+
+  authorize = this.basicAuthorize;
+
   /** @internal */
-  private parseUri(path: string, env: Record<string, unknown>): URL {
-    const uri = new URL(path, `http://${this.defaultHost}/`);
-    if (!uri.pathname.startsWith("/")) uri.pathname = `/${uri.pathname}`;
-    if (env["HTTPS"] === "on") uri.protocol = "https:";
+  private closeBody(body: unknown): void {} // eslint-disable-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.
+
+  /** @internal */
+  private parseUri(path: string, env: RackEnv): Generic {
+    const uri = URI.parse(path);
+    if (!uri.path!.startsWith("/")) uri.path = `/${uri.path}`;
+    uri.host ??= this.defaultHost;
+    if (env["HTTPS"] === "on") uri.scheme ??= "https";
     return uri;
   }
 
   /** @internal */
-  private envFor(uri: URL, env: Record<string, unknown>): Record<string, unknown> {
-    env = { ...DEFAULT_ENV, ...this._env, ...env };
+  private static readonly DEFAULT_ENV: RackEnv = {
+    "rack.test": true,
+    REMOTE_ADDR: "127.0.0.1",
+    SERVER_PROTOCOL: "HTTP/1.0",
+  };
 
-    env["HTTP_HOST"] ??= [uri.hostname, uri.port === "" ? null : uri.port]
+  static {
+    if (!(release() >= "2.3")) {
+      Session.DEFAULT_ENV["HTTP_VERSION"] = Session.DEFAULT_ENV["SERVER_PROTOCOL"];
+    }
+  }
+
+  /** @internal */
+  private envFor(uri: Generic, env: RackEnv): RackEnv {
+    env = { ...Session.DEFAULT_ENV, ...this._env, ...env };
+
+    env["HTTP_HOST"] ??= [uri.host, uri.port !== uri.defaultPort ? uri.port : null]
       .filter((part) => part != null)
       .join(":");
-    if (uri.protocol === "https:") env["HTTPS"] = "on";
+    if (uri instanceof HTTPS) env["HTTPS"] = "on";
     if (env[":xhr"] != null && env[":xhr"] !== false) {
       env["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
     }
@@ -106,10 +233,12 @@ export class Session {
 
     let params = env[":params"];
     delete env[":params"];
-    const queryArray: Array<string | null | undefined> = [uri.search.slice(1)];
+    let queryArray: Array<string | null | undefined> = [uri.query];
 
     if (env["REQUEST_METHOD"] === "GET") {
-      if (params != null && params !== false) this.appendQueryParams(queryArray, params);
+      if (params != null && params !== false) {
+        this.appendQueryParams(queryArray, params);
+      }
     } else if (!(":input" in env)) {
       env["CONTENT_TYPE"] ??= "application/x-www-form-urlencoded";
       if (params == null || params === false) params = {};
@@ -138,11 +267,17 @@ export class Session {
       }
     }
 
-    const compacted = queryArray.filter((q) => q != null && q !== "");
-    uri.search = compacted.join("&");
+    const queryParams = env[":query_params"];
+    delete env[":query_params"];
+    if (queryParams != null && queryParams !== false) {
+      this.appendQueryParams(queryArray, queryParams);
+    }
+    queryArray = queryArray.filter((q) => q != null);
+    queryArray = queryArray.filter((q) => q !== "");
+    uri.query = queryArray.join("&");
 
     if (":cookie" in env) {
-      const cookie = env[":cookie"] as string | undefined;
+      const cookie = env[":cookie"];
       delete env[":cookie"];
       this.setCookie(cookie, uri);
     }
@@ -160,8 +295,8 @@ export class Session {
   }
 
   /** @internal */
-  private multipartContentType(env: Record<string, unknown>): string {
-    const requestedContentType = String(env["CONTENT_TYPE"]);
+  private multipartContentType(env: RackEnv): string {
+    const requestedContentType = env["CONTENT_TYPE"] as string;
     if (requestedContentType.startsWith("multipart/")) {
       return requestedContentType;
     } else {
@@ -169,16 +304,38 @@ export class Session {
     }
   }
 
-  /** @internal */
-  private async processRequest(uri: URL, env: Record<string, unknown>): Promise<MockResponse> {
-    env["HTTP_COOKIE"] ??= this.cookieJar.for(URI.parse(uri.toString()));
+  /**
+   * @missingRailsCall call — PERMANENT
+   * @internal
+   */
+  private async processRequest(
+    uri: Generic,
+    env: RackEnv,
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
-    const [status, headers, body] = await this.app(env);
-    const parts: string[] = [];
-    for await (const chunk of body) parts.push(String(chunk));
+    const [status, headers, rackBody] = await this.app(env);
+    const body: string[] = [];
+    for await (const chunk of rackBody) body.push(String(chunk));
 
-    this._lastResponse = new MockResponse(status, headers, parts, env["rack.errors"]);
-    this.cookieJar.merge(this._lastResponse.getHeader("set-cookie"), URI.parse(uri.toString()));
+    this._lastResponse = new MockResponse(
+      status,
+      headers,
+      body,
+      (env["rack.errors"] as { flush(): unknown }).flush(),
+    );
+    this.closeBody(rackBody);
+    this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
+    this._afterRequest.forEach((hook) => hook());
+    this._lastResponse.finish();
+
+    if (block) block(this._lastResponse);
+
     return this._lastResponse;
   }
+}
+
+export function encodingAwareStrings(): boolean {
+  return release() >= "1.6";
 }

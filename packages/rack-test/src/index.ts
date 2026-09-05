@@ -6,6 +6,7 @@ export {
   END_BOUNDARY,
   Error,
   Session,
+  encodingAwareStrings,
 } from "./test.js";
 export { Utils } from "./utils.js";
 export { Cookie, CookieJar } from "./cookie-jar.js";
