@@ -51,7 +51,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
       });
     }
     await rm(dbDir, { recursive: true, force: true });
-    (Base as any)._shardKeys = undefined;
     (Base as any)._defaultShard = undefined;
     (Base as any).connectionClass = undefined;
   });

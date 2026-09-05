@@ -335,7 +335,7 @@ export class PostgreSQLAdapter
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();
   private _maxIdentifierLength: number | null = null;
-  private _useInsertReturning = true;
+  private _useInsertReturning: unknown = true;
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
   private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
@@ -418,12 +418,10 @@ export class PostgreSQLAdapter
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if ("insertReturning" in this._config) {
-      const cast = PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning);
-      this._useInsertReturning = cast != null && cast !== false;
-    } else {
-      this._useInsertReturning = true;
-    }
+    this._useInsertReturning =
+      "insertReturning" in this._config
+        ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
+        : true;
     if (minMessages !== undefined && typeof minMessages !== "string") {
       throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
     }
@@ -903,7 +901,7 @@ export class PostgreSQLAdapter
           const upper = sql.trimStart().toUpperCase();
 
           if (
-            this._useInsertReturning &&
+            this.isUseInsertReturning() &&
             upper.startsWith("INSERT") &&
             !upper.includes("RETURNING")
           ) {
@@ -1268,7 +1266,7 @@ export class PostgreSQLAdapter
   }
 
   isUseInsertReturning(): boolean {
-    return this._useInsertReturning;
+    return this._useInsertReturning != null && this._useInsertReturning !== false;
   }
 
   private lastInsertIdResult = pgLastInsertIdResult;
