@@ -58,6 +58,6 @@ describe("Rack::Test::Session", () => {
   it("allow symbol access", () => {
     const jar = new CookieJar();
     jar.set("value", "foo;abc");
-    expect(jar.get("value")).toBe("foo;abc");
+    expect(jar.get({ toString: () => "value" })).toBe("foo;abc");
   });
 });

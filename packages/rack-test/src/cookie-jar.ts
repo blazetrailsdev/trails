@@ -49,7 +49,7 @@ export class Cookie {
       this._options["domain"] = uri.host ?? defaultHost;
     }
 
-    this._options["path"] ??= (uri.path ?? "").replace(/\/[^/]*$/, "");
+    this._options["path"] ??= uri.path!.replace(/\/[^/]*$/, "");
   }
 
   replaces(other: Cookie): boolean {
@@ -105,7 +105,7 @@ export class Cookie {
   }
 
   matches(uri: Generic): boolean {
-    return !this.isExpired() && this.isValid(uri) && (uri.path ?? "").startsWith(this.path());
+    return !this.isExpired() && this.isValid(uri) && uri.path!.startsWith(this.path());
   }
 
   /** @missingRailsArgs reverse — PERMANENT */
