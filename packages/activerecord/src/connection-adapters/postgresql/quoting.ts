@@ -15,7 +15,7 @@ import {
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
@@ -281,6 +281,7 @@ export function quotedDate(value: TemporalDateLike): string {
 
 function yearOf(value: TemporalDateLike): number {
   if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
+  if (value instanceof RubyTime) return value.toTime().year;
   if (value instanceof Temporal.PlainTime) return 2000;
   return value.year;
 }

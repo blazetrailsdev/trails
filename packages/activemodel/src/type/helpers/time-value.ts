@@ -1,6 +1,7 @@
 import { Temporal, Time } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
+  ActsLikeObject,
   TimeWithZone,
   inTimeZone as stringInTimeZone,
   toFs,
@@ -15,12 +16,23 @@ export interface TimezoneAware {
 
 interface TimeValueHost {
   precision?: number;
+  isUtc: boolean;
   applySecondsPrecision<T>(value: T): T;
 }
 
-/** @missingRailsCall acts_like? — CONVERGEABLE time-cast-result-cannot-model-a-zoned-ruby-time */
-export function serializeCastValue<T>(this: TimeValueHost, value: T): T {
-  return this.applySecondsPrecision(value);
+export function serializeCastValue(this: TimeValueHost, value: unknown): unknown {
+  value = this.applySecondsPrecision(value);
+
+  if (ActsLikeObject.actsLike(value, "time")) {
+    const time = toTime(value);
+    if (this.isUtc) {
+      if (!time.isUtc()) value = time.getutc();
+    } else {
+      value = time.getlocal();
+    }
+  }
+
+  return value;
 }
 
 type NsecBearing =
@@ -141,6 +153,20 @@ export const TimeValue = {
   /** @missingRailsCall new — CONVERGEABLE call-gate-credits-ruby-new-only-as-constructor */
   fastStringToTime,
 };
+
+function toTime(value: unknown): TimeWithZone | Time {
+  if (value instanceof TimeWithZone || value instanceof Time) return value;
+  if (value instanceof Temporal.Instant) return timeAt(value).getutc();
+  if (value instanceof Temporal.ZonedDateTime) return timeAt(value.toInstant()).getutc();
+  if (value instanceof Temporal.PlainDateTime) {
+    return timeAt(value.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant());
+  }
+  return timeAt(Temporal.Instant.fromEpochMilliseconds((value as Date).getTime()));
+}
+
+function timeAt(value: Temporal.Instant): Time {
+  return Time.at(new Rational(value.epochNanoseconds, 1_000_000_000n));
+}
 
 function respondToNsec(value: unknown): value is NsecBearing {
   return (
