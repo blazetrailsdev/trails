@@ -24,8 +24,6 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/json.rb:6); the class/interface merge is how `include()` surfaces on the type side.
 export class Json extends ValueType<unknown> {
-  readonly name: string = "json";
-
   override type(): string {
     return "json";
   }

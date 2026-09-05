@@ -143,8 +143,8 @@ export function currentAdapterName(): AdapterName {
   return base ? adapterNameFrom(base) : "sqlite3";
 }
 
-typeRegistry.register("date", null, () => new Date()); // boundary: AR Type::Date class, not JS Date
-typeRegistry.register("datetime", null, () => new DateTime());
-typeRegistry.register("time", null, () => new Time());
-typeRegistry.register("text", null, () => new Text());
-typeRegistry.register("json", null, () => new Json());
+typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date
+typeRegistry.register("datetime", DateTime);
+typeRegistry.register("time", Time);
+typeRegistry.register("text", Text);
+typeRegistry.register("json", Json);

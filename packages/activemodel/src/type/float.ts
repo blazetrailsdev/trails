@@ -4,8 +4,6 @@ import { applyNumericMixin } from "./helpers/numeric.js";
 const NumericValueType = applyNumericMixin(ValueType<number>);
 
 export class FloatType extends NumericValueType {
-  readonly name = "float";
-
   type(): string {
     return "float";
   }

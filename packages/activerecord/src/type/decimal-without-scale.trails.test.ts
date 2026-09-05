@@ -10,7 +10,7 @@ describe("DecimalWithoutScale", () => {
   it("reports type as decimal", () => {
     const type = new DecimalWithoutScale();
     expect(type.type()).toBe("decimal");
-    expect(type.name).toBe("decimal");
+    expect(type.type()).toBe("decimal");
   });
 
   it("casts integer strings", () => {

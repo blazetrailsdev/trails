@@ -1,8 +1,6 @@
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {
-  override readonly name: string = "decimal";
-
   override type(): string {
     return "decimal";
   }

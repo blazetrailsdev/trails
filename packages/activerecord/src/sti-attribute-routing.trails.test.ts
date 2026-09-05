@@ -62,8 +62,8 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(Triangle.typeForAttribute("name").name).toBe("string");
-    expect(Triangle.typeForAttribute("sides").name).toBe("integer");
+    expect(Triangle.typeForAttribute("name").type()).toBe("string");
+    expect(Triangle.typeForAttribute("sides").type()).toBe("integer");
     expect(attributeNamesOf(Shape)).not.toContain("sides");
   });
 
@@ -97,7 +97,9 @@ describe("STI subclass attribute() registration", () => {
     const { ValueType } = await import("@blazetrails/activemodel");
 
     class UuidT extends ValueType {
-      override readonly name = "uuid" as unknown as "value";
+      override type(): string {
+        return "uuid";
+      }
     }
 
     class Shape extends Base {
@@ -128,11 +130,11 @@ describe("STI subclass attribute() registration", () => {
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
-    expect(Shape.typeForAttribute("guid").name).toBe("uuid");
+    expect(Shape.typeForAttribute("guid").type()).toBe("uuid");
     expect(attributeNamesOf(Shape)).not.toContain("radius");
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
-    expect(Circle.typeForAttribute("radius").name).toBe("integer");
-    expect(Circle.typeForAttribute("guid").name).toBe("uuid");
+    expect(Circle.typeForAttribute("radius").type()).toBe("integer");
+    expect(Circle.typeForAttribute("guid").type()).toBe("uuid");
   });
   it("own-table descendant under an STI ancestor keeps attribute() on itself", () => {
     class Shape extends Base {
@@ -154,15 +156,15 @@ describe("STI subclass attribute() registration", () => {
     }
 
     expect(Object.hasOwn(Ticket, "_pendingAttributeModifications")).toBe(true);
-    expect(Ticket.typeForAttribute("priority").name).toBe("integer");
+    expect(Ticket.typeForAttribute("priority").type()).toBe("integer");
     expect(attributeNamesOf(Shape)).not.toContain("priority");
     expect(attributeNamesOf(Circle)).not.toContain("priority");
 
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
     expect(attributeNamesOf(Shape)).not.toContain("radius");
-    expect(Circle.typeForAttribute("radius").name).toBe("integer");
+    expect(Circle.typeForAttribute("radius").type()).toBe("integer");
 
-    expect(Ticket.typeForAttribute("radius").name).toBe("integer");
+    expect(Ticket.typeForAttribute("radius").type()).toBe("integer");
   });
   it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {
     class Shape extends Base {

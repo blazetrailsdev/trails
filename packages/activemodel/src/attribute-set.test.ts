@@ -483,8 +483,8 @@ describe("AttributeSetTest", () => {
 
     const p = new Person({ name: "Alice", age: 25 });
     const types = p._attributes.castTypes();
-    expect(types.name?.name).toBe("string");
-    expect(types.age?.name).toBe("integer");
+    expect(types.name?.type()).toBe("string");
+    expect(types.age?.type()).toBe("integer");
   });
 
   it("#key? returns true for initialized attributes", () => {

@@ -13,8 +13,6 @@ export class Data {
 }
 
 export class Xml extends StringType {
-  override readonly name: string = "xml";
-
   override type(): string {
     return "xml";
   }

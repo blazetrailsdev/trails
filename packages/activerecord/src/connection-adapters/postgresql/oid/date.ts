@@ -9,8 +9,6 @@ import {
 import { parsePostgresDate } from "../../abstract/temporal-wire.js";
 
 export class Date extends DateType {
-  override readonly name: string = "date";
-
   /** @missingRailsCall format — PERMANENT */
   override castValue(
     value: unknown,

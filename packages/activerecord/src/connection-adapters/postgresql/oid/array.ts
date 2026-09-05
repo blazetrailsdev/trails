@@ -126,7 +126,6 @@ export interface ArraySubtype {
 }
 
 export class Array extends ValueType<unknown> {
-  readonly name: string = "array";
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
   private readonly pgEncoder: PgTextEncoderArray;

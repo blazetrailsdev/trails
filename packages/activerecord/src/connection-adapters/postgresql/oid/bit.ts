@@ -41,8 +41,6 @@ export class Data {
 }
 
 export class Bit extends ValueType<string> {
-  readonly name: string = "bit";
-
   override type(): string {
     return "bit";
   }

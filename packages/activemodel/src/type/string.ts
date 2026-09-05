@@ -1,8 +1,6 @@
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
-  readonly name: string = "string";
-
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     if (typeof newValue !== "string") return false;
     if (rawOldValue === null || rawOldValue === undefined) return true;

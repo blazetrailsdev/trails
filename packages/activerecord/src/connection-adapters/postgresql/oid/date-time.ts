@@ -15,8 +15,6 @@ import {
 type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTime extends ArDateTime {
-  override readonly name: string = "datetime";
-
   /** @missingRailsCall format — PERMANENT */
   override castValue(value: unknown): PgDateTimeResult | null {
     if (value === null || value === undefined) return null;

@@ -9,8 +9,6 @@ const NumericValueType = applyNumericMixin(ValueType<BigDecimal>);
 const BIGDECIMAL_PRECISION = 18;
 
 export class DecimalType extends NumericValueType {
-  readonly name: string = "decimal";
-
   type(): string {
     return "decimal";
   }

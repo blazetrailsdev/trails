@@ -5,7 +5,9 @@ import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
 
 class UuidType extends ValueType {
-  override readonly name = "uuid" as unknown as "value";
+  override type(): string {
+    return "uuid";
+  }
 }
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
@@ -153,8 +155,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle.typeForAttribute("radius").name).toBe("integer");
-    expect(Shape.typeForAttribute("radius").name).toBe("value");
+    expect(Circle.typeForAttribute("radius").type()).toBe("integer");
+    expect(Shape.typeForAttribute("radius").type()).toBeUndefined();
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
@@ -304,12 +306,12 @@ describe("sync loadSchema / columnsHash", () => {
     Post.columnsHash();
 
     expect(Object.keys(Post.columnsHash())).toContain("guid");
-    expect(Post.typeForAttribute("title").name).toBe("string");
+    expect(Post.typeForAttribute("title").type()).toBe("string");
 
     (resetColumnInformation as any).call(Post);
 
     expect((Post as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
-    expect(Post.typeForAttribute("title").name).toBe("string");
+    expect(Post.typeForAttribute("title").type()).toBe("string");
   });
 
   function makeResettableAdapter(cols: Record<string, unknown>) {

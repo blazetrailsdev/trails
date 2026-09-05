@@ -48,4 +48,26 @@ describe("TypeRegistry", () => {
     const t = Types.typeRegistry.lookup("type_registry_test_custom");
     expect(t).toBeInstanceOf(Types.StringType);
   });
+
+  it("keyFor returns the registry key a type instance was built from", () => {
+    for (const key of [
+      "string",
+      "integer",
+      "float",
+      "boolean",
+      "date",
+      "datetime",
+      "decimal",
+      "big_integer",
+      "immutable_string",
+      "binary",
+      "time",
+    ]) {
+      expect(Types.typeRegistry.keyFor(Types.typeRegistry.lookup(key))).toBe(key);
+    }
+  });
+
+  it("keyFor returns null for a type that was never registered", () => {
+    expect(Types.typeRegistry.keyFor(defaultValue())).toBeNull();
+  });
 });

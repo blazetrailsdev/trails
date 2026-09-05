@@ -124,7 +124,7 @@ export function defineEnum(
 
 export class EnumType extends ValueType<string> {
   /** @internal */
-  override readonly name: string;
+  readonly name: string;
   private _mapping: HashWithIndifferentAccess<EnumValue>;
   private _reverseMapping: ReadonlyMap<EnumValue, string>;
   private _raiseOnInvalidValues: boolean;

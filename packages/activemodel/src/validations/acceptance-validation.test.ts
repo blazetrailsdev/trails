@@ -257,7 +257,7 @@ describe("AcceptanceValidationTest", () => {
     }
     interface Agreement extends Attributes {}
 
-    expect(Agreement.attributeTypes()["terms"].name).toBe("boolean");
+    expect(Agreement.attributeTypes()["terms"].type()).toBe("boolean");
   });
 });
 describe("LazilyDefineAttributes#matches?", () => {

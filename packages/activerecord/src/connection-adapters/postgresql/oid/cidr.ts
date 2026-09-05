@@ -16,8 +16,6 @@ export class IPAddr {
 }
 
 export class Cidr extends ValueType<IPAddr> {
-  readonly name: string = "cidr";
-
   override type(): string {
     return "cidr";
   }

@@ -106,8 +106,6 @@ import {
 } from "@blazetrails/activemodel";
 
 class MysqlBigInteger extends BigIntegerType {
-  override readonly name: string = "integer";
-
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
   }

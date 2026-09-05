@@ -12,17 +12,17 @@ export interface RangeSubtype {
 }
 
 export class RangeType extends ValueType<Range<unknown>> {
-  readonly name: string;
   readonly subtype: RangeSubtype;
+  readonly #type: string;
 
   constructor(subtype: RangeSubtype, type: string = "range") {
     super();
     this.subtype = subtype;
-    this.name = type;
+    this.#type = type;
   }
 
   override type(): string {
-    return this.name;
+    return this.#type;
   }
 
   userInputInTimeZone(value: unknown): unknown {

@@ -8,8 +8,6 @@ const DEFAULT_LIMIT = 4;
 const NumericValueType = applyNumericMixin(ValueType<number | bigint>);
 
 export class IntegerType extends NumericValueType {
-  readonly name: string = "integer";
-
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
     super(options);
   }

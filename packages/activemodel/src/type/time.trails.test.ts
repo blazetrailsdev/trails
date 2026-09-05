@@ -134,7 +134,7 @@ describe("TimeType cast and serialize coverage", () => {
   });
 
   it("has name 'time'", () => {
-    expect(type.name).toBe("time");
+    expect(type.type()).toBe("time");
   });
 
   it("casts undefined to null", () => {

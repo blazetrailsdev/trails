@@ -2,8 +2,6 @@ import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export class ValueType<T = unknown> {
-  /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
-  readonly name: string = "value";
   #precision?: number;
   #limit?: number;
   protected readonly _scale?: number;

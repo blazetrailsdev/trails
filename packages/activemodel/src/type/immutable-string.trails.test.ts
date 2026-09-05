@@ -61,11 +61,6 @@ describe("ImmutableStringType casting", () => {
     expect(type.type()).toBe("string");
   });
 
-  it("name stays immutable_string", () => {
-    const type = new ImmutableStringType();
-    expect(type.name).toBe("immutable_string");
-  });
-
   it("cast then serialize of custom-true value preserves the string", () => {
     const type = new ImmutableStringType({ true: "aye" });
     const cast = type.cast(true);

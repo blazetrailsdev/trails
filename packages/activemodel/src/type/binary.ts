@@ -5,8 +5,6 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 export class BinaryType extends ValueType<unknown> {
-  readonly name = "binary";
-
   type(): string {
     return "binary";
   }
