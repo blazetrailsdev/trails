@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File, IO } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -126,6 +126,32 @@ export class RackBody {
 
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
     for (const chunk of this.each()) yield chunk as string | Uint8Array;
+  }
+}
+
+export class FileBody {
+  private readonly _toPath: string;
+
+  constructor(path: string) {
+    this._toPath = path;
+  }
+
+  toPath(): string {
+    return this._toPath;
+  }
+
+  get body(): string {
+    return IO.binread(this.toPath());
+  }
+
+  *each(): IterableIterator<string> {
+    const file = File.open(this.toPath(), "rb");
+    try {
+      let chunk: string | null;
+      while ((chunk = file.read(16384)) !== null) yield chunk;
+    } finally {
+      file.close();
+    }
   }
 }
 
@@ -363,19 +389,7 @@ export class Response {
 
   sendFile(path: string): void {
     this.commitBang();
-    let cached: string | null = null;
-    const read = () => (cached ??= File.open(path, "rb", (file) => file.read()));
-    this.stream = {
-      toPath(): string {
-        return path;
-      },
-      get body(): string {
-        return read();
-      },
-      *each(): IterableIterator<string> {
-        yield read();
-      },
-    };
+    this.stream = new FileBody(path);
   }
 
   resetBodyBang(): void {

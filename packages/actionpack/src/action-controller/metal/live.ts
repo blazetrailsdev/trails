@@ -57,6 +57,7 @@ export class Buffer {
       this._response.deleteHeader("Content-Length");
     }
 
+    this._response.commitBang();
     this._buf.push(string);
 
     if (!this.isConnected) {
