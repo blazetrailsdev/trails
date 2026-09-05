@@ -42,6 +42,10 @@ export interface SkeletonArtifact {
  * `begin`/`rescue` chain, sitting after the `try` its `:bodystmt` emits, so a
  * two-clause Ruby `rescue` reads against the two `instanceof` arms of its TS
  * `catch` rather than against one opaque `try` apiece.
+ *
+ * A `throw` arrives from either extractor as `throw:<Class>` when the raise
+ * names one, so membership is tested against the class-ERASED token; the class
+ * itself is what the `raise-class` verdict reads (see {@link ArmVerdict}).
  */
 export const CONTROL_TOKENS: ReadonlySet<string> = new Set([
   "if",

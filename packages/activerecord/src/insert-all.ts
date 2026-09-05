@@ -467,10 +467,7 @@ export class Builder implements InsertBuilder {
     tableName: string,
     keys: string[],
   ): Promise<Record<string, ValueType>> {
-    const columns = ((await this.model.schemaCache().columnsHash(tableName)) ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const columns = (await this.model.schemaCache().columnsHash(tableName)) ?? {};
 
     const unknownColumn = keys.find((key) => !(key in columns));
     if (unknownColumn !== undefined) {
