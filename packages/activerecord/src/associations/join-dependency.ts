@@ -184,6 +184,7 @@ export class JoinDependency {
     return this._joinRoot;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-join-dependency-nodes-and-instantiate-from-rows */
   get nodes(): JoinPart[] {
     const result: JoinPart[] = [];
     this._joinRoot.each((part) => {
@@ -501,6 +502,7 @@ export class JoinDependency {
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-join-dependency-nodes-and-instantiate-from-rows */
   instantiateFromRows(
     rows: Record<string, unknown>[],
     strictLoadingValue?: boolean | null,

@@ -7,6 +7,7 @@ interface Rebaseable {
   initializeCopy(source: unknown): void;
 }
 
+/** @noRailsEquivalent CONVERGEABLE retire-association-relation-new-owner-seed-rebase */
 export function rebaseNewOwnerSeed(
   target: Rebaseable,
   freshScope: unknown,

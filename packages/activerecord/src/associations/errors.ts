@@ -382,6 +382,7 @@ export class DeleteRestrictionError extends ActiveRecordError {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class HasOnePersistedAssignmentError extends ActiveRecordError {
   readonly association: string;
 
@@ -398,6 +399,7 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class CollectionPersistedAssignmentError extends ActiveRecordError {
   readonly association: string;
 
@@ -413,6 +415,7 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;
 

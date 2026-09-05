@@ -346,7 +346,7 @@ export class LoaderQuery {
     );
   }
 
-  hashKey(): string {
+  hash(): string {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
