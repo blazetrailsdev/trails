@@ -4,6 +4,7 @@ import {
   DateNegativeInfinity,
   type ValueType,
 } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
@@ -108,8 +109,12 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
     else if (value.isHex()) return `X'${value.toString()}'`;
     return null;
   }
-  if (typeof value === "number" || typeof value === "bigint") {
-    if (typeof value === "bigint" || Number.isFinite(value)) {
+  if (typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal) {
+    if (
+      value instanceof BigDecimal
+        ? value.isFinite()
+        : typeof value === "bigint" || Number.isFinite(value)
+    ) {
       return abstractQuote.call(this, value);
     } else {
       return `'${String(value)}'`;
