@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { SessionId } from "@blazetrails/rack-session";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
-import { UploadedFile } from "../action-dispatch/http/upload.js";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { UploadedFile } from "@blazetrails/rack-test";
 import { Base } from "./base.js";
 
 describe("TestSession Rails-mirroring API", () => {
@@ -164,7 +165,9 @@ describe("ActionController::TestRequest helpers", () => {
   it("assignParameters builds real multipart body when params include an UploadedFile", () => {
     const req = TestRequest.create();
     req.setHeader("REQUEST_METHOD", "POST");
-    const file = new UploadedFile({ filename: "hello.txt", type: "text/plain", content: "hi" });
+    const file = new UploadedFile(new StringIO("hi"), "text/plain", false, {
+      originalFilename: "hello.txt",
+    });
     req.assignParameters(null, "uploads", "create", { upload: file }, "/uploads", ["upload"]);
     const ct = req.getHeader("CONTENT_TYPE") ?? "";
     expect(ct).toContain("multipart/form-data");

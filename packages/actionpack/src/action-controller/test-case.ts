@@ -1,4 +1,4 @@
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, include, isPlainObject, type Included } from "@blazetrails/activesupport";
 import { KeyError, merge, SecureRandom } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
@@ -9,12 +9,16 @@ import {
   type PersistedRequest,
 } from "@blazetrails/rack-session";
 import { buildNestedQuery } from "@blazetrails/rack";
+import {
+  MULTIPART_BOUNDARY,
+  UploadedFile as RackTestUploadedFile,
+  Utils as RackTestUtils,
+} from "@blazetrails/rack-test";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import { RequestUtils, type ParamValue } from "../action-dispatch/request/utils.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
-import { UploadedFile } from "../action-dispatch/http/upload.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -40,6 +44,33 @@ const STATUS_RANGES: Record<string, [number, number]> = {
   missing: [400, 499],
   error: [500, 599],
 };
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`actionpack/lib/action_controller/test_case.rb:152`); the class/interface merge is how a mixin surfaces on the type side. */
+interface Encoder extends Included<typeof RackTestUtils> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+class Encoder {
+  shouldMultipart(params: Record<string, unknown>): boolean {
+    let multipart = false;
+    const query = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(query);
+      } else if (isPlainObject(value)) {
+        Object.values(value).forEach(query);
+      } else if (value instanceof RackTestUploadedFile) {
+        multipart = true;
+      }
+    };
+    Object.values(params).forEach(query);
+    return multipart;
+  }
+
+  get contentType(): string {
+    return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
+  }
+}
+
+include(Encoder, RackTestUtils);
 
 export class TestCase {
   /** @internal */
@@ -456,11 +487,11 @@ export class TestRequest extends AbstractTestRequest {
         this.queryString = buildNestedQuery(nonPathParameters);
       }
     } else {
-      if (shouldMultipart(nonPathParameters)) {
-        const { body, boundary } = buildMultipartBody(nonPathParameters);
-        this.setHeader("CONTENT_TYPE", `multipart/form-data; boundary=${boundary}`);
-        this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(body, "binary")));
-        this.setHeader("rack.input", body);
+      if (TestRequest.ENCODER.shouldMultipart(nonPathParameters)) {
+        this.setHeader("CONTENT_TYPE", TestRequest.ENCODER.contentType);
+        const data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
+        this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(data, "binary")));
+        this.setHeader("rack.input", data);
         this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
       } else {
         this.fetchHeader("CONTENT_TYPE", (k) => {
@@ -503,6 +534,8 @@ export class TestRequest extends AbstractTestRequest {
     this.pathParameters = pathParameters;
   }
 
+  static readonly ENCODER = new Encoder();
+
   /**
    * @internal
    * @missingRailsArgs merge — PERMANENT
@@ -525,51 +558,6 @@ export class TestRequest extends AbstractTestRequest {
     this.env["action_dispatch.request.request_parameters"] = normalized;
     return normalized;
   }
-
-  /** @internal */
-  static shouldMultipart(params: Record<string, unknown>): boolean {
-    return shouldMultipart(params);
-  }
-}
-
-/** @internal */
-function buildMultipartBody(params: Record<string, unknown>): { body: string; boundary: string } {
-  const boundary = "AaB03x";
-  const parts: string[] = [];
-  function addParts(prefix: string, value: unknown): void {
-    if (value instanceof UploadedFile) {
-      parts.push(
-        `--${boundary}\r\n` +
-          `content-disposition: form-data; name="${prefix}"; filename="${value.originalFilename}"\r\n` +
-          `content-type: ${value.contentType}\r\n\r\n` +
-          value.read().toString("binary") +
-          "\r\n",
-      );
-    } else if (Array.isArray(value)) {
-      for (const item of value) addParts(`${prefix}[]`, item);
-    } else if (value !== null && typeof value === "object") {
-      for (const [k, v] of Object.entries(value)) addParts(`${prefix}[${k}]`, v);
-    } else {
-      parts.push(
-        `--${boundary}\r\ncontent-disposition: form-data; name="${prefix}"\r\n\r\n${String(value ?? "")}\r\n`,
-      );
-    }
-  }
-  for (const [k, v] of Object.entries(params)) addParts(k, v);
-  return { body: parts.join("") + `--${boundary}--\r\n`, boundary };
-}
-
-/** @internal */
-function shouldMultipart(params: Record<string, unknown>): boolean {
-  const check = (value: unknown): boolean => {
-    if (Array.isArray(value)) return value.some(check);
-    if (value instanceof UploadedFile) return true;
-    if (value !== null && typeof value === "object") {
-      return Object.values(value).some(check);
-    }
-    return false;
-  };
-  return Object.values(params).some(check);
 }
 
 export class LiveTestResponse extends Response {
