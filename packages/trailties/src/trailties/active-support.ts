@@ -32,17 +32,14 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    if (this.config.get("activeSupport") === undefined) this.config.set("activeSupport", {});
+    this.config.set("activeSupport", {});
 
     this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
     });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
-      const activeSupport =
-        ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig | undefined) ??
-        (this.config.get("activeSupport") as ActiveSupportConfig | undefined) ??
-        {};
+      const activeSupport = (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig;
       const deprecators = (app as TrailtieApp).deprecators;
       if (activeSupport.reportDeprecations === false) {
         deprecators.setSilenced(true);
@@ -67,8 +64,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_support.set_hash_digest_class", () => {
-      const klass = (this.config.get("activeSupport") as ActiveSupportConfig | undefined)
-        ?.hashDigestClass;
+      const klass = (this.config.get("activeSupport") as ActiveSupportConfig).hashDigestClass;
       if (klass) {
         Digest.hashDigestClass = klass;
       }

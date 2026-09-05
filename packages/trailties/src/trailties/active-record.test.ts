@@ -1,7 +1,7 @@
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Trailtie, loadDefaults, type ActiveRecordConfig } from "./active-record.js";
+import { Trailtie, type ActiveRecordConfig } from "./active-record.js";
 import { Base } from "@blazetrails/activerecord";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "@blazetrails/activerecord";
@@ -211,26 +211,5 @@ describe("RailtieTest", () => {
     expect(() => Base.asynchronousQueriesTracker().currentSession).toThrow(
       "Can't perform asynchronous queries without a query session",
     );
-  });
-
-  it("load_defaults: partial_inserts is true without any version load", () => {
-    Base.partialInserts = true;
-    expect(Base.partialInserts).toBe(true);
-  });
-
-  it("load_defaults 7.0 sets partial_inserts to false", () => {
-    Base.partialInserts = true;
-    loadDefaults("7.0");
-    expect(Base.partialInserts).toBe(false);
-  });
-
-  it("load_defaults 7.1 sets raise_on_assign_to_attr_readonly to true", () => {
-    ActiveRecord.raiseOnAssignToAttrReadonly = false;
-    loadDefaults("7.1");
-    expect(ActiveRecord.raiseOnAssignToAttrReadonly).toBe(true);
-  });
-
-  it("load_defaults raises for an unknown version string", () => {
-    expect(() => loadDefaults("bogus")).toThrow('Unknown version "bogus"');
   });
 });

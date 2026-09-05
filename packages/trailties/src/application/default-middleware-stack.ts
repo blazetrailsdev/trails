@@ -3,6 +3,7 @@ import {
   AssumeSSL,
   Callbacks,
   ContentSecurityPolicyMiddleware,
+  PermissionsPolicyMiddleware,
   Cookies,
   DebugExceptions,
   Executor,
@@ -97,6 +98,7 @@ export class DefaultMiddlewareStack {
 
     if (!config.apiOnly) {
       stack.use(ContentSecurityPolicyMiddleware as never);
+      stack.use(PermissionsPolicyMiddleware as never);
     }
 
     return stack;

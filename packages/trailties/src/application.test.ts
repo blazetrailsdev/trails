@@ -547,7 +547,7 @@ describe("Application::Configuration", () => {
   it("config.load_defaults skips a framework that has not registered its config", () => {
     const c = new Configuration();
     expect(() => c.loadDefaults("8.0")).not.toThrow();
-    expect(c.get("assets")).toBeUndefined();
+    expect(c.respondTo("assets")).toBe(false);
   });
 
   it("config.load_defaults raises on an unknown version", () => {

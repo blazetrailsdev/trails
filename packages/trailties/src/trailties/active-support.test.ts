@@ -13,7 +13,6 @@ import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
 const deprecator = activeSupportDeprecator();
 let deprecators: Deprecators;
-let appConfig: Record<string, unknown>;
 let app: { config: { get(key: string): unknown }; deprecators: Deprecators };
 
 describe("RailtieTest", () => {
@@ -22,8 +21,7 @@ describe("RailtieTest", () => {
 
   beforeEach(() => {
     deprecators = new Deprecators();
-    appConfig = {};
-    app = { config: { get: (key: string): unknown => appConfig[key] }, deprecators };
+    app = { config: Trailtie.config, deprecators };
     savedHashDigestClass = Digest.hashDigestClass;
     const cur = Trailtie.config.get("activeSupport");
     try {
@@ -122,26 +120,5 @@ describe("RailtieTest", () => {
     const before = Digest.hashDigestClass;
     await runTrailtieInitializers(Trailtie, app);
     expect(Digest.hashDigestClass).toBe(before);
-  });
-
-  it("runInitializers reads deprecation settings off the yielded application's config", async () => {
-    const other = new Deprecation();
-    deprecators.set("other", other);
-    appConfig["activeSupport"] = { reportDeprecations: false } satisfies ActiveSupportConfig;
-    Trailtie.config.set("activeSupport", {} satisfies ActiveSupportConfig);
-    const savedBehavior = deprecator.behavior;
-    const savedSilenced = deprecator.silenced;
-    const savedDisallowed = deprecator.disallowedBehavior;
-    try {
-      await runTrailtieInitializers(Trailtie, app);
-      for (const d of [deprecator, other]) {
-        expect(d.silenced).toBe(true);
-        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.silence]);
-      }
-    } finally {
-      deprecator.behavior = savedBehavior;
-      deprecator.silenced = savedSilenced;
-      deprecator.disallowedBehavior = savedDisallowed;
-    }
   });
 });

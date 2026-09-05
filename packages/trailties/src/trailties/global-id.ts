@@ -40,45 +40,41 @@ export class Trailtie extends BaseTrailtie {
     this.config.eagerLoadNamespaces.push(GlobalID);
 
     this.initializer("global_id", (app) => {
-      Trailtie.initialize(app as TrailtieApp);
-    });
+      const defaultExpiresIn = months(1).toI();
+      const defaultAppName = dasherize(
+        (app as TrailtieApp).railtieName.replace("_application", ""),
+      );
 
-    this.initializer("web_console.deprecator", (app) => {
-      (app as TrailtieApp).deprecators?.set("globalId", GlobalID.deprecator());
-    });
-  }
-
-  static initialize(app: TrailtieApp): void {
-    let config = app.config.get("globalId") as GlobalIdConfig | undefined;
-    if (config === undefined) {
-      config = Trailtie.config.get("globalId") as GlobalIdConfig;
-      app.config.set("globalId", config);
-    }
-    const defaultExpiresIn = months(1).toI();
-    const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
-
-    setApp((config.app ??= defaultAppName));
-    SignedGlobalID.expiresIn =
-      "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
-
-    onLoad("after_initialize", () => {
+      const config = (app as TrailtieApp).config.get("globalId") as GlobalIdConfig;
       setApp((config.app ??= defaultAppName));
       SignedGlobalID.expiresIn =
         "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
 
-      config.verifier ??= (() => {
-        try {
-          return new Verifier(app.keyGenerator().generateKey("signed_global_ids"));
-        } catch (error) {
-          if (error instanceof ArgumentError) return undefined;
-          throw error;
-        }
-      })();
-      SignedGlobalID.verifier = config.verifier;
+      this.config.afterInitialize(() => {
+        setApp((config.app ??= defaultAppName));
+        SignedGlobalID.expiresIn =
+          "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
+
+        config.verifier ??= (() => {
+          try {
+            return new Verifier(
+              (app as TrailtieApp).keyGenerator().generateKey("signed_global_ids"),
+            );
+          } catch (error) {
+            if (error instanceof ArgumentError) return undefined;
+            throw error;
+          }
+        })();
+        SignedGlobalID.verifier = config.verifier;
+      });
+
+      onLoad("active_record_fixture_set", (fixtureSet: FixtureSetHost) => {
+        extend(fixtureSet as object, FixtureSet);
+      });
     });
 
-    onLoad("active_record_fixture_set", (fixtureSet: FixtureSetHost) => {
-      extend(fixtureSet as object, FixtureSet);
+    this.initializer("web_console.deprecator", (app) => {
+      (app as TrailtieApp).deprecators?.set("globalId", GlobalID.deprecator());
     });
   }
 }
