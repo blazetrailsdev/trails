@@ -242,39 +242,38 @@ export class AbstractController {
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    this.actionName = action;
     this._performed = false;
     await _runProcessActionCallbacks(this, action, () => this._dispatchAction(action, ...args));
   }
 
   /** @internal */
   async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    if (this.isActionMethod(action)) {
-      const method = (this as any)[action];
-      if (typeof method === "function") {
-        await method.apply(this, args);
-      }
-    } else if (typeof (this as any).actionMissing === "function") {
-      await (this as any).actionMissing(action, ...args);
-    } else {
+    const method = (this as any)[action];
+    if (typeof method !== "function") {
       throw new ActionNotFound(
         `The action '${action}' could not be found for ${this.constructor.name}`,
         this,
         action,
       );
     }
+    await method.apply(this, args);
   }
 
   async process(action: string, ...args: unknown[]): Promise<void> {
-    if (!this._findActionName(action)) {
+    this._actionName = String(action);
+
+    const actionName = this._findActionName(this._actionName);
+    if (!actionName) {
       throw new ActionNotFound(
         `The action '${action}' could not be found for ${this.constructor.name}`,
         this,
         action,
       );
     }
+
     this._responseBody = null;
-    await this.processAction(action, ...args);
+
+    await this.processAction(actionName, ...args);
   }
 
   isAvailableAction(actionName: string): boolean {

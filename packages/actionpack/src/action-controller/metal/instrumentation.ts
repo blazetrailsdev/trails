@@ -1,12 +1,10 @@
-import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
+import { ExecutionContext, Notifications, toF } from "@blazetrails/activesupport";
 import {
   ExceptionWrapper,
   classNameOf,
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-
-const now = (): number => globalThis.performance?.now() ?? Date.now();
 
 interface InstrumentationHost {
   actionName?: string;
@@ -58,17 +56,6 @@ export interface Notifier {
   instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
 }
 
-export function instrumentRender(
-  fn: () => unknown,
-  notifier?: Notifier,
-): { result: unknown; viewRuntime: number } {
-  const start = now();
-  const result = fn();
-  const viewRuntime = now() - start;
-  notifier?.instrument("render.action_controller", { duration: viewRuntime });
-  return { result, viewRuntime };
-}
-
 /** @internal */
 export function haltedCallbackHook(filter: unknown, _name?: unknown, notifier?: Notifier): void {
   notifier?.instrument("halted_callback.action_controller", { filter });
@@ -81,19 +68,17 @@ export function cleanupViewRuntime<T>(block: () => T): T {
 
 /** @internal */
 export function appendInfoToPayload(
-  this: { viewRuntime?: number } | undefined,
+  this: { viewRuntime?: number | null } | undefined,
   payload: Record<string, unknown>,
 ): void {
-  if (this && this.viewRuntime !== undefined) {
-    payload.viewRuntime = this.viewRuntime;
-  }
+  payload.view_runtime = this?.viewRuntime;
 }
 
 export function logProcessAction(payload: Record<string, unknown>): string[] {
   const messages: string[] = [];
-  const viewRuntime = payload.view_runtime ?? payload.viewRuntime;
-  if (viewRuntime !== undefined && viewRuntime !== null) {
-    messages.push(`Views: ${Number(viewRuntime).toFixed(1)}ms`);
+  const viewRuntime = payload.view_runtime;
+  if (viewRuntime != null && viewRuntime !== false) {
+    messages.push(`Views: ${toF(String(viewRuntime)).toFixed(1)}ms`);
   }
   return messages;
 }

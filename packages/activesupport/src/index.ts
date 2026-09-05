@@ -261,6 +261,7 @@ export {
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
 export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
+export { toF, toI } from "./core-ext/string/conversions.js";
 
 export {
   delegate,
@@ -382,6 +383,7 @@ export {
   ArgumentError,
 } from "./time-zone-config.js";
 
+export { Benchmark } from "./benchmark.js";
 export { Notifications } from "./notifications.js";
 export {
   Event as NotificationEvent,
@@ -430,6 +432,7 @@ export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
 export { trailsLogger, _setTrailsLogger } from "./trails-logger-slot.js";
+export { trails, _setTrails } from "./trails-slot.js";
 export type {
   ErrorSeverity,
   ErrorContext,

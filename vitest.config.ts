@@ -142,6 +142,14 @@ const alias = {
     __dirname,
     "packages/activesupport/src/digest.ts",
   ),
+  // Above the bare entry: Vite's object alias is a prefix match, so "…/cache"
+  // alone would also swallow "…/cache/*".
+  "@blazetrails/activesupport/cache/":
+    path.resolve(__dirname, "packages/activesupport/src/cache/") + "/",
+  "@blazetrails/activesupport/cache": path.resolve(
+    __dirname,
+    "packages/activesupport/src/cache.ts",
+  ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,

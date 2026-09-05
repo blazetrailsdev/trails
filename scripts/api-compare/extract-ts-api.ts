@@ -864,7 +864,7 @@ export function extractFromProgram(
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
         // as a module. This is the shape every `include(Host, Mod)`
-        // mixin uses (see activesupport/src/include.ts).
+        // mixin uses (see ruby-compat/src/include.ts).
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
@@ -2549,7 +2549,7 @@ export function internalJsDocTagApplies(node: ts.Node): boolean {
  */
 /**
  * Ruby module-body visibility, read off `defineModule(pub, prot, priv)`
- * (`packages/activesupport/src/include.ts`) — the single declaration site for a
+ * (`packages/ruby-compat/src/include.ts`) — the single declaration site for a
  * mixin member's visibility, and the one syntactic shape this can key on.
  *
  * A member of `QueryMethodsPrivateInstanceMethods` is `private` in Rails

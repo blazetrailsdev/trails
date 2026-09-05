@@ -5,6 +5,8 @@ import {
   Notifications,
 } from "@blazetrails/activesupport";
 import { LogSubscriber } from "../log-subscriber.js";
+import { Base } from "../base.js";
+import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 
 class CaptureLogger {
   messages: string[] = [];
@@ -77,9 +79,36 @@ describe("ACLogSubscriberTest", () => {
       "send_file",
       "redirect_to",
       "send_data",
+      "write_fragment",
+      "read_fragment",
+      "exist_fragment?",
+      "expire_fragment",
     ]);
     expect(silencedBy({ "info?": true, "debug?": false, "error?": true })).toEqual([
       "unpermitted_parameters",
     ]);
+  });
+
+  it("the fragment cache methods log nothing unless enable_fragment_cache_logging is on", () => {
+    const caching = Base as unknown as CachingClassMethods;
+    const previous = caching.enableFragmentCacheLogging;
+    const event = new NotificationEvent("write_fragment.action_controller", 0, 0.0102, "x", {
+      key: "views/foo",
+    });
+    try {
+      caching.enableFragmentCacheLogging = false;
+      subscriber.writeFragment(event);
+      expect(logger.messages).toEqual([]);
+
+      caching.enableFragmentCacheLogging = true;
+      subscriber.writeFragment(event);
+      subscriber["existFragment?"](event);
+      expect(logger.messages).toEqual([
+        "Write fragment views/foo (10.2ms)",
+        "Exist fragment? views/foo (10.2ms)",
+      ]);
+    } finally {
+      caching.enableFragmentCacheLogging = previous;
+    }
   });
 });

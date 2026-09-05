@@ -18,6 +18,11 @@ describe("HashWithIndifferentAccess", () => {
     expect(h.dig("a", 5)).toBeUndefined();
   });
 
+  it("dig with array rejects a non-Integer index", () => {
+    const h = new HashWithIndifferentAccess<unknown>({ a: [1, { b: 2 }] });
+    expect(() => h.dig("a", "0")).toThrow("no implicit conversion of String into Integer");
+  });
+
   it("dig raises TypeError for non-diggable intermediate", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(() => h.dig("a", "b")).toThrow("Integer does not have #dig method");

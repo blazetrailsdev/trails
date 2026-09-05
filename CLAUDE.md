@@ -534,7 +534,7 @@ and `this` resolves to the actual subclass at runtime.
 
 For **instance methods mixed in bulk** (like Rails' `include QueryMethods`),
 use `include()` / `Included<>` from `@blazetrails/activesupport`. See
-`activesupport/src/include.ts` and `relation.ts` + `relation/query-methods.ts`.
+`ruby-compat/src/include.ts` and `relation.ts` + `relation/query-methods.ts`.
 
 When NOT to use this:
 

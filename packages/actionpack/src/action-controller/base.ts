@@ -1,4 +1,4 @@
-import { ArgumentError, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import { ArgumentError, Benchmark, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { File, getCrypto, symbolToS } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
@@ -218,68 +218,74 @@ export class Base extends Metal {
     return PROTECTED_IVARS;
   }
 
+  viewRuntime: number | null = null;
+
   render(options: RenderOptions = {}): void {
-    if (this.performed) {
-      throw new DoubleRenderError(
-        "Render and/or redirect were called multiple times in this action.",
-      );
-    }
+    this.viewRuntime = this.cleanupViewRuntime(() =>
+      Benchmark.realtime(":float_millisecond", () => {
+        if (this.performed) {
+          throw new DoubleRenderError(
+            "Render and/or redirect were called multiple times in this action.",
+          );
+        }
 
-    if (options.status) {
-      this.status = options.status;
-    }
+        if (options.status) {
+          this.status = options.status;
+        }
 
-    if (options.json !== undefined) {
-      const jsonStr =
-        typeof options.json === "string" ? options.json : JSON.stringify(options.json);
-      if (options.callback && JSONP_CALLBACK_RE.test(options.callback)) {
-        const jsonPayload =
-          typeof options.json === "string" ? JSON.stringify(options.json) : jsonStr;
-        const safeJson = escapeJsonForJs(jsonPayload);
-        this.contentType = options.contentType ?? "text/javascript; charset=utf-8";
-        this.body = `/**/\n${options.callback}(${safeJson})`;
-      } else {
-        this.contentType = options.contentType ?? "application/json; charset=utf-8";
-        this.body = jsonStr;
-      }
-    } else if (options.plain !== undefined) {
-      this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-      this.body = options.plain;
-    } else if (options.html !== undefined) {
-      this.contentType = options.contentType ?? "text/html; charset=utf-8";
-      this.body = options.html;
-    } else if (options.body !== undefined) {
-      if (options.contentType != null) {
-        this.contentType = String(options.contentType);
-      } else if (!this.response.mediaType) {
-        this.contentType = "text/plain";
-      }
-      this.body = options.body;
-    } else if (options.text !== undefined) {
-      this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-      this.body = options.text;
-    } else if (options.partial !== undefined) {
-      this._pendingRender = { type: "partial", options };
-      return;
-    } else if (
-      options.template !== undefined ||
-      options.action !== undefined ||
-      options.collection !== undefined
-    ) {
-      this._pendingRender = { type: "template", options };
-      return;
-    } else if (this.lookupContext.viewPaths.size > 0) {
-      this._pendingRender = { type: "template", options };
-      return;
-    } else {
-      this._renderTemplate(this.actionName, options);
-      if (!this.performed) {
-        this.contentType = "text/html; charset=utf-8";
-        this.body = "";
-      }
-    }
+        if (options.json !== undefined) {
+          const jsonStr =
+            typeof options.json === "string" ? options.json : JSON.stringify(options.json);
+          if (options.callback && JSONP_CALLBACK_RE.test(options.callback)) {
+            const jsonPayload =
+              typeof options.json === "string" ? JSON.stringify(options.json) : jsonStr;
+            const safeJson = escapeJsonForJs(jsonPayload);
+            this.contentType = options.contentType ?? "text/javascript; charset=utf-8";
+            this.body = `/**/\n${options.callback}(${safeJson})`;
+          } else {
+            this.contentType = options.contentType ?? "application/json; charset=utf-8";
+            this.body = jsonStr;
+          }
+        } else if (options.plain !== undefined) {
+          this.contentType = options.contentType ?? "text/plain; charset=utf-8";
+          this.body = options.plain;
+        } else if (options.html !== undefined) {
+          this.contentType = options.contentType ?? "text/html; charset=utf-8";
+          this.body = options.html;
+        } else if (options.body !== undefined) {
+          if (options.contentType != null) {
+            this.contentType = String(options.contentType);
+          } else if (!this.response.mediaType) {
+            this.contentType = "text/plain";
+          }
+          this.body = options.body;
+        } else if (options.text !== undefined) {
+          this.contentType = options.contentType ?? "text/plain; charset=utf-8";
+          this.body = options.text;
+        } else if (options.partial !== undefined) {
+          this._pendingRender = { type: "partial", options };
+          return;
+        } else if (
+          options.template !== undefined ||
+          options.action !== undefined ||
+          options.collection !== undefined
+        ) {
+          this._pendingRender = { type: "template", options };
+          return;
+        } else if (this.lookupContext.viewPaths.size > 0) {
+          this._pendingRender = { type: "template", options };
+          return;
+        } else {
+          this._renderTemplate(this.actionName, options);
+          if (!this.performed) {
+            this.contentType = "text/html; charset=utf-8";
+            this.body = "";
+          }
+        }
 
-    this.markPerformed();
+        this.markPerformed();
+      }),
+    );
   }
 
   _pendingRender: { type: string; options: RenderOptions } | null = null;
@@ -666,7 +672,6 @@ export class Base extends Metal {
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    this.actionName = action;
     await _instrumentProcessAction.call(this as never, async () => {
       try {
         _processAction.call(this as never, action, ...args);

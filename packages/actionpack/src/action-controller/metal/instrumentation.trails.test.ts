@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { isSymbol } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import { logProcessAction } from "./instrumentation.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { ParamError } from "../../action-dispatch/http/param-error.js";
@@ -100,5 +101,28 @@ describe("ActionController::Instrumentation#process_action", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].status).toBe(400);
+  });
+
+  it("publishes process_action with the view_runtime the render measured", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        this.render({ plain: "hello" });
+      }
+    }
+    await new WidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(typeof events[0].view_runtime).toBe("number");
+    expect(events[0].view_runtime).toBeGreaterThanOrEqual(0);
+  });
+
+  it("log_process_action formats a String view_runtime through to_f", () => {
+    expect(logProcessAction({ view_runtime: "12.5" })).toEqual(["Views: 12.5ms"]);
+    expect(logProcessAction({ view_runtime: "abc" })).toEqual(["Views: 0.0ms"]);
+    expect(logProcessAction({})).toEqual([]);
   });
 });
