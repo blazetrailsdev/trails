@@ -20,10 +20,16 @@ export class ConnectionUrlResolver {
         throw new Error(`Invalid database URL: ${redactUrl(url)}`);
       }
       this._adapter = null;
-      this._opaque = null;
-      this._emptyAuthority = true;
-      this._parsed = new URL(`http://placeholder/${url.replace(/^\//, "")}`);
-      this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
+      this._parsed = null;
+      this._emptyAuthority = false;
+      const queryIdx = url.indexOf("?");
+      if (queryIdx >= 0) {
+        this._opaque = url.slice(0, queryIdx);
+        this._query = url.slice(queryIdx + 1);
+      } else {
+        this._opaque = url;
+        this._query = null;
+      }
       return;
     }
 
