@@ -142,6 +142,7 @@ export class Session {
     this.env(name, value);
   }
 
+  /** @missingRailsCall delete — PERMANENT */
   env(name: string, value: unknown): void {
     if (value == null) {
       delete this._env[name];
@@ -253,7 +254,10 @@ export class Session {
     }
   }
 
-  /** @internal */
+  /**
+   * @missingRailsCall call — PERMANENT
+   * @internal
+   */
   private async processRequest(
     uri: Generic,
     env: RackEnv,

@@ -1,7 +1,9 @@
+import { assertEmpty } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MockResponse, Request } from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
 import { Error as RackTestError, Session } from "./index.js";
+import { mustBe } from "./test-helpers/assertions.js";
 
 const app = FAKE_APP;
 
@@ -21,11 +23,11 @@ const lastResponse = (): MockResponse => session.lastResponse();
 
 describe("Rack::Test::Session", () => {
   it("supports being initialized with a Rack::MockSession app", async () => {
-    expect((await Session.new(new Session(app)).request("/")).isOk).toBe(true);
+    mustBe(await Session.new(new Session(app)).request("/"), "isOk");
   });
 
   it("supports being initialized with an app", async () => {
-    expect((await Session.new(app).request("/")).isOk).toBe(true);
+    mustBe(await Session.new(app).request("/"), "isOk");
   });
 });
 
@@ -33,11 +35,11 @@ describe("Rack::Test::Session#request", () => {
   it("requests the URI using GET by default", async () => {
     await request("/");
     expect(lastRequest().env["REQUEST_METHOD"]).toBe("GET");
-    expect(lastResponse().isOk).toBe(true);
+    mustBe(lastResponse(), "isOk");
   });
 
   it("returns last response", async () => {
-    expect((await request("/")).isOk).toBe(true);
+    mustBe(await request("/"), "isOk");
   });
 
   it("uses the provided env", async () => {
@@ -88,7 +90,7 @@ describe("Rack::Test::Session#request", () => {
 
   it("yields the response to a given block", async () => {
     await request("/", {}, (response) => {
-      expect(response.isOk).toBe(true);
+      mustBe(response, "isOk");
     });
   });
 
@@ -148,9 +150,9 @@ describe("Rack::Test::Session#request", () => {
       ":params": {},
       CONTENT_TYPE: "multipart/form-data",
     });
-    expect(lastRequest().POST).toEqual({});
+    assertEmpty({ ...lastRequest().POST });
     lastRequest().env["rack.input"].rewind();
-    expect(lastRequest().env["rack.input"].read()).toBe("");
+    assertEmpty(lastRequest().env["rack.input"].read());
   });
 
   it("supports sending :query_params for POST", async () => {
@@ -170,8 +172,8 @@ describe("Rack::Test::Session#request", () => {
 
   it("doesn't follow redirects by default", async () => {
     await request("/redirect");
-    expect(lastResponse().isRedirect).toBe(true);
-    expect(lastResponse().getBody()).toBe("");
+    mustBe(lastResponse(), "isRedirect");
+    assertEmpty(lastResponse().getBody());
   });
 
   it("allows passing :input in for POSTs", async () => {
@@ -272,7 +274,7 @@ describe("Rack::Test::Session#request", () => {
   it("sends XMLHttpRequest for the X-Requested-With header if :xhr option is given", async () => {
     await request("/", { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    expect(lastRequest().xhr).toBe(true);
+    mustBe(lastRequest(), "xhr");
   });
 });
 
@@ -319,7 +321,7 @@ describe("Rack::Test::Session#header", () => {
     session.header("User-Agent", null);
     await request("/");
 
-    expect(lastRequest().env).not.toHaveProperty("HTTP_USER_AGENT");
+    expect(Object.keys(lastRequest().env)).not.toContain("HTTP_USER_AGENT");
   });
 
   it("is overridden by headers sent during the request", async () => {
@@ -359,7 +361,7 @@ describe("Rack::Test::Session#env", () => {
     session.env("rack.session", null);
     await request("/");
 
-    expect(lastRequest().env).not.toHaveProperty("X_CSRF_TOKEN");
+    expect(Object.keys(lastRequest().env)).not.toContain("X_CSRF_TOKEN");
   });
 
   it("is overridden by envs sent during the request", async () => {
@@ -420,7 +422,7 @@ function verbExamples(verb: Verb): void {
     await session[verb]("/");
 
     expect(lastRequest().env["REQUEST_METHOD"]).toBe(verb.toUpperCase());
-    expect(lastResponse().isOk).toBe(true);
+    mustBe(lastResponse(), "isOk");
   });
 
   it("uses the provided env", async () => {
@@ -432,7 +434,7 @@ function verbExamples(verb: Verb): void {
     let yielded = false;
 
     await session[verb]("/", {}, {}, (response) => {
-      expect(response.isOk).toBe(true);
+      mustBe(response, "isOk");
       yielded = true;
     });
 
@@ -452,7 +454,7 @@ function verbExamples(verb: Verb): void {
   it("sends XMLHttpRequest for the X-Requested-With header", async () => {
     await session[verb]("/", {}, { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    expect(lastRequest().xhr).toBe(true);
+    mustBe(lastRequest(), "xhr");
   });
 }
 
@@ -483,7 +485,7 @@ describe("Rack::Test::Session#get", () => {
 
   it("does not set CONTENT_TYPE when params are not provided", async () => {
     await session.get("/");
-    expect(lastRequest().env).not.toHaveProperty("CONTENT_TYPE");
+    expect(Object.keys(lastRequest().env)).not.toContain("CONTENT_TYPE");
   });
 
   it("sets CONTENT_LENGTH to zero or does not set it when params are not provided", async () => {
@@ -493,7 +495,7 @@ describe("Rack::Test::Session#get", () => {
 
   it("does not set CONTENT_TYPE twhen params are explicitly set to nil", async () => {
     await session.get("/", null);
-    expect(lastRequest().env).not.toHaveProperty("CONTENT_TYPE");
+    expect(Object.keys(lastRequest().env)).not.toContain("CONTENT_TYPE");
   });
 
   it("sets CONTENT_LENGTH to zero or does not set it when params are explicitly set to nil", async () => {
@@ -591,6 +593,11 @@ describe("Rack::Test::Session#delete", () => {
   verbExamples("delete");
   nonGetVerbExamples("delete");
 
+  it("accepts a body", async () => {
+    await session.patch("/", "Lobsterlicious!");
+    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+  });
+
   it("uses the provided params hash", async () => {
     await session.delete("/", { foo: "bar" });
     expect(lastRequest().GET).toEqual({});
@@ -623,7 +630,7 @@ describe("Rack::Test::Session#custom_request", () => {
     await session.customRequest("link", "/");
 
     expect(lastRequest().env["REQUEST_METHOD"]).toBe("LINK");
-    expect(lastResponse().isOk).toBe(true);
+    mustBe(lastResponse(), "isOk");
   });
 
   it("uses the provided env", async () => {
@@ -635,7 +642,7 @@ describe("Rack::Test::Session#custom_request", () => {
     let yielded = false;
 
     await session.customRequest("link", "/", {}, {}, (response) => {
-      expect(response.isOk).toBe(true);
+      mustBe(response, "isOk");
       yielded = true;
     });
 
@@ -655,6 +662,6 @@ describe("Rack::Test::Session#custom_request", () => {
   it("sends XMLHttpRequest for the X-Requested-With header for an XHR", async () => {
     await session.customRequest("link", "/", {}, { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    expect(lastRequest().xhr).toBe(true);
+    mustBe(lastRequest(), "xhr");
   });
 });

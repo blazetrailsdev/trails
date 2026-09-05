@@ -2,7 +2,6 @@ import { Time } from "@blazetrails/date";
 import { Request, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { inspect } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
 export class FakeApp {
   async call(env: RackEnv): Promise<RackResponse> {
     const res = this.handle(env);
@@ -11,7 +10,7 @@ export class FakeApp {
     for (const s of b) length += s.length;
     h["content-length"] = String(length);
     h["content-type"] = "text/html;charset=utf-8";
-    return res;
+    return res as unknown as RackResponse;
   }
 
   /** @internal */
@@ -156,7 +155,6 @@ function required(value: unknown): unknown {
   return value;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export class InputRewinder {
   /** @internal */
   private readonly app: (env: RackEnv) => Promise<RackResponse>;

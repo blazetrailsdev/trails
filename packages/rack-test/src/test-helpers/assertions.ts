@@ -2,13 +2,21 @@ import { expect } from "vitest";
 import { rbObjClass } from "@blazetrails/ruby-compat";
 
 /** @internal */
-export function mustBe(actual: Record<string, () => unknown>, operator: string): void {
-  expect(actual[operator](), `Expected ${inspect(actual)} to be ${operator}`).toBeTruthy();
+export function mustBe(actual: object, operator: string): void {
+  expect(resolve(actual, operator), `Expected ${inspect(actual)} to be ${operator}`).toBeTruthy();
 }
 
 /** @internal */
-export function wontBe(actual: Record<string, () => unknown>, operator: string): void {
-  expect(actual[operator](), `Expected ${inspect(actual)} to not be ${operator}`).toBeFalsy();
+export function wontBe(actual: object, operator: string): void {
+  expect(
+    resolve(actual, operator),
+    `Expected ${inspect(actual)} to not be ${operator}`,
+  ).toBeFalsy();
+}
+
+function resolve(actual: object, operator: string): unknown {
+  const member = (actual as Record<string, unknown>)[operator];
+  return typeof member === "function" ? (member as () => unknown).call(actual) : member;
 }
 
 /** @internal */
