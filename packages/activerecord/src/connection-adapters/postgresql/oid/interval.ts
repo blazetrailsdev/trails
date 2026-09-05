@@ -2,8 +2,6 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
 
 export class Interval extends ValueType<Duration> {
-  readonly name: string = "interval";
-
   constructor(options?: { precision?: number }) {
     super(options);
   }

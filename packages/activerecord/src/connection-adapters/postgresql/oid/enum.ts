@@ -1,8 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Enum extends ValueType<string> {
-  readonly name: string = "enum";
-
   override type(): string {
     return "enum";
   }

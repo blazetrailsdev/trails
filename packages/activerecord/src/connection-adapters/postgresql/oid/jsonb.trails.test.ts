@@ -5,7 +5,7 @@ describe("PostgreSQL::OID::Jsonb", () => {
   it("type() and name both return jsonb", () => {
     const t = new Jsonb();
     expect(t.type()).toBe("jsonb");
-    expect(t.name).toBe("jsonb");
+    expect(t.type()).toBe("jsonb");
   });
 
   it("cast parses JSON strings", () => {

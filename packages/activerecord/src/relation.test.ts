@@ -18,7 +18,9 @@ import { Categorization as CanonCategorization } from "./test-helpers/models/cat
 import { captureSql } from "./testing/sql-capture.js";
 
 class EnsureRoundTripTypeCasting extends ValueType {
-  override readonly name = "string" as unknown as "value";
+  override type(): string {
+    return "string";
+  }
   override cast(value: unknown): unknown {
     if (value == null) return value;
     if (value !== "value from user") throw new Error(String(value));

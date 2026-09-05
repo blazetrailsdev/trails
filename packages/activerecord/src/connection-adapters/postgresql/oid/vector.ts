@@ -1,7 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Vector extends ValueType<unknown> {
-  readonly name: string = "vector";
   readonly delim: string;
   readonly subtype: unknown;
 

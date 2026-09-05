@@ -5,8 +5,6 @@ import { StringKeyedHashAccessor } from "../../../store.js";
 const HSTORE_ERROR = "Invalid Hstore document: %s";
 
 export class Hstore extends ValueType<Record<string, string | null>> {
-  readonly name: string = "hstore";
-
   override type(): string {
     return "hstore";
   }

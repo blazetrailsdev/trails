@@ -225,7 +225,7 @@ describe("DateTimeType cast and serialize coverage", () => {
   });
 
   it("has name 'datetime'", () => {
-    expect(type.name).toBe("datetime");
+    expect(type.type()).toBe("datetime");
   });
 
   it("casts null to null", () => {

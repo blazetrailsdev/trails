@@ -32,8 +32,6 @@ export interface DateType extends Omit<
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateType extends ValueType<DateCastResult> {
-  readonly name: string = "date";
-
   type(): string {
     return "date";
   }

@@ -29,7 +29,7 @@ describe("jsonCodec", () => {
   it("decodes a JSON string back to a coder", () => {
     const decoded = jsonCodec.decode(jsonCodec.encode(coder));
     expect(decoded.conciseAttributes!.map((attr) => attr.name)).toEqual(["name", "age"]);
-    expect(decoded.conciseAttributes![0].type!.name).toBe("string");
+    expect(decoded.conciseAttributes![0].type!.type()).toBe("string");
     expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("Alice");
   });
 

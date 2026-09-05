@@ -3,7 +3,9 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 
 class DoublingType extends ValueType {
-  override readonly name = "doubling" as unknown as "value";
+  override type(): string {
+    return "doubling";
+  }
   override deserialize(value: unknown): unknown {
     return typeof value === "string" ? value + value : value;
   }
@@ -56,13 +58,13 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsA);
     await Widget.loadSchema();
 
-    expect(Widget.typeForAttribute("payload").name).toBe("value");
+    expect(Widget.typeForAttribute("payload").type()).toBeUndefined();
 
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
     await Widget.loadSchema();
 
-    expect(Widget.typeForAttribute("payload").name).toBe("doubling");
+    expect(Widget.typeForAttribute("payload").type()).toBe("doubling");
   });
 
   it("drops stale schema-sourced columns on adapter swap", async () => {

@@ -7,8 +7,6 @@ export const ACCEPTABLE_UUID_REGEX =
   /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i;
 
 export class Uuid extends ValueType<string> {
-  readonly name = "uuid";
-
   override type(): string {
     return "uuid";
   }

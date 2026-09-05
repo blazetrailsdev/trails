@@ -44,7 +44,7 @@ export function toEnvelope(coder: AttributeSetCoder): AttributeSetEnvelope {
       defaultAttributes.push(attr.name);
       continue;
     }
-    envelope.types[attr.name] = attr.type?.name ?? null;
+    envelope.types[attr.name] = attr.type == null ? null : typeRegistry.keyFor(attr.type);
     envelope.values[attr.name] = attr.valueBeforeTypeCast;
   }
   if (defaultAttributes.length > 0) envelope.defaultAttributes = defaultAttributes;

@@ -108,7 +108,6 @@ export interface Coder {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class Serialized extends ValueType {
-  readonly name = "serialized";
   readonly subtype: ValueType | null;
   readonly coder: Coder;
 

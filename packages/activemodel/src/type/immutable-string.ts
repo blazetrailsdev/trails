@@ -10,7 +10,6 @@ export interface ImmutableStringTypeOptions {
 }
 
 export class ImmutableStringType extends ValueType<string> {
-  readonly name: string = "immutable_string";
   readonly true: string;
   readonly false: string;
 

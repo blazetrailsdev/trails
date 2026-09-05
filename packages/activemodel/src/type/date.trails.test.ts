@@ -43,7 +43,7 @@ describe("DateType cast and serialize coverage", () => {
   });
 
   it("has name 'date'", () => {
-    expect(type.name).toBe("date");
+    expect(type.type()).toBe("date");
   });
 
   it("casts null to null", () => {

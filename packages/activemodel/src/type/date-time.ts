@@ -32,8 +32,6 @@ export interface DateTimeType
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateTimeType extends ValueType<DateTimeCastResult> {
-  readonly name: string = "datetime";
-
   type(): string {
     return "datetime";
   }

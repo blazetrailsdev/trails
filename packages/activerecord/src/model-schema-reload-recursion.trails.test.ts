@@ -5,7 +5,9 @@ import { reloadSchemaFromCache } from "./model-schema.js";
 import { registerSubclass } from "./inheritance.js";
 
 class UuidType extends ValueType {
-  override readonly name = "uuid" as unknown as "value";
+  override type(): string {
+    return "uuid";
+  }
 }
 
 function makeAdapter(columns: Record<string, unknown>): unknown {

@@ -1,10 +1,8 @@
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType<[number, number]> {
-  override readonly name: string = "point";
-
   override type(): string {
-    return this.name;
+    return "point";
   }
 
   cast(value: unknown): [number, number] | null {

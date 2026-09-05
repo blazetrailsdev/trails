@@ -152,7 +152,7 @@ describe("AttributeRegistrationTest", () => {
     interface MyModel extends Attributes {}
 
     const types = MyModel.attributeTypes();
-    expect(types["count"].name).toBe("integer");
+    expect(types["count"].type()).toBe("integer");
     expect(types["count"].cast("5")).toBe(5);
   });
 
@@ -318,11 +318,11 @@ describe("AttributeRegistrationTest", () => {
     });
 
     expect(attributes.getAttribute("foo").type).toBeInstanceOf(MyDecorator);
-    expect(attributes.getAttribute("foo").type!.name).toBe("foo");
+    expect((attributes.getAttribute("foo").type as MyDecorator).name).toBe("foo");
     expect((attributes.getAttribute("foo").type as MyDecorator).castType).toBe(TYPE_1);
 
     expect(attributes.getAttribute("bar").type).toBeInstanceOf(MyDecorator);
-    expect(attributes.getAttribute("bar").type!.name).toBe("bar");
+    expect((attributes.getAttribute("bar").type as MyDecorator).name).toBe("bar");
     expect((attributes.getAttribute("bar").type as MyDecorator).castType).toBe(TYPE_2);
 
     expect(attributes.getAttribute("qux").type).toBe(TYPE_2);
@@ -415,7 +415,7 @@ describe("AttributeRegistrationTest", () => {
 
   it("the default type is used when type is omitted", () => {
     const stringType = Types.typeRegistry.lookup("string");
-    expect(stringType.name).toBe("string");
+    expect(stringType.type()).toBe("string");
     expect(stringType.cast("hello")).toBe("hello");
   });
 
@@ -450,8 +450,8 @@ describe("AttributeRegistrationTest", () => {
     interface Person extends Attributes {}
 
     const types = Person.attributeTypes();
-    expect(types["name"].name).toBe("string");
-    expect(types["age"].name).toBe("integer");
+    expect(types["name"].type()).toBe("string");
+    expect(types["age"].type()).toBe("integer");
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {
@@ -467,8 +467,8 @@ describe("AttributeRegistrationTest", () => {
     }
     interface User extends Attributes {}
 
-    expect(User.typeForAttribute("name")?.name).toBe("string");
-    expect(User.typeForAttribute("age")?.name).toBe("integer");
+    expect(User.typeForAttribute("name")?.type()).toBe("string");
+    expect(User.typeForAttribute("age")?.type()).toBe("integer");
   });
 
   it(".attribute_types returns the default type when key is missing", () => {
@@ -483,7 +483,7 @@ describe("AttributeRegistrationTest", () => {
     }
     interface Person extends Attributes {}
 
-    expect(Person.typeForAttribute("name").name).toBe("string");
+    expect(Person.typeForAttribute("name").type()).toBe("string");
     expect(Person.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
   });
 

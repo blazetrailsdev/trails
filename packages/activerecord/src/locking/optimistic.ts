@@ -13,12 +13,10 @@ import type { CounterCacheCounters } from "../counter-cache.js";
 
 export class LockingType extends ValueType<number> {
   private _subtype: ValueType;
-  override readonly name: string;
 
   constructor(subtype: ValueType) {
     super();
     this._subtype = subtype;
-    this.name = subtype.name;
   }
 
   override type(): string | undefined {

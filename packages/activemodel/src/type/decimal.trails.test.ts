@@ -66,7 +66,7 @@ describe("DecimalType cast and serialize coverage", () => {
   const type = new Types.DecimalType();
 
   it("has name 'decimal'", () => {
-    expect(type.name).toBe("decimal");
+    expect(type.type()).toBe("decimal");
   });
 
   it("type cast decimal", () => {

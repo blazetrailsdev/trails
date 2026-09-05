@@ -908,8 +908,8 @@ describe("ReflectionTest", () => {
   it("column string type and limit", async () => {
     await CanonicalTopic.loadSchema();
     expect((CanonicalTopic as any).columnForAttribute("title").type).toBe("string");
-    expect(CanonicalTopic.typeForAttribute("title").name).toBe("string");
-    expect(CanonicalTopic.typeForAttribute("heading").name).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("title").type()).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("heading").type()).toBe("string");
     expect((CanonicalTopic as any).columnForAttribute("title").limit).toBe(250);
   });
 
@@ -931,7 +931,7 @@ describe("ReflectionTest", () => {
     expect(["integer", "big_integer"]).toContain(
       (CanonicalTopic as any).columnForAttribute("id").type,
     );
-    expect(["integer", "big_integer"]).toContain(CanonicalTopic.typeForAttribute("id").name);
+    expect(["integer", "big_integer"]).toContain(CanonicalTopic.typeForAttribute("id").type());
   });
 
   it("non existent columns return null object", async () => {

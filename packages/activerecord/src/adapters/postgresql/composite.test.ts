@@ -17,8 +17,6 @@ interface FullAddress {
 }
 
 class FullAddressType extends ValueType<FullAddress> {
-  override readonly name = "full_address";
-
   override type(): string {
     return "full_address";
   }

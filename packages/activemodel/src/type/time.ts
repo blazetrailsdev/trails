@@ -27,8 +27,6 @@ export interface TimeType
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TimeType extends ValueType<Temporal.Instant | TimeWithZone | RubyTime> {
-  readonly name = "time";
-
   type(): string {
     return "time";
   }

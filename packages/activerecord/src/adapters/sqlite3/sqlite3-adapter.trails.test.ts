@@ -47,36 +47,36 @@ describe("SqliteAdapter", () => {
 
   describe("lookupCastType", () => {
     it("resolves base SQL types", () => {
-      expect(castType("text").name).toBe("text");
-      expect(castType("integer").name).toBe("integer");
-      expect(castType("float").name).toBe("float");
-      expect(castType("boolean").name).toBe("boolean");
-      expect(castType("date").name).toBe("date");
-      expect(castType("datetime").name).toBe("datetime");
-      expect(castType("time").name).toBe("time");
-      expect(castType("json").name).toBe("json");
-      expect(castType("blob").name).toBe("binary");
+      expect(castType("text").type()).toBe("text");
+      expect(castType("integer").type()).toBe("integer");
+      expect(castType("float").type()).toBe("float");
+      expect(castType("boolean").type()).toBe("boolean");
+      expect(castType("date").type()).toBe("date");
+      expect(castType("datetime").type()).toBe("datetime");
+      expect(castType("time").type()).toBe("time");
+      expect(castType("json").type()).toBe("json");
+      expect(castType("blob").type()).toBe("binary");
     });
 
     it("strips precision/scale metadata", () => {
-      expect(castType("DECIMAL(10, 0)").name).toBe("decimal");
-      expect(castType("decimal(5,2)").name).toBe("decimal");
-      expect(castType("INTEGER(11)").name).toBe("integer");
+      expect(castType("DECIMAL(10, 0)").type()).toBe("decimal");
+      expect(castType("decimal(5,2)").type()).toBe("decimal");
+      expect(castType("INTEGER(11)").type()).toBe("integer");
     });
 
     it("handles case-insensitive types", () => {
-      expect(castType("TEXT").name).toBe("text");
-      expect(castType("INTEGER").name).toBe("integer");
-      expect(castType("BOOLEAN").name).toBe("boolean");
+      expect(castType("TEXT").type()).toBe("text");
+      expect(castType("INTEGER").type()).toBe("integer");
+      expect(castType("BOOLEAN").type()).toBe("boolean");
     });
 
     it("resolves SQLite affinity types via regex", () => {
-      expect(castType("varchar").name).toBe("string");
-      expect(castType("character").name).toBe("string");
-      expect(castType("clob").name).toBe("text");
-      expect(castType("double").name).toBe("float");
-      expect(castType("bigint").name).toBe("integer");
-      expect(castType("tinyint").name).toBe("integer");
+      expect(castType("varchar").type()).toBe("string");
+      expect(castType("character").type()).toBe("string");
+      expect(castType("clob").type()).toBe("text");
+      expect(castType("double").type()).toBe("float");
+      expect(castType("bigint").type()).toBe("integer");
+      expect(castType("tinyint").type()).toBe("integer");
     });
   });
 });

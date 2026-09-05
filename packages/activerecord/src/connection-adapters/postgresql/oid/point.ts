@@ -13,8 +13,6 @@ export class PointValue {
 }
 
 export class Point extends ValueType<PointValue> {
-  readonly name: string = "point";
-
   override type(): string {
     return "point";
   }

@@ -4,11 +4,15 @@ import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
 class UuidType extends ValueType {
-  override readonly name = "uuid" as unknown as "value";
+  override type(): string {
+    return "uuid";
+  }
 }
 
 class JsonbType extends ValueType {
-  override readonly name = "jsonb" as unknown as "value";
+  override type(): string {
+    return "jsonb";
+  }
 }
 
 function makeAdapter(
@@ -54,8 +58,8 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model.typeForAttribute("guid").name).toBe("uuid");
-    expect(Model.typeForAttribute("payload").name).toBe("jsonb");
+    expect(Model.typeForAttribute("guid").type()).toBe("uuid");
+    expect(Model.typeForAttribute("payload").type()).toBe("jsonb");
   });
 
   it("does not overwrite user-declared attributes", async () => {
@@ -65,7 +69,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model.typeForAttribute("guid").name).toBe("string");
+    expect(Model.typeForAttribute("guid").type()).toBe("string");
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -217,7 +221,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { adapter: unknown }).adapter = adapter;
     await Post.loadSchema();
 
-    expect(Post.typeForAttribute("age").name).toBe("integer");
+    expect(Post.typeForAttribute("age").type()).toBe("integer");
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
 
@@ -295,6 +299,6 @@ describe("set adapter auto-loads schema", () => {
 
     await Post.loadSchema();
 
-    expect(Post.typeForAttribute("guid").name).toBe("uuid");
+    expect(Post.typeForAttribute("guid").type()).toBe("uuid");
   });
 });

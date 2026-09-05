@@ -1,10 +1,8 @@
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {
-  override readonly name: string = "macaddr";
-
   override type(): string {
-    return this.name;
+    return "macaddr";
   }
 
   override isChanged(

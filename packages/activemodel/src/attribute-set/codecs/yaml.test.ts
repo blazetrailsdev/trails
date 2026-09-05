@@ -4,6 +4,7 @@ import { AttributeSetCodecError } from "./codec.js";
 import type { AttributeSetCoder } from "./codec.js";
 import { Attribute } from "../../attribute.js";
 import { typeRegistry } from "../../type/registry.js";
+import { ValueType } from "../../type/value.js";
 
 const stringType = typeRegistry.lookup("string");
 const integerType = typeRegistry.lookup("integer");
@@ -26,7 +27,7 @@ describe("yamlCodec", () => {
   it("decodes a YAML string back to a coder", () => {
     const decoded = yamlCodec.decode(yamlCodec.encode(coder));
     expect(decoded.conciseAttributes!.map((attr) => attr.name)).toEqual(["name", "age"]);
-    expect(decoded.conciseAttributes![0].type!.name).toBe("string");
+    expect(decoded.conciseAttributes![0].type!.type()).toBe("string");
     expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("Alice");
   });
 
@@ -50,7 +51,7 @@ describe("yamlCodec", () => {
   it("round-trips with unknown type key (schema drift)", () => {
     const drifted = "v: 1\ntypes:\n  score: future_type\nvalues:\n  score: 42\n";
     const decoded = yamlCodec.decode(drifted);
-    expect(decoded.conciseAttributes![0].type!.name).toBe("value");
+    expect(decoded.conciseAttributes![0].type).toBeInstanceOf(ValueType);
     expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe(42);
   });
 

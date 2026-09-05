@@ -1,8 +1,6 @@
 import { IntegerType } from "./integer.js";
 
 export class BigIntegerType extends IntegerType {
-  readonly name: string = "big_integer";
-
   override serializeCastValue(value: number | bigint | null): number | bigint | null {
     return value;
   }

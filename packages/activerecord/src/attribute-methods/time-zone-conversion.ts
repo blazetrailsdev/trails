@@ -38,12 +38,10 @@ export const TimeZoneConversion = {
 
 export class TimeZoneConverter extends ValueType<unknown> {
   private readonly _subtype: ValueType;
-  override readonly name: string;
 
   constructor(subtype: ValueType) {
     super();
     this._subtype = subtype;
-    this.name = subtype.name;
   }
 
   static wrap(subtype: ValueType): TimeZoneConverter {
