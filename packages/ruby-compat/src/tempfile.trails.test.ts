@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
+import { Process } from "./process.js";
 import { Tempfile } from "./tempfile.js";
 
 describe("Tempfile", () => {
@@ -139,6 +140,33 @@ describe("Tempfile", () => {
     expect(() => tempfile.setEncoding("no-such-encoding")).toThrow(
       "unknown encoding name - no-such-encoding",
     );
+    tempfile.close();
+    tempfile.unlink();
+  });
+
+  it("new creates the file at 0600 in the open(2) call rather than by a chmod", () => {
+    const chmod = File.chmod;
+    File.chmod = () => {
+      throw new Error("chmod must not be reached");
+    };
+    try {
+      const tempfile = Tempfile.new("perm");
+      expect(File.stat(tempfile.path!).mode & 0o777).toBe(0o600);
+      tempfile.close();
+      tempfile.unlink();
+    } finally {
+      File.chmod = chmod;
+    }
+  });
+
+  it("the name carries the local date, the process id and a random draw", () => {
+    const tempfile = Tempfile.new("stamp");
+    const name = tempfile.path!.split("/").pop()!;
+    const now = new Date();
+    const t = `${String(now.getFullYear()).padStart(4, "0")}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+    expect(name).toMatch(new RegExp(`^stamp${t}-${Process.pid}-[0-9a-z]+$`));
+
     tempfile.close();
     tempfile.unlink();
   });

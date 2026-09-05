@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { getProcessAdapter } from "./process-adapter.js";
 
 interface SystemCallError extends Error {
   code?: string;
@@ -39,6 +40,19 @@ export class Process {
    * `Process::CLOCK_THREAD_CPUTIME_ID` (`vendor/ruby/process.c:9422`).
    */
   static readonly CLOCK_THREAD_CPUTIME_ID = ":CLOCK_THREAD_CPUTIME_ID";
+
+  /**
+   * `vendor/ruby/process.c:9195`, where `rb_mProcess` registers
+   * `proc_get_pid` (`process.c:530`) as `Process.pid` — `getpid(2)`, which
+   * `Dir::Tmpname.create` stamps into a candidate name as `$$`
+   * (`vendor/ruby/lib/tmpdir.rb:154`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.pid`
+   * (`vendor/ruby/process.c:530`).
+   */
+  static get pid(): number {
+    return getProcessAdapter().pid();
+  }
 
   /**
    * `vendor/ruby/process.c:8283` `rb_clock_gettime`, which reads the tick for

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { Process } from "./process.js";
+import { getProcessAdapter } from "./process-adapter.js";
 
 describe("Process", () => {
   it("clock_gettime answers a non-decreasing float second reading", () => {
@@ -32,6 +33,12 @@ describe("Process", () => {
     expect(() => Process.clockGettime(":CLOCK_PROCESS_CPUTIME_ID")).toThrow(
       "Invalid argument - clock_gettime(:CLOCK_PROCESS_CPUTIME_ID)",
     );
+  });
+
+  it("pid answers the running process id", () => {
+    expect(Process.pid).toBe(getProcessAdapter().pid());
+    expect(Number.isInteger(Process.pid)).toBe(true);
+    expect(Process.pid).toBeGreaterThan(0);
   });
 
   it("carries the clock ids Rails names", () => {

@@ -66,7 +66,7 @@ export interface FsAdapter {
   symlinkSync?(target: string, path: string): void;
   realpathSync?(path: string): string;
   accessSync?(path: string, mode: number): void;
-  openSync(path: string, flags: string): number;
+  openSync(path: string, flags: string, mode?: number): number;
   readSync(
     fd: number,
     buffer: Uint8Array,
@@ -134,7 +134,7 @@ export function registerFsAdapter(name: string, fs: FsAdapter, path: PathAdapter
 let nodeAttempted = false;
 
 interface FlockableFs {
-  openSync(path: string, flags: string): number;
+  openSync(path: string, flags: string, mode?: number): number;
   closeSync(fd: number): void;
   unlinkSync(path: string): void;
 }
@@ -185,8 +185,8 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
   };
 
   return {
-    openSync: (path: string, flags: string) => {
-      const fd = nodeFs.openSync(path, flags);
+    openSync: (path: string, flags: string, mode?: number) => {
+      const fd = nodeFs.openSync(path, flags, mode);
       flockPaths.set(fd, path);
       return fd;
     },

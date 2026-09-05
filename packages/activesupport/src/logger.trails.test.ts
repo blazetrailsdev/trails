@@ -22,6 +22,7 @@ function makeCapturingAdapter(): { adapter: ProcessAdapter; written: string[] } 
     cwd: () => "/capture",
     chdir: () => {},
     platform: () => "capture",
+    pid: () => 1,
     setEnv: () => {},
     exit: () => {
       throw new Error("exit");

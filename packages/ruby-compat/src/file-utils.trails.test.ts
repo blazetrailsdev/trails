@@ -277,6 +277,45 @@ describe("FileUtils", () => {
     expect(nodeFs.readlinkSync(dest)).toEqual(target);
   });
 
+  it("copy_entry copies the target of a symlinked root under dereference_root", () => {
+    const target = nodePath.join(root, "target");
+    const src = nodePath.join(root, "link");
+    const dest = nodePath.join(root, "copy");
+    nodeFs.writeFileSync(target, "contents");
+    nodeFs.symlinkSync(target, src);
+
+    FileUtils.copyEntry(src, dest, false, true);
+
+    expect(nodeFs.lstatSync(dest).isSymbolicLink()).toBe(false);
+    expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("contents");
+  });
+
+  it("copy_entry unlinks an existing destination file under remove_destination", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "new");
+    nodeFs.writeFileSync(dest, "old");
+
+    FileUtils.copyEntry(src, dest, false, false, true);
+
+    expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("new");
+  });
+
+  it("copy_entry unlinks an existing destination symlink under remove_destination", () => {
+    const src = nodePath.join(root, "src");
+    const other = nodePath.join(root, "other");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "new");
+    nodeFs.writeFileSync(other, "old");
+    nodeFs.symlinkSync(other, dest);
+
+    FileUtils.copyEntry(src, dest, false, false, true);
+
+    expect(nodeFs.lstatSync(dest).isSymbolicLink()).toBe(false);
+    expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("new");
+    expect(nodeFs.readFileSync(other, "utf-8")).toEqual("old");
+  });
+
   it.each([
     ["a device file", "isCharacterDevice", "cannot handle device file"],
     ["a device file", "isBlockDevice", "cannot handle device file"],
