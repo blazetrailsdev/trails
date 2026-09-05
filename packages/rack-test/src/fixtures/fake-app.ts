@@ -1,16 +1,32 @@
 import { Time } from "@blazetrails/date";
-import { Request, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import {
+  Lint,
+  Request,
+  release,
+  type RackApp,
+  type RackBody,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
 import { inspect } from "@blazetrails/ruby-compat";
+
+/** @internal */
+type FakeResponse = [number, Record<string, string | string[]>, string[]];
+
+/** @internal */
+async function* eachBody(body: string[]): RackBody {
+  for (const s of body) yield s;
+}
 
 export class FakeApp {
   async call(env: RackEnv): Promise<RackResponse> {
     const res = this.handle(env);
-    const [, h, b] = res;
+    const [status, h, b] = res;
     let length = 0;
-    for (const s of b) length += s.length;
+    for (const s of b) length += new TextEncoder().encode(s).length;
     h["content-length"] = String(length);
     h["content-type"] = "text/html;charset=utf-8";
-    return res as unknown as RackResponse;
+    return [status, h as Record<string, string>, eachBody(b)];
   }
 
   /** @internal */
@@ -20,7 +36,7 @@ export class FakeApp {
   }
 
   /** @internal */
-  private handle(env: RackEnv): [number, Record<string, string | string[]>, string[]] {
+  private handle(env: RackEnv): FakeResponse {
     const method = env["REQUEST_METHOD"] as string;
     const path = env["PATH_INFO"] as string;
     const req = new Request(env);
@@ -141,7 +157,8 @@ export class FakeApp {
     }
 
     if (path === "/cookies/set-multiple" && method === "GET") {
-      const value = ["key1=value1", "key2=value2"];
+      const value =
+        release() >= "2.3" ? ["key1=value1", "key2=value2"] : "key1=value1\nkey2=value2";
       return [200, { "set-cookie": value }, ["Set"]];
     }
 
@@ -178,5 +195,6 @@ export class InputRewinder {
 }
 
 const fakeApp = new FakeApp();
-const inputRewinder = new InputRewinder((env: RackEnv) => fakeApp.call(env));
-export const FAKE_APP = (env: RackEnv) => inputRewinder.call(env);
+const lint = new Lint((env: RackEnv) => fakeApp.call(env));
+const inputRewinder = new InputRewinder((env: RackEnv) => lint.call(env) as Promise<RackResponse>);
+export const FAKE_APP: RackApp = (env: RackEnv) => inputRewinder.call(env);
