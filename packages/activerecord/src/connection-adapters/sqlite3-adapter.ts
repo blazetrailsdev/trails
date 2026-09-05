@@ -488,8 +488,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  override typeCastedBinds = (binds: unknown[] | null | undefined): unknown[] | undefined =>
-    binds?.map(_driverBind, this);
+  override typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined {
+    return binds?.map(_driverBind, this);
+  }
 
   override quoteString(s: string): string {
     return sqliteQuoteString(s);

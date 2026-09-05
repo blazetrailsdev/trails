@@ -68,6 +68,7 @@ import {
 import {
   quote as abstractQuote,
   typeCast as abstractTypeCast,
+  typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
@@ -801,7 +802,9 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  declare typeCastedBinds: (binds: unknown[] | null | undefined) => unknown[] | undefined;
+  typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined {
+    return abstractTypeCastedBinds.call(this, binds);
+  }
 
   quoteString(s: string): string {
     return abstractQuoteString(s);

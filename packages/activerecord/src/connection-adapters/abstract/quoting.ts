@@ -298,7 +298,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
 }
 
 /** @internal */
-function typeCastedBinds(
+export function typeCastedBinds(
   this: { typeCast: (v: unknown) => unknown },
   binds: unknown[] | null | undefined,
 ): unknown[] | undefined {
