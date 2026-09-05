@@ -212,6 +212,12 @@ export class Session {
     SERVER_PROTOCOL: "HTTP/1.0",
   };
 
+  static {
+    if (!(release() >= "2.3")) {
+      Session.DEFAULT_ENV["HTTP_VERSION"] = Session.DEFAULT_ENV["SERVER_PROTOCOL"];
+    }
+  }
+
   /** @internal */
   private envFor(uri: Generic, env: RackEnv): RackEnv {
     env = { ...Session.DEFAULT_ENV, ...this._env, ...env };
