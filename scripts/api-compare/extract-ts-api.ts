@@ -1560,6 +1560,20 @@ export function extractFromProgram(
     });
   }
 
+  // A barrel clone is spread from its declaring entry BEFORE the two passes
+  // above run, so it shares the `extends` array they push onto but not the
+  // `extendsFiles` object they replace. Re-syncing the map keeps a re-exported
+  // host's mixin edges resolvable: without it a cross-package edge
+  // (`include(Json, MutableModule)`, activemodel's module reached from
+  // activerecord) arrives at the clone as a bare short name and resolves to
+  // nothing, dropping the whole inheritance edge.
+  for (const entity of [...Object.values(info.classes), ...Object.values(info.modules)]) {
+    if (entity.reExportedFrom === undefined) continue;
+    const source = info.classes[entity.reExportedFrom] ?? info.modules[entity.reExportedFrom];
+    if (source?.extendsFiles === undefined) continue;
+    entity.extendsFiles = { ...source.extendsFiles, ...(entity.extendsFiles ?? {}) };
+  }
+
   // Object.defineProperty pass: detect two patterns that wire methods onto a
   // class prototype without going through include(). Both appear in base.ts:
   //

@@ -1,6 +1,3 @@
 {
-  "actiondispatch": 3,
-  "activemodel": 1,
-  "activerecord": 14,
-  "rack": 1
+  "activerecord": 3
 }

@@ -153,6 +153,7 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     gzipWriter: (io) => {
       const stream = zlib.createGzip();
       let headerSeen = false;
+      let failure: Error | null = null;
       const handle: GzipWriterHandle = {
         mtime: null,
         write: (data) => stream.write(data),
@@ -160,6 +161,7 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         finish: async () => {
           stream.end();
           await ended;
+          if (failure !== null) throw failure;
         },
       };
       stream.on("data", (chunk) => {
@@ -172,9 +174,12 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         }
         io.write(bytes);
       });
-      const ended = new Promise<void>((res, rej) => {
+      const ended = new Promise<void>((res) => {
         stream.on("end", () => res());
-        stream.on("error", (err) => rej(err as Error));
+        stream.on("error", (err) => {
+          failure = err as Error;
+          res();
+        });
       });
       return handle;
     },

@@ -2718,6 +2718,24 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
   });
 
+  it("re-syncs a clone's extendsFiles, which the include pass writes after cloning", () => {
+    const info = extractFromFiles("/p", {
+      "type/helpers/mutable.ts": `export const MutableModule = { cast() {} };`,
+      "type/json.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { MutableModule } from "./helpers/mutable.js";
+        export class Json { deserialize(): void {} }
+        include(Json, MutableModule);
+      `,
+      "type.ts": `export { Json } from "./type/json.js";`,
+    });
+
+    const declaring = info.classes["type/json.ts:Json"];
+    const clone = info.classes["type.ts:Json"];
+    expect(clone.extends).toEqual(["MutableModule"]);
+    expect(clone.extendsFiles).toEqual(declaring.extendsFiles);
+  });
+
   it("resolves a two-hop barrel chain to a fixpoint, in either file order", () => {
     const declaring = {
       "adapters/abstract-adapter.ts": `export class AbstractAdapter { quoteTableName(): void {} }`,
