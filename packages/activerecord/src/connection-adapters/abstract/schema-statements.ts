@@ -876,10 +876,7 @@ export class SchemaStatements {
     let sql: string;
     const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
     if (native === undefined) {
-      if (type == null) sql = "";
-      else if (!String(type).trim())
-        throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
-      else sql = String(type);
+      sql = type == null ? "" : String(type);
     } else {
       const spec = (typeof native === "string" ? { name: native } : native) as {
         name?: string;
@@ -913,10 +910,6 @@ export class SchemaStatements {
       } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
         sql += `(${limit})`;
       }
-    }
-
-    if (options.array && type !== "primary_key") {
-      throw new Error("Array columns are only supported on PostgreSQL");
     }
 
     return sql;

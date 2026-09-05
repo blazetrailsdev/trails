@@ -192,4 +192,33 @@ describe("ControllerRuntimeTest", () => {
       ]);
     });
   });
+
+  describe("initialize", () => {
+    it("seats dbRuntime to null on a fresh controller", () => {
+      class SeatController {
+        logger: { "info?": boolean } | null = null;
+        processAction(): unknown {
+          return undefined;
+        }
+        cleanupViewRuntime<T>(block: () => T): T {
+          return block();
+        }
+        appendInfoToPayload(): void {}
+        static logProcessAction(): string[] {
+          return [];
+        }
+      }
+      include(SeatController as never, ControllerRuntime);
+
+      const controller = new SeatController() as SeatController & { dbRuntime: number | null };
+      expect(controller.dbRuntime).toBe(null);
+      expect(Object.hasOwn(controller, "dbRuntime")).toBe(false);
+
+      controller.dbRuntime = 1.5;
+      expect(Object.hasOwn(controller, "dbRuntime")).toBe(true);
+      expect(new SeatController() as unknown as { dbRuntime: unknown }).toMatchObject({
+        dbRuntime: null,
+      });
+    });
+  });
 });

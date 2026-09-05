@@ -19,16 +19,6 @@ beforeAll(async () => {
   conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
 });
 
-describe("SchemaCreation#typeToSql blank type guard", () => {
-  it("throws a descriptive error for an empty custom type", () => {
-    expect(() => conn.typeToSql("" as any)).toThrow(/empty or blank type/);
-  });
-
-  it("throws a descriptive error for a whitespace-only custom type", () => {
-    expect(() => conn.typeToSql("   " as any)).toThrow(/empty or blank type/);
-  });
-});
-
 describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
   it("returns '' for a nil type (Rails type_to_sql: type.to_s of nil)", () => {
     expect(conn.typeToSql(undefined as any)).toBe("");

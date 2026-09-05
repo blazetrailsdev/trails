@@ -24,9 +24,6 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    if (options.array && type !== "primary_key") {
-      throw new Error("Array columns are only supported on PostgreSQL");
-    }
     const limit = options.limit;
     const unsigned = options.unsigned;
     const size = (options as { size?: string | null }).size ?? limitToSize(limit ?? null, type);

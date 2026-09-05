@@ -8,7 +8,6 @@ import {
   Table,
   type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
-import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base } from "../../base.js";
 import type { TableDefinitionConn } from "./schema-definitions.js";
@@ -639,24 +638,6 @@ describe("ReferenceDefinition helpers", () => {
     ref.addTo(td);
     expect(td.columns[0].name).toBe("taggable_type");
     expect(td.columns[1].name).toBe("taggable_id");
-  });
-});
-
-describe("TableDefinition#toSql blank type guard", () => {
-  it("throws a descriptive error for an empty custom type", async () => {
-    const td = new TableDefinition(conn, "t");
-    td.column("bad", "" as any);
-    await expect(new SchemaCreation(conn).accept(td)).rejects.toThrow(
-      /Column "bad" has an empty or blank type/,
-    );
-  });
-
-  it("throws a descriptive error for a whitespace-only custom type", async () => {
-    const td = new TableDefinition(conn, "t");
-    td.column("bad", "   " as any);
-    await expect(new SchemaCreation(conn).accept(td)).rejects.toThrow(
-      /Column "bad" has an empty or blank type/,
-    );
   });
 });
 

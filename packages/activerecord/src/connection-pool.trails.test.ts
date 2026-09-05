@@ -686,25 +686,23 @@ describe("ConnectionPool schema cache", () => {
 });
 
 describe("adapterNameFromConfig", () => {
-  it("resolves postgresql aliases to the registered postgresql name", async () => {
+  it("answers the registered Rails adapter names verbatim", async () => {
     expect(adapterNameFromConfig("postgresql")).toBe("postgresql");
-    expect(adapterNameFromConfig("postgres")).toBe("postgresql");
-    expect(adapterNameFromConfig("pg")).toBe("postgresql");
-  });
-
-  it("resolves mysql aliases to the registered mysql2 name", async () => {
     expect(adapterNameFromConfig("mysql2")).toBe("mysql2");
-    expect(adapterNameFromConfig("mysql")).toBe("mysql2");
-    expect(adapterNameFromConfig("mariadb")).toBe("mysql2");
+    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite3");
   });
 
-  it("resolves sqlite aliases to the registered sqlite3 name", async () => {
-    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite3");
-    expect(adapterNameFromConfig("sqlite")).toBe("sqlite3");
+  it("answers sqlite3 for the trails-only SQLite drivers", async () => {
+    expect(adapterNameFromConfig("libsql")).toBe("sqlite3");
+    expect(adapterNameFromConfig("node-sqlite")).toBe("sqlite3");
+    expect(adapterNameFromConfig("expo-sqlite")).toBe("sqlite3");
   });
 
   it("raises AdapterNotFound for an unregistered adapter", async () => {
     expect(() => adapterNameFromConfig(undefined)).toThrow(AdapterNotFound);
+    expect(() => adapterNameFromConfig("postgres")).toThrow(
+      "Database configuration specifies nonexistent 'postgres' adapter.",
+    );
     expect(() => adapterNameFromConfig("unknown")).toThrow(
       "Database configuration specifies nonexistent 'unknown' adapter.",
     );
