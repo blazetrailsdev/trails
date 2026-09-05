@@ -56,7 +56,9 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   override async active(): Promise<boolean> {
     return this.activeFlag;
   }
-  readonly inTransaction = false;
+  isInTransaction(): boolean {
+    return false;
+  }
 
   async execute(_sql: string, _name?: string | null): Promise<Record<string, unknown>[]> {
     return [];

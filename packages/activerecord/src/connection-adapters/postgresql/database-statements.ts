@@ -287,7 +287,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
   updateTypemapForDefaultTimezone(): Promise<void>;
   prepareStatement(sql: string, binds: unknown[], rawConnection: pg.Client): Promise<string>;
   isCachedPlanFailure(pgerror: unknown): boolean;
-  inTransaction: boolean;
+  isInTransaction(): boolean;
   sqlKey(sql: string): string;
   _statements: StatementPool;
   verifiedBang(): void;
@@ -328,7 +328,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
         break;
       } catch (error) {
         if (this.isCachedPlanFailure(error)) {
-          if (this.inTransaction) {
+          if (this.isInTransaction()) {
             throw new PreparedStatementCacheExpired(
               (error as { message?: string })?.message ?? "cached plan expired",
               { sql, binds, cause: error },

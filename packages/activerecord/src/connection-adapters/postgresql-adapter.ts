@@ -900,7 +900,7 @@ export class PostgreSQLAdapter
             !upper.includes("RETURNING")
           ) {
             const withReturning = `${pgSql} RETURNING id`;
-            const useSavepoint = this.inTransaction;
+            const useSavepoint = this.isInTransaction();
             const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
             payload.sql = withReturning;
             try {
@@ -1411,7 +1411,7 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  get inTransaction(): boolean {
+  isInTransaction(): boolean {
     return this.openTransactions() > 0;
   }
 
