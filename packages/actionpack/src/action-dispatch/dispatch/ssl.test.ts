@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, release } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 
 type App = (env: RackEnv) => Promise<RackResponse>;
 
@@ -224,9 +224,7 @@ describe("SecureCookiesTest", () => {
   }
 
   function assertCookies(setCookie: string | string[] | undefined, ...expected: string[]) {
-    let cookies = setCookie;
-    if (!(release() >= "3")) cookies = String(cookies).split("\n");
-    expect(cookies).toEqual(expected);
+    expect(setCookie).toEqual(expected);
   }
 
   it("flag cookies as secure", async () => {

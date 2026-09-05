@@ -1,5 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, release } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import { merge } from "@blazetrails/ruby-compat";
 
 export interface RedirectOptions {
@@ -163,15 +163,8 @@ export class SSL {
     const cookies = headers["set-cookie"];
     if (!cookies) return;
 
-    if (!(release() >= "3")) {
-      headers["set-cookie"] = String(cookies)
-        .split("\n")
-        .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie))
-        .join("\n");
-    } else {
-      headers["set-cookie"] = [cookies]
-        .flat()
-        .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie));
-    }
+    headers["set-cookie"] = [cookies]
+      .flat()
+      .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie));
   }
 }
