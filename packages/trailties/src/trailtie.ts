@@ -1,4 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
@@ -37,7 +38,7 @@ export class Trailtie extends Initializable {
     super();
     const klass = this.constructor as typeof Trailtie;
     if (klass.isAbstractRailtie()) {
-      throw new Error(`${klass.name} is abstract, you cannot instantiate it directly.`);
+      throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
     }
   }
 

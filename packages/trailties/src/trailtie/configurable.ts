@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
 import { ownState, readOwnState } from "./per-class-state.js";
 
@@ -22,7 +23,7 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
   let parent = Object.getPrototypeOf(subclass) as typeof Trailtie | null;
   while (parent && parent !== Function.prototype && parent !== Object.prototype) {
     if (readOwnState<boolean>(parent, SEALED_KEY) === true) {
-      throw new Error(`You cannot inherit from a ${parent.name} child`);
+      throw new RuntimeError(`You cannot inherit from a ${parent.name} child`);
     }
     parent = Object.getPrototypeOf(parent) as typeof Trailtie | null;
   }

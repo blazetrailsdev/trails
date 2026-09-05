@@ -1,3 +1,5 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
 export type InitializerGroup = string;
 
 export interface InitializerOptions {
@@ -145,7 +147,7 @@ export class Initializable {
     const block = typeof optsOrBlock === "function" ? optsOrBlock : maybeBlock;
     const opts: InitializerOptions = typeof optsOrBlock === "function" ? {} : { ...optsOrBlock };
     if (typeof block !== "function") {
-      throw new TypeError("A block must be passed when defining an initializer");
+      throw new ArgumentError("A block must be passed when defining an initializer");
     }
     const own = this._ownInitializers();
     const referencedBefore = opts.before !== undefined && own.some((i) => i.name === opts.before);
