@@ -73,8 +73,6 @@ describe("compareArms", () => {
   });
 
   it("never lets a helper's own arms raise a flag the two bodies did not raise", () => {
-    // The helper diverges, and its own row says so; charging it to each of its
-    // callers would report the one divergence once per call site.
     const caller = {
       ...row(["ref:helper"], ["ref:helper"]),
       rubyHelpers: { helper: [] },

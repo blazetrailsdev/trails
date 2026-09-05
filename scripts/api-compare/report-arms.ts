@@ -119,6 +119,9 @@ export function controlArms(skeleton: readonly string[]): string[] {
  * the reach: the splice is positional, so the `order` verdict survives it. Once
  * per reach and one hop deep — the spliced skeletons carry their own reaches
  * unresolved, so mutual recursion terminates by construction.
+ *
+ * Resolved as an OWN property: a reach is a method name, so `ref:constructor`
+ * and `ref:toString` would otherwise resolve against Object.prototype.
  */
 export function spliceHelperSkeletons(
   skeleton: readonly string[],
@@ -127,9 +130,6 @@ export function spliceHelperSkeletons(
   if (sameFileSkeletons === undefined) return [...skeleton];
   const out: string[] = [];
   for (const token of skeleton) {
-    // Own-property, because a reach is a Ruby/TS method name and
-    // `ref:constructor` / `ref:toString` would otherwise resolve against
-    // Object.prototype.
     const name = token.startsWith("ref:") ? token.slice("ref:".length) : undefined;
     const helper =
       name !== undefined && Object.hasOwn(sameFileSkeletons, name)

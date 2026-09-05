@@ -4231,6 +4231,13 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
   }
 }
 
+function isInstanceOfTest(expression: ts.Expression): boolean {
+  return (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
+  );
+}
+
 /**
  * The body as an ordered CONTROL + call skeleton — the stream a call-SEQUENCE
  * comparison reads (RFC 0084). Neither `calls` nor `callSeq`
@@ -4239,24 +4246,22 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
  * Rails calls it twice is invisible to them. Names are raw, as `calls` records
  * them — the Ruby↔TS conventions live in compare.ts. Signal only; nothing gates
  * on it yet.
+ *
+ * Arms are counted per CLAUSE, matching extract-ruby-api.rb#walk_for_skeleton
+ * (RFC 0113). A SwitchStatement itself emits nothing and each of its
+ * CaseClauses emits one arm, so the `switch` port and the `if`/`else if` port
+ * of one Ruby `case` read as the same arm count its `when` clauses do; a
+ * DefaultClause emits nothing, as Ruby's `else` does. A CatchClause's typed
+ * arms are Ruby's `rescue` clauses, so each top-level `instanceof` arm tokens
+ * as `rescue` IN PLACE OF the `if` its lowering spells, before that arm's own
+ * reaches — where the Ruby `:rescue` clause node sits. A catch with no
+ * `instanceof` chain is a bare Ruby `rescue` and emits exactly one.
  */
-function isInstanceOfTest(expression: ts.Expression): boolean {
-  return (
-    ts.isBinaryExpression(expression) &&
-    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
-  );
-}
-
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
-      // A SwitchStatement itself emits nothing and each of its CaseClauses
-      // emits one arm, so a `switch` port of a Ruby `case` reads as the same
-      // arm count its `if`/`else if` port does and as the `case`'s own `when`
-      // clauses do (extract-ruby-api.rb#walk_for_skeleton). A DefaultClause
-      // emits nothing, as Ruby's `else` does.
       case ts.SyntaxKind.IfStatement:
       case ts.SyntaxKind.ConditionalExpression:
       case ts.SyntaxKind.CaseClause:
@@ -4337,13 +4342,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     }
     ts.forEachChild(n, visit);
   };
-  // A `catch` block's typed arms are Ruby's `rescue` clauses
-  // (`rescue A => e` / `rescue B`), which is why they token as `rescue` rather
-  // than as the `if` their lowering spells: `catch (e) { if (e instanceof A) …
-  // else if (e instanceof B) … }` is a two-clause `rescue`, not two extra
-  // branches. A catch with no `instanceof` chain is a bare Ruby `rescue`, so it
-  // emits exactly one — before the handler's own reaches, where the Ruby
-  // `:rescue` clause node sits.
   const visitCatchClause = (clause: ts.CatchClause): void => {
     const statements = clause.block.statements;
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));

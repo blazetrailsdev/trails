@@ -2705,7 +2705,7 @@ class ApiExtractor
     sites
   end
 
-  SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop when].freeze
+  SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop when in].freeze
   SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
   SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
 
@@ -2725,7 +2725,8 @@ class ApiExtractor
   # rather than a `:bodystmt` (RFC 0113).
   #
   # Arms are counted per CLAUSE, not per statement (RFC 0113): a `case` itself
-  # emits nothing and each of its `:when` clauses emits one `if`, so a six-arm
+  # emits nothing and each of its `:when` (or `:in`) clauses emits one `if`,
+  # so a six-arm
   # `case` reads as six arms against the six `case` clauses of its `switch`
   # port or the six arms of its `if`/`elsif` chain port; and each `:rescue`
   # clause of a `:bodystmt` emits one `rescue` after that `:bodystmt`'s `try`,
