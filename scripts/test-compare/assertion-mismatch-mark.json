@@ -6,34 +6,34 @@
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 286,
-      "kind": 473,
+      "assertionCount": 285,
+      "kind": 466,
       "value": 76
     },
     "actiondispatch": {
-      "assertionCount": 364,
-      "kind": 519,
+      "assertionCount": 360,
+      "kind": 515,
       "value": 74
     },
     "actionview": {
       "assertionCount": 41,
-      "kind": 96,
+      "kind": 93,
       "value": 2
     },
     "activemodel": {
-      "assertionCount": 281,
-      "kind": 423,
-      "value": 53
+      "assertionCount": 277,
+      "kind": 419,
+      "value": 33
     },
     "activerecord": {
-      "assertionCount": 1868,
-      "kind": 3812,
-      "value": 31
+      "assertionCount": 1865,
+      "kind": 3800,
+      "value": 28
     },
     "activesupport": {
-      "assertionCount": 863,
-      "kind": 1212,
-      "value": 103
+      "assertionCount": 862,
+      "kind": 1211,
+      "value": 102
     },
     "arel": {
       "assertionCount": 0,
@@ -61,9 +61,9 @@
       "value": 0
     },
     "rack": {
-      "assertionCount": 372,
-      "kind": 471,
-      "value": 61
+      "assertionCount": 341,
+      "kind": 444,
+      "value": 53
     },
     "rack-session": {
       "assertionCount": 0,

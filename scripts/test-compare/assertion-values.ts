@@ -19,7 +19,10 @@
 // Normalization applied (documented deviations): Ruby `nil` and TS `null` /
 // `undefined` all fold to `x:nil`; a Ruby symbol (`:foo`) folds to the same
 // `s:foo` token as the string `"foo"` (symbol-vs-string is not a fidelity
-// divergence for a ported assertion). NOT normalized: numeric width/precision
+// divergence for a ported assertion); a bare lower-snake identifier folds onto
+// its camelCase spelling (`s:author_name` and `s:authorName` are one token),
+// since trails camelCases every attribute/method name and Rails does not. NOT
+// normalized: numeric width/precision
 // (`n:5` ≠ `n:5.0`), string case/whitespace, or regex/array/hash literals (those
 // arrive as `null` — a non-literal — and are skipped, never compared).
 //
@@ -106,7 +109,7 @@ function collectSide(
     const value = values?.[i];
     if (value != null) {
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
-      entry.captured.push(foldSymbolToken(value));
+      entry.captured.push(foldNameToken(foldSymbolToken(value)));
     }
   }
   return map;
@@ -123,6 +126,25 @@ function collectSide(
  */
 function foldSymbolToken(token: string): string {
   return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
+}
+
+/**
+ * Fold an identifier-shaped string token's snake_case spelling onto its
+ * camelCase one. trails camelCases every attribute/method name (the repo rename
+ * rule, docs/ruby-ts-conventions.md) while Rails does not, so a ported
+ * assertion whose expected literal IS a name — `assert_equal :author_name,
+ * t.errors.attribute_names[1]` vs `expect(...).toEqual("authorName")` — is a
+ * spelling-convention difference, not a fidelity divergence. Applied to BOTH
+ * sides, like foldSymbolToken, so every spelling folds onto one token.
+ *
+ * Deliberately narrow: only a token that is a bare lower-snake identifier is
+ * folded, so a sentence, a SQL string, or a CONSTANT_NAME is compared verbatim.
+ */
+function foldNameToken(token: string): string {
+  if (!token.startsWith("s:")) return token;
+  const text = token.slice(2);
+  if (!/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(text)) return token;
+  return `s:${text.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase())}`;
 }
 
 /**

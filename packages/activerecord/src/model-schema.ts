@@ -864,9 +864,9 @@ export const InstanceMethods = {
     this: { constructor: unknown },
     name: string,
     block?: () => ValueType,
-  ): ValueType {
+  ): ValueType | null {
     return (
-      this.constructor as { typeForAttribute(n: string, b?: () => ValueType): ValueType }
+      this.constructor as { typeForAttribute(n: string, b?: () => ValueType): ValueType | null }
     ).typeForAttribute(name, block);
   },
 

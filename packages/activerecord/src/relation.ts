@@ -1859,7 +1859,7 @@ export class Relation<T extends Base> {
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
       const type = this.model.typeForAttribute(String(attr.name));
-      return [attr, this.predicateBuilder.buildBindAttribute(String(attr.name), type.cast(value))];
+      return [attr, this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value))];
     });
   }
 

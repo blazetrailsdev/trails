@@ -84,7 +84,7 @@ interface CalculationRelation {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
-    typeForAttribute?(name: string, block?: () => ColumnType): ColumnType;
+    typeForAttribute?(name: string, block?: () => ColumnType): ColumnType | null;
     attributeTypes(): Record<string, ColumnType>;
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: CalculationConnection;

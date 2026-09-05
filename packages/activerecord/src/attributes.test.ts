@@ -115,8 +115,8 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("overloaded properties with limit", () => {
-    expect(OverloadedType.typeForAttribute("overloaded_string_with_limit").limit).toBe(50);
-    expect(UnoverloadedType.typeForAttribute("overloaded_string_with_limit").limit).toBe(255);
+    expect(OverloadedType.typeForAttribute("overloaded_string_with_limit")!.limit).toBe(50);
+    expect(UnoverloadedType.typeForAttribute("overloaded_string_with_limit")!.limit).toBe(255);
   });
 
   it("overloaded default but keeping its own type", () => {
@@ -161,7 +161,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    const startsAtType = WithStartsAt.typeForAttribute("starts_at");
+    const startsAtType = WithStartsAt.typeForAttribute("starts_at")!;
     expect(startsAtType.constructor.name).toMatch(/DateTime/);
     expect((new WithStartsAt() as any).starts_at).toBeDefined();
   });
@@ -175,8 +175,8 @@ describe("CustomPropertiesTest", () => {
         }
       }
 
-      const startsAtType = WithTimes.typeForAttribute("starts_at");
-      const endsAtType = WithTimes.typeForAttribute("ends_at");
+      const startsAtType = WithTimes.typeForAttribute("starts_at")!;
+      const endsAtType = WithTimes.typeForAttribute("ends_at")!;
 
       expect(startsAtType.constructor.name).toMatch(/TimeZoneConverter/);
       expect(endsAtType.constructor.name).toMatch(/TimeZoneConverter/);
@@ -469,7 +469,7 @@ describe("CustomPropertiesTest", () => {
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
     await withImmutableStrings(() => {
       const immutableStringType = typeRegistry.lookup("immutable_string").constructor;
-      expect(OverloadedType.typeForAttribute("inferred_string").constructor).toBe(
+      expect(OverloadedType.typeForAttribute("inferred_string")!.constructor).toBe(
         immutableStringType,
       );
     });
@@ -477,14 +477,14 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default retains limit information", async () => {
     await withImmutableStrings(() => {
-      expect(OverloadedType.typeForAttribute("inferred_string").limit).toBe(255);
+      expect(OverloadedType.typeForAttribute("inferred_string")!.limit).toBe(255);
     });
   });
 
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
     await withImmutableStrings(() => {
       const defaultStringType = typeRegistry.lookup("string").constructor;
-      expect(OverloadedType.typeForAttribute("string_with_default").constructor).toBe(
+      expect(OverloadedType.typeForAttribute("string_with_default")!.constructor).toBe(
         defaultStringType,
       );
     });
@@ -574,7 +574,7 @@ describe("DefineAttributeTest", () => {
     Post.defineAttribute("score", intType);
     expect(Post._defaultAttributes()).toBe(before);
     expect(before.getAttribute("score").type!.type()).toBe("integer");
-    expect(Post.typeForAttribute("score").type()).toBe("integer");
+    expect(Post.typeForAttribute("score")!.type()).toBe("integer");
   });
 });
 

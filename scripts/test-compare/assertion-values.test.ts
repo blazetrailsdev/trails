@@ -25,6 +25,45 @@ describe("assertionValueMismatch", () => {
     ).toEqual([{ kind: "equal", rails: ["s:short"], trails: ["s:long"] }]);
   });
 
+  it("folds a snake_case attribute-name literal onto its camelCase spelling", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:author_name"],
+        ["toEqual"],
+        ["s:authorName"],
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:author_name"],
+        ["toEqual"],
+        ["s::authorName"],
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:author_name"],
+        ["toEqual"],
+        ["s:titleName"],
+        false,
+      ),
+    ).toEqual([{ kind: "equal", rails: ["s:authorName"], trails: ["s:titleName"] }]);
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:is too short (minimum is 5 characters)"],
+        ["toEqual"],
+        ["s:is too short (minimum is 5 characters)"],
+        false,
+      ),
+    ).toBeNull();
+  });
+
   it("compares as an order-independent multiset per kind", () => {
     // Same two equality values, asserted in a different order → no divergence.
     expect(

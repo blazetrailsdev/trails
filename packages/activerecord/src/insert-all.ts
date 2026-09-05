@@ -476,7 +476,10 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
-  private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, ValueType> {
+  private extractTypesFromColumnsOn(
+    tableName: string,
+    keys: string[],
+  ): Record<string, ValueType | null> {
     const columns = this._insertAll.schemaCacheColumnsHash(tableName);
 
     const unknownColumn = keys.find((key) => !(key in columns));
@@ -484,7 +487,7 @@ export class Builder implements InsertBuilder {
       throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
     }
 
-    const types: Record<string, ValueType> = {};
+    const types: Record<string, ValueType | null> = {};
     for (const key of keys) types[key] = this.model.typeForAttribute(key);
     return types;
   }
@@ -559,7 +562,7 @@ export class Builder implements InsertBuilder {
     const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
       const type = types[key];
-      value = SerializeCastValue.serialize(type, type.cast(value));
+      value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });
     return new Nodes.ValuesList(rows);

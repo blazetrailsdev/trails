@@ -12,6 +12,25 @@ import {
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 
+/** @noRailsEquivalent PERMANENT */
+function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<string, Attribute> {
+  const raiseIfFrozen = (target: Record<string, Attribute>): void => {
+    if (Object.isFrozen(target)) {
+      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(target)}`);
+    }
+  };
+  return new Proxy(attributes, {
+    set(target, name, value: Attribute): boolean {
+      raiseIfFrozen(target);
+      return Reflect.set(target, name, value);
+    },
+    deleteProperty(target, name): boolean {
+      raiseIfFrozen(target);
+      return Reflect.deleteProperty(target, name);
+    },
+  });
+}
+
 export class AttributeSet {
   protected _attributes: Record<string, Attribute>;
 
@@ -32,7 +51,9 @@ export class AttributeSet {
   }
 
   constructor(attributes: Record<string, Attribute> = {}) {
-    this._attributes = Object.setPrototypeOf(attributes, null) as Record<string, Attribute>;
+    this._attributes = frozenErrorRaisingStore(
+      Object.setPrototypeOf(attributes, null) as Record<string, Attribute>,
+    );
   }
 
   getAttribute(name: string): Attribute {
@@ -172,11 +193,11 @@ export class AttributeSet {
   }
 
   initializeDup(_other: AttributeSet): void {
-    this._attributes = dup(this._attributes);
+    this._attributes = frozenErrorRaisingStore(dup(this._attributes));
   }
 
   initializeClone(_other: AttributeSet): void {
-    this._attributes = dup(this._attributes);
+    this._attributes = frozenErrorRaisingStore(dup(this._attributes));
   }
 
   /** @noRailsEquivalent PERMANENT */

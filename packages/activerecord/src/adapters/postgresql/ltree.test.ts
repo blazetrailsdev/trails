@@ -43,7 +43,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("ltree");
       expect(column.array).toBeFalsy();
 
-      const type = Ltree.typeForAttribute("path");
+      const type = Ltree.typeForAttribute("path")!;
       expect(type.isBinary()).toBe(false);
     });
 

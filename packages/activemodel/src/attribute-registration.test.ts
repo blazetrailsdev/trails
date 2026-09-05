@@ -117,7 +117,7 @@ describe("AttributeRegistrationTest", () => {
     }
     interface MyModel extends Attributes {}
 
-    const fallback = MyModel.typeForAttribute("unknown");
+    const fallback = MyModel.typeForAttribute("unknown")!;
     expect(fallback).toBeInstanceOf(ValueType);
     expect(fallback.cast("anything")).toBe("anything");
   });
@@ -136,7 +136,7 @@ describe("AttributeRegistrationTest", () => {
 
     const types = MyModel.attributeTypes();
     expect(types["unknown"]).toBeInstanceOf(ValueType);
-    expect(types["unknown"].cast("hello")).toBe("hello");
+    expect(types["unknown"]!.cast("hello")).toBe("hello");
   });
 
   it("attributeTypes returns the registered type, not the fallback, for known keys", () => {
@@ -152,8 +152,8 @@ describe("AttributeRegistrationTest", () => {
     interface MyModel extends Attributes {}
 
     const types = MyModel.attributeTypes();
-    expect(types["count"].type()).toBe("integer");
-    expect(types["count"].cast("5")).toBe(5);
+    expect(types["count"]!.type()).toBe("integer");
+    expect(types["count"]!.cast("5")).toBe(5);
   });
 
   it("new attributes can be registered at any time", () => {
@@ -450,8 +450,8 @@ describe("AttributeRegistrationTest", () => {
     interface Person extends Attributes {}
 
     const types = Person.attributeTypes();
-    expect(types["name"].type()).toBe("string");
-    expect(types["age"].type()).toBe("integer");
+    expect(types["name"]!.type()).toBe("string");
+    expect(types["age"]!.type()).toBe("integer");
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {
@@ -483,7 +483,7 @@ describe("AttributeRegistrationTest", () => {
     }
     interface Person extends Attributes {}
 
-    expect(Person.typeForAttribute("name").type()).toBe("string");
+    expect(Person.typeForAttribute("name")!.type()).toBe("string");
     expect(Person.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
   });
 

@@ -13,20 +13,20 @@ export interface AttributeRegistrationClassMethods {
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
-  attributeTypes(): Record<string, ValueType>;
-  typeForAttribute(name: string, block?: () => ValueType): ValueType;
+  attributeTypes(): Record<string, ValueType | null>;
+  typeForAttribute(name: string, block?: () => ValueType): ValueType | null;
 }
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
-  _cachedAttributeTypes?: Record<string, ValueType> | null;
+  _cachedAttributeTypes?: Record<string, ValueType | null> | null;
   _attributesBuilder?: unknown;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal */
   resolveAttributeName(name: string): string;
 
-  attributeTypes(): Record<string, ValueType>;
+  attributeTypes(): Record<string, ValueType | null>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
   /** @internal */
@@ -167,13 +167,13 @@ export const ClassMethods = {
     return this._cachedDefaultAttributes;
   },
 
-  attributeTypes(this: AttributeHostInternals): Record<string, ValueType> {
+  attributeTypes(this: AttributeHostInternals): Record<string, ValueType | null> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
     const cast = host._defaultAttributes().castTypes();
-    const proxy = new Proxy(cast as Record<string, ValueType>, {
+    const proxy = new Proxy(cast, {
       get(target, prop, receiver) {
         if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
           return defaultValue();
@@ -189,7 +189,7 @@ export const ClassMethods = {
     this: AttributeHostInternals,
     attributeName: string,
     block?: () => ValueType,
-  ): ValueType {
+  ): ValueType | null {
     attributeName = this.resolveAttributeName(attributeName);
 
     const types = this.attributeTypes();
