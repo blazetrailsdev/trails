@@ -4290,9 +4290,24 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.CatchClause:
         visitCatchClause(n as ts.CatchClause);
         return;
-      case ts.SyntaxKind.ThrowStatement:
-        tokens.push("throw");
+      case ts.SyntaxKind.ThrowStatement: {
+        // The thrown class, as extract-ruby-api.rb#skeleton_raise_class carries
+        // it for `raise Foo, "m"` / `raise Foo.new("m")` — the LAST segment of
+        // a qualified constructor, matching how `new:Ctor` is spelled below. A
+        // rethrow (`throw e`) and a `throw someCall()` name no class and keep
+        // the bare token, as Ruby's bare `raise` does.
+        const thrown = (n as ts.ThrowStatement).expression;
+        const ctor = ts.isNewExpression(thrown) ? thrown.expression : undefined;
+        const cls = ctor
+          ? ts.isIdentifier(ctor)
+            ? ctor.text
+            : ts.isPropertyAccessExpression(ctor)
+              ? ctor.name.text
+              : undefined
+          : undefined;
+        tokens.push(cls === undefined ? "throw" : `throw:${cls}`);
         break;
+      }
       case ts.SyntaxKind.NewExpression: {
         const ctor = (n as ts.NewExpression).expression;
         tokens.push(

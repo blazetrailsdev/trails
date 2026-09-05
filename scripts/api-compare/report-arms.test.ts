@@ -43,6 +43,33 @@ describe("controlArms rescue", () => {
   });
 });
 
+describe("raise-class verdict", () => {
+  it("keeps a class-bearing throw as an arm, class intact", () => {
+    expect(controlArms(["throw:RecordNotSaved", "if"])).toEqual(["throw:RecordNotSaved", "if"]);
+  });
+
+  it("agrees when the port raises the same class", () => {
+    expect(compareArms(row(["throw:RecordNotSaved"], ["throw:RecordNotSaved"]))).toBeUndefined();
+  });
+
+  it("reports raise-class when only the class differs", () => {
+    const verdict = compareArms(row(["if", "throw:RecordNotSaved"], ["if", "throw:Error"]))!;
+    expect(verdict.kind).toBe("raise-class");
+    expect(verdict.raiseClasses).toEqual(["RecordNotSaved -> Error"]);
+    expect(cluster(verdict)).toBe("raise-class");
+  });
+
+  it("stays a count row when an arm is missing outright", () => {
+    const verdict = compareArms(row(["if", "throw:RecordNotSaved"], ["if"]))!;
+    expect(verdict.kind).toBe("count");
+    expect(verdict.missing).toEqual(["throw"]);
+  });
+
+  it("says nothing when one side names no class", () => {
+    expect(compareArms(row(["throw:RecordNotSaved"], ["throw"]))).toBeUndefined();
+  });
+});
+
 describe("spliceHelperSkeletons", () => {
   it("replaces a same-file reach with that helper's own skeleton, in place", () => {
     expect(

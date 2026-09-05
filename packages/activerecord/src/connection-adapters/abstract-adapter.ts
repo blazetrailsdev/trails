@@ -1659,7 +1659,7 @@ export class AbstractAdapter implements Quoting {
         `${this.constructor.name} should define \`buildInsertSql\` to implement adapter-specific logic for handling duplicates during INSERT`,
       );
     }
-    return `INSERT ${insert.into()}`;
+    return `INSERT ${await insert.into()}`;
   }
 
   getDatabaseVersion(): Version | number | Promise<Version | number> {

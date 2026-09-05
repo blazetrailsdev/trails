@@ -1292,6 +1292,18 @@ export class Time {
     );
   }
 
+  compare(other: unknown): number | null {
+    if (!(other instanceof Time)) return null;
+    const n = this.#instant.epochNanoseconds - other.#instant.epochNanoseconds;
+    if (n === 0n) return 0;
+    return n > 0n ? 1 : -1;
+  }
+
+  eql(other: unknown): boolean {
+    if (!(other instanceof Time)) return false;
+    return this.#instant.epochNanoseconds === other.#instant.epochNanoseconds;
+  }
+
   isUtc(): boolean {
     return this.#tzmodeUtc;
   }

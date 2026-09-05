@@ -530,6 +530,25 @@ describe("Time", () => {
     expect(Time.iso8601).toBe(Time.xmlschema);
   });
 
+  describe("Time#<=> and Time#eql?", () => {
+    it("compares two times by their whole timew", () => {
+      expect(Time.utc(2000, 1, 1).compare(Time.utc(2000, 1, 2))).toBe(-1);
+      expect(Time.utc(2000, 1, 2).compare(Time.utc(2000, 1, 1))).toBe(1);
+      expect(Time.utc(2000, 1, 1).compare(Time.utc(2000, 1, 1))).toBe(0);
+      expect(Time.at(0, 1).compare(Time.at(0))).toBe(1);
+    });
+
+    it("answers nil for an operand that is not a Time", () => {
+      expect(Time.utc(2000, 1, 1).compare(0)).toBeNull();
+    });
+
+    it("eql? requires the same subsecond value", () => {
+      expect(Time.at(0, new Rational(1, 2)).eql(Time.at(0, new Rational(1, 2)))).toBe(true);
+      expect(Time.at(0, 1).eql(Time.at(0))).toBe(false);
+      expect(Time.at(0).eql(0)).toBe(false);
+    });
+  });
+
   describe("Time.strptime", () => {
     it("parses a date with an explicit format", () => {
       vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
