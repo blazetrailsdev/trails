@@ -20,6 +20,16 @@ export class Middleware {
     readonly block?: MiddlewareBlock,
   ) {}
 
+  get name(): string {
+    return this.klass.name;
+  }
+
+  equals(middleware: unknown): boolean | undefined {
+    if (middleware instanceof Middleware) return this.klass === middleware.klass;
+    if (typeof middleware === "function") return this.klass === middleware;
+    return undefined;
+  }
+
   inspect(): string {
     return typeof this.klass === "function"
       ? this.klass.name
@@ -72,7 +82,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   }
 
   deleteBang(target: MiddlewareFactory): void {
-    const idx = this.findIndex(target);
+    const idx = this.indexOf(target);
     if (idx === -1) {
       const name = (target as { name?: string }).name;
       throw new Error(`No such middleware to remove: ${name || String(target)}`);
@@ -116,14 +126,14 @@ export class MiddlewareStack implements Iterable<Middleware> {
   }
 
   delete(target: MiddlewareFactory): void {
-    const idx = this.findIndex(target);
+    const idx = this.indexOf(target);
     if (idx !== -1) {
       this.entries.splice(idx, 1);
     }
   }
 
   deleteStrict(target: MiddlewareFactory): void {
-    const idx = this.findIndex(target);
+    const idx = this.indexOf(target);
     if (idx === -1) throw new Error("No such middleware to delete");
     this.entries.splice(idx, 1);
   }
@@ -149,7 +159,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   }
 
   includes(klass: MiddlewareFactory): boolean {
-    return this.findIndex(klass) !== -1;
+    return this.indexOf(klass) !== -1;
   }
 
   get(index: number): Middleware | undefined {
@@ -173,10 +183,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return current;
   }
 
-  private findIndex(klass: MiddlewareFactory): number {
-    return this.entries.findIndex((e) => e.klass === klass);
-  }
-
   /** @internal */
   assertIndex(index: number | MiddlewareFactory, where: "before" | "after"): number {
     const i = typeof index === "number" ? index : this.indexOf(index);
@@ -195,6 +201,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   /** @internal */
   indexOf(klass: MiddlewareFactory): number {
-    return this.findIndex(klass);
+    return this.entries.findIndex((m) => m.name === klass.name);
   }
 }

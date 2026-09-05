@@ -847,7 +847,7 @@ export class RouteSet {
     const method = String(environment.method ?? "GET").toUpperCase();
     const matched = this.recognize(method, path);
     if (!matched) {
-      throw new RoutingError(`No route matches [${method}] ${rbInspect(path)}`);
+      throw new RoutingError(`No route matches ${rbInspect(path)}`);
     }
     return {
       ...matched.route.defaults,
