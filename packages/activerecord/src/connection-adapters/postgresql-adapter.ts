@@ -418,9 +418,11 @@ export class PostgreSQLAdapter
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (insertReturning !== undefined) {
+    if ("insertReturning" in this._config) {
       const cast = PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning);
       this._useInsertReturning = cast != null && cast !== false;
+    } else {
+      this._useInsertReturning = true;
     }
     if (minMessages !== undefined && typeof minMessages !== "string") {
       throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);

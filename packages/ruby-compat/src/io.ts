@@ -170,9 +170,11 @@ export class IO {
   }
 
   /**
-   * `rb_io_external_encoding` (`vendor/ruby/io.c:13407`) — the stream's
-   * `encs.enc`, or `nil` where none was recorded. trails carries no `enc2`,
-   * so the first arm never fires.
+   * `rb_io_external_encoding` (`vendor/ruby/io.c:13407`) in its
+   * `FMODE_WRITABLE` arm (`io.c:13415-13419`) — `encs.enc`, or `nil` where
+   * none was recorded. The `encs.enc2` arm above it and the `io_read_encoding`
+   * fallthrough below it need a second encoding and an `fptr->mode` that this
+   * partial port of `rb_io_t` does not carry.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#external_encoding`
    * (`vendor/ruby/io.c:13407`).
