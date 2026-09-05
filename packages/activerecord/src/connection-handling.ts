@@ -444,6 +444,8 @@ export function connectionSpecificationName(this: typeof Base): string {
 }
 
 export function schemaCache(this: typeof Base) {
+  const directAdapter = (this as any)._adapter;
+  if (directAdapter) return directAdapter.schemaCache;
   return connectionPool.call(this).schemaCache;
 }
 
