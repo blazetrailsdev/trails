@@ -53,7 +53,6 @@ export class Constraints extends Endpoint {
   override app(): unknown {
     return this._app;
   }
-
   readonly constraints: readonly unknown[];
 
   static readonly SERVE: ConstraintsStrategy = (app, req) =>

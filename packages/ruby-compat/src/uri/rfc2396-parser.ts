@@ -69,10 +69,10 @@ export class RFC2396Parser {
     } else if ((m = this.regexp.ABS_URI.exec(uri))) {
       [scheme, opaque, userinfo, host, port, registry, path, query, fragment] = group(m, 9);
 
-      if (!scheme) {
+      if (scheme == null) {
         throw new InvalidURIError(`bad URI(absolute but no scheme): ${uri}`);
       }
-      if (!opaque && !path && !host && !registry) {
+      if (opaque == null && path == null && host == null && registry == null) {
         throw new InvalidURIError(`bad URI(absolute but no path): ${uri}`);
       }
     } else if ((m = this.regexp.REL_URI.exec(uri))) {
@@ -132,14 +132,15 @@ export class RFC2396Parser {
     const reserved = (ret.RESERVED = opts.RESERVED ?? RESERVED);
     ret.DOMLABEL = opts.DOMLABEL ?? DOMLABEL;
     ret.TOPLABEL = opts.TOPLABEL ?? TOPLABEL;
-    let hostname = (ret.HOSTNAME = opts.HOSTNAME as string);
+    let hostname: string | undefined = opts.HOSTNAME;
+    ret.HOSTNAME = hostname!;
 
     const uric = (ret.URIC = `(?:[${unreserved}${reserved}]|${escaped})`);
     const uricNoSlash = (ret.URIC_NO_SLASH = `(?:[${unreserved};?:@&=+$,]|${escaped})`);
     const query = (ret.QUERY = `${uric}*`);
     const fragment = (ret.FRAGMENT = `${uric}*`);
 
-    if (!hostname) {
+    if (hostname == null) {
       hostname = ret.HOSTNAME = "(?:[a-zA-Z0-9\\-.]|%[0-9a-fA-F][0-9a-fA-F])+";
     }
 

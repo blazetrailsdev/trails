@@ -75,6 +75,7 @@ export class Route {
   /** @internal */
   readonly formatted: boolean;
   readonly internal: boolean;
+  /** @internal */
   readonly to: MountableApp | undefined;
   /** @internal */
   private _app: Endpoint | undefined;
