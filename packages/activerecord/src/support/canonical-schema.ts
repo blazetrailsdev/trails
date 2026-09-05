@@ -208,14 +208,15 @@ export async function runTable(
   } else if (meta.id === false || meta.serialPk !== undefined) {
     createOpts.id = false;
   }
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
+  if (typeRegistryKey === null) {
+    throw new ActiveRecordError(
+      `Cannot lay the canonical schema on adapter '${adapter.adapterName}' — it is none of the three trails ports.`,
+    );
+  }
   let builder!: TableBuilder;
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
-    builder = new TableBuilder(
-      t,
-      typeRegistryKeyFor(adapter) ?? "sqlite3",
-      typeMap,
-      meta.serialPk ?? null,
-    );
+    builder = new TableBuilder(t, typeRegistryKey, typeMap, meta.serialPk ?? null);
     fn(builder);
   });
 
