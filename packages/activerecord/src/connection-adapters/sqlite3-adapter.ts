@@ -213,7 +213,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  _rawConnection!: SqliteConnection;
+  get _rawConnection(): SqliteConnection {
+    return this._connection as unknown as SqliteConnection;
+  }
+  /** @internal */
+  set _rawConnection(value: SqliteConnection) {
+    this._connection = value as unknown as AbstractAdapter | null;
+  }
   private _asyncConnectPending = false;
   private _connectingPromise: Promise<void> | null = null;
   private _closingDriver: Promise<void> | null = null;
@@ -432,47 +438,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.rawExecute(sql, name, binds, prepare, false, allowRetry, materializeTransactions);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  override async rawExecute(
-    sql: string,
-    name: string | null = null,
-    binds: unknown[] = [],
-    prepare = false,
-    async = false,
-    _allowRetry = false,
-    materializeTransactions = true,
-    batch = false,
-  ): Promise<unknown> {
-    await this.ensureConnected();
-    try {
-      if (materializeTransactions) await this.materializeTransactions();
-      const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-      return await this.log(
-        sql,
-        name,
-        binds,
-        this.typeCastedBinds(binds),
-        async,
-        async (payload) => {
-          try {
-            return await this.performQuery(this._rawConnection, sql, binds, driverBinds, {
-              prepare,
-              notificationPayload: payload,
-              batch,
-            });
-          } catch (e: any) {
-            throw this.translateExceptionClass(e, sql, binds);
-          }
-        },
-      );
-    } finally {
-      if (materializeTransactions) this.dirtyCurrentTransaction();
-    }
-  }
-
   async commit(): Promise<void> {
     if (this._transactionManager.openTransactions > 0) {
       return this._transactionManager.commitTransaction();
@@ -518,6 +483,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override typeCast(value: unknown): unknown {
     return sqliteTypeCast.call(this, value);
   }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  override typeCastedBinds = (binds: unknown[] | null | undefined): unknown[] | undefined =>
+    binds?.map(_driverBind, this);
 
   override quoteString(s: string): string {
     return sqliteQuoteString(s);
@@ -746,9 +718,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   private _disconnect(): void {
+    const conn = this._rawConnection;
     super.disconnectBang();
-    if (this._rawConnection?.isOpen()) {
-      const closing = this._rawConnection.close();
+    if (conn?.isOpen()) {
+      const closing = conn.close();
       if (closing) this._chainClose(closing);
     }
   }
@@ -800,7 +773,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
   override getDatabaseVersion(): Version | Promise<Version> {
-    if (this._rawConnection === undefined && !this._asyncConnectPending) this.connect();
+    if (this._rawConnection == null && !this._asyncConnectPending) this.connect();
     const driver = this._rawConnection as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
     const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
@@ -1715,15 +1688,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const adapter = new this(filename, options);
     await adapter.connectBang();
     return adapter;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  override async verifyBang(): Promise<void> {
-    await this.completeAsyncConnect();
-    await super.verifyBang();
   }
 
   /** @internal */
