@@ -1,4 +1,5 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
+import { URI } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -63,7 +64,7 @@ export class Session {
   }
 
   setCookie(cookie: string | string[] | null | undefined, uri: URL | null = null): void {
-    this.cookieJar.merge(cookie, uri);
+    this.cookieJar.merge(cookie, uri && URI.parse(uri.toString()));
   }
 
   lastRequest(): Request {
@@ -170,14 +171,14 @@ export class Session {
 
   /** @internal */
   private async processRequest(uri: URL, env: Record<string, unknown>): Promise<MockResponse> {
-    env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
+    env["HTTP_COOKIE"] ??= this.cookieJar.for(URI.parse(uri.toString()));
     this._lastRequest = new Request(env);
     const [status, headers, body] = await this.app(env);
     const parts: string[] = [];
     for await (const chunk of body) parts.push(String(chunk));
 
     this._lastResponse = new MockResponse(status, headers, parts, env["rack.errors"]);
-    this.cookieJar.merge(this._lastResponse.getHeader("set-cookie"), uri);
+    this.cookieJar.merge(this._lastResponse.getHeader("set-cookie"), URI.parse(uri.toString()));
     return this._lastResponse;
   }
 }

@@ -164,6 +164,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // `MiddlewareStackProxy#plus`, the spelling `Relation::WhereClause` already
   // uses for Ruby `+`.
   "Rails::Configuration::MiddlewareStackProxy": { "+": ["plus"] },
+  // rack-test cookie_jar.rb:106 `def <=>(other)` → cookie-jar.ts
+  // `Cookie#spaceship`.
+  "Rack::Test::Cookie": { "<=>": ["spaceship"] },
+  // rack-test cookie_jar.rb:150 `def [](name)` / :160 `def []=(name, value)` /
+  // :197 `def <<(new_cookie)` → cookie-jar.ts `CookieJar#get` / `set` / `push`.
+  "Rack::Test::CookieJar": { "[]": ["get"], "[]=": ["set"], "<<": ["push"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never
