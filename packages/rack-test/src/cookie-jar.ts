@@ -24,15 +24,14 @@ export class Cookie {
     this._defaultHost = defaultHost;
     uri ??= this.defaultUri();
 
-    const split = raw.split(/[;,] */, 2);
-    this.raw = split[0];
+    this.raw = raw.split(/[;,] */, 2)[0];
     const options = raw.slice(this.raw.length).replace(/^[;,] */, "");
 
     const first = Object.entries(Utils.parseQuery(this.raw, ";"))[0] as
-      | [string, string | string[] | null]
+      | [string, string | null]
       | undefined;
     this.name = first ? first[0] : "";
-    this.value = first == null || first[1] == null ? undefined : String(first[1]);
+    this.value = first == null ? undefined : (first[1] ?? undefined);
     this._options = {};
     for (const [k, v] of Object.entries(Utils.parseQuery(options, ";"))) {
       this._options[k.toLowerCase()] = v ?? undefined;
