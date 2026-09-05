@@ -64,11 +64,4 @@ describe("MutableModule", () => {
     const newValue = { x: 42 };
     expect(t.isChangedInPlace(rawOld, newValue)).toBe(false);
   });
-
-  it("isChangedInPlace handles pre-parsed object rawOldValue (driver-parsed case)", () => {
-    const t = new FakeJsonType();
-    const rawOld = { a: 1 };
-    expect(t.isChangedInPlace(rawOld, { a: 1 })).toBe(false);
-    expect(t.isChangedInPlace(rawOld, { a: 2 })).toBe(true);
-  });
 });

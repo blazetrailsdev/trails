@@ -248,6 +248,8 @@ export function prepareValueForValidation(
   record: ValidatableRecord,
   attrName: string,
 ): unknown {
+  if (isRecordAttributeChangedInPlace(record, attrName)) return value;
+
   const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
   const cameFromUser = `${attrName}CameFromUser`;
