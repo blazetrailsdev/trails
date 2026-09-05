@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { File } from "./file.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { stdout } from "./process-adapter.js";
@@ -250,41 +251,6 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
 }
 
 /**
- * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
- * walks a directory tree and copies each entry with `Entry_#copy`
- * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
- *
- * `Entry_#copy`'s `socket?` and `pipe?` arms each raise before their copy under
- * an interpreter that answers no `UNIXServer` (`fileutils.rb:2258-2263`) and no
- * `File.mkfifo` (`fileutils.rb:2267`); neither constant exists here, so those
- * are the arms taken. `door?` (`:2269`) is Solaris-only and no backend answers
- * a predicate for it, so a door reaches the true `else` (`:2273`).
- */
-function copyEntry(src: string, dest: string, preserve = false): void {
-  const ent = entryLstat(src, false);
-  if (ent.isFile()) {
-    FileUtils.copyFile(src, dest, preserve, false);
-  } else if (ent.isDirectory()) {
-    FileUtils.mkdirP(dest);
-    for (const name of getFs().readdirSync(src)) {
-      copyEntry(getPath().join(src, name), getPath().join(dest, name), preserve);
-    }
-    if (preserve) copyMetadata(src, dest, false);
-  } else if (ent.isSymbolicLink?.() === true) {
-    fileSymlink(fileReadlink(src), dest);
-    if (preserve) copyMetadata(src, dest, false);
-  } else if (ent.isCharacterDevice?.() === true || ent.isBlockDevice?.() === true) {
-    throw new Error("cannot handle device file");
-  } else if (ent.isSocket?.() === true) {
-    throw new Error("cannot handle socket");
-  } else if (ent.isFIFO?.() === true) {
-    throw new Error("cannot handle FIFO");
-  } else {
-    throw new Error(`unknown file type: ${src}`);
-  }
-}
-
-/**
  * `File.utime` (`vendor/ruby/file.c:2983`). `utimesSync` is optional on the
  * backend contract, and an adapter without one still has to raise `ENOENT` for
  * a missing path — which is the branch `touch` reads — so the fallback stats
@@ -418,6 +384,66 @@ export class FileUtils {
     });
   }
 
+  /**
+   * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
+   * walks a directory tree and copies each entry with `Entry_#copy`
+   * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
+   *
+   * `Entry_#copy`'s `socket?` and `pipe?` arms each raise before their copy under
+   * an interpreter that answers no `UNIXServer` (`fileutils.rb:2258-2263`) and no
+   * `File.mkfifo` (`fileutils.rb:2267`); neither constant exists here, so those
+   * are the arms taken. `door?` (`:2269`) is Solaris-only and no backend answers
+   * a predicate for it, so a door reaches the true `else` (`:2273`).
+   *
+   * `dereference_root` rewrites the root through `File.realpath`
+   * (`fileutils.rb:1041-1043`) so a symlinked root is copied as its target, and
+   * `remove_destination` unlinks an existing destination entry before each copy
+   * (`fileutils.rb:1047`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static copyEntry(
+    src: string,
+    dest: string,
+    preserve = false,
+    dereferenceRoot = false,
+    removeDestination = false,
+  ): void {
+    if (dereferenceRoot) {
+      src = File.realpath(src);
+    }
+
+    if (removeDestination && (File.isFile(dest) || File.isSymlink(dest))) File.delete(dest);
+
+    const ent = entryLstat(src, false);
+    if (ent.isFile()) {
+      FileUtils.copyFile(src, dest, preserve, false);
+    } else if (ent.isDirectory()) {
+      FileUtils.mkdirP(dest);
+      for (const name of getFs().readdirSync(src)) {
+        FileUtils.copyEntry(
+          getPath().join(src, name),
+          getPath().join(dest, name),
+          preserve,
+          false,
+          removeDestination,
+        );
+      }
+      if (preserve) copyMetadata(src, dest, false);
+    } else if (ent.isSymbolicLink?.() === true) {
+      fileSymlink(fileReadlink(src), dest);
+      if (preserve) copyMetadata(src, dest, false);
+    } else if (ent.isCharacterDevice?.() === true || ent.isBlockDevice?.() === true) {
+      throw new Error("cannot handle device file");
+    } else if (ent.isSocket?.() === true) {
+      throw new Error("cannot handle socket");
+    } else if (ent.isFIFO?.() === true) {
+      throw new Error("cannot handle FIFO");
+    } else {
+      throw new Error(`unknown file type: ${src}`);
+    }
+  }
+
   /** `FileUtils.copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose
    * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
    * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
@@ -457,7 +483,7 @@ export class FileUtils {
         } catch (error) {
           const code = (error as { code?: string }).code;
           if (code !== "EXDEV" && code !== "EPERM") throw error;
-          copyEntry(s, d, true);
+          FileUtils.copyEntry(s, d, true);
           FileUtils.removeEntry(s, force);
         }
       } catch (error) {

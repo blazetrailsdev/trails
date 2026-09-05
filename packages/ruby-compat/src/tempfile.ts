@@ -2,6 +2,7 @@ import { getCrypto } from "./crypto-adapter.js";
 import { Dir } from "./dir.js";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
+import { Process } from "./process.js";
 
 /**
  * The `basename` argument of `Tempfile.new` (`vendor/ruby/lib/tempfile.rb:150`):
@@ -47,10 +48,6 @@ function random(): string {
  * `Dir::Tmpname.create(basename, tmpdir = nil)`
  * (`vendor/ruby/lib/tmpdir.rb:140`) — yields candidate names until one is not
  * taken, retrying on `Errno::EEXIST`, and returns the name that stuck.
- *
- * Ruby's second name component is `$$`, the process id
- * (`vendor/ruby/lib/tmpdir.rb:154`); trails has no `process.*`, so it is a
- * second draw from {@link random}.
  */
 function createTmpname(
   basename: TempfileBasename,
@@ -64,12 +61,11 @@ function createTmpname(
 
   let n: number | null = null;
   for (;;) {
-    /* boundary: `Time.now.strftime("%Y%m%d")` (`vendor/ruby/lib/tmpdir.rb:153`)
-       — the stamp is local-time in Ruby and UTC here. */
-    const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const now = new Date();
+    const t = `${String(now.getFullYear()).padStart(4, "0")}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
     const path = File.join(
       tmpdir,
-      `${prefix}${t}-${random()}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
+      `${prefix}${t}-${Process.pid}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
     );
     try {
       block(path);
@@ -114,9 +110,6 @@ export class Tempfile {
    * `Tempfile#initialize` (`vendor/ruby/lib/tempfile.rb:150`) — the name comes
    * from `Dir::Tmpname.create`, and the file is opened `RDWR|CREAT|EXCL`
    * (`tempfile.rb:154`) with `perm: 0600` (`tempfile.rb:158`).
-   *
-   * `FsAdapter.openSync` takes no permission argument, so `0600` is a `chmod`
-   * behind the exclusive create rather than the `open(2)` mode.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.new`
    * (`vendor/ruby/lib/tempfile.rb:150`).
@@ -409,9 +402,8 @@ function openExclusive(
 ): File {
   let tmpfile: File | null = null;
   createTmpname(basename, tmpdir, (path) => {
-    tmpfile = File.open(path, "wx+");
+    tmpfile = File.open(path, "wx+", { perm: 0o600 });
     if (options.encoding != null) tmpfile.setEncoding(options.encoding);
-    File.chmod(0o600, path);
   });
   return tmpfile!;
 }

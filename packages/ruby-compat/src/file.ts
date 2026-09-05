@@ -286,13 +286,26 @@ export class File extends IO {
    * flags and recorded on the stream instead (`rb_io_binmode`, `io.c:6311`),
    * where {@link IO#write} reads it.
    *
+   * `rb_io_s_open` takes the `opt` hash Ruby's `File.open(filename, mode, opt)`
+   * form passes through to `open(2)`, of which `perm:` is the mode
+   * `Tempfile#initialize` sets to `0600` (`vendor/ruby/lib/tempfile.rb:158`).
+   * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
+   * only the one trailing position for both, so the third parameter is either,
+   * discriminated by `typeof`.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
    */
-  static open(fileName: string, mode: string): File;
+  static open(fileName: string, mode: string, opt?: { perm?: number }): File;
   static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
-  static open<T>(fileName: string, mode: string, block?: (file: File) => T): T | File {
-    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")), fileName);
+  static open<T>(
+    fileName: string,
+    mode: string,
+    blockOrOpt?: ((file: File) => T) | { perm?: number },
+  ): T | File {
+    const block = typeof blockOrOpt === "function" ? blockOrOpt : undefined;
+    const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
+    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, ""), opt?.perm), fileName);
     if (mode.includes("b")) file.binmode();
     if (!block) return file;
     try {

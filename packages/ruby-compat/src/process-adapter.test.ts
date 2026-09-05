@@ -51,6 +51,7 @@ function makeFakeAdapter(overrides: Partial<ProcessAdapter> = {}): ProcessAdapte
     cwd: () => "/fake/cwd",
     chdir: () => {},
     platform: () => "browser",
+    pid: () => 4242,
     setEnv: (key, value) => {
       if (value === undefined) delete innerEnv[key];
       else innerEnv[key] = value;

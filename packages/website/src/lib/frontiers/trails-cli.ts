@@ -138,6 +138,7 @@ const browserProcessAdapter: ProcessAdapter = {
   cwd: () => "/",
   chdir: () => {},
   platform: () => "browser",
+  pid: () => 1,
   setEnv: () => {},
   exit: () => {
     throw new Error("exit() is not supported in the browser CLI");
