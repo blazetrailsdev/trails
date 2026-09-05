@@ -365,11 +365,10 @@ export interface AbstractAdapter {
     tableName: string,
     indexName: string,
   ): Promise<IndexDefinition | boolean | undefined>;
-  indexNameLength(): number;
-  /** @internal */
   maxIdentifierLength(): number;
   tableNameLength(): number;
   tableAliasLength(): number;
+  indexNameLength(): number;
   /** @internal */
   bindParamsLength(): number;
   /** @internal */
