@@ -21,6 +21,7 @@ function makeView(performCaching = true): CacheHelperHost & { store: Map<string,
     outputBuffer: new OutputBuffer(),
     cacheFragmentName,
     digestPathFromTemplate,
+    viewCacheDependencies: () => [],
     safeConcat(string: unknown) {
       return view.outputBuffer.safeAppend(string);
     },

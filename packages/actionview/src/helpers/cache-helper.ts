@@ -17,16 +17,16 @@ export interface CacheHelperController {
   urlFor(options: unknown): string;
   readFragment(key: unknown, options?: unknown): unknown;
   writeFragment(key: unknown, content: unknown, options?: unknown): unknown;
-  viewCacheDependencies(): unknown[];
 }
 
 export interface CacheHelperHost {
-  controller: CacheHelperController | null;
+  controller: CacheHelperController;
   currentTemplate: Template | null;
   lookupContext: LookupContext | null;
   outputBuffer: OutputBuffer;
   viewRenderer?: { cacheHits: Record<string, unknown> };
   safeConcat(string: unknown): unknown;
+  viewCacheDependencies(): unknown[];
   cacheFragmentName(name?: unknown, options?: CacheFragmentNameOptions): unknown;
   digestPathFromTemplate(template: Template): string;
 }
@@ -40,10 +40,10 @@ const ACTION_VIEW_CACHING = "action_view_caching";
 
 export const CachingRegistry = {
   isCaching(): boolean {
-    if (!IsolatedExecutionState.has(ACTION_VIEW_CACHING)) {
-      IsolatedExecutionState.set(ACTION_VIEW_CACHING, false);
-    }
-    return IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING) ?? false;
+    const caching = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
+    return caching != null && caching !== false
+      ? caching
+      : IsolatedExecutionState.set(ACTION_VIEW_CACHING, false);
   },
 
   trackCaching<T>(block: () => T): T {
@@ -64,8 +64,7 @@ export function cache(
   options: Record<string, unknown> = {},
   block?: () => unknown,
 ): null {
-  const controller = this.controller;
-  if (controller != null && "performCaching" in controller && controller.performCaching) {
+  if ("performCaching" in this.controller && this.controller.performCaching) {
     CachingRegistry.trackCaching(() => {
       const nameOptions = { skipDigest: options.skipDigest };
       this.safeConcat(
@@ -125,13 +124,12 @@ export function cacheFragmentName(
   }
 }
 
-/** @internal */
 export function digestPathFromTemplate(this: CacheHelperHost, template: Template): string {
   const digest = Digestor.digest({
     name: template.virtualPath as string,
     format: template.format,
     finder: this.lookupContext as LookupContext,
-    dependencies: this.controller?.viewCacheDependencies() as string[],
+    dependencies: this.viewCacheDependencies() as string[],
   });
 
   if (isPresent(digest)) {
@@ -147,7 +145,7 @@ function fragmentNameWithDigest(
   name: unknown,
   digestPath: string | null | undefined,
 ): unknown {
-  if (isPlainHash(name)) name = this.controller?.urlFor(name).split("://").pop();
+  if (isHash(name)) name = this.controller.urlFor(name).split("://").at(-1);
 
   if (this.currentTemplate?.virtualPath || digestPath) {
     digestPath ??= this.digestPathFromTemplate(this.currentTemplate as Template);
@@ -165,7 +163,7 @@ function fragmentFor(
   block?: () => unknown,
 ): unknown {
   const content = readFragmentFor.call(this, name, options);
-  if (content != null) {
+  if (content != null && content !== false) {
     if (this.viewRenderer !== undefined)
       this.viewRenderer.cacheHits[this.currentTemplate?.virtualPath as string] = "hit";
     return content;
@@ -182,7 +180,7 @@ function readFragmentFor(
   name: unknown,
   options?: Record<string, unknown> | null,
 ): unknown {
-  return this.controller?.readFragment(name, options ?? undefined);
+  return this.controller.readFragment(name, options ?? undefined);
 }
 
 /** @internal */
@@ -195,11 +193,11 @@ function writeFragmentFor(
   const fragment: SafeBuffer = this.outputBuffer.capture([], () => {
     block?.();
   });
-  return this.controller?.writeFragment(name, fragment, options ?? undefined);
+  return this.controller.writeFragment(name, fragment, options ?? undefined);
 }
 
 /** @internal */
-function isPlainHash(value: unknown): value is Record<string, unknown> {
+function isHash(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" &&
     value !== null &&
