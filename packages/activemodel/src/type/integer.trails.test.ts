@@ -83,4 +83,9 @@ describe("IntegerType", () => {
   it("isChanged returns true for a genuine numeric change — real value differs", () => {
     expect(type.isChanged(10, 5, "5")).toBe(true);
   });
+
+  it("cast rescues the FloatDomainError a non-finite decimal raises", () => {
+    expect(type.cast(BigDecimal.NAN)).toBeNull();
+    expect(type.cast(BigDecimal.INFINITY)).toBeNull();
+  });
 });

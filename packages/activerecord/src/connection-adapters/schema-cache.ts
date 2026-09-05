@@ -1,5 +1,4 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { Gzip } from "@blazetrails/activesupport/gzip";
+import { File, FileUtils, Zlib } from "@blazetrails/ruby-compat";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
 import type { Deduplicable } from "./deduplicable.js";
@@ -106,8 +105,7 @@ export class SchemaCache {
 
   static read<T>(filename: string, callback: (data: string) => T): T {
     if (File.extname(filename) === ".gz") {
-      const raw = File.open(filename, "rb", (f) => f.read());
-      return callback(Gzip.decompress(raw));
+      return Zlib.GzipReader.open(filename, (gz) => callback(gz.read()));
     }
     return callback(File.read(filename));
   }
@@ -384,7 +382,7 @@ export class SchemaCache {
     this.encodeWith(coder);
     const payload = JSON.stringify(coder, null, 2);
     if (File.extname(filename) === ".gz") {
-      File.open(filename, "wb", (f) => f.write(Gzip.compress(payload)));
+      Zlib.GzipWriter.open(filename, (gz) => gz.write(payload));
     } else {
       File.write(filename, payload);
     }

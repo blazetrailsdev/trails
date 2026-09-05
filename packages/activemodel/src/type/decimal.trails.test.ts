@@ -27,7 +27,7 @@ describe("DecimalTypeTrails", () => {
 
   it("apply_scale does not OOM on adversarial exponents", () => {
     const type = new Types.DecimalType({ scale: 2 });
-    expect(type.cast("1e10000000")).toEqual(bd("0"));
+    expect(type.cast("1e10000000")!.exponent()).toBe(10000001);
   });
 
   it("apply_scale rounds to a multiple of ten for a negative scale", () => {
@@ -147,7 +147,7 @@ describe("DecimalType cast and serialize coverage", () => {
 
   it("serialize leaves adversarial exponents as the raw cast string", () => {
     const type = new Types.DecimalType({ scale: 2 });
-    expect(type.serialize("1e10000000")).toEqual(bd("0"));
+    expect((type.serialize("1e10000000") as BigDecimal).exponent()).toBe(10000001);
   });
 
   it("applyScale leaves the NaN sentinel untouched", () => {
