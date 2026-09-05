@@ -24,7 +24,7 @@ import { ValueType } from "./value.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
 export interface TimeType
   extends
-    Omit<InstanceMethods<TimeWithZone | RubyTime>, "valueFromMultiparameterAssignment">,
+    InstanceMethods<TimeWithZone | RubyTime>,
     Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
   serializeCastValue(value: TimeWithZone | RubyTime | null): unknown;
 }
@@ -62,14 +62,19 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
   /** @internal */
   protected castValue(value: unknown): TimeWithZone | RubyTime | null {
     if (typeof value !== "string") {
-      // boundary: a `Temporal.Instant` and a `Temporal.PlainDateTime` are both
+      // boundary: a `Temporal.Instant` and a `Temporal.PlainDateTime` each stand for the zoneless Ruby ::Time `cast_value` receives.
+      let seconds: Rational | null = null;
       if (value instanceof Temporal.Instant) {
-        value = this.#timeAt(new Rational(value.epochNanoseconds, 1_000_000_000n));
-      }
-      if (value instanceof Temporal.PlainDateTime) {
-        value = this.#timeAt(
-          new Rational(value.toZonedDateTime(this.#zoneId()).epochNanoseconds, 1_000_000_000n),
+        seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
+      } else if (value instanceof Temporal.PlainDateTime) {
+        seconds = new Rational(
+          value.toZonedDateTime(this.#zoneId()).epochNanoseconds,
+          1_000_000_000n,
         );
+      }
+      if (seconds != null) {
+        const time = RubyTime.at(seconds);
+        value = this.isUtc ? time.getutc() : time.getlocal();
       }
       return this.applySecondsPrecision(value) as TimeWithZone | RubyTime | null;
     }
@@ -105,25 +110,8 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
   }
 
   /** @internal */
-  #timeAt(seconds: Rational): RubyTime {
-    const at = RubyTime.at(seconds);
-    return this.isUtc ? at.getutc() : at.getlocal();
-  }
-
-  /** @internal */
   #zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
-  }
-
-  /** @internal */
-  protected valueFromMultiparameterAssignment(values: Record<string, unknown>): RubyTime | null {
-    const time = (
-      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
-        this: unknown,
-        valuesHash: Record<string, unknown>,
-      ) => RubyTime | null
-    ).call(this, values);
-    return time;
   }
 }
 

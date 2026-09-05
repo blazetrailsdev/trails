@@ -25,10 +25,11 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   value = this.applySecondsPrecision(value);
 
   if (ActsLikeObject.actsLike(value, "time")) {
+    const time = value as Time | TimeWithZone;
     if (this.isUtc) {
-      if (!(value as Time).isUtc()) value = (value as Time).getutc();
+      if (!time.isUtc()) value = time.getutc();
     } else {
-      value = (value as Time).getlocal();
+      value = time.getlocal();
     }
   }
 

@@ -140,12 +140,10 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-            time: Temporal.Instant;
+            time: RubyTime;
           };
-          expect(record.time).toBeInstanceOf(Temporal.Instant);
-          expect(record.time.epochNanoseconds).toBe(
-            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-          );
+          expect(record.time).toBeInstanceOf(RubyTime);
+          expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
         await adapter.reconnect();
@@ -166,12 +164,10 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-            time: Temporal.Instant;
+            time: RubyTime;
           };
-          expect(record.time).toBeInstanceOf(Temporal.Instant);
-          expect(record.time.epochNanoseconds).toBe(
-            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-          );
+          expect(record.time).toBeInstanceOf(RubyTime);
+          expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
         await adapter.reconnect();
@@ -235,12 +231,10 @@ describeIfPg("PostgreSQLAdapter", () => {
               }
               await PostgresqlTimestampWithZone.loadSchema();
               const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-                time: Temporal.Instant;
+                time: RubyTime;
               };
-              expect(record.time).toBeInstanceOf(Temporal.Instant);
-              expect(record.time.epochNanoseconds).toBe(
-                Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-              );
+              expect(record.time).toBeInstanceOf(RubyTime);
+              expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
             },
           );
         });
@@ -293,7 +287,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         ).keys(),
       ];
       expect(keys.length).toBeGreaterThan(0);
-      for (const k of keys) expect(k).toBeInstanceOf(Temporal.Instant);
+      for (const k of keys) expect(k).toBeInstanceOf(RubyTime);
     });
     it("load infinity and beyond", async () => {
       class Dev extends Base {

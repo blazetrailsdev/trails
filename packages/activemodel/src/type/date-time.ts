@@ -27,7 +27,7 @@ export interface DateTimeType
   extends
     Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
-  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | RubyTime | null;
+  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -38,20 +38,21 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
-    // boundary: a JS `Date`, a `Temporal.Instant` and a `Temporal.PlainDateTime`
+    let seconds: Rational | null = null;
+    // boundary: a JS `Date`, a `Temporal.Instant` and a `Temporal.PlainDateTime` each stand for the zoneless Ruby ::Time `cast_value` receives.
     if (value instanceof Date) {
-      value = this.timeAt(new Rational(value.getTime(), 1000));
-    }
-    if (value instanceof Temporal.Instant) {
-      value = this.timeAt(new Rational(value.epochNanoseconds, 1_000_000_000n));
-    }
-    if (value instanceof Temporal.PlainDateTime) {
-      value = this.timeAt(
-        new Rational(
-          value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).epochNanoseconds,
-          1_000_000_000n,
-        ),
+      seconds = new Rational(value.getTime(), 1000);
+    } else if (value instanceof Temporal.Instant) {
+      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
+    } else if (value instanceof Temporal.PlainDateTime) {
+      seconds = new Rational(
+        value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).epochNanoseconds,
+        1_000_000_000n,
       );
+    }
+    if (seconds != null) {
+      const time = RubyTime.at(seconds);
+      value = this.isUtc ? time.getutc() : time.getlocal();
     }
     if (typeof value !== "string")
       return this.applySecondsPrecision(value) as DateTimeCastResult | null;
@@ -110,15 +111,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       ) => RubyTime | null
     ).call(this, valuesHash as Record<string, unknown>);
     return time;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  protected timeAt(seconds: Rational): RubyTime {
-    const at = RubyTime.at(seconds);
-    return this.isUtc ? at.getutc() : at.getlocal();
   }
 
   get isUtc(): boolean {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
@@ -219,7 +219,7 @@ describe("Migration", () => {
       expect(typeof bob.last_name).toBe("string");
       expect(typeof bob.bio).toBe("string");
       expect(typeof bob.age).toBe("number");
-      expect(bob.birthday).toBeInstanceOf(Temporal.Instant);
+      expect(bob.birthday).toBeInstanceOf(RubyTime);
       expect(bob.favorite_day).toBeInstanceOf(Temporal.PlainDate);
       expect(bob.queryAttribute("male")).toBe(true);
       expect(bob.wealth).toBeInstanceOf(BigDecimal);
