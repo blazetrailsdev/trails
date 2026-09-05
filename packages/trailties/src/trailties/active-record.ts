@@ -34,6 +34,7 @@ export interface ActiveRecordConfig {
   queryLogTagsFormat: "legacy" | "sqlcommenter";
   cacheQueryLogTags: boolean;
   raiseOnAssignToAttrReadonly: boolean;
+  partialInserts?: boolean;
   belongsToRequiredValidatesForeignKey: boolean;
   generateSecureTokenOn: "create" | "initialize";
   queues: Record<string, unknown>;
@@ -133,6 +134,12 @@ export class Trailtie extends BaseTrailtie {
       ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
       ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
       ActiveRecord.queues = cfg.queues;
+      const partialInserts = cfg.partialInserts;
+      if (partialInserts !== undefined) {
+        onLoad("active_record", (base: typeof Base) => {
+          base.partialInserts = partialInserts;
+        });
+      }
     });
 
     this.initializer("active_record.set_executor_hooks", () => {

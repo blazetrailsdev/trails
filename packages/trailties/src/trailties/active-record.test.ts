@@ -197,6 +197,16 @@ describe("RailtieTest", () => {
     expect(ExtendedDeterministicUniquenessValidator.installed).toBe(false);
   });
 
+  it("runInitializers applies partial_inserts from config.active_record to Base", async () => {
+    Base.partialInserts = true;
+    (Trailtie.config.get("activeRecord") as ActiveRecordConfig).partialInserts = false;
+
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("active_record", Base);
+
+    expect(Base.partialInserts).toBe(false);
+  });
+
   it("runInitializers installs the executor hooks that open an async query session", async () => {
     await runTrailtieInitializers(Trailtie, blogApp());
 
