@@ -633,15 +633,36 @@ the Proxy calls back through.
 
 **The alternative — `serializableHash` / `asJson` returning `Promise`
 unconditionally, the way RFC 0063 made `isValid()` return `Promise<boolean>` —
-was considered and rejected, because `toJSON` cannot answer it.**
-`JSON.stringify` calls `toJSON` synchronously and never awaits, and trails'
+was considered and rejected, because an async `asJson` propagates through the
+whole JSON encoder and takes `to_json` with it.** `asJson` is not one method;
+it is the recursive dispatcher at
+`activesupport/src/core-ext/object/json.ts:256`, standing in for Ruby's
+`as_json` method lookup, and there are ~19 `asJson` definitions feeding it.
+`Array.asJson` recurses per element back through that dispatcher (`:125-137`)
+and `Enumerable.asJson` delegates to `Array.asJson` (`:85-89`), so any
+collection containing a model goes async. `JSONGemEncoder#jsonify`
+(`activesupport/src/json/encoding.ts:40`, Rails'
+`activesupport/lib/active_support/json/encoding.rb`) recurses through `asJson`
+for every nested node, so the encoder goes async; `Encoding#encode`
+(`encoding.ts:19`) and its call sites follow, and **`to_json` returns a
+Promise** where Rails' returns a String
+(`activesupport/lib/active_support/core_ext/object/json.rb:35-43`). That is a
+fidelity loss at a more prominent Rails surface than the thenable it would
+remove. And it does not even buy the simplification: `jsonify` would still need
+a synchronous path for the `JSON.stringify` case, so the same sync/async split
+survives — relocated out of one contained Proxy and duplicated across every
+`asJson` definition in the repo.
+
+**The `JSON.stringify` → `toJSON` path is not the binding constraint.**
+`JSON.stringify` does call `toJSON` synchronously and never awaits, and trails'
 `toJSON` (`activesupport/src/core-ext/object/json.ts:47-60`, the port of
-`ActiveSupport::ToJsonWithActiveSupportEncoder#to_json`,
-`core_ext/object/json.rb:35-43`) returns `this.asJson()` from inside that
-synchronous call. An unconditionally-async `asJson` would make
-`JSON.stringify(record)` emit `{}` for every model in the repo, which is not a
-cost the async boundary can be paid with. There is no third shape: `to_json` is
-Rails-facing API, so it cannot be dropped to buy the uniform Promise.
+`ActiveSupport::ToJsonWithActiveSupportEncoder#to_json`) returns
+`this.asJson()` from inside that synchronous call — but on that path `toJSON`
+receives only the property key and calls `asJson()` with **no options**, so
+there is no `include:` to load and nothing to await. It is a fixable coupling,
+not a wall; do not mistake it for the decision's foundation. There is also no
+third shape: `to_json` is Rails-facing API, so it cannot be dropped to buy the
+uniform Promise.
 
 This is a genuine language shortcoming — JS has no synchronous await and no
 lazily-loading collection read — and it is ratified repo-wide here.
