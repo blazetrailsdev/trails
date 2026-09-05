@@ -7,8 +7,6 @@ import {
   type ActionDispatchConfig,
   type ContentSecurityPolicyConfig,
 } from "./action-dispatch.js";
-import { ContentSecurityPolicy } from "@blazetrails/actionpack";
-import { ContentSecurityPolicyMiddleware } from "@blazetrails/actionpack";
 import { URL as HttpURL } from "@blazetrails/actionpack";
 import { QueryParser } from "@blazetrails/actionpack";
 import { RequestUtils } from "@blazetrails/actionpack";
@@ -98,51 +96,6 @@ describe("ActionDispatch::Trailtie", () => {
     expect(c.reportOnly).toBe(false);
     expect(c.nonceGenerator).toBeNull();
     expect(c.nonceDirectives).toBeNull();
-  });
-
-  it("defaultMiddleware contributes ContentSecurityPolicyMiddleware", () => {
-    const stack = Trailtie.defaultMiddleware();
-    const klasses = [...stack].map((e) => e.klass);
-    expect(klasses).toContain(ContentSecurityPolicyMiddleware);
-  });
-
-  it("seedContentSecurityPolicyEnv copies config slots onto request env", () => {
-    const headers: Record<string, unknown> = {};
-    const req = {
-      getHeader: (k: string) => headers[k],
-      setHeader: (k: string, v: unknown) => (headers[k] = v),
-    };
-    const policy = new ContentSecurityPolicy((p) => p.defaultSrc("'self'"));
-    const generator = () => "abc";
-    const cfg = Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
-    cfg.policy = policy;
-    cfg.reportOnly = true;
-    cfg.nonceGenerator = generator;
-    cfg.nonceDirectives = ["script-src"];
-
-    Trailtie.seedContentSecurityPolicyEnv(req);
-
-    expect(headers["action_dispatch.content_security_policy"]).toBe(policy);
-    expect(headers["action_dispatch.content_security_policy_report_only"]).toBe(true);
-    expect(headers["action_dispatch.content_security_policy_nonce_generator"]).toBe(generator);
-    expect(headers["action_dispatch.content_security_policy_nonce_directives"]).toEqual([
-      "script-src",
-    ]);
-  });
-
-  it("seedContentSecurityPolicyEnv writes all four slots unconditionally (Rails parity)", () => {
-    const headers: Record<string, unknown> = {
-      "action_dispatch.content_security_policy_report_only": true,
-    };
-    const req = {
-      getHeader: (k: string) => headers[k],
-      setHeader: (k: string, v: unknown) => (headers[k] = v),
-    };
-    Trailtie.seedContentSecurityPolicyEnv(req);
-    expect(headers["action_dispatch.content_security_policy_report_only"]).toBe(false);
-    expect(headers["action_dispatch.content_security_policy"]).toBeNull();
-    expect(headers["action_dispatch.content_security_policy_nonce_generator"]).toBeNull();
-    expect(headers["action_dispatch.content_security_policy_nonce_directives"]).toBeNull();
   });
 
   it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", async () => {

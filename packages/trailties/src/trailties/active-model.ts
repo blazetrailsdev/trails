@@ -8,13 +8,6 @@ export interface ActiveModelConfig {
   i18nCustomizeFullMessage?: boolean;
 }
 
-export interface TrailtieConfig {
-  env?: string;
-  /** @deprecated */
-  i18nCustomizeFullMessage?: boolean;
-  activeModel?: ActiveModelConfig;
-}
-
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
@@ -23,6 +16,8 @@ interface TrailtieApp {
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
+
+    this.config.set("activeModel", {} satisfies ActiveModelConfig);
 
     this.initializer("active_model.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeModel", deprecator());
@@ -33,24 +28,11 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
-      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage({
-        i18nCustomizeFullMessage: Trailtie.config.get("i18nCustomizeFullMessage") as
-          | boolean
-          | undefined,
-        activeModel: Trailtie.config.get("activeModel") as ActiveModelConfig | undefined,
-      });
+      const activeModel = this.config.get("activeModel") as ActiveModelConfig;
+      const i18nCustomizeFullMessage = activeModel.i18nCustomizeFullMessage;
+      delete activeModel.i18nCustomizeFullMessage;
+      ActiveModelError.i18nCustomizeFullMessage = i18nCustomizeFullMessage || false;
     });
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  static initialize(config?: TrailtieConfig): void {
-    const env = config?.env ?? Trailtie.detectEnv();
-    SecurePassword.minCost = env === "test";
-    ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage(config);
-  }
-
-  private static resolveI18nCustomizeFullMessage(cfg?: TrailtieConfig): boolean {
-    return cfg?.activeModel?.i18nCustomizeFullMessage ?? cfg?.i18nCustomizeFullMessage ?? false;
   }
 
   private static detectEnv(): string {

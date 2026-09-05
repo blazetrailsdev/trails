@@ -19,38 +19,6 @@ import { installExtendedQueriesIfConfigured } from "@blazetrails/activerecord/en
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
-type FrameworkDefaultsEntry = {
-  partialInserts?: boolean;
-  raiseOnAssignToAttrReadonly?: boolean;
-};
-
-const KNOWN_VERSIONS = new Set(["5.0", "5.1", "5.2", "6.0", "6.1", "7.0", "7.1", "7.2", "8.0"]);
-
-const FRAMEWORK_DEFAULTS: Array<[string, FrameworkDefaultsEntry]> = [
-  ["7.0", { partialInserts: false }],
-  ["7.1", { raiseOnAssignToAttrReadonly: true }],
-];
-
-function compareVersions(a: string, b: string): number {
-  const [aMaj = 0, aMin = 0] = a.split(".").map(Number);
-  const [bMaj = 0, bMin = 0] = b.split(".").map(Number);
-  return aMaj !== bMaj ? aMaj - bMaj : aMin - bMin;
-}
-
-export function loadDefaults(version: string): void {
-  if (!KNOWN_VERSIONS.has(version)) {
-    throw new Error(`Unknown version ${JSON.stringify(version)}`);
-  }
-  for (const [v, defaults] of FRAMEWORK_DEFAULTS) {
-    if (compareVersions(v, version) <= 0) {
-      if (defaults.partialInserts !== undefined) Base.partialInserts = defaults.partialInserts;
-      if (defaults.raiseOnAssignToAttrReadonly !== undefined) {
-        ActiveRecord.raiseOnAssignToAttrReadonly = defaults.raiseOnAssignToAttrReadonly;
-      }
-    }
-  }
-}
-
 export type ActiveRecordEncryptionConfig = Parameters<typeof EncryptionConfigurable.configure>[0];
 
 export interface ActiveRecordConfig {
@@ -66,27 +34,10 @@ export interface ActiveRecordConfig {
   queryLogTagsFormat: "legacy" | "sqlcommenter";
   cacheQueryLogTags: boolean;
   raiseOnAssignToAttrReadonly: boolean;
+  partialInserts?: boolean;
   belongsToRequiredValidatesForeignKey: boolean;
   generateSecureTokenOn: "create" | "initialize";
   queues: Record<string, unknown>;
-}
-
-function defaultActiveRecordConfig(): ActiveRecordConfig {
-  return {
-    encryption: {},
-    useSchemaCacheDump: true,
-    checkSchemaCacheDumpVersion: true,
-    maintainTestSchema: true,
-    hasManyInversing: false,
-    queryLogTagsEnabled: false,
-    queryLogTags: ["application"],
-    queryLogTagsFormat: "legacy",
-    cacheQueryLogTags: false,
-    raiseOnAssignToAttrReadonly: false,
-    belongsToRequiredValidatesForeignKey: true,
-    generateSecureTokenOn: "create",
-    queues: {},
-  };
 }
 
 const setTimeZoneAwareAttributes = (base: typeof Base): void => {
@@ -124,7 +75,21 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.config.set("activeRecord", defaultActiveRecordConfig());
+    this.config.set("activeRecord", {
+      encryption: {},
+      useSchemaCacheDump: true,
+      checkSchemaCacheDumpVersion: true,
+      maintainTestSchema: true,
+      hasManyInversing: false,
+      queryLogTagsEnabled: false,
+      queryLogTags: ["application"],
+      queryLogTagsFormat: "legacy",
+      cacheQueryLogTags: false,
+      raiseOnAssignToAttrReadonly: false,
+      belongsToRequiredValidatesForeignKey: true,
+      generateSecureTokenOn: "create",
+      queues: {},
+    } satisfies ActiveRecordConfig);
 
     this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeRecord", deprecator());
@@ -169,6 +134,12 @@ export class Trailtie extends BaseTrailtie {
       ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
       ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
       ActiveRecord.queues = cfg.queues;
+      const partialInserts = cfg.partialInserts;
+      if (partialInserts !== undefined) {
+        onLoad("active_record", (base: typeof Base) => {
+          base.partialInserts = partialInserts;
+        });
+      }
     });
 
     this.initializer("active_record.set_executor_hooks", () => {

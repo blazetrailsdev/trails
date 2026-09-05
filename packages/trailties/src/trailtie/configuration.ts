@@ -64,6 +64,11 @@ export class Configuration {
   }
 
   get(key: string): unknown {
+    if (!Object.prototype.hasOwnProperty.call(Configuration._options, key)) {
+      throw new NoMethodError(
+        `undefined method '${key}' for an instance of ${this.constructor.name}`,
+      );
+    }
     return Configuration._options[key];
   }
 

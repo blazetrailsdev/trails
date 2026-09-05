@@ -11,14 +11,6 @@ export interface ActionControllerConfig {
   wrapParametersByDefault: boolean;
 }
 
-function defaultActionControllerConfig(): ActionControllerConfig {
-  return {
-    raiseOnOpenRedirects: false,
-    logQueryTagsAroundActions: true,
-    wrapParametersByDefault: false,
-  };
-}
-
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
@@ -33,7 +25,11 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.config.set("actionController", defaultActionControllerConfig());
+    this.config.set("actionController", {
+      raiseOnOpenRedirects: false,
+      logQueryTagsAroundActions: true,
+      wrapParametersByDefault: false,
+    } satisfies ActionControllerConfig);
 
     this.initializer("action_controller.set_configs", (app) => {
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
