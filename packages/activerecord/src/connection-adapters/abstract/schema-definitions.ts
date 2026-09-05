@@ -307,8 +307,8 @@ export class CheckConstraintDefinition {
     this.options = options;
   }
 
-  get name(): string {
-    return this.options.name as string;
+  get name(): string | undefined {
+    return this.options.name;
   }
 
   get validate(): boolean | null {
@@ -768,9 +768,9 @@ export class AlterTable {
   protected readonly _td: TableDefinition;
   readonly adds: AddColumnDefinition[] = [];
   readonly foreignKeyAdds: ForeignKeyDefinition[] = [];
-  readonly foreignKeyDrops: string[] = [];
+  readonly foreignKeyDrops: (string | undefined)[] = [];
   readonly checkConstraintAdds: CheckConstraintDefinition[] = [];
-  readonly checkConstraintDrops: string[] = [];
+  readonly checkConstraintDrops: (string | undefined)[] = [];
   readonly constraintDrops: string[] = [];
   constructor(td: TableDefinition) {
     this._td = td;
@@ -788,7 +788,7 @@ export class AlterTable {
     this.foreignKeyAdds.push(this._td.newForeignKeyDefinition(toTable, options));
   }
 
-  dropForeignKey(name: string): void {
+  dropForeignKey(name: string | undefined): void {
     this.foreignKeyDrops.push(name);
   }
 
@@ -799,7 +799,7 @@ export class AlterTable {
     this.checkConstraintAdds.push(this._td.newCheckConstraintDefinition(expression, options));
   }
 
-  dropCheckConstraint(constraintName: string): void {
+  dropCheckConstraint(constraintName: string | undefined): void {
     this.checkConstraintDrops.push(constraintName);
   }
 

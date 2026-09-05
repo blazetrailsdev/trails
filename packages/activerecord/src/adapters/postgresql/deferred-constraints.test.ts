@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_ch_fk",
           deferrable: "immediate",
         });
-        const fkName = (await adapter.foreignKeys("dc_ch"))[0].name!;
+        const fkName = (await adapter.foreignKeys("dc_ch"))[0].name;
         await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", fkName);

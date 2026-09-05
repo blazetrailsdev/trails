@@ -6,6 +6,19 @@ import "../connection-handling.js";
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTrailsTest", () => {
+    it("adapter_class raises AdapterNotFound when no adapter is configured", async () => {
+      const config = new HashConfig("default_env", "primary", {});
+      await expect(config.adapterClass()).rejects.toThrow(AdapterNotFound);
+      await expect(config.adapterClass()).rejects.toThrow(
+        "Database configuration specifies nonexistent '' adapter.",
+      );
+    });
+
+    it("new_connection raises AdapterNotFound when no adapter is configured", () => {
+      const config = new HashConfig("default_env", "primary", {});
+      expect(() => config.newConnection()).toThrow(AdapterNotFound);
+    });
+
     it("validate rejects an empty adapter string", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "" });
       expect(() => config.validateBang()).toThrow(AdapterNotFound);

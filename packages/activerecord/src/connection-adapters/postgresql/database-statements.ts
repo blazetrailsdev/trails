@@ -246,7 +246,7 @@ interface SetConstraintsHost {
 export async function setConstraints(
   this: SetConstraintsHost,
   deferred: "deferred" | "immediate",
-  ...constraints: string[]
+  ...constraints: (string | undefined)[]
 ): Promise<void> {
   if (deferred !== "deferred" && deferred !== "immediate") {
     throw new ArgumentError(`deferred must be "deferred" or "immediate"`);

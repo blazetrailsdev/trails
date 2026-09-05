@@ -29,11 +29,18 @@ export interface DatabaseConfigOptions {
   [key: string]: unknown;
 }
 
-type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
-type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
-type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
-type LoadErrorLookup = (adapterName: string) => unknown | null;
-type AdapterNameValidator = (adapterName: string) => void;
+type AdapterClassResolver = (
+  adapterName: string | undefined,
+) => Promise<new (...args: any[]) => unknown>;
+type AdapterClassResolverSync = (
+  adapterName: string | undefined,
+) => (new (...args: any[]) => unknown) | null;
+type AdapterArgBuilder = (
+  adapterName: string | undefined,
+  configuration: Record<string, unknown>,
+) => unknown[];
+type LoadErrorLookup = (adapterName: string | undefined) => unknown | null;
+type AdapterNameValidator = (adapterName: string | undefined) => void;
 let _adapterClassResolver: AdapterClassResolver | null = null;
 let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
 let _validateAdapterName: AdapterNameValidator | null = null;
@@ -73,9 +80,6 @@ export class DatabaseConfig {
         "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
       );
     }
-    if (!this.adapter) {
-      throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
-    }
     return (this.#adapterClass ??= await _adapterClassResolver(this.adapter));
   }
 
@@ -84,7 +88,7 @@ export class DatabaseConfig {
    * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
    */
   adapterClassSync(): (new (...args: any[]) => unknown) | null {
-    if (!_adapterClassResolverSync || !this.adapter) return null;
+    if (!_adapterClassResolverSync) return null;
     return _adapterClassResolverSync(this.adapter);
   }
 
@@ -106,11 +110,9 @@ export class DatabaseConfig {
         "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
       );
     }
-    if (!this.adapter) {
-      throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
-    }
     const Klass = _adapterClassResolverSync(this.adapter);
     if (!Klass) {
+      _validateAdapterName?.(this.adapter);
       const loadError = _loadAdapterError?.(this.adapter) ?? null;
       const remediation = loadError
         ? `loader failed: ${(loadError as Error).message ?? loadError}`

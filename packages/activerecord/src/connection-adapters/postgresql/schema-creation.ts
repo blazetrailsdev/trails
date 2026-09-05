@@ -51,7 +51,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);
-    sql += ((o.constraintValidations as string[] | undefined) ?? [])
+    sql += ((o.constraintValidations as (string | undefined)[] | undefined) ?? [])
       .map((fk) => this.visitValidateConstraint(fk))
       .join(" ");
     sql += (
@@ -85,7 +85,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitValidateConstraint(name: string): string {
+  protected visitValidateConstraint(name: string | undefined): string {
     return `VALIDATE CONSTRAINT ${this.conn.quoteColumnName(name)}`;
   }
 

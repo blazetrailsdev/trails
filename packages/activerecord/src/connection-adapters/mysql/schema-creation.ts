@@ -60,12 +60,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitDropForeignKey(name: string): string {
+  protected visitDropForeignKey(name: string | undefined): string {
     return `DROP FOREIGN KEY ${name}`;
   }
 
   /** @internal */
-  protected override async visitDropCheckConstraint(name: string): Promise<string> {
+  protected override async visitDropCheckConstraint(name: string | undefined): Promise<string> {
     return `DROP ${(await this.isMariadb()) ? "CONSTRAINT" : "CHECK"} ${name}`;
   }
 

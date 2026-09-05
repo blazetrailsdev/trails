@@ -537,7 +537,7 @@ export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
     options?: UniqueConstraintOptions,
   ): Promise<void>;
   removeUniqueConstraint(tableName: string, options?: { name?: string }): Promise<void>;
-  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   validateCheckConstraint(tableName: string, constraintName: string): Promise<void>;
 }
 
@@ -567,7 +567,7 @@ export class Table extends AbstractTable {
     return this._pgSchema.removeUniqueConstraint(this._pgTableName, options);
   }
 
-  validateConstraint(constraintName: string): Promise<void> {
+  validateConstraint(constraintName: string | undefined): Promise<void> {
     return this._pgSchema.validateConstraint(this._pgTableName, constraintName);
   }
 
@@ -779,7 +779,7 @@ export class Table extends AbstractTable {
 }
 
 export class AlterTable extends AbstractAlterTable {
-  readonly constraintValidations: string[] = [];
+  readonly constraintValidations: (string | undefined)[] = [];
   readonly exclusionConstraintAdds: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraintAdds: UniqueConstraintDefinition[] = [];
 
@@ -797,7 +797,7 @@ export class AlterTable extends AbstractAlterTable {
     return this._td as TableDefinition;
   }
 
-  validateConstraint(name: string): void {
+  validateConstraint(name: string | undefined): void {
     this.constraintValidations.push(name);
   }
 
