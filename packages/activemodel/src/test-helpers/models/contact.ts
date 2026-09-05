@@ -118,7 +118,6 @@ export class Contact extends Model {
     return exceptBang(instanceValues(this), "address", "friends", "contact");
   }
 
-  /** @noRailsEquivalent CONVERGEABLE respond-to-is-only-defined-on-attribute-methods-hosts */
   respondTo(method: string): boolean {
     return method in (this as unknown as Record<string, unknown>);
   }
