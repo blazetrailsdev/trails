@@ -172,7 +172,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
         end
       `,
     });
-    expect(s["Foo#initialize"]).toEqual(["try", "rescue", "ref:load"]);
+    expect(s["Foo#initialize"]).toEqual(["try", "ref:load", "rescue"]);
   });
 
   // A `define_method(name) { … }` body IS the method body and is right there in

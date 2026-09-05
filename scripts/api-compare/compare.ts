@@ -1184,21 +1184,26 @@ export interface CallSkeleton {
  * splice a body into itself. One hop only: the entries are recorded as their
  * authors wrote them, so a helper's own reaches stay reaches and the splice
  * cannot walk a mutual-recursion cycle.
+ *
+ * Accumulated in a Map, because a reach is a method name and `ref:constructor`
+ * / `ref:toString` would read as already-present against a plain object's
+ * prototype; `report-arms.ts#spliceHelperSkeletons` reads the record back with
+ * the matching own-property test.
  */
 export function sameFileHelperSkeletons(
   ownName: string,
   skeleton: readonly string[],
   resolve: (name: string) => string[] | undefined,
 ): Record<string, string[]> | undefined {
-  const helpers: Record<string, string[]> = {};
+  const helpers = new Map<string, string[]>();
   for (const token of skeleton) {
     if (!token.startsWith("ref:")) continue;
     const name = token.slice("ref:".length);
-    if (name === ownName || helpers[name] !== undefined) continue;
+    if (name === ownName || helpers.has(name)) continue;
     const resolved = resolve(name);
-    if (resolved !== undefined) helpers[name] = foldSkeletonTokens(resolved);
+    if (resolved !== undefined) helpers.set(name, foldSkeletonTokens(resolved));
   }
-  return Object.keys(helpers).length === 0 ? undefined : helpers;
+  return helpers.size === 0 ? undefined : Object.fromEntries(helpers);
 }
 
 /** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact

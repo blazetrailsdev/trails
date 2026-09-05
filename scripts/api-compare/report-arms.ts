@@ -154,16 +154,20 @@ function multisetDifference(a: readonly string[], b: readonly string[]): string[
   return out;
 }
 
-function armVerdict(row: SkeletonRow, ruby: readonly string[], ts: readonly string[]) {
+function armVerdict(
+  row: SkeletonRow,
+  ruby: readonly string[],
+  ts: readonly string[],
+): ArmMismatch | undefined {
   const rubyArms = controlArms(ruby);
   const tsArms = controlArms(ts);
   const missing = multisetDifference(rubyArms, tsArms);
   const invented = multisetDifference(tsArms, rubyArms);
   if (missing.length > 0 || invented.length > 0) {
-    return { ...row, kind: "count" as const, rubyArms, tsArms, missing, invented };
+    return { ...row, kind: "count", rubyArms, tsArms, missing, invented };
   }
   if (rubyArms.join(" ") === tsArms.join(" ")) return undefined;
-  return { ...row, kind: "order" as const, rubyArms, tsArms, missing: [], invented: [] };
+  return { ...row, kind: "order", rubyArms, tsArms, missing: [], invented: [] };
 }
 
 /**
