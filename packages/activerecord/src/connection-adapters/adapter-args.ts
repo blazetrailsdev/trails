@@ -1,4 +1,7 @@
-/** @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ */
 export function inferAdapterNameFromUrl(url: string): string | undefined {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
     return "postgresql";
