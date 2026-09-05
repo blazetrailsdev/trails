@@ -48,7 +48,7 @@ function enumTypeFrom(
   if (reflected instanceof EnumType) {
     subtype = reflected.subtypeType();
   } else {
-    const rv = reflected as ValueType<unknown>;
+    const rv = reflected!;
     subtype = rv.type() == null ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
   return new EnumType(

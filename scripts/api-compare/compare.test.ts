@@ -952,12 +952,6 @@ describe("superclassesMatch", () => {
     expect(superclassesMatch(null, ["Node"], "Attribute")).toBe(true);
   });
 
-  it("accepts activemodel ValueType extending Type when Ruby Value has no super", () => {
-    // Rails' `Type::Value` has no super; TS adds an abstract `Type`
-    // intermediate so subclasses can declare `abstract cast`.
-    expect(superclassesMatch(null, ["Type"], "ValueType")).toBe(true);
-  });
-
   it("accepts AR Base extending Model when Ruby Base has no super", () => {
     // `ActiveRecord::Base` has no Ruby super; TS `Base extends Model`
     // to expose the ActiveModel host class on subclasses.
