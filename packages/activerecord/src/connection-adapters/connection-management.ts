@@ -72,6 +72,7 @@ export class BodyProxy {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-connection-management-onto-executor-and-body-proxy */
 export class ConnectionManagement {
   constructor(private readonly app: RackApp) {}
 

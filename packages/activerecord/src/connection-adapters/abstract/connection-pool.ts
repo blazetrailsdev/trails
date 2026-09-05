@@ -38,8 +38,6 @@ interface PoolManagedConnection {
   expire?(): void;
 }
 
-export { withExecutionContext } from "./connection-pool/execution-context.js";
-
 export interface AbstractPool {
   get schemaCache(): unknown;
 }

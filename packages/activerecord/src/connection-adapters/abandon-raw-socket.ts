@@ -9,6 +9,7 @@ interface RawConnectionLike {
   connection?: { stream?: RawSocketLike };
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function abandonRawSocket(rawConnection: unknown): void {
   if (rawConnection === null || rawConnection === undefined) return;
   const candidate = rawConnection as RawConnectionLike;

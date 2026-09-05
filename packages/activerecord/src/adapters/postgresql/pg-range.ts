@@ -6,6 +6,7 @@ import { Range } from "@blazetrails/ruby-compat";
 
 export type SubtypeCast = (value: string) => unknown;
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-range-helper-onto-oid-range-cast-value */
 export function parseRange(input: string, subtype?: SubtypeCast): Range<unknown> | null {
   if (!input || input === "empty") return null;
 
@@ -35,23 +36,4 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range<unknown>
   const castEnd = rawEnd !== null && subtype ? subtype(rawEnd) : rawEnd;
 
   return new Range(castBegin, castEnd, excludeEnd);
-}
-
-export type SubtypeSerialize = (value: unknown) => string;
-
-export function serializeRange(range: Range<unknown>, subtype?: SubtypeSerialize): string {
-  const serializeBound = (v: unknown): string => {
-    if (v === null || v === undefined) return "";
-    const s = subtype ? subtype(v) : String(v);
-    return quoteRangeBound(s);
-  };
-  const endBracket = range.excludeEnd ? ")" : "]";
-  return `[${serializeBound(range.begin)},${serializeBound(range.end)}${endBracket}`;
-}
-
-function quoteRangeBound(value: string): string {
-  if (/[",\\\s[\]()]/.test(value)) {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '""')}"`;
-  }
-  return value;
 }

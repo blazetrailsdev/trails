@@ -38,6 +38,7 @@ const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgPars
   [OID_TIMETZ_ARRAY, passthrough],
 ]);
 
+/** @noRailsEquivalent PERMANENT */
 export function makeGetTypeParser(pgTypes: {
   getTypeParser: (oid: number, format: "text" | "binary") => unknown;
 }): (oid: number, format?: string) => PgParser {

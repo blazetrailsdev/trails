@@ -6,7 +6,6 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
-import { adapterNameFromUrl } from "./connection-adapters/adapter-args.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -633,13 +632,6 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
   });
   if (tz) ActiveRecord.defaultTimezone = tz;
 }
-
-export {
-  normalizeAdapterName,
-  parseSqliteUrl,
-  buildAdapterArg,
-} from "./connection-adapters/adapter-args.js";
-export { adapterNameFromUrl };
 
 export const ClassMethods = {
   connectsTo,

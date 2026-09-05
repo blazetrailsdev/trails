@@ -8,6 +8,7 @@ import {
 type Field = { type: string; string: () => string | null };
 type NextFn = () => unknown;
 
+/** @noRailsEquivalent PERMANENT */
 export function temporalTypeCast(field: Field, next: NextFn): unknown {
   switch (field.type) {
     case "TIMESTAMP":

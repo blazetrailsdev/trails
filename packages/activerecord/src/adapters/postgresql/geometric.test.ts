@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { PgPoint, parsePoint, castPoint } from "./geometric.js";
+import { Point, PointValue } from "../../connection-adapters/postgresql/oid/point.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+
+const pointType = new Point();
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -49,8 +51,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("point type cast", async () => {
-      const p = parsePoint("(1.5,2.3)");
-      expect(p).toBeInstanceOf(PgPoint);
+      const p = pointType.cast("(1.5,2.3)");
+      expect(p).toBeInstanceOf(PointValue);
       expect(p!.x).toBeCloseTo(1.5);
       expect(p!.y).toBeCloseTo(2.3);
     });
@@ -60,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         "(10,25.2)",
       ]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = parsePoint(rows[0].x);
+      const p = pointType.cast(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
       expect(p!.y).toBeCloseTo(25.2);
     });
@@ -89,47 +91,47 @@ describeIfPg("PostgreSQLAdapter", () => {
         "(10,25.2)",
       ]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = parsePoint(rows[0].x);
+      const p = pointType.cast(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
       expect(p!.y).toBeCloseTo(25.2);
 
       await adapter.execQuery(`UPDATE postgresql_points SET x = $1`, "SQL", ["(30,40)"]);
       const rows2 = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p2 = parsePoint(rows2[0].x as string);
+      const p2 = pointType.cast(rows2[0].x as string);
       expect(p2!.x).toBeCloseTo(30);
       expect(p2!.y).toBeCloseTo(40);
     });
 
     it("mutation", () => {
-      const p = new PgPoint(10, 20);
+      const p = new PointValue(10, 20);
       p.y = 25;
       expect(p.y).toBe(25);
-      expect(p.toString()).toBe("(10,25)");
+      expect(pointType.serialize(p)).toBe("(10,25)");
     });
 
     it("array assignment", () => {
-      const p = castPoint([1, 2]);
-      expect(p).toBeInstanceOf(PgPoint);
+      const p = pointType.cast([1, 2]);
+      expect(p).toBeInstanceOf(PointValue);
       expect(p!.x).toBe(1);
       expect(p!.y).toBe(2);
     });
 
     it("hash assignment", () => {
-      const p = castPoint({ x: 1, y: 2 });
-      expect(p).toBeInstanceOf(PgPoint);
+      const p = pointType.cast({ x: 1, y: 2 });
+      expect(p).toBeInstanceOf(PointValue);
       expect(p!.x).toBe(1);
       expect(p!.y).toBe(2);
     });
 
     it("string assignment", () => {
-      const p = castPoint("(1, 2)");
-      expect(p).toBeInstanceOf(PgPoint);
+      const p = pointType.cast("(1, 2)");
+      expect(p).toBeInstanceOf(PointValue);
       expect(p!.x).toBe(1);
       expect(p!.y).toBe(2);
     });
 
     it("empty string assignment", () => {
-      const p = castPoint("");
+      const p = pointType.cast("");
       expect(p).toBeNull();
     });
 
@@ -171,13 +173,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", ["(5,10)"]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
       expect(rows[0].x).toBeTruthy();
-      const p = parsePoint(rows[0].x);
+      const p = pointType.cast(rows[0].x);
       expect(p!.x).toBeCloseTo(5);
       expect(p!.y).toBeCloseTo(10);
     });
 
     it("legacy mutation", () => {
-      const p = new PgPoint(10, 20);
+      const p = new PointValue(10, 20);
       p.x = 15;
       expect(p.x).toBe(15);
     });

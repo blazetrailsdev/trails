@@ -4,11 +4,8 @@ import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
-import {
-  ConnectionPool,
-  NullPool,
-  withExecutionContext,
-} from "./connection-adapters/abstract/connection-pool.js";
+import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
+import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
 import { AdapterNotFound } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
