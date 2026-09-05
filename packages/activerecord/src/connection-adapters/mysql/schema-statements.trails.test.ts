@@ -149,7 +149,7 @@ describe("MySQL::SchemaStatements", () => {
       "users",
       {
         Field: "name",
-        ValueType: "varchar(255)",
+        Type: "varchar(255)",
         Null: "YES",
         Default: "Dean",
         Extra: "",
@@ -169,7 +169,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "updated_at",
-        ValueType: "timestamp",
+        Type: "timestamp",
         Null: "NO",
         Default: "CURRENT_TIMESTAMP",
         Extra: "",
@@ -186,7 +186,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "created_at",
-        ValueType: "datetime",
+        Type: "datetime",
         Null: "NO",
         Default: "CURRENT_TIMESTAMP",
         Extra: "",
@@ -203,7 +203,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "created_at",
-        ValueType: "datetime",
+        Type: "datetime",
         Null: "NO",
         Default: "now()",
         Extra: "DEFAULT_GENERATED",
@@ -220,7 +220,7 @@ describe("MySQL::SchemaStatements", () => {
       "items",
       {
         Field: "uid",
-        ValueType: "char(36)",
+        Type: "char(36)",
         Null: "NO",
         Default: "uuid()",
         Extra: "DEFAULT_GENERATED",
@@ -237,7 +237,7 @@ describe("MySQL::SchemaStatements", () => {
       "items",
       {
         Field: "due_on",
-        ValueType: "date",
+        Type: "date",
         Null: "YES",
         Default: "CURRENT_DATE",
         Extra: "DEFAULT_GENERATED",
@@ -254,7 +254,7 @@ describe("MySQL::SchemaStatements", () => {
       "orders",
       {
         Field: "total",
-        ValueType: "decimal(10,2)",
+        Type: "decimal(10,2)",
         Null: "YES",
         Default: "price * qty",
         Extra: "DEFAULT_GENERATED",
@@ -271,7 +271,7 @@ describe("MySQL::SchemaStatements", () => {
       "users",
       {
         Field: "bio",
-        ValueType: "text",
+        Type: "text",
         Null: "YES",
         Default: "'hello world'",
         Extra: "",
@@ -302,7 +302,7 @@ describe("MySQL::SchemaStatements", () => {
       "t",
       {
         Field: "id",
-        ValueType: "bigint",
+        Type: "bigint",
         Null: "NO",
         Default: null,
         Extra: "",

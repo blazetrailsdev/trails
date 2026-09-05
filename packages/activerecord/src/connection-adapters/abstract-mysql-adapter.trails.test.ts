@@ -92,7 +92,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     adapter.columnDefinitions = async () => [
       {
         Field: "col",
-        ValueType: "int(11)",
+        Type: "int(11)",
         Null: "YES",
         Default: null,
         Extra: "",
@@ -108,7 +108,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
   }
 
   it("reads the current type from SHOW COLUMNS ... LIKE under the SCHEMA name", async () => {
-    const { adapter, queries } = await makeAdapter({ ValueType: "varchar(36)" });
+    const { adapter, queries } = await makeAdapter({ Type: "varchar(36)" });
     const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
     expect(queries).toEqual([["SHOW COLUMNS FROM `users` LIKE 'col'", "SCHEMA"]]);
     expect(sql).toBe("CHANGE `col` `col2` varchar(36) DEFAULT NULL");
@@ -116,7 +116,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
 
   it("carries default, null, auto_increment and comment into the CHANGE clause", async () => {
     const { adapter } = await makeAdapter({
-      ValueType: "bigint(20)",
+      Type: "bigint(20)",
       Null: "NO",
       Default: "7",
       Extra: "auto_increment",
