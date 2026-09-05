@@ -20,27 +20,23 @@ export interface Naming {
 
 function modelName(this: NamingHost): ModelName {
   if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-    const namespace = detectRelativeModelNamingParent(this);
+    let namespace: { name: string } | null = null;
+    const segments = (this.moduleName ?? "").split("::").filter((segment) => segment !== "");
+    while (segments.length > 0) {
+      const n = safeConstantize(segments.join("::")) as
+        | { name: string; useRelativeModelNaming?: () => unknown }
+        | null
+        | undefined;
+      const relative = n?.useRelativeModelNaming?.();
+      if (relative != null && relative !== false) {
+        namespace = n!;
+        break;
+      }
+      segments.pop();
+    }
     this._modelName = new ModelName(this as unknown as ModelLike, namespace);
   }
   return this._modelName;
-}
-
-/** @noRailsEquivalent CONVERGEABLE serializers-json-duplicates-model-name */
-export function detectRelativeModelNamingParent(klass: {
-  moduleName?: string;
-}): { name: string } | null {
-  const segments = (klass.moduleName ?? "").split("::").filter((segment) => segment !== "");
-  while (segments.length > 0) {
-    const parent = safeConstantize(segments.join("::")) as
-      | { name: string; useRelativeModelNaming?: () => unknown }
-      | null
-      | undefined;
-    const relative = parent?.useRelativeModelNaming?.();
-    if (relative != null && relative !== false) return parent!;
-    segments.pop();
-  }
-  return null;
 }
 
 function namingExtended(base: NamingHost): void {

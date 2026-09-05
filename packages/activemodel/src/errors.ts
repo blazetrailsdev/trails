@@ -92,7 +92,7 @@ export class Errors<TBase extends object = object> {
   }
 
   include(attribute: string): boolean {
-    return this._errors.some((e) => e.attribute === attribute);
+    return this._errors.some((e) => e.match(attribute));
   }
 
   hasKey(attribute: string): boolean {

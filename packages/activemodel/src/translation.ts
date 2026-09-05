@@ -1,7 +1,7 @@
 import { humanize, isPresent } from "@blazetrails/activesupport";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
-import type { ModelName } from "./naming.js";
+import { Naming, type ModelName } from "./naming.js";
 
 export function raiseOnMissingTranslations(value?: boolean): boolean {
   if (value !== undefined) {
@@ -24,6 +24,14 @@ export class Translation {
   static lookupAncestors = lookupAncestors;
 
   static humanAttributeName = humanAttributeName;
+}
+
+for (const moduleMethod of Object.keys(Naming)) {
+  Object.defineProperty(
+    Translation,
+    moduleMethod,
+    Object.getOwnPropertyDescriptor(Naming, moduleMethod)!,
+  );
 }
 
 export interface HumanAttributeNameOptions {

@@ -118,6 +118,11 @@ export class Serialized extends ValueType {
     this.coder = coder;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE api-compare-nulls-a-delegateclass-superclass */
+  override type(): string | undefined {
+    return this.subtype.type();
+  }
+
   accessor(): unknown {
     return IndifferentHashAccessor;
   }

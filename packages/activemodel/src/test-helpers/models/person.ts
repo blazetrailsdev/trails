@@ -1,6 +1,7 @@
 import { extend } from "@blazetrails/activesupport";
 import { Model } from "../../index.js";
-import { Translation } from "../../translation.js";
+import { Translation, type TranslationClassMethods } from "../../translation.js";
+import type { ModelName } from "../../naming.js";
 
 export class Person extends Model {
   declare private _title: string | null | undefined;
@@ -50,6 +51,12 @@ export class Person extends Model {
 }
 
 export class Gender {
+  static moduleName = "Person";
+
+  declare static humanAttributeName: TranslationClassMethods["humanAttributeName"];
+
+  declare static modelName: ModelName;
+
   static {
     extend(this, Translation);
   }
