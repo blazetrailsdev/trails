@@ -1,5 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { escape } from "@blazetrails/rack";
+import { URI } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Cookie, CookieJar } from "./cookie-jar.js";
 
@@ -38,19 +39,19 @@ describe("Rack::Test::Cookie", () => {
   });
 
   it("#valid? should consider the given URI scheme for secure cookies", () => {
-    expect(cookie("; secure").isValid(new URL("https://www.example.org/"))).toBe(true);
-    expect(cookie("; secure").isValid(new URL("httpx://www.example.org/"))).toBe(false);
-    expect(cookie("; secure").isValid(new URL("/", "http://example.org/"))).toBe(false);
+    expect(cookie("; secure").isValid(URI.parse("https://www.example.org/"))).toBe(true);
+    expect(cookie("; secure").isValid(URI.parse("httpx://www.example.org/"))).toBe(false);
+    expect(cookie("; secure").isValid(URI.parse("/"))).toBe(false);
   });
 
   it("#valid? is indifferent to matching paths", () => {
-    expect(cookie().isValid(new URL("https://www.example.org/foo"))).toBe(true);
-    expect(cookie().isValid(new URL("https://www.example.org/bar"))).toBe(true);
+    expect(cookie().isValid(URI.parse("https://www.example.org/foo"))).toBe(true);
+    expect(cookie().isValid(URI.parse("https://www.example.org/bar"))).toBe(true);
   });
 
   it("#matches? demands matching paths", () => {
-    expect(cookie().matches(new URL("https://www.example.org/foo"))).toBe(true);
-    expect(cookie().matches(new URL("https://www.example.org/bar"))).toBe(false);
+    expect(cookie().matches(URI.parse("https://www.example.org/foo"))).toBe(true);
+    expect(cookie().matches(URI.parse("https://www.example.org/bar"))).toBe(false);
   });
 
   it("#http_only? for a non HTTP only cookie returns false", () => {

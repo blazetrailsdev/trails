@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { type Generic, URI, regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -20,7 +20,7 @@ export class Cookie {
   /** @internal */
   private readonly _exactDomainMatch: boolean;
 
-  constructor(raw: string, uri: URL | null = null, defaultHost: string = DEFAULT_HOST) {
+  constructor(raw: string, uri: Generic | null = null, defaultHost: string = DEFAULT_HOST) {
     this._defaultHost = defaultHost;
     uri ??= this.defaultUri();
 
@@ -46,17 +46,16 @@ export class Cookie {
       }
     } else {
       this._exactDomainMatch = true;
-      this._options["domain"] = uri.hostname || defaultHost;
+      this._options["domain"] = uri.host ?? defaultHost;
     }
 
-    this._options["path"] ??= uri.pathname.replace(/\/[^/]*$/, "");
+    this._options["path"] ??= (uri.path ?? "").replace(/\/[^/]*$/, "");
   }
 
   replaces(other: Cookie): boolean {
-    return (
-      this.name.toLowerCase() === other.name.toLowerCase() &&
-      this.domain() === other.domain() &&
-      this.path() === other.path()
+    return equals(
+      [this.name.toLowerCase(), this.domain(), this.path()],
+      [other.name.toLowerCase(), other.domain(), other.path()],
     );
   }
 
@@ -64,8 +63,8 @@ export class Cookie {
     return this.value == null || this.value === "";
   }
 
-  domain(): string {
-    return this._options["domain"] as string;
+  domain(): string | string[] {
+    return this._options["domain"]!;
   }
 
   isSecure(): boolean {
@@ -91,29 +90,29 @@ export class Cookie {
     return expires != null && (expires.minus(Time.now()) as number) < 0;
   }
 
-  isValid(uri: URL | null): boolean {
+  isValid(uri: Generic | null): boolean {
     uri ??= this.defaultUri();
 
-    if (uri.hostname === "") uri.hostname = this._defaultHost;
+    if (uri.host == null) uri.host = this._defaultHost;
 
     const pattern = new RegExp(
-      `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain())}$`,
+      `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain() as string)}$`,
       "i",
     );
     return (
-      (!this.isSecure() || (this.isSecure() && uri.protocol === "https:")) &&
-      pattern.test(uri.hostname)
+      (!this.isSecure() || (this.isSecure() && uri.scheme === "https")) && pattern.test(uri.host)
     );
   }
 
-  matches(uri: URL): boolean {
-    return !this.isExpired() && this.isValid(uri) && uri.pathname.startsWith(this.path());
+  matches(uri: Generic): boolean {
+    return !this.isExpired() && this.isValid(uri) && (uri.path ?? "").startsWith(this.path());
   }
 
+  /** @missingRailsArgs reverse — PERMANENT */
   spaceship(other: Cookie): number {
     return compare(
-      [this.name, this.path(), reverseString(this.domain())],
-      [other.name, other.path(), reverseString(other.domain())],
+      [this.name, this.path(), reverse(this.domain())],
+      [other.name, other.path(), reverse(other.domain())],
     );
   }
 
@@ -133,8 +132,8 @@ export class Cookie {
   }
 
   /** @internal */
-  private defaultUri(): URL {
-    return new URL(`http://${this._defaultHost}/`);
+  private defaultUri(): Generic {
+    return URI.parse(`//${this._defaultHost}/`);
   }
 }
 
@@ -159,7 +158,7 @@ export class CookieJar {
     return this;
   }
 
-  get(name: string): string | undefined {
+  get(name: string | { toString(): string }): string | undefined {
     name = String(name);
     for (const cookie of this._cookies) {
       if (cookie.name === name) return cookie.value;
@@ -182,7 +181,7 @@ export class CookieJar {
     this._cookies = this._cookies.filter((cookie) => cookie.name !== name);
   }
 
-  merge(rawCookies: string | string[] | null | undefined, uri: URL | null = null): void {
+  merge(rawCookies: string | string[] | null | undefined, uri: Generic | null = null): void {
     if (rawCookies == null) return;
 
     const cookies = typeof rawCookies === "string" ? rawCookies.split("\n") : rawCookies;
@@ -200,7 +199,7 @@ export class CookieJar {
     this._cookies.sort((a, b) => a.spaceship(b));
   }
 
-  for(uri: URL | null): string {
+  for(uri: Generic | null): string {
     let buf = "";
     let delimiter: string | undefined;
 
@@ -220,20 +219,38 @@ export class CookieJar {
   }
 
   /** @internal */
-  private eachCookieFor(uri: URL | null, block: (cookie: Cookie) => void): void {
+  private eachCookieFor(uri: Generic | null, block: (cookie: Cookie) => void): void {
     for (const cookie of this._cookies) {
       if (!uri || cookie.matches(uri)) block(cookie);
     }
   }
 }
 
+type Component = string | string[];
+
 /** @internal */
-function reverseString(value: string): string {
-  return [...value].reverse().join("");
+function reverse(value: Component): Component {
+  return typeof value === "string" ? [...value].reverse().join("") : [...value].reverse();
 }
 
 /** @internal */
-function compare(a: string[], b: string[]): number {
+function equals(a: Component[], b: Component[]): boolean {
+  return a.every((value, i) => {
+    const other = b[i];
+    if (Array.isArray(value) || Array.isArray(other)) {
+      return (
+        Array.isArray(value) &&
+        Array.isArray(other) &&
+        value.length === other.length &&
+        value.every((v, j) => v === other[j])
+      );
+    }
+    return value === other;
+  });
+}
+
+/** @internal */
+function compare(a: Component[], b: Component[]): number {
   for (let i = 0; i < a.length; i++) {
     if (a[i] < b[i]) return -1;
     if (a[i] > b[i]) return 1;

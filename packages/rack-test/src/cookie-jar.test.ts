@@ -1,4 +1,5 @@
 import { assertEmpty } from "@blazetrails/activesupport";
+import { URI } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Cookie, CookieJar } from "./cookie-jar.js";
 
@@ -22,7 +23,7 @@ describe("Rack::Test::CookieJar", () => {
 
   it("ignores leading dot in domain", () => {
     const jar = new CookieJar();
-    jar.push(new Cookie("a=c; domain=.lithostech.com", new URL("https://lithostech.com")));
+    jar.push(new Cookie("a=c; domain=.lithostech.com", URI.parse("https://lithostech.com")));
     expect(jar.getCookie("a")!.domain()).toBe("lithostech.com");
   });
 
@@ -67,20 +68,20 @@ describe("Rack::Test::CookieJar", () => {
   it("#merge does not merge invalid raw cookie strings", () => {
     const jar = new CookieJar();
     jar.set("a", "b");
-    jar.merge("c=d; domain=example.org; secure", new URL("/", "http://example.org/"));
+    jar.merge("c=d; domain=example.org; secure", URI.parse("/"));
     expect(jar.toHash()).toEqual({ a: "b" });
   });
 
   it("#merge ignores empty cookies in cookie strings", () => {
     const jar = new CookieJar();
-    jar.merge("", new URL("/", "http://example.org/"));
+    jar.merge("", URI.parse("/"));
     jar.merge("\nc=d");
     expect(jar.toHash()).toEqual({ c: "d" });
   });
 
   it("#merge ignores empty cookies in cookie arrays", () => {
     const jar = new CookieJar();
-    jar.merge(["", "c=d"], new URL("/", "http://example.org/"));
+    jar.merge(["", "c=d"], URI.parse("/"));
     expect(jar.toHash()).toEqual({ c: "d" });
   });
 });
