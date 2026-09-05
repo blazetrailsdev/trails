@@ -157,7 +157,8 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-    if (opts.adapters && !opts.adapters.includes(typeRegistryKeyFor(adapter) as AdapterName))
+    const typeRegistryKey = typeRegistryKeyFor(adapter);
+    if (opts.adapters && (typeRegistryKey === null || !opts.adapters.includes(typeRegistryKey)))
       continue;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
@@ -184,10 +185,11 @@ export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
   const ss = adapter as unknown as SchemaStatements;
+  const typeRegistryKey = typeRegistryKeyFor(adapter);
   const typeMap =
-    typeRegistryKeyFor(adapter) === "postgresql"
+    typeRegistryKey === "postgresql"
       ? COLUMN_TYPE_MAP_PG
-      : typeRegistryKeyFor(adapter) === "mysql2"
+      : typeRegistryKey === "mysql2"
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
   return { ss, typeMap };
@@ -210,7 +212,7 @@ export async function runTable(
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
     builder = new TableBuilder(
       t,
-      typeRegistryKeyFor(adapter) as AdapterName,
+      typeRegistryKeyFor(adapter) ?? "sqlite3",
       typeMap,
       meta.serialPk ?? null,
     );

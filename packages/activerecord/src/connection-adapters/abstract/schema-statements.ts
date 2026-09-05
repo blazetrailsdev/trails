@@ -803,8 +803,8 @@ export class SchemaStatements {
     );
   }
 
-  indexes(_tableName: string): Promise<IndexDefinition[]> {
-    // @nie disposition=TODO
+  async indexes(_tableName: string): Promise<IndexDefinition[]> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:81
     throw new NotImplementedError("#indexes is not implemented");
   }
 
