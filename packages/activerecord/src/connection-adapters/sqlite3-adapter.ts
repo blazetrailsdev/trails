@@ -40,7 +40,6 @@ import {
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
-  ActiveRecordError,
   StatementInvalid,
   RecordNotUnique,
   InvalidForeignKey,
@@ -403,8 +402,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
             return affectedRows;
           } catch (e: any) {
-            const translated = this._translateException(e, sql, binds);
-            throw translated;
+            throw this.translateExceptionClass(e, sql, binds);
           }
         },
       );
@@ -466,8 +464,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
               batch,
             });
           } catch (e: any) {
-            const translated = this._translateException(e, sql, binds);
-            throw translated;
+            throw this.translateExceptionClass(e, sql, binds);
           }
         },
       );
@@ -1562,24 +1559,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await this.internalExecQuery(
       `INSERT INTO ${quoteTableName(to)} (${quotedColumns}) SELECT ${quotedFromColumns} FROM ${quoteTableName(from)}`,
     );
-  }
-
-  private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    if (e instanceof ActiveRecordError) return e;
-    const msg = e instanceof Error ? e.message : String(e);
-    let exc: Error;
-    if (e instanceof Error) {
-      exc = e;
-    } else {
-      exc = new Error(msg, { cause: e });
-      const code = (e as any)?.code;
-      if (code !== undefined) (exc as any).code = code;
-    }
-    const translated = this.translateException(exc, { message: msg, sql, binds }) as Error;
-    if (translated !== exc && (translated as { cause?: unknown }).cause === undefined) {
-      (translated as { cause?: unknown }).cause = exc;
-    }
-    return translated;
   }
 
   /** @internal */

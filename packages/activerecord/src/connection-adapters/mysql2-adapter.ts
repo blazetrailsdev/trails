@@ -112,26 +112,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   _affectedRowsBeforeWarnings = 0;
 
-  protected override _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    const build = (): Error => {
-      if (isMysql2DriverTimeout(e)) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return new AdapterTimeout(msg, { sql, binds, connectionPool: this.pool });
+  /** @internal */
+  override translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    if (isMysql2DriverTimeout(exception)) {
+      return new AdapterTimeout(message, { sql, binds, connectionPool: this.pool });
+    } else if (isMysql2ConnectionError(exception)) {
+      if (/MySQL client is not connected/i.test((exception as Error).message)) {
+        return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+      } else {
+        return new ConnectionFailed(message, { sql, binds, connectionPool: this.pool });
       }
-      if (isMysql2ConnectionError(e)) {
-        const msg = (e as Error).message;
-        if (/MySQL client is not connected/i.test(msg)) {
-          return new ConnectionNotEstablished(e as Error, { connectionPool: this.pool });
-        }
-        return new ConnectionFailed(msg, { sql, binds, connectionPool: this.pool });
-      }
-      return super._translateException(e, sql, binds);
-    };
-    const translated = build();
-    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
-      (translated as { cause?: unknown }).cause = e;
+    } else {
+      return super.translateException(exception, { message, sql, binds });
     }
-    return translated;
   }
 
   private _getStmtPool(): MysqlStatementPool {
@@ -417,7 +413,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private async _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error> {
-    let translated: Error = this._translateException(e, sql, binds);
+    let translated = this.translateExceptionClass(e, sql, binds) as Error;
     if (translated instanceof MismatchedForeignKey) {
       translated = translated.setQuery(sql, binds);
     }

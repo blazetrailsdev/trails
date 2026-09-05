@@ -72,7 +72,6 @@ import {
   RangeError as ActiveRecordRangeError,
   RecordNotUnique,
   SerializationFailure,
-  StatementInvalid,
   ValueTooLong,
   SQLWarning,
 } from "../errors.js";
@@ -99,6 +98,17 @@ const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
 const OID_INTERVAL_ARRAY = 1187;
 const OID_MONEY = 790;
+const VALUE_LIMIT_VIOLATION = "22001";
+const NUMERIC_VALUE_OUT_OF_RANGE = "22003";
+const NOT_NULL_VIOLATION = "23502";
+const FOREIGN_KEY_VIOLATION = "23503";
+const UNIQUE_VIOLATION = "23505";
+const SERIALIZATION_FAILURE = "40001";
+const DEADLOCK_DETECTED = "40P01";
+const DUPLICATE_DATABASE = "42P04";
+const LOCK_NOT_AVAILABLE = "55P03";
+const QUERY_CANCELED = "57014";
+
 const PQTRANS_IDLE = 0;
 const PQTRANS_ACTIVE = 1;
 const PQTRANS_INTRANS = 2;
@@ -668,15 +678,14 @@ export class PostgreSQLAdapter
                   },
                 );
               } catch (e: any) {
-                throw this._translateException(e, rewritten, bindArray);
+                throw this.translateExceptionClass(e, rewritten, bindArray);
               }
             },
           );
           payload.row_count = r.rows?.length ?? 0;
           return r;
         } catch (e: any) {
-          const translated = this._translateException(e, rewritten, bindArray);
-          throw translated;
+          throw this.translateExceptionClass(e, rewritten, bindArray);
         }
       },
     );
@@ -979,8 +988,7 @@ export class PostgreSQLAdapter
           return affected;
         });
       } catch (e: any) {
-        const translated = this._translateException(e, pgSql, binds);
-        throw translated;
+        throw this.translateExceptionClass(e, pgSql, binds);
       }
     });
   }
@@ -1317,7 +1325,7 @@ export class PostgreSQLAdapter
       try {
         await client.query(sql);
       } catch (e) {
-        throw this._translateException(e, sql, []);
+        throw this.translateExceptionClass(e, sql, []);
       }
     });
   }
@@ -2066,52 +2074,43 @@ export class PostgreSQLAdapter
     return `'${pgQuoteString(String(value))}'`;
   }
 
-  private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    if (e instanceof ActiveRecordError) return e;
-    const build = (): Error => {
-      if (!(e instanceof Error))
-        return new StatementInvalid(String(e), { sql, binds, connectionPool: this.pool });
-      const code = (e as { code?: string }).code;
-      const msg = e.message;
-      switch (code) {
-        case "23505":
-          return new RecordNotUnique(msg, { sql, binds, connectionPool: this.pool });
-        case "23503":
-          return new InvalidForeignKey(msg, { sql, binds, connectionPool: this.pool });
-        case "23502":
-          return new NotNullViolation(msg, { sql, binds, connectionPool: this.pool });
-        case "22001":
-          return new ValueTooLong(msg, { sql, binds, connectionPool: this.pool });
-        case "22003":
-          return new ActiveRecordRangeError(msg, { sql, binds, connectionPool: this.pool });
-        case "40001":
-          return new SerializationFailure(msg, { sql, binds, connectionPool: this.pool });
-        case "40P01":
-          return new Deadlocked(msg, { sql, binds, connectionPool: this.pool });
-        case "42P04":
-          return new DatabaseAlreadyExists(msg, { sql, binds, connectionPool: this.pool });
-        case "55P03":
-          return new LockWaitTimeout(msg, { sql, binds, connectionPool: this.pool });
-        case "57014":
-          return new QueryCanceled(msg, { sql, binds, connectionPool: this.pool });
-        default:
-          if (PostgreSQLAdapter._isConnectionClosedBeforeSend(e)) {
-            return new ConnectionNotEstablished(e, { connectionPool: this.pool });
-          }
-          if (PostgreSQLAdapter._isConnectionError(e)) {
-            return new ConnectionFailed(e, { connectionPool: this.pool });
-          }
-          if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
-            return new StatementInvalid(msg, { sql, binds, connectionPool: this.pool });
-          }
-          return e;
-      }
-    };
-    const translated = build();
-    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
-      (translated as { cause?: unknown }).cause = e;
+  /** @internal */
+  translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
+      case undefined:
+        if (PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
+          return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+        } else if (PostgreSQLAdapter._isConnectionError(exception)) {
+          return new ConnectionFailed(exception as Error, { connectionPool: this.pool });
+        } else {
+          return super.translateException(exception, { message, sql, binds });
+        }
+      case UNIQUE_VIOLATION:
+        return new RecordNotUnique(message, { sql, binds, connectionPool: this.pool });
+      case FOREIGN_KEY_VIOLATION:
+        return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
+      case VALUE_LIMIT_VIOLATION:
+        return new ValueTooLong(message, { sql, binds, connectionPool: this.pool });
+      case NUMERIC_VALUE_OUT_OF_RANGE:
+        return new ActiveRecordRangeError(message, { sql, binds, connectionPool: this.pool });
+      case NOT_NULL_VIOLATION:
+        return new NotNullViolation(message, { sql, binds, connectionPool: this.pool });
+      case SERIALIZATION_FAILURE:
+        return new SerializationFailure(message, { sql, binds, connectionPool: this.pool });
+      case DEADLOCK_DETECTED:
+        return new Deadlocked(message, { sql, binds, connectionPool: this.pool });
+      case DUPLICATE_DATABASE:
+        return new DatabaseAlreadyExists(message, { sql, binds, connectionPool: this.pool });
+      case LOCK_NOT_AVAILABLE:
+        return new LockWaitTimeout(message, { sql, binds, connectionPool: this.pool });
+      case QUERY_CANCELED:
+        return new QueryCanceled(message, { sql, binds, connectionPool: this.pool });
+      default:
+        return super.translateException(exception, { message, sql, binds });
     }
-    return translated;
   }
 
   indexName(
@@ -2245,14 +2244,6 @@ export class PostgreSQLAdapter
   /** @internal */
   hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
     return defaultValue == null && DEFAULT_FUNCTION_RE.test(defaultExpr);
-  }
-
-  /** @internal */
-  translateException(
-    exception: unknown,
-    opts: { message?: string; sql?: string; binds?: unknown[] } = {},
-  ): Error {
-    return this._translateException(exception, opts.sql as string, opts.binds ?? []);
   }
 
   /** @internal */

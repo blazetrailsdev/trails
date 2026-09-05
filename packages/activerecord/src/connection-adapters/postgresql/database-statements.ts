@@ -64,7 +64,7 @@ interface ExecuteHost extends PerformQueryHost {
   /** @internal */
   _performQuery: typeof performQuery;
   /** @internal */
-  _translateException(e: unknown, sql: string, binds: unknown[]): Error;
+  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown;
 }
 
 export async function execute(
@@ -86,7 +86,7 @@ export async function execute(
           return result?.rows ?? [];
         });
       } catch (e) {
-        const translated = this._translateException(e, sql, []);
+        const translated = this.translateExceptionClass(e, sql, []) as Error;
         throw translated;
       }
     });
