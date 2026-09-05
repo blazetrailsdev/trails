@@ -21,6 +21,7 @@ export function executionContextId(): number {
   return IsolatedExecutionState.get<number>(CONTEXT_ID_KEY) ?? 0;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function withExecutionContext<T>(fn: () => T): T {
   const id = ++_contextIdCounter;
   const runHooks = () => {

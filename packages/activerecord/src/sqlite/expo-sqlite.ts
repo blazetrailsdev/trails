@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: open. */
 import { createRequire } from "node:module";
 import {
   type ColumnInfo,

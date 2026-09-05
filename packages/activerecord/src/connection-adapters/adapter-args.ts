@@ -1,6 +1,3 @@
-/** @internal */
-import { AdapterNotFound } from "../errors.js";
-
 /**
  * @internal
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
@@ -24,16 +21,6 @@ export function inferAdapterNameFromUrl(url: string): string | undefined {
   return undefined;
 }
 
-export function adapterNameFromUrl(url: string): string {
-  const inferred = inferAdapterNameFromUrl(url);
-  if (inferred !== undefined) return inferred;
-  throw new AdapterNotFound(
-    `Cannot detect database adapter from URL "${url}". ` +
-      `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
-      `or pass { adapter: "postgresql", url: "..." }`,
-  );
-}
-
 function isRemoteLibsqlUrl(url: string): boolean {
   return (
     url.startsWith("libsql://") ||
@@ -44,6 +31,7 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-adapter-args-url-parsing-onto-connection-url-resolver */
 export function normalizeAdapterName(name: string): string {
   switch (name) {
     case "postgresql":
@@ -65,6 +53,7 @@ export function normalizeAdapterName(name: string): string {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-adapter-args-url-parsing-onto-connection-url-resolver */
 export function parseSqliteUrl(url: string): string {
   if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
     const stripped = url.replace(/^sqlite3?:\/\//, "");
@@ -73,6 +62,7 @@ export function parseSqliteUrl(url: string): string {
   return url;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function buildAdapterArg(
   adapterName: string,
   configuration: Record<string, unknown>,

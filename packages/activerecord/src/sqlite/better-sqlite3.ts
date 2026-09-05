@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "better-sqlite3";
 import { File } from "@blazetrails/ruby-compat";
 import {

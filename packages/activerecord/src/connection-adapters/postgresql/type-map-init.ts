@@ -172,6 +172,7 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-native-types-and-instance-type-map-onto-adapter */
 export function initializeInstanceTypeMap(
   m: HashLookupTypeMap,
   defaultTimezone: "utc" | "local" = "utc",

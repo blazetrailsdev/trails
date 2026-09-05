@@ -1,6 +1,7 @@
 const READ_ONLY_STATEMENTS =
   /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL|CLOSE|DECLARE|FETCH|MOVE)$/;
 
+/** @noRailsEquivalent CONVERGEABLE converge-sql-classification-onto-build-read-query-regexp */
 export function stripSqlComments(sql: string): string {
   let result = sql.replace(/\/\*[\s\S]*?\*\//g, "");
   result = result
@@ -14,6 +15,7 @@ export function stripSqlComments(sql: string): string {
   return result;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-sql-classification-onto-build-read-query-regexp */
 export function isWriteQuerySql(sql: string): boolean {
   const stripped = stripSqlComments(sql).replace(/^\s*\(+\s*/, "");
 

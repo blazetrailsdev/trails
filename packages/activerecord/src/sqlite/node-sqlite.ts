@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import { createRequire } from "node:module";
 import { File } from "@blazetrails/ruby-compat";
 import {

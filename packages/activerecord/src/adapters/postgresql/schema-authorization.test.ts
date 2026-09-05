@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
-import { makeSchemaThingModel } from "./schema-ar-models.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
+
+type ModelCtor = typeof Base;
+
+function makeSchemaThingModel(): ModelCtor {
+  class SchemaThing extends Base {
+    static {
+      this.tableName = "schema_things";
+    }
+  }
+  return SchemaThing as unknown as ModelCtor;
+}
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";

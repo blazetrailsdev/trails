@@ -1,9 +1,10 @@
 import { kernelFloat } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
+/** @noRailsEquivalent PERMANENT */
 export class PointValue {
-  readonly x: number;
-  readonly y: number;
+  x: number;
+  y: number;
 
   constructor(x: number, y: number) {
     this.x = x;

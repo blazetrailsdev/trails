@@ -87,6 +87,7 @@ export const POSTGRESQL_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
   enum: {},
 };
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-native-types-and-instance-type-map-onto-adapter */
 export function postgresqlNativeDatabaseTypes(
   datetimeType: string,
   overrides: NativeDatabaseTypes = {},
