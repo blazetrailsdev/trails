@@ -7,7 +7,7 @@ import {
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
 import { underscore } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
@@ -53,7 +53,7 @@ export class RouteInfo {
 
   /** @internal */
   private async viewPath(root: ViewPathRoot): Promise<string> {
-    const path = await getPathAsync();
+    const path = getPath();
     return path.join(root.path(), String(this.controllerName), String(this.actionName));
   }
 

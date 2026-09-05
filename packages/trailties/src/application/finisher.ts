@@ -1,5 +1,5 @@
 import { runLoadHooks, underscore } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -162,8 +162,8 @@ async function collectControllers(
   prefix: string,
   out: Map<string, DispatchableControllerClass>,
 ): Promise<void> {
-  const fs = await getFsAsync();
-  const p = await getPathAsync();
+  const fs = getFs();
+  const p = getPath();
   if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
 
   for (const entry of await fs.readdir(dir)) {

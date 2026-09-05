@@ -3,13 +3,7 @@ import {
   MissingContentError,
   MissingKeyError,
 } from "@blazetrails/activesupport/encrypted-file";
-import {
-  getFsAsync,
-  getChildProcessAsync,
-  env,
-  stdout,
-  setExitCode,
-} from "@blazetrails/ruby-compat";
+import { getFs, getChildProcessAsync, env, stdout, setExitCode } from "@blazetrails/ruby-compat";
 
 const pickEditor = (): string | null => env.VISUAL || env.EDITOR || null;
 
@@ -20,7 +14,7 @@ function displayEditorHint(invocation: string): void {
 }
 
 async function ensureKeyFile(file: EncryptedFile): Promise<void> {
-  const fs = await getFsAsync();
+  const fs = getFs();
   if (await fs.exists(file.keyPath)) return;
   await fs.writeFile!(file.keyPath, `${EncryptedFile.generateKey()}\n`, { mode: 0o600 });
 }

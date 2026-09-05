@@ -13,7 +13,7 @@ import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { underscore } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fetch } from "@blazetrails/ruby-compat";
 
@@ -579,8 +579,8 @@ export class Mapper {
   }
 
   async draw(name: string): Promise<void> {
-    const fs = await getFsAsync();
-    const p = await getPathAsync();
+    const fs = getFs();
+    const p = getPath();
     let path: string | undefined;
     for (const _path of this._drawPaths) {
       if (await fs.exists(`${_path}/${name}.ts`)) {

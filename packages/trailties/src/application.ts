@@ -7,7 +7,7 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -69,7 +69,7 @@ export class Application extends Engine {
   }
 
   static async findRoot(from: string): Promise<string> {
-    const fs = await getFsAsync();
+    const fs = getFs();
     return this.findRootWithFlag("config.ts", from, fs.cwd());
   }
 
@@ -231,7 +231,7 @@ export class Application extends Engine {
     path: string,
     opts: { keyPath?: string; envKey?: string } = {},
   ): Promise<EncryptedFile> {
-    const p = await getPathAsync();
+    const p = getPath();
     const root = await this.resolvedRoot();
     return new EncryptedFile({
       contentPath: p.resolve(root, path),
@@ -256,8 +256,8 @@ export class Application extends Engine {
 async function defaultCredentialPaths(
   root: string,
 ): Promise<{ contentPath: string; keyPath: string }> {
-  const path = await getPathAsync();
-  const fs = await getFsAsync();
+  const path = getPath();
+  const fs = getFs();
   const env = resolveEnv();
   const envContent = path.resolve(root, "config", "credentials", `${env}.yml.enc`);
   if (await fs.exists(envContent)) {

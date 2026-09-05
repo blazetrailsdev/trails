@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EnvironmentInquirer, NullLogger, trailsRoot } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -159,7 +159,7 @@ describe("Trails", () => {
   it("Trails.root synthesizes no cwd of its own — the fallback is Application#root's (Rails: find_root's Dir.pwd)", async () => {
     class NoRootApp extends Application {}
     Application.register(NoRootApp);
-    const fs = await getFsAsync();
+    const fs = getFs();
     expect(await Trails.root()).toBe(await fs.realpath!(fs.cwd()));
   });
 

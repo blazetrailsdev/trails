@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFsAsync, getPathAsync, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../core.js";
@@ -43,7 +43,7 @@ describe("ConnectionSwappingNestedTest", () => {
   type DbName = (typeof DB_NAMES)[number];
 
   async function asyncFs() {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const { mkdtemp, writeFile, readdir, unlink, rmdir } = fs;
     if (!mkdtemp || !writeFile || !readdir || !unlink || !rmdir) {
       throw new Error("fs adapter is missing the async APIs this test requires");
@@ -65,7 +65,7 @@ describe("ConnectionSwappingNestedTest", () => {
   beforeEach(async () => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     const fs = await asyncFs();
-    const path = await getPathAsync();
+    const path = getPath();
     const os = await getOsAsync();
 
     dbDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-conn-swap-"));
@@ -98,7 +98,7 @@ describe("ConnectionSwappingNestedTest", () => {
     vi.unstubAllEnvs();
 
     const fs = await asyncFs();
-    const path = await getPathAsync();
+    const path = getPath();
     for (const entry of await fs.readdir(dbDir)) {
       await fs.unlink(path.join(dbDir, entry));
     }

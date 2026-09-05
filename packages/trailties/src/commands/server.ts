@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler } from "@blazetrails/rack";
@@ -42,8 +42,8 @@ export function serverCommand(): Command {
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {
-  const fs = await getFsAsync();
-  const p = await getPathAsync();
+  const fs = getFs();
+  const p = getPath();
   return (
     (await fs.exists(p.join(root, "vite.config.ts"))) ||
     (await fs.exists(p.join(root, "vite.config.js")))

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import {
   env,
   setExitCode,
@@ -71,7 +71,8 @@ function normalizeRawConfig(raw: RawConfig): RawConfig {
 }
 
 async function migrationsDirsForConfig(config: RawConfig): Promise<string[]> {
-  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
+  const fs = getFs();
+  const path = getPath();
   const cwd = fs.cwd();
   const raw = (config as { migrationsPaths?: string | string[] }).migrationsPaths;
   if (typeof raw === "string" && raw.length > 0) return [path.resolve(cwd, raw)];
@@ -324,7 +325,7 @@ async function runTestLoadSchema(options: {
   const config = toDbConfig(raw, "test");
   await runProtectedEnvCheck(config, "test");
   const filename = DatabaseTasks.schemaDumpPath(config);
-  const fs = await getFsAsync();
+  const fs = getFs();
   if (!filename || !(await fs.exists(filename))) {
     console.error(
       `No schema file found at ${filename ?? "(none)"}. Run \`trails db schema:dump\` first.`,
@@ -358,7 +359,8 @@ async function structureLoadReachesDatabase(
 
 let _seedImportCounter = 0;
 async function runSeed(prefix = ""): Promise<void> {
-  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
+  const fs = getFs();
+  const path = getPath();
   const cwd = fs.cwd();
   const seedCandidates = [path.join(cwd, "db", "seeds.ts"), path.join(cwd, "db", "seeds.js")];
   let seedFile: string | undefined;
@@ -913,7 +915,7 @@ export function dbCommand(): Command {
     .option("--format <format>", "Override schema format: ts, js, or sql")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      const fs = await getFsAsync();
+      const fs = getFs();
       await forEachDatabase(opts, async ({ config, prefix }) => {
         await runProtectedEnvCheck(config, config.envName);
         const previousFormat = DatabaseTasks.schemaFormat;
@@ -990,7 +992,7 @@ export function dbCommand(): Command {
       "Delete db/schema_cache.json for every database configuration in the current environment",
     )
     .action(async () => {
-      const fs = await getFsAsync();
+      const fs = getFs();
       const envName = resolveEnv();
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(

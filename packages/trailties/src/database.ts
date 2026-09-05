@@ -1,5 +1,5 @@
 import { reverseMerge, trailsRoot } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
@@ -45,8 +45,8 @@ function formatUnknown(value: unknown): string {
 export async function loadDatabaseConfigModule(
   cwd?: string,
 ): Promise<{ path: string; module: DatabaseConfigModule } | null> {
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
+  const fs = getFs();
+  const path = getPath();
   const resolvedCwd = cwd ?? fs.cwd();
 
   const candidates = [
@@ -97,8 +97,8 @@ export async function loadDatabaseConfigModule(
 type AnyHash = Record<string, unknown>;
 
 export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
+  const fs = getFs();
+  const path = getPath();
   const resolvedRoot = root ?? trailsRoot() ?? fs.cwd();
 
   const loaded = await loadDatabaseConfigModule(resolvedRoot);
@@ -262,8 +262,8 @@ export async function resolveSchemaFormat(
     return normalize(env.SCHEMA_FORMAT ?? "", "SCHEMA_FORMAT env var");
   }
 
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
+  const fs = getFs();
+  const path = getPath();
   const resolvedCwd = cwd ?? fs.cwd();
 
   const loaded = await loadDatabaseConfigModule(resolvedCwd);

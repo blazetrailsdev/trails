@@ -1,5 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
-import { Dir, File, getPathAsync } from "@blazetrails/ruby-compat";
+import { Dir, File, getPath } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
 
 export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> & {
@@ -41,7 +41,7 @@ export class Generators {
   /** @internal */
   static async lookupBang(): Promise<void> {
     if (_subclasses) return;
-    const path = await getPathAsync();
+    const path = getPath();
     if (!path.pathToFileURL) {
       throw new Error("PathAdapter.pathToFileURL() is required to look up generators.");
     }

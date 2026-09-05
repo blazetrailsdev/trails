@@ -118,7 +118,6 @@ async function main(): Promise<void> {
   // (and fail) at module load, replacing the "missing dist/" hint with a bare
   // module-not-found. Specifiers are package names, not dist paths, so Node ESM
   // dedupes them with the fixture models' own imports to one module instance.
-  const { getFsAsync, getPathAsync } = await import("@blazetrails/ruby-compat");
   const { Base, modelRegistry } = await import("@blazetrails/activerecord");
 
   try {
@@ -140,12 +139,6 @@ async function main(): Promise<void> {
     //    process-global registry. Without this eager access Relation#toSql()
     //    would use the default generic visitor since it never touches
     //    Base.adapter itself, producing incorrect boolean/date literals.
-    //
-    //    The sqlite3 adapter resolves the database path through the *sync*
-    //    `getFs()`, whose node auto-registration is async-only under pure ESM —
-    //    warm the registry first or it throws "No filesystem adapter configured".
-    await getFsAsync();
-    await getPathAsync();
     //
     //    The config must be an explicit adapter/database hash, mirroring the
     //    Rails side's `establish_connection adapter: "sqlite3", database: ...`.

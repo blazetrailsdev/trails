@@ -19,7 +19,7 @@ export function atomicWrite<T>(
 
     if (oldStat) {
       try {
-        File.chown(oldStat.uid ?? null, oldStat.gid ?? null, tempFile.path!);
+        File.chown(oldStat.uid, oldStat.gid, tempFile.path!);
         File.chmod(oldStat.mode, tempFile.path!);
       } catch (error) {
         const code = (error as { code?: string }).code;

@@ -4,15 +4,15 @@ import * as nodePath from "node:path";
 import * as os from "node:os";
 import { Generators } from "./generators.js";
 import { createProgram } from "./cli.js";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 beforeAll(async () => {
   await Generators.lookupBang();
 });
 
 async function generatorDirectories(): Promise<string[]> {
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
+  const fs = getFs();
+  const path = getPath();
   const root = decodeURIComponent(new URL("./generators/rails/", import.meta.url).pathname);
   const out: string[] = [];
   const walk = async (dir: string, namespace: string[]): Promise<void> => {

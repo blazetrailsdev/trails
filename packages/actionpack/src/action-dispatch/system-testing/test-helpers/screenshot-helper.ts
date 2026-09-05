@@ -1,4 +1,4 @@
-import { File, getFsAsync } from "@blazetrails/ruby-compat";
+import { File, getFs } from "@blazetrails/ruby-compat";
 
 export interface ScreenshotPage {
   screenshot(options: { path: string }): Promise<Buffer>;
@@ -111,7 +111,7 @@ function absoluteHtmlPath(this: ScreenshotHelperHost): string {
 export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
   if (!this._page) return;
   const path = absoluteHtmlPath.call(this);
-  const fs = await getFsAsync();
+  const fs = getFs();
   await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
   const content = await this._page.content();
   await fs.writeFile!(path, content);
@@ -121,7 +121,7 @@ export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
 export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | undefined> {
   if (!this._page) return;
   const path = absoluteImagePath.call(this);
-  const fs = await getFsAsync();
+  const fs = getFs();
   await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
   return this._page.screenshot({ path });
 }

@@ -225,12 +225,12 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
   try {
     if (symlink) {
       try {
-        if (st.uid != null && st.gid != null) fileLchown(st.uid, st.gid, path);
+        fileLchown(st.uid, st.gid, path);
       } catch (error) {
         if (!(error instanceof NotImplementedError)) throw error;
       }
     } else {
-      if (st.uid != null && st.gid != null) getFs().chownSync?.(path, st.uid, st.gid);
+      getFs().chownSync?.(path, st.uid, st.gid);
     }
   } catch (error) {
     const code = (error as { code?: string }).code;
@@ -254,10 +254,11 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
  * walks a directory tree and copies each entry with `Entry_#copy`
  * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
  *
- * `FsStatResult` has no `chardev?` / `blockdev?` / `socket?` / `pipe?` / `door?`
- * predicate, so `Entry_#copy`'s five raising arms (`fileutils.rb:2255-2271`) and
- * its true `else` (`fileutils.rb:2273`) cannot be told apart and all land on the
- * one `unknown file type` message.
+ * `Entry_#copy`'s `socket?` and `pipe?` arms each raise before their copy under
+ * an interpreter that answers no `UNIXServer` (`fileutils.rb:2258-2263`) and no
+ * `File.mkfifo` (`fileutils.rb:2267`); neither constant exists here, so those
+ * are the arms taken. `door?` (`:2269`) is Solaris-only and no backend answers
+ * a predicate for it, so a door reaches the true `else` (`:2273`).
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
   const ent = entryLstat(src, false);
@@ -272,6 +273,12 @@ function copyEntry(src: string, dest: string, preserve = false): void {
   } else if (ent.isSymbolicLink?.() === true) {
     fileSymlink(fileReadlink(src), dest);
     if (preserve) copyMetadata(src, dest, false);
+  } else if (ent.isCharacterDevice?.() === true || ent.isBlockDevice?.() === true) {
+    throw new Error("cannot handle device file");
+  } else if (ent.isSocket?.() === true) {
+    throw new Error("cannot handle socket");
+  } else if (ent.isFIFO?.() === true) {
+    throw new Error("cannot handle FIFO");
   } else {
     throw new Error(`unknown file type: ${src}`);
   }

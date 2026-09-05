@@ -17,7 +17,7 @@ import {
   abort,
   File,
   FileUtils,
-  getPathAsync,
+  getPath,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
@@ -655,7 +655,7 @@ export class DatabaseTasks {
         return;
       }
 
-      const path = await getPathAsync();
+      const path = getPath();
       if (!path.pathToFileURL) {
         throw new Error(
           "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +

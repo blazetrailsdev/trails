@@ -1,4 +1,4 @@
-import { osAdapterConfig, registerOsAdapter, getFsAsync } from "@blazetrails/ruby-compat";
+import { osAdapterConfig, registerOsAdapter, getFs } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 import { workerForkCount } from "./ar-db-slots.js";
@@ -10,7 +10,7 @@ const CONFIG_PATH = sourcePath("../../../../vitest.config.ts");
 const HELPER_PATH = sourcePath("./ar-db-forks-default.ts");
 
 async function readSource(path: string): Promise<string> {
-  const fs = await getFsAsync();
+  const fs = getFs();
   if (!fs.readFile) throw new Error("fs adapter has no async readFile");
   return fs.readFile(path, "utf8");
 }
