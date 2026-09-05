@@ -1,71 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
-import {
-  assertPredicate,
-  assertNotPredicate,
-  BigDecimal,
-  NumberHelper,
-  include,
-} from "@blazetrails/activesupport";
+import { assertPredicate, assertNotPredicate, BigDecimal } from "@blazetrails/activesupport";
 import { Range } from "@blazetrails/ruby-compat";
-import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { ValueType } from "../type/value.js";
-
-class Topic extends Model {
-  declare approved: any;
-  declare static attribute: AttributesClassHalf["attribute"];
-  declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-  declare static defineAttributeMethod: AttributesClassHalf["defineAttributeMethod"];
-
-  static {
-    include(this, Attributes);
-    this.attribute("title", "string");
-    this.attribute("content", "string");
-    this.attribute("approved", new ValueType());
-    this.attributeMethodSuffix("BeforeTypeCast", { parameters: false });
-    this.defineAttributeMethod("price");
-  }
-
-  declare _price: unknown;
-
-  set price(value: unknown) {
-    this._price = value;
-  }
-
-  get price(): unknown {
-    return NumberHelper.numberToCurrency(this._price as number);
-  }
-
-  get rawPrice(): unknown {
-    return this._price;
-  }
-
-  conditionIsFalse(): boolean {
-    return false;
-  }
-
-  attributeBeforeTypeCast(attr: string): unknown {
-    if (attr === "price") return this._price;
-    return this._attributes.getAttribute(attr).valueBeforeTypeCast;
-  }
-}
-interface Topic extends Attributes {}
-
-class Person extends Model {
-  declare karma: any;
-  declare static attribute: AttributesClassHalf["attribute"];
-
-  static {
-    include(this, Attributes);
-    this.attribute("karma", new ValueType());
-  }
-}
-interface Person extends Attributes {}
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
 
 class ActingAsNumeric {
   toF(): number {
