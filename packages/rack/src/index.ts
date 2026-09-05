@@ -5,7 +5,7 @@ export type RackEnv = Record<string, unknown>;
 
 export type RackBody = AsyncIterable<string | Uint8Array>;
 
-export type RackResponse = [number, Record<string, string>, RackBody];
+export type RackResponse = [number, Record<string, string | string[]>, RackBody];
 
 export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -35,6 +35,7 @@ export {
   ParamsTooDeepError,
   QueryLimitError,
   QueryParser,
+  Params,
   getDefaultQueryParser,
   setDefaultQueryParser,
   getParamDepthLimit,

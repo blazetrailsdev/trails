@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { bodyFromString, release } from "@blazetrails/rack";
 
 type App = (env: RackEnv) => Promise<RackResponse>;
 
-function buildApp(responseHeaders: Record<string, string> = {}, sslOptions: SSLOptions = {}): SSL {
+function buildApp(
+  responseHeaders: Record<string, string | string[]> = {},
+  sslOptions: SSLOptions = {},
+): SSL {
   const inner: App = async (_env) => [200, { ...responseHeaders }, bodyFromString("")];
   return new SSL(inner, { hsts: { subdomains: true }, ...sslOptions });
 }
@@ -209,17 +212,21 @@ describe("StrictTransportSecurityTest", () => {
   });
 });
 
-const DEFAULT_COOKIES = "id=1; path=/\ntoken=abc; path=/; secure; HttpOnly";
+const DEFAULT_COOKIES = ["id=1; path=/", "token=abc; path=/; secure; HttpOnly"];
 
 describe("SecureCookiesTest", () => {
-  async function get(responseHeaders: Record<string, string> = {}, sslOptions: SSLOptions = {}) {
+  async function get(
+    responseHeaders: Record<string, string | string[]> = {},
+    sslOptions: SSLOptions = {},
+  ) {
     const app = buildApp(responseHeaders, sslOptions);
     return app.call(makeEnv("https://example.org"));
   }
 
-  function assertCookies(setCookie: string | undefined, ...expected: string[]) {
-    const actual = (setCookie ?? "").split("\n");
-    expect(actual).toEqual(expected);
+  function assertCookies(setCookie: string | string[] | undefined, ...expected: string[]) {
+    let cookies = setCookie;
+    if (!(release() >= "3")) cookies = String(cookies).split("\n");
+    expect(cookies).toEqual(expected);
   }
 
   it("flag cookies as secure", async () => {

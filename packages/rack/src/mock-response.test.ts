@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { MockRequest, FatalWarning } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 
-const app = async (_env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
+const app = async (
+  _env: Record<string, any>,
+): Promise<[number, Record<string, string | string[]>, any]> => {
   return [200, { "content-type": "text/plain" }, ["OK"]];
 };
 
@@ -27,7 +29,7 @@ it("provides access to the HTTP headers", async () => {
 
 it("provides access to session cookies", async () => {
   const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar" }, ["OK"]] as [number, Record<string, string>, any];
+    [200, { "set-cookie": "foo=bar" }, ["OK"]] as [number, Record<string, string | string[]>, any];
   const res = await new MockRequest(cookieApp).get("/");
   expect(res.cookie("foo")).toBeDefined();
   expect(res.cookie("foo")!.value).toEqual(["bar"]);
@@ -76,14 +78,18 @@ it("parses cookies giving max-age precedence over expires", async () => {
 
 it("provides access to secure cookies", async () => {
   const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar; secure" }, ["OK"]] as [number, Record<string, string>, any];
+    [200, { "set-cookie": "foo=bar; secure" }, ["OK"]] as [
+      number,
+      Record<string, string | string[]>,
+      any,
+    ];
   const res = await new MockRequest(cookieApp).get("/");
   expect(res.cookie("foo")!.secure).toBe(true);
 });
 
 it("parses cookie headers with equals sign at the end", async () => {
   const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar=" }, ["OK"]] as [number, Record<string, string>, any];
+    [200, { "set-cookie": "foo=bar=" }, ["OK"]] as [number, Record<string, string | string[]>, any];
   const res = await new MockRequest(cookieApp).get("/");
   expect(res.cookie("foo")).toBeDefined();
 });
@@ -95,7 +101,7 @@ it("returns nil if a non existent cookie is requested", async () => {
 
 it("handles an empty cookie", async () => {
   const cookieApp = async () =>
-    [200, { "set-cookie": "foo=" }, ["OK"]] as [number, Record<string, string>, any];
+    [200, { "set-cookie": "foo=" }, ["OK"]] as [number, Record<string, string | string[]>, any];
   const res = await new MockRequest(cookieApp).get("/");
   const c = res.cookie("foo");
   expect(c).toBeDefined();
@@ -117,7 +123,7 @@ it("provides access to the HTTP body", async () => {
 it("provides access to the Rack errors", async () => {
   const errApp = async (env: any) => {
     env["rack.errors"].write("test error");
-    return [200, {}, ["OK"]] as [number, Record<string, string>, any];
+    return [200, {}, ["OK"]] as [number, Record<string, string | string[]>, any];
   };
   const res = await new MockRequest(errApp).get("/");
   expect(res.errors).toContain("test error");
@@ -143,7 +149,7 @@ it("ignores plain strings passed as errors", () => {
 it("optionally makes Rack errors fatal", async () => {
   const errApp = async (env: any) => {
     env["rack.errors"].write("fatal!");
-    return [200, {}, ["OK"]] as [number, Record<string, string>, any];
+    return [200, {}, ["OK"]] as [number, Record<string, string | string[]>, any];
   };
   await expect(new MockRequest(errApp).get("/", { ":fatal": true })).rejects.toThrow(FatalWarning);
 });

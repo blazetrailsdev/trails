@@ -9,7 +9,7 @@ export class ShowStatus {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const response = await this.app(env);
     const [status, headers, body] = response;
     const detail = env[RACK_SHOWSTATUS_DETAIL];

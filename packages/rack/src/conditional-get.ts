@@ -14,7 +14,7 @@ export class ConditionalGet {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
       return this.app(env);
@@ -34,7 +34,7 @@ export class ConditionalGet {
     return response;
   }
 
-  private fresh(env: Record<string, any>, headers: Record<string, string>): boolean {
+  private fresh(env: Record<string, any>, headers: Record<string, string | string[]>): boolean {
     const noneMatch = env["HTTP_IF_NONE_MATCH"];
     if (noneMatch) {
       return this.isEtagMatches(noneMatch, headers);
@@ -51,17 +51,17 @@ export class ConditionalGet {
     return false;
   }
 
-  private isEtagMatches(noneMatch: string, headers: Record<string, string>): boolean {
+  private isEtagMatches(noneMatch: string, headers: Record<string, string | string[]>): boolean {
     return headers[ETAG] === noneMatch;
   }
 
-  private modifiedSince(modifiedSince: Date, headers: Record<string, string>): boolean {
+  private modifiedSince(modifiedSince: Date, headers: Record<string, string | string[]>): boolean {
     const lastModified = this.toRfc2822(headers["last-modified"]);
     return lastModified != null && modifiedSince >= lastModified;
   }
 
-  private toRfc2822(since: string | undefined): Date | null {
-    if (!since || since.length < 16) return null;
+  private toRfc2822(since: string | string[] | undefined): Date | null {
+    if (typeof since !== "string" || since.length < 16) return null;
     try {
       const d = new Date(since);
       return isNaN(d.getTime()) ? null : d;

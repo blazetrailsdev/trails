@@ -1,6 +1,7 @@
 import {
   Notifications,
   IsolatedExecutionState,
+  isPresent,
   type NotificationSubscriber,
   type NotificationEvent as Event,
 } from "@blazetrails/activesupport";
@@ -74,8 +75,8 @@ export class ServerTiming {
     }
 
     const existing = headers[SERVER_TIMING];
-    if (existing != null && existing.trim() !== "") {
-      headerInfo.unshift(existing);
+    if (isPresent(existing)) {
+      headerInfo.unshift(String(existing));
     }
     headers[SERVER_TIMING] = headerInfo.join(", ");
 

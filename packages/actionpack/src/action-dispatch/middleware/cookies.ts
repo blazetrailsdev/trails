@@ -450,13 +450,13 @@ export class Cookies {
     if (!jar || jar.isCommitted()) return response;
 
     const [status, headers, body] = response;
-    const outHeaders: Record<string, string> = { ...headers };
+    const outHeaders: Record<string, string | string[]> = { ...headers };
     const setHeaders = jar.getSetCookieHeaders();
     if (setHeaders.length > 0) {
       const existingList: string[] = [];
       for (const key of Object.keys(outHeaders)) {
         if (key.toLowerCase() !== "set-cookie") continue;
-        const v = outHeaders[key] as unknown as string | string[];
+        const v = outHeaders[key];
         if (Array.isArray(v)) existingList.push(...v);
         else existingList.push(v);
         if (key !== "set-cookie") delete outHeaders[key];

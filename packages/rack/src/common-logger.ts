@@ -29,7 +29,7 @@ export class CommonLogger {
     this.logger = logger || null;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const began = clockTime();
     const response = await this.app(env);
     const [status, headers, _body] = response;
@@ -42,7 +42,7 @@ export class CommonLogger {
   private log(
     env: Record<string, any>,
     status: number,
-    headers: Record<string, string>,
+    headers: Record<string, string | string[]>,
     elapsed: number,
     logger: any,
   ): void {
@@ -99,8 +99,8 @@ export class CommonLogger {
     }
   }
 
-  private extractContentLength(headers: Record<string, string>): string {
+  private extractContentLength(headers: Record<string, string | string[]>): string {
     const value = headers[CONTENT_LENGTH];
-    return !value || value === "0" ? "-" : value;
+    return !value || value === "0" ? "-" : String(value);
   }
 }

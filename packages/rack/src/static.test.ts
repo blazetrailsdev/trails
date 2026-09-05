@@ -8,7 +8,11 @@ import * as os from "os";
 
 let tmpDir: string;
 const fallbackApp = async () =>
-  [200, { "content-type": "text/plain" }, ["fallback"]] as [number, Record<string, string>, any];
+  [200, { "content-type": "text/plain" }, ["fallback"]] as [
+    number,
+    Record<string, string | string[]>,
+    any,
+  ];
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rack-static-"));

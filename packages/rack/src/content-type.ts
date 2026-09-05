@@ -11,7 +11,7 @@ export class ContentType {
     this.contentType = contentType;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const response = await this.app(env);
     const [status, headers] = response;
     if (!hasKey(STATUS_WITH_NO_ENTITY_BODY, status)) {

@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjClass } from "@blazetrails/ruby-compat";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
     super(message);
@@ -34,6 +34,13 @@ export class Params extends Object {
   }
 }
 
+Object.defineProperty(Params.prototype, "__proto__", {
+  value: undefined,
+  writable: true,
+  enumerable: false,
+  configurable: true,
+});
+
 const DEFAULT_SEP = /& */;
 const COMMON_SEP: Record<string, RegExp> = {
   ";": /; */,
@@ -47,8 +54,6 @@ function escapedSepRe(sep: string): RegExp {
 
 const BYTESIZE_LIMIT = 4194304;
 const PARAMS_LIMIT = 4096;
-
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 export class QueryParser {
   readonly paramDepthLimit: number;
@@ -145,7 +150,7 @@ export class QueryParser {
     return Object.assign(Object.create(null), params);
   }
 
-  normalizeParams(params: any, name: string, v: string | null, _depth?: number): void {
+  normalizeParams(params: any, name: string, v: unknown, _depth?: number): void {
     this._normalizeParams(params, name, v, 0);
   }
 
@@ -176,106 +181,92 @@ export class QueryParser {
     return qs;
   }
 
-  private _normalizeParams(params: any, name: string, v: string | null, depth: number): void {
+  private _normalizeParams(params: any, name: string | null, v: unknown, depth: number): any {
     if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
-    if (!name) return;
-    if (DANGEROUS_KEYS.has(name)) return;
 
-    if (!name.includes("[")) {
-      params[name] = v;
-      return;
-    }
-
-    const match = name.match(/^([^[]*)((?:\[[^\]]*\])*)$/);
-    if (!match || !match[1]) {
-      params[name] = v;
-      return;
-    }
-
-    const prefix = match[1];
-    if (DANGEROUS_KEYS.has(prefix)) return;
-    const rest = match[2];
-
-    if (!rest) {
-      params[prefix] = v;
-      return;
-    }
-
-    const brackets = rest.match(/\[[^\]]*\]/g) || [];
-    const fullBrackets = brackets.join("");
-    const afterBrackets = rest.substring(fullBrackets.length);
-
-    if (afterBrackets) {
-      const segs = [prefix, ...brackets.map((b) => b.slice(1, -1))];
-      const lastKey = segs.pop()! + afterBrackets;
-      let cur = params;
-      for (const k of segs) {
-        if (!(k in cur) || typeof cur[k] !== "object" || Array.isArray(cur[k])) {
-          cur[k] = Object.create(null);
-        }
-        cur = cur[k];
-      }
-      if (!DANGEROUS_KEYS.has(lastKey)) cur[lastKey] = v;
-      return;
-    }
-
-    const keys = brackets.map((b) => b.slice(1, -1));
-    this._setNestedValue(params, prefix, keys, v, depth);
-  }
-
-  private _setNestedValue(
-    params: any,
-    prefix: string,
-    keys: string[],
-    v: string | null,
-    depth: number,
-  ): void {
-    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
-    if (DANGEROUS_KEYS.has(prefix)) return;
-
-    if (keys.length === 0) {
-      params[prefix] = v;
-      return;
-    }
-
-    const firstKey = keys[0];
-    const restKeys = keys.slice(1);
-
-    if (firstKey === "") {
-      if (!Object.hasOwn(params, prefix)) params[prefix] = [];
-      const arr = params[prefix];
-      if (!Array.isArray(arr)) {
-        const got = arr === null ? "Nil" : (arr?.constructor?.name ?? typeof arr);
-        throw new ParameterTypeError(`expected Array (got ${got}) for param \`${prefix}'`);
-      }
-      if (restKeys.length === 0) {
-        arr.push(v);
+    let k: string;
+    let after: string;
+    let start: number;
+    if (name == null) {
+      k = after = "";
+    } else if (depth === 0) {
+      if ((start = name.indexOf("[", 1)) !== -1) {
+        k = name.substring(0, start);
+        after = name.substring(start);
       } else {
-        if (arr.length === 0 || this._shouldStartNewHash(arr[arr.length - 1], restKeys)) {
-          arr.push(Object.create(null));
-        }
-        this._setNestedValue(arr[arr.length - 1], restKeys[0], restKeys.slice(1), v, depth + 1);
+        k = name;
+        after = "";
       }
-      return;
+    } else if (name.startsWith("[]")) {
+      k = "[]";
+      after = name.substring(2);
+    } else if (name.startsWith("[") && (start = name.indexOf("]", 1)) !== -1) {
+      k = name.substring(1, start);
+      after = name.substring(start + 1);
+    } else {
+      k = name;
+      after = "";
     }
 
-    if (!Object.hasOwn(params, prefix)) params[prefix] = Object.create(null);
-    const container = params[prefix];
-    if (typeof container === "string") {
-      throw new ParameterTypeError(`expected Hash (got String) for param \`${prefix}'`);
+    if (k === "") return;
+
+    if (after === "") {
+      if (k === "[]" && depth !== 0) {
+        return [v];
+      } else {
+        params[k] = v;
+      }
+    } else if (after === "[") {
+      params[name!] = v;
+    } else if (after === "[]") {
+      params[k] ??= [];
+      if (!Array.isArray(params[k])) {
+        throw new ParameterTypeError(
+          `expected Array (got ${rbObjClass(params[k])}) for param \`${k}'`,
+        );
+      }
+      params[k].push(v);
+    } else if (after.startsWith("[]")) {
+      let childKey: string;
+      if (
+        !(
+          after[2] === "[" &&
+          after.endsWith("]") &&
+          (childKey = after.substring(3, after.length - 1)) !== "" &&
+          !childKey.includes("[") &&
+          !childKey.includes("]")
+        )
+      ) {
+        childKey = after.substring(2);
+      }
+      params[k] ??= [];
+      if (!Array.isArray(params[k])) {
+        throw new ParameterTypeError(
+          `expected Array (got ${rbObjClass(params[k])}) for param \`${k}'`,
+        );
+      }
+      const last = params[k][params[k].length - 1];
+      if (this.isParamsHashType(last) && !this.isParamsHashHasKey(last, childKey!)) {
+        this._normalizeParams(last, childKey!, v, depth + 1);
+      } else {
+        params[k].push(this._normalizeParams(this.makeParams(), childKey!, v, depth + 1));
+      }
+    } else {
+      params[k] ??= this.makeParams();
+      if (!this.isParamsHashType(params[k])) {
+        throw new ParameterTypeError(
+          `expected Hash (got ${rbObjClass(params[k])}) for param \`${k}'`,
+        );
+      }
+      params[k] = this._normalizeParams(params[k], after, v, depth + 1);
     }
-    if (container === null) {
-      throw new ParameterTypeError(`expected Hash (got Nil) for param \`${prefix}'`);
-    }
-    if (Array.isArray(container)) {
-      throw new ParameterTypeError(`expected Hash (got Array) for param \`${prefix}'`);
-    }
-    this._setNestedValue(container, firstKey, restKeys, v, depth + 1);
+
+    return params;
   }
 
   /** @internal */
   private isParamsHashType(obj: any): boolean {
-    return typeof obj === "object" && obj !== null && !Array.isArray(obj);
+    return obj instanceof this.paramsClass;
   }
 
   /** @internal */
@@ -288,22 +279,6 @@ export class QueryParser {
       h = h[part];
     }
     return true;
-  }
-
-  private _shouldStartNewHash(lastItem: any, keys: string[]): boolean {
-    if (typeof lastItem !== "object" || lastItem === null || Array.isArray(lastItem)) return true;
-    let current = lastItem;
-    for (let i = 0; i < keys.length; i++) {
-      if (keys[i] === "") return false;
-      if (Object.hasOwn(current, keys[i])) {
-        if (i === keys.length - 1) return true;
-        current = current[keys[i]];
-        if (typeof current !== "object" || current === null || Array.isArray(current)) return true;
-      } else {
-        return false;
-      }
-    }
-    return false;
   }
 }
 

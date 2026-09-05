@@ -24,9 +24,9 @@ export class Lock {
     this.mutex = mutex || new DefaultMutex();
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     this.mutex.lock();
-    let response: [number, Record<string, string>, any];
+    let response: [number, Record<string, string | string[]>, any];
     try {
       response = await this.app(env);
     } catch (e) {

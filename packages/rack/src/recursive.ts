@@ -19,12 +19,12 @@ export class Recursive {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     return this._call(env);
   }
 
   /** @internal */
-  async _call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async _call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     let currentEnv = env;
     while (true) {
       const scriptName: string = currentEnv[SCRIPT_NAME] || "";
@@ -50,7 +50,7 @@ export class Recursive {
     env: Record<string, any>,
     path: string,
     scriptName = "",
-  ): Promise<[number, Record<string, string>, any]> {
+  ): Promise<[number, Record<string, string | string[]>, any]> {
     if (scriptName !== "" && !(path.startsWith(scriptName + "/") || path === scriptName)) {
       throw new Error(`can only include below ${scriptName}, not ${path}`);
     }

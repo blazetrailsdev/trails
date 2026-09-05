@@ -1,5 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { bodyFromString, release } from "@blazetrails/rack";
 import { merge } from "@blazetrails/ruby-compat";
 
 export interface RedirectOptions {
@@ -145,7 +145,7 @@ export class SSL {
   }
 
   /** @internal */
-  private setHstsHeaderBang(headers: Record<string, string>): void {
+  private setHstsHeaderBang(headers: Record<string, string | string[]>): void {
     if (headers["strict-transport-security"]) return;
     headers["strict-transport-security"] = this.buildHstsHeader();
   }
@@ -159,12 +159,19 @@ export class SSL {
   }
 
   /** @internal */
-  private flagCookiesAsSecureBang(headers: Record<string, string>): void {
+  private flagCookiesAsSecureBang(headers: Record<string, string | string[]>): void {
     const cookies = headers["set-cookie"];
     if (!cookies) return;
-    headers["set-cookie"] = cookies
-      .split("\n")
-      .map((cookie) => (/;\s*secure\s*(;|$)/i.test(cookie) ? cookie : `${cookie}; secure`))
-      .join("\n");
+
+    if (!(release() >= "3")) {
+      headers["set-cookie"] = String(cookies)
+        .split("\n")
+        .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie))
+        .join("\n");
+    } else {
+      headers["set-cookie"] = [cookies]
+        .flat()
+        .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie));
+    }
   }
 }

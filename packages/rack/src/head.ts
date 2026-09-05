@@ -8,7 +8,7 @@ export class Head {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const response = await this.app(env);
     const [, , body] = response;
 

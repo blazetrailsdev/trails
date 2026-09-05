@@ -24,6 +24,7 @@ import { MockResponse } from "./mock-response.js";
 import { buildMultipart } from "./multipart.js";
 import { MULTIPART_BOUNDARY } from "./multipart/generator.js";
 import { buildNestedQuery, parseNestedQuery } from "./utils.js";
+import type { RackResponse } from "./index.js";
 
 export class FatalWarning extends Error {
   constructor(message: string) {
@@ -47,7 +48,7 @@ export class FatalWarner {
 
 export type RackApp = (
   env: Record<string, any>,
-) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
+) => [number, RackResponse[1], any] | Promise<[number, RackResponse[1], any]>;
 
 /** @noRailsEquivalent PERMANENT */
 const DEFAULT_PORT: Record<string, number | null> = {

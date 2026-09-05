@@ -11,8 +11,8 @@ export interface EventHandler {
 
 export class EventResponse {
   status: number;
-  headers: Record<string, string>;
-  constructor(status: number, headers: Record<string, string>) {
+  headers: Record<string, string | string[]>;
+  constructor(status: number, headers: Record<string, string | string[]>) {
     this.status = status;
     this.headers = headers;
   }
@@ -70,7 +70,7 @@ export class Events {
   /** @internal */
   private makeResponse(
     status: number,
-    headers: Record<string, string>,
+    headers: Record<string, string | string[]>,
     _body: RackBody,
   ): EventResponse {
     return new EventResponse(status, headers);

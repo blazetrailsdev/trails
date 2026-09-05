@@ -34,7 +34,7 @@ export class Basic extends AbstractHandler {
     super(app, realm, authenticator);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const auth = new BasicRequest(env);
 
     if (!auth.provided()) return this.unauthorized();

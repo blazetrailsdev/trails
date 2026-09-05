@@ -86,7 +86,7 @@ export class ShowExceptions {
     return !this.acceptsHtml(env);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     try {
       return await this.app(env);
     } catch (e: any) {

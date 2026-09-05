@@ -14,7 +14,7 @@ export class Sendfile {
     this.mappings = mappings || [];
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const response = await this.app(env);
     const [, headers, body] = response;
 

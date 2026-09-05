@@ -20,7 +20,7 @@ export class AuthBasic {
     }
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const auth = env["HTTP_AUTHORIZATION"];
 
     if (auth == null) {
@@ -53,7 +53,7 @@ export class AuthBasic {
     return this.unauthorized();
   }
 
-  private unauthorized(): [number, Record<string, string>, any] {
+  private unauthorized(): [number, Record<string, string | string[]>, any] {
     return [
       401,
       {

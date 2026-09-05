@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { File, StringIO } from "@blazetrails/ruby-compat";
+import { Date, DateTime, Time } from "@blazetrails/date";
+import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import { Parameters, ParameterMissing } from "../../metal/strong-parameters.js";
+
+const thisFile = new URL(import.meta.url).pathname;
 
 describe("ParametersExpectTest", () => {
   it("key to array: returns only permitted scalar keys", () => {
@@ -134,12 +141,22 @@ describe("ParametersExpectTest", () => {
   });
 
   it("key: permitted scalar values", () => {
-    const inner = new Parameters({ name: "John", age: 22 });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name", "age"] }) as Parameters;
-    expect(result.get("name")).toBe("John");
-    expect(result.get("age")).toBe(22);
-    expect(result.permitted).toBe(true);
+    let values: unknown[] = ["a", ":a"];
+    values = values.concat([0, 1.0, 2n ** 128n, new BigDecimal(1)]);
+    values = values.concat([true, false]);
+    values = values.concat([Date.today(), Time.now(), DateTime.now()]);
+    values = values.concat([
+      File.open(thisFile, "r"),
+      new StringIO(),
+      new UploadedFile({ tempfile: thisFile }),
+      new RackTestUploadedFile(thisFile),
+    ]);
+
+    for (const value of values) {
+      const params = new Parameters({ id: value });
+
+      expect(params.expect("id")).toBe(value);
+    }
   });
 
   it("key: unknown keys are filtered out", () => {

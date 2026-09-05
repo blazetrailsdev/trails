@@ -6,6 +6,7 @@ import {
   InvalidParameterError,
   QueryLimitError,
   ParamsTooDeepError,
+  Params,
 } from "./query-parser.js";
 import { ArgumentError, Process, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 
@@ -13,7 +14,7 @@ export { ArgumentError };
 
 export { STATUS_WITH_NO_ENTITY_BODY };
 export { ParameterTypeError, InvalidParameterError, QueryLimitError, ParamsTooDeepError };
-export { QueryParser };
+export { QueryParser, Params };
 
 let _defaultQueryParser = QueryParser.makeDefault(32);
 let _multipartFileLimit = 128;
@@ -81,7 +82,8 @@ export function clockTime(): number {
   return Process.clockGettime(Process.CLOCK_MONOTONIC);
 }
 
-export function escape(s: string | { toString(): string }): string {
+export function escape(s: string | { toString(): string } | null | undefined): string {
+  if (s == null) return "";
   return encodeURIComponent(String(s)).replace(/%20/g, "+");
 }
 
@@ -118,19 +120,18 @@ export function buildQuery(params: Record<string, string | string[] | null>): st
     .join("&");
 }
 
-export function buildNestedQuery(value: any, prefix?: string): string {
+export function buildNestedQuery(value: any, prefix: string | null = null): string {
   if (Array.isArray(value)) {
-    return value.map((v) => buildNestedQuery(v, `${prefix}[]`)).join("&");
-  } else if (value !== null && typeof value === "object") {
+    return value.map((v) => buildNestedQuery(v, `${prefix ?? ""}[]`)).join("&");
+  } else if (value !== null && value !== undefined && typeof value === "object") {
     return Object.entries(value)
-      .map(([k, v]) => buildNestedQuery(v, prefix ? `${prefix}[${k}]` : k))
+      .map(([k, v]) => buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k))
       .filter((s) => s.length > 0)
       .join("&");
   } else if (value === null || value === undefined) {
-    if (prefix === undefined) throw new ArgumentError("value must be a Hash");
     return escape(prefix);
   } else {
-    if (prefix === undefined) throw new ArgumentError("value must be a Hash");
+    if (prefix == null) throw new ArgumentError("value must be a Hash");
     return `${escape(prefix)}=${escape(String(value))}`;
   }
 }
