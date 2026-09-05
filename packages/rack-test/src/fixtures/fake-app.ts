@@ -14,6 +14,9 @@ import { inspect } from "@blazetrails/ruby-compat";
 type FakeResponse = [number, Record<string, string | string[]>, string[]];
 
 /** @internal */
+const textEncoder = new TextEncoder();
+
+/** @internal */
 async function* eachBody(body: string[]): RackBody {
   for (const s of body) yield s;
 }
@@ -23,7 +26,7 @@ export class FakeApp {
     const res = this.handle(env);
     const [status, h, b] = res;
     let length = 0;
-    for (const s of b) length += new TextEncoder().encode(s).length;
+    for (const s of b) length += textEncoder.encode(s).length;
     h["content-length"] = String(length);
     h["content-type"] = "text/html;charset=utf-8";
     return [status, h as Record<string, string>, eachBody(b)];
