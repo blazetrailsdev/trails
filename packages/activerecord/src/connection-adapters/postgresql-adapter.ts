@@ -1929,7 +1929,7 @@ export class PostgreSQLAdapter
       opclass?: Record<string, string>;
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
-      include?: string[];
+      include?: string | string[];
       comment?: string;
     } = {},
   ): Promise<void> {

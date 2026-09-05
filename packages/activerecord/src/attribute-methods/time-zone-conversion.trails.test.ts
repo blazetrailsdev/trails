@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { typeRegistry, Types } from "@blazetrails/activemodel";
-import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -190,5 +190,17 @@ describe("TimeZoneConverter#serialize containers", () => {
     const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range<unknown>(-Infinity, twz(), false)) as Range;
     expect(serialized.begin).toBe(-Infinity);
+  });
+
+  it("answers respond_to?(:infinite?) for a value carrying its own infinite?", () => {
+    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const deserialized = converter.deserialize(
+      new Range<unknown>(BigDecimal.INFINITY, null, false),
+    ) as Range;
+    expect(deserialized.begin).toBe(BigDecimal.INFINITY);
+
+    const finite = new BigDecimal("1.5");
+    const stillFinite = converter.deserialize(new Range<unknown>(finite, null, false)) as Range;
+    expect(stillFinite.begin).not.toBe(finite);
   });
 });

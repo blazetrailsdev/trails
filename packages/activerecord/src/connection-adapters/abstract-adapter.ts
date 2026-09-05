@@ -356,7 +356,7 @@ export interface AbstractAdapter {
       name?: string;
       unique?: boolean;
       valid?: boolean;
-      include?: string[];
+      include?: string | string[];
       nullsNotDistinct?: boolean;
       [key: string]: unknown;
     },

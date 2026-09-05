@@ -55,7 +55,7 @@ export interface IndexInfo {
   using?: string;
   type?: string;
   nullsNotDistinct?: boolean;
-  include?: string[];
+  include?: string | string[];
   comment?: string;
 }
 
@@ -235,7 +235,7 @@ class AdapterSchemaSource implements SchemaSource {
       type?: string;
       lengths?: number | Record<string, number>;
       opclasses?: string | Record<string, string>;
-      include?: string[];
+      include?: string | string[];
       comment?: string;
     };
     const raw = (await this._adapter.indexes(tableName)) as RichIdx[];
@@ -768,8 +768,7 @@ export abstract class SchemaDumper {
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
     if (!this._adapter().defaultIndexType(index))
       parts.push(`using: ${JSON.stringify(index.using)}`);
-    if (index.include && index.include.length > 0)
-      parts.push(`include: ${JSON.stringify(index.include)}`);
+    if (index.include != null) parts.push(`include: ${JSON.stringify(index.include)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.comment) parts.push(`comment: ${JSON.stringify(index.comment)}`);

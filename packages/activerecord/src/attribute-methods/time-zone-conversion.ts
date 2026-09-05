@@ -176,7 +176,10 @@ export class TimeZoneConverter extends ValueType<unknown> {
 /** @internal */
 function isInfinite(value: unknown): boolean {
   const fn = (value as { isInfinite?: unknown }).isInfinite;
-  if (typeof fn === "function") return (fn as () => unknown).call(value) !== false;
+  if (typeof fn === "function") {
+    const result = (fn as () => unknown).call(value);
+    return result != null && result !== false;
+  }
   return value === Infinity || value === -Infinity;
 }
 
