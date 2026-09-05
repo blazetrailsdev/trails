@@ -92,11 +92,6 @@ export class Contact extends Model {
     this._contact = value;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE respond-to-is-only-defined-on-attribute-methods-hosts */
-  respondTo(method: string): boolean {
-    return method in (this as unknown as Record<string, unknown>);
-  }
-
   social(): string[] {
     return ["twitter", "github"];
   }
@@ -121,6 +116,11 @@ export class Contact extends Model {
 
   get attributes(): Record<string, unknown> {
     return exceptBang(instanceValues(this), "address", "friends", "contact");
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE respond-to-is-only-defined-on-attribute-methods-hosts */
+  respondTo(method: string): boolean {
+    return method in (this as unknown as Record<string, unknown>);
   }
 }
 
