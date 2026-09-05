@@ -14,7 +14,7 @@ export interface ActionViewConfig {
   defaultEnforceUtf8: boolean | null;
   imageLoading: string | null;
   imageDecoding: string | null;
-  applyStylesheetMediaDefault: boolean;
+  applyStylesheetMediaDefault?: boolean;
   preloadLinksHeader?: boolean | null;
   prependContentExfiltrationPrevention: boolean;
   annotateRenderedViewWithFilenames: boolean;
@@ -39,11 +39,7 @@ export class Trailtie extends BaseTrailtie {
       applyStylesheetMediaDefault: true,
       prependContentExfiltrationPrevention: false,
       annotateRenderedViewWithFilenames: false,
-    } as ActionViewConfig);
-
-    this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("actionView", deprecator());
-    });
+    } satisfies ActionViewConfig);
 
     this.config.afterInitialize((app) => {
       const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
@@ -51,8 +47,12 @@ export class Trailtie extends BaseTrailtie {
       delete actionView.preloadLinksHeader;
       setPreloadLinksHeader(preloadLinksHeader ?? null);
       const applyStylesheetMediaDefault = actionView.applyStylesheetMediaDefault;
-      delete (actionView as Partial<ActionViewConfig>).applyStylesheetMediaDefault;
+      delete actionView.applyStylesheetMediaDefault;
       setApplyStylesheetMediaDefault(applyStylesheetMediaDefault ?? null);
+    });
+
+    this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
+      (app as TrailtieApp).deprecators.set("actionView", deprecator());
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {

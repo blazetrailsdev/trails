@@ -91,14 +91,14 @@ export class Trailtie extends BaseTrailtie {
         "Referrer-Policy": "strict-origin-when-cross-origin",
       },
       cookiesRotations: null,
-    } as ActionDispatchConfig);
+    } satisfies ActionDispatchConfig);
 
     this.config.set("contentSecurityPolicy", {
       policy: null,
       reportOnly: false,
       nonceGenerator: null,
       nonceDirectives: null,
-    } as ContentSecurityPolicyConfig);
+    } satisfies ContentSecurityPolicyConfig);
 
     this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());

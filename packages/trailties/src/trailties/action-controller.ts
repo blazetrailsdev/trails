@@ -29,7 +29,7 @@ export class Trailtie extends BaseTrailtie {
       raiseOnOpenRedirects: false,
       logQueryTagsAroundActions: true,
       wrapParametersByDefault: false,
-    } as ActionControllerConfig);
+    } satisfies ActionControllerConfig);
 
     this.initializer("action_controller.set_configs", (app) => {
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {

@@ -88,7 +88,7 @@ export class Trailtie extends BaseTrailtie {
       belongsToRequiredValidatesForeignKey: true,
       generateSecureTokenOn: "create",
       queues: {},
-    } as ActiveRecordConfig);
+    } satisfies ActiveRecordConfig);
 
     this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeRecord", deprecator());

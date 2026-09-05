@@ -32,7 +32,7 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.config.set("activeSupport", {});
+    this.config.set("activeSupport", {} satisfies ActiveSupportConfig);
 
     this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
