@@ -1,7 +1,6 @@
 import { HashConfig } from "./hash-config.js";
 import { type DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
-import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js";
 
 export class UrlConfig extends HashConfig {
   readonly url: string;
@@ -49,11 +48,7 @@ export class UrlConfig extends HashConfig {
       return { url };
     }
     if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-      if (/^[A-Za-z0-9_-]+$/.test(url)) {
-        return { database: url };
-      }
-      const adapter = inferAdapterNameFromUrl(url);
-      return adapter ? { url, adapter } : { url };
+      return { database: url };
     }
     return new ConnectionUrlResolver(url).toHash();
   }

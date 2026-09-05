@@ -257,7 +257,9 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
-    this._cacheConfig = new ConnectionPoolConfiguration(this.dbConfig.queryCache);
+    this._cacheConfig = new ConnectionPoolConfiguration(this.dbConfig.queryCache, () =>
+      this._resolvePinnedConnection(),
+    );
 
     this.asyncExecutor = this.buildAsyncExecutor();
 
@@ -479,7 +481,6 @@ export class ConnectionPool implements ReapablePool {
       } else {
         this._pinnedConnections.set(ctxId, pin);
       }
-      this._cacheConfig.incrementPinnedCount();
     }
     pin.depth++;
 
@@ -505,7 +506,6 @@ export class ConnectionPool implements ReapablePool {
         } else {
           this._pinnedConnections.delete(ctxId);
         }
-        this._cacheConfig.decrementPinnedCount();
         if (newlyCheckedOut) {
           this.checkin(connection);
         }
@@ -534,7 +534,6 @@ export class ConnectionPool implements ReapablePool {
         } else {
           this._pinnedConnections.delete(ctxId);
         }
-        this._cacheConfig.decrementPinnedCount();
       }
 
       if (isTransactionAware(connection)) {

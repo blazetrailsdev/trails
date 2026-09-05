@@ -284,6 +284,7 @@ export function clearQueryCachesForCurrentThread(this: typeof Base): void {
 }
 
 export function leaseConnection(this: typeof Base): Promise<DatabaseAdapter> {
+  if ((this as any)._adapter) return Promise.resolve((this as any)._adapter);
   return connectionPool.call(this).leaseConnection();
 }
 

@@ -1355,28 +1355,16 @@ export class PostgreSQLAdapter
         await this.connectBang();
         return;
       }
-      this._connectionConfigured = false;
+
       if (this.transactionStatus !== PQTRANS_IDLE) {
-        await live.query("ROLLBACK").catch(() => {});
-      }
-      if (this._client) {
-        this._client = null;
-        this._inTransaction = false;
+        await live.query("ROLLBACK");
       }
       await live.query("DISCARD ALL");
-      if (this._rawConnection === live && !this._closed) {
-        await this.configureConnection().catch((error: unknown) => {
-          if (this._rawConnection === live) {
-            this._rawConnection = null;
-            this._connectionConfigured = false;
-            this._typeMapEagerLoaded = false;
-            void this._statements.reset();
-          }
-          live.end().catch(() => {});
-          throw error;
-        });
-      }
-      void this._statements.reset();
+
+      this._connectionConfigured = false;
+      this._client = null;
+      this._inTransaction = false;
+
       await super.resetBang();
     });
   }

@@ -12,7 +12,7 @@ import {
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
 import { LibSQLRemoteAdapter } from "../connection-adapters/libsql-remote-adapter.js";
 import { LibSQLReplicaAdapter } from "../connection-adapters/libsql-replica-adapter.js";
-import { buildAdapterArg, parseSqliteUrl } from "../connection-adapters/adapter-args.js";
+import { buildAdapterArg } from "../connection-adapters/adapter-args.js";
 
 describe("SqliteDriver — libsql round-trip", () => {
   let driver: SqliteConnection;
@@ -300,15 +300,21 @@ describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
 
 describe("parseSqliteUrl — remote URL pass-through", () => {
   it("passes libsql:// through unchanged", () => {
-    expect(parseSqliteUrl("libsql://mydb.turso.io")).toBe("libsql://mydb.turso.io");
+    expect(buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" })).toEqual([
+      "libsql://mydb.turso.io",
+    ]);
   });
 
   it("passes https:// through unchanged", () => {
-    expect(parseSqliteUrl("https://mydb.turso.io")).toBe("https://mydb.turso.io");
+    expect(buildAdapterArg("libsql-remote", { url: "https://mydb.turso.io" })).toEqual([
+      "https://mydb.turso.io",
+    ]);
   });
 
   it("still strips sqlite3:// prefix for local adapters", () => {
-    expect(parseSqliteUrl("sqlite3:///tmp/local.db")).toBe("/tmp/local.db");
+    expect(buildAdapterArg("sqlite3", { url: "sqlite3:///tmp/local.db" })).toEqual([
+      "/tmp/local.db",
+    ]);
   });
 });
 

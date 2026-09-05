@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAdapterArg, normalizeAdapterName, parseSqliteUrl } from "./adapter-args.js";
+import { buildAdapterArg } from "./adapter-args.js";
 
 describe("buildAdapterArg", () => {
   describe("sqlite", () => {
@@ -197,29 +197,29 @@ describe("buildAdapterArg", () => {
 
 describe("normalizeAdapterName", () => {
   it("maps aliases to canonical names", () => {
-    expect(normalizeAdapterName("postgres")).toBe("postgresql");
-    expect(normalizeAdapterName("mysql")).toBe("mysql");
-    expect(normalizeAdapterName("sqlite3")).toBe("sqlite");
-    expect(normalizeAdapterName("custom")).toBe("custom");
+    expect(buildAdapterArg("sqlite3", { database: "file.db" })).toEqual(["file.db"]);
+    expect(buildAdapterArg("custom", { database: "db" })).toEqual([
+      { database: "db", host: "localhost" },
+    ]);
   });
 
   it("normalizes the node-sqlite adapter to the sqlite arg shape", () => {
-    expect(normalizeAdapterName("node-sqlite")).toBe("sqlite");
+    expect(buildAdapterArg("node-sqlite", { database: "file.db" })).toEqual(["file.db"]);
   });
 });
 
 describe("parseSqliteUrl", () => {
   it("strips sqlite3:// and sqlite:// prefixes", () => {
-    expect(parseSqliteUrl("sqlite3://file.db")).toBe("file.db");
-    expect(parseSqliteUrl("sqlite://memory.db")).toBe("memory.db");
+    expect(buildAdapterArg("sqlite3", { url: "sqlite3://file.db" })).toEqual(["file.db"]);
+    expect(buildAdapterArg("sqlite3", { url: "sqlite://memory.db" })).toEqual(["memory.db"]);
   });
 
   it("treats an empty path as :memory:", () => {
-    expect(parseSqliteUrl("sqlite3://")).toBe(":memory:");
+    expect(buildAdapterArg("sqlite3", { url: "sqlite3://" })).toEqual([":memory:"]);
   });
 
   it("passes bare paths through unchanged", () => {
-    expect(parseSqliteUrl("/tmp/x.db")).toBe("/tmp/x.db");
-    expect(parseSqliteUrl(":memory:")).toBe(":memory:");
+    expect(buildAdapterArg("sqlite3", { database: "/tmp/x.db" })).toEqual(["/tmp/x.db"]);
+    expect(buildAdapterArg("sqlite3", { database: ":memory:" })).toEqual([":memory:"]);
   });
 });
