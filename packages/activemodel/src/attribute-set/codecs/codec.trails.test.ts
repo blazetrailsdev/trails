@@ -11,6 +11,12 @@ class UnregisteredType extends ValueType {
   }
 }
 
+class OtherUnregisteredType extends ValueType {
+  override type(): string {
+    return "other-unregistered";
+  }
+}
+
 const codecs: [string, AttributeSetCodec][] = [
   ["jsonCodec", jsonCodec],
   ["yamlCodec", yamlCodec],
@@ -43,5 +49,12 @@ describe.each(codecs)("%s with a type outside ActiveModel's registry", (_name, c
   it("still decodes a nil type as a nil type", () => {
     const decoded = codec.decode(codec.encode(nilTyped));
     expect(decoded.conciseAttributes![0].type).toBeNull();
+  });
+
+  it("keys each unregistered type distinctly, so the one-time warn stays per-type", () => {
+    const other: AttributeSetCoder = {
+      conciseAttributes: [Attribute.fromUser("name", "Alice", new OtherUnregisteredType())],
+    };
+    expect(codec.encode(unregistered)).not.toEqual(codec.encode(other));
   });
 });
