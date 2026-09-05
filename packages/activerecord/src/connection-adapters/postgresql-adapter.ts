@@ -2079,6 +2079,14 @@ export class PostgreSQLAdapter
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
+    if (
+      !(exception instanceof pg.DatabaseError) &&
+      !PostgreSQLAdapter._isConnectionError(exception) &&
+      !PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)
+    ) {
+      return exception;
+    }
+
     switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
       case undefined:
         if (PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {

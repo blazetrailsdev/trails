@@ -1097,7 +1097,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
     switch (this.errorNumber(exception as Error & { errno?: number })) {
       case null:
-      case undefined:
         if (/MySQL client is not connected/i.test(exceptionMessage)) {
           return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
         } else {

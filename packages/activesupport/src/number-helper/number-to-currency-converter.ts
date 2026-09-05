@@ -42,7 +42,7 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
   protected override get options(): Record<string, unknown> {
     if (!this._options) {
       const defaults = merge(this.defaultFormatOptions(), this.i18nOpts());
-      if (this.opts.format) defaults.negativeFormat = `-${this.opts.format}`;
+      if (this.opts.format != null) defaults.negativeFormat = `-${this.opts.format}`;
       this._options = mergeBang(defaults, this.opts as Record<string, unknown>);
     }
     return this._options;
@@ -50,7 +50,7 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
 
   protected i18nOpts(): Record<string, unknown> {
     const i18n = this.i18nFormatOptions();
-    if (i18n.format) i18n.negativeFormat ??= `-${i18n.format}`;
+    if (i18n.format != null) i18n.negativeFormat ??= `-${i18n.format}`;
     return i18n;
   }
 }
