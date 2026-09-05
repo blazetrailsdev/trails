@@ -26,10 +26,6 @@ describe("assertionValueMismatch", () => {
   });
 
   it("folds a snake_case attribute-name literal onto its camelCase spelling", () => {
-    // Rails' `assert_equal :author_name, t.errors.attribute_names[1]`
-    // (vendor/rails/activemodel/test/cases/validations_test.rb:237-244) against
-    // the trails port, which must spell the shared Topic's accessor
-    // `authorName`.
     expect(
       assertionValueMismatch(
         ["assert_equal"],
@@ -39,7 +35,6 @@ describe("assertionValueMismatch", () => {
         false,
       ),
     ).toBeNull();
-    // The colon-prefixed Symbol spelling folds the same way.
     expect(
       assertionValueMismatch(
         ["assert_equal"],
@@ -49,7 +44,6 @@ describe("assertionValueMismatch", () => {
         false,
       ),
     ).toBeNull();
-    // A genuinely different name still diverges.
     expect(
       assertionValueMismatch(
         ["assert_equal"],
@@ -59,8 +53,6 @@ describe("assertionValueMismatch", () => {
         false,
       ),
     ).toEqual([{ kind: "equal", rails: ["s:authorName"], trails: ["s:titleName"] }]);
-    // A non-identifier string is compared verbatim — no underscore squashing in
-    // a sentence or a SQL fragment.
     expect(
       assertionValueMismatch(
         ["assert_equal"],

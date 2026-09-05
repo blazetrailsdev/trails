@@ -31,6 +31,7 @@ describe("AttributeSetTest", () => {
     expect(() => frozen().writeCastValue("bar", 2)).toThrow(FrozenError);
     expect(() => frozen().writeFromUser("bar", 2)).toThrow(FrozenError);
     expect(() => frozen().writeFromUser("foo", 2)).toThrow("can't modify frozen attributes");
+    expect(() => frozen().freeze().freeze()).not.toThrow();
   });
 
   it("initialize_dup gives the copy its own attributes hash", () => {

@@ -183,6 +183,7 @@ export class BigDecimal {
           ? this.digits
           : `0${this.digits}`;
     let value = BigInt(kept === "" ? "0" : kept);
+    if (keepCount > this.digits.length) value *= 10n ** BigInt(keepCount - this.digits.length);
     if (roundsAway(rest, kept, this.sign === "-", mode)) value += 1n;
     if (n < 0) value *= 10n ** BigInt(-n);
     return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, Math.max(n, 0));

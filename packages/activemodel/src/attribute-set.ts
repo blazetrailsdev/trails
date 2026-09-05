@@ -24,10 +24,6 @@ function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<
       raiseIfFrozen(target);
       return Reflect.set(target, name, value);
     },
-    defineProperty(target, name, descriptor): boolean {
-      raiseIfFrozen(target);
-      return Reflect.defineProperty(target, name, descriptor);
-    },
     deleteProperty(target, name): boolean {
       raiseIfFrozen(target);
       return Reflect.deleteProperty(target, name);
