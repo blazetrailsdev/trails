@@ -165,12 +165,19 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
     if (ActsLikeObject.actsLike(value, "time")) {
       return inTimeZone(value as DateOrTime);
-    } else if (typeof value === "number" && !Number.isFinite(value)) {
+    } else if (isInfinite(value)) {
       return value;
     } else {
       return this.map(value, (v) => this.convertTimeToTimeZone(v));
     }
   }
+}
+
+/** @internal */
+function isInfinite(value: unknown): boolean {
+  const fn = (value as { isInfinite?: unknown }).isInfinite;
+  if (typeof fn === "function") return (fn as () => unknown).call(value) !== false;
+  return value === Infinity || value === -Infinity;
 }
 
 /** @internal */

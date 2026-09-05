@@ -218,7 +218,7 @@ export class SchemaCreation {
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
-    if ((await this.supportsIndexInclude()) && index.include && index.include.length > 0) {
+    if ((await this.supportsIndexInclude()) && index.include != null) {
       parts.push(`INCLUDE (${await this.quotedIncludeColumns(index.include)})`);
     }
     if ((await this.supportsNullsNotDistinct()) && index.nullsNotDistinct)
