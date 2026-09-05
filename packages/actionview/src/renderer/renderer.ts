@@ -48,7 +48,7 @@ export class Renderer {
     return (await this.renderPartialToObject(context, options, block)).body;
   }
 
-  cacheHits: Record<string, number> = {};
+  cacheHits: Record<string, unknown> = {};
 
   private renderTemplateToObject(
     context: ViewContext,

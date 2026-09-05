@@ -53,7 +53,7 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
-  adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
+  adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite3"];
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null
       ? "SELECT name FROM catalog"

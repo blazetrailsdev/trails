@@ -26,6 +26,7 @@ import {
   AsynchronousQueryInsideTransactionError,
   ActiveRecordError,
   Rollback,
+  FixtureError,
 } from "../../errors.js";
 
 import type { Quoting } from "./quoting.js";
@@ -48,6 +49,7 @@ import {
 import type { Base } from "../../base.js";
 import { isWriteQuerySql } from "../sql-classification.js";
 import { ActiveRecord } from "../../ar-config.js";
+import { rubyInspect } from "../../relation/ruby-inspect.js";
 
 /** @internal */
 let _base: typeof Base | undefined;
@@ -1203,51 +1205,60 @@ export async function executeBatch(
   }
 }
 
+const DEFAULT_INSERT_VALUE = arelSql("DEFAULT");
+
 /** @internal */
 export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
-  return arelSql("DEFAULT");
+  return DEFAULT_INSERT_VALUE;
 }
 
 /** @internal */
-export function buildFixtureSql(
+export async function buildFixtureSql(
   this: DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">,
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
+      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
+      defaultInsertValue?(column: unknown): unknown;
+    },
   fixtures: Record<string, unknown>[],
   tableName: string,
-): string {
-  if (fixtures.length === 0) {
-    const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
-    return `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
-  }
+): Promise<string> {
+  const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
+  const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
+    ([, column]) => !(supportsVirtualColumns && (column as { virtual?: boolean }).virtual),
+  );
+  const columnNames = columns.map(([name]) => name);
 
-  const allColumns = [...new Set(fixtures.flatMap((f) => Object.keys(f)))];
-  if (allColumns.length === 0) {
-    const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
-    return `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
-  }
+  const valuesList = fixtures.map((fixture) => {
+    const unknownColumns = Object.keys(fixture).filter((name) => !columnNames.includes(name));
+    if (unknownColumns.length > 0) {
+      throw new FixtureError(
+        `table "${tableName}" has no columns named ${unknownColumns.map((name) => rubyInspect(name)).join(", ")}.`,
+      );
+    }
 
-  const DEFAULT_VALUE = arelSql("DEFAULT");
+    return columns.map(([name, column]) =>
+      name in fixture
+        ? arelSql(this.quote(withYamlFallback(fixture[name])))
+        : (this.defaultInsertValue ?? defaultInsertValue).call(this, column),
+    );
+  });
+
   const table = new Table(tableName);
   const manager = new InsertManager(table);
 
-  const valuesList = fixtures.map((fixture) =>
-    allColumns.map((col) =>
-      col in fixture ? arelSql(this.quote(withYamlFallback(fixture[col]))) : DEFAULT_VALUE,
-    ),
-  );
-
   if (valuesList.length === 1) {
-    const row = valuesList[0];
-    const filteredValues: unknown[] = [];
-    allColumns.forEach((col, i) => {
-      if (row[i] !== DEFAULT_VALUE) {
-        filteredValues.push(row[i]);
-        manager.columns.push(table.get(col));
+    const values = valuesList.shift() as unknown[];
+    const newValues: unknown[] = [];
+    columnNames.forEach((column, i) => {
+      if (values[i] !== DEFAULT_INSERT_VALUE) {
+        newValues.push(values[i]);
+        manager.columns.push(table.get(column));
       }
     });
-    manager.values = manager.createValues(filteredValues);
+    manager.values = manager.createValues(newValues);
   } else {
-    allColumns.forEach((col) => manager.columns.push(table.get(col)));
+    columnNames.forEach((column) => manager.columns.push(table.get(column)));
     manager.values = manager.createValuesList(valuesList);
   }
 
@@ -1260,12 +1271,18 @@ export function buildFixtureSql(
 /** @internal */
 export function buildFixtureStatements(
   this: DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">,
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
+      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
+      defaultInsertValue?(column: unknown): unknown;
+    },
   fixtureSet: Record<string, Record<string, unknown>[]>,
-): string[] {
-  return Object.entries(fixtureSet)
-    .filter(([, fixtures]) => fixtures.length > 0)
-    .map(([tableName, fixtures]) => buildFixtureSql.call(this, fixtures, tableName));
+): Promise<string[]> {
+  return Promise.all(
+    Object.entries(fixtureSet)
+      .filter(([, fixtures]) => fixtures.length > 0)
+      .map(([tableName, fixtures]) => buildFixtureSql.call(this, fixtures, tableName)),
+  );
 }
 
 /** @internal */

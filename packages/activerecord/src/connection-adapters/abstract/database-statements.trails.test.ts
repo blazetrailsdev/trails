@@ -3,6 +3,8 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Rollback, StatementInvalid } from "../../errors.js";
+import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
+import { defaultInsertValue as mysqlDefaultInsertValue } from "../mysql/database-statements.js";
 import {
   buildFixtureSql,
   buildFixtureStatements,
@@ -971,16 +973,43 @@ describe("returningColumnValues", () => {
 });
 
 describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) / combineMultiStatements", () => {
-  type FixtureHost = DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">;
+  type FixtureColumn = { name: string; virtual?: boolean; autoIncrement?: boolean } & Record<
+    string,
+    unknown
+  >;
 
-  function makeHost(quoter: { q?: (n: string) => string } = {}): FixtureHost {
+  type FixtureHost = DatabaseStatementsHost &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
+      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+      supportsVirtualColumns?(): Promise<boolean> | boolean;
+      defaultInsertValue?(column: unknown): unknown;
+    };
+
+  const USERS: Record<string, FixtureColumn> = {
+    name: { name: "name" },
+    age: { name: "age" },
+  };
+
+  function makeHost(
+    quoter: { q?: (n: string) => string } = {},
+    columns: Record<string, Record<string, FixtureColumn>> = {},
+  ): FixtureHost {
     const q = quoter.q ?? ((n: string) => `"${n}"`);
+    const tables: Record<string, Record<string, FixtureColumn>> = {
+      users: USERS,
+      posts: { title: { name: "title" } },
+      orders: { id: { name: "id" } },
+      t: { val: { name: "val" } },
+      ...columns,
+    };
     return {
       ...hostDefaults,
       pool,
       typeCastedBinds,
       log,
+      schemaCache: {
+        columnsHash: async (tableName: string) => tables[tableName],
+      },
       quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
       quoteTableName: q,
       quoteColumnName: q,
@@ -1025,14 +1054,8 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
   });
 
   describe("buildFixtureSql", () => {
-    it("returns empty-insert placeholder for an empty fixtures array", () => {
-      const sql = buildFixtureSql.call(makeHost(), [], "users");
-      expect(sql).toMatch(/INSERT INTO "users"/);
-      expect(sql).toMatch(/DEFAULT VALUES/);
-    });
-
-    it("single-row: includes only columns present in the fixture (no DEFAULT filler)", () => {
-      const sql = buildFixtureSql.call(makeHost(), [{ name: "Alice", age: 30 }], "users");
+    it("single-row: includes only columns present in the fixture (no DEFAULT filler)", async () => {
+      const sql = await buildFixtureSql.call(makeHost(), [{ name: "Alice", age: 30 }], "users");
       expect(sql).toContain('"name"');
       expect(sql).toContain('"age"');
       expect(sql).toContain("'Alice'");
@@ -1040,15 +1063,16 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       expect(sql).not.toContain("DEFAULT");
     });
 
-    it("single-row: strips missing columns (DEFAULT-strip optimisation)", () => {
-      const sql = buildFixtureSql.call(makeHost(), [{ name: "Alice" }], "users");
+    it("single-row: strips missing columns (DEFAULT-strip optimisation)", async () => {
+      const sql = await buildFixtureSql.call(makeHost(), [{ name: "Alice" }], "users");
       expect(sql).toContain('"name"');
+      expect(sql).not.toContain('"age"');
       expect(sql).not.toContain("DEFAULT");
     });
 
-    it("multi-row: includes all union columns, using DEFAULT for missing entries", () => {
+    it("multi-row: includes all schema columns, using DEFAULT for missing entries", async () => {
       const fixtures = [{ name: "Alice" }, { name: "Bob", age: 25 }];
-      const sql = buildFixtureSql.call(makeHost(), fixtures, "users");
+      const sql = await buildFixtureSql.call(makeHost(), fixtures, "users");
       expect(sql).toContain('"name"');
       expect(sql).toContain('"age"');
       expect(sql).toContain("'Alice'");
@@ -1057,32 +1081,81 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       expect(sql).toContain("DEFAULT");
     });
 
-    it("uses adapter quoteTableName / quoteColumnName for identifier quoting", () => {
+    it("uses adapter quoteTableName / quoteColumnName for identifier quoting", async () => {
       const host = makeHost({ q: (n) => `\`${n}\`` });
-      const sql = buildFixtureSql.call(host, [{ id: 1 }], "orders");
+      const sql = await buildFixtureSql.call(host, [{ id: 1 }], "orders");
       expect(sql).toContain("`orders`");
       expect(sql).toContain("`id`");
     });
 
-    it("uses adapter quote() for value escaping", () => {
+    it("uses adapter quote() for value escaping", async () => {
       const host: FixtureHost = {
-        ...hostDefaults,
-        pool,
-        typeCastedBinds,
+        ...makeHost(),
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
-        quoteTableName: (n) => `"${n}"`,
-        quoteColumnName: (n) => `"${n}"`,
-        quoteString: (s) => s,
       };
-      const sql = buildFixtureSql.call(host, [{ val: "x" }], "t");
+      const sql = await buildFixtureSql.call(host, [{ val: "x" }], "t");
       expect(sql).toContain("E'x'");
+    });
+
+    it("takes its columns from the schema cache, not from the fixture keys", async () => {
+      const sql = await buildFixtureSql.call(
+        makeHost(),
+        [{ name: "Alice" }, { name: "Bob" }],
+        "users",
+      );
+      expect(sql).toContain('"age"');
+    });
+
+    it("rejects virtual columns when the adapter supports them", async () => {
+      const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
+      host.supportsVirtualColumns = async () => true;
+      const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
+      expect(sql).not.toContain('"upper"');
+    });
+
+    it("keeps a virtual column when the adapter's async predicate resolves false", async () => {
+      const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
+      host.supportsVirtualColumns = async () => false;
+      const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
+      expect(sql).toContain('"upper"');
+    });
+
+    it("raises FixtureError naming the unknown columns", async () => {
+      await expect(
+        buildFixtureSql.call(makeHost(), [{ name: "Alice", nope: 1 }], "users"),
+      ).rejects.toThrow(`table "users" has no columns named "nope".`);
+    });
+
+    it("calls default_insert_value for a column the fixture omits (sqlite3 default_function)", async () => {
+      const host = makeHost(
+        {},
+        {
+          users: {
+            name: { name: "name" },
+            created_at: { name: "created_at", defaultFunction: "CURRENT_TIMESTAMP" },
+          },
+        },
+      );
+      host.defaultInsertValue = sqliteDefaultInsertValue;
+      const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
+      expect(sql).toContain("CURRENT_TIMESTAMP");
+    });
+
+    it("calls default_insert_value for a column the fixture omits (mysql auto_increment)", async () => {
+      const host = makeHost(
+        {},
+        { users: { id: { name: "id", autoIncrement: true }, name: { name: "name" } } },
+      );
+      host.defaultInsertValue = mysqlDefaultInsertValue as (column: unknown) => unknown;
+      const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
+      expect(sql).not.toContain("DEFAULT");
     });
   });
 
   describe("buildFixtureStatements", () => {
-    it("returns one INSERT per non-empty table", () => {
+    it("returns one INSERT per non-empty table", async () => {
       const host = makeHost();
-      const result = buildFixtureStatements.call(host, {
+      const result = await buildFixtureStatements.call(host, {
         users: [{ name: "Alice" }],
         posts: [{ title: "Hi" }],
       });
@@ -1091,8 +1164,8 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       expect(result[1]).toContain('"posts"');
     });
 
-    it("skips empty fixture arrays", () => {
-      const result = buildFixtureStatements.call(makeHost(), {
+    it("skips empty fixture arrays", async () => {
+      const result = await buildFixtureStatements.call(makeHost(), {
         users: [{ name: "Alice" }],
         posts: [],
       });
@@ -1100,8 +1173,8 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       expect(result[0]).toContain('"users"');
     });
 
-    it("returns empty array when all fixture sets are empty", () => {
-      expect(buildFixtureStatements.call(makeHost(), { users: [] })).toEqual([]);
+    it("returns empty array when all fixture sets are empty", async () => {
+      expect(await buildFixtureStatements.call(makeHost(), { users: [] })).toEqual([]);
     });
   });
 });

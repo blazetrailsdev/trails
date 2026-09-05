@@ -125,3 +125,20 @@ export {
   MAX_HEADER_SIZE,
 } from "./asset-tag-helper.js";
 export type { AssetTagHelperHost } from "./asset-tag-helper.js";
+
+export {
+  cache,
+  isCaching,
+  uncacheableBang,
+  cacheIf,
+  cacheUnless,
+  cacheFragmentName,
+  digestPathFromTemplate,
+  CachingRegistry,
+  UncacheableFragmentError,
+} from "./cache-helper.js";
+export type {
+  CacheHelperHost,
+  CacheHelperController,
+  CacheFragmentNameOptions,
+} from "./cache-helper.js";

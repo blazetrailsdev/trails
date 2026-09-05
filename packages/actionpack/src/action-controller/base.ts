@@ -882,6 +882,7 @@ helperMethod(
   Base as unknown as HelpersClassMethods,
   "isContentSecurityPolicy",
   "contentSecurityPolicyNonce",
+  "viewCacheDependencies",
 );
 
 export { DoubleRenderError };

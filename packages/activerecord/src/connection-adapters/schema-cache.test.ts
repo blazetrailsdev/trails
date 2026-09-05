@@ -578,7 +578,7 @@ class MockAdapter {
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
-  nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
+  nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite3"];
   supportsCheckConstraints = async () => true;
   supportsIndexesInCreate = () => false;
   supportsPartialIndex = () => true;

@@ -102,7 +102,7 @@ function formatNotFoundAllMessage(
   if (notFoundIds) {
     error +=
       ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
+      ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
   }
   return error;
 }
@@ -476,7 +476,7 @@ export function raiseRecordNotFoundExceptionBang(
   const error = formatNotFoundAllMessage(
     name,
     key,
-    wrapped.join(", "),
+    (ids as unknown[]).flat(Infinity).join(", "),
     conditions,
     resultSize,
     expectedSize,

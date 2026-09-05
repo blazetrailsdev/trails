@@ -710,3 +710,11 @@ export class MultiparameterAssignmentErrors extends ActiveRecordError {
     this.errors = errors;
   }
 }
+
+/** @noRailsEquivalent CONVERGEABLE relocate-fixture-error-to-fixtures-ts */
+export class FixtureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FixtureError";
+  }
+}

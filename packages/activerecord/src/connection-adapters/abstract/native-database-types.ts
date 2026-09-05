@@ -1,3 +1,5 @@
+import type { AdapterName } from "../abstract-adapter.js";
+
 export interface NativeDatabaseType {
   name?: string;
   limit?: number;
@@ -97,11 +99,8 @@ export function postgresqlNativeDatabaseTypes(
   return types;
 }
 
-export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<
-  "sqlite" | "postgres" | "mysql2",
-  NativeDatabaseTypes
-> = {
-  sqlite: SQLITE3_NATIVE_DATABASE_TYPES,
-  postgres: POSTGRESQL_NATIVE_DATABASE_TYPES,
+export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<AdapterName, NativeDatabaseTypes> = {
+  sqlite3: SQLITE3_NATIVE_DATABASE_TYPES,
+  postgresql: POSTGRESQL_NATIVE_DATABASE_TYPES,
   mysql2: MYSQL_NATIVE_DATABASE_TYPES,
 };

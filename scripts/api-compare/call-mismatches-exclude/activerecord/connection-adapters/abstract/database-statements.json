@@ -3,36 +3,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "build_fixture_sql",
-    "call": "columns_hash",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "build_fixture_sql",
-    "call": "default_insert_value",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "build_fixture_sql",
-    "call": "join",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "build_fixture_sql",
     "call": "lookup_cast_type_from_column",
     "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "build_fixture_sql",
-    "call": "reject",
-    "reason": "database_statements.rb:608 `schema_cache.columns_hash(table_name).reject { … }` — a Hash receiver, but trails' `buildFixtureSql` derives its columns from the fixture keys themselves and never reads `columnsHash` (database-statements.ts:1230-1250), which is the `columns_hash` row above."
   },
   {
     "package": "activerecord",
