@@ -2,7 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 
 const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string[]][] = [
   ["ASCII-8BIT", null, ["BINARY"]],
-  ["UTF-8", "utf-8", ["CP65001", "locale", "external", "filesystem"]],
+  ["UTF-8", "utf-8", ["CP65001"]],
   ["US-ASCII", "windows-1252", ["ASCII", "ANSI_X3.4-1968", "646"]],
   ["UTF-16BE", "utf-16be", ["UCS-2BE"]],
   ["UTF-16LE", "utf-16le", []],
@@ -141,21 +141,51 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
  * because its decoder IS the registry entry (`rb_encoding *`), and JS keeps
  * the two apart.
  *
- * The one name in `Encoding.name_list` with no row is `internal`, which
- * `enc_find` resolves through `rb_default_internal_encoding` and which MRI
- * answers `nil` for whenever `Encoding.default_internal` is unset — the state
- * trails is always in, since it has no `default_internal` to set.
+ * The four special names `enc_find` documents — `locale`, `external`,
+ * `filesystem` and `internal` (`encoding.c:1357-1360`) — carry no row: MRI
+ * registers them with `enc_alias_internal` (`encoding.c:1497,1563`) against
+ * the seats below, and re-points them whenever a seat moves.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Encoding` (`vendor/ruby/encoding.c:1368`).
  */
 export class Encoding {
-  static readonly #registry = new Map<string, Encoding>();
+  static readonly #registry = new Map<string, Encoding | null>();
+
+  /**
+   * `rb_locale_encoding` (`vendor/ruby/encoding.c:1490-1500`) — the seat the
+   * `locale` alias resolves through. MRI reads it off the process environment;
+   * trails has no locale to read, so it is `UTF-8`.
+   */
+  static #locale: Encoding;
+
+  /**
+   * `rb_filesystem_encoding` (`vendor/ruby/encoding.c:1520`) — the seat the
+   * `filesystem` alias resolves through, which off Windows is
+   * `Init_enc_set_filesystem_encoding`'s
+   * `rb_enc_to_index(rb_default_external_encoding())`
+   * (`vendor/ruby/localeinit.c:135`, `miniinit.c:36`) and so tracks
+   * `default_external` rather than standing on its own.
+   */
+  static #filesystem: Encoding;
+
+  static #defaultExternal: Encoding;
+
+  static #defaultInternal: Encoding | null = null;
 
   static {
     for (const [name, decoderLabel, aliases] of ROWS) {
       const encoding = new Encoding(name, decoderLabel);
       for (const key of [name, ...aliases]) Encoding.#registry.set(key.toLowerCase(), encoding);
     }
+
+    Encoding.#locale = Encoding.#registry.get("utf-8")!;
+    Encoding.#defaultExternal = Encoding.#locale;
+    Encoding.#filesystem = Encoding.#defaultExternal;
+
+    Encoding.#registry.set("locale", Encoding.#locale);
+    Encoding.#registry.set("filesystem", Encoding.#filesystem);
+    Encoding.#registry.set("external", Encoding.#defaultExternal);
+    Encoding.#registry.set("internal", Encoding.#defaultInternal);
   }
 
   /**
@@ -200,13 +230,56 @@ export class Encoding {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding.find` (`vendor/ruby/encoding.c:1368`).
    */
-  static find(enc: string | Encoding): Encoding {
+  static find(enc: string | Encoding): Encoding | null {
     if (enc instanceof Encoding) return enc;
-    const found = Encoding.#registry.get(String(enc).toLowerCase());
-    if (found === undefined) {
+    const key = String(enc).toLowerCase();
+    if (!Encoding.#registry.has(key)) {
       throw new ArgumentError(`unknown encoding name - ${String(enc)}`);
     }
-    return found;
+    return Encoding.#registry.get(key) ?? null;
+  }
+
+  /**
+   * `Encoding.default_external` (`get_default_external`,
+   * `vendor/ruby/encoding.c:1619`) and its writer
+   * (`rb_enc_set_default_external`, `encoding.c:1625-1633`), which raises
+   * rather than accept `nil`. `enc_set_default_encoding` re-points the
+   * `external` alias, and — for this seat alone — re-derives the `filesystem`
+   * one with it (`encoding.c:1562-1564`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Encoding.default_external`.
+   */
+  static get defaultExternal(): Encoding {
+    return Encoding.#defaultExternal;
+  }
+
+  static set defaultExternal(encoding: string | Encoding | null) {
+    const found = encoding == null ? null : Encoding.find(encoding);
+    if (found === null) {
+      throw new ArgumentError("default external can not be nil");
+    }
+    Encoding.#defaultExternal = found;
+    Encoding.#registry.set("external", found);
+    Encoding.#filesystem = found;
+    Encoding.#registry.set("filesystem", found);
+  }
+
+  /**
+   * `Encoding.default_internal` (`get_default_internal`,
+   * `vendor/ruby/encoding.c:1703`) and its writer
+   * (`rb_enc_set_default_internal`, `encoding.c:1709-1714`), which does accept
+   * `nil` — the unset state `Encoding.find("internal")` answers `nil` from.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Encoding.default_internal`.
+   */
+  static get defaultInternal(): Encoding | null {
+    return Encoding.#defaultInternal;
+  }
+
+  static set defaultInternal(encoding: string | Encoding | null) {
+    const found = encoding == null ? null : Encoding.find(encoding);
+    Encoding.#defaultInternal = found;
+    Encoding.#registry.set("internal", found);
   }
 
   /**
@@ -217,14 +290,14 @@ export class Encoding {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::ASCII_8BIT`.
    */
-  static readonly ASCII_8BIT = Encoding.find("ASCII-8BIT");
+  static readonly ASCII_8BIT = Encoding.find("ASCII-8BIT")!;
 
   /** @noRailsEquivalent PERMANENT */
   static readonly BINARY = Encoding.ASCII_8BIT;
 
   /** @noRailsEquivalent PERMANENT */
-  static readonly UTF_8 = Encoding.find("UTF-8");
+  static readonly UTF_8 = Encoding.find("UTF-8")!;
 
   /** @noRailsEquivalent PERMANENT */
-  static readonly US_ASCII = Encoding.find("US-ASCII");
+  static readonly US_ASCII = Encoding.find("US-ASCII")!;
 }

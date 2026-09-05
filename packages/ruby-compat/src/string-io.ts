@@ -140,11 +140,19 @@ export class StringIO {
    * `Rack::Test::Utils.build_file_part`'s `set_encoding(Encoding::BINARY)`
    * (`vendor/rack-test/lib/rack/test/utils.rb:148`) is asking for.
    *
+   * `rb_find_encoding` (`vendor/ruby/encoding.c:325-332`) answers a NULL
+   * `rb_encoding *` for a name that resolves to `UNSPECIFIED_ENCODING` — the
+   * `internal` alias while `Encoding.default_internal` is unset — and
+   * `strio_set_encoding` then falls through the mode-string path to no
+   * encoding at all, which the stream reports as `ASCII-8BIT` (verified
+   * against ruby 3.3: `StringIO.new("x").set_encoding("internal")
+   * .external_encoding` is `#<Encoding:ASCII-8BIT>`).
+   *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#set_encoding`
    * (`vendor/ruby/ext/stringio/stringio.c:1801`).
    */
   setEncoding(extEnc: Encoding | string): this {
-    this.enc = Encoding.find(extEnc);
+    this.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
     return this;
   }
 

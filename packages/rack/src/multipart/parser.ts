@@ -450,7 +450,7 @@ export class Parser {
     body: any,
   ): [string, any] {
     name = String(name);
-    let encoding = Encoding.UTF_8;
+    let encoding: Encoding | null = Encoding.UTF_8;
 
     name = forceEncoding(name, encoding);
 
@@ -475,7 +475,7 @@ export class Parser {
     return [name, typeof body === "string" ? forceEncoding(body, encoding) : body];
   }
   /** @internal */
-  private findEncoding(enc: string | null | undefined): Encoding {
+  private findEncoding(enc: string | null | undefined): Encoding | null {
     try {
       return Encoding.find(enc!);
     } catch (error) {

@@ -4,20 +4,20 @@ import { ArgumentError } from "./argument-error.js";
 
 describe("Encoding.find", () => {
   it("resolves a canonical Ruby name to its Encoding", () => {
-    expect(Encoding.find("UTF-8").name).toBe("UTF-8");
-    expect(Encoding.find("Shift_JIS").name).toBe("Shift_JIS");
+    expect(Encoding.find("UTF-8")!.name).toBe("UTF-8");
+    expect(Encoding.find("Shift_JIS")!.name).toBe("Shift_JIS");
   });
 
   it("is case-insensitive, as enc_registered's case-folding table is", () => {
     expect(Encoding.find("utf-8")).toBe(Encoding.UTF_8);
-    expect(Encoding.find("SHIFT_JIS").name).toBe("Shift_JIS");
+    expect(Encoding.find("SHIFT_JIS")!.name).toBe("Shift_JIS");
   });
 
   it("resolves a Ruby alias to its canonical encoding", () => {
     expect(Encoding.find("BINARY")).toBe(Encoding.ASCII_8BIT);
-    expect(Encoding.find("CP932").name).toBe("Windows-31J");
+    expect(Encoding.find("CP932")!.name).toBe("Windows-31J");
     expect(Encoding.find("646")).toBe(Encoding.US_ASCII);
-    expect(Encoding.find("ISO8859-15").name).toBe("ISO-8859-15");
+    expect(Encoding.find("ISO8859-15")!.name).toBe("ISO-8859-15");
   });
 
   it("resolves the names TextDecoder rejects", () => {
@@ -40,6 +40,37 @@ describe("Encoding.find", () => {
 
   it("returns an Encoding argument unchanged, as enc_find's is_obj_encoding arm does", () => {
     expect(Encoding.find(Encoding.UTF_8)).toBe(Encoding.UTF_8);
+  });
+
+  it("answers null for internal while default_internal is unset, as enc_find does", () => {
+    expect(Encoding.defaultInternal).toBeNull();
+    expect(Encoding.find("internal")).toBeNull();
+  });
+
+  it("resolves locale, external and filesystem through their seats", () => {
+    expect(Encoding.find("locale")).toBe(Encoding.UTF_8);
+    expect(Encoding.find("filesystem")).toBe(Encoding.UTF_8);
+    expect(Encoding.find("external")).toBe(Encoding.defaultExternal);
+  });
+
+  it("re-points the external and internal aliases when a seat moves", () => {
+    try {
+      Encoding.defaultInternal = "US-ASCII";
+      expect(Encoding.find("internal")).toBe(Encoding.US_ASCII);
+
+      Encoding.defaultExternal = Encoding.ASCII_8BIT;
+      expect(Encoding.find("external")).toBe(Encoding.ASCII_8BIT);
+      expect(Encoding.find("filesystem")).toBe(Encoding.ASCII_8BIT);
+    } finally {
+      Encoding.defaultInternal = null;
+      Encoding.defaultExternal = Encoding.UTF_8;
+    }
+  });
+
+  it("refuses a nil default_external, as rb_enc_set_default_external does", () => {
+    expect(() => (Encoding.defaultExternal = null)).toThrow(
+      new ArgumentError("default external can not be nil"),
+    );
   });
 
   it("renders as its name, and inspects as #<Encoding:name>", () => {
@@ -225,28 +256,29 @@ describe("Encoding.find", () => {
     "stateless-ISO-2022-JP-KDDI",
   ];
 
-  it("resolves every name MRI's Encoding.name_list carries, but internal", () => {
+  it("resolves every name MRI's Encoding.name_list carries", () => {
     expect(MRI_NAME_LIST.length).toBe(175);
     const unresolved = MRI_NAME_LIST.filter((name) => {
       try {
-        return !(Encoding.find(name) instanceof Encoding);
+        Encoding.find(name);
+        return false;
       } catch {
         return true;
       }
     });
-    expect(unresolved).toEqual(["internal"]);
+    expect(unresolved).toEqual([]);
   });
 
   it("leaves UTF-16 unlabelled: WHATWG's utf-16 is utf-16le, not MRI's BOM-dispatching dummy", () => {
     const beBom = new Uint8Array([0xfe, 0xff, 0x00, 0x41]);
     expect(new TextDecoder("utf-16").encoding).toBe("utf-16le");
     expect(new TextDecoder("utf-16").decode(beBom)).not.toBe("A");
-    expect(Encoding.find("UTF-16").decoderLabel).toBeNull();
+    expect(Encoding.find("UTF-16")!.decoderLabel).toBeNull();
   });
 
   it("registers a name MRI carries but JS cannot decode, with a null decoderLabel", () => {
     for (const name of ["UTF-7", "EUC-TW", "Emacs-Mule", "IBM437", "SJIS-DoCoMo"]) {
-      expect(Encoding.find(name).decoderLabel).toBeNull();
+      expect(Encoding.find(name)!.decoderLabel).toBeNull();
     }
   });
 });

@@ -154,11 +154,18 @@ export class IO {
    * {@link binmode} also sets but which carries no `FMODE_BINMODE` of its own.
    * It answers the stream.
    *
+   * MRI records NO external encoding for a name that resolves to
+   * `UNSPECIFIED_ENCODING` — the `internal` alias while
+   * `Encoding.default_internal` is unset (`ruby -e 'p
+   * STDOUT.set_encoding("internal").external_encoding'` answers `nil`) — and
+   * {@link enc} has no such state to hold, so the null is asserted away here.
+   * Converged by `io-set-encoding-cannot-hold-mri-null-external-encoding`.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#set_encoding`
    * (`vendor/ruby/io.c:13474`).
    */
   setEncoding(extEnc: Encoding | string): this {
-    this.enc = Encoding.find(extEnc);
+    this.enc = Encoding.find(extEnc)!;
     return this;
   }
 
