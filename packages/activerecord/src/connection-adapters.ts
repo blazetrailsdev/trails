@@ -84,11 +84,11 @@ export async function resolve(adapterName: string | undefined): Promise<AdapterC
           ? new URL(errorPath).pathname.endsWith(pathToAdapter.replace(/^\.+/, ""))
           : errorPath === pathToAdapter || pathToAdapter.startsWith(`${errorPath}/`))
           ? new Error(
-              `Error loading the '${adapterName}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
+              `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
               { cause: err },
             )
           : new Error(
-              `Error loading the '${adapterName}' Active Record adapter. Missing a package it depends on? ${message}`,
+              `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a package it depends on? ${message}`,
               { cause: err },
             );
       resolveErrors.set(adapterName ?? "", loadError);
