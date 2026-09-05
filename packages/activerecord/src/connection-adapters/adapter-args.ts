@@ -1,26 +1,3 @@
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function inferAdapterNameFromUrl(url: string): string | undefined {
-  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
-    return "postgresql";
-  }
-  if (url.startsWith("mysql://") || url.startsWith("mysql2://")) {
-    return "mysql";
-  }
-  if (
-    url.startsWith("sqlite://") ||
-    url.startsWith("sqlite3://") ||
-    url.endsWith(".sqlite3") ||
-    url.endsWith(".db") ||
-    url === ":memory:"
-  ) {
-    return "sqlite";
-  }
-  return undefined;
-}
-
 function isRemoteLibsqlUrl(url: string): boolean {
   return (
     url.startsWith("libsql://") ||
@@ -31,16 +8,12 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-args-url-parsing-onto-connection-url-resolver */
-export function normalizeAdapterName(name: string): string {
+function normalizeAdapterName(name: string): string {
   switch (name) {
     case "postgresql":
-    case "postgres":
       return "postgresql";
-    case "mysql":
     case "mysql2":
       return "mysql";
-    case "sqlite":
     case "sqlite3":
     case "node-sqlite":
     case "expo-sqlite":
@@ -53,8 +26,7 @@ export function normalizeAdapterName(name: string): string {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-args-url-parsing-onto-connection-url-resolver */
-export function parseSqliteUrl(url: string): string {
+function parseSqliteUrl(url: string): string {
   if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
     const stripped = url.replace(/^sqlite3?:\/\//, "");
     return stripped || ":memory:";

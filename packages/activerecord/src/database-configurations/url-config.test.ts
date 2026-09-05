@@ -101,10 +101,5 @@ describe("DatabaseConfigurations", () => {
       const cfg = new UrlConfig("test", "primary", "foo-bar", { database: "not_foo" });
       expect(cfg.database).toBe("foo-bar");
     });
-
-    it("infers the adapter for a scheme-less sqlite shorthand at build time", () => {
-      expect(new UrlConfig("test", "primary", ":memory:").adapter).toBe("sqlite");
-      expect(new UrlConfig("test", "primary", "test/db/primary.sqlite3").adapter).toBe("sqlite");
-    });
   });
 });

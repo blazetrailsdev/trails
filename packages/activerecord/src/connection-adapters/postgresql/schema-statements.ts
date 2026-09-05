@@ -562,21 +562,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {
     if (columnNumbers.length === 0) return [];
-    if (!Number.isSafeInteger(tableOid)) throw new TypeError("tableOid must be a safe integer");
-    const safeNums = columnNumbers.map((n) => {
-      if (!Number.isSafeInteger(n))
-        throw new TypeError("columnNumbers must contain only safe integers");
-      return n;
-    });
     const rows = await this.query(
       `SELECT a.attnum, a.attname
        FROM pg_attribute a
        WHERE a.attrelid = ${tableOid}
-       AND a.attnum IN (${safeNums.join(", ")})`,
+       AND a.attnum IN (${columnNumbers.join(", ")})`,
       "SCHEMA",
     );
     const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
-    return safeNums.map((n) => map.get(n)).filter((name): name is string => name != null);
+    return columnNumbers.map((n) => map.get(n)).filter((name): name is string => name != null);
   }
 
   override columnsForDistinct(
@@ -1177,14 +1171,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
       : this.quoteColumnName(rangeName);
     const quoteQualifiedIdentifier = (identifier: string, param: string) => {
       if (/[\s()]/.test(identifier)) {
-        throw new Error(
+        throw new ArgumentError(
           `PostgreSQLAdapter#createRange: ${param} must be a simple or schema-qualified identifier ` +
             `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
         );
       }
       const parts = identifier.match(/[^".]+|"[^"]*"/g) ?? [];
       if (parts.length === 0 || parts.length > 2) {
-        throw new Error(
+        throw new ArgumentError(
           `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
         );
       }

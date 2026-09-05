@@ -763,11 +763,13 @@ describe("ConnectionPoolConfiguration query cache", () => {
   });
 
   describe("pin wiring", () => {
-    it("pinConnectionBang increments _pinnedCount; unpinConnectionBang decrements it", async () => {
+    it("pinConnectionBang pins a connection; unpinConnectionBang unpins it", async () => {
       const pool = makeAmbientPool({ pool: 1 });
 
-      const pinnedCount = () =>
-        (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+      const pinnedCount = (): number =>
+        (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
+          ? 1
+          : 0;
 
       try {
         expect(pinnedCount()).toBe(0);
@@ -783,10 +785,12 @@ describe("ConnectionPoolConfiguration query cache", () => {
       }
     });
 
-    it("two concurrent contexts each contribute to _pinnedCount independently", async () => {
+    it("two concurrent contexts each pin a connection independently", async () => {
       const pool = makeAmbientPool({ pool: 2 });
-      const pinnedCount = () =>
-        (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+      const pinnedCount = (): number =>
+        (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
+          ? 1
+          : 0;
 
       try {
         await Promise.all([
@@ -808,7 +812,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       }
     });
 
-    it("decrements _pinnedCount when beginTransaction throws", async () => {
+    it("unpins when beginTransaction throws", async () => {
       const pool = makeAmbientPool({ pool: 1 });
       try {
         const seed = await pool.checkout();
@@ -824,8 +828,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
           enableLazyTransactionsBang() {},
         };
 
-        const pinnedCount = () =>
-          (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+        const pinnedCount = (): number =>
+          (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
+            ? 1
+            : 0;
 
         await withExecutionContext(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
@@ -843,8 +849,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
         pool.checkin(seed);
         vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
 
-        const pinnedCount = () =>
-          (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+        const pinnedCount = (): number =>
+          (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
+            ? 1
+            : 0;
 
         await withExecutionContext(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");

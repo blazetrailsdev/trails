@@ -184,9 +184,10 @@ export class ConnectionPoolConfiguration {
   private _threadQueryCaches = new QueryCacheRegistry();
   private _queryCacheMaxSize: number | null;
   private _queryCacheVersion = { value: 0 };
-  private _pinnedCount = 0;
+  private _pinnedConnection: () => unknown;
 
-  constructor(queryCache?: unknown) {
+  constructor(queryCache?: unknown, pinnedConnection: () => unknown = () => null) {
+    this._pinnedConnection = pinnedConnection;
     if (queryCache === 0 || queryCache === false) {
       this._queryCacheMaxSize = null;
     } else if (typeof queryCache === "number") {
@@ -281,7 +282,7 @@ export class ConnectionPoolConfiguration {
   }
 
   clearQueryCache(): void {
-    if (this._pinnedCount > 0) {
+    if (this._pinnedConnection()) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();
@@ -291,22 +292,6 @@ export class ConnectionPoolConfiguration {
     return this._threadQueryCaches.computeIfAbsent(String(executionContextId()), () => {
       return new Store(this._queryCacheVersion, this._queryCacheMaxSize);
     });
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
-   */
-  incrementPinnedCount(): void {
-    this._pinnedCount++;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
-   */
-  decrementPinnedCount(): void {
-    this._pinnedCount--;
   }
 }
 

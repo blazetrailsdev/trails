@@ -16,7 +16,15 @@ export class ConnectionUrlResolver {
 
     const schemeMatch = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):(\/\/)?(.*)$/);
     if (!schemeMatch) {
-      throw new Error(`Invalid database URL: ${redactUrl(url)}`);
+      if (/^[^/?#]*:/.test(url)) {
+        throw new Error(`Invalid database URL: ${redactUrl(url)}`);
+      }
+      this._adapter = null;
+      this._opaque = null;
+      this._emptyAuthority = true;
+      this._parsed = new URL(`http://placeholder/${url.replace(/^\//, "")}`);
+      this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
+      return;
     }
 
     const scheme = schemeMatch[1].toLowerCase().replace(/-/g, "_");

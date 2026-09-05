@@ -1,4 +1,4 @@
-import { kernelFloat } from "@blazetrails/ruby-compat";
+import { kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 /** @noRailsEquivalent PERMANENT */
@@ -9,6 +9,11 @@ export class PointValue {
   constructor(x: number, y: number) {
     this.x = x;
     this.y = y;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  equals(other: unknown): boolean {
+    return other instanceof PointValue && rbEqual(this.x, other.x) && rbEqual(this.y, other.y);
   }
 }
 
@@ -22,7 +27,7 @@ export class Point extends ValueType<PointValue> {
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    return rawOldValue !== this.serialize(newValue);
+    return !rbEqual(rawOldValue, this.serialize(newValue));
   }
 
   cast(value: unknown): PointValue | null {
