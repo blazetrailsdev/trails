@@ -19,9 +19,10 @@ it("emits decompressible gzip for a multi-chunk body", async () => {
   const [, headers, out] = await deflater.call({ HTTP_ACCEPT_ENCODING: "gzip" });
 
   expect(headers["content-encoding"]).toBe("gzip");
-  const compressed = Buffer.from(out[0] as string, "binary");
-  expect(getZlib().gunzip(compressed).toString()).toBe("chunk1chunk2chunk3");
-  expect(headers["content-length"]).toBe(String(compressed.length));
+  expect(headers["content-length"]).toBeUndefined();
+  const chunks: Uint8Array[] = [];
+  await (out as GzipStream).each((data) => chunks.push(data));
+  expect(getZlib().gunzip(Buffer.concat(chunks)).toString()).toBe("chunk1chunk2chunk3");
 });
 
 it("writes the mtime into the gzip header, as Zlib::GzipWriter#mtime= does", async () => {

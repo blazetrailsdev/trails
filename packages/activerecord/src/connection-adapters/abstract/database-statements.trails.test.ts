@@ -42,6 +42,8 @@ import {
   DatabaseStatements,
   castResult,
   affectedRows,
+  internalExecute,
+  rawExecute,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Transaction, TransactionManager } from "./transaction.js";
@@ -85,6 +87,8 @@ const hostDefaults: Pick<
   | "castResult"
   | "affectedRows"
   | "isWriteQuery"
+  | "internalExecute"
+  | "rawExecute"
 > = {
   currentTransaction: () => TransactionManager.NULL_TRANSACTION,
   withinNewTransaction: async (_options, block) => block() as never,
@@ -99,6 +103,8 @@ const hostDefaults: Pick<
     await fn();
   },
   transaction: async (fn) => fn(),
+  internalExecute,
+  rawExecute,
 };
 
 describe("DatabaseStatements", () => {
@@ -299,18 +305,6 @@ describe("DatabaseStatements", () => {
   });
 
   describe("internalExecQuery", () => {
-    it("throws when binds provided without internalExecute", async () => {
-      const { internalExecQuery } = await import("./database-statements.js");
-      const host = {
-        log,
-        typeCastedBinds,
-        execute: async () => [],
-      } as unknown as DatabaseStatementsHost;
-      await expect(internalExecQuery.call(host, "SELECT ?", "SQL", [1])).rejects.toThrow(
-        "internalExecQuery requires internalExecute",
-      );
-    });
-
     it("delegates to internalExecute when available", async () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
@@ -441,17 +435,6 @@ describe("DatabaseStatements", () => {
       );
       expect(err.sql).toBe("ORIGINAL");
       expect(err.binds).toEqual([99]);
-    });
-
-    it("normalizes execute fallback result", async () => {
-      const { internalExecQuery } = await import("./database-statements.js");
-      const host = {
-        log,
-        typeCastedBinds,
-        execute: async () => [{ id: 1 }],
-      } as unknown as DatabaseStatementsHost;
-      const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
-      expect((result as any).rows).toEqual([[1]]);
     });
   });
 

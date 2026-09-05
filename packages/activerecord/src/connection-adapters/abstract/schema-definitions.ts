@@ -159,7 +159,7 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
 }
 
 export interface ForeignKeyLookupOptions {
-  toTable?: string;
+  toTable?: string | null;
   column?: string | string[];
   name?: string;
   validate?: boolean | null;
@@ -169,76 +169,39 @@ export interface ForeignKeyLookupOptions {
   deferrable?: "immediate" | "deferred" | false;
 }
 
-export type ForeignKeyStoredOptionKey =
-  | "column"
-  | "name"
-  | "primaryKey"
-  | "onDelete"
-  | "onUpdate"
-  | "deferrable";
-
 export class ForeignKeyDefinition {
-  readonly fromTable: string;
-  readonly toTable: string;
-  readonly column: string | string[];
-  readonly primaryKey: string | string[];
-  readonly name: string | undefined;
-  readonly onDelete?: ReferentialAction;
-  readonly onUpdate?: ReferentialAction;
-  readonly deferrable?: "immediate" | "deferred" | false;
-  readonly validate: boolean | null;
-  readonly options: Record<string, unknown>;
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  readonly storesValidate: boolean;
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
-
   constructor(
-    fromTable: string,
-    toTable: string,
-    column: string | string[],
-    primaryKey: string | string[],
-    name: string | undefined,
-    onDelete?: ReferentialAction,
-    onUpdate?: ReferentialAction,
-    deferrable?: "immediate" | "deferred" | false,
-    validate?: boolean | null,
-    storedOptionKeys?: Iterable<ForeignKeyStoredOptionKey>,
-  ) {
-    this.fromTable = fromTable;
-    this.toTable = toTable;
-    this.column = column;
-    this.primaryKey = primaryKey;
-    this.name = name;
-    this.onDelete = onDelete;
-    this.onUpdate = onUpdate;
-    this.deferrable = deferrable;
-    this.storesValidate = validate !== undefined;
-    this.validate = this.storesValidate ? (validate as boolean | null) : true;
-    this.storedOptionKeys = new Set(
-      storedOptionKeys ?? ["column", "name", "primaryKey", "onDelete", "onUpdate", "deferrable"],
-    );
-    this.options = {};
-    for (const key of this.storedOptionKeys) {
-      this.options[key] = (this as unknown as Record<string, unknown>)[key];
-    }
-    if (this.storesValidate) this.options["validate"] = this.validate;
+    readonly fromTable: string,
+    readonly toTable: string,
+    readonly options: Partial<AddForeignKeyOptions>,
+  ) {}
+
+  get name(): string | undefined {
+    return this.options["name"];
+  }
+
+  get column(): string | string[] {
+    return this.options["column"] as string | string[];
+  }
+
+  get primaryKey(): string | string[] {
+    return this.options["primaryKey"] ?? this.defaultPrimaryKey;
+  }
+
+  get onDelete(): ReferentialAction | undefined {
+    return this.options["onDelete"];
+  }
+
+  get onUpdate(): ReferentialAction | undefined {
+    return this.options["onUpdate"];
+  }
+
+  get deferrable(): "immediate" | "deferred" | false | undefined {
+    return this.options["deferrable"];
   }
 
   get isCustomPrimaryKey(): boolean {
-    return this.primaryKey !== this.defaultPrimaryKey;
-  }
-
-  /** @internal */
-  get defaultPrimaryKey(): string {
-    return "id";
+    return this.options["primaryKey"] !== this.defaultPrimaryKey;
   }
 
   /** @missingRailsArgs fetch — PERMANENT */
@@ -255,35 +218,33 @@ export class ForeignKeyDefinition {
     return this.name != null ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
   }
 
-  isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
-    const toArray = (c: unknown): string[] =>
+  isDefinedFor({
+    toTable = null,
+    validate = null,
+    ...options
+  }: ForeignKeyLookupOptions = {}): boolean {
+    const slice: Record<string, unknown> = {};
+    for (const k of Object.keys(this.options)) {
+      if (k in options) slice[k] = (options as Record<string, unknown>)[k];
+    }
+
+    const toStrings = (c: unknown): string[] =>
       c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
-    const optionEqual = (a: unknown, b: unknown): boolean => {
-      const aa = toArray(a);
-      const bb = toArray(b);
-      return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
-    };
-    const stored = (key: ForeignKeyStoredOptionKey): boolean => this.storedOptionKeys.has(key);
+
     return (
-      (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      (options.validate == null || !this.storesValidate || options.validate === this.validate) &&
-      (options.column === undefined ||
-        !stored("column") ||
-        optionEqual(options.column, this.column)) &&
-      (options.name === undefined || !stored("name") || options.name === this.name) &&
-      (options.primaryKey === undefined ||
-        !stored("primaryKey") ||
-        optionEqual(options.primaryKey, this.primaryKey)) &&
-      (options.onDelete === undefined ||
-        !stored("onDelete") ||
-        optionEqual(options.onDelete, this.onDelete)) &&
-      (options.onUpdate === undefined ||
-        !stored("onUpdate") ||
-        optionEqual(options.onUpdate, this.onUpdate)) &&
-      (options.deferrable === undefined ||
-        !stored("deferrable") ||
-        optionEqual(options.deferrable, this.deferrable))
+      (toTable == null || toTable.toString() === this.toTable) &&
+      (validate == null || validate === fetch(this.options, "validate", validate)) &&
+      Object.entries(slice).every(([k, v]) => {
+        const mine = toStrings((this.options as Record<string, unknown>)[k]);
+        const theirs = toStrings(v);
+        return mine.length === theirs.length && mine.every((x, i) => x === theirs[i]);
+      })
     );
+  }
+
+  /** @internal */
+  get defaultPrimaryKey(): string {
+    return "id";
   }
 }
 
@@ -1008,25 +969,11 @@ export class TableDefinition {
   ): ForeignKeyDefinition {
     const prefix = this.conn.tableNamePrefix ?? globalTableNamePrefix();
     const suffix = this.conn.tableNameSuffix ?? globalTableNameSuffix();
-    const prefixedToTable = `${prefix}${toTable}${suffix}`;
-    const opts = this.conn.foreignKeyOptions(this.name, prefixedToTable, { ...options });
-    const storedOptionKeys: ForeignKeyStoredOptionKey[] = ["column", "name"];
-    if (options.primaryKey !== undefined) storedOptionKeys.push("primaryKey");
-    if (options.onDelete !== undefined) storedOptionKeys.push("onDelete");
-    if (options.onUpdate !== undefined) storedOptionKeys.push("onUpdate");
-    if (options.deferrable !== undefined) storedOptionKeys.push("deferrable");
-    return new ForeignKeyDefinition(
-      this.name,
-      prefixedToTable,
-      opts.column as string | string[],
-      (opts.primaryKey as string | string[] | undefined) ?? "id",
-      opts.name as string,
-      opts.onDelete as ReferentialAction | undefined,
-      opts.onUpdate as ReferentialAction | undefined,
-      opts.deferrable as "immediate" | "deferred" | false | undefined,
-      opts.validate as boolean | undefined,
-      storedOptionKeys,
-    );
+    toTable = `${prefix}${toTable}${suffix}`;
+    options = this.conn.foreignKeyOptions(this.name, toTable, {
+      ...options,
+    }) as Partial<AddForeignKeyOptions>;
+    return new ForeignKeyDefinition(this.name, toTable, options);
   }
 
   newCheckConstraintDefinition(

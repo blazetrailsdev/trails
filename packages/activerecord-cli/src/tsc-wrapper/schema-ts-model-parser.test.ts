@@ -87,7 +87,7 @@ describe("parseSchemaForModels", () => {
     expect(fk.toTable).toBe("authors");
     expect(fk.column).toBe("author_id");
     expect(fk.primaryKey).toBe("id");
-    expect(fk.validate).toBe(true);
+    expect(fk.isValidate).toBe(true);
   });
 
   it("infers the FK column from the Rails convention when the option is absent", () => {
@@ -132,7 +132,7 @@ describe("parseSchemaForModels", () => {
     expect(fk.column).toBe("post_id");
     expect(fk.primaryKey).toBe("uuid");
     expect(fk.onDelete).toBe("cascade");
-    expect(fk.validate).toBe(false);
+    expect(fk.isValidate).toBe(false);
   });
 
   it("handles multiple tables with cross-table foreign keys", () => {

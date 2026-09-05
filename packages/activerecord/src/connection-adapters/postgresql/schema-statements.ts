@@ -876,17 +876,22 @@ export class SchemaStatements extends AbstractSchemaStatements {
           column = Utils.unquoteIdentifier(row.column as string);
           primaryKey = row.primary_key as string;
         }
-        return new ForeignKeyDefinition(
-          tableName,
-          toTable,
+        const options: Partial<AddForeignKeyOptions> = {
           column,
+          name: row.name as string,
           primaryKey,
-          row.name as string,
-          this.extractForeignKeyAction(row.on_delete as string),
-          this.extractForeignKeyAction(row.on_update as string),
-          this.extractConstraintDeferrable(row.deferrable as boolean, row.deferred as boolean),
-          (row.valid as boolean) ?? true,
+        };
+
+        options.onDelete = this.extractForeignKeyAction(row.on_delete as string);
+        options.onUpdate = this.extractForeignKeyAction(row.on_update as string);
+        options.deferrable = this.extractConstraintDeferrable(
+          row.deferrable as boolean,
+          row.deferred as boolean,
         );
+
+        options.validate = row.valid as boolean;
+
+        return new ForeignKeyDefinition(tableName, toTable, options);
       }),
     );
   }

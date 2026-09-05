@@ -74,7 +74,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async visitAddForeignKey(o: ForeignKeyDefinition): Promise<string> {
     let sql = await super.visitAddForeignKey(o);
-    if (!o.validate) sql += " NOT VALID";
+    if (!o.isValidate) sql += " NOT VALID";
     return sql;
   }
 

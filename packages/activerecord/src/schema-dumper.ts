@@ -909,7 +909,11 @@ export abstract class SchemaDumper {
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
       if (fk.deferrable !== undefined && fk.deferrable !== false)
         opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
-      if (fk.validate === false) opts.push("validate: false");
+      const isValidate =
+        "isValidate" in (fk as object)
+          ? (fk as unknown as { isValidate: boolean | null }).isValidate
+          : fk.validate;
+      if (isValidate == null || isValidate === false) opts.push("validate: false");
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }

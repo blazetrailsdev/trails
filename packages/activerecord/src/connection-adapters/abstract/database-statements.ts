@@ -90,7 +90,7 @@ export interface DatabaseStatementsHost {
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result>;
   /** @internal */
-  internalExecute?(
+  internalExecute(
     sql: string,
     name?: string | null,
     binds?: unknown[],
@@ -110,7 +110,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   dirtyCurrentTransaction(): void;
   /** @internal */
-  rawExecute?(
+  rawExecute(
     sql: string,
     name?: string | null,
     binds?: unknown[],
@@ -714,20 +714,18 @@ export async function rawExecQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  if (!this.rawExecute) {
-    throw new Error("rawExecQuery requires rawExecute on the adapter");
-  }
-  const rawResult = await this.rawExecute(
-    sql,
-    name,
-    binds,
-    opts?.prepare ?? false,
-    opts?.async ?? false,
-    opts?.allowRetry ?? false,
-    opts?.materializeTransactions ?? true,
-    opts?.batch ?? false,
+  return this.castResult(
+    await this.rawExecute(
+      sql,
+      name,
+      binds,
+      opts?.prepare ?? false,
+      opts?.async ?? false,
+      opts?.allowRetry ?? false,
+      opts?.materializeTransactions ?? true,
+      opts?.batch ?? false,
+    ),
   );
-  return this.castResult(rawResult);
 }
 
 export async function internalExecQuery(
@@ -737,45 +735,13 @@ export async function internalExecQuery(
   binds?: unknown[],
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
-  if (this?.internalExecute) {
-    const rawResult = await this.internalExecute(sql, name, binds, {
+  return this.castResult(
+    await this.internalExecute(sql, name, binds, {
       prepare: options?.prepare,
       allowRetry: options?.allowRetry,
       materializeTransactions: options?.materializeTransactions,
-    });
-    return this.castResult(rawResult);
-  }
-  if (binds && binds.length > 0) {
-    throw new Error(
-      "internalExecQuery requires internalExecute on the adapter when binds are provided",
-    );
-  }
-  const result = await (this.execute ?? execute).call(this, sql, name);
-  return normalizeResult(result);
-}
-
-function normalizeResult(result: unknown): Result {
-  if (result instanceof Result) return result;
-  if (
-    typeof result === "object" &&
-    result !== null &&
-    "rows" in result &&
-    Array.isArray((result as any).rows)
-  ) {
-    const r = result as { rows: unknown[][]; columns?: string[] };
-    return new Result(r.columns ?? [], r.rows);
-  }
-  if (Array.isArray(result)) {
-    if (result.length === 0) return new Result([], []);
-    const first = result[0];
-    const isHashRow = typeof first === "object" && first !== null && !Array.isArray(first);
-    if (isHashRow) {
-      return Result.fromRowHashes(result as Record<string, unknown>[]);
-    }
-    const rows = result.map((row) => (Array.isArray(row) ? row : [row]));
-    return new Result([], rows);
-  }
-  return new Result([], []);
+    }),
+  );
 }
 
 /** @internal */

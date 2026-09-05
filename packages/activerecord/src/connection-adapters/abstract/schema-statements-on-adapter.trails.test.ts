@@ -210,7 +210,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
       foreignKeys(_table: string) {
         return Promise.resolve([
-          new ForeignKeyDefinition("products", "other", "other_id", "id", "real_fk_name"),
+          new ForeignKeyDefinition("products", "other", {
+            column: "other_id",
+            primaryKey: "id",
+            name: "real_fk_name",
+          }),
         ]);
       }
     }
