@@ -59,6 +59,7 @@ export class CollectionAssociation extends Association {
     return this.replace(records);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   syncWrite(records: Base[]): void {
     for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
     if (
@@ -71,6 +72,7 @@ export class CollectionAssociation extends Association {
     this.replace(records) as Base[];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   syncIdsWrite(_ids: unknown[]): never {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }

@@ -103,6 +103,7 @@ export function association(this: Base, name: string): AssociationInstance {
   return instance;
 }
 
+/** @noRailsEquivalent CONVERGEABLE retire-load-belongs-to-and-load-has-one */
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
@@ -111,6 +112,7 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
   return result as Base | null;
 }
 
+/** @noRailsEquivalent CONVERGEABLE retire-load-belongs-to-and-load-has-one */
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "hasOne");
   const result = await bypassStrictLoading.call(this, () =>

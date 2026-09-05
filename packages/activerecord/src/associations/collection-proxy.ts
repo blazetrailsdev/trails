@@ -294,6 +294,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ) as T | T[];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
   new(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
   new(

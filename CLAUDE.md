@@ -690,13 +690,20 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Eight instances exist and are the only ones:
+where Ruby resolves the constant. Nine instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
   `key-generator.ts`.
 - `activerecord/src/associations/collection-proxy-slot.ts` — the
   `CollectionProxy` ctor, read by `associations.ts`.
+- `activerecord/src/associations/_scope-slots.ts` — the `AssociationRelation`
+  factory and the `DisableJoinsAssociationScope` builder, read by
+  `associations/association.ts` for `Association#scope`
+  (`associations/association.rb:107-115,312-314`). The cycles are closed by
+  `class AssociationRelation extends Relation` (`association-relation.ts`) and by
+  `disable-joins-association-scope.ts`, so `association.ts` cannot import either
+  back.
 - `activemodel/src/attribute/user-provided-default-slot.ts` — the
   `UserProvidedDefault` ctor, read by `attribute.ts` for
   `Attribute#with_user_default` (`activemodel/lib/active_model/attribute/user_provided_default.rb:7-9`).

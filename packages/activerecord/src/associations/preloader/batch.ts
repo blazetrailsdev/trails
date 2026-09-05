@@ -101,7 +101,7 @@ export class Batch {
 
   private async groupAndLoadSimilar(loaders: Association[]): Promise<void> {
     const nonThroughLoaders = loaders.filter((l) => !(l instanceof ThroughAssociation));
-    const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hashKey());
+    const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hash());
     for (const similarLoaders of groups.values()) {
       const query = similarLoaders[0].loaderQuery();
       await query.loadRecordsInBatch(similarLoaders);
