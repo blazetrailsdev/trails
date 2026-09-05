@@ -67,31 +67,66 @@ export class Session {
     this.clearCookies();
   }
 
-  get(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  get(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("GET", uri, params, env, block);
   }
 
-  post(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  post(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("POST", uri, params, env, block);
   }
 
-  put(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  put(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("PUT", uri, params, env, block);
   }
 
-  patch(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  patch(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("PATCH", uri, params, env, block);
   }
 
-  delete(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  delete(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("DELETE", uri, params, env, block);
   }
 
-  options(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  options(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("OPTIONS", uri, params, env, block);
   }
 
-  head(uri: string, params: unknown = {}, env: RackEnv = {}, block?: ResponseBlock) {
+  head(
+    uri: string,
+    params: unknown = {},
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
     return this.customRequest("HEAD", uri, params, env, block);
   }
 
@@ -159,20 +194,28 @@ export class Session {
   authorize = this.basicAuthorize;
 
   /** @internal */
-  private closeBody(_body: unknown): void {}
+  // eslint-disable-next-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.
+  private closeBody(body: unknown): void {}
 
   /** @internal */
   private parseUri(path: string, env: RackEnv): Generic {
     const uri = URI.parse(path);
-    if (!(uri.path ?? "").startsWith("/")) uri.path = `/${uri.path ?? ""}`;
+    if (!uri.path!.startsWith("/")) uri.path = `/${uri.path}`;
     uri.host ??= this.defaultHost;
-    if (uri.scheme == null && env["HTTPS"] === "on") uri.scheme = "https";
+    if (env["HTTPS"] === "on") uri.scheme ??= "https";
     return uri;
   }
 
   /** @internal */
+  private static readonly DEFAULT_ENV: RackEnv = {
+    "rack.test": true,
+    REMOTE_ADDR: "127.0.0.1",
+    SERVER_PROTOCOL: "HTTP/1.0",
+  };
+
+  /** @internal */
   private envFor(uri: Generic, env: RackEnv): RackEnv {
-    env = { ...DEFAULT_ENV, ...this._env, ...env };
+    env = { ...Session.DEFAULT_ENV, ...this._env, ...env };
 
     env["HTTP_HOST"] ??= [uri.host, uri.port !== uri.defaultPort ? uri.port : null]
       .filter((part) => part != null)
@@ -185,7 +228,7 @@ export class Session {
 
     let params = env[":params"];
     delete env[":params"];
-    const queryArray: Array<string | null | undefined> = [uri.query];
+    let queryArray: Array<string | null | undefined> = [uri.query];
 
     if (env["REQUEST_METHOD"] === "GET") {
       if (params != null && params !== false) {
@@ -224,7 +267,9 @@ export class Session {
     if (queryParams != null && queryParams !== false) {
       this.appendQueryParams(queryArray, queryParams);
     }
-    uri.query = queryArray.filter((q) => q != null && q !== "").join("&");
+    queryArray = queryArray.filter((q) => q != null);
+    queryArray = queryArray.filter((q) => q !== "");
+    uri.query = queryArray.join("&");
 
     if (":cookie" in env) {
       const cookie = env[":cookie"];
@@ -265,17 +310,17 @@ export class Session {
   ): Promise<MockResponse> {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
-    const [status, headers, body] = await this.app(env);
-    const chunks: string[] = [];
-    for await (const chunk of body) chunks.push(String(chunk));
+    const [status, headers, rackBody] = await this.app(env);
+    const body: string[] = [];
+    for await (const chunk of rackBody) body.push(String(chunk));
 
     this._lastResponse = new MockResponse(
       status,
       headers,
-      chunks,
-      (env["rack.errors"] as { flush(): unknown } | undefined)?.flush(),
+      body,
+      (env["rack.errors"] as { flush(): unknown }).flush(),
     );
-    this.closeBody(body);
+    this.closeBody(rackBody);
     this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
     this._afterRequest.forEach((hook) => hook());
     this._lastResponse.finish();
@@ -285,13 +330,6 @@ export class Session {
     return this._lastResponse;
   }
 }
-
-/** @internal */
-const DEFAULT_ENV: RackEnv = {
-  "rack.test": true,
-  REMOTE_ADDR: "127.0.0.1",
-  SERVER_PROTOCOL: "HTTP/1.0",
-};
 
 export function encodingAwareStrings(): boolean {
   return release() >= "1.6";
