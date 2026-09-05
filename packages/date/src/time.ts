@@ -862,6 +862,44 @@ export class Time {
     );
   }
 
+  /**
+   * `vendor/ruby/lib/time.rb:620-653` — parses `time` as a dateTime defined by
+   * the XML Schema and converts it to a Time object. Aliased as `iso8601`.
+   */
+  static xmlschema(time: string): Time {
+    const m =
+      /^\s*(-?\d+)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?(Z|[+-]\d\d(?::?\d\d)?)?\s*$/i.exec(
+        time,
+      );
+    if (m != null) {
+      let year = Number(m[1]);
+      let mon = Number(m[2]);
+      let day = Number(m[3]);
+      let hour = Number(m[4]);
+      let min = Number(m[5]);
+      let sec = Number(m[6]);
+      let usec: number | Rational = 0;
+      if (m[7] != null) {
+        const digits = m[7].slice(1);
+        usec = new Rational(BigInt(digits), 10n ** BigInt(digits.length)).mul(1000000);
+      }
+      if (m[8] != null) {
+        const zone = m[8];
+        const off = Time.zoneOffset(zone);
+        [year, mon, day, hour, min, sec] = Time.#applyOffset(year, mon, day, hour, min, sec, off!);
+        const t = Time.utc(year, mon, day, hour, min, sec, usec);
+        return Time.#forceZone(t, zone, off);
+      } else {
+        return Time.local(year, mon, day, hour, min, sec, usec);
+      }
+    } else {
+      throw new ArgumentError(`invalid xmlschema format: ${stringInspect(time)}`);
+    }
+  }
+
+  /** `vendor/ruby/lib/time.rb:653` */
+  declare static iso8601: (time: string) => Time;
+
   constructor(
     year: number | string,
     month: number | string | null = 1,
@@ -1174,4 +1212,5 @@ export class Time {
   }
 }
 
+Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;

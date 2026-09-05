@@ -2,10 +2,10 @@ import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { MessagePack } from "../message-pack/index.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
-import { ArgumentError, SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
+import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
 export interface MetadataOptions {
   expiresAt?: Temporal.Instant | null;
@@ -157,21 +157,13 @@ export abstract class Metadata {
     return expiry;
   }
 
-  /**
-   * @missingRailsCall iso8601 — PERMANENT
-   * @missingRailsCall parse — CONVERGEABLE wire-messages-metadata-parse-expiry-onto-time-parse
-   */
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
       return expiresAt;
     } else if (Encoding.useStandardJsonTimeFormat) {
-      return Temporal.Instant.from(expiresAt);
+      return Time.iso8601(expiresAt).toTime().toInstant();
     } else {
-      // boundary: pending wire-messages-metadata-parse-expiry-onto-time-parse, which lands Time.parse here
-      const parsed = new Date(expiresAt).getTime();
-      if (Number.isNaN(parsed))
-        throw new ArgumentError(`no time information in ${JSON.stringify(expiresAt)}`);
-      return Temporal.Instant.fromEpochMilliseconds(parsed);
+      return Time.parse(expiresAt).toTime().toInstant();
     }
   }
 
