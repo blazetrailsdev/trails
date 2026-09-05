@@ -1,7 +1,7 @@
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
@@ -162,10 +162,16 @@ export class TimeZoneConverter extends ValueType<unknown> {
   private convertTimeToTimeZone(value: unknown): unknown {
     if (value == null) return null;
 
-    if (value instanceof TimeWithZone || value instanceof Temporal.Instant) {
+    if (
+      value instanceof TimeWithZone ||
+      value instanceof Temporal.Instant ||
+      value instanceof RubyTime
+    ) {
       const zone = timeZone();
       if (!zone) return value;
-      return value instanceof TimeWithZone ? value.inTimeZone(zone) : new TimeWithZone(value, zone);
+      return value instanceof TimeWithZone
+        ? value.inTimeZone(zone)
+        : new TimeWithZone(value instanceof RubyTime ? value.toTime().toInstant() : value, zone);
     }
     if (typeof value === "number" && !Number.isFinite(value)) return value;
 

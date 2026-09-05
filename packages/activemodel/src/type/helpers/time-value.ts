@@ -156,12 +156,13 @@ export const TimeValue = {
 
 function toTime(value: unknown): TimeWithZone | Time {
   if (value instanceof TimeWithZone || value instanceof Time) return value;
-  if (value instanceof Temporal.Instant) return timeAt(value).getutc();
-  if (value instanceof Temporal.ZonedDateTime) return timeAt(value.toInstant()).getutc();
+  // boundary: a JS `Date` is one of the values `acts_like?(:time)` admits.
+  if (value instanceof Date) return timeAt(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
   if (value instanceof Temporal.PlainDateTime) {
     return timeAt(value.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant());
   }
-  return timeAt(Temporal.Instant.fromEpochMilliseconds((value as Date).getTime()));
+  if (value instanceof Temporal.ZonedDateTime) return timeAt(value.toInstant()).getutc();
+  return timeAt(value as Temporal.Instant).getutc();
 }
 
 function timeAt(value: Temporal.Instant): Time {
