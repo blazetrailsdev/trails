@@ -19,6 +19,19 @@ const RESERVED = ";/?:@&=+$,\\[\\]";
 const DOMLABEL = `(?:[${ALNUM}](?:[-${ALNUM}]*[${ALNUM}])?)`;
 const TOPLABEL = `(?:[${ALPHA}](?:[-${ALNUM}]*[${ALNUM}])?)`;
 
+/**
+ * Ruby's possessive `\A\s*+` (`vendor/ruby/lib/uri/rfc2396_parser.rb:500-501`)
+ * as JS spells an atomic group: a lookahead that captures what it matched
+ * followed by an immediate backreference, which matches once and never gives
+ * any of it back. Without it the leading run is retried at every offset and a
+ * non-matching whitespace-prefixed string costs quadratic time where MRI's is
+ * linear. The wrapper is itself a capturing group, so the components `split`
+ * reads start at {@link COMPONENT_GROUP_START} rather than 1.
+ */
+const ATOMIC_LEADING_SPACE = "(?=(\\s*))\\1";
+
+const COMPONENT_GROUP_START = 2;
+
 /** `initialize_pattern`'s `opts` (`vendor/ruby/lib/uri/rfc2396_parser.rb:338-345`). */
 export interface RFC2396ParserOptions {
   ESCAPED?: string;
@@ -200,8 +213,8 @@ export class RFC2396Parser {
   private initializeRegexp(pattern: Record<string, string>): Record<string, RegExp> {
     const ret: Record<string, RegExp> = {};
 
-    ret.ABS_URI = new RegExp(`^\\s*${pattern.X_ABS_URI}\\s*$`);
-    ret.REL_URI = new RegExp(`^\\s*${pattern.X_REL_URI}\\s*$`);
+    ret.ABS_URI = new RegExp(`^${ATOMIC_LEADING_SPACE}${pattern.X_ABS_URI}\\s*$`);
+    ret.REL_URI = new RegExp(`^${ATOMIC_LEADING_SPACE}${pattern.X_REL_URI}\\s*$`);
 
     ret.URI_REF = new RegExp(pattern.URI_REF);
     ret.ABS_URI_REF = new RegExp(pattern.X_ABS_URI);
@@ -243,6 +256,6 @@ export class RFC2396Parser {
 
 function group(m: RegExpExecArray, n: number): (string | null)[] {
   const out: (string | null)[] = [];
-  for (let i = 1; i <= n; i++) out.push(m[i] ?? null);
+  for (let i = 0; i < n; i++) out.push(m[COMPONENT_GROUP_START + i] ?? null);
   return out;
 }

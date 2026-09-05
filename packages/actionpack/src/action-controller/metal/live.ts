@@ -17,7 +17,7 @@ interface LiveResponseLike {
   headers: Headers;
   setHeader(key: string, value: string): void;
   deleteHeader(key: string): void;
-  close?(): void;
+  commitBang(): void;
 }
 
 type ErrorCallback = () => void;
@@ -72,9 +72,7 @@ export class Buffer {
   }
 
   close(): void {
-    if (typeof (this._response as { close?: () => void }).close === "function") {
-      (this._response as { close: () => void }).close();
-    }
+    this._response.commitBang();
     this._closed = true;
     this._buf.push(null);
   }
@@ -171,11 +169,6 @@ export class SSE {
 
 export class Response extends DispatchResponse {
   declare stream: Buffer;
-
-  constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
-    super(status, headers, body);
-    this.stream = this.buildBuffer(this, body);
-  }
 
   close(): void {
     this.beforeCommitted();
