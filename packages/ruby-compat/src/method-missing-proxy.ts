@@ -1,10 +1,21 @@
 import { NoMethodError } from "./no-method-error.js";
 
 /**
- * Names JS itself probes for on an arbitrary object to decide whether it
- * implements a protocol — `await x` reads `then`, structured comparison reads
- * `toJSON`, vitest's matchers read `asymmetricMatch`/`$$typeof`. A raising
- * function in those slots would be *called* by the probe, so they stay absent.
+ * Names a probe reads off an arbitrary object and then *calls*, where Ruby's
+ * `method_missing` is never reached. Two kinds:
+ *
+ * - what JS itself probes to decide whether an object implements a protocol —
+ *   `await x` reads `then`, structured comparison reads `toJSON`, vitest's
+ *   matchers read `asymmetricMatch`/`$$typeof`;
+ * - what Ruby answers from `Object` itself, so the send resolves before
+ *   `method_missing`: `Object#blank?` (`activesupport/lib/active_support/core_ext/object/blank.rb:16-18`)
+ *   is a real public method on every object, and it in turn asks
+ *   `respond_to?(:empty?)` — trails spells both as the free functions `isBlank`
+ *   / `isEmpty`, which read the member off the receiver instead.
+ *
+ * A raising function in those slots would be *called* by the probe, so they
+ * stay absent. A name the delegate really answers is forwarded before this set
+ * is consulted, so nothing real is suppressed.
  *
  * @noRailsEquivalent PERMANENT — the same language shortcoming as
  * {@link methodMissingProxy} below, which this set exists for and which spells
@@ -22,6 +33,9 @@ export const PROTOCOL_PROBES = new Set([
   "asymmetricMatch",
   "$$typeof",
   "nodeType",
+  "isBlank",
+  "isEmpty",
+  "empty",
 ]);
 
 /**

@@ -11,7 +11,7 @@ export class Cascade {
     for (const s of cascadeFor) this.cascadeFor[s] = true;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     if (this.apps.length === 0) {
       return [404, { [CONTENT_TYPE]: "text/plain" }, []];
     }

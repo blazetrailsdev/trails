@@ -145,7 +145,7 @@ export class SSL {
   }
 
   /** @internal */
-  private setHstsHeaderBang(headers: Record<string, string>): void {
+  private setHstsHeaderBang(headers: Record<string, string | string[]>): void {
     if (headers["strict-transport-security"]) return;
     headers["strict-transport-security"] = this.buildHstsHeader();
   }
@@ -159,12 +159,12 @@ export class SSL {
   }
 
   /** @internal */
-  private flagCookiesAsSecureBang(headers: Record<string, string>): void {
+  private flagCookiesAsSecureBang(headers: Record<string, string | string[]>): void {
     const cookies = headers["set-cookie"];
     if (!cookies) return;
-    headers["set-cookie"] = cookies
-      .split("\n")
-      .map((cookie) => (/;\s*secure\s*(;|$)/i.test(cookie) ? cookie : `${cookie}; secure`))
-      .join("\n");
+
+    headers["set-cookie"] = [cookies]
+      .flat()
+      .map((cookie) => (!/;\s*secure\s*(;|$)/i.test(cookie) ? `${cookie}; secure` : cookie));
   }
 }

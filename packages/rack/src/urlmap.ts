@@ -40,7 +40,7 @@ export class URLMap {
     });
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const pathInfo = (env[PATH_INFO] || "").toString();
     const scriptName = (env[SCRIPT_NAME] || "").toString();
     const serverName = (env[SERVER_NAME] || "").toString();

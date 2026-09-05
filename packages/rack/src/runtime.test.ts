@@ -40,7 +40,7 @@ it("allow multiple timers to be set", async () => {
   const [, headers] = await outer.call(request());
   expect(headers["x-runtime-app"]).toMatch(/[\d.]+/);
   expect(headers["x-runtime-all"]).toMatch(/[\d.]+/);
-  expect(parseFloat(headers["x-runtime-all"])).toBeGreaterThan(
-    parseFloat(headers["x-runtime-app"]),
+  expect(parseFloat(String(headers["x-runtime-all"]))).toBeGreaterThan(
+    parseFloat(String(headers["x-runtime-app"])),
   );
 });

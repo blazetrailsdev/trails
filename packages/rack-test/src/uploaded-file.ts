@@ -11,6 +11,29 @@ import {
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
+export interface UploadedFile {
+  /** @noRailsEquivalent PERMANENT */
+  readonly size: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly pos: number;
+  /** @noRailsEquivalent PERMANENT */
+  read(): string;
+  /** @noRailsEquivalent PERMANENT */
+  rewind(): number;
+  /** @noRailsEquivalent PERMANENT */
+  setEncoding(extEnc: Encoding | string): File | StringIO;
+  /** @noRailsEquivalent PERMANENT */
+  binmode(): File | StringIO;
+  /** @noRailsEquivalent PERMANENT */
+  isEof(): boolean;
+  /** @noRailsEquivalent PERMANENT */
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): string;
+  /** @noRailsEquivalent PERMANENT */
+  close(): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class UploadedFile {
   originalFilename: string | null;
 

@@ -11,7 +11,7 @@ export class Runtime {
     if (name) this.headerName += `-${String(name).toLowerCase()}`;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const startTime = clockTime();
     const response = await this.app(env);
     const [, headers] = response;

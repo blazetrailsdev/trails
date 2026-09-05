@@ -22,7 +22,7 @@ export class AbstractHandler {
 
   protected unauthorized(
     wwwAuthenticate = this.challenge(),
-  ): [number, Record<string, string>, any] {
+  ): [number, Record<string, string | string[]>, any] {
     return [
       401,
       { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "0", "www-authenticate": wwwAuthenticate },
@@ -30,7 +30,7 @@ export class AbstractHandler {
     ];
   }
 
-  protected badRequest(): [number, Record<string, string>, any] {
+  protected badRequest(): [number, Record<string, string | string[]>, any] {
     return [400, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "0" }, []];
   }
 }

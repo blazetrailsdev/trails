@@ -15,7 +15,7 @@ export class ETag {
     this.cacheControl = arguments.length < 3 ? DEFAULT_CACHE_CONTROL : (cacheControl ?? null);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const response = await this.app(env);
     const [status, headers, body] = response;
 
@@ -46,7 +46,7 @@ export class ETag {
   }
 
   /** @internal */
-  private skipCaching(headers: Record<string, string>): boolean {
+  private skipCaching(headers: Record<string, string | string[]>): boolean {
     return ETAG in headers || "last-modified" in headers;
   }
 

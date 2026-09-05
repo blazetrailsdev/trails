@@ -76,7 +76,7 @@ export class Middleware {
       : CONTENT_SECURITY_POLICY;
   }
 
-  private policyPresent(headers: Record<string, string>): boolean {
+  private policyPresent(headers: Record<string, string | string[]>): boolean {
     return (
       headers[CONTENT_SECURITY_POLICY] != null ||
       headers[CONTENT_SECURITY_POLICY_REPORT_ONLY] != null

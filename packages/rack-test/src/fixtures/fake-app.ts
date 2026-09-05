@@ -29,7 +29,7 @@ export class FakeApp {
     for (const s of b) length += textEncoder.encode(s).length;
     h["content-length"] = String(length);
     h["content-type"] = "text/html;charset=utf-8";
-    return [status, h as Record<string, string>, eachBody(b)];
+    return [status, h, eachBody(b)];
   }
 
   /** @internal */

@@ -8,7 +8,7 @@ export class TempfileReaper {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     env[RACK_TEMPFILES] = env[RACK_TEMPFILES] || [];
 
     if (Array.isArray(env["rack.response_finished"])) {
@@ -17,7 +17,7 @@ export class TempfileReaper {
       });
     }
 
-    let response: [number, Record<string, string>, any];
+    let response: [number, Record<string, string | string[]>, any];
     try {
       response = await this.app(env);
     } catch (e) {

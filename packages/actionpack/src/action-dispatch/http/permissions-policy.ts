@@ -41,7 +41,7 @@ export class Middleware {
     return response;
   }
 
-  private policyPresent(headers: Record<string, string>): boolean {
+  private policyPresent(headers: Record<string, string | string[]>): boolean {
     return headers[FEATURE_POLICY] != null;
   }
 

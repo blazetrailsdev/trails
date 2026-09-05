@@ -199,8 +199,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     ]);
   });
 
-  it.skip("builds nested multipart bodies with arbitrarily nested array of hashes", () => {
-    // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
+  it("builds nested multipart bodies with arbitrarily nested array of hashes", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
     const data = Utils.buildMultipart({
       files: files,
@@ -248,8 +247,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     expect(params["bar"][0]).toEqual({ qux: "2" });
   });
 
-  it.skip("allows for nested files", () => {
-    // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
+  it("allows for nested files", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
     const data = Utils.buildMultipart({
       foo: [
@@ -271,8 +269,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     ).toBeNull();
   });
 
-  it.skip("allows for forcing multipart uploads even without a file", () => {
-    // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
+  it("allows for forcing multipart uploads even without a file", () => {
     const data = Utils.buildMultipart({ foo: [{ id: "2", data: ["3", "4"] }] }, true, true)!;
 
     const params = parseData(data);

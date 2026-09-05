@@ -9,7 +9,7 @@ export class Config {
     this.block = block;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     this.block(env);
     return this.app(env);
   }

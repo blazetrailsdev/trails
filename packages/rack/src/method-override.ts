@@ -21,7 +21,7 @@ export class MethodOverride {
     return ALLOWED_METHODS;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     if (ALLOWED_METHODS.includes(env[REQUEST_METHOD])) {
       const method = this.methodOverride(env);
       if (method && HTTP_METHODS.includes(method)) {
