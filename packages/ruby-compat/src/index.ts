@@ -163,6 +163,7 @@ export { setVerbose, verbose } from "./verbose.js";
 export { Zlib } from "./zlib.js";
 export {
   BadURIError,
+  DEFAULT_PARSER,
   Generic,
   HTTP,
   HTTPS,

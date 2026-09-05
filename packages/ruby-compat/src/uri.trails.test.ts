@@ -6,6 +6,7 @@ import {
   HTTP,
   HTTPS,
   InvalidComponentError,
+  DEFAULT_PARSER,
   InvalidURIError,
   RFC2396_PARSER,
   URI,
@@ -125,5 +126,78 @@ describe("URI::RFC2396_Parser#escape", () => {
 
   it("takes a String unsafe set as well as a Regexp", () => {
     expect(RFC2396_PARSER.escape("a@b:c/d", "@:/")).toBe("a%40b%3Ac%2Fd");
+  });
+});
+
+describe("URI::RFC2396_Parser#split", () => {
+  it("splits an absolute URI against regexp[:ABS_URI]", () => {
+    const abs = ["http", null, "a.example.com", "8080", null, "/p", null, "q", "f"];
+    expect(DEFAULT_PARSER.split("http://a.example.com:8080/p?q#f")).toEqual(abs);
+  });
+
+  it("splits an opaque URI into the opaque slot", () => {
+    const opaque = ["mailto", null, null, null, null, null, "x@y.com", null, null];
+    expect(DEFAULT_PARSER.split("mailto:x@y.com")).toEqual(opaque);
+  });
+
+  it("raises InvalidURIError on a string that is not a URI", () => {
+    expect(() => DEFAULT_PARSER.split("http://")).toThrow(InvalidURIError);
+  });
+
+  it("parses through URI.for, answering the registered scheme class", () => {
+    expect(DEFAULT_PARSER.parse("http://example.com/x")).toBeInstanceOf(HTTP);
+  });
+});
+
+describe("URI::Generic with the default parser", () => {
+  function generic(): Generic {
+    return new Generic(null, null, null, null, null, null, null, null, null);
+  }
+
+  it("defaults its parser to DEFAULT_PARSER", () => {
+    expect(generic().parser).toBe(DEFAULT_PARSER);
+  });
+
+  it("checks scheme= against regexp[:SCHEME]", () => {
+    const u = generic();
+    u.scheme = "http";
+    expect(u.scheme).toBe("http");
+    expect(() => (u.scheme = "1bad")).toThrow(
+      new InvalidComponentError("bad component(expected scheme component): 1bad"),
+    );
+  });
+
+  it("checks host= against regexp[:HOST]", () => {
+    const u = generic();
+    u.host = "example.com";
+    expect(u.host).toBe("example.com");
+    expect(() => (u.host = "bad host")).toThrow(
+      new InvalidComponentError("bad component(expected host component): bad host"),
+    );
+  });
+
+  it("checks port= against regexp[:PORT]", () => {
+    const u = generic();
+    u.port = "8080";
+    expect(u.port).toBe(8080);
+    expect(() => (u.port = "80a")).toThrow(
+      new InvalidComponentError('bad component(expected port component): "80a"'),
+    );
+  });
+
+  it("checks path= against regexp[:ABS_PATH] and regexp[:REL_PATH]", () => {
+    const u = generic();
+    u.scheme = "http";
+    u.path = "/a/b";
+    expect(u.path).toBe("/a/b");
+    expect(() => (u.path = "rel")).toThrow(
+      new InvalidComponentError("bad component(expected absolute path component): rel"),
+    );
+  });
+
+  it("checks fragment= against regexp[:FRAGMENT]", () => {
+    const u = generic();
+    u.fragment = "x";
+    expect(u.fragment).toBe("x");
   });
 });

@@ -270,7 +270,7 @@ describe("MetalControllerInstanceTests", () => {
     c.responseBody = "hello";
     expect(c.responseBody).toBe("hello");
     expect(c.response.body).toBe("hello");
-    expect(c.isPerformed()).toBe(true);
+    expect(c.performed).toBe(true);
   });
 
   it("responseBody= accepts array form", () => {
@@ -286,16 +286,6 @@ describe("MetalControllerInstanceTests", () => {
     c.responseBody = "hi";
     c.responseBody = null;
     expect(c.response.body).toBe("");
-  });
-
-  it("isPerformed mirrors performed and reflects responseBody=", () => {
-    const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
-    expect(c.isPerformed()).toBe(false);
-    c.setResponseBang(makeResponse());
-    c.responseBody = "x";
-    expect(c.isPerformed()).toBe(true);
-    expect(c.performed).toBe(true);
   });
 
   it("callbacks work through dispatch", async () => {

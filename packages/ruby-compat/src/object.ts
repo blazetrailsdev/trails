@@ -78,6 +78,8 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
+  const own = (value as { inspect?: unknown }).inspect;
+  if (typeof own === "function") return String((own as () => unknown).call(value));
   return String(value);
 }
 

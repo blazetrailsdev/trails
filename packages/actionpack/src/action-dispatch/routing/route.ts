@@ -7,6 +7,7 @@ import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
 import { Request } from "../http/request.js";
+import type { Endpoint } from "./endpoint.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const PATHFOR_SEPARATORS = "/.?";
@@ -74,7 +75,10 @@ export class Route {
   /** @internal */
   readonly formatted: boolean;
   readonly internal: boolean;
-  readonly app: MountableApp | undefined;
+  /** @internal */
+  readonly to: MountableApp | undefined;
+  /** @internal */
+  private _app: Endpoint | undefined;
 
   private readonly paramNames: string[];
   /** @internal */
@@ -115,9 +119,17 @@ export class Route {
     this.anchor = options.anchor !== false;
     this.formatted = options.format !== false;
     this.internal = options.internal === true;
-    this.app = options.app;
+    this.to = options.app;
 
     this.paramNames = collectParamNamesFromJourneyAst(this.path);
+  }
+
+  get app(): Endpoint | undefined {
+    return this._app;
+  }
+
+  set app(app: Endpoint | undefined) {
+    this._app = app;
   }
 
   get isRedirect(): boolean {

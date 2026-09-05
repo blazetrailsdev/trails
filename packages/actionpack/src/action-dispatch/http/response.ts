@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File, IO } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -129,12 +129,37 @@ export class RackBody {
   }
 }
 
+export class FileBody {
+  private readonly _toPath: string;
+
+  constructor(path: string) {
+    this._toPath = path;
+  }
+
+  toPath(): string {
+    return this._toPath;
+  }
+
+  get body(): string {
+    return IO.binread(this.toPath());
+  }
+
+  *each(): IterableIterator<string> {
+    const file = File.open(this.toPath(), "rb");
+    try {
+      let chunk: string | null;
+      while ((chunk = file.read(16384)) !== null) yield chunk;
+    } finally {
+      file.close();
+    }
+  }
+}
+
 export class Response {
   static defaultCharset = "utf-8";
 
   private _status: number;
   private _headers: Headers;
-  private _body: string[];
   private _committed = false;
   private _sending = false;
   private _sent = false;
@@ -148,7 +173,7 @@ export class Response {
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
-    this._body = [...body];
+    this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
   }
 
   get status(): number {
@@ -236,12 +261,16 @@ export class Response {
   }
 
   get body(): string {
-    return this._body.join("");
+    return (this.stream as { body: string }).body;
   }
 
-  set body(value: string) {
-    this._body = [value];
-    this.setHeader("content-length", String(Buffer.byteLength(value, "utf-8")));
+  set body(value: string | { toPath(): string }) {
+    if (typeof (value as { toPath?: unknown }).toPath === "function") {
+      this.stream = value;
+      return;
+    }
+    this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
+    this.setHeader("content-length", String(Buffer.byteLength(value as string, "utf-8")));
   }
 
   get contentLength(): number | undefined {
@@ -251,14 +280,12 @@ export class Response {
   }
 
   write(data: string): void {
-    if (this._committed) {
-      throw new Error("Response already committed");
-    }
-    this._body.push(data);
+    (this.stream as { write(string: string): void }).write(data);
   }
 
   close(): void {
-    this._committed = true;
+    const stream = this.stream as { close?: () => void };
+    if (typeof stream?.close === "function") stream.close();
   }
 
   get committed(): boolean {
@@ -353,13 +380,8 @@ export class Response {
     return this.rackResponse(this._status, this._headers.toHash());
   }
 
-  private _ensureStream(): unknown {
-    if (!this.stream) this.stream = this.buildBuffer(this, this.mungeBodyObject(this._body));
-    return this.stream;
-  }
-
   bodyParts(): unknown[] {
-    const stream = this._ensureStream() as { each(): IterableIterator<unknown> };
+    const stream = this.stream as { each(): IterableIterator<unknown> };
     const parts: unknown[] = [];
     for (const chunk of stream.each()) parts.push(chunk);
     return parts;
@@ -367,28 +389,15 @@ export class Response {
 
   sendFile(path: string): void {
     this.commitBang();
-    let cached: string | null = null;
-    const read = () => (cached ??= File.open(path, "rb", (file) => file.read()));
-    this.stream = {
-      toPath(): string {
-        return path;
-      },
-      get body(): string {
-        return read();
-      },
-      *each(): IterableIterator<string> {
-        yield read();
-      },
-    };
+    this.stream = new FileBody(path);
   }
 
   resetBodyBang(): void {
     this.stream = this.buildBuffer(this, []);
-    this._body = [];
   }
 
   *each(): IterableIterator<unknown> {
-    const stream = this._ensureStream() as { each(): IterableIterator<unknown> };
+    const stream = this.stream as { each(): IterableIterator<unknown> };
     this.sendingBang();
     for (const chunk of stream.each()) yield chunk;
     this.sentBang();

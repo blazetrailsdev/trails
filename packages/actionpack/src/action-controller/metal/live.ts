@@ -17,7 +17,7 @@ interface LiveResponseLike {
   headers: Headers;
   setHeader(key: string, value: string): void;
   deleteHeader(key: string): void;
-  close?(): void;
+  commitBang(): void;
 }
 
 type ErrorCallback = () => void;
@@ -43,9 +43,11 @@ export class Buffer {
     this._buf = this.buildQueue((this.constructor as typeof Buffer).queueSize);
   }
 
-  write(string: string): void {
-    if (this._closed) throw new Error("closed stream");
+  get body(): string {
+    return this._buf.join("");
+  }
 
+  write(string: string): void {
     if (!this._response.committed) {
       if (this._response.headers.get("Cache-Control") === undefined) {
         this._response.headers.set("Cache-Control", "no-cache");
@@ -53,6 +55,8 @@ export class Buffer {
       this._response.deleteHeader("Content-Length");
     }
 
+    if (this._closed) throw new Error("closed stream");
+    this._response.commitBang();
     this._buf.push(string);
 
     if (!this.isConnected) {
@@ -68,9 +72,7 @@ export class Buffer {
   }
 
   close(): void {
-    if (typeof (this._response as { close?: () => void }).close === "function") {
-      (this._response as { close: () => void }).close();
-    }
+    this._response.commitBang();
     this._closed = true;
     this._buf.push(null);
   }
@@ -167,11 +169,6 @@ export class SSE {
 
 export class Response extends DispatchResponse {
   declare stream: Buffer;
-
-  constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
-    super(status, headers, body);
-    this.stream = new Buffer(this);
-  }
 
   close(): void {
     this.beforeCommitted();

@@ -1,5 +1,6 @@
 import { b } from "../string/b.js";
-import { BadURIError, InvalidComponentError, InvalidURIError, RFC3986_PARSER } from "./common.js";
+import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
+import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
 
 /**
@@ -31,12 +32,6 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * not ported either, and it runs through five `check_*` privates no other
  * ported body reaches.
  *
- * `parser` defaults to {@link RFC3986_PARSER} rather than MRI's
- * `DEFAULT_PARSER` (`generic.rb:174`), which is the RFC 2396 parser: only that
- * parser's `escape` is ported, so it carries none of the `regexp` table the
- * `check*` methods below read, and the RFC 3986 parser is the one every URI
- * `URI.parse` builds already holds (`rfc3986_parser.rb:131`).
- *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Generic`
  * (`vendor/ruby/lib/uri/generic.rb:21`) ships with the interpreter.
  */
@@ -63,7 +58,7 @@ export class Generic {
   protected _query: string | null = null;
   protected _opaque: string | null = null;
   protected _fragment: string | null = null;
-  protected _parser: RFC3986Parser | null;
+  protected _parser: RFC2396Parser | RFC3986Parser | null;
 
   /** `initialize` (`vendor/ruby/lib/uri/generic.rb:169`). */
   constructor(
@@ -76,9 +71,9 @@ export class Generic {
     opaque: string | null,
     query: string | null,
     fragment: string | null,
-    parser: RFC3986Parser = RFC3986_PARSER,
+    parser: RFC2396Parser | RFC3986Parser = DEFAULT_PARSER,
   ) {
-    this._parser = parser === RFC3986_PARSER ? null : parser;
+    this._parser = parser === DEFAULT_PARSER ? null : parser;
 
     this.setScheme(scheme);
     this.setHost(host);
@@ -135,8 +130,8 @@ export class Generic {
   }
 
   /** `parser` (`vendor/ruby/lib/uri/generic.rb:289`). */
-  get parser(): RFC3986Parser {
-    return this._parser ?? RFC3986_PARSER;
+  get parser(): RFC2396Parser | RFC3986Parser {
+    return this._parser ?? DEFAULT_PARSER;
   }
 
   /** `check_scheme` (`vendor/ruby/lib/uri/generic.rb:320`). */

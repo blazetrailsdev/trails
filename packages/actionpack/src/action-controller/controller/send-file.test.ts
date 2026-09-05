@@ -41,8 +41,9 @@ describe("SendFileTest", () => {
       }
     }
     const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.body).toBe(testFileData);
+    const response = makeResponse();
+    await c.dispatch("file", makeRequest(), response);
+    expect(response.body).toBe(testFileData);
   });
 
   it("file stream", async () => {
@@ -52,8 +53,9 @@ describe("SendFileTest", () => {
       }
     }
     const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.body).toBe(testFileData);
+    const response = makeResponse();
+    await c.dispatch("file", makeRequest(), response);
+    expect(response.body).toBe(testFileData);
   });
 
   it("file url based filename", async () => {
@@ -212,8 +214,9 @@ describe("SendFileTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("fileFromBeforeAction", makeRequest(), makeResponse());
-    expect(c.body).toBe(testFileData);
+    const response = makeResponse();
+    await c.dispatch("fileFromBeforeAction", makeRequest(), response);
+    expect(response.body).toBe(testFileData);
   });
 
   it("send file with action controller live", async () => {

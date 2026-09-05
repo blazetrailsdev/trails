@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Mapper } from "../../routing/mapper.js";
+import type { MountableApp } from "../../routing/route.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
+
+class MountedRackApp {
+  call(_env: Record<string, unknown>): void {}
+  inspect(): string {
+    return "MountedRackApp";
+  }
+}
+const mountedRackApp = new MountedRackApp() as unknown as MountableApp;
 
 describe("RoutesInspectorTest", () => {
   let set: RouteSet;
@@ -88,7 +97,15 @@ describe("RoutesInspectorTest", () => {
 
   it.skip("rails routes shows named route with mounted rack app", () => {});
 
-  it.skip("rails routes shows overridden named route with mounted rack app with name", () => {});
+  it("rails routes shows overridden named route with mounted rack app with name", () => {
+    const output = draw((r) => {
+      r.mount(mountedRackApp, { at: "/foo", as: "blog" });
+    });
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern Controller#Action",
+      "  blog      /foo        MountedRackApp",
+    ]);
+  });
 
   it.skip("rails routes shows route with rack app nested with dynamic constraints", () => {});
 
