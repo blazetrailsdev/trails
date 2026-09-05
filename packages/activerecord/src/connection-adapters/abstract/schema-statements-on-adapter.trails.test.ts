@@ -77,6 +77,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.allSql).toEqual([]);
   });
 
+  it("indexes() raises NotImplementedError on an adapter that does not override it", async () => {
+    const stub = new StubAdapter();
+    await expect(stub.indexes("things")).rejects.toThrow(NotImplementedError);
+  });
+
   it("indexes() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
     const sqlite = new SqliteCapturingAdapter();
     await sqlite.indexes("things");
