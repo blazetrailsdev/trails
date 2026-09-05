@@ -1,10 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   The model below spells `include ActiveModel::Serializers::JSON` in its class body, the way the
+   Rails test model it mirrors does (test/models/contact.rb:5); the class/interface merge beside it
+   is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { setParseJsonTimes } from "@blazetrails/activesupport";
+import { include, setParseJsonTimes } from "@blazetrails/activesupport";
 import { JSON as JSONHost } from "./json.js";
 
 describe("Serializers::JSON decoding (trails)", () => {
-  class Event extends JSONHost {
+  class Event {
     static {
+      include(this, JSONHost);
       Object.defineProperty(this.prototype, "attributes", {
         get(this: Event) {
           return { occurredAt: this._occurredAt };
@@ -24,6 +29,7 @@ describe("Serializers::JSON decoding (trails)", () => {
       return this._occurredAt;
     }
   }
+  interface Event extends JSONHost {}
 
   it("fromJson converts a date string when parseJsonTimes is on", () => {
     setParseJsonTimes(true);

@@ -261,16 +261,17 @@ export function prepareValueForValidation(
   const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
   const cameFromUser = `${attrName}CameFromUser`;
-  if (cameFromUser in r) {
-    if (r[cameFromUser]) {
-      rawValue = r[`${attrName}BeforeTypeCast`];
-    } else if (typeof r.readAttribute === "function") {
-      rawValue = r.readAttribute(attrName);
+
+  if (respondTo(r, cameFromUser)) {
+    if (publicSend(r, cameFromUser)) {
+      rawValue = publicSend(r, `${attrName}BeforeTypeCast`);
+    } else if (respondTo(r, "readAttribute")) {
+      rawValue = r.readAttribute!(attrName);
     }
   } else {
     const beforeTypeCast = `${attrName}BeforeTypeCast`;
-    if (beforeTypeCast in r) {
-      rawValue = r[beforeTypeCast];
+    if (respondTo(r, beforeTypeCast)) {
+      rawValue = publicSend(r, beforeTypeCast);
     }
   }
   return rawValue !== undefined && rawValue !== null && rawValue !== false ? rawValue : value;
@@ -295,6 +296,15 @@ export function isRecordAttributeChangedInPlace(
 function parseFloat(num: number, precision: number, scale?: number): number {
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
+}
+
+function respondTo(obj: RecordWithRawAttribute, method: string): boolean {
+  return method in obj;
+}
+
+function publicSend(obj: RecordWithRawAttribute, method: string): unknown {
+  const value = obj[method];
+  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }
 
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;

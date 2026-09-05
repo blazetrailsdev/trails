@@ -286,4 +286,59 @@ describe("NumericalityValidator (trails-only)", () => {
     );
     expect(result).toBe(99);
   });
+  it("cameFromUser as a method is invoked, not read as a truthy function", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreBeforeTypeCast = "raw-value";
+      scoreCameFromUser() {
+        return true;
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "initial",
+      rec as never,
+      "score",
+    );
+    expect(result).toBe("raw-value");
+  });
+
+  it("cameFromUser as a method returning false takes the readAttribute arm", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreBeforeTypeCast = "raw-value";
+      scoreCameFromUser() {
+        return false;
+      }
+      readAttribute(_name: string) {
+        return 99;
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "initial",
+      rec as never,
+      "score",
+    );
+    expect(result).toBe(99);
+  });
+
+  it("beforeTypeCast as a method is invoked", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreBeforeTypeCast() {
+        return "raw-value";
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "fallback",
+      rec as never,
+      "score",
+    );
+    expect(result).toBe("raw-value");
+  });
 });

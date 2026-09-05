@@ -32,6 +32,8 @@ export class AttributeSetCodecError extends Error {
   }
 }
 
+const UNKNOWN_TYPE_KEY_PREFIX = "?unregistered:";
+
 const warnedKeys = new Set<string>();
 
 /** @noRailsEquivalent PERMANENT */
@@ -44,7 +46,10 @@ export function toEnvelope(coder: AttributeSetCoder): AttributeSetEnvelope {
       defaultAttributes.push(attr.name);
       continue;
     }
-    envelope.types[attr.name] = attr.type == null ? null : typeRegistry.keyFor(attr.type);
+    envelope.types[attr.name] =
+      attr.type == null
+        ? null
+        : (typeRegistry.keyFor(attr.type) ?? UNKNOWN_TYPE_KEY_PREFIX + attr.type.constructor.name);
     envelope.values[attr.name] = attr.valueBeforeTypeCast;
   }
   if (defaultAttributes.length > 0) envelope.defaultAttributes = defaultAttributes;

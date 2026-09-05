@@ -38,7 +38,10 @@ type ValidatorClass = new (
 
 export interface ValidatesWithClassHost {
   _validators: Map<string | null, ValidatorLike[]>;
-  validate(fn: (record: ValidatableRecord) => unknown, options?: Record<string, unknown>): void;
+  validate(
+    filter: ValidatorLike | ((record: ValidatableRecord) => unknown),
+    options?: Record<string, unknown>,
+  ): void;
 }
 
 export async function validatesWith(this: ValidatableRecord, ...args: unknown[]): Promise<void> {
@@ -78,7 +81,7 @@ export const ClassMethods = {
       }
       this._validators = _validators;
 
-      this.validate((record) => validator.validate(record), options);
+      this.validate(validator, options);
     }
   },
 };
