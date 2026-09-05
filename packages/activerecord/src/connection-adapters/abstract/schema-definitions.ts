@@ -185,7 +185,7 @@ export class ForeignKeyDefinition {
   }
 
   get primaryKey(): string | string[] {
-    return this.options["primaryKey"] || this.defaultPrimaryKey;
+    return this.options["primaryKey"] ?? this.defaultPrimaryKey;
   }
 
   get onDelete(): ReferentialAction | undefined {
