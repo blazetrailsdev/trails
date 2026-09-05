@@ -903,8 +903,8 @@ export class Time {
         (d.cwyear != null && year == null) ||
         ((d.cwday != null || d.cweek != null) && !(d.mon != null && d.mday != null))
       ) {
-        const date_ = Date.strptime(date, format);
-        return Time.local(date_.year, date_.month, date_.day);
+        const plainDate = Date.strptime(date, format);
+        return Time.local(plainDate.year, plainDate.month, plainDate.day);
       }
       if (
         (d.wnum0 != null || d.wnum1 != null) &&
