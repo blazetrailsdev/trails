@@ -208,6 +208,24 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(makeStatements({ _config: { foreignKeys: false } }).isForeignKeysEnabled()).toBe(false);
   });
 
+  it("foreignKeyName", () => {
+    const ss = makeStatements();
+    expect(ss.foreignKeyName("astronauts", { name: "my_fk" })).toBe("my_fk");
+    expect(ss.foreignKeyName("astronauts", { column: "rocket_id" })).toMatch(
+      /^fk_rails_[0-9a-f]{10}$/,
+    );
+    expect(() => ss.foreignKeyName("astronauts", {})).toThrow(KeyError);
+    expect(() => ss.foreignKeyName("astronauts", {})).toThrow("key not found: :column");
+  });
+
+  it("foreignKeyName returns an explicitly supplied nullish name instead of deriving", () => {
+    const ss = makeStatements();
+    expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(
+      undefined,
+    );
+    expect(ss.foreignKeyName("astronauts", { name: "", column: "rocket_id" })).toBe("");
+  });
+
   it("checkConstraintName", () => {
     const ss = makeStatements();
     expect(ss.checkConstraintName("users", { name: "my_chk" })).toBe("my_chk");

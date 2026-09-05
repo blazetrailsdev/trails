@@ -64,10 +64,10 @@ export function parseSqliteUrl(url: string): string {
 
 /** @noRailsEquivalent PERMANENT */
 export function buildAdapterArg(
-  adapterName: string,
+  adapterName: string | undefined,
   configuration: Record<string, unknown>,
 ): unknown[] {
-  const normalized = normalizeAdapterName(adapterName);
+  const normalized = normalizeAdapterName(adapterName ?? "");
   const url = configuration.url as string | undefined;
   const database = configuration.database as string | undefined;
   if (normalized === "sqlite") {

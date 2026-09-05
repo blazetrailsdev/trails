@@ -334,27 +334,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlReturningColumnValues.call(this, result);
   }
 
-  supportsSavepoints(): boolean {
-    return true;
-  }
-
-  supportsLazyTransactions(): boolean {
-    return true;
-  }
-
-  async supportsJson(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("5.7.8") >= 0;
-  }
-
-  supportsComments(): boolean {
-    return true;
-  }
-
-  supportsCommentsInCreate(): boolean {
-    return true;
-  }
-
   supportsDdlTransactions(): boolean {
     return false;
   }

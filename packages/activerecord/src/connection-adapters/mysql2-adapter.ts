@@ -320,6 +320,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
+  async supportsJson(): Promise<boolean> {
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("5.7.8") >= 0;
+  }
+
+  supportsComments(): boolean {
+    return true;
+  }
+
+  supportsCommentsInCreate(): boolean {
+    return true;
+  }
+
+  supportsSavepoints(): boolean {
+    return true;
+  }
+
+  supportsLazyTransactions(): boolean {
+    return true;
+  }
+
   /** @internal */
   isTextType(type: string): boolean {
     return (

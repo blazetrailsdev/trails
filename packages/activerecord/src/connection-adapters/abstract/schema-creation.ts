@@ -305,12 +305,12 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitDropForeignKey(name: string): string {
+  protected visitDropForeignKey(name: string | undefined): string {
     return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
   }
 
   /** @internal */
-  protected async visitDropCheckConstraint(name: string): Promise<string> {
+  protected async visitDropCheckConstraint(name: string | undefined): Promise<string> {
     return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
   }
 

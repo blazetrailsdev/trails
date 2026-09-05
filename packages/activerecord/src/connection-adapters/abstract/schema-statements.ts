@@ -81,7 +81,7 @@ export type JoinTableOptions = {
 };
 
 export interface ValidateConstraintStatements {
-  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
@@ -578,7 +578,7 @@ export class SchemaStatements {
     delete (lookup as RemoveForeignKeyOptions).ifExists;
     const fk = await this.foreignKeyForBang(fromTable, lookup);
     const at = this.createAlterTable(fromTable);
-    at.dropForeignKey(fk.name!);
+    at.dropForeignKey(fk.name);
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -1640,20 +1640,19 @@ export class SchemaStatements {
   /**
    * @internal
    * @missingRailsCall first — PERMANENT
-   * @missingRailsCall map — PERMANENT
    */
   foreignKeyName(
     tableName: string,
     options: { name?: string; column?: string | string[] },
-  ): string {
-    if (options.name) return options.name;
-    if (options.column === undefined) {
-      throw new ArgumentError(`foreign_key_name requires either :name or :column to be specified`);
+  ): string | undefined {
+    if ("name" in options) return options.name;
+    if (!("column" in options)) {
+      throw new KeyError("key not found: :column");
     }
-    const cols = wrap(options.column);
-    const identifier = `${tableName}_${cols.join("_and_")}_fk`;
-    const hex = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
-    return `fk_rails_${hex}`;
+    const columns = wrap(options.column).map(String);
+    const identifier = `${tableName}_${columns.join("_and_")}_fk`;
+    const hashedIdentifier = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
+    return `fk_rails_${hashedIdentifier}`;
   }
 
   /** @internal */

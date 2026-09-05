@@ -491,19 +491,9 @@ export class PostgreSQLAdapter
     this._connectionConfigured = true;
     if (!this._typeMapEagerLoaded) {
       this._typeMapEagerLoaded = true;
-      await this._eagerLoadAdditionalTypes(client);
-    }
-  }
-
-  private async _eagerLoadAdditionalTypes(client: pg.Client): Promise<void> {
-    this._typeMap = null;
-    this._regtypeOids.clear();
-    const initializer = new TypeMapInitializer(this.typeMap);
-    for await (const query of this.loadTypesQueries(initializer)) {
-      const result = await client.query(query);
-      const records = result.rows as unknown as PgTypeRow[];
-      this._captureRegtypeOids(records);
-      initializer.run(records);
+      this._typeMap = null;
+      this._regtypeOids.clear();
+      await this.loadAdditionalTypes();
     }
   }
 
@@ -1381,10 +1371,7 @@ export class PostgreSQLAdapter
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall internal_execute — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
-   */
+  /** @internal */
   async configureConnection(): Promise<void> {
     const conn = this._rawConnection;
     if (!conn) return;
@@ -2381,7 +2368,10 @@ export interface PostgreSQLAdapter {
 
   buildExplainClause(options?: ExplainOption[]): Promise<string>;
 
-  setConstraints(deferred: "deferred" | "immediate", ...constraints: string[]): Promise<void>;
+  setConstraints(
+    deferred: "deferred" | "immediate",
+    ...constraints: (string | undefined)[]
+  ): Promise<void>;
 
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
@@ -2465,7 +2455,7 @@ export interface PostgreSQLAdapter {
   changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
 
   /** @internal */
-  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
 
   validateCheckConstraint(
     tableName: string,

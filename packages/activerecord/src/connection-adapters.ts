@@ -16,16 +16,16 @@ const resolveErrors = new Map<string, unknown>();
  * @internal
  * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
-export function resolveSync(adapterName: string): AdapterClass | null {
-  return resolvedSyncCache.get(adapterName) ?? null;
+export function resolveSync(adapterName: string | undefined): AdapterClass | null {
+  return resolvedSyncCache.get(adapterName ?? "") ?? null;
 }
 
 /**
  * @internal
  * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
-export function resolveSyncError(adapterName: string): unknown | null {
-  return resolveErrors.get(adapterName) ?? null;
+export function resolveSyncError(adapterName: string | undefined): unknown | null {
+  return resolveErrors.get(adapterName ?? "") ?? null;
 }
 
 export function register(name: string, loader: AdapterLoader): void {
@@ -39,36 +39,36 @@ export function register(name: string, loader: AdapterLoader): void {
  * @internal
  * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
-export function validateAdapterName(adapterName: string): void {
-  const loader = adapters.get(adapterName);
+export function validateAdapterName(adapterName: string | undefined): void {
+  const loader = adapters.get(adapterName ?? "");
   if (!loader) {
     const err = new AdapterNotFound(
-      `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
+      `Database configuration specifies nonexistent '${adapterName ?? ""}' adapter. ` +
         `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
         `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
         `adapter package to your package.json if it's not in the list of available adapters.`,
     );
-    resolveErrors.set(adapterName, err);
+    resolveErrors.set(adapterName ?? "", err);
     throw err;
   }
-  const loadError = resolveErrors.get(adapterName);
+  const loadError = resolveErrors.get(adapterName ?? "");
   if (loadError !== undefined) throw loadError;
 }
 
-export async function resolve(adapterName: string): Promise<AdapterClass> {
-  const cached = resolved.get(adapterName);
+export async function resolve(adapterName: string | undefined): Promise<AdapterClass> {
+  const cached = resolved.get(adapterName ?? "");
   if (cached) return cached;
 
   validateAdapterName(adapterName);
-  const loader = adapters.get(adapterName)!;
+  const loader = adapters.get(adapterName ?? "")!;
   const promise = loader()
     .then((klass) => {
-      resolvedSyncCache.set(adapterName, klass);
-      resolveErrors.delete(adapterName);
+      resolvedSyncCache.set(adapterName ?? "", klass);
+      resolveErrors.delete(adapterName ?? "");
       return klass;
     })
     .catch((err) => {
-      resolved.delete(adapterName);
+      resolved.delete(adapterName ?? "");
       const message = err instanceof Error ? err.message : String(err);
       const errorPath =
         typeof (err as { url?: unknown }).url === "string"
@@ -84,17 +84,17 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
           ? new URL(errorPath).pathname.endsWith(pathToAdapter.replace(/^\.+/, ""))
           : errorPath === pathToAdapter || pathToAdapter.startsWith(`${errorPath}/`))
           ? new Error(
-              `Error loading the '${adapterName}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
+              `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
               { cause: err },
             )
           : new Error(
-              `Error loading the '${adapterName}' Active Record adapter. Missing a package it depends on? ${message}`,
+              `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a package it depends on? ${message}`,
               { cause: err },
             );
-      resolveErrors.set(adapterName, loadError);
+      resolveErrors.set(adapterName ?? "", loadError);
       throw loadError;
     });
-  resolved.set(adapterName, promise);
+  resolved.set(adapterName ?? "", promise);
   return promise;
 }
 

@@ -778,7 +778,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  async validateConstraint(tableName: string, constraintName: string): Promise<void> {
+  async validateConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
     const at = this.createAlterTable(tableName) as PgAlterTable;
     at.validateConstraint(constraintName);
     await this.execute(await this.schemaCreation.accept(at));
@@ -799,7 +799,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: ForeignKeyLookupOptions = {},
   ): Promise<void> {
     const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
-      .name!;
+      .name;
     await this.validateConstraint(fromTable, fkNameToValidate);
   }
 
