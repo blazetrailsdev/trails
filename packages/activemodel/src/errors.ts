@@ -1,5 +1,11 @@
-import { deepDup } from "@blazetrails/activesupport";
-import { Hash, transformValues } from "@blazetrails/ruby-compat";
+import {
+  deepDup,
+  include,
+  presence,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
+} from "@blazetrails/activesupport";
+import { Hash, rbEqual, transformValues } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 
@@ -9,6 +15,7 @@ export type ErrorDetailHash = { error: string; [k: string]: unknown };
 
 const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
   private _base: TBase | null;
@@ -96,16 +103,13 @@ export class Errors<TBase extends object = object> {
     return this.include(attribute);
   }
 
-  delete(
-    attribute: string,
-    type?: string,
-    options?: Record<string, unknown>,
-  ): ActiveModelError[] | null {
+  delete(attribute: string, type?: string, options?: Record<string, unknown>): string[] | null {
+    [attribute, type, options] = this.normalizeArguments(attribute, type, options);
     const matches = this.where(attribute, type, options);
-    if (matches.length === 0) return null;
-    const toRemove = new Set(matches);
-    this._errors = this._errors.filter((e) => !toRemove.has(e));
-    return matches;
+    for (const error of matches) {
+      this._errors = this._errors.filter((e) => !rbEqual(e, error));
+    }
+    return presence(matches.map((error) => error.message)) ?? null;
   }
 
   get(attribute: string): string[] {
@@ -290,6 +294,12 @@ export class Errors<TBase extends object = object> {
     return `#<ActiveModel::Errors [${details.join(", ")}]>`;
   }
 }
+
+export interface Errors<TBase extends object = object> {
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+
+include(Errors, ToJsonWithActiveSupportEncoder);
 
 export class StrictValidationFailed extends globalThis.Error {
   constructor(message?: string) {

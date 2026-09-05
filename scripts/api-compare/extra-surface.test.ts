@@ -2663,6 +2663,120 @@ describe("buildReport — re-export clones", () => {
     expect(byFile.get("foo.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnFoo"]);
     expect(byFile.get("barrel.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnBarrel"]);
   });
+
+  it("allows a `<X>Type` rename gathered into a barrel's namespace object", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::String": rubyClass({ name: "String", file: "type/string.rb" }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "type/string.ts:StringType": {
+              name: "StringType",
+              file: "type/string.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+          modules: {
+            "index.ts:Types": {
+              name: "Types",
+              file: "index.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("StringType")],
+              classMethods: [],
+            },
+          },
+        },
+      },
+    };
+
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const index = report.packages[0].extraFiles.find((f) => f.tsFile === "index.ts");
+    expect(index?.extras.map((e) => e.name) ?? []).toEqual(["Types"]);
+  });
+
+  it("still charges a name a Rails-matched file DECLARES, though another file declares it too", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::String": rubyClass({ name: "String", file: "type/string.rb" }),
+            "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "type/string.ts:StringType": {
+              name: "StringType",
+              file: "type/string.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+            "foo.ts:Foo": {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+            // A SECOND, unrelated declaration of the same short name, in a file
+            // that mirrors `foo.rb` — it is that file's own extra surface.
+            "foo.ts:StringType": {
+              name: "StringType",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const foo = report.packages[0].extraFiles.find((f) => f.tsFile === "foo.ts");
+    expect(foo?.extras.map((e) => e.name) ?? []).toEqual(["StringType"]);
+  });
 });
 
 describe("buildReport — @noRailsEquivalent tags", () => {

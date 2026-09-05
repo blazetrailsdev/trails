@@ -39,7 +39,6 @@ export class AttributeSet {
   }
 
   set(name: string, value: Attribute): void {
-    this.assertNotFrozen();
     this._attributes[name] = value;
   }
 
@@ -84,7 +83,6 @@ export class AttributeSet {
     value: unknown,
     type?: { deserialize(value: unknown): unknown },
   ): void {
-    this.assertNotFrozen();
     const existing = this._attributes[name];
     if (existing) {
       this._attributes[name] = existing.withValueFromDatabase(value);
@@ -103,7 +101,6 @@ export class AttributeSet {
   }
 
   writeCastValue(name: string, value: unknown): void {
-    this.assertNotFrozen();
     this._attributes[name] = this.getAttribute(name).withCastValue(value);
   }
 
@@ -131,7 +128,6 @@ export class AttributeSet {
   }
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
-    this.assertNotFrozen();
     for (const [name, attr] of Object.entries(targetAttributes.attributes())) {
       if (!hasKey(this._attributes, name)) {
         this._attributes[name] = attr;
@@ -180,12 +176,6 @@ export class AttributeSet {
 
   initializeClone(_other: AttributeSet): void {
     this._attributes = dup(this._attributes);
-  }
-
-  private assertNotFrozen(): void {
-    if (Object.isFrozen(this)) {
-      throw new FrozenError("can't modify frozen AttributeSet");
-    }
   }
 
   /** @noRailsEquivalent PERMANENT */

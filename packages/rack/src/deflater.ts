@@ -1,5 +1,4 @@
-import * as zlib from "zlib";
-import { hasKey } from "@blazetrails/ruby-compat";
+import { GzipWriter, getZlib, hasKey } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 
 export interface DeflaterOptions {
@@ -60,7 +59,7 @@ export class Deflater {
     headers["content-encoding"] = encoding;
 
     const compressed = await this.compress(body, encoding);
-    headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed));
+    headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed, "binary"));
 
     return [status, headers, [compressed]];
   }
@@ -97,36 +96,83 @@ export class Deflater {
   }
 
   private async compress(body: any, encoding: string): Promise<string> {
-    const chunks: string[] = [];
+    if (encoding === "gzip") {
+      const chunks: Uint8Array[] = [];
+      const stream = new GzipStream(body, null, this.sync);
+      await stream.each((data) => chunks.push(data));
+      stream.close();
+      return Buffer.concat(chunks).toString("binary");
+    }
+
+    const parts: string[] = [];
     if (Array.isArray(body)) {
-      for (const chunk of body) chunks.push(String(chunk));
+      for (const chunk of body) parts.push(String(chunk));
     } else if (body && typeof body.each === "function") {
-      body.each((chunk: string) => chunks.push(String(chunk)));
+      body.each((chunk: string) => parts.push(String(chunk)));
     } else if (body && typeof body.forEach === "function") {
-      body.forEach((chunk: string) => chunks.push(String(chunk)));
+      body.forEach((chunk: string) => parts.push(String(chunk)));
     } else if (typeof body === "string") {
-      chunks.push(body);
+      parts.push(body);
     }
 
     if (body && typeof body.close === "function") {
       body.close();
     }
 
-    const input = Buffer.from(chunks.join(""));
+    const input = Buffer.from(parts.join(""));
 
-    return new Promise((resolve, reject) => {
-      const cb = (err: Error | null, result: Buffer) => {
-        if (err) reject(err);
-        else resolve(result.toString("binary"));
-      };
+    if (encoding === "deflate") {
+      return Buffer.from(getZlib().deflate(input)).toString("binary");
+    }
+    return input.toString();
+  }
+}
 
-      if (encoding === "gzip") {
-        zlib.gzip(input, cb);
-      } else if (encoding === "deflate") {
-        zlib.deflate(input, cb);
+export class GzipStream {
+  static readonly BUFFER_LENGTH = 128 * 1_024;
+
+  private body: any;
+  private mtime: number | null;
+  private sync: boolean | null;
+  private writer!: (data: Uint8Array) => void;
+
+  constructor(body: any, mtime: number | null, sync: boolean | null) {
+    this.body = body;
+    this.mtime = mtime;
+    this.sync = sync;
+  }
+
+  async each(block: (data: Uint8Array) => void): Promise<void> {
+    this.writer = block;
+    const gzip = new GzipWriter(this);
+    if (this.mtime) gzip.mtime = this.mtime;
+    try {
+      if (typeof this.body.read === "function") {
+        let part: string | null;
+        while ((part = this.body.read(GzipStream.BUFFER_LENGTH)) != null) {
+          gzip.write(Buffer.from(String(part), "binary"));
+          if (this.sync) gzip.flush();
+        }
       } else {
-        resolve(input.toString());
+        const each = (this.body.each ?? this.body.forEach) as (
+          visit: (part: string) => void,
+        ) => void;
+        each.call(this.body, (part: string) => {
+          if (part.length === 0) return;
+          gzip.write(Buffer.from(String(part), "binary"));
+          if (this.sync) gzip.flush();
+        });
       }
-    });
+    } finally {
+      await gzip.finish();
+    }
+  }
+
+  write(data: Uint8Array): void {
+    this.writer.call(undefined, data);
+  }
+
+  close(): void {
+    if (typeof this.body.close === "function") this.body.close();
   }
 }

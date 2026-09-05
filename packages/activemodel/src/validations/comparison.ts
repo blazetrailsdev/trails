@@ -28,7 +28,7 @@ export class ComparisonValidator extends EachValidator {
       if (rawOptionValue === undefined) continue;
       const optionValue = this.resolveValue(record, rawOptionValue);
 
-      if (value === null || value === undefined || (typeof value === "string" && isBlank(value))) {
+      if (value == null || isBlank(value)) {
         record.errors.add(attrName, ":blank", this.errorOptions(value, optionValue));
         return;
       }

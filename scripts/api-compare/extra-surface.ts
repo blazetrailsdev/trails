@@ -2091,6 +2091,50 @@ function buildPackageReport(
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
 
+  const tsDeclFileByName = new Map<string, string>();
+  for (const c of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
+    if (!c.file || c.reExportedFrom || tsDeclFileByName.has(c.name)) continue;
+    tsDeclFileByName.set(c.name, c.file);
+  }
+
+  const declaresLocally = (
+    name: string,
+    classes: ClassInfo[],
+    modules: ClassInfo[],
+    fileFns: MethodInfo[] | undefined,
+  ): boolean =>
+    classes.some((c) => c.name === name) ||
+    modules.some((m) => m.name === name) ||
+    (fileFns ?? []).some((f) => f.name === name && f.reExportedFrom === undefined);
+
+  const reExportSourceOf = (
+    name: string,
+    fileFns: MethodInfo[] | undefined,
+  ): string | undefined => {
+    const fn = fileFns?.find((f) => f.name === name && f.reExportedFrom !== undefined);
+    if (fn === undefined) return undefined;
+    return fn.reExportedFrom!.slice(0, fn.reExportedFrom!.lastIndexOf(":"));
+  };
+
+  const allowedNamesCache = new Map<string, Set<string>>();
+  const allowedNamesForRubyFile = (sourceRuby: string): Set<string> => {
+    const hit = allowedNamesCache.get(sourceRuby);
+    if (hit !== undefined) return hit;
+    const names = collectAllowedNames(
+      rubyFiles.get(sourceRuby) ?? [],
+      pkg,
+      rubyPkg.modules,
+      moduleFqnByShort,
+      crossPackageModules,
+      crossPackagePkgByFqn,
+      Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
+      sourceRuby,
+      rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
+    );
+    allowedNamesCache.set(sourceRuby, names);
+    return names;
+  };
+
   const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
     ...[...rubyFileNames].map((rubyFile) => ({
       tsFile: rubyFileToTs(rubyFile, pkg),
@@ -2168,25 +2212,26 @@ function buildPackageReport(
     // lives in `arel/nodes/casted.rb` (casted.rb:47-58), which `nodes/casted.ts`
     // already matches. Score it there, so passing it through a barrel does not
     // re-charge it as extra surface.
-    if (rubyFile === null) {
-      for (const fn of fileFns ?? []) {
-        if (fn.reExportedFrom === undefined) continue;
-        const sourceTs = fn.reExportedFrom.slice(0, fn.reExportedFrom.lastIndexOf(":"));
-        const sourceRuby = rubyFileByTsFile.get(sourceTs);
-        if (sourceRuby === undefined) continue;
-        const sourceAllowed = collectAllowedNames(
-          rubyFiles.get(sourceRuby) ?? [],
-          pkg,
-          rubyPkg.modules,
-          moduleFqnByShort,
-          crossPackageModules,
-          crossPackagePkgByFqn,
-          Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
-          sourceRuby,
-          rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
-        );
-        if (sourceAllowed.has(fn.name)) allowed.add(fn.name);
-      }
+    //
+    // The same holds for any name DECLARED in another file — a class gathered
+    // into a namespace object (`export const Types = { StringType, ... }` in
+    // ActiveModel's barrel) reaches the surface without a `reExportedFrom` edge.
+    // A sanctioned class rename is allowed only in the file that mirrors its
+    // `.rb` (`TS_PARENT_ALIASES`: `ActiveModel::Type::String` is `StringType`),
+    // so gathering the twelve renamed type classes re-charged every one as novel.
+    for (const name of tsNames) {
+      if (allowed.has(name)) continue;
+      // A name this file DECLARES is its own surface, whatever another file
+      // declares under the same short name — so only names that arrive from
+      // elsewhere (a re-export, or a namespace object gathering imports) are
+      // scored at their declaring file.
+      if (declaresLocally(name, classes, modules, fileFns)) continue;
+      const reExport = reExportSourceOf(name, fileFns);
+      const sourceTs = reExport ?? tsDeclFileByName.get(name);
+      if (sourceTs === undefined || sourceTs === expectedTs) continue;
+      const sourceRuby = rubyFileByTsFile.get(sourceTs);
+      if (sourceRuby === undefined) continue;
+      if (allowedNamesForRubyFile(sourceRuby).has(name)) allowed.add(name);
     }
 
     if (rubyFile !== null) {

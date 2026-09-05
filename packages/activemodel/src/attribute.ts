@@ -1,6 +1,7 @@
 import { Type } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
 import { _UserProvidedDefaultCtor } from "./attribute/user-provided-default-slot.js";
 
@@ -187,14 +188,11 @@ export abstract class Attribute {
   }
 
   equals(other: Attribute): boolean {
-    const typeEqual =
-      this.type === other.type ||
-      (this.type != null && other.type != null && this.type.constructor === other.type.constructor);
     return (
       this.constructor === other.constructor &&
       this.name === other.name &&
       this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
-      typeEqual
+      rbEqual(this.type, other.type)
     );
   }
 

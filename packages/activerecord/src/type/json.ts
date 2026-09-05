@@ -1,4 +1,5 @@
-import { ValueType } from "@blazetrails/activemodel";
+import { MutableModule, ValueType, type Mutable } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
@@ -21,6 +22,7 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/json.rb:6); the class/interface merge is how `include()` surfaces on the type side.
 export class Json extends ValueType<unknown> {
   readonly name: string = "json";
 
@@ -30,11 +32,6 @@ export class Json extends ValueType<unknown> {
 
   accessor(): typeof StringKeyedHashAccessor {
     return StringKeyedHashAccessor;
-  }
-
-  cast(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    return this.deserialize(this.serialize(value));
   }
 
   deserialize(value: unknown): unknown {
@@ -53,11 +50,12 @@ export class Json extends ValueType<unknown> {
     return ActiveSupportJSON.encode(value);
   }
 
-  override isMutable(): boolean {
-    return true;
-  }
-
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     return !jsonEqual(this.deserialize(rawOldValue), newValue);
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
+export interface Json extends Mutable {}
+
+include(Json, MutableModule);
