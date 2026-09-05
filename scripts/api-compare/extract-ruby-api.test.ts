@@ -156,6 +156,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       "try",
       "ref:save",
       "ref:get",
+      "rescue",
       "ref:rollback",
     ]);
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
@@ -171,7 +172,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
         end
       `,
     });
-    expect(s["Foo#initialize"]).toEqual(["try", "ref:load"]);
+    expect(s["Foo#initialize"]).toEqual(["try", "rescue", "ref:load"]);
   });
 
   // A `define_method(name) { … }` body IS the method body and is right there in
@@ -271,6 +272,48 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       "ref:to_sym",
       "ref:inspect",
       "ref:merge!",
+    ]);
+  });
+
+  it("emits one if per when clause of a case, and none for the case itself", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def lock(kind)
+            case kind
+            when :a then a
+            when :b then b
+            when :c then c
+            else z
+            end
+          end
+        end
+      `,
+    });
+    expect(s["Foo#lock"]).toEqual(["if", "ref:a", "if", "ref:b", "if", "ref:c", "ref:z"]);
+  });
+
+  it("emits one rescue per rescue clause, after the bodystmt's try", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def translate_exception(e)
+            run
+          rescue Busy
+            busy
+          rescue Locked
+            locked
+          end
+        end
+      `,
+    });
+    expect(s["Foo#translate_exception"]).toEqual([
+      "try",
+      "ref:run",
+      "rescue",
+      "ref:busy",
+      "rescue",
+      "ref:locked",
     ]);
   });
 

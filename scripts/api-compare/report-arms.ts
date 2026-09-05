@@ -36,10 +36,20 @@ export interface SkeletonArtifact {
 
 /**
  * The skeleton stream's CONTROL tokens — the arms. Both extractors emit exactly
- * these four (`extract-ruby-api.rb:2382-2429`, `extract-ts-api.ts:3064-3091`);
- * everything else in a stream is a `ref:<name>` / `new:<Ctor>` reach.
+ * these five (`extract-ruby-api.rb#walk_for_skeleton`,
+ * `extract-ts-api.ts#extractSkeleton`); everything else in a stream is a
+ * `ref:<name>` / `new:<Ctor>` reach. `rescue` is the per-CLAUSE arm of a
+ * `begin`/`rescue` chain, sitting after the `try` its `:bodystmt` emits, so a
+ * two-clause Ruby `rescue` reads against the two `instanceof` arms of its TS
+ * `catch` rather than against one opaque `try` apiece.
  */
-export const CONTROL_TOKENS: ReadonlySet<string> = new Set(["if", "loop", "try", "throw"]);
+export const CONTROL_TOKENS: ReadonlySet<string> = new Set([
+  "if",
+  "loop",
+  "try",
+  "rescue",
+  "throw",
+]);
 
 /**
  * THE MERGE RULE (RFC 0113 open question 3, decided here): project each stream
@@ -57,9 +67,11 @@ export const CONTROL_TOKENS: ReadonlySet<string> = new Set(["if", "loop", "try",
  *   them re-reports that debt here and buries the arm signal under it. Worse,
  *   they arrive here with none of the forgiveness the call gate applies to
  *   them: `effectiveTsCalls`' same-file-helper and delegate unions are set
- *   operations that a sequence cannot take, so a faithful port that merely
+ *   operations that a sequence cannot take WHOLE, so a faithful port that merely
  *   extracts a helper — the single most common false positive the call gate was
- *   built to absorb — would flag on every one of its moved reaches.
+ *   built to absorb — would flag on every one of its moved reaches. The
+ *   same-file half of that forgiveness IS taken here, at the reach rather than
+ *   over the stream: see {@link spliceHelperSkeletons}.
  * - **Multiset equality over the whole stream plus a `reordered` verdict** (the
  *   retired prism-codegen scorer's `matched` / `reordered` split, and
  *   `catalog.ts:skeletonDiff`'s two-directional difference). The verdict split
@@ -93,6 +105,37 @@ export function controlArms(skeleton: readonly string[]): string[] {
   return skeleton.filter((token) => CONTROL_TOKENS.has(token));
 }
 
+/**
+ * `skeleton` with every `ref:<helper>` reach that resolves to a SAME-FILE
+ * method replaced, in place, by that method's own skeleton — the sequence
+ * analogue of the union `effectiveTsCalls` (`compare.ts`) already takes over
+ * call SETS, and taken on the same terms: only a same-file reach splices, so a
+ * cross-file delegation still cannot credit an arm, and the resolution itself
+ * was done by compare.ts (`sameFileHelperSkeletons`), which owns the
+ * per-(file, name) scoping.
+ *
+ * `ArmVerdict`'s rejected option 1 rejected a union over the WHOLE stream
+ * because a set operation cannot be taken over a sequence. It can be taken at
+ * the reach: the splice is positional, so the `order` verdict survives it. Once
+ * per reach and one hop deep — the spliced skeletons carry their own reaches
+ * unresolved, so mutual recursion terminates by construction.
+ */
+export function spliceHelperSkeletons(
+  skeleton: readonly string[],
+  sameFileSkeletons: Readonly<Record<string, readonly string[]>> | undefined,
+): string[] {
+  if (sameFileSkeletons === undefined) return [...skeleton];
+  const out: string[] = [];
+  for (const token of skeleton) {
+    const helper = token.startsWith("ref:")
+      ? sameFileSkeletons[token.slice("ref:".length)]
+      : undefined;
+    if (helper === undefined) out.push(token);
+    else out.push(...helper);
+  }
+  return out;
+}
+
 /** The multiset difference `a - b`, in `a`'s own order. */
 function multisetDifference(a: readonly string[], b: readonly string[]): string[] {
   const remaining = new Map<string, number>();
@@ -108,8 +151,8 @@ function multisetDifference(a: readonly string[], b: readonly string[]): string[
 
 /** The verdict for one pair, or undefined when its arms agree exactly. */
 export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
-  const rubyArms = controlArms(row.ruby);
-  const tsArms = controlArms(row.ts);
+  const rubyArms = controlArms(spliceHelperSkeletons(row.ruby, row.rubyHelpers));
+  const tsArms = controlArms(spliceHelperSkeletons(row.ts, row.tsHelpers));
   const missing = multisetDifference(rubyArms, tsArms);
   const invented = multisetDifference(tsArms, rubyArms);
   if (missing.length > 0 || invented.length > 0) {
