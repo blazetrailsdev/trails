@@ -8,21 +8,21 @@ import {
   hasKey,
   transformValues,
 } from "@blazetrails/ruby-compat";
-import { Type } from "../type/value.js";
+import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
 export class Builder {
-  readonly types: Record<string, Type>;
+  readonly types: Record<string, ValueType>;
   readonly defaultAttributes: Record<string, Attribute>;
 
-  constructor(types: Record<string, Type>, defaultAttributes: Record<string, Attribute> = {}) {
+  constructor(types: Record<string, ValueType>, defaultAttributes: Record<string, Attribute> = {}) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
 
   buildFromDatabase(
     values: Record<string, unknown> = {},
-    additionalTypes: Record<string, Type> = {},
+    additionalTypes: Record<string, ValueType> = {},
   ): AttributeSet {
     return new LazyAttributeSet(values, this.types, additionalTypes, this.defaultAttributes);
   }
@@ -30,16 +30,16 @@ export class Builder {
 
 export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
-  private types: Record<string, Type>;
-  private additionalTypes: Record<string, Type>;
+  private types: Record<string, ValueType>;
+  private additionalTypes: Record<string, ValueType>;
   private defaultAttributes: Record<string, Attribute>;
   private castedValues: Record<string, unknown>;
   private materialized: boolean;
 
   constructor(
     values: Record<string, unknown>,
-    types: Record<string, Type>,
-    additionalTypes: Record<string, Type>,
+    types: Record<string, ValueType>,
+    additionalTypes: Record<string, ValueType>,
     defaultAttributes: Record<string, Attribute>,
     attributes: Record<string, Attribute> = {},
   ) {
@@ -88,7 +88,7 @@ export class LazyAttributeSet extends AttributeSet {
     }
 
     if (valuePresent) {
-      const type = fetch<Type>(this.additionalTypes, name, this.types[name]);
+      const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
       const casted = type.deserialize(value);
       this.castedValues[name] = casted;
       return casted;
@@ -118,7 +118,7 @@ export class LazyAttributeSet extends AttributeSet {
       value = valuePresent ? this.values[name] : undefined;
     }
 
-    const type = fetch<Type>(this.additionalTypes, name, this.types[name]);
+    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type, this.castedValues[name]);
@@ -137,9 +137,9 @@ export class LazyAttributeSet extends AttributeSet {
 
 export class LazyAttributeHash {
   private delegate: Record<string, Attribute>;
-  private types: Record<string, Type>;
+  private types: Record<string, ValueType>;
   private values: Record<string, unknown>;
-  private additionalTypes: Record<string, Type>;
+  private additionalTypes: Record<string, ValueType>;
   private defaultAttributes: Record<string, Attribute>;
   private materialized: boolean;
 
@@ -163,9 +163,9 @@ export class LazyAttributeHash {
   }
 
   constructor(
-    types: Record<string, Type>,
+    types: Record<string, ValueType>,
     values: Record<string, unknown>,
-    additionalTypes: Record<string, Type> = {},
+    additionalTypes: Record<string, ValueType> = {},
     defaultAttributes: Record<string, Attribute> = {},
     delegateHash: Record<string, Attribute> = {},
   ) {
@@ -211,9 +211,9 @@ export class LazyAttributeHash {
   }
 
   marshalDump(): [
-    Record<string, Type>,
+    Record<string, ValueType>,
     Record<string, unknown>,
-    Record<string, Type>,
+    Record<string, ValueType>,
     Record<string, Attribute>,
     Record<string, Attribute>,
   ] {
@@ -222,9 +222,9 @@ export class LazyAttributeHash {
 
   static marshalLoad(
     values: [
-      Record<string, Type>,
+      Record<string, ValueType>,
       Record<string, unknown>,
-      (Record<string, Type> | undefined)?,
+      (Record<string, ValueType> | undefined)?,
       (Record<string, Attribute> | undefined)?,
       (Record<string, Attribute> | undefined)?,
     ],
@@ -251,7 +251,7 @@ export class LazyAttributeHash {
 
   /** @internal */
   assignDefaultValue(name: string): Attribute {
-    const type = fetch<Type>(this.additionalTypes, name, this.types[name]);
+    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
     let valuePresent = true;
     let value: unknown;
     if (Object.hasOwn(this.values, name)) {

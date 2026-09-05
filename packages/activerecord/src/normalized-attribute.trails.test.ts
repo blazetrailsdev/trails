@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
 import { fixtures } from "./test-fixtures.js";
-import { StringType, Type } from "@blazetrails/activemodel";
+import { StringType, ValueType } from "@blazetrails/activemodel";
 import { NormalizedValueType } from "./normalization.js";
 
 class NormalizedCompany extends Company {}
@@ -66,17 +66,20 @@ describe("STI subclass normalizes", () => {
 });
 
 describe("NormalizedValueType equality", () => {
-  const build = (castType: Type, normalizer: (value: unknown) => unknown, normalizeNil = false) =>
-    new NormalizedValueType({ castType, normalizer, normalizeNil });
+  const build = (
+    castType: ValueType,
+    normalizer: (value: unknown) => unknown,
+    normalizeNil = false,
+  ) => new NormalizedValueType({ castType, normalizer, normalizeNil });
 
   it("does not answer equality from the wrapped cast type", () => {
     const castType = new StringType();
     const normalizer = (value: unknown) => value;
 
     expect(build(castType, normalizer).equals(castType)).toBe(false);
-    expect(build(castType, normalizer).equals(build(castType, normalizer) as unknown as Type)).toBe(
-      true,
-    );
+    expect(
+      build(castType, normalizer).equals(build(castType, normalizer) as unknown as ValueType),
+    ).toBe(true);
   });
 
   it("distinguishes normalizer and apply_to_nil", () => {
@@ -84,10 +87,10 @@ describe("NormalizedValueType equality", () => {
     const normalizer = (value: unknown) => value;
 
     expect(
-      build(castType, normalizer).equals(build(castType, (value) => value) as unknown as Type),
+      build(castType, normalizer).equals(build(castType, (value) => value) as unknown as ValueType),
     ).toBe(false);
     expect(
-      build(castType, normalizer).equals(build(castType, normalizer, true) as unknown as Type),
+      build(castType, normalizer).equals(build(castType, normalizer, true) as unknown as ValueType),
     ).toBe(false);
   });
 });

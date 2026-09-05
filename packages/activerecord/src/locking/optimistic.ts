@@ -1,7 +1,7 @@
 import { merge } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import {
   queryConstraintsList,
@@ -12,10 +12,10 @@ import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 
 export class LockingType extends ValueType<number> {
-  private _subtype: Type;
+  private _subtype: ValueType;
   override readonly name: string;
 
-  constructor(subtype: Type) {
+  constructor(subtype: ValueType) {
     super();
     this._subtype = subtype;
     this.name = subtype.name;
@@ -273,7 +273,7 @@ export function _queryConstraintsHash(
 }
 
 /** @internal */
-export function hookAttributeType(this: LockingHost, name: string, castType: Type): Type {
+export function hookAttributeType(this: LockingHost, name: string, castType: ValueType): ValueType {
   if (this.lockOptimistically !== false && name === this._lockingColumn) {
     return new LockingType(castType);
   }

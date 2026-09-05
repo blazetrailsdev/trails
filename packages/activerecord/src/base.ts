@@ -27,7 +27,7 @@ import {
   Dirty as AMDirty,
   JSONSerializer,
   Model,
-  Type,
+  ValueType,
   type AttributeOptions,
   type CallbackConditions,
   type CallbackObject,
@@ -859,13 +859,17 @@ export class Base extends Model {
 
   static attribute(
     name: string,
-    typeName?: string | Type | AttributeOptions,
+    typeName?: string | ValueType | AttributeOptions,
     options?: AttributeOptions,
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
       _initializeGeneratedModules.call(this as never);
     }
-    if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
+    if (
+      typeName !== undefined &&
+      typeof typeName !== "string" &&
+      !(typeName instanceof ValueType)
+    ) {
       options = typeName;
       typeName = undefined;
     }
@@ -878,19 +882,19 @@ export class Base extends Model {
   }
 
   /** @internal */
-  static hookAttributeType(name: string, type: Type): Type {
+  static hookAttributeType(name: string, type: ValueType): ValueType {
     const tzType = tzHookAttributeType.call(this as any, name, type);
     return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
 
-  static typeForAttribute(name: string, block?: () => Type): Type {
+  static typeForAttribute(name: string, block?: () => ValueType): ValueType {
     (ModelSchema.loadSchema as any).call(this);
     const resolved = (this as any).attributeAliases?.[name] ?? name;
     if (block) {
       const attributeTypes = this.attributeTypes();
       return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
     }
-    return this._defaultAttributes().getAttribute(resolved).type!;
+    return this.attributeTypes()[resolved];
   }
 
   static get arelTable(): Table {
@@ -2287,7 +2291,7 @@ export class Base extends Model {
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
   declare attributesBeforeTypeCast: () => Record<string, unknown>;
-  declare typeForAttribute: (name: string, block?: () => Type) => Type;
+  declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];

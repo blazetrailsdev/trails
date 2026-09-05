@@ -25,7 +25,7 @@ import {
   parseMysqlName,
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
@@ -107,7 +107,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   const castTypeNamed = (name: string, limit: number | null = null) =>
-    ({ type: () => name, limit, precision: null, scale: null }) as unknown as Type;
+    ({ type: () => name, limit, precision: null, scale: null }) as unknown as ValueType;
 
   const baseLookupCastType = (sqlType: string | null) => {
     const base = (sqlType ?? "")

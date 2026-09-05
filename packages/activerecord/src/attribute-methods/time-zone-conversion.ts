@@ -1,4 +1,3 @@
-import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -6,7 +5,7 @@ import { classAttribute, included } from "@blazetrails/activesupport";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
-interface TimeValueSubtype extends Type {
+interface TimeValueSubtype extends ValueType {
   userInputInTimeZone(value: unknown): unknown;
 }
 
@@ -38,16 +37,16 @@ export const TimeZoneConversion = {
 };
 
 export class TimeZoneConverter extends ValueType<unknown> {
-  private readonly _subtype: Type;
+  private readonly _subtype: ValueType;
   override readonly name: string;
 
-  constructor(subtype: Type) {
+  constructor(subtype: ValueType) {
     super();
     this._subtype = subtype;
     this.name = subtype.name;
   }
 
-  static wrap(subtype: Type): TimeZoneConverter {
+  static wrap(subtype: ValueType): TimeZoneConverter {
     return subtype instanceof TimeZoneConverter ? subtype : new TimeZoneConverter(subtype);
   }
 
@@ -98,7 +97,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 
   override serializeCastValue(value: unknown): unknown {
-    const sub = this._subtype as ValueTypeInstance;
+    const sub = this._subtype;
     if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
       return sub.itselfIfSerializeCastValueCompatible()
         ? sub.serializeCastValue(value as any)
@@ -147,16 +146,16 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return ns - roundedOff;
   }
 
-  override equals(other: Type): boolean {
+  override equals(other: ValueType): boolean {
     if (!(other instanceof TimeZoneConverter)) return false;
-    const sub = this._subtype as ValueTypeInstance;
+    const sub = this._subtype;
     return typeof sub.equals === "function"
       ? sub.equals(other._subtype)
       : this._subtype === other._subtype;
   }
 
   override map(value: unknown, block: (value: unknown) => unknown): unknown {
-    return (this._subtype as ValueTypeInstance).map(value as never, block);
+    return this._subtype.map(value as never, block);
   }
 
   private convertTimeToTimeZone(value: unknown): unknown {
@@ -244,8 +243,8 @@ interface TimeZoneConversionHost {
 export function hookAttributeType(
   this: TimeZoneConversionHost,
   name: string,
-  castType: Type,
-): Type {
+  castType: ValueType,
+): ValueType {
   if (isCreateTimeZoneConversionAttribute.call(this, name, castType)) {
     return TimeZoneConverter.wrap(castType);
   }
@@ -256,7 +255,7 @@ export function hookAttributeType(
 function isCreateTimeZoneConversionAttribute(
   this: TimeZoneConversionHost,
   name: string,
-  castType: Type,
+  castType: ValueType,
 ): boolean {
   const enabledForColumn =
     this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name as any);

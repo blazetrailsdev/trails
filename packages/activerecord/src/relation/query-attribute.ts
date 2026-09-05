@@ -1,9 +1,9 @@
-import { Attribute, Type } from "@blazetrails/activemodel";
+import { Attribute, ValueType } from "@blazetrails/activemodel";
 import { Substitute } from "../statement-cache.js";
 
-type CastType = Pick<Type, "cast" | "serialize">;
+type CastType = Pick<ValueType, "cast" | "serialize">;
 
-class DelegatingType extends Type<unknown> {
+class DelegatingType extends ValueType<unknown> {
   readonly name = "query";
   private _delegate: CastType;
 
@@ -21,8 +21,9 @@ class DelegatingType extends Type<unknown> {
   }
 }
 
-function ensureType(type: CastType): Type {
-  if (type instanceof Type) return type;
+function ensureType(type: CastType | null): ValueType | null {
+  if (type === null) return type;
+  if (type instanceof ValueType) return type;
   return new DelegatingType(type);
 }
 
@@ -30,7 +31,7 @@ export class QueryAttribute extends Attribute {
   /** @internal */
   private _unboundable?: 1 | -1 | false;
 
-  constructor(name: string, value: unknown, type: CastType) {
+  constructor(name: string, value: unknown, type: CastType | null) {
     super(name, value, ensureType(type));
   }
 
@@ -39,7 +40,7 @@ export class QueryAttribute extends Attribute {
   }
 
   override withCastValue(value: unknown): QueryAttribute {
-    return new QueryAttribute(this.name, value, this.type!);
+    return new QueryAttribute(this.name, value, this.type);
   }
 
   override get valueForDatabase(): unknown {

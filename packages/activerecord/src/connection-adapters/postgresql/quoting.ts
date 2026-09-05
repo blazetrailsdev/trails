@@ -2,7 +2,7 @@ import {
   BinaryData,
   DateInfinity,
   DateNegativeInfinity,
-  type Type,
+  type ValueType,
 } from "@blazetrails/activemodel";
 import { ActiveRecord } from "../../ar-config.js";
 import {
@@ -48,7 +48,7 @@ export interface DefaultExpressionColumn {
 
 export interface CastTypeLookupHost {
   lookupCastTypeFromColumn(column: DefaultExpressionColumn): { serialize(value: unknown): unknown };
-  lookupCastType(sqlType: string | null): Type;
+  lookupCastType(sqlType: string | null): ValueType;
 }
 
 const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
@@ -214,7 +214,7 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export interface LookupableTypeMap {
-  lookup(oid: number, fmod: number, sqlType: string): Type;
+  lookup(oid: number, fmod: number, sqlType: string): ValueType;
 }
 
 export interface RegtypeOidHost {
@@ -234,7 +234,7 @@ export interface CastableColumn {
  * @missingRailsCall query_value — PERMANENT
  * @missingRailsCall quote — PERMANENT
  */
-export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): Type {
+export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): ValueType {
   return abstractLookupCastType.call(this as never, regtypeOid.call(this, sqlType));
 }
 
@@ -251,7 +251,7 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
 export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap },
   column: CastableColumn,
-): Type {
+): ValueType {
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

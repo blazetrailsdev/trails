@@ -5,7 +5,7 @@ import {
   AttributeSetBuilder,
   YAMLEncoder,
   type AttributeSet,
-  type Type,
+  type ValueType,
 } from "@blazetrails/activemodel";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import {
@@ -303,7 +303,7 @@ export interface SchemaHost {
   connection: any;
   prototype: object;
   superclass?: SchemaHost;
-  hookAttributeType?(name: string, type: Type): Type;
+  hookAttributeType?(name: string, type: ValueType): ValueType;
   /** @internal */
   reloadSchemaFromCache(): void;
 }
@@ -860,9 +860,13 @@ export const ClassMethods = {
 };
 
 export const InstanceMethods = {
-  typeForAttribute(this: { constructor: unknown }, name: string, block?: () => Type): Type {
+  typeForAttribute(
+    this: { constructor: unknown },
+    name: string,
+    block?: () => ValueType,
+  ): ValueType {
     return (
-      this.constructor as { typeForAttribute(n: string, b?: () => Type): Type }
+      this.constructor as { typeForAttribute(n: string, b?: () => ValueType): ValueType }
     ).typeForAttribute(name, block);
   },
 

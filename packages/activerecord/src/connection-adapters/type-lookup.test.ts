@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { adapterType } from "../test-adapter.js";
 
 interface TypeLookupConnection {
-  lookupCastType(sqlType: string): Type;
+  lookupCastType(sqlType: string): ValueType;
 }
 
 let adapter: TypeLookupConnection;

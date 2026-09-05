@@ -3,7 +3,7 @@ import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
 
@@ -79,7 +79,7 @@ export interface SchemaSource {
   /** @internal */
   indexes(tableName: string): Promise<IndexInfo[]>;
   /** @internal */
-  lookupCastTypeFromColumn(column: ColumnInfo): Type;
+  lookupCastTypeFromColumn(column: ColumnInfo): ValueType;
 }
 
 export type SchemaDumpLanguage = "ts" | "js";
@@ -158,7 +158,7 @@ class AdapterSchemaSource implements SchemaSource {
     return this._adapter.tables();
   }
 
-  lookupCastTypeFromColumn(column: ColumnInfo): Type {
+  lookupCastTypeFromColumn(column: ColumnInfo): ValueType {
     return this._adapter.lookupCastTypeFromColumn(column as { sqlType: string | null });
   }
 

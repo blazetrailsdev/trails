@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { AdapterSpecificRegistry, TypeConflictError } from "./adapter-specific-registry.js";
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
-class TestType extends Type<unknown> {
+class TestType extends ValueType<unknown> {
   readonly name = "test";
   readonly args: unknown;
   constructor(args?: unknown) {
@@ -17,7 +17,7 @@ class TestType extends Type<unknown> {
   }
 }
 
-class FooType extends Type<unknown> {
+class FooType extends ValueType<unknown> {
   readonly name = "foo";
   cast(value: unknown) {
     return value;
@@ -26,7 +26,7 @@ class FooType extends Type<unknown> {
     return "foo";
   }
 }
-class BarType extends Type<unknown> {
+class BarType extends ValueType<unknown> {
   readonly name = "bar";
   cast(value: unknown) {
     return value;
@@ -36,10 +36,10 @@ class BarType extends Type<unknown> {
   }
 }
 
-class Decoration extends Type<unknown> {
+class Decoration extends ValueType<unknown> {
   readonly name = "decoration";
-  readonly value: Type;
-  constructor(value: Type) {
+  readonly value: ValueType;
+  constructor(value: ValueType) {
     super();
     this.value = value;
   }
@@ -50,10 +50,10 @@ class Decoration extends Type<unknown> {
     return "decoration";
   }
 }
-class OtherDecoration extends Type<unknown> {
+class OtherDecoration extends ValueType<unknown> {
   readonly name = "other_decoration";
-  readonly value: Type;
-  constructor(value: Type) {
+  readonly value: ValueType;
+  constructor(value: ValueType) {
     super();
     this.value = value;
   }

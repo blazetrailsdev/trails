@@ -1,12 +1,12 @@
 import { ArgumentError } from "../attribute-assignment.js";
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
 export type TypeOptions = { precision?: number; scale?: number; limit?: number } & Record<
   string,
   unknown
 >;
-export type TypeFactory = (name: string, ...args: unknown[]) => Type;
-export type TypeClass = new (...args: never[]) => Type;
+export type TypeFactory = (name: string, ...args: unknown[]) => ValueType;
+export type TypeClass = new (...args: never[]) => ValueType;
 
 export class TypeRegistry {
   /** @internal */
@@ -23,7 +23,7 @@ export class TypeRegistry {
     this.registrations.set(typeName, block);
   }
 
-  lookup(symbol: string, ...args: unknown[]): Type {
+  lookup(symbol: string, ...args: unknown[]): ValueType {
     const registration = this.registrations.get(symbol);
 
     if (registration) {

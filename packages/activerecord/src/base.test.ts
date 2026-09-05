@@ -10,7 +10,7 @@ import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport"
 import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { IntegerType, Type } from "@blazetrails/activemodel";
+import { IntegerType, ValueType } from "@blazetrails/activemodel";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Company as CanonicalCompany } from "./test-helpers/models/company.js";
 import { PostRecord } from "./test-helpers/models/post.js";
@@ -658,7 +658,7 @@ describe("BasicsTest", () => {
     const attrs = { ...(seed as any).attributes };
     delete attrs.id;
 
-    class Typecast extends Type {
+    class Typecast extends ValueType {
       readonly name = "typecast";
       cast() {
         return "t.lo";

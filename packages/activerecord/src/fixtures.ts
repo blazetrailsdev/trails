@@ -22,7 +22,7 @@ import { Zlib } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
-import { defaultValue, type Type } from "@blazetrails/activemodel";
+import { defaultValue, type ValueType } from "@blazetrails/activemodel";
 
 /** @internal */
 export class FixtureSetPrimaryKeyError extends Error {
@@ -469,7 +469,7 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   const pending: Array<{ name: string; scheme: unknown }> =
     (ModelClass as any)._pendingEncryptions ?? [];
   for (const { name, scheme } of pending) {
-    const existingType = (ModelClass as any).typeForAttribute(name) as Type;
+    const existingType = (ModelClass as any).typeForAttribute(name) as ValueType;
     const castType =
       existingType instanceof EncryptedAttributeType
         ? existingType.castType

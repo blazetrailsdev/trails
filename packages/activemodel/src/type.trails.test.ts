@@ -3,7 +3,7 @@ import { Types } from "./index.js";
 
 describe("Type#itselfIfSerializeCastValueCompatible", () => {
   it("base Type is compatible (both methods at the base class)", () => {
-    class Base extends Types.Type<string> {
+    class Base extends Types.ValueType<string> {
       readonly name = "base";
       cast(v: unknown) {
         return v as string;
@@ -13,7 +13,7 @@ describe("Type#itselfIfSerializeCastValueCompatible", () => {
   });
 
   it("subclass that overrides only serialize is incompatible", () => {
-    class SerializeOnly extends Types.Type<string> {
+    class SerializeOnly extends Types.ValueType<string> {
       readonly name = "serialize_only";
       cast(v: unknown) {
         return v as string;
@@ -26,7 +26,7 @@ describe("Type#itselfIfSerializeCastValueCompatible", () => {
   });
 
   it("subclass that overrides both stays compatible", () => {
-    class Both extends Types.Type<string> {
+    class Both extends Types.ValueType<string> {
       readonly name = "both";
       cast(v: unknown) {
         return v as string;
@@ -42,7 +42,7 @@ describe("Type#itselfIfSerializeCastValueCompatible", () => {
   });
 
   it("subclass overriding only serializeCastValue stays compatible", () => {
-    class CastOnly extends Types.Type<string> {
+    class CastOnly extends Types.ValueType<string> {
       readonly name = "cast_only";
       cast(v: unknown) {
         return v as string;

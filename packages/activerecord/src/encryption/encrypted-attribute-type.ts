@@ -1,4 +1,4 @@
-import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
+import { ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
@@ -15,7 +15,7 @@ import {
 export class EncryptedAttributeType extends ValueType {
   readonly name = "encrypted";
   readonly scheme: Scheme;
-  readonly castType: Type;
+  readonly castType: ValueType;
   private _previousType: boolean;
   private _default?: unknown;
   private _previousTypes?: Map<boolean, EncryptedAttributeType[]>;
@@ -25,7 +25,7 @@ export class EncryptedAttributeType extends ValueType {
 
   constructor(options: {
     scheme: Scheme;
-    castType?: Type;
+    castType?: ValueType;
     previousType?: boolean;
     default?: unknown;
   }) {
@@ -288,9 +288,9 @@ export class EncryptedAttributeType extends ValueType {
   /** @internal */
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
-      const binaryCastType: Type =
+      const binaryCastType: ValueType =
         this.castType.isSerialized() && this.castType instanceof Serialized
-          ? this.castType.subtype
+          ? this.castType.subtype!
           : this.castType;
       const raw = binaryCastType.deserialize?.(value) ?? value;
       return raw instanceof Uint8Array ? Buffer.from(raw).toString("latin1") : raw;

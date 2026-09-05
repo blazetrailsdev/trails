@@ -1,5 +1,4 @@
 import {
-  Type,
   BigIntegerType,
   BinaryType,
   BooleanType,
@@ -11,7 +10,7 @@ import {
   ValueType,
   typeRegistry,
 } from "@blazetrails/activemodel";
-export { Type } from "@blazetrails/activemodel";
+export { ValueType } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 import { ConnectionNotEstablished } from "./errors.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
@@ -51,7 +50,7 @@ export const String = StringType;
 export const Value = ValueType;
 
 let _registry = new AdapterSpecificRegistry();
-let _defaultValue: Type | undefined;
+let _defaultValue: ValueType | undefined;
 let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
 export interface AdapterNameSource {
@@ -91,22 +90,22 @@ export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): vo
 
 export function register(
   typeName: string,
-  klass?: (new (...args: any[]) => Type) | null,
+  klass?: (new (...args: any[]) => ValueType) | null,
   options?: { adapter?: AdapterName; override?: boolean },
-  block?: (...args: unknown[]) => Type,
+  block?: (...args: unknown[]) => ValueType,
 ): void {
   registry().register(typeName, klass, options, block);
 }
 
 export function addModifier(
   options: Record<string, unknown>,
-  klass: new (subtype: Type) => Type,
+  klass: new (subtype: ValueType) => ValueType,
   registrationOptions?: { adapter?: AdapterName },
 ): void {
   registry().addModifier(options, klass, registrationOptions);
 }
 
-export function lookup(...argsAndKwargs: unknown[]): Type {
+export function lookup(...argsAndKwargs: unknown[]): ValueType {
   const last = argsAndKwargs[argsAndKwargs.length - 1];
   const hasKwargs =
     last !== null &&
@@ -119,7 +118,7 @@ export function lookup(...argsAndKwargs: unknown[]): Type {
   return registry().lookup(...args, { ...kwargs, adapter });
 }
 
-export function defaultValue(): Type {
+export function defaultValue(): ValueType {
   return (_defaultValue ??= new ValueType());
 }
 

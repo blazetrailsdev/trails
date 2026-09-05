@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { Nodes, Visitors } from "@blazetrails/arel";
-import { ArgumentError, SerializeCastValue, type Type } from "@blazetrails/activemodel";
+import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -476,7 +476,7 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
-  private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
+  private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, ValueType> {
     const columns = this._insertAll.schemaCacheColumnsHash(tableName);
 
     const unknownColumn = keys.find((key) => !(key in columns));
@@ -484,7 +484,7 @@ export class Builder implements InsertBuilder {
       throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
     }
 
-    const types: Record<string, Type> = {};
+    const types: Record<string, ValueType> = {};
     for (const key of keys) types[key] = this.model.typeForAttribute(key);
     return types;
   }

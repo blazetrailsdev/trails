@@ -1,12 +1,12 @@
 import type { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
-import type { Type } from "../type/value.js";
+import type { ValueType } from "../type/value.js";
 import type { AttributeSetCoder } from "./codecs/codec.js";
 
 export class YAMLEncoder {
-  private defaultTypes: Record<string, Type>;
+  private defaultTypes: Record<string, ValueType>;
 
-  constructor(defaultTypes: Record<string, Type>) {
+  constructor(defaultTypes: Record<string, ValueType>) {
     this.defaultTypes = defaultTypes;
   }
 

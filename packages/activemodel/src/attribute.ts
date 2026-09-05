@@ -1,4 +1,4 @@
-import { Type } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { rbEqual } from "@blazetrails/ruby-compat";
@@ -28,7 +28,7 @@ export abstract class Attribute {
 
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
-  readonly type: Type | null;
+  readonly type: ValueType | null;
   /** @internal */
   originalAttribute: Attribute | null;
   private _value: unknown;
@@ -39,7 +39,7 @@ export abstract class Attribute {
   static fromDatabase(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type | null,
+    type: ValueType | null,
     value?: unknown,
   ): FromDatabase {
     return new FromDatabase(name, valueBeforeTypeCast, type, null, value);
@@ -48,7 +48,7 @@ export abstract class Attribute {
   static fromUser(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type | null,
+    type: ValueType | null,
     originalAttribute: Attribute | null = null,
   ): FromUser {
     return new FromUser(name, valueBeforeTypeCast, type, originalAttribute);
@@ -57,7 +57,7 @@ export abstract class Attribute {
   static withCastValue(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type | null,
+    type: ValueType | null,
   ): WithCastValue {
     return new WithCastValue(name, valueBeforeTypeCast, type);
   }
@@ -66,7 +66,7 @@ export abstract class Attribute {
     return new Null(name);
   }
 
-  static uninitialized(name: string, type: Type | null): Uninitialized {
+  static uninitialized(name: string, type: ValueType | null): Uninitialized {
     return new Uninitialized(name, type);
   }
 
@@ -77,7 +77,7 @@ export abstract class Attribute {
   constructor(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type | null,
+    type: ValueType | null,
     originalAttribute: Attribute | null = null,
     value?: unknown,
   ) {
@@ -160,14 +160,14 @@ export abstract class Attribute {
     return (this.constructor as typeof Attribute).withCastValue(this.name, value, this.type);
   }
 
-  withType(type: Type | null): Attribute {
+  withType(type: ValueType | null): Attribute {
     if (this.changedInPlace()) {
       return this.withValueFromUser(this.value).withType(type);
     }
     const Ctor = this.constructor as new (
       name: string,
       valueBeforeTypeCast: unknown,
-      type: Type | null,
+      type: ValueType | null,
       originalAttribute: Attribute | null,
     ) => Attribute;
     return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
@@ -305,7 +305,7 @@ export class Null extends Attribute {
     return null;
   }
 
-  override withType(type: Type | null): Attribute {
+  override withType(type: ValueType | null): Attribute {
     return Attribute.withCastValue(this.name, null, type);
   }
 
@@ -321,7 +321,7 @@ export class Null extends Attribute {
 export class Uninitialized extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
-  constructor(name: string, type: Type | null) {
+  constructor(name: string, type: ValueType | null) {
     super(name, null, type);
   }
 
@@ -345,7 +345,7 @@ export class Uninitialized extends Attribute {
     return new Uninitialized(this.name, this.type);
   }
 
-  override withType(type: Type | null): Attribute {
+  override withType(type: ValueType | null): Attribute {
     return new Uninitialized(this.name, type);
   }
 

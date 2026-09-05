@@ -2,7 +2,7 @@ import {
   Attribute,
   AttributeSet,
   UserProvidedDefault,
-  type Type,
+  type ValueType,
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
@@ -29,7 +29,7 @@ export interface Attributes {
   ): void;
   defineAttribute(
     name: string,
-    castType: Type,
+    castType: ValueType,
     options?: { default?: unknown; userProvidedDefault?: boolean },
   ): void;
   _defaultAttributes(): AttributeSet;
@@ -38,7 +38,7 @@ export interface Attributes {
 export function defineAttribute(
   this: AnyClass,
   name: string,
-  castType: Type,
+  castType: ValueType,
   options: { default?: unknown; userProvidedDefault?: boolean } = {},
 ): void {
   const { default: default_ = NO_DEFAULT_PROVIDED, userProvidedDefault = true } = options;
@@ -118,7 +118,7 @@ function defineDefaultAttribute(
   this: AnyClass,
   name: string,
   value: unknown,
-  type: Type,
+  type: ValueType,
   { fromUser }: { fromUser: boolean },
 ): void {
   let defaultAttribute: Attribute;
@@ -147,7 +147,7 @@ export function resolveTypeName(
   this: AnyClass,
   name: string,
   options?: Record<string, unknown>,
-): Type {
+): ValueType {
   return typeLookup(name, {
     ...options,
     adapter: adapterNameFrom(this as unknown as AdapterNameSource),
@@ -155,9 +155,9 @@ export function resolveTypeName(
 }
 
 /** @internal */
-function typeForColumn(this: AnyClass, connection: unknown, column: unknown): Type {
+function typeForColumn(this: AnyClass, connection: unknown, column: unknown): ValueType {
   const lookupCastTypeFromColumn = (
-    connection as { lookupCastTypeFromColumn?: (c: unknown) => Type }
+    connection as { lookupCastTypeFromColumn?: (c: unknown) => ValueType }
   )?.lookupCastTypeFromColumn;
   let type =
     (typeof lookupCastTypeFromColumn === "function"
@@ -165,7 +165,7 @@ function typeForColumn(this: AnyClass, connection: unknown, column: unknown): Ty
       : null) ?? typeDefaultValue();
 
   if (this.immutableStringsByDefault) {
-    const toImmutableString = (type as { toImmutableString?: () => Type }).toImmutableString;
+    const toImmutableString = (type as { toImmutableString?: () => ValueType }).toImmutableString;
     if (typeof toImmutableString === "function") type = toImmutableString.call(type);
   }
 

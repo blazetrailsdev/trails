@@ -1,4 +1,4 @@
-import { ArgumentError, type Type } from "@blazetrails/activemodel";
+import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";
@@ -109,7 +109,7 @@ export class TypeMapInitializer {
 
   private register(
     oid: number | string,
-    oidType: Type | ((oid: number | string, ...args: unknown[]) => Type),
+    oidType: ValueType | ((oid: number | string, ...args: unknown[]) => ValueType),
   ): void {
     oid = this.assertValidRegistration(oid, oidType);
     if (typeof oidType === "function") {
@@ -127,7 +127,7 @@ export class TypeMapInitializer {
   private registerWithSubtype(
     oid: number | string,
     targetOid: number,
-    block: (subtype: OidSubtype) => Type,
+    block: (subtype: OidSubtype) => ValueType,
   ): void {
     if (this.store.isKey(targetOid)) {
       this.register(oid, (_oid: number | string, ...args: unknown[]) =>

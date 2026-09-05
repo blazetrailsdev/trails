@@ -2174,15 +2174,12 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
 // Keyed by ts class name → ts superclass name that should be accepted.
 // - Arel Table/Attribute: Rails has no super (plain object or
 //   `Struct.new(...)`), TS roots them at `Node` for uniform AST walking.
-// - ActiveModel ValueType: Rails' `Value` has no super, TS adds an
-//   abstract `Type` above so subclasses can declare `abstract cast`.
 // - AR LockingType / Serialized: Rails uses `DelegateClass(Type::Value)`
 //   — a dynamic parent our extractor can't resolve (comes through as
 //   null). TS extends `ValueType` directly, which matches the intent.
 const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["Table", "Node"],
   ["Attribute", "Node"],
-  ["ValueType", "Type"],
   ["LockingType", "ValueType"],
   ["Serialized", "ValueType"],
   ["TimeZoneConverter", "ValueType"],

@@ -1,4 +1,4 @@
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { defaultValue } from "../type.js";
 
@@ -16,12 +16,12 @@ export class Connection {
     return type.serialize(value);
   }
 
-  typeForAttribute(attrName: unknown): Type {
+  typeForAttribute(attrName: unknown): ValueType {
     const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaCache;
     const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
     const column = columnsHash?.[toS(attrName)];
     const type = column
-      ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as Type | undefined)
+      ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as ValueType | undefined)
       : undefined;
     return type ?? defaultValue();
   }

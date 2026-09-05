@@ -9,7 +9,7 @@ import {
   rbInspect,
   transformValues,
 } from "@blazetrails/ruby-compat";
-import { Type } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 
 export class AttributeSet {
@@ -43,8 +43,8 @@ export class AttributeSet {
     this._attributes[name] = value;
   }
 
-  castTypes(): Record<string, Type> {
-    return transformValues(this.attributes(), (attr) => attr.type!);
+  castTypes(): Record<string, ValueType | null> {
+    return transformValues(this.attributes(), (attr) => attr.type);
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
@@ -88,7 +88,7 @@ export class AttributeSet {
     if (existing) {
       this._attributes[name] = existing.withValueFromDatabase(value);
     } else {
-      const colType = (type as Type) ?? defaultValue();
+      const colType = (type as ValueType) ?? defaultValue();
       this._attributes[name] = Attribute.fromDatabase(name, value, colType);
     }
   }

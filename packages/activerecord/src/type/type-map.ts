@@ -1,19 +1,19 @@
-import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 export class TypeMap {
-  private _mapping: Map<string | RegExp, (...args: string[]) => Type> = new Map();
+  private _mapping: Map<string | RegExp, (...args: string[]) => ValueType> = new Map();
   private _parent?: TypeMap;
-  private _cache: Map<string | null, Type> = new Map();
+  private _cache: Map<string | null, ValueType> = new Map();
 
   constructor(parent?: TypeMap) {
     this._parent = parent;
   }
 
-  lookup(lookupKey: string | null): Type {
+  lookup(lookupKey: string | null): ValueType {
     return this.fetch(lookupKey, () => new ValueType());
   }
 
-  fetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
+  fetch(lookupKey: string | null, fallback?: (key: string) => ValueType): ValueType {
     const cached = this._cache.get(lookupKey);
     if (cached) return cached;
     const result = this.performFetch(lookupKey, fallback);
@@ -21,7 +21,11 @@ export class TypeMap {
     return result;
   }
 
-  registerType(key: string | RegExp, value?: Type, block?: (...args: string[]) => Type): void {
+  registerType(
+    key: string | RegExp,
+    value?: ValueType,
+    block?: (...args: string[]) => ValueType,
+  ): void {
     if (!value && !block) throw new ArgumentError("registerType requires a value or block");
     if (block) {
       this._mapping.set(key, block);
@@ -39,7 +43,10 @@ export class TypeMap {
   }
 
   /** @missingRailsCall call — PERMANENT */
-  protected performFetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
+  protected performFetch(
+    lookupKey: string | null,
+    fallback?: (key: string) => ValueType,
+  ): ValueType {
     const matchingPair = [...this._mapping.entries()]
       .reverse()
       .find(([key]) =>
