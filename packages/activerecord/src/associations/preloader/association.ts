@@ -269,13 +269,13 @@ export class Association {
   private associationKeyType(): string | undefined {
     const associationKeyName = this.associationKeyName;
     if (Array.isArray(associationKeyName)) return undefined;
-    return this.klass.typeForAttribute(associationKeyName).type();
+    return this.klass.typeForAttribute(associationKeyName)!.type();
   }
 
   private ownerKeyType(): string | undefined {
     const ownerKeyName = this.ownerKeyName;
     if (this.model == null || Array.isArray(ownerKeyName)) return undefined;
-    return this.model.typeForAttribute(ownerKeyName).type();
+    return this.model.typeForAttribute(ownerKeyName)!.type();
   }
 
   /** @internal */

@@ -17,20 +17,6 @@ export class BigDecimal {
   private exp: number;
   private readonly nonFinite: "NaN" | "Infinity" | null;
 
-  /** @noRailsEquivalent PERMANENT */
-  get intDigits(): string {
-    if (this.digits === "" || this.exp <= 0) return "0";
-    return this.exp >= this.digits.length
-      ? this.digits.padEnd(this.exp, "0")
-      : this.digits.slice(0, this.exp);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  get fracDigits(): string {
-    if (this.digits === "" || this.exp >= this.digits.length) return "";
-    return this.exp >= 0 ? this.digits.slice(this.exp) : "0".repeat(-this.exp) + this.digits;
-  }
-
   constructor(
     value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
     ndigits = 0,
@@ -81,8 +67,20 @@ export class BigDecimal {
       return this.nonFinite === "NaN" ? "NaN" : `${prefix}Infinity`;
     }
     if (scientific) return `${prefix}${this.toScientific(group)}`;
-    const frac = this.fracDigits === "" ? "0" : this.fracDigits;
-    const intPart = group > 0 ? groupFromRight(this.intDigits, group) : this.intDigits;
+    const intDigits =
+      this.digits === "" || this.exp <= 0
+        ? "0"
+        : this.exp >= this.digits.length
+          ? this.digits.padEnd(this.exp, "0")
+          : this.digits.slice(0, this.exp);
+    const fracDigits =
+      this.digits === "" || this.exp >= this.digits.length
+        ? ""
+        : this.exp >= 0
+          ? this.digits.slice(this.exp)
+          : "0".repeat(-this.exp) + this.digits;
+    const frac = fracDigits === "" ? "0" : fracDigits;
+    const intPart = group > 0 ? groupFromRight(intDigits, group) : intDigits;
     const fracPart = group > 0 ? groupFromLeft(frac, group) : frac;
     return `${prefix}${intPart}.${fracPart}`;
   }
@@ -99,7 +97,12 @@ export class BigDecimal {
     if (this.nonFinite !== null) {
       throw new FloatDomainError(`Computation results in '${this.sign}Infinity'`);
     }
-    const magnitude = BigInt(this.intDigits === "" ? "0" : this.intDigits);
+    const magnitude =
+      this.exp <= 0
+        ? 0n
+        : this.exp >= this.digits.length
+          ? BigInt(this.digits) * 10n ** BigInt(this.exp - this.digits.length)
+          : BigInt(this.digits.slice(0, this.exp));
     const signed = this.sign === "-" ? -magnitude : magnitude;
     const num = Number(signed);
     return Number.isSafeInteger(num) ? num : (signed as unknown as number);
@@ -125,9 +128,7 @@ export class BigDecimal {
   abs(): BigDecimal {
     if (this.isNan()) return this;
     if (this.nonFinite !== null) return BigDecimal.INFINITY;
-    return this.sign === "-"
-      ? BigDecimal.fromUnscaled(this.unscaled(-1), this.fracDigits.length)
-      : this;
+    return this.sign === "-" ? BigDecimal.fromUnscaled(this.unscaled(-1), this.scale()) : this;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -140,7 +141,7 @@ export class BigDecimal {
     }
     return BigDecimal.fromUnscaled(
       this.unscaled() * other.unscaled(),
-      this.fracDigits.length + other.fracDigits.length,
+      this.scale() + other.scale(),
     );
   }
 
@@ -158,20 +159,29 @@ export class BigDecimal {
       const otherRank = other.isInfinite() ?? 0;
       return thisRank < otherRank ? -1 : thisRank > otherRank ? 1 : 0;
     }
-    const scale = Math.max(this.fracDigits.length, other.fracDigits.length);
-    const left = this.unscaledAt(scale);
-    const right = other.unscaledAt(scale);
-    return left < right ? -1 : left > right ? 1 : 0;
+    const thisSign = this.isZero() ? 0 : this.sign === "-" ? -1 : 1;
+    const otherSign = other.isZero() ? 0 : other.sign === "-" ? -1 : 1;
+    if (thisSign !== otherSign) return thisSign < otherSign ? -1 : 1;
+    if (thisSign === 0) return 0;
+    if (this.exp !== other.exp) return this.exp < other.exp ? -thisSign : thisSign;
+    const width = Math.max(this.digits.length, other.digits.length);
+    const left = this.digits.padEnd(width, "0");
+    const right = other.digits.padEnd(width, "0");
+    return left === right ? 0 : left < right ? -thisSign : thisSign;
   }
 
   /** @noRailsEquivalent PERMANENT */
   round(n = 0, mode = ":default"): BigDecimal {
     if (this.nonFinite !== null) return this;
-    if (n >= this.fracDigits.length) return this;
-    const digits = this.intDigits + this.fracDigits;
-    const keepCount = this.intDigits.length + n;
-    const kept = keepCount > 0 ? digits.slice(0, keepCount) : "";
-    const rest = keepCount > 0 ? digits.slice(keepCount) : "0".repeat(-keepCount) + digits;
+    if (n >= this.scale()) return this;
+    const keepCount = this.exp + n;
+    const kept = keepCount > 0 ? this.digits.slice(0, keepCount) : "";
+    const rest =
+      keepCount > 0
+        ? this.digits.slice(keepCount)
+        : keepCount === 0
+          ? this.digits
+          : `0${this.digits}`;
     let value = BigInt(kept === "" ? "0" : kept);
     if (roundsAway(rest, kept, this.sign === "-", mode)) value += 1n;
     if (n < 0) value *= 10n ** BigInt(-n);
@@ -184,12 +194,15 @@ export class BigDecimal {
   }
 
   private unscaled(signum = 1): bigint {
-    const magnitude = BigInt(this.intDigits + this.fracDigits);
+    const magnitude =
+      this.digits === ""
+        ? 0n
+        : BigInt(this.digits) * 10n ** BigInt(Math.max(this.exp - this.digits.length, 0));
     return this.sign === "-" && signum > 0 ? -magnitude : magnitude;
   }
 
-  private unscaledAt(scale: number): bigint {
-    return this.unscaled() * 10n ** BigInt(scale - this.fracDigits.length);
+  private scale(): number {
+    return Math.max(this.digits.length - this.exp, 0);
   }
 
   private static fromUnscaled(value: bigint, scale: number): BigDecimal {

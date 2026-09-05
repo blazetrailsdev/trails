@@ -40,7 +40,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("cidr");
       expect(column.array).toBeFalsy();
 
-      const type = PostgresqlNetworkAddress.typeForAttribute("cidr_address");
+      const type = PostgresqlNetworkAddress.typeForAttribute("cidr_address")!;
       expect(type.isBinary()).toBe(false);
     });
 
@@ -50,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("inet");
       expect(column.array).toBeFalsy();
 
-      const type = PostgresqlNetworkAddress.typeForAttribute("inet_address");
+      const type = PostgresqlNetworkAddress.typeForAttribute("inet_address")!;
       expect(type.isBinary()).toBe(false);
     });
 
@@ -60,7 +60,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("macaddr");
       expect(column.array).toBeFalsy();
 
-      const type = PostgresqlNetworkAddress.typeForAttribute("mac_address");
+      const type = PostgresqlNetworkAddress.typeForAttribute("mac_address")!;
       expect(type.isBinary()).toBe(false);
     });
 

@@ -155,8 +155,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle.typeForAttribute("radius").type()).toBe("integer");
-    expect(Shape.typeForAttribute("radius").type()).toBeUndefined();
+    expect(Circle.typeForAttribute("radius")!.type()).toBe("integer");
+    expect(Shape.typeForAttribute("radius")!.type()).toBeUndefined();
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
@@ -306,12 +306,12 @@ describe("sync loadSchema / columnsHash", () => {
     Post.columnsHash();
 
     expect(Object.keys(Post.columnsHash())).toContain("guid");
-    expect(Post.typeForAttribute("title").type()).toBe("string");
+    expect(Post.typeForAttribute("title")!.type()).toBe("string");
 
     (resetColumnInformation as any).call(Post);
 
     expect((Post as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
-    expect(Post.typeForAttribute("title").type()).toBe("string");
+    expect(Post.typeForAttribute("title")!.type()).toBe("string");
   });
 
   function makeResettableAdapter(cols: Record<string, unknown>) {

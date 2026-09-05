@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.type).toBe("decimal");
       expect(column.sqlType).toBe("custom_money");
       assertNotPredicate(column, (c) => c.isArray());
-      const type = PostgresqlDomain.typeForAttribute("price");
+      const type = PostgresqlDomain.typeForAttribute("price")!;
       assertNotPredicate(type, (t) => t.isBinary());
     });
 

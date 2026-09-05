@@ -295,7 +295,7 @@ export function getStiBase(modelClass: object): typeof Base {
 /** @internal */
 export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
   typeName = baseClass.baseClass
-    .typeForAttribute(baseClass.inheritanceColumn as string)
+    .typeForAttribute(baseClass.inheritanceColumn as string)!
     .cast(typeName) as string;
 
   const subclass = baseClass.stiClassFor(typeName);

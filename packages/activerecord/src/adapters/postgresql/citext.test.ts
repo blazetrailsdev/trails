@@ -46,7 +46,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("citext");
       expect(column.array).toBeFalsy();
 
-      const type = Citext.typeForAttribute("cival");
+      const type = Citext.typeForAttribute("cival")!;
       expect(type.isBinary()).toBe(false);
     });
 

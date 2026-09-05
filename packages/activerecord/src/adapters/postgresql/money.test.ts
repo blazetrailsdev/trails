@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.scale).toBe(2);
       expect(column.array).toBeFalsy();
 
-      const type = PostgresqlMoney.typeForAttribute("wealth");
+      const type = PostgresqlMoney.typeForAttribute("wealth")!;
       expect(type.isBinary()).toBe(false);
     });
 
@@ -72,7 +72,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("money type cast", () => {
-      const type = PostgresqlMoney.typeForAttribute("wealth");
+      const type = PostgresqlMoney.typeForAttribute("wealth")!;
       for (const [str, num] of [
         ["12,345,678.12", 12345678.12],
         ["12.345.678,12", 12345678.12],
@@ -89,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("money regex backtracking", () => {
-      const type = PostgresqlMoney.typeForAttribute("wealth");
+      const type = PostgresqlMoney.typeForAttribute("wealth")!;
       expect(Number(type.cast("$" + ",".repeat(100000) + ".11!"))).toBeCloseTo(0, 2);
       expect(Number(type.cast("$" + ".".repeat(100000) + ",11!"))).toBeCloseTo(0, 2);
     });

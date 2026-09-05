@@ -17,7 +17,7 @@ describe("EnumTest", () => {
   });
 
   it("type.serialize", () => {
-    const type = Book.typeForAttribute("status");
+    const type = Book.typeForAttribute("status")!;
 
     expect(type.serialize(0)).toBe(0);
     expect(type.serialize(1)).toBe(1);
@@ -31,7 +31,7 @@ describe("EnumTest", () => {
   });
 
   it("type.cast", () => {
-    const type = Book.typeForAttribute("status");
+    const type = Book.typeForAttribute("status")!;
     expect(type.cast(0)).toBe("proposed");
     expect(type.cast(1)).toBe("written");
     expect(type.cast(2)).toBe("published");
@@ -793,7 +793,7 @@ describe("EnumTest", () => {
   });
 
   it("data type of Enum type", () => {
-    expect(Book.typeForAttribute("status").type()).toBe("integer");
+    expect(Book.typeForAttribute("status")!.type()).toBe("integer");
   });
 
   it("enum on custom attribute with default", () => {
@@ -1032,7 +1032,7 @@ describe("EnumTest", () => {
         this.enum("status", ["9223372036854775808", "-9223372036854775809"]);
       }
     }
-    const type = (Klass as any).typeForAttribute("status");
+    const type = (Klass as any).typeForAttribute("status")!;
 
     expect(type.isSerializable("9223372036854775808")).toBe(true);
     expect(type.isSerializable("-9223372036854775809")).toBe(true);

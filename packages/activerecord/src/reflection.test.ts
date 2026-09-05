@@ -517,7 +517,7 @@ describe("ReflectionTest", () => {
         this.attribute("title", "string");
       }
     }
-    const type = Topic2.typeForAttribute("attribute_that_doesnt_exist");
+    const type = Topic2.typeForAttribute("attribute_that_doesnt_exist")!;
     const object = { sentinel: true };
     expect(type.deserialize(object)).toBe(object);
     expect(type.cast(object)).toBe(object);
@@ -908,8 +908,8 @@ describe("ReflectionTest", () => {
   it("column string type and limit", async () => {
     await CanonicalTopic.loadSchema();
     expect((CanonicalTopic as any).columnForAttribute("title").type).toBe("string");
-    expect(CanonicalTopic.typeForAttribute("title").type()).toBe("string");
-    expect(CanonicalTopic.typeForAttribute("heading").type()).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("title")!.type()).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("heading")!.type()).toBe("string");
     expect((CanonicalTopic as any).columnForAttribute("title").limit).toBe(250);
   });
 
@@ -931,7 +931,7 @@ describe("ReflectionTest", () => {
     expect(["integer", "big_integer"]).toContain(
       (CanonicalTopic as any).columnForAttribute("id").type,
     );
-    expect(["integer", "big_integer"]).toContain(CanonicalTopic.typeForAttribute("id").type());
+    expect(["integer", "big_integer"]).toContain(CanonicalTopic.typeForAttribute("id")!.type());
   });
 
   it("non existent columns return null object", async () => {

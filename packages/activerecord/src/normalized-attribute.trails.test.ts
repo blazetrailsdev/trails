@@ -9,7 +9,7 @@ class OtherCompany extends Company {}
 class ReloadedCompany extends Company {}
 class RefreshedCompany extends Company {}
 
-const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name);
+const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name)!;
 
 describe("STI subclass normalizes", () => {
   fixtures([]);
@@ -22,9 +22,9 @@ describe("STI subclass normalizes", () => {
       with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
     });
 
-    expect(NormalizedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
-    expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
-    expect(OtherCompany.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
+    expect(NormalizedCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("ACME");
+    expect(Company.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
+    expect(OtherCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
 
     expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
     expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");
@@ -37,14 +37,14 @@ describe("STI subclass normalizes", () => {
     ReloadedCompany.normalizes("name", {
       with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
     });
-    expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
+    expect(ReloadedCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("ACME");
 
     void ReloadedCompany.resetColumnInformation();
     await Company.loadSchema();
     await ReloadedCompany.loadSchema();
 
-    expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
-    expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
+    expect(ReloadedCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("ACME");
+    expect(Company.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
   });
 
   it("re-reflects a subclass whose key set is unchanged after a base reset", async () => {

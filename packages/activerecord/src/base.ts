@@ -887,7 +887,7 @@ export class Base extends Model {
     return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
 
-  static typeForAttribute(name: string, block?: () => ValueType): ValueType {
+  static typeForAttribute(name: string, block?: () => ValueType): ValueType | null {
     (ModelSchema.loadSchema as any).call(this);
     const resolved = (this as any).attributeAliases?.[name] ?? name;
     if (block) {
@@ -2291,7 +2291,7 @@ export class Base extends Model {
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
   declare attributesBeforeTypeCast: () => Record<string, unknown>;
-  declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType;
+  declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
@@ -2672,7 +2672,7 @@ export class Base extends Model {
       return `${name}(Table doesn't exist)`;
     }
     const attrList = Object.entries(this.attributeTypes())
-      .map(([attr, type]) => `${attr}: ${type.type() ?? ""}`)
+      .map(([attr, type]) => `${attr}: ${type!.type() ?? ""}`)
       .join(", ");
     return `${name}(${attrList})`;
   }

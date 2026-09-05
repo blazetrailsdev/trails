@@ -320,7 +320,7 @@ interface CoreHost {
   prototype: any;
   all(): any;
   isScopeAttributes(): boolean;
-  typeForAttribute(name: string): { cast(value: unknown): unknown };
+  typeForAttribute(name: string): { cast(value: unknown): unknown } | null;
   ensureSchemaLoaded(): Promise<void>;
 }
 
@@ -813,7 +813,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       .where({ [this.primaryKey as string]: compactedIds })
       .toArray();
     const pkType = this.typeForAttribute(this.primaryKey as string);
-    const castIds = compactedIds.map((i) => pkType.cast(i));
+    const castIds = compactedIds.map((i) => pkType!.cast(i));
     const idToRecord = new Map<unknown, any>();
     for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {

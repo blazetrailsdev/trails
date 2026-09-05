@@ -67,6 +67,17 @@ describe("BigDecimalTrails", () => {
     expect(new BigDecimal("1e-10000000").exponent()).toBe(-9999999);
   });
 
+  it("compares two large-exponent values without expanding either", () => {
+    const big = new BigDecimal("1e10000000");
+    const bigger = new BigDecimal("1e10000001");
+
+    expect(big.compare(bigger)).toBe(-1);
+    expect(bigger.compare(big)).toBe(1);
+    expect(big.compare(new BigDecimal("1e10000000"))).toBe(0);
+    expect(new BigDecimal("-1e10000000").compare(big)).toBe(-1);
+    expect(big.round(0)).toBe(big);
+  });
+
   it("carries a Rational's exponent without expanding the digits", () => {
     const tiny = new BigDecimal({ numerator: 1n, denominator: 10n ** 10000n }, 10);
 
