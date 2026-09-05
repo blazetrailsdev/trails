@@ -20,7 +20,10 @@ export const READ_QUERY =
 
 /** @internal */
 interface CastResultHost {
-  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<ValueType>;
+  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): ValueType;
+  /** @internal */
+  loadAdditionalTypes(oids?: number[]): Promise<void>;
+  typeMap: { isKey(oid: number): boolean };
 }
 
 /** @internal */
@@ -148,11 +151,8 @@ interface TransactionHost {
     binds?: unknown[],
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
-  commit(): Promise<void>;
   /** @internal */
   _client: pg.Client | null;
-  /** @internal */
-  _inTransaction: boolean;
   /** @internal */
   _acquireFreshClient(): Promise<pg.Client>;
   /** @internal */
@@ -169,10 +169,8 @@ export async function beginDbTransaction(this: TransactionHost): Promise<void> {
       materializeTransactions: false,
       allowRetry: true,
     });
-    this._inTransaction = true;
   } catch (error) {
     this._client = null;
-    this._inTransaction = false;
     if (this.constructor._isConnectionError(error)) this._discardRawConnection();
     throw error;
   }
@@ -190,18 +188,25 @@ export async function beginIsolatedDbTransaction(
       materializeTransactions: false,
       allowRetry: true,
     });
-    this._inTransaction = true;
   } catch (error) {
     this._client = null;
-    this._inTransaction = false;
     if (this.constructor._isConnectionError(error)) this._discardRawConnection();
     throw error;
   }
 }
 
-/** @missingRailsCall internal_execute — CONVERGEABLE commit-db-transaction-should-hold-its-own-internal-execute */
 export async function commitDbTransaction(this: TransactionHost): Promise<void> {
-  return this.commit();
+  try {
+    await this.internalExecute("COMMIT", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
+  } catch (error) {
+    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
+    throw error;
+  } finally {
+    this._client = null;
+  }
 }
 
 export async function execRollbackDbTransaction(this: TransactionHost): Promise<void> {
@@ -213,7 +218,6 @@ export async function execRollbackDbTransaction(this: TransactionHost): Promise<
     });
   } finally {
     this._client = null;
-    this._inTransaction = false;
   }
 }
 
@@ -357,11 +361,21 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
     return Result.empty();
   }
 
+  const missing: number[] = [];
+  for (const f of fields) {
+    if (!this.typeMap.isKey(f.dataTypeID) && !missing.includes(f.dataTypeID)) {
+      missing.push(f.dataTypeID);
+    }
+  }
+  if (missing.length > 0) {
+    await this.loadAdditionalTypes(missing);
+  }
+
   const columnNames = fields.map((f) => f.name);
   const columnTypes: Record<string | number, ValueType> = {};
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i];
-    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
+    const type = this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
     columnTypes[i] = type;
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }

@@ -104,7 +104,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _permanentlyClosed = false;
   private _isFakeConnection = false;
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
-  private _inTransaction = false;
   private _connectionConfigured = false;
   override _statements: MysqlStatementPool | null = null;
 
@@ -518,7 +517,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       materializeTransactions: false,
       allowRetry: true,
     });
-    this._inTransaction = true;
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
@@ -532,7 +530,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         materializeTransactions: false,
       });
       await this.internalExecute("BEGIN", "TRANSACTION", [], { materializeTransactions: false });
-      this._inTransaction = true;
     });
   }
 
@@ -544,16 +541,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._transactionManager.openTransactions > 0) {
       return this._transactionManager.commitTransaction();
     }
-    if (!this._inTransaction || !this._client) throw new Error("No active transaction");
-    try {
-      await this.internalExecute("COMMIT", "TRANSACTION");
-    } finally {
-      this._inTransaction = false;
-    }
+    return this.commitDbTransaction();
   }
 
   async commitDbTransaction(): Promise<void> {
-    return this.commit();
+    await this.internalExecute("COMMIT", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
   }
 
   async rollback(): Promise<void> {
@@ -564,12 +559,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async rollbackDbTransaction(): Promise<void> {
-    if (!this._inTransaction || !this._client) throw new Error("No active transaction");
-    try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION");
-    } finally {
-      this._inTransaction = false;
-    }
+    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
   }
 
   override async internalExecute(
@@ -751,7 +744,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   private _closeRawHandle(): void {
-    this._inTransaction = false;
     this._connectionConfigured = false;
     this._statements = null;
     if (this._client) {
@@ -767,7 +759,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     this._connectGeneration++;
     super.discardBang();
-    this._inTransaction = false;
     this._connectionConfigured = false;
     this._statements = null;
     const conn = this._client;
@@ -778,7 +769,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async close(): Promise<void> {
     this._permanentlyClosed = true;
     this._connectGeneration++;
-    this._inTransaction = false;
     this._connectionConfigured = false;
     this._statements = null;
     if (this._client) {

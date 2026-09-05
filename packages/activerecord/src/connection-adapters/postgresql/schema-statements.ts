@@ -1361,7 +1361,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         string | null,
         string | null,
       ];
-    const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
+    const typeMetadata = this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
     const defaultValue = this.extractValueFromDefault(default_);
 
     let defaultFunction: string | null;
@@ -1389,13 +1389,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
-  override async fetchTypeMetadata(
+  override fetchTypeMetadata(
     columnName: string,
     sqlType: string,
     oid: number,
     fmod: number,
-  ): Promise<TypeMetadata> {
-    const castType = await this.getOidType(oid, fmod, columnName, sqlType);
+  ): TypeMetadata {
+    const castType = this.getOidType(oid, fmod, columnName, sqlType);
     return new TypeMetadata(
       {
         sqlType,

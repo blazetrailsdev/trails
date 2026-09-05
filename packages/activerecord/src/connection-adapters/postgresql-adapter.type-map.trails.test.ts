@@ -3,6 +3,7 @@ import { Array as OidArray } from "./postgresql/oid/array.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
+import { castResult } from "./postgresql/database-statements.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
@@ -44,19 +45,18 @@ describe("PostgreSQLAdapter#getOidType", () => {
 
   it("returns the registered type for a known OID", async () => {
     adapter.typeMap.registerType(2950, new Uuid());
-    const type = await adapter.getOidType(2950, -1, "guid");
+    const type = adapter.getOidType(2950, -1, "guid");
     expect(type).toBeInstanceOf(Uuid);
   });
 
-  it("warns and registers a fallback ValueType for an unknown OID", async () => {
+  it("warns and registers a fallback ValueType for an unknown OID", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
 
-    const type = await adapter.getOidType(999_999, -1, "mystery_column");
+    const type = adapter.getOidType(999_999, -1, "mystery_column");
     expect(type).toBeInstanceOf(ValueType);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("unknown OID 999999"));
     warn.mockClear();
-    const second = await adapter.getOidType(999_999, -1, "mystery_column");
+    const second = adapter.getOidType(999_999, -1, "mystery_column");
     expect(second).toBeInstanceOf(ValueType);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -66,9 +66,15 @@ describe("PostgreSQLAdapter#getOidType", () => {
     const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockImplementation(async () => {
       adapter.typeMap.registerType(987_654, new Uuid());
     });
-    const type = await adapter.getOidType(987_654, -1, "user_defined_column");
+    const result = await castResult.call(
+      adapter as never,
+      {
+        fields: [{ name: "user_defined_column", dataTypeID: 987_654, dataTypeModifier: -1 }],
+        rows: [],
+      } as never,
+    );
     expect(loadSpy).toHaveBeenCalledWith([987_654]);
-    expect(type).toBeInstanceOf(Uuid);
+    expect(result.columnTypes["user_defined_column"]).toBeInstanceOf(Uuid);
     expect(warn).not.toHaveBeenCalled();
   });
 });

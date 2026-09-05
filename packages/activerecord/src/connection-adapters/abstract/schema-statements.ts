@@ -1586,10 +1586,7 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  fetchTypeMetadata(
-    sqlType: string | null,
-    ..._rest: unknown[]
-  ): SqlTypeMetadata | Promise<SqlTypeMetadata> {
+  fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata {
     const castType = this.lookupCastType(sqlType);
     return new SqlTypeMetadata({
       sqlType,

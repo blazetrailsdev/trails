@@ -1,4 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
+import { rbEqual } from "@blazetrails/ruby-compat";
 
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
 const NULL_LITERAL = /^null$/i;
@@ -101,14 +102,6 @@ export class PgTextDecoderArray {
     }
 
     return elements;
-  }
-}
-
-function stableStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? `${v}n` : v)) ?? String(value);
-  } catch {
-    return String(value);
   }
 }
 
@@ -225,7 +218,7 @@ export class Array extends ValueType<unknown> {
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldValue = this.deserialize(rawOldValue);
-    return stableStringify(oldValue) !== stableStringify(newValue);
+    return !rbEqual(oldValue, newValue);
   }
 
   override isForceEquality(value: unknown): boolean {

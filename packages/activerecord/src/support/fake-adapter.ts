@@ -62,7 +62,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return SchemaStatements.prototype.fetchTypeMetadata.call(
       this as unknown as SchemaStatements,
       sqlType,
-    ) as SqlTypeMetadata;
+    );
   }
 }
 
