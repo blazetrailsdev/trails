@@ -1,4 +1,4 @@
-import { block, fetch, KeyError, OpenSSL } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError, OpenSSL, slice } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -536,10 +536,15 @@ export class SchemaStatements {
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
     if (!this.useForeignKeys()) return;
-    if (options.ifNotExists === true) {
-      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
-        return;
-      }
+    if (
+      options.ifNotExists === true &&
+      (await this.foreignKeyExists(
+        fromTable,
+        toTable,
+        slice(options as Record<string, unknown>, "column") as ForeignKeyLookupOptions,
+      ))
+    ) {
+      return;
     }
     options = this.foreignKeyOptions(
       fromTable,
