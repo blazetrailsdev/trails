@@ -65,4 +65,24 @@ describe("sameFileHelperSkeletons", () => {
   it("records nothing when no reach resolves", () => {
     expect(sameFileHelperSkeletons("build", ["ref:elsewhere", "if"], resolve)).toBeUndefined();
   });
+  it("folds the rest of the block-iterator family, not just each", () => {
+    expect(
+      foldSkeletonTokens([
+        "ref:each_key",
+        "ref:each_value",
+        "ref:each_pair",
+        "ref:each_with_index",
+        "ref:each_with_object",
+        "ref:reverse_each",
+      ]),
+    ).toEqual(["loop", "loop", "loop", "loop", "loop", "loop"]);
+  });
+
+  it("leaves an iterator whose faithful port keeps a call alone", () => {
+    expect(foldSkeletonTokens(["ref:map", "ref:filter_map", "ref:inject"])).toEqual([
+      "ref:map",
+      "ref:filter_map",
+      "ref:inject",
+    ]);
+  });
 });

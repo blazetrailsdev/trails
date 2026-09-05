@@ -150,7 +150,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#create"]).toEqual([
       "if",
       "ref:dirty",
-      "throw",
+      "throw:Boom",
       "ref:each",
       "ref:save",
       "try",
@@ -160,6 +160,53 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       "ref:rollback",
     ]);
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
+  });
+
+  it("carries the raised class on the throw token, however the raise is spelled", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def a; raise Boom, "m"; end
+          def b; raise Boom.new("m"); end
+          def c; raise Boom; end
+          def d; raise(ActiveRecord::RecordNotSaved, "m"); end
+        end
+      `,
+    });
+    expect(s["Foo#a"]).toEqual(["throw:Boom"]);
+    expect(s["Foo#b"]).toEqual(["throw:Boom", "new:Boom"]);
+    expect(s["Foo#c"]).toEqual(["throw:Boom"]);
+    expect(s["Foo#d"]).toEqual(["throw:RecordNotSaved"]);
+  });
+
+  it("leaves a classless raise as the bare throw token", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def a; raise; end
+          def b; raise "m"; end
+          def c(e); raise e; end
+        end
+      `,
+    });
+    expect(s["Foo#a"]).toEqual(["throw"]);
+    expect(s["Foo#b"]).toEqual(["throw"]);
+    expect(s["Foo#c"]).toEqual(["throw"]);
+  });
+
+  it("emits an if for a logical op-assign, as the ??= port does", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def a; @x ||= compute; end
+          def b; @y &&= compute; end
+          def c; @z += 1; end
+        end
+      `,
+    });
+    expect(s["Foo#a"]).toEqual(["if", "ref:compute"]);
+    expect(s["Foo#b"]).toEqual(["if", "ref:compute"]);
+    expect(s["Foo#c"] ?? []).not.toContain("if");
   });
 
   it("emits try for a modifier rescue, which Ripper hangs off :rescue_mod", () => {

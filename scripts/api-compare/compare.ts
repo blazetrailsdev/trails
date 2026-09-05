@@ -294,6 +294,29 @@ export const NO_JS_CALL_FORM = new Set([
 const JS_ITERATION_CALLEE = "forEach";
 
 /**
+ * Ruby's block iterators whose faithful port is a native loop rather than a
+ * call — Hash's and Enumerable's `each_*` family plus `reverse_each`, each of
+ * which a port spells `for (const … of …)` (reversed, entry-destructured, or
+ * index-counted as the name demands) with no callee at all.
+ *
+ * A name whose port KEEPS a call is deliberately absent: `map`, `select`,
+ * `filter_map`, `sum` and friends all have a JS method a faithful port names,
+ * so folding them would let a real dropped iteration read as a loop.
+ * `each_with_object` is here because JS has no `reduce`-with-seed spelling of
+ * it that a Rails-shaped body uses; `inject` is not, because `reduce` is.
+ */
+const RUBY_BLOCK_ITERATORS = [
+  "each_key",
+  "each_value",
+  "each_pair",
+  "each_entry",
+  "each_index",
+  "each_with_index",
+  "each_with_object",
+  "reverse_each",
+];
+
+/**
  * The skeleton-stream names that stand for the SAME construct as a native
  * loop, on either side: Ruby's block iterators and the JS iteration callee.
  *
@@ -303,12 +326,22 @@ const JS_ITERATION_CALLEE = "forEach";
  * all ({@link NO_JS_CALL_FORM}), which is exactly the pairing that makes
  * `xs.each { ... }` a `ref:each` on the Ruby side and a bare `loop` on the TS
  * side of the same ported body.
+ *
+ * That derivation resolves to `each` ALONE, because it is the only block
+ * iterator {@link JS_ENUMERABLE_ALIASES} carries — so `each_pair`,
+ * `each_with_object` and their siblings, whose faithful port is the SAME
+ * native `for...of`, reported an invented `loop` against a Ruby side showing
+ * only a `ref:` reach (RFC 0113). {@link RUBY_BLOCK_ITERATORS} names the rest
+ * of the family explicitly; it cannot be derived, since those names have no
+ * JS call analogue to be aliased ONTO.
  */
-const LOOP_SKELETON_NAMES = new Set(
-  [...JS_ENUMERABLE_ALIASES]
+const LOOP_SKELETON_NAMES = new Set([
+  JS_ITERATION_CALLEE,
+  ...[...JS_ENUMERABLE_ALIASES]
     .filter(([ruby, aliases]) => NO_JS_CALL_FORM.has(ruby) && aliases.includes(JS_ITERATION_CALLEE))
-    .flatMap(([ruby, aliases]) => [ruby, ...aliases]),
-);
+    .map(([ruby]) => ruby),
+  ...RUBY_BLOCK_ITERATORS,
+]);
 
 /**
  * Fold a skeleton stream's block-iteration tokens onto `loop`, so Ruby's

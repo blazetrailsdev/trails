@@ -2708,6 +2708,14 @@ class ApiExtractor
   SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop when in].freeze
   SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
   SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
+  # The op-assign operators Ripper hands back as the STRING token `"||="` /
+  # `"&&="` (`[:@op, "||=", …]`) — not the `:"||"` Symbols above, and carrying
+  # the `=`, which is why testing an `:opassign` against SKELETON_LOGICAL_OPS
+  # could never pass. `@x ||= y` is a guarded write and its faithful port —
+  # `this._x ??= y`, or `if (!this._x) this._x = y` — emits `if` on the TS side
+  # (extract-ts-api.ts#isSkeletonLogicalOp), so this side has to as well. A
+  # non-logical op-assign (`+=`) is not a branch and emits nothing.
+  SKELETON_LOGICAL_OP_ASSIGNS = %w[||= &&=].freeze
 
   # The body's ordered control + call skeleton — `if` / `loop` / `try` /
   # `rescue` / `throw`, `new:Const` and `ref:<name>` reaches, in source order
@@ -2766,7 +2774,7 @@ class ApiExtractor
       tokens << "if"
       walk_for_skeleton(node[3], tokens)
       return
-    elsif kind == :opassign && SKELETON_LOGICAL_OPS.include?(op_assign_op(node[2]))
+    elsif kind == :opassign && SKELETON_LOGICAL_OP_ASSIGNS.include?(op_assign_op(node[2]).to_s)
       tokens << "if"
     elsif kind == :aref
       # Receiver, then the `[]` reach, then the index — as
@@ -2775,9 +2783,19 @@ class ApiExtractor
       tokens << "ref:get"
       walk_for_skeleton(node[2], tokens)
       return
+    elsif kind == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :fcall
+      # `raise(Foo, "m")` — the parenthesised spelling, whose arguments hang off
+      # the `:method_add_arg` rather than off the `:fcall` that names the call.
+      # Walked in the same order the bare `:fcall` + generic descent already
+      # gives (name, then arguments), so only the raise CLASS is new here.
+      skeleton_push_name(tokens, ident_name(node[1][1]), nil, node[2])
+      walk_for_skeleton(node[2], tokens)
+      return
     elsif %i[fcall vcall command].include?(kind)
       name = ident_name(node[1])
-      skeleton_push_name(tokens, name, nil) unless kind == :vcall && capture_local?(name)
+      unless kind == :vcall && capture_local?(name)
+        skeleton_push_name(tokens, name, nil, kind == :command ? node[2] : nil)
+      end
     elsif %i[call command_call].include?(kind)
       # Receiver before the call it receives, matching
       # extract-ts-api.ts#extractSkeleton; the two orders must agree.
@@ -2799,17 +2817,40 @@ class ApiExtractor
     op.is_a?(Array) ? op[1] : op
   end
 
-  def skeleton_push_name(tokens, name, recv)
+  def skeleton_push_name(tokens, name, recv, args = nil)
     return unless name
 
     if name == "raise"
-      tokens << "throw"
+      const = skeleton_raise_class(args)
+      tokens << (const ? "throw:#{const}" : "throw")
     elsif name == "new"
       const = skeleton_const_name(recv)
       tokens << (const ? "new:#{const}" : "ref:new")
     else
       tokens << "ref:#{name}"
     end
+  end
+
+  # The class a `raise` names, as its LAST constant segment
+  # (`ActiveRecord::RecordNotSaved` -> `RecordNotSaved`), matching how
+  # `new:Const` is already spelled. `raise Foo, "m"` and `raise Foo.new("m")`
+  # are the same raise written two ways — the pairing `drop_raised_new` already
+  # takes for the call set — so BOTH answer `Foo`. A bare `raise`, a
+  # `raise "msg"` (RuntimeError) and a `raise e` re-raise name no class and
+  # answer nil, leaving the classless `throw` token.
+  def skeleton_raise_class(args)
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    return nil unless args.is_a?(Array) && args[0] == :args_add_block
+    first = args[1].is_a?(Array) ? args[1][0] : nil
+    return nil unless first.is_a?(Array)
+
+    # `raise Foo.new("m")` / `raise Foo.new`: the constant is the receiver of
+    # the `new` call, which Ripper wraps in a `:method_add_arg` only when the
+    # call carries an argument list.
+    first = first[1] if first[0] == :method_add_arg && first[1].is_a?(Array) &&
+                        first[1][0] == :call
+    first = first[1] if first[0] == :call
+    skeleton_const_name(first)
   end
 
   def skeleton_const_name(recv)

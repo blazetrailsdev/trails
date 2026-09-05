@@ -39,7 +39,6 @@ interface ResolvedConnectionFacts {
   supportsInsertConflictTarget: boolean;
   primaryKeys: string[];
   indexes: (tableName: string) => unknown[];
-  columnsHash: Record<string, unknown>;
 }
 
 /**
@@ -73,9 +72,6 @@ async function resolveConnectionFacts(
     if (pk != null) primaryKeys = Array.isArray(pk) ? pk : [pk];
   }
   const indexes: unknown[] = cache ? await cache.indexes(model.tableName) : [];
-  const columnsHash: Record<string, unknown> = cache
-    ? ((await cache.columnsHash(model.tableName)) ?? {})
-    : {};
   return {
     supportsInsertReturning,
     supportsInsertOnDuplicateSkip,
@@ -83,7 +79,6 @@ async function resolveConnectionFacts(
     supportsInsertConflictTarget,
     primaryKeys,
     indexes: (name: string) => (name === model.tableName ? indexes : []),
-    columnsHash,
   };
 }
 
@@ -195,14 +190,6 @@ export class InsertAll {
   updatableColumns(): string[] {
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  schemaCacheColumnsHash(tableName: string): Record<string, unknown> {
-    return tableName === this.model.tableName ? this._facts.columnsHash : {};
   }
 
   /** @missingRailsCall table_name — PERMANENT */
@@ -447,7 +434,7 @@ export class InsertAll {
 
 export interface InsertBuilder {
   readonly model: ModelClass;
-  into(): string;
+  into(): Promise<string>;
   conflictTarget(): string;
   returning(): string | undefined;
   updatableColumns(): string[];
@@ -476,8 +463,11 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
-  private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, ValueType> {
-    const columns = this._insertAll.schemaCacheColumnsHash(tableName);
+  private async extractTypesFromColumnsOn(
+    tableName: string,
+    keys: string[],
+  ): Promise<Record<string, ValueType>> {
+    const columns = (await this.model.schemaCache().columnsHash(tableName)) ?? {};
 
     const unknownColumn = keys.find((key) => !(key in columns));
     if (unknownColumn !== undefined) {
@@ -538,7 +528,7 @@ export class Builder implements InsertBuilder {
     return this._insertAll.keys;
   }
 
-  into(): string {
+  async into(): Promise<string> {
     const tableName = this.quoteTable(String(this.model.arelTable.name));
     const keys = [...this._insertAll.keysIncludingTimestamps()];
     if (keys.length === 0) {
@@ -547,12 +537,12 @@ export class Builder implements InsertBuilder {
       }
       return `INTO ${tableName} ${this._connection.emptyInsertStatementValue()}`;
     }
-    const compiledValues = this._visitor().compile(this.valuesList());
+    const compiledValues = this._visitor().compile(await this.valuesList());
     return `INTO ${tableName} (${this.columnsList()}) ${compiledValues}`;
   }
 
-  valuesList(): Nodes.ValuesList {
-    const types = this.extractTypesFromColumnsOn(this.model.tableName, [
+  async valuesList(): Promise<Nodes.ValuesList> {
+    const types = await this.extractTypesFromColumnsOn(this.model.tableName, [
       ...this._insertAll.keysIncludingTimestamps(),
     ]);
 

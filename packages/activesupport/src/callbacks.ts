@@ -110,10 +110,6 @@ export class MethodCall implements CallTemplate {
   invertedLambda(): (target: object, value: unknown) => boolean {
     return (target: object) => !this.send(target);
   }
-
-  make(target: object, _value: unknown): unknown {
-    return this.send(target);
-  }
 }
 
 export class ObjectCall implements CallTemplate {
@@ -145,10 +141,6 @@ export class ObjectCall implements CallTemplate {
     const ot = this.target;
     return (target: object) => !this.send((ot ?? target) as Record<string, unknown>, target);
   }
-
-  make(instance: object, _value: unknown): unknown {
-    return this.send((this.target ?? instance) as Record<string, unknown>, instance);
-  }
 }
 
 export class InstanceExec0 implements CallTemplate {
@@ -167,10 +159,6 @@ export class InstanceExec0 implements CallTemplate {
     const f = this.fn;
     return (target: object) => !f.call(target);
   }
-
-  make(target: object, _value: unknown): unknown {
-    return this.fn.call(target);
-  }
 }
 
 export class InstanceExec1 implements CallTemplate {
@@ -188,10 +176,6 @@ export class InstanceExec1 implements CallTemplate {
   invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
     return (target: object) => !f.call(target, target);
-  }
-
-  make(target: object, _value: unknown): unknown {
-    return this.fn.call(target, target);
   }
 }
 
@@ -216,11 +200,6 @@ export class InstanceExec2 implements CallTemplate {
       if (!block) throw new Error("InstanceExec2 callback requires a block");
       return !f.call(target, target, block);
     };
-  }
-
-  make(target: object, block: (() => unknown) | null): unknown {
-    if (!block) throw new Error("InstanceExec2 callback requires a block");
-    return this.fn.call(target, target, block);
   }
 }
 

@@ -42,6 +42,10 @@ export interface SkeletonArtifact {
  * `begin`/`rescue` chain, sitting after the `try` its `:bodystmt` emits, so a
  * two-clause Ruby `rescue` reads against the two `instanceof` arms of its TS
  * `catch` rather than against one opaque `try` apiece.
+ *
+ * A `throw` arrives from either extractor as `throw:<Class>` when the raise
+ * names one, so membership is tested against the class-ERASED token; the class
+ * itself is what the `raise-class` verdict reads (see {@link ArmVerdict}).
  */
 export const CONTROL_TOKENS: ReadonlySet<string> = new Set([
   "if",
@@ -89,7 +93,15 @@ export const CONTROL_TOKENS: ReadonlySet<string> = new Set([
  * `if` regardless of what it tests, which is what keeps this out of RFC 0108's
  * territory.
  */
-export type ArmVerdict = "count" | "order";
+/**
+ * `raise-class` is the third verdict (RFC 0113): the two arm multisets agree
+ * only once the raised CLASS is erased, so the port raises where Rails raises
+ * but names a different error — RFC 0111's "same error class" rows, surfaced
+ * here without a second extractor. It is taken AFTER `count` and `order`,
+ * which both read the class-erased projection so that this story leaves their
+ * row population exactly where it was.
+ */
+export type ArmVerdict = "count" | "order" | "raise-class";
 
 export interface ArmMismatch extends SkeletonRow {
   kind: ArmVerdict;
@@ -99,10 +111,25 @@ export interface ArmMismatch extends SkeletonRow {
   /** Multiset difference, both directions — empty on an `order` row. */
   missing: string[];
   invented: string[];
+  /** `Foo -> Bar` per divergent raise; only a `raise-class` row carries any. */
+  raiseClasses?: string[];
+}
+
+/**
+ * The raised class a `throw:Foo` token carries, or undefined for the classless
+ * `throw` both extractors emit for a bare `raise` / a rethrow.
+ */
+function throwClass(token: string): string | undefined {
+  return token.startsWith("throw:") ? token.slice("throw:".length) : undefined;
+}
+
+/** `throw:Foo` erased to the plain `throw` token {@link CONTROL_TOKENS} carries. */
+function eraseThrowClass(token: string): string {
+  return throwClass(token) === undefined ? token : "throw";
 }
 
 export function controlArms(skeleton: readonly string[]): string[] {
-  return skeleton.filter((token) => CONTROL_TOKENS.has(token));
+  return skeleton.filter((token) => CONTROL_TOKENS.has(eraseThrowClass(token)));
 }
 
 /**
@@ -154,20 +181,44 @@ function multisetDifference(a: readonly string[], b: readonly string[]): string[
   return out;
 }
 
+/**
+ * The `Foo -> Bar` pairs the two class-bearing throw streams disagree on,
+ * taken positionally: the `count` and `order` verdicts have already passed, so
+ * the two projections are the same sequence of arms and the Nth throw on one
+ * side is the Nth throw on the other. A classless `throw` on EITHER side pairs
+ * with nothing — Ruby's bare `raise` and a TS rethrow name no class, so there
+ * is no divergence to report.
+ */
+function raiseClassPairs(ruby: readonly string[], ts: readonly string[]): string[] {
+  const rubyThrows = controlArms(ruby).map(throwClass);
+  const tsThrows = controlArms(ts).map(throwClass);
+  const pairs: string[] = [];
+  for (const [i, rubyClass] of rubyThrows.entries()) {
+    const tsClass = tsThrows[i];
+    if (rubyClass === undefined || tsClass === undefined || rubyClass === tsClass) continue;
+    pairs.push(`${rubyClass} -> ${tsClass}`);
+  }
+  return pairs;
+}
+
 function armVerdict(
   row: SkeletonRow,
   ruby: readonly string[],
   ts: readonly string[],
 ): ArmMismatch | undefined {
-  const rubyArms = controlArms(ruby);
-  const tsArms = controlArms(ts);
+  const rubyArms = controlArms(ruby).map(eraseThrowClass);
+  const tsArms = controlArms(ts).map(eraseThrowClass);
   const missing = multisetDifference(rubyArms, tsArms);
   const invented = multisetDifference(tsArms, rubyArms);
   if (missing.length > 0 || invented.length > 0) {
     return { ...row, kind: "count", rubyArms, tsArms, missing, invented };
   }
-  if (rubyArms.join(" ") === tsArms.join(" ")) return undefined;
-  return { ...row, kind: "order", rubyArms, tsArms, missing: [], invented: [] };
+  if (rubyArms.join(" ") !== tsArms.join(" ")) {
+    return { ...row, kind: "order", rubyArms, tsArms, missing: [], invented: [] };
+  }
+  const raiseClasses = raiseClassPairs(ruby, ts);
+  if (raiseClasses.length === 0) return undefined;
+  return { ...row, kind: "raise-class", rubyArms, tsArms, missing: [], invented: [], raiseClasses };
 }
 
 /**
@@ -198,6 +249,7 @@ export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
 /** The RFC 0113 cluster a `count` row belongs to; an `order` row is `arm-order`. */
 export function cluster(row: ArmMismatch): string {
   if (row.kind === "order") return "arm-order";
+  if (row.kind === "raise-class") return "raise-class";
   if (row.missing.length > 0 && row.invented.length > 0) return "missing-arm + invented-arm";
   return row.missing.length > 0 ? "missing-arm" : "invented-arm";
 }
@@ -207,6 +259,7 @@ function pairLine(row: ArmMismatch): string {
     ...row.missing.map((t) => `-${t}`),
     ...row.invented.map((t) => `+${t}`),
     ...(row.kind === "order" ? [`${row.rubyArms.join(" ")} -> ${row.tsArms.join(" ")}`] : []),
+    ...(row.raiseClasses ?? []),
   ].join(" ");
   return `${row.package}/${row.tsFile}#${row.tsName}  ${row.kind}  ${delta}`;
 }
@@ -248,6 +301,11 @@ export function renderReport(artifact: SkeletonArtifact, top: number): string {
         rows.flatMap((r) => r.invented),
         (t) => t,
       ),
+    ),
+    section(
+      "Raise class mismatches",
+      rows.flatMap((r) => (r.raiseClasses ?? []).map((p): [string, number] => [p, 1])),
+      top,
     ),
     section(
       "Mismatched pairs",

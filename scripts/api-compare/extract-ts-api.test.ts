@@ -532,7 +532,7 @@ describe("body call capture", () => {
     expect(create.skeleton).toEqual([
       "if",
       "ref:dirty",
-      "throw",
+      "throw:Boom",
       "new:Boom",
       "loop",
       "ref:save",
@@ -600,6 +600,24 @@ describe("body call capture", () => {
       "ref:locked",
       "throw",
     ]);
+  });
+
+  it("carries the thrown class on the throw token", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        a() { throw new Boom("m"); }
+        b() { throw new Errors.RecordNotSaved("m"); }
+        c(e: Error) { throw e; }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("a")).toEqual(["throw:Boom", "new:Boom"]);
+    expect(skeleton("b")).toEqual([
+      "throw:RecordNotSaved",
+      "new:RecordNotSaved",
+      "ref:RecordNotSaved",
+    ]);
+    expect(skeleton("c")).toEqual(["throw"]);
   });
 
   it("emits exactly one rescue for a catch with no instanceof chain", () => {

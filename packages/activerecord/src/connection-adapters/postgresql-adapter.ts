@@ -1446,7 +1446,7 @@ export class PostgreSQLAdapter
   }
 
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    let sql = `INSERT ${insert.into()}`;
+    let sql = `INSERT ${await insert.into()}`;
 
     if (insert.skipDuplicates()) {
       sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
