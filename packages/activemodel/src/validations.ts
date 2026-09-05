@@ -24,7 +24,7 @@ import {
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
-import type { CallbackFn, CallbackConditions } from "./callbacks.js";
+import type { CallbackConditions } from "./callbacks.js";
 import {
   Callbacks,
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
@@ -146,7 +146,7 @@ export interface ValidationsClassHost {
   validate(...args: ValidateArgs<ValidatableRecord>): void;
   setCallback(
     name: string,
-    ...filterList: Array<((record: object) => unknown) | CallbackConditions>
+    ...filterList: Array<string | ((record: object) => unknown) | CallbackConditions>
   ): void;
   resetCallbacks(name: string): void;
   /** @internal */
@@ -165,7 +165,6 @@ export const ClassMethods = {
     this.validatesWith(BlockValidator, this._mergeAttributes([...attrNames, options]), block);
   },
 
-  /** @missingRailsArgs set_callback — CONVERGEABLE validate-set-callback-narrows-options-and-wraps-filters */
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: ValidateArgs<T>
@@ -213,25 +212,8 @@ export const ClassMethods = {
 
     this.setCallback(
       "validate",
-      ...(filters as Array<string | ((record: T) => unknown)>).map(
-        (filter): CallbackFn =>
-          (record: object) => {
-            const r = record as T & Record<string, unknown>;
-            if (typeof filter === "function") {
-              return filter.call(r, r) as void;
-            } else if (typeof r[filter] === "function") {
-              return (r[filter] as () => void)();
-            }
-            throw new NoMethodError(
-              `undefined method '${filter}' for an instance of ${r.constructor.name}`,
-            );
-          },
-      ),
-      {
-        ...(options.if !== undefined ? { if: kernelArray(options.if) } : {}),
-        ...(options.unless !== undefined ? { unless: kernelArray(options.unless) } : {}),
-        ...(options.prepend ? { prepend: true } : {}),
-      } as CallbackConditions,
+      ...(filters as Array<string | ((record: object) => unknown)>),
+      options as CallbackConditions,
     );
   },
 

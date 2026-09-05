@@ -358,11 +358,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
         this.defineModelCallbacks("save");
       }
     }
-    const obj = {
-      beforeSave() {
+    const obj = new (class CallbackObject {
+      beforeSave(): void {
         log.push("obj-before");
-      },
-    };
+      }
+    })();
     Thing.setCallback("save", "before", obj);
     Thing.setCallback("save", "before", () => log.push("fn-kept"));
 
@@ -378,11 +378,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
         this.defineModelCallbacks("ship");
       }
     }
-    const obj = {
-      beforeShip() {
+    const obj = new (class CallbackObject {
+      beforeShip(): void {
         log.push("obj");
-      },
-    };
+      }
+    })();
     (Thing as unknown as { beforeShip: (o: object) => void }).beforeShip(obj);
     (Thing as unknown as { beforeShip: (fn: () => void) => void }).beforeShip(() => log.push("fn"));
 
@@ -398,11 +398,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
         this.defineModelCallbacks("save");
       }
     }
-    const obj = {
-      beforeSave() {
+    const obj = new (class CallbackObject {
+      beforeSave(): void {
         log.push("obj-before");
-      },
-    };
+      }
+    })();
     Thing.setCallback("save", "before", obj);
     Thing.setCallback("save", "before", () => log.push("fn"));
 
@@ -563,7 +563,7 @@ describe("unified sync/async runner", () => {
       static {
         include(this, Attributes);
         this.attribute("name", "string");
-        this.validate("checkRemote");
+        this.validate(":checkRemote");
       }
       async checkRemote() {
         await Promise.resolve();
@@ -895,7 +895,7 @@ describe("Callbacks (extended)", () => {
       static {
         include(this, Attributes);
         this.attribute("value", "integer");
-        this.validate("validateCustom");
+        this.validate(":validateCustom");
       }
       validateCustom() {
         if (this._readAttribute("value") === 0) {
@@ -1015,11 +1015,11 @@ describe("skipCallback with CallbackObject (mixin-level)", () => {
   it("removes a CallbackObject from the chain by reference", async () => {
     const log: string[] = [];
     const Klass = modelWith("save");
-    const obj = {
-      beforeSave() {
+    const obj = new (class CallbackObject {
+      beforeSave(): void {
         log.push("obj");
-      },
-    };
+      }
+    })();
     Klass.beforeSave(obj);
     Klass.beforeSave(() => log.push("fn"));
     Klass.skipCallback("save", "before", obj);

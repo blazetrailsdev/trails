@@ -50,8 +50,8 @@ export class Account extends Base {
       }
     });
 
-    this.validate("checkEmptyCreditLimit");
-    this.validate("ensureGoodCredit", { on: "bankLoan" });
+    this.validate(":checkEmptyCreditLimit");
+    this.validate(":ensureGoodCredit", { on: "bankLoan" });
   }
 
   checkEmptyCreditLimit() {

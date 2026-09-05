@@ -257,7 +257,7 @@ describe("ValidatesWithTest", () => {
     }
     interface Person extends Attributes {}
 
-    Person.validate("customValidation");
+    Person.validate(":customValidation");
     const p = new Person({});
     await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
@@ -279,7 +279,7 @@ describe("ValidatesWithTest", () => {
     }
     interface Person extends Attributes {}
 
-    Person.validate("checkName");
+    Person.validate(":checkName");
     const p = new Person({});
     await p.isValid();
     expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
