@@ -476,10 +476,6 @@ export class File extends IO {
    * glob `pattern`. Under `FNM_EXTGLOB` the pattern is brace-expanded first and
    * the first alternative that matches wins (`dir.c:3471-3478`).
    *
-   * MRI advances both cursors by `rb_enc_mbclen` (`dir.c:390`); a JS string
-   * indexes by UTF-16 code unit, so `?` and a bracket consume one unit rather
-   * than one astral character.
-   *
    * @noRailsEquivalent PERMANENT — Ruby core `File.fnmatch`
    * (`vendor/ruby/dir.c:3457`).
    */
@@ -539,6 +535,26 @@ export class File extends IO {
 }
 
 /**
+ * `Inc(p, e, enc)` (`vendor/ruby/dir.c:237`) — the cursor advance MRI spells
+ * through `rb_enc_mbclen`, one whole character. A JS string is UTF-16, so an
+ * astral character is the two code units of a surrogate pair.
+ */
+function inc(str: string, i: number): number {
+  const cp = str.codePointAt(i);
+  return i + (cp !== undefined && cp > 0xffff ? 2 : 1);
+}
+
+/**
+ * The one whole character at `i` — what MRI's `memcmp(t1, s, r)`
+ * (`vendor/ruby/dir.c:277`) and `rb_enc_codepoint` (`dir.c:281`) read, where a
+ * JS index reads one code unit.
+ */
+function charAt(str: string, i: number): string {
+  const cp = str.codePointAt(i);
+  return cp === undefined ? "" : String.fromCodePoint(cp);
+}
+
+/**
  * `bracket` (`vendor/ruby/dir.c:240`), which answers the pattern index just
  * past the closing `]` when `s` is in the class, and `null` when it is not or
  * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p`, the
@@ -566,28 +582,28 @@ function bracket(
     let t1 = p;
     if (escape && pattern[t1] === "\\") t1++;
     if (t1 >= pattern.length) return null;
-    p = t1 + 1;
+    p = inc(pattern, t1);
     if (p >= pattern.length) return null;
     if (pattern[p] === "-" && pattern[p + 1] !== "]") {
       let t2 = p + 1;
       if (escape && pattern[t2] === "\\") t2++;
       if (t2 >= pattern.length) return null;
-      p = t2 + 1;
+      p = inc(pattern, t2);
       if (ok) continue;
-      if (pattern[t1] === string[s] || pattern[t2] === string[s]) {
+      if (charAt(pattern, t1) === charAt(string, s) || charAt(pattern, t2) === charAt(string, s)) {
         ok = true;
         continue;
       }
-      if (compareChar(string[s], pattern[t1], nocase) < 0) continue;
-      if (compareChar(string[s], pattern[t2], nocase) > 0) continue;
+      if (compareChar(charAt(string, s), charAt(pattern, t1), nocase) < 0) continue;
+      if (compareChar(charAt(string, s), charAt(pattern, t2), nocase) > 0) continue;
     } else {
       if (ok) continue;
-      if (pattern[t1] === string[s]) {
+      if (charAt(pattern, t1) === charAt(string, s)) {
         ok = true;
         continue;
       }
       if (!nocase) continue;
-      if (compareChar(string[s], pattern[p], nocase) !== 0) continue;
+      if (compareChar(charAt(string, s), charAt(pattern, p), nocase) !== 0) continue;
     }
     ok = true;
   }
@@ -656,7 +672,7 @@ function fnmatchHelper(
         case "?":
           if (isEndS(s)) return ret(false);
           p++;
-          s++;
+          s = inc(string, s);
           continue;
 
         case "[": {
@@ -664,7 +680,7 @@ function fnmatchHelper(
           const t = bracket(p + 1, pattern, s, string, flags);
           if (t !== null) {
             p = t;
-            s++;
+            s = inc(string, s);
             continue;
           }
           break failed;
@@ -674,21 +690,21 @@ function fnmatchHelper(
       p = unescape(p);
       if (isEndS(s)) return ret(isEndP(p));
       if (isEndP(p)) break failed;
-      if (pattern[p] === string[s]) {
-        p++;
-        s++;
+      if (charAt(pattern, p) === charAt(string, s)) {
+        p = inc(pattern, p);
+        s = inc(string, s);
         continue;
       }
       if (!nocase) break failed;
-      if (compareChar(pattern[p], string[s], nocase) !== 0) break failed;
-      p++;
-      s++;
+      if (compareChar(charAt(pattern, p), charAt(string, s), nocase) !== 0) break failed;
+      p = inc(pattern, p);
+      s = inc(string, s);
       continue;
     }
 
     if (ptmp !== null && stmp !== null) {
       p = ptmp;
-      stmp++;
+      stmp = inc(string, stmp);
       s = stmp;
       continue;
     }

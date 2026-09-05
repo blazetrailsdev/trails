@@ -1,4 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
@@ -803,7 +804,7 @@ export class RouteSet {
       };
     }
     if (options.raiseOnMissing !== false) {
-      throw new RoutingError(`No route matches ${JSON.stringify(path)}`);
+      throw new RoutingError(`No route matches ${rbInspect(path)}`);
     }
     return undefined;
   }
@@ -846,7 +847,7 @@ export class RouteSet {
     const method = String(environment.method ?? "GET").toUpperCase();
     const matched = this.recognize(method, path);
     if (!matched) {
-      throw new RoutingError(`No route matches [${method}] ${JSON.stringify(path)}`);
+      throw new RoutingError(`No route matches ${rbInspect(path)}`);
     }
     return {
       ...matched.route.defaults,

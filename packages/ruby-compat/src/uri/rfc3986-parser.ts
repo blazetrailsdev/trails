@@ -1,6 +1,18 @@
 import { ArgumentError } from "../argument-error.js";
+import { rbInspect } from "../object.js";
 import { InvalidURIError, URI } from "./common.js";
 import { Generic } from "./generic.js";
+
+/**
+ * An atomic group, which is how the possessive quantifiers of
+ * `vendor/ruby/lib/uri/rfc3986_parser.rb:5-71` (`*+`, `++`) are spelled in a
+ * language with no possessive form: a lookahead that captures what it matched,
+ * followed by an immediate backreference to that capture, matches `source`
+ * once and never gives any of it back.
+ */
+function atomic(name: string, source: string): string {
+  return `(?=(?<${name}>${source}))\\k<${name}>`;
+}
 
 /**
  * `URI::RFC3986_Parser`'s component patterns (`vendor/ruby/lib/uri/rfc3986_parser.rb:5-34`),
@@ -13,8 +25,7 @@ import { Generic } from "./generic.js";
  * call. The expanded copies are non-capturing — a JS pattern may not repeat a
  * group NAME — and only the groups `split` reads keep theirs.
  *
- * The possessive quantifiers Ruby writes (`*+`, `++`) are greedy here; JS has
- * no possessive form, so the patterns backtrack where MRI's refuse to.
+ * Ruby's possessive quantifiers come through {@link atomic}.
  */
 const DEC_OCTET = "(?:[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5]|\\d)";
 const IPV4ADDRESS = `(?:${DEC_OCTET}\\.${DEC_OCTET}\\.${DEC_OCTET}\\.${DEC_OCTET})`;
@@ -32,29 +43,29 @@ const IPV6ADDRESS =
   `|(?:(?:${H16}:){0,5}${H16})?::${H16}` +
   `|(?:(?:${H16}:){0,6}${H16})?::` +
   ")";
-const IPVFUTURE = "v[0-9a-fA-F]+\\.[!$&-.0-9:;=A-Z_a-z~]+";
+const IPVFUTURE = `v${atomic("ipvFutureHex", "[0-9a-fA-F]+")}\\.${atomic("ipvFutureTail", "[!$&-.0-9:;=A-Z_a-z~]+")}`;
 const IP_LITERAL = `\\[(?:${IPV6ADDRESS}|${IPVFUTURE})\\]`;
-const REG_NAME = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9;=A-Z_a-z~])*";
+const REG_NAME = atomic("regName", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9;=A-Z_a-z~])*");
 const HOST = `(?:${IP_LITERAL}|${IPV4ADDRESS}|${REG_NAME})`;
 
-const USERINFO = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=A-Z_a-z~])*";
-const SCHEME = "[A-Za-z][+\\-.0-9A-Za-z]*";
+const USERINFO = atomic("userinfoBody", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=A-Z_a-z~])*");
+const SCHEME = `[A-Za-z]${atomic("schemeTail", "[+\\-.0-9A-Za-z]*")}`;
 const SEG = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/])";
 const SEG_NC = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9;=@A-Z_a-z~])";
-const FRAGMENT = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*";
+const FRAGMENT = atomic("fragmentBody", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*");
 
 /** `RFC3986_URI` (`vendor/ruby/lib/uri/rfc3986_parser.rb:36-52`). */
 const RFC3986_URI = new RegExp(
   "^" +
     `(?<scheme>${SCHEME}):` +
     "(?:" +
-    `//(?<authority>(?:(?<userinfo>${USERINFO})@)?(?<host>${HOST})(?::(?<port>\\d*))?)` +
-    `(?<pathAbempty>(?:/${SEG}*)?)` +
-    `|(?<pathAbsolute>/((?!/)${SEG}+)?)` +
-    `|(?<pathRootless>(?!/)${SEG}+)` +
+    `//(?<authority>(?:(?<userinfo>${USERINFO})@)?(?<host>${HOST})(?::(?<port>${atomic("uriPort", "\\d*")}))?)` +
+    `(?<pathAbempty>(?:/${atomic("uriAbempty", `${SEG}*`)})?)` +
+    `|(?<pathAbsolute>/((?!/)${atomic("uriAbsolute", `${SEG}+`)})?)` +
+    `|(?<pathRootless>(?!/)${atomic("uriRootless", `${SEG}+`)})` +
     "|(?<pathEmpty>)" +
     ")" +
-    "(?:\\?(?<query>[^#]*))?" +
+    `(?:\\?(?<query>${atomic("uriQuery", "[^#]*")}))?` +
     `(?:#(?<fragment>${FRAGMENT}))?` +
     "$",
 );
@@ -63,13 +74,13 @@ const RFC3986_URI = new RegExp(
 const RFC3986_relative_ref = new RegExp(
   "^" +
     "(?:" +
-    `//(?<authority>(?:(?<userinfo>${USERINFO})@)?(?<host>${HOST}(?<!/))?(?::(?<port>\\d*))?)` +
-    `(?<pathAbempty>(?:/${SEG}*)?)` +
-    `|(?<pathAbsolute>/${SEG}*)` +
-    `|(?<pathNoscheme>${SEG_NC}+(?:/${SEG}*)?)` +
+    `//(?<authority>(?:(?<userinfo>${USERINFO})@)?(?<host>${HOST}(?<!/))?(?::(?<port>${atomic("refPort", "\\d*")}))?)` +
+    `(?<pathAbempty>(?:/${atomic("refAbempty", `${SEG}*`)})?)` +
+    `|(?<pathAbsolute>/${atomic("refAbsolute", `${SEG}*`)})` +
+    `|(?<pathNoscheme>${atomic("refNoschemeHead", `${SEG_NC}+`)}(?:/${atomic("refNoschemeTail", `${SEG}*`)})?)` +
     "|(?<pathEmpty>)" +
     ")" +
-    "(?:\\?(?<query>[^#]*))?" +
+    `(?:\\?(?<query>${atomic("refQuery", "[^#]*")}))?` +
     `(?:#(?<fragment>${FRAGMENT}))?` +
     "$",
 );
@@ -108,20 +119,21 @@ export class RFC3986Parser {
     SCHEME: new RegExp(`^${SCHEME}$`),
     USERINFO: new RegExp(`^${USERINFO}$`),
     HOST: new RegExp(`^${HOST}$`),
-    ABS_PATH: new RegExp(`^/${SEG}*$`),
-    REL_PATH: new RegExp(`^(?!/)${SEG}+$`),
-    QUERY: new RegExp("^(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*$"),
+    ABS_PATH: new RegExp(`^/${atomic("absPath", `${SEG}*`)}$`),
+    REL_PATH: new RegExp(`^(?!/)${atomic("relPath", `${SEG}+`)}$`),
+    QUERY: new RegExp(`^${atomic("query", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*")}$`),
     FRAGMENT: new RegExp(`^${FRAGMENT}$`),
     OPAQUE: new RegExp("^(?:[^/].*)?$"),
-    // eslint-disable-next-line no-control-regex
-    PORT: new RegExp("^[\\x09\\x0a\\x0c\\x0d ]*\\d*[\\x09\\x0a\\x0c\\x0d ]*$"),
+    PORT: new RegExp(
+      `^${atomic("portLead", "[\\x09\\x0a\\x0c\\x0d ]*")}\\d*[\\x09\\x0a\\x0c\\x0d ]*$`,
+    ),
   };
 
   /** `split` (`vendor/ruby/lib/uri/rfc3986_parser.rb:77`). */
   split(uri: string): SplitComponents {
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7f]*$/.test(uri)) {
-      throw new InvalidURIError(`URI must be ascii only ${JSON.stringify(uri)}`);
+      throw new InvalidURIError(`URI must be ascii only ${rbInspect(uri)}`);
     }
     let m = RFC3986_URI.exec(uri);
     if (m) {
@@ -160,7 +172,7 @@ export class RFC3986Parser {
         g.fragment ?? null,
       ];
     }
-    throw new InvalidURIError(`bad URI(is not URI?): ${JSON.stringify(uri)}`);
+    throw new InvalidURIError(`bad URI(is not URI?): ${rbInspect(uri)}`);
   }
 
   /** `parse` (`vendor/ruby/lib/uri/rfc3986_parser.rb:130`). */

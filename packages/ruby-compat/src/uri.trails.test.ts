@@ -35,6 +35,12 @@ describe("URI.parse", () => {
     expect(() => URI.parse("http://example.com/\\")).toThrow(InvalidURIError);
     expect(new InvalidURIError("x")).toBeInstanceOf(URIError);
   });
+
+  it("rejects a long almost-matching authority without backtracking", () => {
+    const started = Date.now();
+    expect(() => URI.parse(`http://${"a".repeat(50000)}\\`)).toThrow(InvalidURIError);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
 });
 
 describe("URI::Generic", () => {

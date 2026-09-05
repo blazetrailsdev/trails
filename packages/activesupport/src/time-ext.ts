@@ -19,14 +19,16 @@ import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 import {
   DAYS_INTO_WEEK,
+  allWeek,
+  beginningOfWeek,
+  endOfWeek,
   lastWeek,
   nextWeek,
   prevWeek,
 } from "./core-ext/date-and-time/calculations.js";
-import { beginningOfWeek as beginningOfWeekDefault } from "./core-ext/date/calculations.js";
 import { KeyError } from "@blazetrails/ruby-compat";
 
-export { nextWeek, prevWeek, lastWeek };
+export { nextWeek, prevWeek, lastWeek, beginningOfWeek, endOfWeek, allWeek };
 
 function dayIndex(day: string): number {
   const idx = DAYS_INTO_WEEK[day.toLowerCase()];
@@ -92,34 +94,6 @@ export function endOfMinute(date: Date): Temporal.Instant {
 
 export { beginningOfMinute as atBeginningOfMinute };
 export { endOfMinute as atEndOfMinute };
-
-/** @internal */
-function _beginningOfWeekDate(date: Date, startDay: string = beginningOfWeekDefault()): Date {
-  const d = clone(date);
-  const currentDay = d.getDay();
-  let diff = currentDay - dayIndex(startDay);
-  if (diff < 0) diff += 7;
-  d.setDate(d.getDate() - diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-export function beginningOfWeek(
-  date: Date,
-  startDay: string = beginningOfWeekDefault(),
-): Temporal.Instant {
-  return instantFrom(_beginningOfWeekDate(date, startDay));
-}
-
-export function endOfWeek(
-  date: Date,
-  startDay: string = beginningOfWeekDefault(),
-): Temporal.Instant {
-  const d = _beginningOfWeekDate(date, startDay);
-  d.setDate(d.getDate() + 6);
-  d.setHours(23, 59, 59, 999);
-  return instantFrom(d);
-}
 
 export function beginningOfMonth(date: Date): Temporal.Instant {
   const d = clone(date);
@@ -294,13 +268,6 @@ export function daysInYear(year: number): number {
 
 export function allDay(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
   return { start: beginningOfDay(date), end: endOfDay(date) };
-}
-
-export function allWeek(
-  date: Date,
-  startDay: string = beginningOfWeekDefault(),
-): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfWeek(date, startDay), end: endOfWeek(date, startDay) };
 }
 
 export function allMonth(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {

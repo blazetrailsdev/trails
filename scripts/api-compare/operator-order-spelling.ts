@@ -61,6 +61,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // stores (RFC 0115 retired the bare-value Map-compat sibling it used to be).
   "ActiveModel::AttributeSet": { "[]": ["getAttribute"], "[]=": ["set"] },
   // attribute.rb:115 `def ==(other)` → attribute.ts `equals`.
+  // actionpack/lib/action_dispatch/middleware/stack.rb:25-32 — the stack entry's
+  // `==`, ported as `equals` in action-dispatch/middleware/stack.ts.
+  "ActionDispatch::MiddlewareStack::Middleware": { "==": ["equals"] },
   "ActiveModel::Attribute": { "==": ["equals"] },
   // type/value.rb:121 `def ==(other)` → type/value.ts `equals`.
   "ActiveModel::Type::Value": { "==": ["equals"] },

@@ -6,6 +6,7 @@ import {
   eachKey,
   except,
   hasKey,
+  rbInspect,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Type } from "./type/value.js";
@@ -23,7 +24,7 @@ export class AttributeSet {
     if (hasKey(attributes, name)) return attributes[name];
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
-    throw new KeyError(`key not found: ${JSON.stringify(name)}`);
+    throw new KeyError(`key not found: ${rbInspect(name)}`);
   }
 
   except(...names: string[]): Record<string, Attribute> {
