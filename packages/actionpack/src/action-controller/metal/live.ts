@@ -48,8 +48,6 @@ export class Buffer {
   }
 
   write(string: string): void {
-    if (this._closed) throw new Error("closed stream");
-
     if (!this._response.committed) {
       if (this._response.headers.get("Cache-Control") === undefined) {
         this._response.headers.set("Cache-Control", "no-cache");
@@ -57,6 +55,7 @@ export class Buffer {
       this._response.deleteHeader("Content-Length");
     }
 
+    if (this._closed) throw new Error("closed stream");
     this._response.commitBang();
     this._buf.push(string);
 
