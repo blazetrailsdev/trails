@@ -30,7 +30,7 @@ import {
 import { Range } from "@blazetrails/ruby-compat";
 
 const HOST = quotingHost({ quotedDate, quotedBinary });
-const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const quote = (value: unknown): string | null => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("PostgreSQL quoting", () => {

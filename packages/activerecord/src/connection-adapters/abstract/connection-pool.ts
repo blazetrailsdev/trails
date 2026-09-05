@@ -86,13 +86,13 @@ export class NullPool implements AbstractPool {
     return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
   }
 
-  async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
+  serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      (await this._mutex.synchronize(async () => {
+      this._mutex.synchronize(async () => {
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
-      }))
+      })
     );
   }
 
@@ -304,7 +304,7 @@ export class ConnectionPool implements ReapablePool {
     return this._boundSchemaCache;
   }
 
-  serverVersion(connection: DatabaseAdapter): Promise<unknown> {
+  serverVersion(connection: DatabaseAdapter): unknown {
     return this.poolConfig.serverVersion(connection);
   }
 
