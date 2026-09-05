@@ -798,9 +798,11 @@ export class SchemaStatements {
       ): Column | Promise<Column>;
     };
     const definitions = await adapter.columnDefinitions(tableName);
-    return Promise.all(
-      definitions.map((field) => adapter.newColumnFromField(tableName, field, definitions)),
-    );
+    const columns: Column[] = [];
+    for (const field of definitions) {
+      columns.push(await adapter.newColumnFromField(tableName, field, definitions));
+    }
+    return columns;
   }
 
   async indexes(_tableName: string): Promise<IndexDefinition[]> {

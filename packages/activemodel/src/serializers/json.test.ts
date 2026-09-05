@@ -1,12 +1,19 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Serializers::JSON` in its class body, the way the
+   Rails test model it mirrors does (test/models/contact.rb:5); the class/interface merge beside it
+   is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { extend } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { JSON as JSONHost } from "./json.js";
-import { Naming } from "../naming.js";
+import type { ModelName } from "../naming.js";
 
 describe("Serializers::JSON host", () => {
-  class Person extends JSONHost {
+  class Person {
+    declare static modelName: ModelName;
+    declare static includeRootInJson: boolean | string;
+
     static {
-      extend(this, Naming);
+      include(this, JSONHost);
       Object.defineProperty(this.prototype, "attributes", {
         get() {
           return { name: this._name, age: this._age };
@@ -28,16 +35,21 @@ describe("Serializers::JSON host", () => {
       return this._age;
     }
   }
+  interface Person extends JSONHost {}
 
   it("modelName resolves to the subclass and is memoized per-class", () => {
     expect(Person.modelName.name).toBe("Person");
     expect(Person.modelName).toBe(Person.modelName);
 
-    class Other extends JSONHost {
+    class Other {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
-        extend(this, Naming);
+        include(this, JSONHost);
       }
     }
+    interface Other extends JSONHost {}
     expect(Other.modelName.name).toBe("Other");
     expect(Other.modelName).not.toBe(Person.modelName);
   });
@@ -73,9 +85,12 @@ describe("Serializers::JSON host", () => {
   });
 
   it("includeRootInJson default applies when no root option passed", () => {
-    class Rooted extends JSONHost {
+    class Rooted {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
-        extend(this, Naming);
+        include(this, JSONHost);
         this.includeRootInJson = true;
         Object.defineProperty(this.prototype, "attributes", {
           get() {
@@ -93,6 +108,7 @@ describe("Serializers::JSON host", () => {
         return this._x;
       }
     }
+    interface Rooted extends JSONHost {}
     const r = new Rooted();
     r._x = 1;
     expect(r.asJson()).toHaveProperty(Rooted.modelName.element);
@@ -111,8 +127,12 @@ describe("Serializers::JSON host", () => {
   });
 
   it("asJson coerces JSON-unsafe values (e.g. bigint)", () => {
-    class Big extends JSONHost {
+    class Big {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
+        include(this, JSONHost);
         Object.defineProperty(this.prototype, "attributes", {
           get() {
             return { id: this._id };
@@ -129,14 +149,19 @@ describe("Serializers::JSON host", () => {
         return this._id;
       }
     }
+    interface Big extends JSONHost {}
     const b = new Big();
     b._id = 9007199254740993n;
     expect(() => globalThis.JSON.stringify(b.asJson())).not.toThrow();
   });
 
   it("includeRootInJson accepts a string custom root", () => {
-    class CustomRooted extends JSONHost {
+    class CustomRooted {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
+        include(this, JSONHost);
         this.includeRootInJson = "author";
         Object.defineProperty(this.prototype, "attributes", {
           get() {
@@ -154,14 +179,19 @@ describe("Serializers::JSON host", () => {
         return this._name;
       }
     }
+    interface CustomRooted extends JSONHost {}
     const c = new CustomRooted();
     c._name = "Eve";
     expect(c.asJson()).toMatchObject({ author: { name: "Eve" } });
   });
 
   it("fromJson always unwraps via first-value semantics (Rails hash.values.first)", () => {
-    class Keyed extends JSONHost {
+    class Keyed {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
+        include(this, JSONHost);
         this.includeRootInJson = "data";
         Object.defineProperty(this.prototype, "attributes", {
           get() {
@@ -179,13 +209,18 @@ describe("Serializers::JSON host", () => {
         return this._v;
       }
     }
+    interface Keyed extends JSONHost {}
     const k = new Keyed().fromJson('{"payload":{"v":7},"data":{"v":1}}');
     expect(k._v).toBe(7);
   });
 
   it("fromJson treats an explicitly passed nil includeRoot as nil, not the class default", () => {
-    class ExplicitNil extends JSONHost {
+    class ExplicitNil {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
+        include(this, JSONHost);
         this.includeRootInJson = true;
         Object.defineProperty(this.prototype, "attributes", {
           get() {
@@ -202,13 +237,18 @@ describe("Serializers::JSON host", () => {
         return this._v;
       }
     }
+    interface ExplicitNil extends JSONHost {}
     const e = new ExplicitNil().fromJson('{"v":7}', null);
     expect(e._v).toBe(7);
   });
 
   it("fromJson uses class-level includeRootInJson default when no second arg passed", () => {
-    class Defaulted extends JSONHost {
+    class Defaulted {
+      declare static modelName: ModelName;
+      declare static includeRootInJson: boolean | string;
+
       static {
+        include(this, JSONHost);
         this.includeRootInJson = true;
         Object.defineProperty(this.prototype, "attributes", {
           get() {
@@ -226,6 +266,7 @@ describe("Serializers::JSON host", () => {
         return this._v;
       }
     }
+    interface Defaulted extends JSONHost {}
     const d = new Defaulted().fromJson('{"defaulted":{"v":99}}');
     expect(d._v).toBe(99);
   });

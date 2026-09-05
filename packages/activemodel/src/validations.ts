@@ -133,7 +133,10 @@ Validations.prototype.validate = Validations.prototype.isValid;
 
 type ValidatorLike = Validator | EachValidator | { validate(record: ValidatableRecord): unknown };
 
-type ValidateFilter<T extends ValidatableRecord> = string | ((record: T) => unknown);
+type ValidateFilter<T extends ValidatableRecord> =
+  | string
+  | ((record: T) => unknown)
+  | ValidatorLike;
 
 export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
   | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
