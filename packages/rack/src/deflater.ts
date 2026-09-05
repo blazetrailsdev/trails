@@ -48,10 +48,8 @@ export class Deflater {
 
     const encoding = Utils.selectBestEncoding(["gzip", "identity"], request.acceptEncoding);
 
-    const vary = String(headers["vary"] ?? "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter((v) => v !== "");
+    const varyHeader = String(headers["vary"] ?? "");
+    const vary = varyHeader === "" ? [] : varyHeader.split(",").map((v) => v.trim());
     if (!vary.includes("*") && !vary.some((v) => v.toLowerCase() === "accept-encoding")) {
       vary.push("Accept-Encoding");
       headers["vary"] = vary.join(",");
@@ -63,7 +61,7 @@ export class Deflater {
         delete headers[CONTENT_LENGTH];
         let mtime = headers["last-modified"];
         if (mtime) mtime = Time.httpdate(mtime).toI();
-        response[2] = new GzipStream(body, mtime ?? null, this.sync);
+        response[2] = new GzipStream(body, mtime, this.sync);
         return response;
       }
       case "identity":
@@ -71,7 +69,7 @@ export class Deflater {
       default: {
         const message = `An acceptable encoding for the requested resource ${request.fullpath} could not be found.`;
         const bp = new BodyProxy([message], () => {
-          if (body != null && typeof body.close === "function") body.close();
+          if (typeof body?.close === "function") body.close();
         });
         return [
           406,
@@ -108,11 +106,11 @@ export class GzipStream {
   static readonly BUFFER_LENGTH = 128 * 1_024;
 
   private body: any;
-  private mtime: number | null;
+  private mtime: number | null | undefined;
   private sync: boolean | null;
   private writer!: (data: Uint8Array) => void;
 
-  constructor(body: any, mtime: number | null, sync: boolean | null) {
+  constructor(body: any, mtime: number | null | undefined, sync: boolean | null) {
     this.body = body;
     this.mtime = mtime;
     this.sync = sync;
