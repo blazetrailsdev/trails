@@ -239,11 +239,6 @@ export default defineConfig(
       "packages/activerecord-cli/src/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
       "packages/activerecord/src/sqlite/expo-sqlite.ts",
-      // `flip-rack-deflater-onto-the-zlib-seam` flips this onto the ruby-compat
-      // Zlib seam; today's `new Promise` credits `Zlib::GzipWriter.new`
-      // (`vendor/rack/lib/rack/deflater.rb:101`) to the call-set gate, so the
-      // flip has to converge that call rather than drop it.
-      "packages/rack/src/deflater.ts",
       "packages/activerecord/src/encryption/config.ts",
       "packages/activerecord/src/encryption/context.ts",
       "packages/activerecord/src/connection-handling.ts",

@@ -13,6 +13,70 @@ export interface ZlibAdapter {
   gunzip(data: Uint8Array): Uint8Array;
   deflate(data: Uint8Array): Uint8Array;
   inflate(data: Uint8Array): Uint8Array;
+  gzipWriter(io: GzipWriterIO): GzipWriterHandle;
+}
+
+/**
+ * The object `::Zlib::GzipWriter.new` wraps (`vendor/ruby/ext/zlib/zlib.c:3841`
+ * `rb_gzwriter_initialize`) — anything that responds to `write`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface GzipWriterIO {
+  write(data: Uint8Array): void;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface GzipWriterHandle {
+  mtime: number | null;
+  write(data: Uint8Array): void;
+  flush(): void;
+  finish(): Promise<void>;
+}
+
+/**
+ * Ruby stdlib's `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:3841`), the
+ * streaming counterpart of one-shot `Zlib.gzip` — `Rack::Deflater::GzipStream#each`
+ * writes into it and reads the compressed bytes back through the io it wraps
+ * (`vendor/rack/lib/rack/deflater.rb:101`). Node's gzip stream is asynchronous,
+ * so `finish` is awaited where Ruby's returns.
+ *
+ * @noRailsEquivalent PERMANENT — the platform seam under Ruby stdlib `Zlib`
+ * (`vendor/ruby/ext/zlib/zlib.c:3841`); Rails calls `Zlib`, and neither Rails
+ * nor Ruby declares the backend registry a JS runtime needs.
+ */
+export class GzipWriter implements GzipWriterHandle {
+  private readonly handle: GzipWriterHandle;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(io: GzipWriterIO) {
+    this.handle = resolve().gzipWriter(io);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get mtime(): number | null {
+    return this.handle.mtime;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  set mtime(value: number | null) {
+    this.handle.mtime = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  write(data: Uint8Array): void {
+    this.handle.write(data);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  flush(): void {
+    this.handle.flush();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async finish(): Promise<void> {
+    await this.handle.finish();
+  }
 }
 
 const registry = new Map<string, ZlibAdapter>();
@@ -49,11 +113,19 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
+type NodeGzipStream = {
+  on(event: string, listener: (chunk?: Uint8Array) => void): void;
+  write(data: Uint8Array): void;
+  flush(): void;
+  end(): void;
+};
+
 type NodeZlib = {
   gzipSync: (data: Uint8Array, options: { level: number; strategy: number }) => Uint8Array;
   gunzipSync: (data: Uint8Array) => Uint8Array;
   deflateSync: (data: Uint8Array) => Uint8Array;
   inflateSync: (data: Uint8Array) => Uint8Array;
+  createGzip: () => NodeGzipStream;
 };
 
 function wrap(zlib: NodeZlib): ZlibAdapter {
@@ -62,6 +134,20 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     gunzip: (data) => zlib.gunzipSync(data),
     deflate: (data) => zlib.deflateSync(data),
     inflate: (data) => zlib.inflateSync(data),
+    gzipWriter: (io) => {
+      const stream = zlib.createGzip();
+      stream.on("data", (chunk) => io.write(chunk as Uint8Array));
+      const ended = new Promise<void>((res) => stream.on("end", () => res()));
+      return {
+        mtime: null,
+        write: (data) => stream.write(data),
+        flush: () => stream.flush(),
+        finish: async () => {
+          stream.end();
+          await ended;
+        },
+      };
+    },
   };
 }
 

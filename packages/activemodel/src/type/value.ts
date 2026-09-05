@@ -75,6 +75,15 @@ export abstract class Type<T = unknown> {
     return value;
   }
 
+  equals(other: Type): boolean {
+    return (
+      this.constructor === other.constructor &&
+      this.precision === other.precision &&
+      this.scale === other.scale &&
+      this.limit === other.limit
+    );
+  }
+
   assertValidValue(_: unknown): void {}
 
   isSerialized(): boolean {
@@ -137,13 +146,4 @@ export abstract class Type<T = unknown> {
 export class ValueType<T = unknown> extends Type<T> {
   /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
   readonly name: string = "value";
-
-  equals(other: Type): boolean {
-    return (
-      this.constructor === other.constructor &&
-      this.precision === other.precision &&
-      this.scale === other.scale &&
-      this.limit === other.limit
-    );
-  }
 }

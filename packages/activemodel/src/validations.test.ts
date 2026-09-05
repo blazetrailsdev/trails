@@ -394,7 +394,7 @@ describe("ValidationsTest", () => {
     const hash: Record<string, string[]> = {};
     hash.title = ["can't be blank"];
     hash.content = ["can't be blank"];
-    expect(ActiveSupportJSON.encode(t.errors)).toEqual(ActiveSupportJSON.encode(hash));
+    expect(t.errors.toJSON()).toEqual(ActiveSupportJSON.encode(hash));
   });
 
   it("does not modify options argument", () => {

@@ -137,7 +137,7 @@ describe("Errors — trails-only coverage", () => {
     errors.add("name", ":invalid");
     errors.add("age", ":invalid");
     const removed = errors.delete("name");
-    expect(removed!.length).toBe(2);
+    expect(removed).toEqual(["can't be blank", "is invalid"]);
     expect(errors.count).toBe(1);
   });
 

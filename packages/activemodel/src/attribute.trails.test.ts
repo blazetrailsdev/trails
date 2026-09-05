@@ -6,6 +6,22 @@ import { ValueType } from "./type/value.js";
 import "./attribute/user-provided-default.js";
 
 describe("Attribute — trails-only coverage", () => {
+  describe("equals compares the types by value (attribute.rb:119)", () => {
+    it("is equal for two separately-looked-up instances of the same registry type", () => {
+      const a = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+      const b = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+
+      expect(a.equals(b)).toBe(true);
+    });
+
+    it("is not equal when the types differ only in limit (type/value.rb:121-125)", () => {
+      const a = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 10 }));
+      const b = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 20 }));
+
+      expect(a.equals(b)).toBe(false);
+    });
+  });
+
   it("#== compares a nil type against a non-nil one without raising", () => {
     const stringType = typeRegistry.lookup("string");
     const nilTyped = Attribute.fromUser("name", "Alice", null);

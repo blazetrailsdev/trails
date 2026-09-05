@@ -77,8 +77,14 @@ export { FloatDomainError } from "./float-domain-error.js";
 export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
 export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
-export { registerZlibAdapter, getZlib, getZlibAsync, zlibAdapterConfig } from "./zlib-adapter.js";
-export type { ZlibAdapter } from "./zlib-adapter.js";
+export {
+  registerZlibAdapter,
+  getZlib,
+  getZlibAsync,
+  zlibAdapterConfig,
+  GzipWriter,
+} from "./zlib-adapter.js";
+export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
 export { pack } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";

@@ -1,4 +1,5 @@
-import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
+import { MutableModule, Type, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 
@@ -105,6 +106,7 @@ export interface Coder {
   assertValidValue?(value: unknown, options: { action: string }): void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class Serialized extends ValueType {
   readonly name = "serialized";
   readonly subtype: Type;
@@ -128,10 +130,6 @@ export class Serialized extends ValueType {
         ? Buffer.from(deserialized).toString("utf8")
         : deserialized;
     return this.coder.load(forCoder);
-  }
-
-  cast(value: unknown): unknown {
-    return this.deserialize(this.serialize(value));
   }
 
   serialize(value: unknown): unknown {
@@ -180,10 +178,6 @@ export class Serialized extends ValueType {
     return true;
   }
 
-  override isMutable(): boolean {
-    return true;
-  }
-
   override isBinary(): boolean {
     return this.subtype.isBinary();
   }
@@ -201,3 +195,8 @@ export class Serialized extends ValueType {
     return payload;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
+export interface Serialized extends Mutable {}
+
+include(Serialized, MutableModule);
