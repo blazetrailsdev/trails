@@ -32,13 +32,11 @@ function fk(
   primaryKey = "id",
   name?: string,
 ): ForeignKeyDefinition {
-  return new ForeignKeyDefinition(
-    fromTable,
-    toTable,
+  return new ForeignKeyDefinition(fromTable, toTable, {
     column,
     primaryKey,
-    name ?? `fk_${fromTable}_${column}`,
-  );
+    name: name ?? `fk_${fromTable}_${column}`,
+  });
 }
 
 describe("generateModels", () => {

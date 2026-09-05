@@ -1051,25 +1051,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const onUpdate = this.extractForeignKeyAction(first.on_update as string);
       const fromCols = group.map((r) => r.from as string);
       const toCols = group.map((r) => r.to as string);
-      const column = fromCols.length === 1 ? fromCols[0] : fromCols;
-      const primaryKey = toCols.length === 1 ? toCols[0] : toCols;
       const columnKey = fromCols.join(",");
       const primaryKeyKey = toCols.join(",");
-      const deferrable = fkDefs[`${toTable},${columnKey},${primaryKeyKey}`];
-      results.push(
-        new ForeignKeyDefinition(
-          tableName,
-          toTable,
-          column,
-          primaryKey,
-          undefined,
-          onDelete,
-          onUpdate,
-          deferrable,
-          undefined,
-          ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
-        ),
-      );
+      const options: Partial<AddForeignKeyOptions> = {
+        onDelete,
+        onUpdate,
+        deferrable: fkDefs[`${toTable},${columnKey},${primaryKeyKey}`],
+      };
+
+      if (group.length === 1) {
+        options.column = fromCols[0];
+        options.primaryKey = toCols[0];
+      } else {
+        options.column = fromCols;
+        options.primaryKey = toCols;
+      }
+
+      results.push(new ForeignKeyDefinition(tableName, toTable, options));
     }
     return results;
   }
@@ -1286,7 +1284,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           onDelete: fk.onDelete,
           onUpdate: fk.onUpdate,
           deferrable: fk.deferrable,
-          validate: fk.storesValidate ? fk.validate : undefined,
+          validate: "validate" in fk.options ? fk.options.validate : undefined,
         });
       }
       definition.checkConstraints.push(...checks);

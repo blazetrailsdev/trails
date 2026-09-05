@@ -1,4 +1,8 @@
-import { GzipWriter, getZlib, hasKey } from "@blazetrails/ruby-compat";
+import { GzipWriter, hasKey } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { BodyProxy } from "./body-proxy.js";
+import { Request } from "./request.js";
+import * as Utils from "./utils.js";
 import { CONTENT_TYPE, CONTENT_LENGTH, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 
 export interface DeflaterOptions {
@@ -33,35 +37,49 @@ export class Deflater {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const [status, headers, body] = await this.app(env);
+    const response = (await this.app(env)) as [number, Record<string, any>, any];
+    const [status, headers, body] = response;
 
     if (!this.shouldDeflate(env, status, headers, body)) {
-      return [status, headers, body];
+      return response;
     }
 
-    const acceptEncoding = env["HTTP_ACCEPT_ENCODING"] || "";
-    const encoding = this.preferredEncoding(acceptEncoding);
+    const request = new Request(env);
 
-    if (!encoding) {
-      return [status, headers, body];
+    const encoding = Utils.selectBestEncoding(["gzip", "identity"], request.acceptEncoding);
+
+    const vary = String(headers["vary"] ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v !== "");
+    if (!vary.includes("*") && !vary.some((v) => v.toLowerCase() === "accept-encoding")) {
+      vary.push("Accept-Encoding");
+      headers["vary"] = vary.join(",");
     }
 
-    if (encoding === "identity") {
-      return [status, headers, body];
+    switch (encoding) {
+      case "gzip": {
+        headers["content-encoding"] = "gzip";
+        delete headers[CONTENT_LENGTH];
+        let mtime = headers["last-modified"];
+        if (mtime) mtime = Time.httpdate(mtime).toI();
+        response[2] = new GzipStream(body, mtime ?? null, this.sync);
+        return response;
+      }
+      case "identity":
+        return response;
+      default: {
+        const message = `An acceptable encoding for the requested resource ${request.fullpath} could not be found.`;
+        const bp = new BodyProxy([message], () => {
+          if (body != null && typeof body.close === "function") body.close();
+        });
+        return [
+          406,
+          { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: String(message.length) },
+          bp,
+        ];
+      }
     }
-
-    const vary = headers["vary"];
-    if (!vary || (!vary.includes("*") && !vary.toLowerCase().includes("accept-encoding"))) {
-      headers["vary"] = vary ? vary + ", Accept-Encoding" : "Accept-Encoding";
-    }
-
-    delete headers[CONTENT_LENGTH];
-    headers["content-encoding"] = encoding;
-
-    const compressed = await this.compress(body, encoding);
-    headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed, "binary"));
-
-    return [status, headers, [compressed]];
   }
 
   private shouldDeflate(
@@ -83,48 +101,6 @@ export class Deflater {
     if (this.condition && !this.condition.call(undefined, env, status, headers, body)) return false;
     if (headers[CONTENT_LENGTH] === "0") return false;
     return true;
-  }
-
-  private preferredEncoding(accept: string): string | null {
-    const encodings = accept.split(",").map((s) => s.trim().split(";")[0].trim().toLowerCase());
-    if (encodings.includes("gzip") || encodings.includes("x-gzip")) return "gzip";
-    if (encodings.includes("deflate")) return "deflate";
-    if (encodings.includes("identity") || encodings.includes("*")) return "identity";
-    if (encodings.length === 0 || (encodings.length === 1 && encodings[0] === ""))
-      return "identity";
-    return null;
-  }
-
-  private async compress(body: any, encoding: string): Promise<string> {
-    if (encoding === "gzip") {
-      const chunks: Uint8Array[] = [];
-      const stream = new GzipStream(body, null, this.sync);
-      await stream.each((data) => chunks.push(data));
-      stream.close();
-      return Buffer.concat(chunks).toString("binary");
-    }
-
-    const parts: string[] = [];
-    if (Array.isArray(body)) {
-      for (const chunk of body) parts.push(String(chunk));
-    } else if (body && typeof body.each === "function") {
-      body.each((chunk: string) => parts.push(String(chunk)));
-    } else if (body && typeof body.forEach === "function") {
-      body.forEach((chunk: string) => parts.push(String(chunk)));
-    } else if (typeof body === "string") {
-      parts.push(body);
-    }
-
-    if (body && typeof body.close === "function") {
-      body.close();
-    }
-
-    const input = Buffer.from(parts.join(""));
-
-    if (encoding === "deflate") {
-      return Buffer.from(getZlib().deflate(input)).toString("binary");
-    }
-    return input.toString();
   }
 }
 

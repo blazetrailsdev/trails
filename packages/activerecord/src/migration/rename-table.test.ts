@@ -3,10 +3,6 @@ import { ambientConnection } from "../support/rocket-tables.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertRaises } from "@blazetrails/activesupport";
 
-interface TableNameLimits {
-  tableNameLength(): number;
-}
-
 interface IndexShape {
   readonly name: string;
   readonly columns: string[];
@@ -72,7 +68,7 @@ describe("Migration", () => {
 
     it("rename table raises for long table names", async () => {
       const connection = await ambientConnection();
-      const nameLimit = (connection as unknown as TableNameLimits).tableNameLength();
+      const nameLimit = connection.tableNameLength();
       const longName = "a".repeat(nameLimit + 1);
       const shortName = "a".repeat(nameLimit);
 
@@ -111,7 +107,7 @@ describe("Migration", () => {
 
     it("rename table with long table name and index", async () => {
       const connection = await ambientConnection();
-      const longName = "a".repeat((connection as unknown as TableNameLimits).tableNameLength());
+      const longName = "a".repeat(connection.tableNameLength());
 
       try {
         await connection.addIndex("test_models", "url");

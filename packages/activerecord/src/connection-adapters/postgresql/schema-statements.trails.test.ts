@@ -1113,13 +1113,11 @@ describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
       }),
     } as unknown as DatabaseAdapter;
     const ss = withSchemaStatements(adapter);
-    const fk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      ["rocket_tenant_id", "rocket_id"],
-      ["tenant_id", "id"],
-      "fk_rails_composite",
-    );
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      name: "fk_rails_composite",
+    });
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
 
     await ss.addForeignKey("astronauts", "rockets", {

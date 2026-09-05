@@ -35,10 +35,6 @@ async function indexNames(conn: AbstractAdapter, table: string): Promise<string[
   return indexes.map((i) => i.name);
 }
 
-function indexNameLength(conn: AbstractAdapter): number {
-  return (conn as unknown as { indexNameLength(): number }).indexNameLength();
-}
-
 class TestModel extends Base {
   declare age: unknown;
   declare contributor: unknown;
@@ -381,7 +377,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       const tableNamePrefix = "test_models_";
       const longIndexName =
-        tableNamePrefix + "x".repeat(indexNameLength(connection) - tableNamePrefix.length);
+        tableNamePrefix + "x".repeat(connection.indexNameLength() - tableNamePrefix.length);
       await connection.addColumn("test_models", "category", "string");
       await connection.addIndex("test_models", "category", { name: longIndexName });
 

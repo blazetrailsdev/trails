@@ -96,9 +96,7 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
   const deferrable = opts ? parseDeferrable(opts) : undefined;
   const validate = !(opts && isFalse(objPropValue(opts, "validate")));
 
-  return new ForeignKeyDefinition(
-    fromTable,
-    toTable,
+  return new ForeignKeyDefinition(fromTable, toTable, {
     column,
     primaryKey,
     name,
@@ -106,7 +104,7 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
     onUpdate,
     deferrable,
     validate,
-  );
+  });
 }
 
 /** @internal */

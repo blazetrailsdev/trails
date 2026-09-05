@@ -94,7 +94,7 @@ export async function removeForeignKey(
       table = globalPluralizeTableNames() ? pluralize(table) : table;
     }
     table = this.stripTableNamePrefixAndSuffix(table);
-    const fkOptions = fk.options;
+    const fkOptions = fk.options as Record<string, unknown>;
     matchOptions = Object.fromEntries(
       Object.entries(matchOptions).filter(([k]) => k in fkOptions),
     ) as ForeignKeyLookupOptions;

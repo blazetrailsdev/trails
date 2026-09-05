@@ -6,7 +6,11 @@ import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
-import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
+import type {
+  ColumnType,
+  ColumnOptions,
+  AddForeignKeyOptions,
+} from "../abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
@@ -620,28 +624,21 @@ export async function foreignKeys(
     const fkName = first.name as string;
     const onDelete = this.extractForeignKeyAction(first.on_delete as string);
     const onUpdate = this.extractForeignKeyAction(first.on_update as string);
-    const column =
-      group.length === 1
-        ? (unquoteIdentifier(first.column as string) as string)
-        : group.map((r) => unquoteIdentifier(r.column as string) as string);
-    const primaryKey =
-      group.length === 1
-        ? (first.primary_key as string)
-        : group.map((r) => r.primary_key as string);
-    results.push(
-      new ForeignKeyDefinition(
-        tableName,
-        toTable,
-        column,
-        primaryKey,
-        fkName,
-        onDelete,
-        onUpdate,
-        undefined,
-        undefined,
-        ["column", "name", "primaryKey", "onDelete", "onUpdate"],
-      ),
-    );
+    const options: Partial<AddForeignKeyOptions> = {
+      name: fkName,
+      onUpdate,
+      onDelete,
+    };
+
+    if (group.length === 1) {
+      options.column = unquoteIdentifier(first.column as string) as string;
+      options.primaryKey = first.primary_key as string;
+    } else {
+      options.column = group.map((r) => unquoteIdentifier(r.column as string) as string);
+      options.primaryKey = group.map((r) => r.primary_key as string);
+    }
+
+    results.push(new ForeignKeyDefinition(tableName, toTable, options));
   }
   return results;
 }

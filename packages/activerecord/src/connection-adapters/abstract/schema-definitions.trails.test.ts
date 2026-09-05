@@ -29,7 +29,11 @@ afterEach(() => {
 
 describe("ForeignKeyDefinition#export_name_on_schema_dump?", () => {
   const fk = (name: string): ForeignKeyDefinition =>
-    new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", name);
+    new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      primaryKey: "id",
+      name,
+    });
 
   it("honors a custom SchemaDumper.fkIgnorePattern at call time", () => {
     expect(fk("ignored_fk_astronauts_rockets").isExportNameOnSchemaDump).toBe(true);
@@ -372,16 +376,14 @@ describe("IndexDefinition#defined_for?", () => {
 
 describe("ForeignKeyDefinition#defined_for?", () => {
   const fk = (): ForeignKeyDefinition =>
-    new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      "rocket_id",
-      "pk",
-      "fk_rails_abc",
-      "cascade",
-      "restrict",
-      "deferred",
-    );
+    new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      primaryKey: "pk",
+      name: "fk_rails_abc",
+      onDelete: "cascade",
+      onUpdate: "restrict",
+      deferrable: "deferred",
+    });
 
   it("matches to_table, column, name, and validate explicitly", () => {
     expect(fk().isDefinedFor({ toTable: "rockets" })).toBe(true);
@@ -404,43 +406,45 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("treats an unset stored option as Array(nil) => [], not a 'undefined' string", () => {
-    const noActions = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
+    const noActions = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      primaryKey: "id",
+      name: "fk_x",
+      onDelete: undefined,
+    });
     expect(noActions.onDelete).toBeUndefined();
     expect(noActions.isDefinedFor({ onDelete: "cascade" })).toBe(false);
   });
 
   it("ignores a validate lookup when the definition did not store :validate", () => {
-    const noValidate = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
-    expect(noValidate.storesValidate).toBe(false);
+    const noValidate = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      primaryKey: "id",
+      name: "fk_x",
+    });
+    expect("validate" in noValidate.options).toBe(false);
     expect(noValidate.isDefinedFor({ validate: false })).toBe(true);
     expect(noValidate.isDefinedFor({ validate: true })).toBe(true);
   });
 
   it("compares validate when the definition stored :validate (PG introspection)", () => {
-    const stored = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      "rocket_id",
-      "id",
-      "fk_x",
-      undefined,
-      undefined,
-      undefined,
-      false,
-    );
-    expect(stored.storesValidate).toBe(true);
+    const stored = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      primaryKey: "id",
+      name: "fk_x",
+      validate: false,
+    });
+    expect("validate" in stored.options).toBe(true);
     expect(stored.isDefinedFor({ validate: false })).toBe(true);
     expect(stored.isDefinedFor({ validate: true })).toBe(false);
   });
 
   it("compares composite primary keys element-wise", () => {
-    const composite = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      ["rocket_tenant_id", "rocket_id"],
-      ["tenant_id", "id"],
-      "fk_rails_xyz",
-    );
+    const composite = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      name: "fk_rails_xyz",
+    });
     expect(composite.isDefinedFor({ primaryKey: ["tenant_id", "id"] })).toBe(true);
     expect(composite.isDefinedFor({ primaryKey: ["id", "tenant_id"] })).toBe(false);
     expect(composite.isDefinedFor({ primaryKey: "id" })).toBe(false);
@@ -462,32 +466,22 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("respects adapter-specific stored option keys (mysql lacks deferrable, sqlite lacks name)", () => {
-    const mysqlFk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      "rocket_id",
-      "id",
-      "fk_rails_abc",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      ["column", "name", "primaryKey", "onDelete", "onUpdate"],
-    );
+    const mysqlFk = new ForeignKeyDefinition("astronauts", "rockets", {
+      name: "fk_rails_abc",
+      onUpdate: undefined,
+      onDelete: undefined,
+      column: "rocket_id",
+      primaryKey: "id",
+    });
     expect(mysqlFk.isDefinedFor({ deferrable: "deferred" })).toBe(true);
     expect(mysqlFk.isDefinedFor({ name: "wrong" })).toBe(false);
-    const sqliteFk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      "rocket_id",
-      "id",
-      "fk_synth_name",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
-    );
+    const sqliteFk = new ForeignKeyDefinition("astronauts", "rockets", {
+      onDelete: undefined,
+      onUpdate: undefined,
+      deferrable: undefined,
+      column: "rocket_id",
+      primaryKey: "id",
+    });
     expect(sqliteFk.isDefinedFor({ name: "anything" })).toBe(true);
     expect(sqliteFk.isDefinedFor({ column: "wrong" })).toBe(false);
   });

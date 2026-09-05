@@ -21,27 +21,21 @@ describeIfSqlite("SQLite3::SchemaCreation", () => {
   });
 
   it("appends DEFERRABLE INITIALLY DEFERRED when deferrable is 'deferred'", async () => {
-    const fk = new ForeignKeyDefinition(
-      "orders",
-      "customers",
-      "customer_id",
-      "id",
-      "fk_orders_customers",
-      undefined,
-      undefined,
-      "deferred",
-    );
+    const fk = new ForeignKeyDefinition("orders", "customers", {
+      column: "customer_id",
+      primaryKey: "id",
+      name: "fk_orders_customers",
+      deferrable: "deferred",
+    });
     expect(await sc.accept(fk)).toContain("DEFERRABLE INITIALLY DEFERRED");
   });
 
   it("omits DEFERRABLE when not set", async () => {
-    const fk = new ForeignKeyDefinition(
-      "orders",
-      "customers",
-      "customer_id",
-      "id",
-      "fk_orders_customers",
-    );
+    const fk = new ForeignKeyDefinition("orders", "customers", {
+      column: "customer_id",
+      primaryKey: "id",
+      name: "fk_orders_customers",
+    });
     expect(await sc.accept(fk)).not.toContain("DEFERRABLE");
   });
 

@@ -38,29 +38,20 @@ const s = () =>
 
 describe("PostgreSQL SchemaCreation", () => {
   it("visitForeignKeyDefinition: NOT VALID + DEFERRABLE", () => {
-    const fk1 = new ForeignKeyDefinition(
-      "a",
-      "b",
-      "b_id",
-      "id",
-      "fk",
-      undefined,
-      undefined,
-      undefined,
-      false,
-    );
+    const fk1 = new ForeignKeyDefinition("a", "b", {
+      column: "b_id",
+      primaryKey: "id",
+      name: "fk",
+      validate: false,
+    });
     expect(s().visitForeignKeyDefinition(fk1)).not.toContain("NOT VALID");
-    const fk2 = new ForeignKeyDefinition(
-      "a",
-      "b",
-      "b_id",
-      "id",
-      "fk",
-      undefined,
-      undefined,
-      "deferred",
-      true,
-    );
+    const fk2 = new ForeignKeyDefinition("a", "b", {
+      column: "b_id",
+      primaryKey: "id",
+      name: "fk",
+      deferrable: "deferred",
+      validate: true,
+    });
     expect(s().visitForeignKeyDefinition(fk2)).toContain("DEFERRABLE INITIALLY DEFERRED");
   });
 
@@ -172,17 +163,12 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("visitAlterTable: appends constraint validations after the FK adds (Rails parity)", async () => {
-    const fk = new ForeignKeyDefinition(
-      "users",
-      "posts",
-      "post_id",
-      "id",
-      "fk_users_post_id",
-      undefined,
-      undefined,
-      undefined,
-      true,
-    );
+    const fk = new ForeignKeyDefinition("users", "posts", {
+      column: "post_id",
+      primaryKey: "id",
+      name: "fk_users_post_id",
+      validate: true,
+    });
     const at = new AlterTable({ name: "users" } as unknown as TableDefinition) as any;
     at.foreignKeyAdds.push(fk);
     at.constraintValidations = ["some_constraint"];

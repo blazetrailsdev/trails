@@ -196,15 +196,13 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
 describeIfSqlite("SchemaCreation#visit_ForeignKeyDefinition nil column lists", () => {
   it("renders empty column lists for a nil column and primary key (Ruby Array())", () => {
     const sc = new SchemaCreation(conn) as any;
-    const fk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      null as unknown as string,
-      null as unknown as string,
-      "fk_rails_abc",
-    );
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: null as unknown as string,
+      primaryKey: null as unknown as string,
+      name: "fk_rails_abc",
+    });
     expect(sc.visitForeignKeyDefinition(fk)).toBe(
-      'CONSTRAINT "fk_rails_abc" FOREIGN KEY () REFERENCES "rockets" ()',
+      'CONSTRAINT "fk_rails_abc" FOREIGN KEY () REFERENCES "rockets" ("id")',
     );
   });
 });

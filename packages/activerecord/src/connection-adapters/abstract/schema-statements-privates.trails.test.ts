@@ -438,7 +438,11 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("foreignKeyExists matches by toTable, column, and name", async () => {
     const ss = makeStatements();
-    const fk = new ForeignKeyDefinition("users", "orgs", "org_id", "id", "fk_rails_abc");
+    const fk = new ForeignKeyDefinition("users", "orgs", {
+      column: "org_id",
+      primaryKey: "id",
+      name: "fk_rails_abc",
+    });
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
 
     expect(await ss.foreignKeyExists("users", "orgs")).toBe(true);
@@ -452,13 +456,11 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("foreignKeyExists matches a composite column by value, not reference", async () => {
     const ss = makeStatements();
-    const fk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      ["rocket_tenant_id", "rocket_id"],
-      ["tenant_id", "id"],
-      "fk_rails_composite",
-    );
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      name: "fk_rails_composite",
+    });
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
 
     expect(
@@ -475,13 +477,11 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("addForeignKey with ifNotExists is a no-op when a composite FK already exists", async () => {
     const ss = makeStatements();
-    const fk = new ForeignKeyDefinition(
-      "astronauts",
-      "rockets",
-      ["rocket_tenant_id", "rocket_id"],
-      ["tenant_id", "id"],
-      "fk_rails_composite",
-    );
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      name: "fk_rails_composite",
+    });
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
     const executeMutation = (ss as any).executeMutation as ReturnType<typeof vi.fn>;
     executeMutation.mockClear();

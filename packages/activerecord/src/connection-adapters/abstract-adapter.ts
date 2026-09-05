@@ -367,6 +367,12 @@ export interface AbstractAdapter {
   ): Promise<IndexDefinition | boolean | undefined>;
   indexNameLength(): number;
   /** @internal */
+  maxIdentifierLength(): number;
+  tableNameLength(): number;
+  tableAliasLength(): number;
+  /** @internal */
+  bindParamsLength(): number;
+  /** @internal */
   indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
