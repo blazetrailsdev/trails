@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
 import { RangeType } from "./range.js";
@@ -10,7 +10,7 @@ import { Vector } from "./vector.js";
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),
   serialize: (value: unknown) => (value == null ? null : Number(value)),
-} as unknown as Type;
+} as unknown as ValueType;
 
 describe("PostgreSQL::OID::TypeMapInitializer", () => {
   it("registers arrays, ranges, enums, domains, mapped types, and composites", () => {
@@ -48,7 +48,7 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
         ({
           ...(integerSubtype as object),
           metadata: args[0],
-        }) as unknown as Type,
+        }) as unknown as ValueType,
     );
 
     new TypeMapInitializer(store).run([

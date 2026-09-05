@@ -16,7 +16,7 @@
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import {
@@ -143,13 +143,13 @@ export function castBoundValue(value: unknown): unknown {
 
 export interface QuotingHost {
   /** @internal */
-  lookupCastType(sqlType: string | null): Type;
+  lookupCastType(sqlType: string | null): ValueType;
 }
 
 export function lookupCastTypeFromColumn(
   this: QuotingHost,
   column: { sqlType: string | null },
-): Type {
+): ValueType {
   return this.lookupCastType(column.sqlType);
 }
 
@@ -311,7 +311,10 @@ function typeCastedBinds(
 }
 
 /** @internal */
-export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | number | null): Type {
+export function lookupCastType(
+  this: { typeMap: TypeMap },
+  sqlType: string | number | null,
+): ValueType {
   return this.typeMap.lookup(sqlType as string | null);
 }
 

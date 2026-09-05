@@ -1,5 +1,5 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
-import { Type } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -8,25 +8,25 @@ import type { AttributeOptions } from "./attributes.js";
 export interface AttributeRegistrationClassMethods {
   attribute(
     name: string,
-    type?: string | Type | AttributeOptions,
+    type?: string | ValueType | AttributeOptions,
     options?: AttributeOptions,
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
-  attributeTypes(): Record<string, Type>;
-  typeForAttribute(name: string, block?: () => Type): Type;
+  attributeTypes(): Record<string, ValueType>;
+  typeForAttribute(name: string, block?: () => ValueType): ValueType;
 }
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
-  _cachedAttributeTypes?: Record<string, Type> | null;
+  _cachedAttributeTypes?: Record<string, ValueType> | null;
   _attributesBuilder?: unknown;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal */
   resolveAttributeName(name: string): string;
 
-  attributeTypes(): Record<string, Type>;
+  attributeTypes(): Record<string, ValueType>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
   /** @internal */
@@ -37,7 +37,10 @@ export interface AttributeHostInternals {
   resetDefaultAttributesBang(): void;
 }
 
-export type AttributeDecorator = (name: string, type: Type) => Type | null | undefined;
+export type AttributeDecorator = (
+  name: string,
+  type: ValueType | null,
+) => ValueType | null | undefined;
 
 /** @internal */
 export interface PendingModification {
@@ -49,7 +52,7 @@ export interface PendingModification {
 export class PendingType implements PendingModification {
   constructor(
     readonly name: string,
-    readonly type: Type | null,
+    readonly type: ValueType | null,
   ) {}
 
   applyTo(attributeSet: AttributeSet): void {
@@ -85,7 +88,7 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = this.decorator(name, existing.type!);
+      const newType = this.decorator(name, existing.type);
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
@@ -95,9 +98,9 @@ export class PendingDecorator implements PendingModification {
 
 export interface AttributeRegistrationHost extends AttributeHostInternals {
   /** @internal */
-  resolveTypeName(name: string, options?: Record<string, unknown>): Type;
+  resolveTypeName(name: string, options?: Record<string, unknown>): ValueType;
   /** @internal */
-  hookAttributeType(name: string, type: Type): Type;
+  hookAttributeType(name: string, type: ValueType): ValueType;
 }
 
 type HostAsClass = new (...args: unknown[]) => unknown;
@@ -106,11 +109,11 @@ export const ClassMethods = {
   attribute(
     this: AttributeRegistrationHost,
     name: string,
-    type?: string | Type | AttributeOptions,
+    type?: string | ValueType | AttributeOptions,
     options?: AttributeOptions,
   ): void {
     name = this.resolveAttributeName(name);
-    if (type !== undefined && typeof type !== "string" && !(type instanceof Type)) {
+    if (type !== undefined && typeof type !== "string" && !(type instanceof ValueType)) {
       options = type;
       type = undefined;
     }
@@ -118,7 +121,7 @@ export const ClassMethods = {
     const { default: _default, ...typeOptions } = options ?? {};
     if (typeProvided) {
       type =
-        type instanceof Type
+        type instanceof ValueType
           ? type
           : this.resolveTypeName(
               type as string,
@@ -126,13 +129,13 @@ export const ClassMethods = {
                 ? (typeOptions as Record<string, unknown>)
                 : undefined,
             );
-      type = this.hookAttributeType(name, type as Type);
+      type = this.hookAttributeType(name, type as ValueType);
     }
 
     const noDefault = options?.default === undefined;
     if (type != null || noDefault) {
       this.pendingAttributeModifications().push(
-        new PendingType(name, typeProvided ? (type as Type) : null),
+        new PendingType(name, typeProvided ? (type as ValueType) : null),
       );
     }
     if (!noDefault) {
@@ -164,13 +167,13 @@ export const ClassMethods = {
     return this._cachedDefaultAttributes;
   },
 
-  attributeTypes(this: AttributeHostInternals): Record<string, Type> {
+  attributeTypes(this: AttributeHostInternals): Record<string, ValueType> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
     const cast = host._defaultAttributes().castTypes();
-    const proxy = new Proxy(cast, {
+    const proxy = new Proxy(cast as Record<string, ValueType>, {
       get(target, prop, receiver) {
         if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
           return defaultValue();
@@ -182,7 +185,11 @@ export const ClassMethods = {
     return proxy;
   },
 
-  typeForAttribute(this: AttributeHostInternals, attributeName: string, block?: () => Type): Type {
+  typeForAttribute(
+    this: AttributeHostInternals,
+    attributeName: string,
+    block?: () => ValueType,
+  ): ValueType {
     attributeName = this.resolveAttributeName(attributeName);
 
     const types = this.attributeTypes();
@@ -242,12 +249,12 @@ export const ClassMethods = {
     this: AttributeHostInternals,
     name: string,
     options?: Record<string, unknown>,
-  ): Type {
+  ): ValueType {
     return typeRegistry.lookup(name, options);
   },
 
   /** @internal */
-  hookAttributeType(this: AttributeHostInternals, _attribute: string, type: Type): Type {
+  hookAttributeType(this: AttributeHostInternals, _attribute: string, type: ValueType): ValueType {
     return type;
   },
 };

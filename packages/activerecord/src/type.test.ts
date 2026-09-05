@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { register, lookup, registry, adapterNameFrom, AdapterSpecificRegistry } from "./type.js";
 import { Base } from "./base.js";
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
-class ArgType extends Type<unknown> {
+class ArgType extends ValueType<unknown> {
   readonly name = "arg_type";
   readonly args: unknown;
   constructor(args?: unknown) {

@@ -1,21 +1,26 @@
-import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 export class HashLookupTypeMap {
-  private _mapping: Map<string | number, (lookupKey: string | number, ...args: unknown[]) => Type> =
-    new Map();
-  private _cache: Map<string | number, Map<string, Type>> = new Map();
+  private _mapping: Map<
+    string | number,
+    (lookupKey: string | number, ...args: unknown[]) => ValueType
+  > = new Map();
+  private _cache: Map<string | number, Map<string, ValueType>> = new Map();
   constructor(_parent: HashLookupTypeMap | null = null) {}
 
-  lookup(lookupKey: string | number, ...args: unknown[]): Type {
+  lookup(lookupKey: string | number, ...args: unknown[]): ValueType {
     return this.fetch(lookupKey, ...args, () => new ValueType());
   }
 
-  fetch(lookupKey: string | number, ...rest: unknown[]): Type {
-    let fallback: ((lookupKey: string | number, ...args: unknown[]) => Type) | undefined;
+  fetch(lookupKey: string | number, ...rest: unknown[]): ValueType {
+    let fallback: ((lookupKey: string | number, ...args: unknown[]) => ValueType) | undefined;
     let args: unknown[];
 
     if (rest.length > 0 && typeof rest[rest.length - 1] === "function") {
-      fallback = rest[rest.length - 1] as (lookupKey: string | number, ...a: unknown[]) => Type;
+      fallback = rest[rest.length - 1] as (
+        lookupKey: string | number,
+        ...a: unknown[]
+      ) => ValueType;
       args = rest.slice(0, -1);
     } else {
       args = rest;
@@ -73,8 +78,8 @@ export class HashLookupTypeMap {
 
   registerType(
     key: string | number,
-    value?: Type,
-    block?: (lookupKey: string | number, ...args: unknown[]) => Type,
+    value?: ValueType,
+    block?: (lookupKey: string | number, ...args: unknown[]) => ValueType,
   ): void {
     if (value == null && block == null) {
       throw new ArgumentError("registerType requires a value or block");
@@ -113,8 +118,8 @@ export class HashLookupTypeMap {
   private performFetch(
     type: string | number,
     args: unknown[],
-    fallback?: (lookupKey: string | number, ...args: unknown[]) => Type,
-  ): Type {
+    fallback?: (lookupKey: string | number, ...args: unknown[]) => ValueType,
+  ): ValueType {
     const factory = this._mapping.get(type);
     if (factory) return factory(type, ...args);
     if (fallback) return fallback(type, ...args);

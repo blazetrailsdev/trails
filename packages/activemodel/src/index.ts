@@ -84,7 +84,6 @@ export { serializableHash } from "./serialization.js";
 export type { SerializeOptions, SerializableHash } from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
-export { Type } from "./type/value.js";
 /** @noRailsEquivalent PERMANENT */
 export { typeRegistry } from "./type/registry.js";
 
@@ -117,14 +116,13 @@ import { DateTimeType } from "./type/date-time.js";
 import { DecimalType } from "./type/decimal.js";
 import { BigIntegerType } from "./type/big-integer.js";
 import { ImmutableStringType } from "./type/immutable-string.js";
-import { Type as TypeBase, ValueType } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { BinaryType } from "./type/binary.js";
 import { TimeType } from "./type/time.js";
 import { typeRegistry } from "./type/registry.js";
 export { defaultValue } from "./type.js";
 
 export const Types = {
-  Type: TypeBase,
   typeRegistry,
   StringType,
   IntegerType,

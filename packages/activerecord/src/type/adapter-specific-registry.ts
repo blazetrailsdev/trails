@@ -1,4 +1,4 @@
-import { ArgumentError, Type } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {
@@ -27,7 +27,7 @@ export class Registration {
   /** @internal */
   readonly name: string;
   /** @internal */
-  protected get block(): (...args: unknown[]) => Type {
+  protected get block(): (...args: unknown[]) => ValueType {
     return this._block;
   }
   /** @internal */
@@ -37,12 +37,12 @@ export class Registration {
     return this._override;
   }
 
-  protected _block: (...args: unknown[]) => Type;
+  protected _block: (...args: unknown[]) => ValueType;
   private _override: boolean | null;
 
   constructor(
     name: string,
-    block: (...args: unknown[]) => Type,
+    block: (...args: unknown[]) => ValueType,
     options?: { adapter?: string; override?: boolean },
   ) {
     this.name = name;
@@ -51,7 +51,7 @@ export class Registration {
     this._override = options?.override ?? null;
   }
 
-  call(_registry: AdapterSpecificRegistry, ...argsAndKwargs: unknown[]): Type {
+  call(_registry: AdapterSpecificRegistry, ...argsAndKwargs: unknown[]): ValueType {
     const [args, kwargs] = splitKwargs(argsAndKwargs);
     if (!kwargs) return this._block(...args);
     const { adapter: _adapter, ...rest } = kwargs;
@@ -115,16 +115,16 @@ export class DecorationRegistration extends Registration {
     return this._options;
   }
   /** @internal */
-  private get klass(): new (subtype: Type) => Type {
+  private get klass(): new (subtype: ValueType) => ValueType {
     return this._klass;
   }
 
   private _options: Record<string, unknown>;
-  private _klass: new (subtype: Type) => Type;
+  private _klass: new (subtype: ValueType) => ValueType;
 
   constructor(
     options: Record<string, unknown>,
-    klass: new (subtype: Type) => Type,
+    klass: new (subtype: ValueType) => ValueType,
     registrationOptions?: { adapter?: string },
   ) {
     super("", () => null as any, registrationOptions);
@@ -132,7 +132,7 @@ export class DecorationRegistration extends Registration {
     this._klass = klass;
   }
 
-  override call(registry: AdapterSpecificRegistry, ...argsAndKwargs: unknown[]): Type {
+  override call(registry: AdapterSpecificRegistry, ...argsAndKwargs: unknown[]): ValueType {
     const [args, kwargs] = splitKwargs(argsAndKwargs);
     const filtered: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(kwargs ?? {})) {
@@ -170,7 +170,7 @@ export class AdapterSpecificRegistry {
 
   addModifier(
     options: Record<string, unknown>,
-    klass: new (subtype: Type) => Type,
+    klass: new (subtype: ValueType) => ValueType,
     args?: { adapter?: string },
   ): void {
     this.registrations.push(new DecorationRegistration(options, klass, args));
@@ -178,15 +178,15 @@ export class AdapterSpecificRegistry {
 
   register(
     typeName: string,
-    klass?: (new (...args: any[]) => Type) | null,
+    klass?: (new (...args: any[]) => ValueType) | null,
     options?: { adapter?: string; override?: boolean },
-    block?: (...args: unknown[]) => Type,
+    block?: (...args: unknown[]) => ValueType,
   ): void {
     const factory = block ?? ((_symbol: unknown, ...args: unknown[]) => new klass!(...args));
     this.registrations.push(new Registration(typeName, factory, options));
   }
 
-  lookup(symbol: string, ...args: unknown[]): Type {
+  lookup(symbol: string, ...args: unknown[]): ValueType {
     const registration = this.findRegistration(symbol, ...args);
     if (registration) {
       return registration.call(this, symbol, ...args);

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
-type Type = ValueType;
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
@@ -14,7 +13,7 @@ class JsonbType extends ValueType {
 
 function makeAdapter(
   columns: Record<string, { sqlType: string; default?: unknown }>,
-  typeByColumn: Record<string, Type>,
+  typeByColumn: Record<string, ValueType>,
 ): unknown {
   const hash = columns as unknown as Record<string, unknown>;
   const cache = {

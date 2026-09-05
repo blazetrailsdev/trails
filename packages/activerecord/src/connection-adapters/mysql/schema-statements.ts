@@ -8,7 +8,7 @@ import {
 } from "./schema-definitions.js";
 import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
 import { Column } from "./column.js";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
@@ -343,7 +343,7 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
 /** @internal */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  lookupCastType(sqlType: string | null): Type;
+  lookupCastType(sqlType: string | null): ValueType;
 }
 
 /** @internal */

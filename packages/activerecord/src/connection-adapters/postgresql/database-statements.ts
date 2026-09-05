@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { ArgumentError, type Type } from "@blazetrails/activemodel";
+import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { ActiveRecord } from "../../ar-config.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -20,7 +20,7 @@ export const READ_QUERY =
 
 /** @internal */
 interface CastResultHost {
-  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<Type>;
+  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<ValueType>;
 }
 
 /** @internal */
@@ -358,7 +358,7 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
   }
 
   const columnNames = fields.map((f) => f.name);
-  const columnTypes: Record<string | number, Type> = {};
+  const columnTypes: Record<string | number, ValueType> = {};
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i];
     const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
@@ -367,7 +367,7 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
   }
 
   const rows = (result.rows ?? []) as unknown[][];
-  return new Result(columnNames, rows, columnTypes as Record<string, Type>);
+  return new Result(columnNames, rows, columnTypes as Record<string, ValueType>);
 }
 
 /** @internal */

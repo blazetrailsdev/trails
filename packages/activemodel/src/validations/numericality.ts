@@ -1,7 +1,9 @@
 import {
   ArgumentError as RubyArgumentError,
+  cmp,
   isSymbol,
   kernelFloat,
+  rbCmpint,
   Range,
 } from "@blazetrails/ruby-compat";
 
@@ -105,7 +107,13 @@ export class NumericalityValidator extends EachValidator {
       } else if (option in COMPARE_CHECKS) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
         if (optionValue === undefined) continue;
-        if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
+        if (
+          !compareOperator(
+            COMPARE_CHECKS[option as CompareKey],
+            rbCmpint(cmp(value, optionValue), value, optionValue),
+            0,
+          )
+        ) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,

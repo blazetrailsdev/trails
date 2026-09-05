@@ -1,4 +1,4 @@
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { enumTypeOf } from "../enum.js";
 
@@ -16,15 +16,15 @@ export class Map {
     return type.serialize(value);
   }
 
-  typeForAttribute(name: unknown): Type {
+  typeForAttribute(name: unknown): ValueType {
     return this._baseTypeForAttribute(toS(name));
   }
 
-  private _baseTypeForAttribute(name: string): Type {
+  private _baseTypeForAttribute(name: string): ValueType {
     const klass = this._klass;
 
     if (typeof klass.typeForAttribute === "function") {
-      return klass.typeForAttribute(name) as Type;
+      return klass.typeForAttribute(name) as ValueType;
     }
 
     return new ValueType();

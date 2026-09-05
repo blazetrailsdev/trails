@@ -2,7 +2,7 @@ import { Attribute } from "../../attribute.js";
 import type { AttributeSet } from "../../attribute-set.js";
 import { typeRegistry } from "../../type/registry.js";
 import { defaultValue } from "../../type.js";
-import type { Type } from "../../type/value.js";
+import type { ValueType } from "../../type/value.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface AttributeSetCoder {
@@ -66,7 +66,7 @@ export function fromEnvelope(envelope: AttributeSetEnvelope): AttributeSetCoder 
   return { conciseAttributes };
 }
 
-function lookupType(typeKey: string | null): Type | null {
+function lookupType(typeKey: string | null): ValueType | null {
   if (typeKey == null) return null;
   try {
     return typeRegistry.lookup(typeKey);

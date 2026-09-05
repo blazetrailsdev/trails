@@ -25,7 +25,7 @@ import {
   parseMysqlName,
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
@@ -107,7 +107,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   const castTypeNamed = (name: string, limit: number | null = null) =>
-    ({ type: () => name, limit, precision: null, scale: null }) as unknown as Type;
+    ({ type: () => name, limit, precision: null, scale: null }) as unknown as ValueType;
 
   const baseLookupCastType = (sqlType: string | null) => {
     const base = (sqlType ?? "")
@@ -149,7 +149,7 @@ describe("MySQL::SchemaStatements", () => {
       "users",
       {
         Field: "name",
-        Type: "varchar(255)",
+        ValueType: "varchar(255)",
         Null: "YES",
         Default: "Dean",
         Extra: "",
@@ -169,7 +169,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "updated_at",
-        Type: "timestamp",
+        ValueType: "timestamp",
         Null: "NO",
         Default: "CURRENT_TIMESTAMP",
         Extra: "",
@@ -186,7 +186,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "created_at",
-        Type: "datetime",
+        ValueType: "datetime",
         Null: "NO",
         Default: "CURRENT_TIMESTAMP",
         Extra: "",
@@ -203,7 +203,7 @@ describe("MySQL::SchemaStatements", () => {
       "events",
       {
         Field: "created_at",
-        Type: "datetime",
+        ValueType: "datetime",
         Null: "NO",
         Default: "now()",
         Extra: "DEFAULT_GENERATED",
@@ -220,7 +220,7 @@ describe("MySQL::SchemaStatements", () => {
       "items",
       {
         Field: "uid",
-        Type: "char(36)",
+        ValueType: "char(36)",
         Null: "NO",
         Default: "uuid()",
         Extra: "DEFAULT_GENERATED",
@@ -237,7 +237,7 @@ describe("MySQL::SchemaStatements", () => {
       "items",
       {
         Field: "due_on",
-        Type: "date",
+        ValueType: "date",
         Null: "YES",
         Default: "CURRENT_DATE",
         Extra: "DEFAULT_GENERATED",
@@ -254,7 +254,7 @@ describe("MySQL::SchemaStatements", () => {
       "orders",
       {
         Field: "total",
-        Type: "decimal(10,2)",
+        ValueType: "decimal(10,2)",
         Null: "YES",
         Default: "price * qty",
         Extra: "DEFAULT_GENERATED",
@@ -271,7 +271,7 @@ describe("MySQL::SchemaStatements", () => {
       "users",
       {
         Field: "bio",
-        Type: "text",
+        ValueType: "text",
         Null: "YES",
         Default: "'hello world'",
         Extra: "",
@@ -302,7 +302,7 @@ describe("MySQL::SchemaStatements", () => {
       "t",
       {
         Field: "id",
-        Type: "bigint",
+        ValueType: "bigint",
         Null: "NO",
         Default: null,
         Extra: "",

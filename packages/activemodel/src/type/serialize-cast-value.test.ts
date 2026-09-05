@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 import { SerializeCastValue } from "./serialize-cast-value.js";
 
 function includeSerializeCastValue(klass: { prototype: object }): void {
@@ -7,9 +7,10 @@ function includeSerializeCastValue(klass: { prototype: object }): void {
   if (!("serializeCastValue" in proto)) {
     proto.serializeCastValue = SerializeCastValue.serializeCastValue;
   }
-  proto.itselfIfSerializeCastValueCompatible = Type.prototype.itselfIfSerializeCastValueCompatible;
+  proto.itselfIfSerializeCastValueCompatible =
+    ValueType.prototype.itselfIfSerializeCastValueCompatible;
   (klass as unknown as Record<string, unknown>).serializeCastValueCompatible =
-    Type.serializeCastValueCompatible;
+    ValueType.serializeCastValueCompatible;
 }
 
 function DelegateClass(protoToForward: object): {

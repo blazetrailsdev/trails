@@ -2182,7 +2182,6 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
 const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["Table", "Node"],
   ["Attribute", "Node"],
-  ["ValueType", "Type"],
   ["LockingType", "ValueType"],
   ["Serialized", "ValueType"],
   ["TimeZoneConverter", "ValueType"],

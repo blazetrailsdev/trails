@@ -4,7 +4,7 @@ import {
   FloatType,
   IntegerType,
   StringType,
-  Type,
+  ValueType,
 } from "@blazetrails/activemodel";
 import * as ArType from "../../type.js";
 
@@ -83,7 +83,7 @@ export function extractScale(sqlType: string | undefined): number | undefined {
 export function registerClassWithLimit(
   mapping: HashLookupTypeMap,
   key: string,
-  klass: new (options?: { limit?: number }) => Type,
+  klass: new (options?: { limit?: number }) => ValueType,
 ): void {
   mapping.registerType(key, undefined, (_key, ...args) => {
     const sqlType = sqlTypeFromArgs(args);
@@ -94,7 +94,7 @@ export function registerClassWithLimit(
 export function registerClassWithPrecision(
   mapping: HashLookupTypeMap,
   key: string,
-  klass: new (options: { precision?: number } & Record<string, unknown>) => Type,
+  klass: new (options: { precision?: number } & Record<string, unknown>) => ValueType,
   extraOptions: Record<string, unknown> = {},
 ): void {
   mapping.registerType(key, undefined, (_key, ...args) => {

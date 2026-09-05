@@ -1,4 +1,4 @@
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
@@ -213,7 +213,7 @@ export async function performQuery(
 
 /** @internal */
 export function castResult(
-  this: { lookupCastType(sqlType: string): Type },
+  this: { lookupCastType(sqlType: string): ValueType },
   rawResult: Mysql2RawResult,
 ): Result {
   if (rawResult.rows == null) return Result.empty();
@@ -224,7 +224,7 @@ export function castResult(
   if (fields.length === 0) {
     result = Result.empty();
   } else {
-    let columnTypes: Record<string | number, Type> | null = null;
+    let columnTypes: Record<string | number, ValueType> | null = null;
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
       const code = f.columnType ?? f.type;

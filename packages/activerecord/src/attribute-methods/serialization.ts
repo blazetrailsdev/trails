@@ -1,6 +1,6 @@
 import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
-import { type AttributeOptions, type Type, ArgumentError } from "@blazetrails/activemodel";
+import { type AttributeOptions, type ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "../type/json.js";
 import { Serialized, type Coder } from "../type/serialized.js";
 import { JSON as CodersJSON } from "../coders/json.js";
@@ -145,7 +145,7 @@ export function serialize(
   delete (attributeOptions as SerializeOptions).yaml;
   this.attribute(attrName, attributeOptions);
 
-  const decorator = (name: string, castType: Type): Type => {
+  const decorator = (name: string, castType: ValueType | null): ValueType => {
     if (castType instanceof Serialized && castType.coder === columnSerializer) return castType;
     if (isTypeIncompatibleWithSerialize(castType, coder, type, castType instanceof Json)) {
       throw new ColumnNotSerializableError(name, castType);

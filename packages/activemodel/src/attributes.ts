@@ -7,7 +7,7 @@ import {
   included,
   prepend,
 } from "@blazetrails/activesupport";
-import { Type } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttributeMethodPattern,
@@ -40,7 +40,7 @@ export function attributes(attrs: AttributeSet): Record<string, unknown> {
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
 
-export function attributeNames(this: { attributeTypes(): Record<string, Type> }): string[] {
+export function attributeNames(this: { attributeTypes(): Record<string, ValueType> }): string[] {
   return Object.keys(this.attributeTypes());
 }
 
@@ -64,7 +64,7 @@ export function _writeAttribute(
 export function attribute(
   this: AttributeRegistrationHost & { defineAttributeMethod(attrName: string): void },
   name: string,
-  typeName?: string | Type | AttributeOptions,
+  typeName?: string | ValueType | AttributeOptions,
   options?: AttributeOptions,
 ): void {
   AttributeRegistrationClassMethods.attribute.call(this, name, typeName, options);

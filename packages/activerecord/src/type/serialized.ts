@@ -1,4 +1,4 @@
-import { MutableModule, Type, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
+import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
@@ -109,10 +109,10 @@ export interface Coder {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class Serialized extends ValueType {
   readonly name = "serialized";
-  readonly subtype: Type;
+  readonly subtype: ValueType | null;
   readonly coder: Coder;
 
-  constructor(subtype: Type, coder: Coder) {
+  constructor(subtype: ValueType | null, coder: Coder) {
     super();
     this.subtype = subtype;
     this.coder = coder;
@@ -120,7 +120,7 @@ export class Serialized extends ValueType {
 
   /** @noRailsEquivalent CONVERGEABLE api-compare-nulls-a-delegateclass-superclass */
   override type(): string | undefined {
-    return this.subtype.type();
+    return this.subtype!.type();
   }
 
   accessor(): unknown {
@@ -129,9 +129,9 @@ export class Serialized extends ValueType {
 
   deserialize(value: unknown): unknown {
     if (this.isDefaultValue(value)) return value;
-    const deserialized = this.subtype.deserialize?.(value) ?? value;
+    const deserialized = this.subtype!.deserialize?.(value) ?? value;
     const forCoder =
-      this.subtype.type?.() === "binary" && deserialized instanceof Uint8Array
+      this.subtype!.type?.() === "binary" && deserialized instanceof Uint8Array
         ? Buffer.from(deserialized).toString("utf8")
         : deserialized;
     return this.coder.load(forCoder);
@@ -141,7 +141,7 @@ export class Serialized extends ValueType {
     if (value === null || value === undefined) return null;
     if (this.isDefaultValue(value)) return null;
     const dumped = this.coder.dump(value);
-    if (this.subtype.serialize) {
+    if (this.subtype?.serialize) {
       return this.subtype.serialize(dumped);
     }
     return dumped;
@@ -165,7 +165,7 @@ export class Serialized extends ValueType {
     const oldNil = rawOldValue === null || rawOldValue === undefined;
     const newNil = rawNewValue === null || rawNewValue === undefined;
     return (
-      oldNil !== newNil || (this.subtype.isChangedInPlace?.(rawOldValue, rawNewValue) ?? false)
+      oldNil !== newNil || (this.subtype!.isChangedInPlace?.(rawOldValue, rawNewValue) ?? false)
     );
   }
 
@@ -184,7 +184,7 @@ export class Serialized extends ValueType {
   }
 
   override isBinary(): boolean {
-    return this.subtype.isBinary();
+    return this.subtype!.isBinary();
   }
 
   private isDefaultValue(value: unknown): boolean {
@@ -194,7 +194,7 @@ export class Serialized extends ValueType {
   private encoded(value: unknown): unknown {
     if (this.isDefaultValue(value)) return undefined;
     const payload = this.coder.dump(value);
-    if (payload && this.subtype.isBinary()) {
+    if (payload && this.subtype!.isBinary()) {
       return new BinaryData(payload);
     }
     return payload;

@@ -1,6 +1,6 @@
 import { Attribute, FromUser } from "../attribute.js";
 import { _setUserProvidedDefaultCtor } from "./user-provided-default-slot.js";
-import { Type } from "../type/value.js";
+import { ValueType } from "../type/value.js";
 
 export class UserProvidedDefault extends FromUser {
   /** @internal */
@@ -11,7 +11,7 @@ export class UserProvidedDefault extends FromUser {
   constructor(
     name: string,
     value: unknown,
-    type: Type | null,
+    type: ValueType | null,
     databaseDefault: Attribute | null = null,
   ) {
     super(name, undefined, type, databaseDefault);
@@ -29,16 +29,16 @@ export class UserProvidedDefault extends FromUser {
     return this.userProvidedValue;
   }
 
-  override withType(type: Type | null): Attribute {
+  override withType(type: ValueType | null): Attribute {
     return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
-  marshalDump(): [string, unknown, Type | null, Attribute | null] {
+  marshalDump(): [string, unknown, ValueType | null, Attribute | null] {
     return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
   }
 
   static marshalLoad(
-    values: [string, unknown, Type | null, Attribute | null],
+    values: [string, unknown, ValueType | null, Attribute | null],
   ): UserProvidedDefault {
     return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
   }

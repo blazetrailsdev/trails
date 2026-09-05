@@ -1,6 +1,6 @@
 import { classAttribute, included, methodMissingProxy } from "@blazetrails/activesupport";
 import { SerializeCastValue } from "@blazetrails/activemodel";
-import type { Type } from "@blazetrails/activemodel";
+import type { ValueType } from "@blazetrails/activemodel";
 
 export type NormalizesArgs = [
   ...names: string[],
@@ -10,8 +10,11 @@ export type NormalizesArgs = [
 /** @internal */
 interface NormalizationClass {
   normalizedAttributes: Set<string>;
-  decorateAttributes(names: string[], decorator: (name: string, castType: Type) => Type): void;
-  typeForAttribute(name: string): Type;
+  decorateAttributes(
+    names: string[],
+    decorator: (name: string, castType: ValueType) => ValueType,
+  ): void;
+  typeForAttribute(name: string): ValueType;
 }
 
 /** @internal */
@@ -37,12 +40,12 @@ export const ClassMethods = {
 
     this.decorateAttributes(
       names,
-      (name: string, castType: Type) =>
+      (name: string, castType: ValueType) =>
         new NormalizedValueType({
           castType,
           normalizer: options.with,
           normalizeNil: applyToNil,
-        }) as unknown as Type,
+        }) as unknown as ValueType,
     );
 
     this.normalizedAttributes = new Set([...this.normalizedAttributes, ...names]);
@@ -75,12 +78,12 @@ export const InstanceMethods = {
 };
 
 export class NormalizedValueType {
-  readonly castType: Type;
+  readonly castType: ValueType;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
   constructor(options: {
-    castType: Type;
+    castType: ValueType;
     normalizer: (value: unknown) => unknown;
     normalizeNil: boolean;
   }) {
@@ -107,11 +110,11 @@ export class NormalizedValueType {
     );
   }
 
-  itselfIfSerializeCastValueCompatible(): Type {
-    return this as unknown as Type;
+  itselfIfSerializeCastValueCompatible(): ValueType {
+    return this as unknown as ValueType;
   }
 
-  equals(other: Type): boolean {
+  equals(other: ValueType): boolean {
     return (
       this.constructor === (other as object)?.constructor &&
       this.normalizeNil === (other as unknown as NormalizedValueType).normalizeNil &&
@@ -121,8 +124,8 @@ export class NormalizedValueType {
   }
 }
 
-function castTypesEqual(a: Type, b: Type): boolean {
-  const equals = (a as { equals?(other: Type): boolean }).equals;
+function castTypesEqual(a: ValueType, b: ValueType): boolean {
+  const equals = (a as { equals?(other: ValueType): boolean }).equals;
   return equals ? equals.call(a, b) : a === b;
 }
 

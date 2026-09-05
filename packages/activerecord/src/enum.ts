@@ -5,13 +5,7 @@ import {
   isBlank,
   pluralize,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  ValueType,
-  IntegerType,
-  Type,
-  defaultValue,
-} from "@blazetrails/activemodel";
+import { ArgumentError, IntegerType, ValueType, defaultValue } from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods, isDangerousAttributeMethod } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
@@ -38,7 +32,7 @@ function inferSubtype(values: Iterable<EnumValue>): string {
 
 function subtypeInstance(subtype: string): ValueType<unknown> {
   try {
-    return arTypeLookup(subtype) as ValueType<unknown>;
+    return arTypeLookup(subtype);
   } catch {
     return new IntegerType();
   }
@@ -47,7 +41,7 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
 function enumTypeFrom(
   name: string,
   mapping: Record<string, EnumValue>,
-  reflected: Type,
+  reflected: ValueType | null,
   raiseOnInvalidValues: boolean,
 ): EnumType {
   let subtype: ValueType<unknown>;
@@ -90,7 +84,7 @@ export function installEnumAttribute(
   } else {
     klass.attribute(name);
   }
-  klass.decorateAttributes([name], (_name: string, subtype: Type) => {
+  klass.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
     if (subtype === defaultValue()) {
       throw new Error(
         `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
@@ -564,7 +558,7 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   const host = klass as unknown as {
     _enums?: Map<string, unknown>;
     attributeAliases?: Record<string, string>;
-    _defaultAttributes(): { getAttribute(n: string): { type: Type } };
+    _defaultAttributes(): { getAttribute(n: string): { type: ValueType } };
   };
   reflectSchemaSync.call(klass);
   if (!host._enums?.has(attribute)) return null;

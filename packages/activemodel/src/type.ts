@@ -1,5 +1,5 @@
 import { typeRegistry, TypeRegistry, type TypeClass, type TypeFactory } from "./type/registry.js";
-import { Type, ValueType } from "./type/value.js";
+import { ValueType } from "./type/value.js";
 import { BigIntegerType } from "./type/big-integer.js";
 import { BinaryType } from "./type/binary.js";
 import { BooleanType } from "./type/boolean.js";
@@ -12,7 +12,7 @@ import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
 import { TimeType } from "./type/time.js";
 
-export { Type } from "./type/value.js";
+export { ValueType } from "./type/value.js";
 
 export function registry(): TypeRegistry {
   return typeRegistry;
@@ -26,7 +26,7 @@ export function register(
   typeRegistry.register(typeName, klass, block);
 }
 
-export function lookup(name: string, ...args: unknown[]): Type {
+export function lookup(name: string, ...args: unknown[]): ValueType {
   return typeRegistry.lookup(name, ...args);
 }
 

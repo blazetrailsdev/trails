@@ -1,7 +1,7 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Contexts } from "./contexts.js";
 import { Configuration as ConfigurationError } from "./errors.js";
-import { type Type } from "@blazetrails/activemodel";
+import { type ValueType } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { encryptionHooks } from "../encryption-hooks.js";
@@ -75,7 +75,7 @@ export class EncryptableRecord {
    * @noRailsEquivalent CONVERGEABLE the decorate_attributes([name]) push of encrypts (encryption/encryptable_record.rb:87-92), made explicit so queue position is stable.
    */
   static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
-    modelClass.decorateAttributes([name], (attrName: string, castType: Type) => {
+    modelClass.decorateAttributes([name], (attrName: string, castType: ValueType) => {
       return new EncryptedAttributeType({
         scheme: pending.scheme,
         castType,

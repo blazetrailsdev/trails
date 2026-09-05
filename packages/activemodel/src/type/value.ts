@@ -1,18 +1,12 @@
 import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
-export abstract class Type<T = unknown> {
+export class ValueType<T = unknown> {
   /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
-  abstract readonly name: string;
+  readonly name: string = "value";
   #precision?: number;
   #limit?: number;
   protected readonly _scale?: number;
-
-  constructor(options?: { precision?: number; scale?: number; limit?: number }) {
-    if (options?.precision !== undefined) this.#precision = options.precision;
-    if (options?.scale !== undefined) this._scale = options.scale;
-    if (options?.limit !== undefined) this.#limit = options.limit;
-  }
 
   get precision(): number | undefined {
     return this.#precision;
@@ -24,6 +18,12 @@ export abstract class Type<T = unknown> {
 
   get limit(): number | undefined {
     return this.#limit;
+  }
+
+  constructor(options?: { precision?: number; scale?: number; limit?: number }) {
+    if (options?.precision !== undefined) this.#precision = options.precision;
+    if (options?.scale !== undefined) this._scale = options.scale;
+    if (options?.limit !== undefined) this.#limit = options.limit;
   }
 
   isSerializable(value: unknown, _block?: (castValue: unknown) => void): boolean {
@@ -75,7 +75,7 @@ export abstract class Type<T = unknown> {
     return value;
   }
 
-  equals(other: Type): boolean {
+  equals(other: ValueType): boolean {
     return (
       this.constructor === other.constructor &&
       this.precision === other.precision &&
@@ -141,9 +141,4 @@ export abstract class Type<T = unknown> {
     });
     return result;
   }
-}
-
-export class ValueType<T = unknown> extends Type<T> {
-  /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
-  readonly name: string = "value";
 }

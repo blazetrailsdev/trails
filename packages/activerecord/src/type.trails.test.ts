@@ -10,7 +10,7 @@ import {
 } from "./type.js";
 import { Base } from "./base.js";
 import { ConnectionNotDefined } from "./errors.js";
-import { Type, StringType, ValueType } from "@blazetrails/activemodel";
+import { ValueType, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
 import "./connection-adapters/postgresql/type-map-init.js";
 import { Bytea } from "./connection-adapters/postgresql/oid/bytea.js";
@@ -21,7 +21,7 @@ import { Interval } from "./connection-adapters/postgresql/oid/interval.js";
 import { Money } from "./connection-adapters/postgresql/oid/money.js";
 import { Uuid } from "./connection-adapters/postgresql/oid/uuid.js";
 
-class GenericType extends Type<unknown> {
+class GenericType extends ValueType<unknown> {
   readonly name: string = "generic";
   cast(value: unknown) {
     return value;

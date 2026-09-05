@@ -4,13 +4,7 @@ import type {
 } from "../database-configurations/database-config.js";
 import pg from "pg";
 import { fetch } from "@blazetrails/ruby-compat";
-import {
-  type Type,
-  ValueType,
-  ArgumentError,
-  BinaryData,
-  TimeType,
-} from "@blazetrails/activemodel";
+import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -578,7 +572,7 @@ export class PostgreSQLAdapter
     fmod: number,
     columnName: string,
     sqlType: string = "",
-  ): Promise<Type> {
+  ): Promise<ValueType> {
     if (!this.typeMap.isKey(oid)) {
       await this.loadAdditionalTypes([oid]);
     }
@@ -596,7 +590,7 @@ export class PostgreSQLAdapter
   }
 
   /** @missingRailsCall verify! — CONVERGEABLE typecaster-connection-drops-datasource-gate-and-with-connection */
-  override lookupCastTypeFromColumn(column: CastableColumn): Type {
+  override lookupCastTypeFromColumn(column: CastableColumn): ValueType {
     if (this._typeMap == null) {
       throw new ConnectionNotEstablished(
         "PostgreSQL type map is not loaded; the connection has not been configured",
@@ -702,7 +696,7 @@ export class PostgreSQLAdapter
     }
 
     const columns = fields.map((f) => f.name);
-    const columnTypes: Record<string | number, Type> = {};
+    const columnTypes: Record<string | number, ValueType> = {};
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
       const type = await this.getOidType(f.dataTypeID, -1, f.name, "");
@@ -712,7 +706,7 @@ export class PostgreSQLAdapter
       }
     }
     const rowArrays = pgResult.rows;
-    return new Result(columns, rowArrays, columnTypes as Record<string, Type>);
+    return new Result(columns, rowArrays, columnTypes as Record<string, ValueType>);
   }
 
   /** @internal */
@@ -1684,7 +1678,7 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  override lookupCastType(sqlType: string | null): Type {
+  override lookupCastType(sqlType: string | null): ValueType {
     return pgLookupCastType.call(this, sqlType);
   }
 

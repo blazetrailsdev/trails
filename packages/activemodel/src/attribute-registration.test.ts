@@ -5,7 +5,6 @@
 import { describe, it, expect } from "vitest";
 import { Model, Types, ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
-import type { Type } from "./type.js";
 import { AttributeRegistration } from "./attribute-registration.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
@@ -19,16 +18,16 @@ const TYPE_2 = new MyType({ precision: 2 });
 
 class MyDecorator extends ValueType<unknown> {
   readonly name: string;
-  readonly castType: Type;
+  readonly castType: ValueType;
 
-  constructor(name: string, castType: Type) {
+  constructor(name: string, castType: ValueType) {
     super();
     this.name = name;
     this.castType = castType;
   }
 
   cast(value: unknown): unknown {
-    return (this.castType as ValueType<unknown>).cast(value);
+    return this.castType.cast(value);
   }
 }
 
@@ -314,7 +313,7 @@ describe("AttributeRegistrationTest", () => {
       klass.attribute("qux", TYPE_2);
       klass.decorateAttributes(
         ["foo", "bar"],
-        (name: string, type: Type) => new MyDecorator(name, type),
+        (name: string, type: ValueType) => new MyDecorator(name, type),
       );
     });
 
@@ -333,7 +332,10 @@ describe("AttributeRegistrationTest", () => {
     const attributes = defaultAttributesFor((klass) => {
       klass.attribute("foo", TYPE_1);
       klass.attribute("bar", TYPE_2);
-      klass.decorateAttributes(null, (name: string, type: Type) => new MyDecorator(name, type));
+      klass.decorateAttributes(
+        null,
+        (name: string, type: ValueType) => new MyDecorator(name, type),
+      );
     });
 
     expect((attributes.getAttribute("foo").type as MyDecorator).castType).toBe(TYPE_1);
@@ -344,7 +346,7 @@ describe("AttributeRegistrationTest", () => {
     const attributes = defaultAttributesFor((klass) => {
       klass.attribute("foo", TYPE_1);
       klass.attribute("bar", TYPE_2);
-      klass.decorateAttributes(null, (name: string, type: Type) =>
+      klass.decorateAttributes(null, (name: string, type: ValueType) =>
         /oo/.test(name) ? new MyDecorator(name, type) : null,
       );
     });
@@ -358,11 +360,11 @@ describe("AttributeRegistrationTest", () => {
       klass.attribute("foo", TYPE_1);
       klass.decorateAttributes(
         null,
-        (name: string, type: Type) => new MyDecorator(`${name}1`, type),
+        (name: string, type: ValueType) => new MyDecorator(`${name}1`, type),
       );
       klass.decorateAttributes(
         null,
-        (name: string, type: Type) => new MyDecorator(`${name}2`, type),
+        (name: string, type: ValueType) => new MyDecorator(`${name}2`, type),
       );
     });
 
@@ -382,7 +384,10 @@ describe("AttributeRegistrationTest", () => {
     });
 
     const child = classWith(parent, (klass: any) => {
-      klass.decorateAttributes(null, (name: string, type: Type) => new MyDecorator(name, type));
+      klass.decorateAttributes(
+        null,
+        (name: string, type: ValueType) => new MyDecorator(name, type),
+      );
     });
 
     expect(child._defaultAttributes().getAttribute("foo").type).toBeInstanceOf(MyDecorator);
@@ -395,7 +400,10 @@ describe("AttributeRegistrationTest", () => {
   it("re-registering an attribute overrides previous decorators", () => {
     const parent = classWith(null, (klass: any) => {
       klass.attribute("foo", TYPE_1);
-      klass.decorateAttributes(null, (name: string, type: Type) => new MyDecorator(name, type));
+      klass.decorateAttributes(
+        null,
+        (name: string, type: ValueType) => new MyDecorator(name, type),
+      );
     });
 
     const child = classWith(parent, (klass: any) => {

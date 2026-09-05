@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { registerSubclass } from "./inheritance.js";
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { loadSchema } from "./model-schema.js";
 import { Firm } from "./test-helpers/models/company.js";
@@ -175,7 +175,7 @@ describe("UnknownPrimaryKeyTest", () => {
 describe("instantiate override types for absent keys (trails)", () => {
   fixtures([]);
 
-  class Typecast extends Type {
+  class Typecast extends ValueType {
     readonly name = "typecast";
     cast() {
       return "t.lo";

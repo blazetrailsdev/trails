@@ -131,7 +131,7 @@ import {
   BinaryType,
   DecimalType,
   ArgumentError,
-  type Type,
+  type ValueType,
 } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
 import { Date as DateType } from "../type/date.js";
@@ -2114,11 +2114,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  lookupCastType(sqlType: string | null): Type {
+  lookupCastType(sqlType: string | null): ValueType {
     return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 
-  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type {
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): ValueType {
     return this.lookupCastType(column.sqlType);
   }
 }

@@ -1,5 +1,5 @@
 import { included, isBlank } from "@blazetrails/activesupport";
-import { BooleanType, type Type } from "@blazetrails/activemodel";
+import { BooleanType, type ValueType } from "@blazetrails/activemodel";
 
 interface QueryIncludeHost {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
@@ -7,7 +7,7 @@ interface QueryIncludeHost {
 
 interface QueryHost {
   _readAttribute(name: string): unknown;
-  typeForAttribute(name: string, block?: () => Type): Type;
+  typeForAttribute(name: string, block?: () => ValueType): ValueType;
 }
 
 export const Query = {
@@ -56,7 +56,7 @@ export function _queryAttribute(this: QueryHost, attrName: string): boolean {
 export function queryCastAttribute(this: QueryHost, attrName: string, value: unknown): boolean {
   if (value === true) return true;
   if (value === false || value == null) return false;
-  if (!this.typeForAttribute(attrName, () => false as unknown as Type)) {
+  if (!this.typeForAttribute(attrName, () => false as unknown as ValueType)) {
     if (typeof value === "number" || typeof value === "bigint" || !/[^0-9]/.test(String(value))) {
       return toI(value) !== 0;
     }
