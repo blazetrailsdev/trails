@@ -384,7 +384,7 @@ describe("ValidationsTest", () => {
   });
 
   it("invalid validator", async () => {
-    Topic.validate("iDontExist");
+    Topic.validate(":iDontExist");
     await assertRaises([NoMethodError], {}, async () => {
       const t = new Topic();
       await t.isValid();
@@ -393,7 +393,7 @@ describe("ValidationsTest", () => {
 
   it("invalid options to validate", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
-      Topic.validate("title", { presence: true } as unknown as ConditionalOptions);
+      Topic.validate(":title", { presence: true } as unknown as ConditionalOptions);
     });
     const message =
       "Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend, :exceptOn. Perhaps you meant to call `validates` instead of `validate`?";
@@ -418,9 +418,9 @@ describe("ValidationsTest", () => {
     }
 
     await assertNothingRaised(() => {
-      Klass.validate("validatorA", { if: () => true });
-      Klass.validate("validatorB", { prepend: true });
-      Klass.validate("validatorC", { unless: () => true });
+      Klass.validate(":validatorA", { if: () => true });
+      Klass.validate(":validatorB", { prepend: true });
+      Klass.validate(":validatorC", { unless: () => true });
     });
 
     const t = new Klass();

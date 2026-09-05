@@ -2,12 +2,12 @@ import { Topic } from "./topic.js";
 
 export class Reply extends Topic {
   static {
-    this.validate("errorsOnEmptyContent");
-    this.validate("titleIsWrongCreate", { on: "create" });
+    this.validate(":errorsOnEmptyContent");
+    this.validate(":titleIsWrongCreate", { on: "create" });
 
-    this.validate("checkEmptyTitle");
-    this.validate("checkContentMismatch", { on: "create" });
-    this.validate("checkWrongUpdate", { on: "update" });
+    this.validate(":checkEmptyTitle");
+    this.validate(":checkContentMismatch", { on: "create" });
+    this.validate(":checkWrongUpdate", { on: "update" });
   }
 
   checkEmptyTitle(): void {

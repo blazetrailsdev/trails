@@ -689,9 +689,9 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
 /** @internal */
 export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
   if (!reflection.validate) return;
-  const validationMethod = `validateAssociatedRecordsFor_${reflection.name}`;
+  const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
   if (!this.prototype) return;
-  if (Object.prototype.hasOwnProperty.call(this.prototype, validationMethod)) return;
+  if (Object.prototype.hasOwnProperty.call(this.prototype, validationMethod.slice(1))) return;
   const isCol =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -699,15 +699,15 @@ export function defineAutosaveValidationCallbacks(this: any, reflection: any): v
   const isHasOne =
     typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
   if (isCol) {
-    defineNonCyclicMethod.call(this, validationMethod, function (this: any) {
+    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
       return validateCollectionAssociation.call(this, reflection);
     });
   } else if (isHasOne) {
-    defineNonCyclicMethod.call(this, validationMethod, function (this: any) {
+    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
       return validateHasOneAssociation.call(this, reflection);
     });
   } else {
-    defineNonCyclicMethod.call(this, validationMethod, function (this: any) {
+    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
       return validateBelongsToAssociation.call(this, reflection);
     });
   }

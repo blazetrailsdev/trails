@@ -2335,7 +2335,7 @@ describe("validate with several filters", () => {
         ran.push("second");
       }
       static {
-        this.validate("first", "second");
+        this.validate(":first", ":second");
       }
     }
 
@@ -2347,7 +2347,7 @@ describe("validate with several filters", () => {
     expect(() => {
       class Bad extends Model {
         static {
-          this.validate("first", "second", { presence: true } as never);
+          this.validate(":first", ":second", { presence: true } as never);
         }
       }
       void Bad;

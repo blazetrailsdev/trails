@@ -685,7 +685,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           autosave: true,
         });
         this.belongsTo("parent", { className: "CircularReader", autosave: true });
-        this.validate("shouldBeFunny");
+        this.validate(":shouldBeFunny");
       }
 
       shouldBeFunny() {

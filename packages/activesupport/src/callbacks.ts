@@ -1,3 +1,5 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
+
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
 
@@ -44,7 +46,7 @@ export type AnyCallback<T extends object = object> =
   | AfterCallback<T>
   | AroundCallback<T>;
 
-export type CallbackObject = { [key: string]: unknown };
+export type CallbackObject = object;
 
 export interface RunCallbacksOptions {
   strict?: "sync";
@@ -91,21 +93,26 @@ export class MethodCall implements CallTemplate {
     return [target, block, this.methodName];
   }
 
+  private send(target: object): unknown {
+    const method = (target as Record<PropertyKey, unknown>)[this.methodName];
+    if (typeof method !== "function") {
+      throw new NoMethodError(
+        `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
+      );
+    }
+    return (method as (this: object) => unknown).call(target);
+  }
+
   makeLambda(): (target: object, value: unknown) => unknown {
-    const m = this.methodName;
-    return (target: object) =>
-      ((target as Record<PropertyKey, unknown>)[m] as (() => unknown) | undefined)?.();
+    return (target: object) => this.send(target);
   }
 
   invertedLambda(): (target: object, value: unknown) => boolean {
-    const m = this.methodName;
-    return (target: object) =>
-      !((target as Record<PropertyKey, unknown>)[m] as (() => unknown) | undefined)?.();
+    return (target: object) => !this.send(target);
   }
 
   make(target: object, _value: unknown): unknown {
-    const t = target as Record<PropertyKey, unknown>;
-    return (t[this.methodName] as ((this: unknown) => unknown) | undefined)?.call(target);
+    return this.send(target);
   }
 }
 
@@ -1012,10 +1019,7 @@ export function normalizeCallbackParams(
 function isCallbackOptions(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return false;
-  return !Object.entries(value as Record<string, unknown>).some(
-    ([k, v]) => typeof v === "function" && k !== "if" && k !== "unless",
-  );
+  return proto === Object.prototype || proto === null;
 }
 
 /**

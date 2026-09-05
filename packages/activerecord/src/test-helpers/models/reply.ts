@@ -55,12 +55,12 @@ export class SillyUniqueReply extends UniqueReply {
 
 export class WrongReply extends Reply {
   static {
-    this.validate("errorsOnEmptyContent");
-    this.validate("titleIsWrongCreate", { on: "create" });
-    this.validate("checkEmptyTitle");
-    this.validate("checkContentMismatch", { on: "create" });
-    this.validate("checkWrongUpdate", { on: "update" });
-    this.validate("checkAuthorNameIsSecret", { on: "specialCase" });
+    this.validate(":errorsOnEmptyContent");
+    this.validate(":titleIsWrongCreate", { on: "create" });
+    this.validate(":checkEmptyTitle");
+    this.validate(":checkContentMismatch", { on: "create" });
+    this.validate(":checkWrongUpdate", { on: "update" });
+    this.validate(":checkAuthorNameIsSecret", { on: "specialCase" });
   }
 
   checkEmptyTitle() {

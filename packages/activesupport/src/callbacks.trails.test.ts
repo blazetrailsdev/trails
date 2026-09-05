@@ -154,3 +154,32 @@ describe("ProcCall", () => {
     expect(template.makeLambda()(target, 1)).toBe(true);
   });
 });
+
+describe("MethodCall", () => {
+  it("raises NoMethodError when the target does not answer the method", () => {
+    const target = { log: [] as string[] };
+    defineCallbacks(target, "save");
+    setCallback(target, "save", "before", ":iDontExist");
+
+    expect(() => runCallbacks(target, "save")).toThrow(
+      /undefined method 'iDontExist' for an instance of Object/,
+    );
+  });
+});
+
+describe("normalizeCallbackParams (trails)", () => {
+  it("takes a trailing hash carrying a class as options, the way extract_options! does", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save");
+    class MyValidator {}
+
+    setCallback(target, "save", "before", () => log.push("ran"), {
+      class: MyValidator,
+      if: () => true,
+    } as never);
+    runCallbacks(target, "save");
+
+    expect(log).toEqual(["ran"]);
+  });
+});
