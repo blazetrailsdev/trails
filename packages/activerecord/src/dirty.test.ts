@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
@@ -1011,7 +1011,7 @@ describe("DirtyTest", () => {
       const mfgAt = aircraft.manufactured_at;
       expect(mfgAt).not.toBeNull();
       const nowMs = Temporal.Now.instant().epochMilliseconds;
-      const mfgAtMs = (mfgAt as Temporal.Instant).epochMilliseconds;
+      const mfgAtMs = (mfgAt as RubyTime).toF() * 1000;
       expect(Math.abs(nowMs - mfgAtMs)).toBeLessThan(5000);
     });
   });
@@ -1025,18 +1025,16 @@ describe("DirtyTest", () => {
       });
 
       expect(aircraft.name).toBe("Boeing2");
-      const castAt = aircraft.manufactured_at as Temporal.Instant;
-      expect(Math.floor(castAt.epochMilliseconds / 1000)).toBe(
-        Math.floor(manufacturingDate.getTime() / 1000),
-      );
+      const castAt = aircraft.manufactured_at as RubyTime;
+      expect(castAt.toI()).toBe(Math.floor(manufacturingDate.getTime() / 1000));
 
       await aircraft.saveBang();
       await aircraft.reload();
 
       expect(aircraft.name).toBe("Boeing2");
-      const reloadedAt = aircraft.manufactured_at as Temporal.Instant;
+      const reloadedAt = aircraft.manufactured_at as RubyTime;
       const expectedStr = manufacturingDate.toISOString().slice(0, 19).replace("T", " ");
-      const actualStr = reloadedAt.toString().slice(0, 19).replace("T", " ");
+      const actualStr = reloadedAt.getutc().xmlschema().slice(0, 19).replace("T", " ");
       expect(actualStr).toBe(expectedStr);
     });
   });

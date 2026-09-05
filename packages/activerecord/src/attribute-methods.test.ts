@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import {
   assertNotDeprecated,
@@ -665,10 +665,10 @@ describe("AttributeMethodsTest", () => {
     await withTimeZoneAwareTypes(["datetime"], async () => {
       await inTimeZone("Pacific Time (US & Canada)", () => {
         const record = target.new({ bonus_time: "10:00:00" }) as any;
-        const expectedTime = Temporal.Instant.from("2000-01-01T10:00:00Z");
+        const expectedTime = RubyTime.utc(2000, 1, 1, 10);
 
-        expect(record.bonus_time.epochNanoseconds).toBe(expectedTime.epochNanoseconds);
-        expect(record.bonus_time).toBeInstanceOf(Temporal.Instant);
+        expect(record.bonus_time).toEqual(expectedTime);
+        expect(record.bonus_time.isUtc()).toBe(true);
       });
     });
   });
@@ -1149,7 +1149,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware attribute to UTC", () => {
     class Event extends Base {
-      declare created_at: Temporal.Instant | Temporal.PlainDateTime | null;
+      declare created_at: RubyTime | Temporal.PlainDateTime | null;
       static {
         this.attribute("name", "string");
         this.attribute("created_at", "datetime");
@@ -1158,10 +1158,8 @@ describe("AttributeMethodsTest", () => {
     const utcDate = instant("2024-06-15T12:00:00Z");
     const e = new Event({ name: "utc", created_at: utcDate });
     const val = e.created_at;
-    expect(val).toBeInstanceOf(Temporal.Instant);
-    expect((val as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      "2024-06-15T12:00:00Z",
-    );
+    expect(val).toBeInstanceOf(RubyTime);
+    expect((val as RubyTime).getutc().xmlschema()).toBe("2024-06-15T12:00:00Z");
   });
   it("attribute_names on a new record", () => {
     class Target extends Base {

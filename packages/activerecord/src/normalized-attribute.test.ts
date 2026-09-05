@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { fixtures } from "./test-fixtures.js";
 
-function noon(time: Temporal.Instant): Temporal.Instant {
-  return time
-    .toZonedDateTimeISO("UTC")
-    .with({ hour: 12, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 })
-    .toInstant();
+function noon(time: RubyTime): RubyTime {
+  const utc = time.getutc();
+  return RubyTime.utc(utc.year, utc.mon, utc.mday, 12, 0, 0);
 }
 
 class NormalizedAircraft extends Aircraft {
@@ -25,7 +23,7 @@ class NormalizedAircraft extends Aircraft {
       },
     });
     this.normalizes("manufactured_at", {
-      with: (time: unknown) => noon(time as Temporal.Instant),
+      with: (time: unknown) => noon(time as RubyTime),
     });
     this.validate(function (this: NormalizedAircraft) {
       this.validated_name = this.name as string;
@@ -36,11 +34,11 @@ class NormalizedAircraft extends Aircraft {
 describe("NormalizedAttributeTest", () => {
   fixtures([]);
 
-  let time: Temporal.Instant;
+  let time: RubyTime;
   let aircraft: NormalizedAircraft;
 
   beforeEach(async () => {
-    time = Temporal.Instant.from("1999-12-31T12:34:56Z");
+    time = RubyTime.utc(1999, 12, 31, 12, 34, 56);
     aircraft = await NormalizedAircraft.createBang({
       name: "fly HIGH",
       manufactured_at: time,
@@ -96,8 +94,8 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("casts value before applying normalization", () => {
-    aircraft.manufactured_at = time.toString();
-    expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
+    aircraft.manufactured_at = time.getutc().xmlschema();
+    expect(aircraft.manufactured_at).toEqual(noon(time));
   });
 
   it("ignores nil by default", () => {
@@ -121,8 +119,8 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("finds record by normalized value", async () => {
-    expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
-    const found = await NormalizedAircraft.findBy({ manufactured_at: time.toString() });
+    expect(aircraft.manufactured_at).toEqual(noon(time));
+    const found = await NormalizedAircraft.findBy({ manufactured_at: time.getutc().xmlschema() });
     expect(found!.id).toBe(aircraft.id);
   });
 

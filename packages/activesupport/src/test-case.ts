@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
+import { Time } from "@blazetrails/date";
 import {
   setTaggedLogger,
   beforeSetup as taggedLoggingBeforeSetup,
@@ -119,3 +120,10 @@ function _runningTest(context: TestContext): RunningTest {
     failures: [],
   };
 }
+
+expect.addEqualityTesters([
+  function timeEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof Time) || !(b instanceof Time)) return undefined;
+    return a.toR().cmp(b.toR()) === 0;
+  },
+]);

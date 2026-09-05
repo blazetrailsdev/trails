@@ -1,4 +1,5 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";
@@ -7,9 +8,10 @@ import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 import { runCallbacks } from "@blazetrails/activesupport";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
+import { isUtc } from "./type/internal/timezone.js";
 
 export interface TouchOptions {
-  time?: Date | Temporal.Instant | null;
+  time?: Date | RubyTime | null;
 }
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
@@ -27,9 +29,9 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const now =
     t == null
       ? currentTimeFromProperTimezone()
-      : t instanceof Temporal.Instant
+      : t instanceof RubyTime
         ? t
-        : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
+        : RubyTime.at(new Rational(t.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
   const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 
@@ -52,7 +54,7 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
 
 export function parseTouchArgs(args: TouchArgs): {
   names: string[];
-  time: Date | Temporal.Instant | null | undefined;
+  time: Date | RubyTime | null | undefined;
 } {
   const last = args[args.length - 1];
   if (last !== undefined && typeof last !== "string") {
@@ -68,7 +70,7 @@ function raiseRecordNotTouchedError(): never {
   );
 }
 
-async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant): Promise<boolean> {
+async function touchRow(this: Base, touchCols: string[], now: RubyTime): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
 
   if (touchCols.length === 0) {
@@ -182,13 +184,13 @@ interface TimestampInstanceHost {
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
-export type TouchAllOptions = { time?: Temporal.Instant };
+export type TouchAllOptions = { time?: RubyTime };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
 export function parseTouchAllArgs(args: TouchAllArgs): {
   names: string[];
-  time: Temporal.Instant | undefined;
+  time: RubyTime | undefined;
 } {
   const last = args[args.length - 1];
   if (last !== undefined && typeof last !== "string") {
@@ -199,15 +201,15 @@ export function parseTouchAllArgs(args: TouchAllArgs): {
 
 export function touchAttributesWithTime(
   this: TimestampHost,
-  ...args: [...names: string[], time: Temporal.Instant | undefined]
-): Record<string, Temporal.Instant> {
+  ...args: [...names: string[], time: RubyTime | undefined]
+): Record<string, RubyTime> {
   const names = args.slice(0, -1) as string[];
-  const time = args[args.length - 1] as Temporal.Instant | undefined;
+  const time = args[args.length - 1] as RubyTime | undefined;
   const resolvedTime = time ?? currentTimeFromProperTimezone();
   const resolved = names.map((n) => this.attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
   const allNames = [...new Set([...updateAttrs, ...resolved])];
-  const result: Record<string, Temporal.Instant> = {};
+  const result: Record<string, RubyTime> = {};
   for (const name of allNames) result[name] = resolvedTime;
   return result;
 }
@@ -215,14 +217,14 @@ export function touchAttributesWithTime(
 export type CounterCacheTouchOption =
   | boolean
   | string
-  | Array<string | { time?: Temporal.Instant }>
-  | { time?: Temporal.Instant };
+  | Array<string | { time?: RubyTime }>
+  | { time?: RubyTime };
 
 export function parseCounterCacheTouch(touch: CounterCacheTouchOption): {
   names: string[];
-  time?: Temporal.Instant;
+  time?: RubyTime;
 } {
-  const wrapped: Array<string | { time?: Temporal.Instant }> =
+  const wrapped: Array<string | { time?: RubyTime }> =
     touch === true || touch === false ? [] : Array.isArray(touch) ? touch : [touch];
   const last = wrapped[wrapped.length - 1];
   if (last !== undefined && typeof last === "object") {
@@ -262,8 +264,9 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
   return this._allTimestampAttributesInModel;
 }
 
-export function currentTimeFromProperTimezone(): Temporal.Instant {
-  return currentTimeInstant();
+export function currentTimeFromProperTimezone(): RubyTime {
+  const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+  return isUtc() ? now.getutc() : now.getlocal();
 }
 
 /** @internal */
@@ -365,17 +368,19 @@ export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
 }
 
 /** @internal */
-export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): Temporal.Instant | null {
+export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): RubyTime | null {
   const attrs = timestampAttributesForUpdateInModel.call(this.constructor);
-  let max: Temporal.Instant | null = null;
+  let max: RubyTime | null = null;
   for (const attr of attrs) {
     const v = this.readAttribute?.(attr);
     if (v == null) continue;
-    const inst: Temporal.Instant =
-      v instanceof Object && typeof (v as any).epochMilliseconds === "number"
-        ? (v as Temporal.Instant)
-        : Temporal.Instant.from(String(v));
-    if (max === null || Temporal.Instant.compare(inst, max) > 0) max = inst;
+    const inst: RubyTime =
+      v instanceof RubyTime
+        ? v
+        : RubyTime.at(
+            new Rational(Temporal.Instant.from(String(v)).epochNanoseconds, 1_000_000_000n),
+          );
+    if (max === null || inst.toR().cmp(max.toR()) > 0) max = inst;
   }
   return max;
 }

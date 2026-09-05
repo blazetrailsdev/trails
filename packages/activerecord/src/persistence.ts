@@ -1,4 +1,5 @@
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
+import { currentTimeFromProperTimezone } from "./timestamp.js";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
@@ -1029,9 +1030,9 @@ export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
 export function _touchRow(
   this: PersistenceInternalHost,
   attributeNames: string[],
-  time?: Temporal.Instant | null,
+  time?: RubyTime | null,
 ): Promise<number> {
-  const t = time ?? Temporal.Now.instant();
+  const t = time ?? currentTimeFromProperTimezone();
   for (const attr of attributeNames) {
     this._writeAttribute(attr, t);
   }

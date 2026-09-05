@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Developer } from "./test-helpers/models/developer.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -8,8 +8,8 @@ describe("timestamp alias resolution", () => {
 
   it("fixtures auto-fill the aliased timestamp column", async () => {
     const dev = await Developer.first();
-    expect(dev!.readAttribute("legacy_updated_at")).toBeInstanceOf(Temporal.Instant);
-    expect(dev!.readAttribute("updated_at")).toBeInstanceOf(Temporal.Instant);
+    expect(dev!.readAttribute("legacy_updated_at")).toBeInstanceOf(RubyTime);
+    expect(dev!.readAttribute("updated_at")).toBeInstanceOf(RubyTime);
   });
 
   it("cache key embeds the aliased updated_at timestamp", async () => {
@@ -36,11 +36,11 @@ describe("timestamp alias resolution", () => {
 
   it("touch updates the aliased timestamp column", async () => {
     const dev = await Developer.first();
-    const before = dev!.readAttribute("legacy_updated_at") as Temporal.Instant;
-    const future = before.add({ hours: 1 });
+    const before = dev!.readAttribute("legacy_updated_at") as RubyTime;
+    const future = before.plus(3600);
     await dev!.touch({ time: future });
     const reloaded = await Developer.find(dev!.id as number);
-    const after = reloaded.readAttribute("legacy_updated_at") as Temporal.Instant;
-    expect(Temporal.Instant.compare(after, before)).toBeGreaterThan(0);
+    const after = reloaded.readAttribute("legacy_updated_at") as RubyTime;
+    expect(after.toF()).toBeGreaterThan(before.toF());
   });
 });

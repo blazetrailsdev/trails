@@ -1,3 +1,4 @@
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { RecordNotFound, registerModel } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
@@ -129,7 +130,7 @@ describe("TokenForTest", () => {
   it("supports JSON-serializable embedded data", async () => {
     const snapshotToken = user.generateTokenFor("snapshot");
     expect((await TokenUser.findByTokenFor("snapshot", snapshotToken))!.id).toBe(user.id);
-    const advanced = new Date(new Date(String((user as any).updated_at)).getTime() + 1000);
+    const advanced = (user as any).updated_at.plus(1) as RubyTime;
     await (user as any).touch({ time: advanced });
     expect(await TokenUser.findByTokenFor("snapshot", snapshotToken)).toBeNull();
   });

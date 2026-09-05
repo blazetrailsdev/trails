@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import {
@@ -87,24 +87,22 @@ describe("applySecondsPrecision", () => {
 describe("newTime", () => {
   it("returns null for 0000-00-00 00:00:00 and rejects out-of-range components", () => {
     expect(newTime(0, 0, 0, 0, 0, 0, 0)).toBeNull();
-    expect(newTime(2024, 2, 30, 0, 0, 0, 0)).toBeNull();
+    expect(newTime(2024, 13, 1, 0, 0, 0, 0)).toBeNull();
   });
 
   it("subtracts offset (in seconds) when offset != 0", () => {
     const i = newTime(2024, 1, 2, 12, 0, 0, 0, 3600);
-    expect(i?.toString()).toBe("2024-01-02T11:00:00Z");
+    expect(i?.getutc().xmlschema()).toBe("2024-01-02T11:00:00Z");
   });
 
   it("splits Ruby microsec (0..999_999) across Temporal millisecond/microsecond", () => {
     const i = newTime(2024, 1, 2, 12, 0, 0, 123456);
-    const z = i?.toZonedDateTimeISO("UTC");
-    expect(z?.millisecond).toBe(123);
-    expect(z?.microsecond).toBe(456);
+    expect(i?.usec).toBe(123456);
   });
 
   it("carries a Rational microsec and offset exactly, as Time.utc does", () => {
     const i = newTime(2000, 1, 1, 14, 23, 55, new Rational(123456, 1_000_000));
-    expect(i?.toString()).toBe("2000-01-01T14:23:55.000000123Z");
+    expect(i?.getutc().xmlschema(9)).toBe("2000-01-01T14:23:55.000000123Z");
 
     const shifted = newTime(
       2000,
@@ -116,7 +114,7 @@ describe("newTime", () => {
       new Rational(123456, 1_000_000),
       new Rational(3600, 1),
     );
-    expect(shifted?.toString()).toBe("2000-01-01T13:23:55.000000123Z");
+    expect(shifted?.getutc().xmlschema(9)).toBe("2000-01-01T13:23:55.000000123Z");
   });
 });
 
@@ -127,7 +125,7 @@ describe("fastStringToTime", () => {
 
   it("normalizes Postgres short offset (+00) to (+00:00)", () => {
     const i = fastStringToTime("2026-04-26 14:23:55.123456+00");
-    expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
+    expect(i?.getutc().xmlschema(6)).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("returns null for a date-only string, as Time.new raises 'no time information'", () => {
@@ -136,16 +134,20 @@ describe("fastStringToTime", () => {
 
   it("floors a sub-second longer than nine digits at the nanosecond", () => {
     const i = fastStringToTime("2026-04-26 14:23:55.1234567891+00:00");
-    expect(i?.toString()).toBe("2026-04-26T14:23:55.123456789Z");
+    expect(i?.getutc().xmlschema(9)).toBe("2026-04-26T14:23:55.123456789Z");
   });
 
   it("truncates a pre-1970 sub-second instant on nsec, not toward zero", () => {
-    const inst = Temporal.Instant.from("1969-12-31T23:59:59.123456789Z");
+    const inst = RubyTime.utc(1969, 12, 31, 23, 59, 59, new Rational(123456789, 1000));
     const time = new TimeType({ precision: 3 });
     const dateTime = new DateTimeType({ precision: 3 });
 
-    expect(String(time.serializeCastValue(inst))).toBe("1969-12-31T23:59:59.123Z");
-    expect(String(dateTime.serializeCastValue(inst))).toBe("1969-12-31T23:59:59.123Z");
+    expect((time.serializeCastValue(inst) as RubyTime).xmlschema(3)).toBe(
+      "1969-12-31T23:59:59.123Z",
+    );
+    expect((dateTime.serializeCastValue(inst) as RubyTime).xmlschema(3)).toBe(
+      "1969-12-31T23:59:59.123Z",
+    );
   });
 });
 

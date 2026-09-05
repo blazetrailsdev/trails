@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
@@ -21,9 +21,13 @@ registerModel(Post);
 registerModel(Project);
 registerModel(Ship);
 
-function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
+function expectedUsec(ts: RubyTime | Temporal.Instant | Temporal.PlainDateTime): string {
   const dt =
-    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts.toZonedDateTime("UTC");
+    ts instanceof RubyTime
+      ? ts.getutc().toTime()
+      : ts instanceof Temporal.Instant
+        ? ts.toZonedDateTimeISO("UTC")
+        : ts.toZonedDateTime("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");

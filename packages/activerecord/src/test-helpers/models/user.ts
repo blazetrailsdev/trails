@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Family } from "./family.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Job } from "./job.js";
@@ -24,13 +24,13 @@ export class User extends Base {
     ((name: "letRoom") => Promise<Room | null>) &
     ((name: "rentedRoom") => Promise<Room | null>);
   declare auth_token: string;
-  declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
+  declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare password: string | null;
   declare password_digest: string;
   declare recovery_password: string | null;
   declare recovery_password_digest: string;
   declare token: string;
-  declare updated_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
+  declare updated_at: (RubyTime | Temporal.PlainDateTime) | null;
 
   static {
     this.hasAndBelongsToMany("jobsPool", {

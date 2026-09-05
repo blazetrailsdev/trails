@@ -1,12 +1,13 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
 function epochMs(v: unknown): number {
+  if (v instanceof RubyTime) return v.toF() * 1000;
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
   throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
 }
 function isTemporalDatetime(v: unknown): boolean {
-  return v instanceof Temporal.Instant;
+  return v instanceof RubyTime;
 }
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
@@ -803,7 +804,7 @@ describe("PersistenceTest", () => {
     const customDatetime = instant("2026-01-01T00:00:00Z");
     for (const attr of ["created_at", "created_on", "updated_at", "updated_on"]) {
       const parrot = await LiveParrot.create({ name: "colombian", [attr]: customDatetime });
-      expect(Math.floor(epochMs(parrot.readAttribute(attr) as Temporal.Instant) / 1000)).toBe(
+      expect(Math.floor(epochMs(parrot.readAttribute(attr) as RubyTime) / 1000)).toBe(
         Math.floor(customDatetime.epochMilliseconds / 1000),
       );
     }

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
-const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
+const utc = (v: RubyTime) => v.getutc().toTime();
 
 describe("MultiParameterAttributeTest", () => {
   fixtures(["topics"]);
@@ -109,8 +109,8 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = topic.written_on as Temporal.Instant;
-    expect(dt).toBeInstanceOf(Temporal.Instant);
+    const dt = topic.written_on as RubyTime;
+    expect(dt).toBeInstanceOf(RubyTime);
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).month).toBe(6);
     expect(utc(dt).day).toBe(24);
@@ -128,8 +128,8 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "16",
       "written_on(5i)": "24",
     });
-    const dt = topic.written_on as Temporal.Instant;
-    expect(dt).toBeInstanceOf(Temporal.Instant);
+    const dt = topic.written_on as RubyTime;
+    expect(dt).toBeInstanceOf(RubyTime);
     expect(utc(dt).hour).toBe(16);
     expect(utc(dt).minute).toBe(24);
   });
@@ -156,8 +156,8 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = topic.written_on as Temporal.Instant;
-    expect(dt).toBeInstanceOf(Temporal.Instant);
+    const dt = topic.written_on as RubyTime;
+    expect(dt).toBeInstanceOf(RubyTime);
     expect(utc(dt).year).toBe(1850);
     expect(utc(dt).month).toBe(6);
     expect(utc(dt).day).toBe(24);
@@ -188,7 +188,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(3i)": "24",
       "written_on(5i)": "24",
     });
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(0);
   });
@@ -202,7 +202,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "",
       "written_on(5i)": "24",
     });
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(0);
   });
@@ -243,10 +243,10 @@ describe("MultiParameterAttributeTest", () => {
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       });
-      const instant = topic.written_on as Temporal.Instant;
-      expect(instant).toBeInstanceOf(Temporal.Instant);
-      expect(instant.toZonedDateTimeISO("UTC").hour).toBe(16);
-      expect(instant.toZonedDateTimeISO("UTC").minute).toBe(24);
+      const instant = topic.written_on as RubyTime;
+      expect(instant).toBeInstanceOf(RubyTime);
+      expect(utc(instant).hour).toBe(16);
+      expect(utc(instant).minute).toBe(24);
     });
   });
 
@@ -315,7 +315,7 @@ describe("MultiParameterAttributeTest", () => {
           });
           const val = topic.written_on;
           expect(val).not.toBeInstanceOf(TimeWithZone);
-          expect(val).toBeInstanceOf(Temporal.Instant);
+          expect(val).toBeInstanceOf(RubyTime);
         },
       );
     } finally {
@@ -343,8 +343,8 @@ describe("MultiParameterAttributeTest", () => {
           });
           const val = topic.written_on;
           expect(val).not.toBeInstanceOf(TimeWithZone);
-          expect(val).toBeInstanceOf(Temporal.Instant);
-          expect((val as Temporal.Instant).toZonedDateTimeISO("UTC").hour).toBe(16);
+          expect(val).toBeInstanceOf(RubyTime);
+          expect((val as RubyTime).getutc().hour).toBe(16);
         },
       );
     } finally {
@@ -397,7 +397,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(2i)": "1",
       "written_on(3i)": "1",
     };
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(13);
     expect(utc(dt).minute).toBe(30);
@@ -413,7 +413,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "",
     });
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(16);
     expect(utc(dt).second).toBe(0);
@@ -425,7 +425,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(2i)": "3",
       "written_on(3i)": "11",
     });
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
     expect(utc(dt).day).toBe(11);
@@ -437,7 +437,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(2i)": "3",
       "written_on(3i)": "11",
     }).new();
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
     expect(utc(dt).day).toBe(11);
@@ -451,7 +451,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "13",
       "written_on(5i)": "55",
     });
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
     expect(utc(dt).day).toBe(11);
@@ -467,7 +467,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "13",
       "written_on(5i)": "55",
     }).new();
-    const dt = topic.written_on as Temporal.Instant;
+    const dt = topic.written_on as RubyTime;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
     expect(utc(dt).day).toBe(11);

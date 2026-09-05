@@ -1,4 +1,5 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {
@@ -12,7 +13,7 @@ import {
   parsePostgresInstant,
 } from "../../abstract/temporal-wire.js";
 
-type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
+type PgDateTimeResult = RubyTime | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTime extends ArDateTime {
   /** @missingRailsCall format — PERMANENT */
@@ -24,7 +25,12 @@ export class DateTime extends ArDateTime {
       if (/ BC$/.test(value)) {
         try {
           const hasOffset = /[-+]\d{2}(?::\d{2})?$/.test(value.slice(0, -3).trimEnd());
-          return hasOffset ? parsePostgresInstant(value) : parsePostgresTimestampAsInstant(value);
+          const instant = hasOffset
+            ? parsePostgresInstant(value)
+            : parsePostgresTimestampAsInstant(value);
+          if (!(instant instanceof Temporal.Instant)) return instant;
+          const time = RubyTime.at(new Rational(instant.epochNanoseconds, 1_000_000_000n));
+          return this.isUtc ? time.getutc() : time.getlocal();
         } catch {
           return null;
         }

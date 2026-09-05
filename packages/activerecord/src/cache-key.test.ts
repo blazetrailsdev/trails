@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
@@ -7,6 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { ActiveRecord } from "./ar-config.js";
 
 function usec(ts: unknown): string {
+  if (ts instanceof RubyTime) ts = ts.getutc().toTime().toInstant();
   if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
   const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");

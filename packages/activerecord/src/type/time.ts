@@ -34,17 +34,15 @@ export class Time extends ActiveModelTime {
       : (serialized as Value | null);
   }
 
-  override serializeCastValue(
-    value: Temporal.Instant | TimeWithZone | RubyTime | null,
-  ): Value | null {
+  override serializeCastValue(value: TimeWithZone | RubyTime | null): Value | null {
     const serialized: unknown = super.serializeCastValue(value);
     return value != null
       ? new Value(serialized as Temporal.Instant | TimeWithZone | RubyTime)
       : null;
   }
 
-  protected override castValue(value: unknown): Temporal.Instant | TimeWithZone | RubyTime | null {
+  protected override castValue(value: unknown): TimeWithZone | RubyTime | null {
     const cast = super.castValue(value);
-    return cast instanceof Value ? cast.getobj() : cast;
+    return cast instanceof Value ? (cast.getobj() as TimeWithZone | RubyTime) : cast;
   }
 }

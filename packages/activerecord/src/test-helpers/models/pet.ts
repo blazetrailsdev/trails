@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Owner } from "./owner.js";
 import type { Person } from "./person.js";
 import type { PetTreasure } from "./pet-treasure.js";
@@ -15,12 +15,12 @@ export class Pet extends Base {
   declare treasures: AssociationProxy<Treasure>;
   declare persons: AssociationProxy<Person>;
   declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare integer: number | null;
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static afterDestroyOutput: any;
 

@@ -1,19 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Types } from "../index.js";
 import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
 
-function timeUtc(
-  year: number,
-  mon: number,
-  mday: number,
-  hour = 0,
-  min = 0,
-  sec = 0,
-): Temporal.Instant {
-  return new Temporal.PlainDateTime(year, mon, mday, hour, min, sec)
-    .toZonedDateTime("UTC")
-    .toInstant();
+function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
+  return RubyTime.utc(year, mon, mday, hour, min, sec);
 }
 
 describe("TimeTest", () => {
@@ -30,12 +21,7 @@ describe("TimeTest", () => {
       .toPlainTime()
       .round("second")
       .toString();
-    expect(
-      (type.cast(timeString) as Temporal.Instant)
-        .toZonedDateTimeISO("UTC")
-        .toPlainTime()
-        .toString(),
-    ).toEqual(timeString);
+    expect((type.cast(timeString) as RubyTime).getutc().strftime("%H:%M:%S")).toEqual(timeString);
 
     expect(type.cast("2015-06-13T19:45:54+03:00")).toEqual(timeUtc(2000, 1, 1, 16, 45, 54));
     expect(type.cast("06:07:08+09:00")).toEqual(timeUtc(1999, 12, 31, 21, 7, 8));

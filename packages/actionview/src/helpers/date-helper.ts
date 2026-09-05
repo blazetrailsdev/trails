@@ -23,6 +23,7 @@ export type DistanceOfTimeInput =
   | Date
   | number
   | { toDate: () => Date }
+  | { toF: () => number }
   | { toTime: () => Date }
   | { epochMilliseconds: number };
 
@@ -38,6 +39,10 @@ function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date
   if (typeof value === "number") return new Date(value * 1000);
   // boundary: public API accepts JS Date as a primary input shape.
   if (value instanceof Date) return value;
+  if (value && typeof (value as { toF?: unknown }).toF === "function") {
+    // boundary: a Ruby `::Time` answers `to_f`, and its `to_time` is not a JS Date.
+    return new Date((value as { toF: () => number }).toF() * 1000);
+  }
   if (value && typeof (value as { toTime?: unknown }).toTime === "function") {
     return (value as { toTime: () => Date }).toTime();
   }

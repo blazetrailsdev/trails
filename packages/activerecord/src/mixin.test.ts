@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { currentTimeInstant, freezeTime, travel, travelBack } from "@blazetrails/activesupport";
+import { freezeTime, travel, travelBack } from "@blazetrails/activesupport";
+import { currentTimeFromProperTimezone } from "./timestamp.js";
 import { Duration } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -27,8 +28,8 @@ describe("TouchTest", () => {
     expect(stamped.readAttribute("updated_at")).toBeNull();
     expect(stamped.readAttribute("created_at")).toBeNull();
     await stamped.save();
-    expect(stamped.readAttribute("created_at")).toEqual(currentTimeInstant());
-    expect(stamped.readAttribute("updated_at")).toEqual(currentTimeInstant());
+    expect(stamped.readAttribute("created_at")).toEqual(currentTimeFromProperTimezone());
+    expect(stamped.readAttribute("updated_at")).toEqual(currentTimeFromProperTimezone());
 
     const oldUpdatedAt = stamped.readAttribute("updated_at");
 
@@ -37,7 +38,7 @@ describe("TouchTest", () => {
     (stamped as any).attributeWillChangeBang("lft");
     await stamped.save();
 
-    expect(stamped.readAttribute("updated_at")).toEqual(currentTimeInstant());
+    expect(stamped.readAttribute("updated_at")).toEqual(currentTimeFromProperTimezone());
     expect(stamped.readAttribute("created_at")).toEqual(oldUpdatedAt);
   });
 

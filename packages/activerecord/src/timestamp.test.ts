@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -43,14 +43,14 @@ describe("TimestampTest", () => {
 
   let developer: Developer;
   let owner: Owner;
-  let previouslyUpdatedAt: Temporal.Instant;
+  let previouslyUpdatedAt: RubyTime;
 
   beforeEach(async () => {
     developer = await Developer.find(developers("david").id);
     owner = await Owner.find((owners("blackbeard") as any).readAttribute("owner_id"));
-    const prevMonth = Temporal.Now.instant().subtract({ hours: 30 * 24 });
+    const prevMonth = RubyTime.now().minus(30 * 24 * 3600) as RubyTime;
     await developer.updateColumns({ legacy_updated_at: prevMonth, legacy_updated_on: prevMonth });
-    previouslyUpdatedAt = developer.legacy_updated_at as Temporal.Instant;
+    previouslyUpdatedAt = developer.legacy_updated_at as RubyTime;
   });
 
   it("saving a changed record updates its timestamp", async () => {
@@ -122,17 +122,17 @@ describe("TimestampTest", () => {
   });
 
   it("touching updates timestamp with given time", async () => {
-    const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
+    const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
     const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0));
     await developer.touch({ time: newTime });
 
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
-    const updatedAt = developer.legacy_updated_at as Temporal.Instant;
-    expect(updatedAt.epochMilliseconds).toBe(newTime.getTime());
+    const updatedAt = developer.legacy_updated_at as RubyTime;
+    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
   });
 
   it("touching an attribute updates timestamp", async () => {
-    const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
+    const previousCreatedAt = developer.legacy_created_at as RubyTime;
     travel(1000);
     try {
       await developer.touch("legacy_created_at");
@@ -164,22 +164,22 @@ describe("TimestampTest", () => {
     const previousValue = task.ending;
     await task.touch("ending");
     expect(task.ending).not.toEqual(previousValue);
-    const diffMs = Math.abs((task.ending as Temporal.Instant).epochMilliseconds - Date.now());
+    const diffMs = Math.abs((task.ending as RubyTime).toF() * 1000 - Date.now());
     expect(diffMs).toBeLessThan(1000);
   });
 
   it("touching an attribute updates timestamp with given time", async () => {
-    const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
-    const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
+    const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
+    const previousCreatedAt = developer.legacy_created_at as RubyTime;
     const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0));
     await developer.touch("legacy_created_at", { time: newTime });
 
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
-    const createdAt = developer.legacy_created_at as Temporal.Instant;
-    const updatedAt = developer.legacy_updated_at as Temporal.Instant;
-    expect(createdAt.epochMilliseconds).toBe(newTime.getTime());
-    expect(updatedAt.epochMilliseconds).toBe(newTime.getTime());
+    const createdAt = developer.legacy_created_at as RubyTime;
+    const updatedAt = developer.legacy_updated_at as RubyTime;
+    expect(createdAt.toF() * 1000).toBe(newTime.getTime());
+    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
   });
 
   it("touching many attributes updates them", async () => {
@@ -191,12 +191,8 @@ describe("TimestampTest", () => {
     expect(task.starting).not.toEqual(previousStarting);
     expect(task.ending).not.toEqual(previousEnding);
     const nowMs = Date.now();
-    expect(Math.abs((task.starting as Temporal.Instant).epochMilliseconds - nowMs)).toBeLessThan(
-      1000,
-    );
-    expect(Math.abs((task.ending as Temporal.Instant).epochMilliseconds - nowMs)).toBeLessThan(
-      1000,
-    );
+    expect(Math.abs((task.starting as RubyTime).toF() * 1000 - nowMs)).toBeLessThan(1000);
+    expect(Math.abs((task.ending as RubyTime).toF() * 1000 - nowMs)).toBeLessThan(1000);
   });
 
   it("touching a record without timestamps is unexceptional", async () => {
@@ -224,7 +220,7 @@ describe("TimestampTest", () => {
 
   it("touching related objects", async () => {
     const ownerForTest = await Owner.find((owners("blackbeard") as any).readAttribute("owner_id"));
-    const previouslyOwnerUpdatedAt = ownerForTest.updated_at as Temporal.Instant;
+    const previouslyOwnerUpdatedAt = ownerForTest.updated_at as RubyTime;
 
     await Owner.noTouching(async () => {
       const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
@@ -264,7 +260,7 @@ describe("TimestampTest", () => {
 
   it("saving an unchanged record with a mutating before save callback updates its timestamp", async () => {
     const dev = await MutatingSaveKlass.create({});
-    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+    const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
     const previousName = dev.name;
 
     travel(1000);
@@ -280,7 +276,7 @@ describe("TimestampTest", () => {
 
   it("saving an unchanged record with a mutating before update callback updates its timestamp", async () => {
     const dev = await MutatingUpdateKlass.create({});
-    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+    const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
     const previousName = dev.name;
 
     travel(1000);
@@ -298,7 +294,7 @@ describe("TimestampTest", () => {
 
   it("saving an unchanged record with a non mutating before update callback does not update its timestamp", async () => {
     const dev = await NonMutatingUpdateKlass.create({});
-    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+    const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
 
     travel(1000);
     try {
@@ -315,7 +311,7 @@ describe("TimestampTest", () => {
   it("saving a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
     const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
     const petOwner = await pet.loadBelongsTo("owner");
-    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as Temporal.Instant;
+    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
     travel(1000);
     try {
@@ -333,7 +329,7 @@ describe("TimestampTest", () => {
   it("destroying a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
     const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
     const petOwner = await pet.loadBelongsTo("owner");
-    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as Temporal.Instant;
+    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
     travel(1000);
     try {
@@ -371,7 +367,7 @@ describe("TimestampTest", () => {
     const ownerInst = await (pet as any).loadBelongsTo("owner");
     const threeDAgo = Temporal.Now.instant().subtract({ hours: 24 * 3 });
     await ownerInst.updateColumns({ happy_at: threeDAgo });
-    const previousOwnerUpdatedAt = ownerInst.updated_at as Temporal.Instant;
+    const previousOwnerUpdatedAt = ownerInst.updated_at as RubyTime;
 
     travel(1000);
     try {

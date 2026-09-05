@@ -1,10 +1,11 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
 import { Range as RangeValue } from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
+import { formattedOffset } from "../time/conversions.js";
 
 export interface ToJsonWithActiveSupportEncoderHost {
   asJson(options?: EncodeOptions | null): unknown;
@@ -179,9 +180,14 @@ export class Hash {
 }
 
 export class Time {
-  static asJson(value: Temporal.Instant | Temporal.ZonedDateTime): string {
+  static asJson(value: RubyTime | Temporal.Instant | Temporal.ZonedDateTime): string {
     const digits =
       Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+
+    if (value instanceof RubyTime) {
+      if (Encoding.useStandardJsonTimeFormat) return value.xmlschema(Encoding.timePrecision);
+      return `${value.strftime("%Y/%m/%d %H:%M:%S")} ${formattedOffset(value, false)}`;
+    }
 
     if (value instanceof Temporal.Instant) {
       if (Encoding.useStandardJsonTimeFormat) {
@@ -265,7 +271,11 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
 
   if (typeof value === "function") return Module.asJson(value as { name: string });
 
-  if (value instanceof Temporal.Instant || value instanceof Temporal.ZonedDateTime) {
+  if (
+    value instanceof RubyTime ||
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
     return Time.asJson(value);
   }
   if (value instanceof Temporal.PlainDate) return Date.asJson(value);

@@ -28,7 +28,7 @@ import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/b
 import { Engine } from "./test-helpers/models/engine.js";
 import { Reader } from "./test-helpers/models/reader.js";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";
 
@@ -485,7 +485,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   const after = (a: unknown, b: unknown): boolean =>
-    Temporal.Instant.compare(a as Temporal.Instant, b as Temporal.Instant) > 0;
+    (a as RubyTime).toR().cmp((b as RubyTime).toR()) > 0;
 
   it("counter cache with touch and lock version", async () => {
     const car = await Car.createBang({});

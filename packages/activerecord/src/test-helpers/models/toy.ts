@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
@@ -10,11 +10,11 @@ export class Toy extends Base {
   declare sponsors: AssociationProxy<Sponsor>;
   declare static withPet: () => Relation<Toy>;
   declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare name: string;
   declare pet_id: number;
   declare toy_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static _primaryKey = "toy_id";
 

@@ -1,6 +1,5 @@
 import { describe, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { instantToS } from "@blazetrails/activesupport";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -9,10 +8,8 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 
-function nsec(v: Temporal.Instant): number {
-  let ns = v.epochNanoseconds % 1_000_000_000n;
-  if (ns < 0n) ns += 1_000_000_000n;
-  return Number(ns);
+function nsec(v: RubyTime): number {
+  return v.nsec;
 }
 
 describe("DateTimePrecisionTest", () => {
@@ -128,15 +125,10 @@ describe("DateTimePrecisionTest", () => {
       expect(foo).not.toBeNull();
       expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
 
-      expect(foo.created_at.epochNanoseconds / 1_000_000_000n).toBe(
-        date.epochNanoseconds / 1_000_000_000n,
-      );
-      expect(instantToS(foo.created_at)).toBe(instantToS(date));
-      expect(instantToS(foo.updated_at)).toBe(instantToS(date));
-      const usecCreated = Number(foo.created_at.epochNanoseconds % 1_000_000_000n) / 1000;
-      expect(usecCreated).toBe(0);
-      const usecUpdated = Number(foo.updated_at.epochNanoseconds % 1_000_000_000n) / 1000;
-      expect(usecUpdated).toBe(999900);
+      expect(foo.created_at).toEqual(RubyTime.utc(2014, 8, 17, 12, 30, 0));
+      expect(foo.updated_at).toEqual(RubyTime.utc(2014, 8, 17, 12, 30, 0, 999900));
+      expect((foo.created_at as RubyTime).usec).toBe(0);
+      expect((foo.updated_at as RubyTime).usec).toBe(999900);
     },
   );
 
@@ -185,8 +177,14 @@ describe("DateTimePrecisionTest", () => {
     const date = Temporal.PlainDate.from("2001-02-03");
     const record = await (Foo as any).create({ happened_at: date });
     const reloaded = await (Foo as any).find(record.id);
-    const pdt = reloaded.happened_at.toZonedDateTimeISO("UTC").toPlainDate();
-    expect(pdt.equals(date)).toBe(true);
+    const happenedAt = (reloaded.happened_at as RubyTime).getutc();
+    expect(
+      Temporal.PlainDate.from({
+        year: happenedAt.year,
+        month: happenedAt.mon,
+        day: happenedAt.mday,
+      }).equals(date),
+    ).toBe(true);
   });
 
   itIfSupports.skipIf(adapterType !== "postgres")(

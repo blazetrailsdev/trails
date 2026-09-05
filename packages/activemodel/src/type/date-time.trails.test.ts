@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
 describe("DateTimeType fallback string parsing", () => {
   const type = new Types.DateTimeType();
-  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+  const cast = (s: string) => (type.cast(s) as RubyTime | null)?.getutc().xmlschema() ?? null;
 
   it("parses asctime order (Wed Sep 04 03:00:00 2013)", () => {
     expect(cast("Wed Sep 04 03:00:00 2013")).toBe("2013-09-04T03:00:00Z");
@@ -42,7 +42,7 @@ describe("DateTimeType fallback string parsing", () => {
 
 describe("DateTimeType fallback zone and ordering coverage", () => {
   const type = new Types.DateTimeType();
-  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+  const cast = (s: string) => (type.cast(s) as RubyTime | null)?.getutc().xmlschema() ?? null;
 
   it("parses month-day-year order with a named zone", () => {
     expect(cast("Sep 04 2013 03:00:00 EAT")).toBe("2013-09-04T00:00:00Z");
@@ -63,7 +63,7 @@ describe("DateTimeType fallback zone and ordering coverage", () => {
 
 describe("DateTimeType date-only strings with a zone token", () => {
   const type = new Types.DateTimeType();
-  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+  const cast = (s: string) => (type.cast(s) as RubyTime | null)?.getutc().xmlschema() ?? null;
 
   it("ignores a trailing Z on a date-only string", () => {
     expect(cast("2013-09-04Z")).toBe("2013-09-04T00:00:00Z");
@@ -85,7 +85,7 @@ describe("DateTimeType date-only strings with a zone token", () => {
 
 describe("DateTimeType offsets sourced from Date._parse", () => {
   const type = new Types.DateTimeType();
-  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+  const cast = (s: string) => (type.cast(s) as RubyTime | null)?.getutc().xmlschema() ?? null;
 
   it("applies a fractional-hour numeric offset", () => {
     expect(cast("2013-09-04 03:00:00 +05:45")).toBe("2013-09-03T21:15:00Z");
@@ -104,7 +104,7 @@ describe("DateTimeType#serializeCastValue", () => {
   it("applies the column precision to the cast Instant", () => {
     const type = new Types.DateTimeType({ precision: 1 });
     const value = type.cast("1999-12-31 12:34:56.789 -1000");
-    expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
+    expect((type.serializeCastValue(value) as RubyTime).xmlschema(1)).toBe(
       "1999-12-31T22:34:56.7Z",
     );
   });
@@ -177,51 +177,49 @@ describe("DateTimeType cast and serialize coverage", () => {
 
   it("string with offset produces Instant", () => {
     const result = type.cast("2024-01-15T10:30:00+05:00");
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect((result as Temporal.Instant).epochMilliseconds).toBe(
-      Temporal.Instant.from("2024-01-15T05:30:00Z").epochMilliseconds,
-    );
+    expect(result).toBeInstanceOf(RubyTime);
+    expect((result as RubyTime).toI()).toBe(RubyTime.utc(2024, 1, 15, 5, 30, 0).toI());
   });
 
   it("string without offset produces Instant (treated as UTC)", () => {
-    const result = type.cast("2024-01-15T10:30:00") as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = result.toZonedDateTimeISO("UTC");
-    expect(zdt.hour).toBe(10);
-    expect(zdt.minute).toBe(30);
+    const result = type.cast("2024-01-15T10:30:00") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    const utc = result.getutc();
+    expect(utc.hour).toBe(10);
+    expect(utc.min).toBe(30);
   });
 
   it("Postgres wire format (space separator, short offset) produces Instant", () => {
     const result = type.cast("2026-04-26 14:23:55.123456+00");
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const i = result as Temporal.Instant;
-    expect(i.toString({ smallestUnit: "microsecond" })).toBe("2026-04-26T14:23:55.123456Z");
+    expect(result).toBeInstanceOf(RubyTime);
+    const i = result as RubyTime;
+    expect(i.getutc().xmlschema(6)).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("Postgres naive wire format produces Instant (treated as UTC)", () => {
-    const result = type.cast("2026-04-26 14:23:55.123456") as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect(result.toZonedDateTimeISO("UTC").microsecond).toBe(456);
+    const result = type.cast("2026-04-26 14:23:55.123456") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    expect(result.getutc().usec % 1000).toBe(456);
   });
 
   it("microsecond precision is preserved through cast", () => {
     const result = type.cast("2026-04-26T14:23:55.123456Z");
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = (result as Temporal.Instant).toZonedDateTimeISO("UTC");
-    expect(zdt.millisecond).toBe(123);
-    expect(zdt.microsecond).toBe(456);
+    expect(result).toBeInstanceOf(RubyTime);
+    expect((result as RubyTime).getutc().usec).toBe(123456);
   });
 
   it("Temporal.Instant passthrough", () => {
     const original = instant("2026-04-26T14:23:55.123456Z");
-    expect(type.cast(original)).toBe(original);
+    expect((type.cast(original) as RubyTime).getutc().xmlschema(6)).toBe(
+      "2026-04-26T14:23:55.123456Z",
+    );
   });
 
   it("Temporal.PlainDateTime is converted to Instant (treated as UTC)", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    const result = type.cast(pdt) as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect(result.toZonedDateTimeISO("UTC").microsecond).toBe(456);
+    const result = type.cast(pdt) as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    expect(result.getutc().usec % 1000).toBe(456);
   });
 
   it("has name 'datetime'", () => {
@@ -242,12 +240,14 @@ describe("DateTimeType cast and serialize coverage", () => {
 
   it("serialize returns the cast Instant (not a SQL string)", () => {
     const i = instant("2026-04-26T14:23:55.123456Z");
-    expect((type.serialize(i) as Temporal.Instant).toString()).toBe("2026-04-26T14:23:55.123456Z");
+    expect((type.serialize(i) as RubyTime).getutc().xmlschema(6)).toBe(
+      "2026-04-26T14:23:55.123456Z",
+    );
   });
 
   it("serialize returns the cast Instant for PlainDateTime (cast to Instant first)", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    expect((type.serialize(pdt) as Temporal.Instant).toString()).toBe(
+    expect((type.serialize(pdt) as RubyTime).getutc().xmlschema(6)).toBe(
       "2026-04-26T14:23:55.123456Z",
     );
   });
@@ -259,13 +259,13 @@ describe("DateTimeType cast and serialize coverage", () => {
   it("serialize respects column precision", () => {
     const t = new Types.DateTimeType({ precision: 3 });
     const i = instant("2026-04-26T14:23:55.123456Z");
-    expect((t.serialize(i) as Temporal.Instant).toString()).toBe("2026-04-26T14:23:55.123Z");
+    expect((t.serialize(i) as RubyTime).getutc().xmlschema(3)).toBe("2026-04-26T14:23:55.123Z");
   });
 
   it("PlainDateTime input is converted to Instant (multiparameter support)", () => {
     const pdt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
     const result = type.cast(pdt);
-    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result).toBeInstanceOf(RubyTime);
   });
 
   it("valueFromMultiparameterAssignment reconstructs an Instant from {1..6}", () => {
@@ -275,7 +275,7 @@ describe("DateTimeType cast and serialize coverage", () => {
       }
     }
     const result = new Probe().call({ 1: 2024, 2: 1, 3: 2, 4: 12, 5: 30, 6: 0 });
-    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result).toBeInstanceOf(RubyTime);
   });
 
   it("valueFromMultiparameterAssignment throws when keys 1/2/3 missing", () => {
@@ -292,13 +292,13 @@ describe("DateTimeType cast and serialize coverage", () => {
   it("cast accepts numeric-keyed multiparameter hash and returns Temporal.Instant", () => {
     const type = new Types.DateTimeType();
     const result = type.cast({ 1: 2024, 2: 6, 3: 15, 4: 10, 5: 30 });
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = (result as Temporal.Instant).toZonedDateTimeISO("UTC");
-    expect(zdt.year).toBe(2024);
-    expect(zdt.month).toBe(6);
-    expect(zdt.day).toBe(15);
-    expect(zdt.hour).toBe(10);
-    expect(zdt.minute).toBe(30);
+    expect(result).toBeInstanceOf(RubyTime);
+    const utc = (result as RubyTime).getutc();
+    expect(utc.year).toBe(2024);
+    expect(utc.month).toBe(6);
+    expect(utc.day).toBe(15);
+    expect(utc.hour).toBe(10);
+    expect(utc.min).toBe(30);
   });
 
   it("valueFromMultiparameterAssignment defaults hour/minute to 0 when only date parts given (P21)", () => {
@@ -307,14 +307,14 @@ describe("DateTimeType cast and serialize coverage", () => {
         return this.valueFromMultiparameterAssignment(values);
       }
     }
-    const result = new Probe().call({ 1: 2025, 2: 7, 3: 4 }) as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = result.toZonedDateTimeISO("UTC");
-    expect(zdt.year).toBe(2025);
-    expect(zdt.month).toBe(7);
-    expect(zdt.day).toBe(4);
-    expect(zdt.hour).toBe(0);
-    expect(zdt.minute).toBe(0);
+    const result = new Probe().call({ 1: 2025, 2: 7, 3: 4 }) as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    const utc = result.getutc();
+    expect(utc.year).toBe(2025);
+    expect(utc.month).toBe(7);
+    expect(utc.day).toBe(4);
+    expect(utc.hour).toBe(0);
+    expect(utc.min).toBe(0);
   });
 });
 

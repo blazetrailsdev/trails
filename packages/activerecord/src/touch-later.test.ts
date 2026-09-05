@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
@@ -14,11 +14,11 @@ import { Topic } from "./test-helpers/models/topic.js";
 const { nodes, trees, owners, pets } = fixtures(["nodes", "trees", "owners", "pets"]);
 
 function toI(value: unknown): number {
-  return Math.floor((value as Temporal.Instant).epochMilliseconds / 1000);
+  return (value as RubyTime).toI();
 }
 
-function twentyFiveDaysAgo(): Temporal.Instant {
-  return Temporal.Now.instant().subtract({ hours: 24 * 25 });
+function twentyFiveDaysAgo(): RubyTime {
+  return RubyTime.now().minus(24 * 25 * 3600) as RubyTime;
 }
 
 describe("TouchLaterTest", () => {
@@ -96,16 +96,14 @@ describe("TouchLaterTest", () => {
   });
 
   it("touch touches immediately with a custom time", async () => {
-    const time = Temporal.Instant.fromEpochMilliseconds(
-      Math.floor(twentyFiveDaysAgo().epochMilliseconds / 1000) * 1000,
-    );
+    const time = RubyTime.at(twentyFiveDaysAgo().toI());
     const topic = await Topic.create({ updated_at: time, created_at: time });
     expect(toI(topic.updated_at)).toBe(toI(time));
     expect(toI(topic.created_at)).toBe(toI(time));
 
     await Topic.transaction(async () => {
       await topic.touchLater("created_at");
-      const customTime = Temporal.Now.instant().subtract({ hours: 24 * 2 });
+      const customTime = RubyTime.now().minus(24 * 2 * 3600) as RubyTime;
       await topic.touch({ time: customTime });
 
       expect(toI((await topic.reload()).updated_at)).toBe(toI(customTime));

@@ -43,7 +43,7 @@ import { PreparedStatementInvalid, StatementInvalid } from "./index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 describe("FinderTest", () => {
   const { topics } = fixtures(["topics"]);
@@ -1828,9 +1828,7 @@ describe("FinderTest", () => {
     expect(await Company.where({ name: "37signals" }).first()).toBeInstanceOf(CanonicalFirm);
     expect(await Company.where({ name: "37signals!" }).first()).toBeNull();
     const writtenOn = (await Topic.where({ id: 1 }).first())!.written_on;
-    expect(
-      writtenOn instanceof Temporal.Instant || writtenOn instanceof Temporal.PlainDateTime,
-    ).toBe(true);
+    expect(writtenOn instanceof RubyTime || writtenOn instanceof Temporal.PlainDateTime).toBe(true);
   });
 
   it("hash condition find malformed", async () => {
@@ -1876,8 +1874,7 @@ describe("FinderTest", () => {
     });
   });
 
-  const isTime = (v: unknown) =>
-    v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
+  const isTime = (v: unknown) => v instanceof RubyTime || v instanceof Temporal.PlainDateTime;
 
   it("condition interpolation", async () => {
     expect(await Company.where("name = '%s'", "37signals").first()).toBeInstanceOf(CanonicalFirm);
