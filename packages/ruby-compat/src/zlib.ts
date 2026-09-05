@@ -2,11 +2,9 @@ import { File } from "./file.js";
 import { getZlib } from "./zlib-adapter.js";
 
 /**
- * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`), the shared seat
- * `GzipReader` and `GzipWriter` are opened through: `gzfile_s_open`
+ * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`). `gzfile_s_open`
  * (`zlib.c:3233`) opens `filename` in the subclass' mode and hands the stream
- * to `gzfile_wrap` (`zlib.c:3178`), which yields the gzip stream and closes it
- * on the way out (`gzfile_ensure_close`) when a block is given.
+ * to `gzfile_wrap` (`zlib.c:3178`), which closes it on the way out of a block.
  */
 class GzipFile {
   constructor(protected io: File) {}
@@ -17,9 +15,8 @@ class GzipFile {
 }
 
 /**
- * `Zlib::GzipReader` (`vendor/ruby/ext/zlib/zlib.c:4877`), the decompressing
- * half — `ActiveRecord::ConnectionAdapters::SchemaCache.read` reads a `.gz`
- * schema cache through its `open` (`schema_cache.rb:246`).
+ * `Zlib::GzipReader` (`vendor/ruby/ext/zlib/zlib.c:4877`); `open` is
+ * `gzfile_s_open(argc, argv, klass, "rb")` (`zlib.c:3871`).
  */
 class GzipReader extends GzipFile {
   static open(filename: string): GzipReader;
@@ -44,9 +41,10 @@ class GzipReader extends GzipFile {
 }
 
 /**
- * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`), the compressing
- * half — the mirror `SchemaCache#dump_to` writes a `.gz` schema cache through
- * (`schema_cache.rb:466`).
+ * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`); `open` is
+ * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`). The `ZlibAdapter`
+ * seam is one-shot rather than streaming, so the deflate stream is finished
+ * into the associated IO at `close` (`rb_gzfile_close`, `zlib.c:3524`).
  */
 class GzipWriter extends GzipFile {
   private buffer = "";
@@ -66,7 +64,7 @@ class GzipWriter extends GzipFile {
 
   write(string: string): number {
     this.buffer += string;
-    return string.length;
+    return new TextEncoder().encode(string).length;
   }
 
   close(): void {
