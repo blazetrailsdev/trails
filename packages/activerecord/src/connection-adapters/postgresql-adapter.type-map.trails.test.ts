@@ -60,12 +60,26 @@ describe("PostgreSQLAdapter#getOidType", () => {
     expect(second).toBeInstanceOf(ValueType);
     expect(warn).not.toHaveBeenCalled();
   });
+});
+
+describe("PostgreSQLAdapter#castResult", () => {
+  let adapter: PostgreSQLAdapter;
+
+  beforeEach(() => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await adapter.close().catch(() => undefined);
+  });
 
   it("loads the type from pg_type on miss before falling back", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockImplementation(async () => {
       adapter.typeMap.registerType(987_654, new Uuid());
     });
+
     const result = await castResult.call(
       adapter as never,
       {
@@ -73,6 +87,7 @@ describe("PostgreSQLAdapter#getOidType", () => {
         rows: [],
       } as never,
     );
+
     expect(loadSpy).toHaveBeenCalledWith([987_654]);
     expect(result.columnTypes["user_defined_column"]).toBeInstanceOf(Uuid);
     expect(warn).not.toHaveBeenCalled();

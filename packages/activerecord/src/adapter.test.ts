@@ -69,18 +69,20 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
   expect(empty.first()).toBeUndefined();
 }
 
+type RawDriverHandle = { query(sql: string): Promise<unknown> } | null;
+
+function rawDriverHandle(conn: DatabaseAdapter): RawDriverHandle {
+  if (adapterType === "postgres") {
+    return (
+      conn as unknown as { _rawConnectionForTest(): RawDriverHandle }
+    )._rawConnectionForTest();
+  }
+  return (conn as unknown as { _clientForTest(): RawDriverHandle })._clientForTest();
+}
+
 async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
   if (adapterType === "postgres" || adapterType === "mysql") {
-    const raw =
-      adapterType === "postgres"
-        ? (
-            conn as unknown as {
-              _rawConnectionForTest(): { query(sql: string): Promise<unknown> } | null;
-            }
-          )._rawConnectionForTest()
-        : (
-            conn as unknown as { _clientForTest(): { query(sql: string): Promise<unknown> } | null }
-          )._clientForTest();
+    const raw = rawDriverHandle(conn);
     if (!raw) return false;
     try {
       await raw.query("SAVEPOINT transaction_test");
