@@ -78,13 +78,13 @@ export class PoolConfig {
     this._schemaReflection = value;
   }
 
-  async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
+  serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      (await this.synchronize(async () => {
+      this.synchronize(async () => {
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
-      }))
+      })
     );
   }
 

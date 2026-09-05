@@ -1015,10 +1015,6 @@ export class PostgreSQLAdapter
     }
   }
 
-  async rollbackDbTransaction(): Promise<void> {
-    return this.execRollbackDbTransaction();
-  }
-
   private static _isConnectionError(err: unknown): boolean {
     const e = err as { code?: string; message?: string } | null | undefined;
     if (!e) return false;
@@ -1648,7 +1644,7 @@ export class PostgreSQLAdapter
   }
 
   override quote(value: unknown): string {
-    return pgQuote.call(this, value);
+    return pgQuote.call(this, value) as string;
   }
 
   override quoteString(s: string): string {
@@ -1669,7 +1665,7 @@ export class PostgreSQLAdapter
   }
 
   override quoteDefaultExpression(value: unknown, column: unknown): string {
-    return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn);
+    return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn) as string;
   }
 
   async extensions(): Promise<string[]> {
@@ -2758,7 +2754,7 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 (PostgreSQLAdapter.prototype as any).isWarningIgnored = pgIsWarningIgnored;
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
-dirtiesQueryCache(PostgreSQLAdapter, "rollbackDbTransaction", "rollbackToSavepoint");
+dirtiesQueryCache(PostgreSQLAdapter, "rollbackToSavepoint");
 dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 include(PostgreSQLAdapter, SchemaStatements);

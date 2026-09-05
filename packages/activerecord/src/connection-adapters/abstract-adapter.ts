@@ -583,6 +583,7 @@ export interface AbstractAdapter {
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result>;
+  rollbackDbTransaction(): Promise<void>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string): boolean;
@@ -2166,6 +2167,8 @@ function ensureAbstractAdapterMixinsApplied(): void {
     "execInsertAll",
     "truncate",
     "truncateTables",
+    "rollbackToSavepoint",
+    "rollbackDbTransaction",
     "restartDbTransaction",
   );
 }

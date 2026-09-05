@@ -92,7 +92,7 @@ export function quotedBinary(
   return bytes ? `'${escapeBytea(bytes)}'` : `'${escapeBytea(value as string)}'`;
 }
 
-export function quote(this: QuotingDispatchHost, value: unknown): string {
+export function quote(this: QuotingDispatchHost, value: unknown): string | null {
   if (
     ActiveRecord.raiseIntWiderThan64bit &&
     (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value)))
@@ -105,20 +105,21 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   }
   if (value instanceof BitData) {
     if (value.isBinary()) return `B'${value.toString()}'`;
-    if (value.isHex()) return `X'${value.toString()}'`;
-    return null as unknown as string;
+    else if (value.isHex()) return `X'${value.toString()}'`;
+    return null;
   }
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    return `'${String(value)}'`;
+  if (typeof value === "number" || typeof value === "bigint") {
+    if (typeof value === "bigint" || Number.isFinite(value)) {
+      return abstractQuote.call(this, value);
+    } else {
+      return `'${String(value)}'`;
+    }
   }
   if (value instanceof ArrayData) {
     return quote.call(this, encodeArray.call(this, value));
   }
   if (value instanceof Range) {
     return quote.call(this, encodeRange.call(this, value));
-  }
-  if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    return String(value);
   }
   return abstractQuote.call(this, value);
 }
@@ -127,7 +128,7 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost & CastTypeLookupHost,
   value: unknown,
   column: DefaultExpressionColumn,
-): string {
+): string | null {
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   } else if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {

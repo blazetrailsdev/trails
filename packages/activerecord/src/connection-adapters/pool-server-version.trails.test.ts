@@ -3,6 +3,7 @@ import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 import { Version } from "./abstract-adapter.js";
+import { Base } from "../base.js";
 
 describe("ConnectionPool#server_version", () => {
   function adapterFetching(versions: string[]): Mysql2Adapter {
@@ -47,6 +48,13 @@ describe("ConnectionPool#server_version", () => {
     const adapter = adapterFetching(["8.0.35"]);
 
     expect(await adapter.supportsExpressionIndex()).toBe(true);
+  });
+
+  it("answers the memo synchronously once a leased connection has warmed it", async () => {
+    const connection = await Base.leaseConnection();
+
+    expect(connection.pool.serverVersion(connection)).toBeInstanceOf(Version);
+    expect(connection.databaseVersion).toBeInstanceOf(Version);
   });
 
   it("re-entrant read from inside the fetch resolves rather than awaiting itself", async () => {

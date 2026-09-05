@@ -355,6 +355,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
 
   packages/activerecord-cli:
     dependencies:

@@ -257,7 +257,6 @@ export async function disconnectAllBang(): Promise<void> {
   await _PoolConfig.disconnectAllBang();
 }
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
-export { ConnectionManagement, BodyProxy } from "./connection-adapters/connection-management.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {
   DatabaseTaskHandler,
