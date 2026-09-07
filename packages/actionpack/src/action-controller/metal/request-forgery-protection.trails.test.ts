@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.js";
 import { Response } from "@blazetrails/rack";
@@ -13,7 +14,11 @@ import {
 } from "./request-forgery-protection.js";
 
 function buildRequest(): NullSessionRequest {
-  const env: Record<string, unknown> = {};
+  const env: Record<string, unknown> = {
+    "action_dispatch.key_generator": new KeyGenerator("x".repeat(32), { iterations: 2 }),
+    "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
+    "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+  };
   return {
     env,
     getHeader: (name: string) => env[name],
@@ -65,7 +70,7 @@ describe("NullSession", () => {
   });
   it("CookieStore round-trips the token through the encrypted jar, bound to the session id", () => {
     const request = buildRequest();
-    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    const jar = new CookieJar(request);
     cookieJar.call(request, jar);
     const session = {
       id: () => ({ publicId: "sid-1" }),
@@ -90,7 +95,7 @@ describe("NullSession", () => {
 
   it("CookieStore ignores a token stored under another session id", () => {
     const request = buildRequest();
-    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    const jar = new CookieJar(request);
     cookieJar.call(request, jar);
     const csrfRequest = {
       method: "POST",
@@ -107,7 +112,7 @@ describe("NullSession", () => {
 
   it("CookieStore returns null for cookie contents that are not JSON", () => {
     const request = buildRequest();
-    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    const jar = new CookieJar(request);
     cookieJar.call(request, jar);
     const csrfRequest = {
       method: "POST",

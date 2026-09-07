@@ -18,7 +18,14 @@ import {
 
 function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
   return {
-    request: { session: { user: 1 }, flash: new FlashHash(), cookies: { a: "1" } },
+    request: {
+      env: {},
+      getHeader: () => undefined,
+      hasHeader: () => false,
+      session: { user: 1 },
+      flash: new FlashHash(),
+      cookies: { a: "1" },
+    },
     response: { redirectUrl: "/somewhere" },
     constructor: { fileFixturePath: null },
     ...overrides,

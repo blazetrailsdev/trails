@@ -47,7 +47,6 @@ export {
   SignedCookieJar,
   EncryptedCookieJar,
   PermanentCookieJar,
-  type CookieJarOptions,
   type SetCookieOptions,
 } from "./middleware/cookies.js";
 export { SSL, type SSLOptions, type HSTSOptions } from "./middleware/ssl.js";

@@ -10,8 +10,18 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { getCrypto, KeyError, rbEqual } from "@blazetrails/ruby-compat";
+import { include, KeyError, rbEqual } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
+import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import {
+  SERIALIZERS,
+  SerializerWithFallback,
+} from "@blazetrails/activesupport/messages/serializer-with-fallback";
+import {
+  InvalidMessage,
+  MessageEncryptor,
+  NullSerializer,
+} from "@blazetrails/activesupport/message-encryptor";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -19,8 +29,17 @@ import { _RequestCtor } from "../http/request-slot.js";
 
 export type CookieExpires = Date | Temporal.Instant;
 
+type MetadataOptions = NonNullable<Parameters<MessageVerifier["generate"]>[1]>;
+
 function isFromNow(expires: unknown): expires is { fromNow(): CookieExpires } {
   return expires != null && typeof (expires as { fromNow?: unknown }).fromNow === "function";
+}
+
+function toInstant(expires: CookieExpires | undefined): Temporal.Instant | null {
+  if (expires == null) return null;
+  return expires instanceof Date
+    ? Temporal.Instant.fromEpochMilliseconds(expires.getTime())
+    : expires;
 }
 
 function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unknown>): boolean {
@@ -34,16 +53,7 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
 }
 
 /** @internal */
-export const COOKIES_APP_OPTIONS_KEY = "action_dispatch.cookies_app_options";
-
-/** @internal */
 export const COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
-
-export interface CookieJarOptions {
-  secret?: string;
-  signedSecret?: string;
-  encryptedSecret?: string;
-}
 
 export interface SetCookieOptions {
   value: string;
@@ -63,17 +73,86 @@ export interface CookieResponse {
   deleteCookie(name: string, options: { path?: string; domain?: string }): void;
 }
 
+export class ChainedCookieJars {
+  declare request: RequestCookieMethodsHost;
+  declare _permanent?: PermanentCookieJar;
+  declare _signed?: SignedCookieJar;
+  declare _encrypted?: EncryptedCookieJar;
+  declare _signedOrEncrypted?: SignedCookieJar | EncryptedCookieJar;
+
+  get permanent(): PermanentCookieJar {
+    return (this._permanent ??= new PermanentCookieJar(this as unknown as CookieJar));
+  }
+
+  get signed(): SignedCookieJar {
+    return (this._signed ??= new SignedCookieJar(this as unknown as CookieJar));
+  }
+
+  get encrypted(): EncryptedCookieJar {
+    return (this._encrypted ??= new EncryptedCookieJar(this as unknown as CookieJar));
+  }
+
+  get signedOrEncrypted(): SignedCookieJar | EncryptedCookieJar {
+    return (this._signedOrEncrypted ??= isPresent(secretKeyBase.call(this.request))
+      ? this.encrypted
+      : this.signed);
+  }
+
+  /** @internal */
+  isUpgradeLegacyHmacAesCbcCookies(): boolean {
+    return Boolean(
+      isPresent(secretKeyBase.call(this.request)) &&
+      isPresent(encryptedSignedCookieSalt.call(this.request)) &&
+      isPresent(encryptedCookieSalt.call(this.request)) &&
+      useAuthenticatedCookieEncryption.call(this.request),
+    );
+  }
+
+  /** @internal */
+  isPrepareUpgradeLegacyHmacAesCbcCookies(): boolean {
+    return Boolean(
+      isPresent(secretKeyBase.call(this.request)) &&
+      isPresent(authenticatedEncryptedCookieSalt.call(this.request)) &&
+      !useAuthenticatedCookieEncryption.call(this.request),
+    );
+  }
+
+  /** @internal */
+  encryptedCookieCipher(): string {
+    return encryptedCookieCipher.call(this.request) ?? "aes-256-gcm";
+  }
+
+  /** @internal */
+  signedCookieDigest(): string {
+    return signedCookieDigest.call(this.request) ?? "SHA1";
+  }
+}
+
 export class CookieJar implements Iterable<[string, string]> {
+  declare permanent: PermanentCookieJar;
+  declare signed: SignedCookieJar;
+  declare encrypted: EncryptedCookieJar;
+  declare signedOrEncrypted: SignedCookieJar | EncryptedCookieJar;
+  /** @internal */
+  declare signedCookieDigest: () => string;
+  /** @internal */
+  declare encryptedCookieCipher: () => string;
+  /** @internal */
+  declare isUpgradeLegacyHmacAesCbcCookies: () => boolean;
+  /** @internal */
+  declare isPrepareUpgradeLegacyHmacAesCbcCookies: () => boolean;
   private _cookies: Map<string, string> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
   private _deletedCookies: Map<string, { path?: string; domain?: string }> = new Map();
-  private _options: CookieJarOptions;
   private _committed = false;
-  /** @internal */
-  _request?: RequestCookieMethodsHost;
+  private _request: RequestCookieMethodsHost;
 
-  constructor(options: CookieJarOptions = {}) {
-    this._options = options;
+  constructor(request: RequestCookieMethodsHost) {
+    this._request = request;
+  }
+
+  get request(): RequestCookieMethodsHost {
+    return this._request;
   }
 
   /** @internal */
@@ -88,12 +167,11 @@ export class CookieJar implements Iterable<[string, string]> {
 
   /** @internal */
   static build<T extends CookieJar>(
-    this: new (options?: CookieJarOptions) => T,
-    req: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
+    this: new (request: RequestCookieMethodsHost) => T,
+    req: RequestCookieMethodsHost,
     cookies: Record<string, string>,
   ): T {
-    const jar = new this(req?.cookiesAppOptions ?? {});
-    if (req && "env" in req) jar._request = req;
+    const jar = new this(req);
     for (const [k, v] of Object.entries(cookies ?? {})) {
       jar._cookies.set(k, v);
     }
@@ -171,14 +249,13 @@ export class CookieJar implements Iterable<[string, string]> {
     options.path ||= "/";
 
     if (!("sameSite" in options)) {
-      options.sameSite =
-        this._request?.cookiesSameSiteProtection?.() as SetCookieOptions["sameSite"];
+      options.sameSite = this.request.cookiesSameSiteProtection?.() as SetCookieOptions["sameSite"];
     }
 
-    const request = this._request as unknown as { host?: string } | undefined;
+    const request = this.request as unknown as { host?: string };
     if (options.domain === ":all" || options.domain === "all") {
       let cookieDomain = "";
-      const host = request?.host ?? "";
+      const host = request.host ?? "";
       const dotSplittedHost = host.split(".");
 
       if (/^[\d.]+$/.test(host) || dotSplittedHost.includes("") || dotSplittedHost.length === 1) {
@@ -202,10 +279,10 @@ export class CookieJar implements Iterable<[string, string]> {
     } else if (Array.isArray(options.domain)) {
       options.domain = options.domain.find((domain) => {
         domain = domain.replace(/^\./, "");
-        return request?.host === domain || (request?.host ?? "").endsWith(`.${domain}`);
+        return request.host === domain || (request.host ?? "").endsWith(`.${domain}`);
       });
     } else if (typeof options.domain === "function") {
-      options.domain = options.domain(this._request);
+      options.domain = options.domain(this.request);
     }
   }
 
@@ -237,27 +314,6 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies[Symbol.iterator]();
   }
 
-  get permanent(): PermanentCookieJar {
-    return new PermanentCookieJar(this);
-  }
-
-  get signed(): SignedCookieJar {
-    const secret = this._options.signedSecret ?? this._options.secret;
-    if (!secret) throw new Error("No secret configured for signed cookies");
-    return new SignedCookieJar(this, secret, this._request);
-  }
-
-  get encrypted(): EncryptedCookieJar {
-    const secret = this._options.encryptedSecret ?? this._options.secret;
-    if (!secret) throw new Error("No secret configured for encrypted cookies");
-    return new EncryptedCookieJar(this, secret, this._request);
-  }
-
-  get signedOrEncrypted(): SignedCookieJar | EncryptedCookieJar {
-    const skb = this._request ? secretKeyBase.call(this._request) : undefined;
-    return skb ? this.encrypted : this.signed;
-  }
-
   write(response: CookieResponse): void {
     for (const [name, value] of this._setCookies) {
       if (this.isWriteCookie(value)) {
@@ -274,18 +330,18 @@ export class CookieJar implements Iterable<[string, string]> {
 
   /** @internal */
   private isWriteCookie(cookie: SetCookieOptions): boolean {
-    const request = this._request as unknown as { ssl?: boolean; host?: string } | undefined;
+    const request = this.request as unknown as { ssl?: boolean; host?: string };
     return (
-      request?.ssl === true ||
+      request.ssl === true ||
       !cookie.secure ||
       CookieJar.alwaysWriteCookie ||
-      (request?.host ?? "").endsWith(".onion")
+      (request.host ?? "").endsWith(".onion")
     );
   }
 
   /** @internal */
-  static parse(cookieHeader: string, options: CookieJarOptions = {}): CookieJar {
-    const jar = new CookieJar(options);
+  static parse(cookieHeader: string, request: RequestCookieMethodsHost = nullRequest): CookieJar {
+    const jar = new CookieJar(request);
     if (!cookieHeader) return jar;
     for (const pair of cookieHeader.split(";")) {
       const [key, ...rest] = pair.split("=");
@@ -297,6 +353,13 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 }
 
+const nullRequest: RequestCookieMethodsHost = {
+  env: {},
+  getHeader: () => undefined,
+  hasHeader: () => false,
+  cookies: {},
+};
+
 export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
 
 function isHash(value: unknown): value is SerializedSetOptions {
@@ -304,6 +367,18 @@ function isHash(value: unknown): value is SerializedSetOptions {
 }
 
 export class AbstractCookieJar {
+  declare permanent: PermanentCookieJar;
+  declare signed: SignedCookieJar;
+  declare encrypted: EncryptedCookieJar;
+  declare signedOrEncrypted: SignedCookieJar | EncryptedCookieJar;
+  /** @internal */
+  declare signedCookieDigest: () => string;
+  /** @internal */
+  declare encryptedCookieCipher: () => string;
+  /** @internal */
+  declare isUpgradeLegacyHmacAesCbcCookies: () => boolean;
+  /** @internal */
+  declare isPrepareUpgradeLegacyHmacAesCbcCookies: () => boolean;
   protected parentJar: CookieJar | AbstractCookieJar;
 
   constructor(parentJar: CookieJar | AbstractCookieJar) {
@@ -334,8 +409,25 @@ export class AbstractCookieJar {
     return options as SerializedSetOptions;
   }
 
-  get permanent(): PermanentCookieJar {
-    return new PermanentCookieJar(this);
+  /** @internal */
+  get request(): RequestCookieMethodsHost {
+    return this.parentJar.request;
+  }
+
+  /** @internal */
+  protected expiryOptions(options: SerializedSetOptions): MetadataOptions {
+    if (isFromNow(options.expires)) {
+      return { expiresIn: options.expires as unknown as number };
+    } else {
+      return { expiresAt: toInstant(options.expires) };
+    }
+  }
+
+  /** @internal */
+  protected cookieMetadata(name: string, options: SerializedSetOptions): MetadataOptions {
+    const metadata = this.expiryOptions(options);
+    if (useCookiesWithMetadata.call(this.request)) metadata.purpose = `cookie.${name}`;
+    return metadata;
   }
 
   protected parse(_name: string, data: unknown, _purpose?: string): unknown {
@@ -345,6 +437,9 @@ export class AbstractCookieJar {
   protected commit(_name: string, _options: SerializedSetOptions): void {}
 }
 
+include(CookieJar, ChainedCookieJars);
+include(AbstractCookieJar, ChainedCookieJars);
+
 export class PermanentCookieJar extends AbstractCookieJar {
   private static readonly TWENTY_YEARS_MS = 20 * 365.25 * 24 * 60 * 60 * 1000;
 
@@ -353,116 +448,80 @@ export class PermanentCookieJar extends AbstractCookieJar {
   }
 }
 
-/** @internal */
-function makeSerializedHost(
-  request: RequestCookieMethodsHost | undefined,
-): SerializedCookieJarsHost {
-  return {
-    request: request ?? {
-      env: {},
-      getHeader: () => undefined,
-      hasHeader: () => false,
-      cookies: {},
-    },
-  };
-}
-
 export class SignedCookieJar extends AbstractCookieJar {
-  private secret: string;
-  private digest: string;
-  private host: SerializedCookieJarsHost;
+  private verifier: MessageVerifier;
 
-  constructor(
-    parentJar: CookieJar | AbstractCookieJar,
-    secret: string,
-    request?: RequestCookieMethodsHost,
-    digest = "sha256",
-  ) {
+  constructor(parentJar: CookieJar | AbstractCookieJar) {
     super(parentJar);
-    this.secret = secret;
-    this.digest = digest;
-    this.host = makeSerializedHost(request);
+
+    const secret = keyGenerator
+      .call(this.request)!
+      .generateKey(signedCookieSalt.call(this.request)!);
+    this.verifier = new MessageVerifier(secret as string, {
+      digest: this.signedCookieDigest(),
+      serializer: NullSerializer,
+    });
   }
 
-  protected parse(name: string, signedMessage: unknown, _purpose?: string): unknown {
-    const data = this.verify(signedMessage as string);
-    return parse.call(this.host, name, data);
+  protected parse(name: string, signedMessage: unknown, purpose?: string): unknown {
+    const data = this.verifier.verified(signedMessage as string, { purpose });
+    return parse.call(this, name, data);
   }
 
   protected commit(name: string, options: SerializedSetOptions): void {
-    commit.call(this.host, name, options);
-    options.value = this.sign(options.value as string);
+    commit.call(this, name, options);
+    options.value = this.verifier.generate(options.value, this.cookieMetadata(name, options));
     checkForOverflowBang(name, options as { value: string });
-  }
-
-  private sign(value: string): string {
-    const hmac = getCrypto().createHmac(this.digest, this.secret).update(value).digest("hex");
-    return `${value}--${hmac}`;
-  }
-
-  private verify(signedValue: string): string | undefined {
-    const idx = signedValue.lastIndexOf("--");
-    if (idx === -1) return undefined;
-    const value = signedValue.slice(0, idx);
-    const sig = signedValue.slice(idx + 2);
-    const expected = getCrypto().createHmac(this.digest, this.secret).update(value).digest("hex");
-    if (sig.length !== expected.length) return undefined;
-    let match = true;
-    for (let i = 0; i < sig.length; i++) {
-      if (sig[i] !== expected[i]) match = false;
-    }
-    return match ? value : undefined;
   }
 }
 
 export class EncryptedCookieJar extends AbstractCookieJar {
-  private secret: string;
-  private host: SerializedCookieJarsHost;
+  private encryptor: MessageEncryptor;
 
-  constructor(
-    parentJar: CookieJar | AbstractCookieJar,
-    secret: string,
-    request?: RequestCookieMethodsHost,
-  ) {
+  constructor(parentJar: CookieJar | AbstractCookieJar) {
     super(parentJar);
-    this.secret = secret;
-    this.host = makeSerializedHost(request);
+
+    if (useAuthenticatedCookieEncryption.call(this.request)) {
+      const keyLen = MessageEncryptor.keyLen(this.encryptedCookieCipher());
+      const secret = keyGenerator
+        .call(this.request)!
+        .generateKey(authenticatedEncryptedCookieSalt.call(this.request)!, keyLen);
+      this.encryptor = new MessageEncryptor(secret as Buffer, {
+        cipher: this.encryptedCookieCipher(),
+        serializer: NullSerializer,
+      });
+    } else {
+      const keyLen = MessageEncryptor.keyLen("aes-256-cbc");
+      const secret = keyGenerator
+        .call(this.request)!
+        .generateKey(encryptedCookieSalt.call(this.request)!, keyLen);
+      const signSecret = keyGenerator
+        .call(this.request)!
+        .generateKey(encryptedSignedCookieSalt.call(this.request)!);
+      this.encryptor = new MessageEncryptor(secret as Buffer, signSecret as Buffer, {
+        cipher: "aes-256-cbc",
+        serializer: NullSerializer,
+      });
+    }
   }
 
-  protected parse(name: string, encryptedMessage: unknown, _purpose?: string): unknown {
-    const data = this.decrypt(encryptedMessage as string);
-    return parse.call(this.host, name, data);
+  protected parse(name: string, encryptedMessage: unknown, purpose?: string): unknown {
+    try {
+      const data = this.encryptor.decryptAndVerify(encryptedMessage as string, { purpose });
+      return parse.call(this, name, data);
+    } catch (error) {
+      if (error instanceof InvalidMessage || error instanceof InvalidSignature) return undefined;
+      throw error;
+    }
   }
 
   protected commit(name: string, options: SerializedSetOptions): void {
-    commit.call(this.host, name, options);
-    options.value = this.encrypt(options.value as string);
+    commit.call(this, name, options);
+    options.value = this.encryptor.encryptAndSign(
+      options.value,
+      this.cookieMetadata(name, options),
+    );
     checkForOverflowBang(name, options as { value: string });
-  }
-
-  private encrypt(value: string): string {
-    const crypto = getCrypto();
-    const key = Buffer.from(this.secret.padEnd(32, "0").slice(0, 32));
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-    let encrypted = cipher.update(value, "utf8", "hex");
-    encrypted += cipher.final("hex");
-    return `${Buffer.from(iv).toString("hex")}--${encrypted}`;
-  }
-
-  private decrypt(encryptedValue: string): string | undefined {
-    try {
-      const [ivHex, encrypted] = encryptedValue.split("--");
-      if (!ivHex || !encrypted) return undefined;
-      const key = Buffer.from(this.secret.padEnd(32, "0").slice(0, 32));
-      const iv = Buffer.from(ivHex, "hex");
-      const decipher = getCrypto().createDecipheriv("aes-256-cbc", key, iv);
-      let decrypted = decipher.update(encrypted, "hex", "utf8");
-      decrypted += decipher.final("utf8");
-      return decrypted;
-    } catch {
-      return undefined;
-    }
   }
 }
 
@@ -502,7 +561,6 @@ export interface RequestCookieMethodsHost {
   env: RackEnv;
   getHeader(name: string): any;
   hasHeader(name: string): boolean;
-  cookiesAppOptions?: CookieJarOptions;
   cookies: Record<string, string>;
   cookiesSameSiteProtection?(): unknown;
 }
@@ -531,7 +589,9 @@ const requestEnvAccessor = <T>(key: string) =>
   };
 
 /** @internal */
-export const keyGenerator = requestEnvAccessor<unknown>("action_dispatch.key_generator");
+export const keyGenerator = requestEnvAccessor<{
+  generateKey(salt: string, keySize?: number): Buffer | string;
+}>("action_dispatch.key_generator");
 /** @internal */
 export const signedCookieSalt = requestEnvAccessor<string>("action_dispatch.signed_cookie_salt");
 /** @internal */
@@ -561,7 +621,7 @@ export const signedCookieDigest = requestEnvAccessor<string>(
 /** @internal */
 export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
 /** @internal */
-export const cookiesSerializer = requestEnvAccessor<string>("action_dispatch.cookies_serializer");
+export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
 /**
  * @internal
  * @missingRailsCall call — PERMANENT
@@ -583,40 +643,6 @@ export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
   "action_dispatch.use_cookies_with_metadata",
 );
 
-/** @internal */
-export interface ChainedCookieJarsHost {
-  request: RequestCookieMethodsHost;
-  signed: SignedCookieJar;
-  encrypted: EncryptedCookieJar;
-}
-
-export function signedOrEncrypted(
-  this: ChainedCookieJarsHost,
-): SignedCookieJar | EncryptedCookieJar {
-  return secretKeyBase.call(this.request) ? this.encrypted : this.signed;
-}
-
-/** @internal */
-export function isUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsHost): boolean {
-  const req = this.request;
-  return Boolean(
-    secretKeyBase.call(req) &&
-    encryptedSignedCookieSalt.call(req) &&
-    encryptedCookieSalt.call(req) &&
-    useAuthenticatedCookieEncryption.call(req),
-  );
-}
-
-/** @internal */
-export function isPrepareUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsHost): boolean {
-  const req = this.request;
-  return Boolean(
-    secretKeyBase.call(req) &&
-    authenticatedEncryptedCookieSalt.call(req) &&
-    !useAuthenticatedCookieEncryption.call(req),
-  );
-}
-
 const MAX_COOKIE_SIZE = 4096;
 
 export interface CookieSerializer {
@@ -628,6 +654,7 @@ export interface CookieSerializer {
 /** @internal */
 export interface SerializedCookieJarsHost {
   request: RequestCookieMethodsHost;
+  set(name: string, options: SerializedSetOptions): unknown;
   _serializer?: CookieSerializer;
 }
 
@@ -653,8 +680,12 @@ const JSON_SERIALIZER: CookieSerializer = {
 /** @internal */
 export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   if (this._serializer) return this._serializer;
-  const configured = this.request.env["action_dispatch.cookies_serializer"];
-  if (
+  const configured = cookiesSerializer.call(this.request);
+  if (configured === "hybrid") {
+    this._serializer = SerializerWithFallback.get("json_allow_marshal");
+  } else if (typeof configured === "string") {
+    this._serializer = SerializerWithFallback.get(configured);
+  } else if (
     configured &&
     typeof configured === "object" &&
     typeof (configured as CookieSerializer).dump === "function" &&
@@ -669,17 +700,31 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 
 /** @internal */
 export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
-  return !serializer.call(this).dumped(dumped);
+  const configured = serializer.call(this);
+  return (
+    Object.values(SERIALIZERS).includes(configured as (typeof SERIALIZERS)["json"]) &&
+    configured !== SERIALIZERS.marshal &&
+    !configured.dumped(dumped)
+  );
 }
 
 /** @internal */
-export function parse(this: SerializedCookieJarsHost, _name: string, dumped: unknown): unknown {
+export function parse(
+  this: SerializedCookieJarsHost,
+  name: string,
+  dumped: unknown,
+  forceReserialize: boolean = false,
+): unknown {
   if (dumped != null) {
     let value: unknown;
     try {
       value = serializer.call(this).load(dumped as string);
     } catch {
       return undefined;
+    }
+
+    if (forceReserialize || isReserialize.call(this, dumped as string)) {
+      this.set(name, { value });
     }
 
     return value;

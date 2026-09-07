@@ -38,7 +38,15 @@ import {
   type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
 
-const cookieJar = () => new CookieJar();
+const cookieJar = () => {
+  const env: Record<string, unknown> = {};
+  return new CookieJar({
+    env,
+    getHeader: (name: string) => env[name],
+    hasHeader: (name: string) => Object.hasOwn(env, name),
+    cookies: {},
+  });
+};
 
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
   return {

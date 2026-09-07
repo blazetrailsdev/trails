@@ -1,17 +1,21 @@
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
 import type { RackApp, RackEnv } from "@blazetrails/rack";
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
-import { Cookies, COOKIES_APP_OPTIONS_KEY } from "../../action-dispatch/middleware/cookies.js";
+import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 
 function buildApp(routes: RouteSet): RackApp {
   const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
   const cookies = new Cookies((e: RackEnv) => store.call(e));
   return (e: RackEnv) => {
-    e[COOKIES_APP_OPTIONS_KEY] = { secret: "a".repeat(64) };
+    e["action_dispatch.key_generator"] = new KeyGenerator("a".repeat(64), { iterations: 2 });
+    e["action_dispatch.signed_cookie_salt"] = "signed cookie";
+    e["action_dispatch.encrypted_cookie_salt"] = "encrypted cookie";
+    e["action_dispatch.encrypted_signed_cookie_salt"] = "signed encrypted cookie";
     return cookies.call(e);
   };
 }

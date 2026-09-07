@@ -114,6 +114,14 @@ const alias = {
     __dirname,
     "packages/activesupport/src/message-verifier.ts",
   ),
+  "@blazetrails/activesupport/messages/serializer-with-fallback": path.resolve(
+    __dirname,
+    "packages/activesupport/src/messages/serializer-with-fallback.ts",
+  ),
+  "@blazetrails/activesupport/message-encryptor": path.resolve(
+    __dirname,
+    "packages/activesupport/src/message-encryptor.ts",
+  ),
   "@blazetrails/activesupport/core-ext/date/calculations": path.resolve(
     __dirname,
     "packages/activesupport/src/core-ext/date/calculations.ts",

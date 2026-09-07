@@ -66,7 +66,6 @@ import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
 import {
-  COOKIES_APP_OPTIONS_KEY,
   authenticatedEncryptedCookieSalt as _authenticatedEncryptedCookieSalt,
   cookieJar as _cookieJar,
   cookiesDigest as _cookiesDigest,
@@ -83,7 +82,6 @@ import {
   useAuthenticatedCookieEncryption as _useAuthenticatedCookieEncryption,
   useCookiesWithMetadata as _useCookiesWithMetadata,
   type CookieJar,
-  type CookieJarOptions,
 } from "../middleware/cookies.js";
 import {
   parameters as _parameters,
@@ -580,18 +578,6 @@ export class Request {
     return flashHash.call(this as never);
   }
 
-  get cookiesAppOptions(): CookieJarOptions | undefined {
-    return this.env[COOKIES_APP_OPTIONS_KEY] as CookieJarOptions | undefined;
-  }
-
-  set cookiesAppOptions(options: CookieJarOptions | undefined) {
-    if (options === undefined) {
-      delete this.env[COOKIES_APP_OPTIONS_KEY];
-    } else {
-      this.env[COOKIES_APP_OPTIONS_KEY] = options;
-    }
-  }
-
   get headers(): HttpHeaders {
     return new HttpHeaders(this);
   }
@@ -969,7 +955,7 @@ export interface Request {
   encryptedCookieCipher(): string | undefined;
   signedCookieDigest(): string | undefined;
   secretKeyBase(): string | undefined;
-  cookiesSerializer(): string | undefined;
+  cookiesSerializer(): unknown;
   cookiesSameSiteProtection(): unknown;
   cookiesDigest(): string | undefined;
   cookiesRotations(): unknown;
