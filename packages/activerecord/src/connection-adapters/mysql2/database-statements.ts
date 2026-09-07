@@ -141,17 +141,6 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   return false;
 }
 
-function driverBoundValue(this: PerformQueryHost, value: unknown): unknown {
-  if (
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Temporal.PlainDate
-  ) {
-    return this.quotedDate(value);
-  }
-  return value;
-}
-
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
@@ -174,7 +163,13 @@ export async function performQuery(
 
   if (prepare) this._trackPrepared?.(rawConnection, sql);
 
-  const driverBinds = typeCastedBinds.map((value) => driverBoundValue.call(this, value));
+  const driverBinds = typeCastedBinds.map((value) =>
+    value instanceof TimeWithZone ||
+    value instanceof RubyTime ||
+    value instanceof Temporal.PlainDate
+      ? this.quotedDate(value)
+      : value,
+  );
 
   let rawResult: unknown;
   let rawFields: mysql.FieldPacket[] | undefined;
