@@ -137,14 +137,24 @@ function foldSymbolToken(token: string): string {
  * spelling-convention difference, not a fidelity divergence. Applied to BOTH
  * sides, like foldSymbolToken, so every spelling folds onto one token.
  *
- * Deliberately narrow: only a token that is a bare lower-snake identifier is
- * folded, so a sentence, a SQL string, or a CONSTANT_NAME is compared verbatim.
+ * Every lower-snake identifier RUN inside the token is folded, not just a token
+ * that is one identifier end to end, because a name also reaches an expected
+ * literal embedded in a sentence — `"Processing by
+ * Another::LogSubscribersController#with_fragment_cache as HTML"`
+ * (actionpack/test/controller/log_subscriber_test.rb:345) is the controller's
+ * `action_name` inside prose. A CONSTANT_NAME is uppercase and a
+ * whitespace-separated word carries no underscore, so neither folds. The fold
+ * runs on BOTH sides before the multiset diff, so a pair that matched before
+ * still matches: it can only merge tokens, never split them.
  */
+const SNAKE_IDENTIFIER_RE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
+
 function foldNameToken(token: string): string {
   if (!token.startsWith("s:")) return token;
   const text = token.slice(2);
-  if (!/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(text)) return token;
-  return `s:${text.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase())}`;
+  return `s:${text.replace(SNAKE_IDENTIFIER_RE, (name) =>
+    name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
+  )}`;
 }
 
 /**
