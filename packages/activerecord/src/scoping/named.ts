@@ -103,14 +103,9 @@ export function scope<T extends typeof Base>(
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 function respondTo(body: unknown, method: "call" | "toProc"): boolean {
   if (typeof body === "function") return true;
-  if (body == null || typeof body !== "object") return false;
-  for (let o: object | null = body; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
-    if (Object.getOwnPropertyDescriptor(o, method)) return true;
-  }
-  return false;
+  return typeof (body as Record<string, unknown> | null | undefined)?.[method] === "function";
 }
 
 /** @noRailsEquivalent PERMANENT */

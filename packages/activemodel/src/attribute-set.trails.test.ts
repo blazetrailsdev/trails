@@ -27,7 +27,7 @@ describe("AttributeSetTest", () => {
     expect(() =>
       frozen().set("bar", Attribute.fromDatabase("bar", 2, typeRegistry.lookup("integer"))),
     ).toThrow(FrozenError);
-    expect(() => frozen().writeFromDatabase("bar", 2)).toThrow(FrozenError);
+    expect(() => frozen().writeFromDatabase("foo", 2)).toThrow(FrozenError);
     expect(() => frozen().writeCastValue("bar", 2)).toThrow(FrozenError);
     expect(() => frozen().writeFromUser("bar", 2)).toThrow(FrozenError);
     expect(() => frozen().writeFromUser("foo", 2)).toThrow("can't modify frozen attributes");
@@ -44,7 +44,7 @@ describe("AttributeSetTest", () => {
     ) as AttributeSet;
 
     duped.initializeDup(attributes);
-    duped.writeFromDatabase("bar", 2);
+    duped.set("bar", Attribute.fromDatabase("bar", 2, typeRegistry.lookup("integer")));
 
     expect(duped.keys()).toEqual(["foo", "bar"]);
     expect(attributes.keys()).toEqual(["foo"]);

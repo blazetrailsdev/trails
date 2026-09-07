@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { modelRegistry, association as collectionProxyFor } from "./associations.js";
-import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
+import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, isBlank } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
@@ -214,25 +214,6 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
   return assocDef?.macro === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
 }
 
-function assertNestedAttributesAreKnown(
-  targetModel: typeof Base,
-  assignable: Record<string, unknown>,
-): void {
-  const keys = Object.keys(assignable);
-  if (keys.length === 0) return;
-  const attributeTypes = targetModel.attributeTypes();
-  if (Object.keys(attributeTypes).length === 0) return;
-  let probe: Base | undefined;
-  const pk = (targetModel as any).primaryKey;
-  const pkColumns = new Set<string>((Array.isArray(pk) ? pk : [pk]).map(String));
-  for (const key of keys) {
-    if (Object.hasOwn(attributeTypes, key) || pkColumns.has(key)) continue;
-    probe ??= new (targetModel as any)() as Base;
-    if ((probe as any).hasAttribute(key)) continue;
-    throw new UnknownAttributeError(probe as object, key);
-  }
-}
-
 /** @internal */
 interface OneToOneAssociation {
   target: Base | null;
@@ -330,8 +311,6 @@ export function assignNestedAttributesForOneToOneAssociation(
 
   if (!isRejectNewRecord.call(record, associationName, attributes)) {
     const assignable = except(attributes, ...UNASSIGNABLE_KEYS);
-    const targetModel = resolveCollectionTargetModel(record, associationName);
-    if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
     if (existingRecord && existingRecord.isNewRecord()) {
       const pending = existingRecord.setAttributes(assignable);
       if (pending) {
@@ -418,8 +397,6 @@ export function assignNestedAttributesForCollectionAssociation(
     for (const a of attrs) {
       if (!hasNestedId(a)) {
         if (!isRejectNewRecord.call(record, associationName, a)) {
-          if (collectionTargetModel)
-            assertNestedAttributesAreKnown(collectionTargetModel, except(a, ...UNASSIGNABLE_KEYS));
           nestedTarget.push(
             collectionProxyFor(record, associationName).build(except(a, ...UNASSIGNABLE_KEYS)),
           );

@@ -10,7 +10,6 @@ import {
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
-import { defaultValue } from "./type.js";
 
 /** @noRailsEquivalent PERMANENT */
 function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<string, Attribute> {
@@ -100,18 +99,8 @@ export class AttributeSet {
     return attr.value;
   }
 
-  writeFromDatabase(
-    name: string,
-    value: unknown,
-    type?: { deserialize(value: unknown): unknown },
-  ): void {
-    const existing = this._attributes[name];
-    if (existing) {
-      this._attributes[name] = existing.withValueFromDatabase(value);
-    } else {
-      const colType = (type as ValueType) ?? defaultValue();
-      this._attributes[name] = Attribute.fromDatabase(name, value, colType);
-    }
+  writeFromDatabase(name: string, value: unknown): void {
+    this._attributes[name] = this.getAttribute(name).withValueFromDatabase(value);
   }
 
   writeFromUser(name: string, value: unknown): unknown {

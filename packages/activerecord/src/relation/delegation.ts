@@ -417,6 +417,19 @@ export function delegateEnumerableMethod(
 
 /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
+  const modelRespondTo = (modelClass: object, prop: string): boolean => {
+    for (
+      let o: object | null = modelClass;
+      o !== null && o !== Function.prototype;
+      o = Object.getPrototypeOf(o) as object | null
+    ) {
+      if (Object.prototype.hasOwnProperty.call(o, prop)) {
+        return typeof (modelClass as any)[prop] === "function";
+      }
+    }
+    return false;
+  };
+
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
@@ -441,8 +454,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
-      const classMethod = (modelClass as any)[prop];
-      if (typeof classMethod === "function") {
+      if (modelRespondTo(modelClass, prop)) {
         const delegator = classMethodDelegator(prop);
         if (!uncacheableMethods().has(prop)) {
           generateRelationMethod(modelClass, prop, delegator);
@@ -457,7 +469,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const modelClass = target._model as typeof Base;
       if (modelClass._scopes.has(prop)) return true;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return typeof (modelClass as any)[prop] === "function";
+      return modelRespondTo(modelClass, prop);
     },
   });
 }

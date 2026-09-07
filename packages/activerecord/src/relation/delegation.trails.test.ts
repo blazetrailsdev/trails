@@ -214,6 +214,15 @@ describe("respond_to_missing? — `in` on the dispatch proxies", () => {
     expect("noSuchThingAtAll" in comments).toBe(false);
   });
 
+  it("does not answer Function.prototype members Ruby's Module never defines", () => {
+    const rel = Comment.all() as unknown as Record<string, unknown>;
+    for (const name of ["call", "apply", "bind"]) {
+      expect(name in rel).toBe(false);
+      expect(rel[name]).toBeUndefined();
+    }
+    expect(rel.toString).toBe(Object.prototype.toString);
+  });
+
   it("keeps an own property whose value is undefined off the delegation path", async () => {
     const rel = Comment.all() as unknown as Record<string, unknown>;
     Object.defineProperty(rel, "whatAreYou", { value: undefined, configurable: true });
