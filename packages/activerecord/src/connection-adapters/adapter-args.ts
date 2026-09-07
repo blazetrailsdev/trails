@@ -8,10 +8,7 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @internal */
 export const ADAPTER_ARG_FAMILIES = {
   postgresql: "postgresql",
   mysql2: "mysql",
