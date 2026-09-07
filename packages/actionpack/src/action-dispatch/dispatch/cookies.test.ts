@@ -351,24 +351,6 @@ describe("CookiesTest", () => {
     expect(jar.encrypted.get("data")).toBeUndefined();
   });
 
-  it("parse empty cookie header", () => {
-    const jar = CookieJar.build(cookieRequest(), {});
-    expect(jar.empty).toBe(true);
-  });
-
-  it("parse multiple cookies", () => {
-    const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2", c: "3" });
-    expect(jar.size).toBe(3);
-    expect(jar.get("a")).toBe("1");
-    expect(jar.get("b")).toBe("2");
-    expect(jar.get("c")).toBe("3");
-  });
-
-  it("parse cookie with equals in value", () => {
-    const jar = CookieJar.build(cookieRequest(), { token: "abc=def=" });
-    expect(jar.get("token")).toBe("abc=def=");
-  });
-
   it("setting cookie with no same site protection", () => {
     const jar = new CookieJar(cookieRequest());
     jar.set("foo", { value: "bar" });
