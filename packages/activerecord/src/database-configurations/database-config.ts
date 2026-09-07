@@ -73,7 +73,9 @@ export class DatabaseConfig {
   }
 
   inspect(): string {
-    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter=${this.adapter}>`;
+    const adapterClass = this.adapterClass();
+    const rendered = adapterClass instanceof Promise ? this.adapter : adapterClass.name;
+    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
   }
 
   newConnection(): unknown {

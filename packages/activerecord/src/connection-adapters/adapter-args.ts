@@ -8,22 +8,23 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const ADAPTER_ARG_FAMILIES: Readonly<Record<string, string>> = {
+  postgresql: "postgresql",
+  mysql2: "mysql",
+  sqlite3: "sqlite",
+  "node-sqlite": "sqlite",
+  "expo-sqlite": "sqlite",
+  libsql: "sqlite",
+  "libsql-remote": "sqlite",
+  "libsql-replica": "sqlite",
+};
+
 function normalizeAdapterName(name: string): string {
-  switch (name) {
-    case "postgresql":
-      return "postgresql";
-    case "mysql2":
-      return "mysql";
-    case "sqlite3":
-    case "node-sqlite":
-    case "expo-sqlite":
-    case "libsql":
-    case "libsql-remote":
-    case "libsql-replica":
-      return "sqlite";
-    default:
-      return name;
-  }
+  return ADAPTER_ARG_FAMILIES[name] ?? name;
 }
 
 function parseSqliteUrl(url: string): string {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildAdapterArg } from "./adapter-args.js";
+import { ADAPTER_ARG_FAMILIES, buildAdapterArg } from "./adapter-args.js";
+import "../connection-adapters.js";
 
 describe("buildAdapterArg", () => {
   describe("sqlite", () => {
@@ -221,5 +222,27 @@ describe("parseSqliteUrl", () => {
   it("passes bare paths through unchanged", () => {
     expect(buildAdapterArg("sqlite3", { database: "/tmp/x.db" })).toEqual(["/tmp/x.db"]);
     expect(buildAdapterArg("sqlite3", { database: ":memory:" })).toEqual([":memory:"]);
+  });
+});
+
+function argFamilyOf(name: string): string {
+  const [byDatabase] = buildAdapterArg(name, { database: "db" });
+  if (typeof byDatabase === "string") return "sqlite";
+  const [byUrl] = buildAdapterArg(name, { url: "u", pool: 5 }) as [Record<string, unknown>];
+  if ("connectionString" in byUrl) return "postgresql";
+  const [bySocket] = buildAdapterArg(name, { database: "db", socket: "/s" }) as [
+    Record<string, unknown>,
+  ];
+  return bySocket.host === undefined ? "mysql" : "unclassified";
+}
+
+describe("ADAPTER_ARG_FAMILIES", () => {
+  it("routes every classified adapter name to its driver-argument family", () => {
+    const observed = Object.keys(ADAPTER_ARG_FAMILIES).map((name) => [name, argFamilyOf(name)]);
+    expect(observed).toEqual(Object.entries(ADAPTER_ARG_FAMILIES));
+  });
+
+  it("leaves an unclassified adapter name on the generic object argument", () => {
+    expect(argFamilyOf("trails_unclassified_adapter")).toBe("unclassified");
   });
 });
