@@ -76,23 +76,23 @@ export interface CookieResponse {
 export class ChainedCookieJars {
   declare request: RequestCookieMethodsHost;
   declare _permanent?: PermanentCookieJar;
-  declare _signed?: SignedCookieJar;
-  declare _encrypted?: EncryptedCookieJar;
-  declare _signedOrEncrypted?: SignedCookieJar | EncryptedCookieJar;
+  declare _signed?: SignedKeyRotatingCookieJar;
+  declare _encrypted?: EncryptedKeyRotatingCookieJar;
+  declare _signedOrEncrypted?: SignedKeyRotatingCookieJar | EncryptedKeyRotatingCookieJar;
 
   get permanent(): PermanentCookieJar {
     return (this._permanent ??= new PermanentCookieJar(this as unknown as CookieJar));
   }
 
-  get signed(): SignedCookieJar {
-    return (this._signed ??= new SignedCookieJar(this as unknown as CookieJar));
+  get signed(): SignedKeyRotatingCookieJar {
+    return (this._signed ??= new SignedKeyRotatingCookieJar(this as unknown as CookieJar));
   }
 
-  get encrypted(): EncryptedCookieJar {
-    return (this._encrypted ??= new EncryptedCookieJar(this as unknown as CookieJar));
+  get encrypted(): EncryptedKeyRotatingCookieJar {
+    return (this._encrypted ??= new EncryptedKeyRotatingCookieJar(this as unknown as CookieJar));
   }
 
-  get signedOrEncrypted(): SignedCookieJar | EncryptedCookieJar {
+  get signedOrEncrypted(): SignedKeyRotatingCookieJar | EncryptedKeyRotatingCookieJar {
     return (this._signedOrEncrypted ??= isPresent(secretKeyBase.call(this.request))
       ? this.encrypted
       : this.signed);
@@ -130,9 +130,9 @@ export class ChainedCookieJars {
 
 export class CookieJar implements Iterable<[string, string]> {
   declare permanent: PermanentCookieJar;
-  declare signed: SignedCookieJar;
-  declare encrypted: EncryptedCookieJar;
-  declare signedOrEncrypted: SignedCookieJar | EncryptedCookieJar;
+  declare signed: SignedKeyRotatingCookieJar;
+  declare encrypted: EncryptedKeyRotatingCookieJar;
+  declare signedOrEncrypted: SignedKeyRotatingCookieJar | EncryptedKeyRotatingCookieJar;
   /** @internal */
   declare signedCookieDigest: () => string;
   /** @internal */
@@ -338,27 +338,7 @@ export class CookieJar implements Iterable<[string, string]> {
       (request.host ?? "").endsWith(".onion")
     );
   }
-
-  /** @internal */
-  static parse(cookieHeader: string, request: RequestCookieMethodsHost = nullRequest): CookieJar {
-    const jar = new CookieJar(request);
-    if (!cookieHeader) return jar;
-    for (const pair of cookieHeader.split(";")) {
-      const [key, ...rest] = pair.split("=");
-      const k = key?.trim();
-      const v = rest.join("=").trim();
-      if (k) jar._cookies.set(k, v);
-    }
-    return jar;
-  }
 }
-
-const nullRequest: RequestCookieMethodsHost = {
-  env: {},
-  getHeader: () => undefined,
-  hasHeader: () => false,
-  cookies: {},
-};
 
 export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
 
@@ -368,9 +348,9 @@ function isHash(value: unknown): value is SerializedSetOptions {
 
 export class AbstractCookieJar {
   declare permanent: PermanentCookieJar;
-  declare signed: SignedCookieJar;
-  declare encrypted: EncryptedCookieJar;
-  declare signedOrEncrypted: SignedCookieJar | EncryptedCookieJar;
+  declare signed: SignedKeyRotatingCookieJar;
+  declare encrypted: EncryptedKeyRotatingCookieJar;
+  declare signedOrEncrypted: SignedKeyRotatingCookieJar | EncryptedKeyRotatingCookieJar;
   /** @internal */
   declare signedCookieDigest: () => string;
   /** @internal */
@@ -448,7 +428,7 @@ export class PermanentCookieJar extends AbstractCookieJar {
   }
 }
 
-export class SignedCookieJar extends AbstractCookieJar {
+export class SignedKeyRotatingCookieJar extends AbstractCookieJar {
   private verifier: MessageVerifier;
 
   constructor(parentJar: CookieJar | AbstractCookieJar) {
@@ -475,7 +455,7 @@ export class SignedCookieJar extends AbstractCookieJar {
   }
 }
 
-export class EncryptedCookieJar extends AbstractCookieJar {
+export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
   private encryptor: MessageEncryptor;
 
   constructor(parentJar: CookieJar | AbstractCookieJar) {
@@ -658,42 +638,18 @@ export interface SerializedCookieJarsHost {
   _serializer?: CookieSerializer;
 }
 
-const JSON_SERIALIZER: CookieSerializer = {
-  dump: (v) => {
-    const out = JSON.stringify(v);
-    if (out === undefined) {
-      throw new TypeError(`cannot serialize ${typeof v} as a cookie value`);
-    }
-    return out;
-  },
-  load: (s) => JSON.parse(s),
-  dumped: (s) => {
-    try {
-      JSON.parse(s);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-};
-
 /** @internal */
 export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   if (this._serializer) return this._serializer;
   const configured = cookiesSerializer.call(this.request);
-  if (configured === "hybrid") {
+  if (configured == null) {
+    this._serializer = SerializerWithFallback.get("marshal");
+  } else if (configured === "hybrid") {
     this._serializer = SerializerWithFallback.get("json_allow_marshal");
   } else if (typeof configured === "string") {
     this._serializer = SerializerWithFallback.get(configured);
-  } else if (
-    configured &&
-    typeof configured === "object" &&
-    typeof (configured as CookieSerializer).dump === "function" &&
-    typeof (configured as CookieSerializer).load === "function"
-  ) {
-    this._serializer = configured as CookieSerializer;
   } else {
-    this._serializer = JSON_SERIALIZER;
+    this._serializer = configured as CookieSerializer;
   }
   return this._serializer;
 }

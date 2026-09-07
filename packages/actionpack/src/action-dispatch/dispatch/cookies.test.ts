@@ -56,17 +56,17 @@ function setCookieHeaders(jar: CookieJar): string[] {
 
 describe("CookieJarTest", () => {
   it("fetch", () => {
-    const jar = CookieJar.parse("foo=bar");
+    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
     expect(jar.fetch("foo")).toBe("bar");
   });
 
   it("fetch exists", () => {
-    const jar = CookieJar.parse("foo=bar");
+    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
     expect(jar.fetch("foo", "default")).toBe("bar");
   });
 
   it("fetch block", () => {
-    const jar = CookieJar.parse("");
+    const jar = CookieJar.build(cookieRequest(), {});
     expect(jar.fetch("missing", "fallback")).toBe("fallback");
   });
 
@@ -77,17 +77,17 @@ describe("CookieJarTest", () => {
   });
 
   it("to hash", () => {
-    const jar = CookieJar.parse("a=1; b=2");
+    const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2" });
     expect(jar.toHash()).toEqual({ a: "1", b: "2" });
   });
 
   it("fetch type error", () => {
-    const jar = CookieJar.parse("");
+    const jar = CookieJar.build(cookieRequest(), {});
     expect(() => jar.fetch("missing")).toThrow(/key not found/);
   });
 
   it("each", () => {
-    const jar = CookieJar.parse("a=1; b=2");
+    const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2" });
     const entries: [string, string][] = [];
     jar.each((k, v) => entries.push([k, v]));
     expect(entries).toEqual([
@@ -97,7 +97,7 @@ describe("CookieJarTest", () => {
   });
 
   it("enumerable", () => {
-    const jar = CookieJar.parse("x=10; y=20");
+    const jar = CookieJar.build(cookieRequest(), { x: "10", y: "20" });
     const entries = [...jar];
     expect(entries).toEqual([
       ["x", "10"],
@@ -106,7 +106,7 @@ describe("CookieJarTest", () => {
   });
 
   it("key methods", () => {
-    const jar = CookieJar.parse("foo=bar");
+    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
     expect(jar.has("foo")).toBe(true);
     expect(jar.has("baz")).toBe(false);
     expect(jar.keys).toEqual(["foo"]);
@@ -243,7 +243,7 @@ describe("CookiesTest", () => {
   });
 
   it("expiring cookie", () => {
-    const jar = CookieJar.parse("user_name=david");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "david" });
     jar.delete("user_name");
     expect(jar.get("user_name")).toBeUndefined();
     const headers = setCookieHeaders(jar);
@@ -251,14 +251,14 @@ describe("CookiesTest", () => {
   });
 
   it("delete cookie with path", () => {
-    const jar = CookieJar.parse("user_name=david");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "david" });
     jar.delete("user_name", { path: "/admin" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("path=/admin");
   });
 
   it("delete cookie return value", () => {
-    const jar = CookieJar.parse("user_name=david");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "david" });
     const val = jar.delete("user_name");
     expect(val).toBe("david");
   });
@@ -276,13 +276,13 @@ describe("CookiesTest", () => {
   });
 
   it("deleted cookie predicate", () => {
-    const jar = CookieJar.parse("user_name=david");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "david" });
     jar.delete("user_name");
     expect(jar.isDeleted("user_name")).toBe(true);
   });
 
   it("deleted cookie predicate with mismatching options", () => {
-    const jar = CookieJar.parse("user_name=david");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "david" });
     jar.delete("user_name", { path: "/admin" });
     expect(jar.isDeleted("user_name", { path: "/" })).toBe(false);
     expect(jar.isDeleted("user_name", { path: "/admin" })).toBe(true);
@@ -331,7 +331,7 @@ describe("CookiesTest", () => {
     jar1.signed.set("session_id", "abc123");
     const raw = jar1.get("session_id")!;
 
-    const jar2 = CookieJar.parse(`session_id=${raw}`, cookieRequest());
+    const jar2 = CookieJar.build(cookieRequest(), { session_id: raw });
     expect(jar2.signed.get("session_id")).toBe("abc123");
   });
 
@@ -352,12 +352,12 @@ describe("CookiesTest", () => {
   });
 
   it("parse empty cookie header", () => {
-    const jar = CookieJar.parse("");
+    const jar = CookieJar.build(cookieRequest(), {});
     expect(jar.empty).toBe(true);
   });
 
   it("parse multiple cookies", () => {
-    const jar = CookieJar.parse("a=1; b=2; c=3");
+    const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2", c: "3" });
     expect(jar.size).toBe(3);
     expect(jar.get("a")).toBe("1");
     expect(jar.get("b")).toBe("2");
@@ -365,7 +365,7 @@ describe("CookiesTest", () => {
   });
 
   it("parse cookie with equals in value", () => {
-    const jar = CookieJar.parse("token=abc=def=");
+    const jar = CookieJar.build(cookieRequest(), { token: "abc=def=" });
     expect(jar.get("token")).toBe("abc=def=");
   });
 
@@ -396,37 +396,37 @@ describe("CookiesTest", () => {
   }
 
   it("deleting cookie get", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
 
   it("deleting cookie post", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
 
   it("deleting cookie patch", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
 
   it("deleting cookie put", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
 
   it("deleting cookie delete", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
 
   it("deleting cookie head", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     assertDeletedCookie(jar);
   });
@@ -506,17 +506,16 @@ describe("CookiesTest", () => {
     marshalJar.signed.set("user_id", 45);
     const marshalValue = marshalJar.get("user_id")!;
 
-    const jar = CookieJar.parse(
-      `user_id=${marshalValue}`,
-      cookieRequest({ "action_dispatch.cookies_serializer": "hybrid" }),
-    );
+    const jar = CookieJar.build(cookieRequest({ "action_dispatch.cookies_serializer": "hybrid" }), {
+      user_id: marshalValue,
+    });
 
     expect(jar.get("user_id")).not.toBe(45);
     expect(jar.signed.get("user_id")).toBe(45);
 
-    const jsonJar = CookieJar.parse(
-      `user_id=${jar.get("user_id")}`,
+    const jsonJar = CookieJar.build(
       cookieRequest({ "action_dispatch.cookies_serializer": "json" }),
+      { user_id: jar.get("user_id")! },
     );
     expect(jsonJar.signed.get("user_id")).toBe(45);
   });
@@ -565,7 +564,7 @@ describe("CookiesTest", () => {
   });
 
   it("delete and set cookie", () => {
-    const jar = CookieJar.parse("user_name=Joe");
+    const jar = CookieJar.build(cookieRequest(), { user_name: "Joe" });
     jar.delete("user_name");
     jar.set("user_name", "Bob");
     expect(jar.get("user_name")).toBe("Bob");
@@ -587,12 +586,12 @@ describe("CookiesTest", () => {
   });
 
   it("legacy signed cookie is treated as nil by signed cookie jar if tampered", () => {
-    const jar = CookieJar.parse("user_id=45", cookieRequest());
+    const jar = CookieJar.build(cookieRequest(), { user_id: "45" });
     expect(jar.signed.get("user_id")).toBeUndefined();
   });
 
   it("legacy signed cookie is treated as nil by encrypted cookie jar if tampered", () => {
-    const jar = CookieJar.parse("foo=baz", cookieRequest());
+    const jar = CookieJar.build(cookieRequest(), { foo: "baz" });
     expect(jar.encrypted.get("foo")).toBeUndefined();
   });
 
