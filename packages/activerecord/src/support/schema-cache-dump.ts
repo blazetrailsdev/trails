@@ -36,7 +36,7 @@ export async function dumpTemplateSchemaCache(
     cache.clearDataSourceCacheBang(adapter, table);
   }
   const filename = await schemaCacheDumpPathFor(runToken);
-  cache.dumpTo(filename);
+  await cache.dumpTo(filename);
   return {
     filename,
     fingerprint: fingerprintOf(await schemaShapes(adapter), dumpedTables(cache.marshalDump())),
@@ -130,10 +130,10 @@ async function shapeQueriesFor(adapter: DatabaseAdapter): Promise<string[]> {
   return queries.map((sql) => sql.replace("/*EXPRESSION*/''", expression));
 }
 
-export function templateSchemaCache(): SchemaCache | null {
+export async function templateSchemaCache(): Promise<SchemaCache | null> {
   if (loaded === undefined) {
     const filename = getEnv(SCHEMA_CACHE_DUMP_ENV);
-    loaded = filename === undefined ? null : SchemaCache._loadFrom(filename);
+    loaded = filename === undefined ? null : await SchemaCache._loadFrom(filename);
   }
   return loaded;
 }

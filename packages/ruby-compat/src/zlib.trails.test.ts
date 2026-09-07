@@ -41,26 +41,26 @@ describe("Zlib.crc32", () => {
  * `SchemaCache.read` and `#dump_to` open a `.gz` through.
  */
 describe("Zlib::GzipFile.open", () => {
-  it("round-trips a string through a gzip file", () => {
+  it("round-trips a string through a gzip file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
     try {
       const filename = join(dir, "schema_cache.json.gz");
-      Zlib.GzipWriter.open(filename, (gz) => gz.write('{"version":1}'));
+      await Zlib.GzipWriter.open(filename, (gz) => gz.write('{"version":1}'));
 
-      expect(Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe('{"version":1}');
+      expect(await Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe('{"version":1}');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("closes the stream on the way out of the block", () => {
+  it("closes the stream on the way out of the block", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
     try {
       const filename = join(dir, "empty.gz");
-      Zlib.GzipWriter.open(filename, (gz) => gz.write(""));
+      await Zlib.GzipWriter.open(filename, (gz) => gz.write(""));
 
       expect(File.size(filename) > 0).toBe(true);
-      expect(Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe("");
+      expect(await Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe("");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

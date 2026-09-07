@@ -4,31 +4,46 @@ import { Tempfile } from "../../tempfile.js";
 export function atomicWrite<T>(
   fileName: string,
   tempDir: string | undefined,
+  block: (tempFile: Tempfile) => Promise<T>,
+): Promise<T>;
+export function atomicWrite<T>(
+  fileName: string,
+  tempDir: string | undefined,
+  block: (tempFile: Tempfile) => T,
+): T;
+export function atomicWrite<T>(
+  fileName: string,
+  tempDir: string | undefined,
   block: (tempFile: Tempfile) => T,
 ): T {
   tempDir ??= File.dirname(fileName);
 
   return Tempfile.open(`.${File.basename(fileName)}`, tempDir, (tempFile) => {
     tempFile.binmode();
-    const returnVal = block(tempFile);
-    tempFile.close();
+    const overwrite = (returnVal: T): T => {
+      tempFile.close();
 
-    const oldStat = File.isExist(fileName)
-      ? File.stat(fileName)
-      : probeStatIn(File.dirname(fileName));
+      const oldStat = File.isExist(fileName)
+        ? File.stat(fileName)
+        : probeStatIn(File.dirname(fileName));
 
-    if (oldStat) {
-      try {
-        File.chown(oldStat.uid, oldStat.gid, tempFile.path!);
-        File.chmod(oldStat.mode, tempFile.path!);
-      } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code !== "EPERM" && code !== "EACCES") throw error;
+      if (oldStat) {
+        try {
+          File.chown(oldStat.uid, oldStat.gid, tempFile.path!);
+          File.chmod(oldStat.mode, tempFile.path!);
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "EPERM" && code !== "EACCES") throw error;
+        }
       }
-    }
 
-    File.rename(tempFile.path!, fileName);
-    return returnVal;
+      File.rename(tempFile.path!, fileName);
+      return returnVal;
+    };
+
+    const returnVal = block(tempFile);
+    if (returnVal instanceof Promise) return returnVal.then(overwrite) as T;
+    return overwrite(returnVal);
   });
 }
 

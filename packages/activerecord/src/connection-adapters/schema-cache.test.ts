@@ -56,15 +56,15 @@ describe("SchemaCacheTest", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("cached?", () => {
+  it("cached?", async () => {
     const cache = new SchemaCache();
     expect(cache.isCached("courses")).toBe(false);
     cache.setColumns("courses", [makeColumn("id", "integer")]);
     expect(cache.isCached("courses")).toBe(true);
 
     const filename = path.join(tmpDir, "schema_cache.json");
-    cache.dumpTo(filename);
-    const loaded = SchemaCache._loadFrom(filename);
+    await cache.dumpTo(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("courses")).toBe(true);
   });
@@ -79,9 +79,9 @@ describe("SchemaCacheTest", () => {
     await warm(cache, "users", "id", cols);
 
     const filename = path.join(tmpDir, "schema_cache.json");
-    cache.dumpTo(filename);
+    await cache.dumpTo(filename);
 
-    const loaded = SchemaCache._loadFrom(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("users")).toBe(true);
 
@@ -94,15 +94,15 @@ describe("SchemaCacheTest", () => {
     expect(loadedCols!["name"].humanName()).toBe("Name");
   });
 
-  it("cache path can be in directory", () => {
+  it("cache path can be in directory", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
     const nested = path.join(tmpDir, "sub", "dir", "schema_cache.json");
-    cache.dumpTo(nested);
+    await cache.dumpTo(nested);
 
     expect(fs.existsSync(nested)).toBe(true);
-    const loaded = SchemaCache._loadFrom(nested);
+    const loaded = await SchemaCache._loadFrom(nested);
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("posts")).toBe(true);
   });
@@ -116,10 +116,10 @@ describe("SchemaCacheTest", () => {
     ]);
 
     const filename = path.join(tmpDir, "schema_cache.json.gz");
-    cache.dumpTo(filename);
+    await cache.dumpTo(filename);
     expect(fs.existsSync(filename)).toBe(true);
 
-    const loaded = SchemaCache._loadFrom(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("courses")).toBe(true);
     const cols = loaded!.getCachedColumnsHash("courses");
@@ -309,8 +309,8 @@ describe("SchemaCacheTest", () => {
     ]);
 
     const filename = path.join(tmpDir, "schema_cache.dump.gz");
-    cache.dumpTo(filename);
-    const loaded = SchemaCache._loadFrom(filename);
+    await cache.dumpTo(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("courses")).toBe(true);
     expect(await loaded!.primaryKeys(null, "courses")).toBe("id");
@@ -321,14 +321,14 @@ describe("SchemaCacheTest", () => {
 
     const a = path.join(tmpDir, "schema_cache_a.json.gz");
     const b = path.join(tmpDir, "schema_cache_b.json.gz");
-    cache.dumpTo(a);
-    cache.dumpTo(b);
+    await cache.dumpTo(a);
+    await cache.dumpTo(b);
 
     const bufA = fs.readFileSync(a);
     const bufB = fs.readFileSync(b);
     expect(bufA.equals(bufB)).toBe(true);
 
-    const loaded = SchemaCache._loadFrom(a);
+    const loaded = await SchemaCache._loadFrom(a);
     expect(loaded!.isCached("posts")).toBe(true);
   });
 
@@ -386,7 +386,7 @@ describe("SchemaCacheTest", () => {
     const cachePath = path.join(tmpDir, "schema_cache.json");
     const cache = new SchemaCache();
     await warm(cache, "gadgets", "id", [makeColumn("id", "integer")]);
-    cache.dumpTo(cachePath);
+    await cache.dumpTo(cachePath);
 
     const prevCheck = SchemaReflection.checkSchemaCacheDumpVersion;
     SchemaReflection.checkSchemaCacheDumpVersion = false;
@@ -490,7 +490,7 @@ describe("SchemaReflectionTest", () => {
 
     const cache = new SchemaCache();
     await warm(cache, "users", "id", [makeColumn("id", "integer"), makeColumn("name", "text")]);
-    cache.dumpTo(cachePath);
+    await cache.dumpTo(cachePath);
 
     const origCheck = SchemaReflection.checkSchemaCacheDumpVersion;
     SchemaReflection.checkSchemaCacheDumpVersion = false;
@@ -550,19 +550,19 @@ describe("SchemaReflectionTest", () => {
     expect(cols![0].sqlType).toBe("varchar(255)");
   });
 
-  it("isCached loads from disk without pool when version check disabled", () => {
+  it("isCached loads from disk without pool when version check disabled", async () => {
     const cachePath = path.join(tmpDir, "schema_cache.json");
 
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);
-    cache.dumpTo(cachePath);
+    await cache.dumpTo(cachePath);
 
     const origCheck = SchemaReflection.checkSchemaCacheDumpVersion;
     SchemaReflection.checkSchemaCacheDumpVersion = false;
     try {
       const reflection = new SchemaReflection(cachePath);
-      expect(reflection.isCached("users")).toBe(true);
-      expect(reflection.isCached("missing")).toBe(false);
+      expect(await reflection.isCached("users")).toBe(true);
+      expect(await reflection.isCached("missing")).toBe(false);
     } finally {
       SchemaReflection.checkSchemaCacheDumpVersion = origCheck;
     }

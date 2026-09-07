@@ -91,10 +91,10 @@ export class SchemaCache {
   private _version: string | number | null = null;
 
   /** @missingRailsCall load — PERMANENT */
-  static _loadFrom(filename: string): SchemaCache | null {
+  static async _loadFrom(filename: string): Promise<SchemaCache | null> {
     try {
       if (!File.isFile(filename)) return null;
-      const data = SchemaCache.read(filename, (content) => content);
+      const data = await SchemaCache.read(filename, (content) => content);
       const parsed = JSON.parse(data);
       const cache = new SchemaCache();
       cache.initWith(parsed);
@@ -104,9 +104,9 @@ export class SchemaCache {
     }
   }
 
-  static read<T>(filename: string, callback: (data: string) => T): T {
+  static async read<T>(filename: string, callback: (data: string) => T): Promise<T> {
     if (File.extname(filename) === ".gz") {
-      return Zlib.GzipReader.open(filename, (gz) => callback(gz.read()));
+      return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
     }
     return callback(File.read(filename));
   }
@@ -377,8 +377,8 @@ export class SchemaCache {
     });
   }
 
-  dumpTo(filename: string): void {
-    this.open(filename, (f) => {
+  async dumpTo(filename: string): Promise<void> {
+    await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
       f.write(JSON.stringify(coder, null, 2));
@@ -465,16 +465,19 @@ export class SchemaCache {
    * @internal
    * @missingRailsArgs atomic_write — PERMANENT
    */
-  private open(filename: string, block: (file: { write(string: string): unknown }) => void): void {
+  private async open(
+    filename: string,
+    block: (file: { write(string: string): unknown }) => void,
+  ): Promise<void> {
     FileUtils.mkdirP(File.dirname(filename));
 
-    atomicWrite(filename, undefined, (file) => {
+    await atomicWrite(filename, undefined, async (file) => {
       if (File.extname(filename) === ".gz") {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
         block(zipper);
         zipper.flush();
-        zipper.close();
+        await zipper.close();
       } else {
         file.setEncoding(Encoding.UTF_8);
         block(file);
@@ -568,8 +571,8 @@ export class SchemaReflection {
     return (await this.cache(pool)).columnsHash(pool, tableName);
   }
 
-  isColumnsHash(pool: unknown, tableName: string): boolean {
-    this.ensureSyncCache();
+  async isColumnsHash(pool: unknown, tableName: string): Promise<boolean> {
+    await this.ensureSyncCache();
     return this._cache?.isColumnsHash(pool, tableName) ?? false;
   }
 
@@ -581,8 +584,8 @@ export class SchemaReflection {
     return (await this.cache(pool)).version(pool);
   }
 
-  size(pool: unknown): number {
-    this.ensureSyncCache();
+  async size(pool: unknown): Promise<number> {
+    await this.ensureSyncCache();
     return this._cache?.size ?? 0;
   }
 
@@ -592,15 +595,15 @@ export class SchemaReflection {
   }
 
   /** @missingRailsCall load_cache — PERMANENT */
-  isCached(tableName: string): boolean {
-    this.ensureSyncCache();
+  async isCached(tableName: string): Promise<boolean> {
+    await this.ensureSyncCache();
     return this._cache?.isCached(tableName) ?? false;
   }
 
   async dumpTo(pool: unknown, filename: string): Promise<void> {
     const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
-    freshCache.dumpTo(filename);
+    await freshCache.dumpTo(filename);
     this._cache = freshCache;
     this._cachePromise = null;
   }
@@ -621,10 +624,10 @@ export class SchemaReflection {
     return this._cachePromise;
   }
 
-  private ensureSyncCache(): void {
+  private async ensureSyncCache(): Promise<void> {
     if (this._cache) return;
     if (!SchemaReflection.checkSchemaCacheDumpVersion) {
-      this._cache = this.loadCacheFromDisk();
+      this._cache = await this.loadCacheFromDisk();
     }
   }
 
@@ -638,7 +641,7 @@ export class SchemaReflection {
     }
   }
 
-  private loadCacheFromDisk(): SchemaCache | null {
+  private async loadCacheFromDisk(): Promise<SchemaCache | null> {
     if (!this.possibleCacheAvailable()) return null;
     return SchemaCache._loadFrom(this._cachePath!);
   }
@@ -646,7 +649,7 @@ export class SchemaReflection {
   private async loadCache(pool: unknown): Promise<SchemaCache | null> {
     if (!this.possibleCacheAvailable()) return null;
 
-    const newCache = SchemaCache._loadFrom(this._cachePath!);
+    const newCache = await SchemaCache._loadFrom(this._cachePath!);
     if (!newCache) return null;
 
     if (SchemaReflection.checkSchemaCacheDumpVersion && pool) {
@@ -711,7 +714,7 @@ export class BoundSchemaReflection {
     return this;
   }
 
-  isCached(tableName: string): boolean {
+  async isCached(tableName: string): Promise<boolean> {
     return this._schemaReflection.isCached(tableName);
   }
 
@@ -739,7 +742,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.columnsHash(this._pool, tableName);
   }
 
-  isColumnsHash(tableName: string): boolean {
+  async isColumnsHash(tableName: string): Promise<boolean> {
     return this._schemaReflection.isColumnsHash(this._pool, tableName);
   }
 
@@ -751,7 +754,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.version(this._pool);
   }
 
-  size(): number {
+  async size(): Promise<number> {
     return this._schemaReflection.size(this._pool);
   }
 

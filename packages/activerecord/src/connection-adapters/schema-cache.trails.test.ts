@@ -28,8 +28,8 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     await cache.indexes(pool, "people");
 
     const filename = path.join(tmpDir, "schema_cache.json");
-    cache.dumpTo(filename);
-    const loaded = SchemaCache._loadFrom(filename);
+    await cache.dumpTo(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     return loaded!.indexes(new FakePool({}), "people");
   }
@@ -201,8 +201,8 @@ describe("SchemaCacheGzipDumpTest", () => {
     const first = path.join(tmpDir, "first.gz");
     const second = path.join(tmpDir, "second.gz");
 
-    cache.dumpTo(first);
-    cache.dumpTo(second);
+    await cache.dumpTo(first);
+    await cache.dumpTo(second);
 
     expect(fs.readFileSync(second)).toEqual(fs.readFileSync(first));
   });
@@ -211,7 +211,7 @@ describe("SchemaCacheGzipDumpTest", () => {
     const cache = await populatedCache();
     const filename = path.join(tmpDir, "schema_cache.json.gz");
 
-    cache.dumpTo(filename);
+    await cache.dumpTo(filename);
 
     expect([...fs.readFileSync(filename).subarray(4, 8)]).toEqual([0, 0, 0, 0]);
   });
@@ -233,9 +233,9 @@ describe("SchemaCacheGzipDumpTest", () => {
     await cache.columns(pool, "weirds");
 
     const filename = path.join(tmpDir, "schema_cache.json");
-    cache.dumpTo(filename);
+    await cache.dumpTo(filename);
 
-    const loaded = SchemaCache._loadFrom(filename);
+    const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     const columns = await loaded!.columns(new FakePool({}), "weirds");
     expect(columns!.map((c) => c.name)).toEqual(["なまえ"]);
@@ -245,7 +245,7 @@ describe("SchemaCacheGzipDumpTest", () => {
     const cache = await populatedCache();
     const filename = path.join(tmpDir, "nested", "deeper", "schema_cache.json");
 
-    cache.dumpTo(filename);
+    await cache.dumpTo(filename);
 
     expect(fs.existsSync(filename)).toBe(true);
   });

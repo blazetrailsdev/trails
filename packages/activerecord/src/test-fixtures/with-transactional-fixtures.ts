@@ -40,7 +40,7 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   if (!sc || pool === null) return;
   try {
-    const dumped = templateSchemaCache();
+    const dumped = await templateSchemaCache();
     if (dumped && (await replaySchemaCacheDump(adapter, pool, dumped))) return;
     await sc.addAll(pool);
   } catch {}

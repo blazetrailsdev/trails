@@ -10,7 +10,7 @@ import { getZlib } from "./zlib-adapter.js";
 class GzipFile<IO extends { close(): void } = File> {
   constructor(protected io: IO) {}
 
-  close(): void {
+  close(): Promise<void> | void {
     this.io.close();
   }
 }
@@ -21,19 +21,18 @@ class GzipFile<IO extends { close(): void } = File> {
  */
 class GzipReader extends GzipFile<File> {
   static open(filename: string): GzipReader;
-  static open<T>(filename: string, block: (gz: GzipReader) => T): T;
-  static open<T>(filename: string, block?: (gz: GzipReader) => T): T | GzipReader {
+  static open<T>(filename: string, block: (gz: GzipReader) => T | Promise<T>): Promise<T>;
+  static open<T>(
+    filename: string,
+    block?: (gz: GzipReader) => T | Promise<T>,
+  ): Promise<T> | GzipReader {
     const io = File.open(filename, "rb");
     const gz = new GzipReader(io);
     if (!block) return gz;
-    try {
-      return block(gz);
-    } finally {
-      gz.close();
-    }
+    return gzfileWrap(gz, block);
   }
 
-  read(): string {
+  async read(): Promise<string> {
     const raw = this.io.read();
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xff;
@@ -72,16 +71,15 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   mtime: number | null = null;
 
   static open(filename: string): GzipWriter;
-  static open<T>(filename: string, block: (gz: GzipWriter) => T): T;
-  static open<T>(filename: string, block?: (gz: GzipWriter) => T): T | GzipWriter {
+  static open<T>(filename: string, block: (gz: GzipWriter) => T | Promise<T>): Promise<T>;
+  static open<T>(
+    filename: string,
+    block?: (gz: GzipWriter) => T | Promise<T>,
+  ): Promise<T> | GzipWriter {
     const io = File.open(filename, "wb");
     const gz = new GzipWriter(io);
     if (!block) return gz;
-    try {
-      return block(gz);
-    } finally {
-      gz.close();
-    }
+    return gzfileWrap(gz, block);
   }
 
   write(string: string): number {
@@ -98,7 +96,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     return this;
   }
 
-  close(): void {
+  async close(): Promise<void> {
     const bytes = new TextEncoder().encode(this.buffer);
     const gzipped = getZlib().gzip(bytes, Zlib.DEFAULT_COMPRESSION, Zlib.DEFAULT_STRATEGY);
     if (this.mtime !== null && gzipped.length >= GZIP_HEADER_LENGTH) {
@@ -107,7 +105,18 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     let out = "";
     for (const byte of gzipped) out += String.fromCharCode(byte);
     this.io.write(out);
-    super.close();
+    await super.close();
+  }
+}
+
+async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
+  gz: G,
+  block: (gz: G) => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await block(gz);
+  } finally {
+    await gz.close();
   }
 }
 
