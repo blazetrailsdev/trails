@@ -4,6 +4,8 @@ import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.j
 import { Response } from "@blazetrails/rack";
 import { SessionHash } from "@blazetrails/rack-session";
 import {
+  CookieStore,
+  type CsrfRequest,
   NullCookieJar,
   NullSession,
   NullSessionHash,
@@ -60,5 +62,61 @@ describe("NullSession", () => {
     const response = new Response();
     jar.write(response);
     expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+  it("CookieStore round-trips the token through the encrypted jar, bound to the session id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    cookieJar.call(request, jar);
+    const session = {
+      id: () => ({ publicId: "sid-1" }),
+      idWas: () => ({ publicId: "sid-1" }),
+    };
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session,
+    } as unknown as CsrfRequest;
+    const store = new CookieStore("csrf_token");
+
+    store.store(csrfRequest, "the-token");
+
+    expect(jar.get("csrf_token")).not.toContain("the-token");
+    expect(store.fetch(csrfRequest)).toBe("the-token");
+
+    store.reset(csrfRequest);
+    expect(store.fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore ignores a token stored under another session id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    cookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => ({ publicId: "sid-1" }), idWas: () => ({ publicId: "sid-2" }) },
+    } as unknown as CsrfRequest;
+    const store = new CookieStore("csrf_token");
+
+    store.store(csrfRequest, "the-token");
+
+    expect(store.fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore returns null for cookie contents that are not JSON", () => {
+    const request = buildRequest();
+    const jar = new CookieJar({ encryptedSecret: "x".repeat(32) });
+    cookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => null, idWas: () => null },
+    } as unknown as CsrfRequest;
+    jar.encrypted.set("csrf_token", "not json");
+
+    expect(new CookieStore("csrf_token").fetch(csrfRequest)).toBeNull();
   });
 });

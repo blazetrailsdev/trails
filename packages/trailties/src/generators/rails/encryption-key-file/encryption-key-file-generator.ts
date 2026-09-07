@@ -1,4 +1,3 @@
-import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
@@ -14,14 +13,21 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
   }
 
   addKeyFile(keyPath: string): void {
-    if (this.fileExists(keyPath)) return;
-    const key = EncryptedFile.generateKey();
-    this.output(`Adding ${keyPath} to store the encryption key: ${key}`);
-    this.output("Save this in a password manager your team can access.");
-    this.output(
-      "If you lose the key, no one, including you, can access anything encrypted with it.",
-    );
-    this.addKeyFileSilently(keyPath, key);
+    if (!this.fileExists(keyPath)) {
+      const key = EncryptedFile.generateKey();
+
+      this.log(`Adding ${keyPath} to store the encryption key: ${key}`);
+      this.log("");
+      this.log("Save this in a password manager your team can access.");
+      this.log("");
+      this.log(
+        "If you lose the key, no one, including you, can access anything encrypted with it.",
+      );
+
+      this.log("");
+      this.addKeyFileSilently(keyPath, key);
+      this.log("");
+    }
   }
 
   addKeyFileSilently(keyPath: string, key?: string): void {
@@ -29,14 +35,18 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
   }
 
   ignoreKeyFile(keyPath: string, ignore: string = this.keyIgnore(keyPath)): void {
-    if (!this.fileExists(".gitignore")) {
-      this.output(`IMPORTANT: Don't commit ${keyPath}. Add this to your ignore file:${ignore}`);
-      return;
+    if (this.fileExists(".gitignore")) {
+      if (!this.readFile(".gitignore").includes(ignore)) {
+        this.log(`Ignoring ${keyPath} so it won't end up in Git history:`);
+        this.log("");
+        this.appendToFile(".gitignore", ignore);
+        this.log("");
+      }
+    } else {
+      this.log(`IMPORTANT: Don't commit ${keyPath}. Add this to your ignore file:`);
+      this.log(ignore, "on_green");
+      this.log("");
     }
-    const existing = File.read(File.join(this.cwd, ".gitignore"));
-    if (existing.includes(ignore)) return;
-    this.output(`Ignoring ${keyPath} so it won't end up in Git history:`);
-    this.appendToFile(".gitignore", ignore);
   }
 
   ignoreKeyFileSilently(keyPath: string, ignore: string = this.keyIgnore(keyPath)): void {

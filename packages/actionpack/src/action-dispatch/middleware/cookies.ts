@@ -422,6 +422,10 @@ export class EncryptedCookieJar {
     this.jar.set(key, { ...(options as SetCookieOptions), value: encrypted });
   }
 
+  get permanent(): PermanentCookieJar {
+    return new PermanentCookieJar(this as unknown as CookieJar);
+  }
+
   get(key: string): unknown {
     const raw = this.jar.get(key);
     if (raw === undefined) return undefined;

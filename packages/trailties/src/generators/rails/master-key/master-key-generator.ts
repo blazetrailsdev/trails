@@ -17,14 +17,21 @@ export class MasterKeyGenerator extends GeneratorBase {
   }
 
   addMasterKeyFile(): void {
-    if (this.fileExists(MASTER_KEY_PATH)) return;
-    const key = EncryptedFile.generateKey();
-    this.output(`Adding ${MASTER_KEY_PATH} to store the master encryption key: ${key}`);
-    this.output("Save this in a password manager your team can access.");
-    this.output(
-      "If you lose the key, no one, including you, can access anything encrypted with it.",
-    );
-    this.addMasterKeyFileSilently(key);
+    if (!this.fileExists(MASTER_KEY_PATH)) {
+      const key = EncryptedFile.generateKey();
+
+      this.log(`Adding ${MASTER_KEY_PATH} to store the master encryption key: ${key}`);
+      this.log("");
+      this.log("Save this in a password manager your team can access.");
+      this.log("");
+      this.log(
+        "If you lose the key, no one, including you, can access anything encrypted with it.",
+      );
+
+      this.log("");
+      this.addMasterKeyFileSilently(key);
+      this.log("");
+    }
   }
 
   addMasterKeyFileSilently(key?: string): void {

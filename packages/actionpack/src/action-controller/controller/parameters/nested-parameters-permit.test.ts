@@ -39,15 +39,19 @@ describe("NestedParametersPermitTest", () => {
   });
 
   it("nested array with strings that should be hashes and additional values", () => {
-    const params = new Parameters({ tags: ["ruby", 42, true, { bad: true }] });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.get("tags")).toEqual(["ruby", 42, true]);
+    const params = new Parameters({
+      book: new Parameters({ title: "Romeo and Juliet", genres: ["Tragedy"] }),
+    });
+    const permitted = params.permit({ book: ["title", { genres: "type" }] });
+    const book = permitted.get("book") as Parameters;
+    expect(book.get("title")).toBe("Romeo and Juliet");
+    expect(book.get("genres")).toEqual([]);
   });
 
   it("nested string that should be a hash", () => {
-    const params = new Parameters({ person: "not_a_hash" });
-    const permitted = params.permit({ person: ["name"] });
-    expect(permitted.has("person")).toBe(true);
+    const params = new Parameters({ book: new Parameters({ genre: "Tragedy" }) });
+    const permitted = params.permit({ book: { genre: "type" } });
+    expect((permitted.get("book") as Parameters).get("genre")).toBeUndefined();
   });
 
   it("nested params with numeric keys", () => {
