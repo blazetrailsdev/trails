@@ -1,5 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
-import { inOrderOf, NameError, wrap } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/ruby-compat";
+import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
@@ -274,13 +275,6 @@ export async function takeBang(this: FinderRelation): Promise<any> {
     raiseRecordNotFoundExceptionBang.call(this);
   }
   return record;
-}
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
 }
 
 /** @internal */

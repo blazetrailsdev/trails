@@ -1,6 +1,8 @@
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
-import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError as RubyArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+
+export { NoMethodError };
 
 /**
  * @internal
@@ -73,14 +75,6 @@ export class ArgumentError extends RubyArgumentError {
   constructor(message?: string) {
     super(message);
     this.name = "ArgumentError";
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-export class NoMethodError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
   }
 }
 

@@ -94,6 +94,12 @@ tester.run("rails-error-parity", rule, {
     { filename: errorsFile, code: nl(ARE, AD, RNF, SI) },
     // Throwing a ported error class is allowed.
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
+    // An imported name shadows the global of the same spelling, so a ported
+    // `RangeError` throws clean while the native one still reports.
+    {
+      filename: baseFile,
+      code: `import { RangeError } from "./errors.js";\nthrow new RangeError("nope");\n`,
+    },
     // Excluded file: bare throw is skipped.
     { filename: excludedFile, code: `throw new Error("bare");\n` },
     // activesupport is in scope: errors.ts mirrors its manifest class.

@@ -1,11 +1,4 @@
-import { NameError } from "@blazetrails/activesupport";
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
+import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export function assertTemplate(options: Record<string, unknown> = {}, message?: string): never {
   throw new NoMethodError(

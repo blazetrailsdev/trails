@@ -1,3 +1,4 @@
+import { OpenSSL } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
@@ -568,10 +569,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const { DerivedSecretKeyProvider } = await import("./derived-secret-key-provider.js");
 
     const keyProviderSha1 = new DerivedSecretKeyProvider("the primary key", {
-      keyGenerator: new KeyGenerator({ hashDigestClass: "SHA1" }),
+      keyGenerator: new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA1 }),
     });
     const keyProviderSha256 = new DerivedSecretKeyProvider("the primary key", {
-      keyGenerator: new KeyGenerator({ hashDigestClass: "SHA256" }),
+      keyGenerator: new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 }),
     });
 
     const adp = await freshAdapter();

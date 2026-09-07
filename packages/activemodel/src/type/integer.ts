@@ -1,6 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
-import { RangeError as ActiveModelRangeError } from "../errors.js";
+import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
 
 const DEFAULT_LIMIT = 4;
@@ -82,7 +82,7 @@ export class IntegerType extends NumericValueType {
   protected ensureInRange(value: number | bigint | null): number | bigint | null {
     if (!this.isInRange(value)) {
       const klass = (this.constructor as { name: string }).name;
-      throw new ActiveModelRangeError(
+      throw new RangeError(
         `${value} is out of range for ${klass} with limit ${this._limit()} bytes`,
       );
     }

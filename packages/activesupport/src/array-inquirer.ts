@@ -1,11 +1,4 @@
-import { NameError } from "./core-ext/name-error.js";
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
+import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export class ArrayInquirer<T extends string | symbol> extends Array<T> {
   constructor(...items: T[]) {

@@ -1,18 +1,18 @@
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom, type DigestClass } from "@blazetrails/ruby-compat";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { Configurable } from "./configurable-slot.js";
 
 export class KeyGenerator {
-  private _hashDigestClass: string;
+  private _hashDigestClass: DigestClass;
 
   constructor({
     hashDigestClass = Configurable.config.hashDigestClass,
-  }: { hashDigestClass?: string } = {}) {
+  }: { hashDigestClass?: DigestClass } = {}) {
     this._hashDigestClass = hashDigestClass;
   }
 
-  get hashDigestClass(): string {
+  get hashDigestClass(): DigestClass {
     return this._hashDigestClass;
   }
 

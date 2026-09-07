@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { KeyGenerator, CachingKeyGenerator } from "./key-generator.js";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto, OpenSSL } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { assertRaises } from "./testing/assertions.js";
 
 describe("KeyGeneratorTest", () => {
-  const InvalidDigest = "InvalidDigest";
+  class InvalidDigest {}
 
   let secret: string;
   let generator: KeyGenerator;
@@ -49,7 +49,7 @@ describe("KeyGeneratorTest", () => {
   it("With custom hash digest class", () => {
     const originalHashDigestClass = KeyGenerator.hashDigestClass;
 
-    KeyGenerator.hashDigestClass = "sha256";
+    KeyGenerator.hashDigestClass = OpenSSL.Digest.SHA256;
 
     const expected =
       "c92322ad55ee691520e8e0f279b53e7a5cc9c1f8efca98295ae252b04cc6e2274c3aaf75ef53b260a6dc548f3e5fbb8af0edf10e7663cf7054c35bcc12835fc0";
@@ -64,10 +64,10 @@ describe("KeyGeneratorTest", () => {
 
   it("Raises if given a non digest instance", async () => {
     await assertRaises([ArgumentError], {}, () => {
-      KeyGenerator.hashDigestClass = InvalidDigest;
+      KeyGenerator.hashDigestClass = InvalidDigest as never;
     });
     await assertRaises([ArgumentError], {}, () => {
-      KeyGenerator.hashDigestClass = new (class {})() as unknown as string;
+      KeyGenerator.hashDigestClass = new InvalidDigest() as never;
     });
   });
 

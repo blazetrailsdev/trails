@@ -1,6 +1,7 @@
 /** @internal */
 
-import { NameError, Notifications } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/ruby-compat";
+import { Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
 function cacheConfigured(host: FragmentsHost): boolean {
@@ -71,13 +72,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object") return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
-}
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
 }
 
 function toStr(content: unknown): string {

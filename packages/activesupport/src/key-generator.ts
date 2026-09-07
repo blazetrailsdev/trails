@@ -1,28 +1,29 @@
 import { ArgumentError } from "./hash-utils.js";
-import { getCrypto, type Bytes } from "@blazetrails/ruby-compat";
-
-const OPENSSL_DIGESTS = new Set(["md5", "sha1", "sha256", "sha384", "sha512"]);
+import { DigestClass, getCrypto, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
 
 export class KeyGenerator {
-  private static _hashDigestClass?: string;
+  private static _hashDigestClass?: DigestClass;
 
-  static set hashDigestClass(klass: string) {
-    if (typeof klass === "string" && OPENSSL_DIGESTS.has(klass)) {
+  static set hashDigestClass(klass: DigestClass) {
+    if (klass instanceof DigestClass) {
       this._hashDigestClass = klass;
     } else {
       throw new ArgumentError(`${String(klass)} is expected to be an OpenSSL::Digest subclass`);
     }
   }
 
-  static get hashDigestClass(): string {
-    return (this._hashDigestClass ??= "sha1");
+  static get hashDigestClass(): DigestClass {
+    return (this._hashDigestClass ??= OpenSSL.Digest.SHA1);
   }
 
   private readonly secret: string;
   private readonly iterations: number;
-  private readonly hashDigestClass: string;
+  private readonly hashDigestClass: DigestClass;
 
-  constructor(secret: string, options: { iterations?: number; hashDigestClass?: string } = {}) {
+  constructor(
+    secret: string,
+    options: { iterations?: number; hashDigestClass?: DigestClass } = {},
+  ) {
     this.secret = secret;
     this.iterations = options.iterations ?? 2 ** 16;
     this.hashDigestClass = options.hashDigestClass ?? KeyGenerator.hashDigestClass;
@@ -34,7 +35,7 @@ export class KeyGenerator {
       salt,
       this.iterations,
       keySize,
-      this.hashDigestClass,
+      this.hashDigestClass.algorithm,
     );
   }
 

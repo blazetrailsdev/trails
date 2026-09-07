@@ -1,30 +1,21 @@
-import { OpenSSL } from "@blazetrails/ruby-compat";
-
-type HashDigestClass = {
-  hexdigest(data: string): string;
-};
-
-const MD5: HashDigestClass = {
-  hexdigest(data: string): string {
-    return OpenSSL.Digest.MD5.hexdigest(data);
-  },
-};
+import { ArgumentError } from "./hash-utils.js";
+import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
 
 export class Digest {
-  private static _hashDigestClass: HashDigestClass = MD5;
+  private static _hashDigestClass?: DigestClass;
 
-  static get hashDigestClass(): HashDigestClass {
-    return this._hashDigestClass;
+  static get hashDigestClass(): DigestClass {
+    return (this._hashDigestClass ??= OpenSSL.Digest.MD5);
   }
 
-  static set hashDigestClass(klass: HashDigestClass) {
-    if (!klass || typeof klass.hexdigest !== "function") {
-      throw new TypeError(`${String(klass)} is expected to implement hexdigest class method`);
+  static set hashDigestClass(klass: DigestClass) {
+    if (typeof (klass as DigestClass | null)?.hexdigest !== "function") {
+      throw new ArgumentError(`${String(klass)} is expected to implement hexdigest class method`);
     }
     this._hashDigestClass = klass;
   }
 
   static hexdigest(arg: string): string {
-    return this._hashDigestClass.hexdigest(arg).slice(0, 32);
+    return this.hashDigestClass.hexdigest(arg).slice(0, 32);
   }
 }

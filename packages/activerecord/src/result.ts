@@ -1,4 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
@@ -51,7 +51,7 @@ export class IndexedRow {
       return this.#row[this.#columnIndexes[column]];
     }
     if (fallback) return fallback();
-    throw new Error(`key not found: "${column}"`);
+    throw new KeyError(`key not found: "${column}"`);
   }
 
   toHash(): Record<string, unknown> {

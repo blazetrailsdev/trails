@@ -1,4 +1,12 @@
-import { getCrypto, chomp, OpenSSL, SecureRandom, URI, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  getCrypto,
+  chomp,
+  OpenSSL,
+  SecureRandom,
+  URI,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 import {
   CookieJar,
@@ -484,7 +492,7 @@ export function protectionMethodClass(
   if (name === "null_session") return NullSession;
   if (name === "reset_session") return ResetSession;
   if (name === "exception") return Exception;
-  throw new TypeError(
+  throw new ArgumentError(
     "Invalid request forgery protection method, use :null_session, :exception, :reset_session, or a custom forgery protection class.",
   );
 }
@@ -505,7 +513,7 @@ export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): 
   if (name === "session") return new SessionStore();
   if (name === "cookie") return new CookieStore("csrf_token");
   if (isStorageStrategy(name)) return name;
-  throw new TypeError(
+  throw new ArgumentError(
     "Invalid CSRF token storage strategy, use :session, :cookie, or a custom CSRF token storage class.",
   );
 }

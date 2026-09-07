@@ -1,14 +1,6 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { NameError } from "./core-ext/name-error.js";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
 
 export class DelegationError extends Error {
   constructor(message: string) {

@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { _RequestCtor } from "./request-slot.js";
@@ -234,14 +235,14 @@ export class ContentSecurityPolicy {
       if (typeof source === "string" || typeof source === "function") {
         return source;
       }
-      throw new TypeError(`Invalid content security policy source: ${String(source)}`);
+      throw new ArgumentError(`Invalid content security policy source: ${String(source)}`);
     });
   }
 
   /** @internal */
   private applyMapping(source: string): string {
     if (!Object.hasOwn(MAPPINGS, source)) {
-      throw new TypeError(`Unknown content security policy source mapping: ${source}`);
+      throw new ArgumentError(`Unknown content security policy source mapping: ${source}`);
     }
     return MAPPINGS[source as keyof typeof MAPPINGS];
   }

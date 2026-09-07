@@ -1,4 +1,6 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, NoMethodError } from "@blazetrails/ruby-compat";
+
+export { NoMethodError };
 
 import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
@@ -42,13 +44,6 @@ export function fileFixtureUpload(
 }
 
 export const fixtureFileUpload = fileFixtureUpload;
-
-export class NoMethodError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
 
 export function assigns(this: TestProcessHost, _key?: string | symbol): never {
   throw new NoMethodError(

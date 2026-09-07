@@ -1,3 +1,4 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { QueryMethods } from "../relation/query-methods.js";
@@ -570,7 +571,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   prepend(..._args: any[]): never {
-    throw new Error("prepend on association is not defined. Please use <<, push or append");
+    throw new NoMethodError("prepend on association is not defined. Please use <<, push or append");
   }
 
   resetScope(): this {

@@ -9,6 +9,7 @@ import {
   deprecator as activeSupportDeprecator,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
+import { DigestClass } from "@blazetrails/ruby-compat";
 import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
 const deprecator = activeSupportDeprecator();
@@ -62,7 +63,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers applies hashDigestClass from Railtie.config.activeSupport", async () => {
-    const custom = { hexdigest: (data: string): string => `custom:${data}` };
+    const custom = new DigestClass("sha256", "OpenSSL::Digest::SHA256");
     Trailtie.config.set("activeSupport", { hashDigestClass: custom } satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, app);
     expect(Digest.hashDigestClass).toBe(custom);
@@ -123,7 +124,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers reads hashDigestClass off the yielded application's config", async () => {
-    const custom = { hexdigest: (data: string): string => `custom:${data}` };
+    const custom = new DigestClass("sha256", "OpenSSL::Digest::SHA256");
     const appConfig: Record<string, unknown> = {
       activeSupport: { hashDigestClass: custom } satisfies ActiveSupportConfig,
     };

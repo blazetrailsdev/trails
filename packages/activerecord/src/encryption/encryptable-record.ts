@@ -1,6 +1,6 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Contexts } from "./contexts.js";
-import { Configuration as ConfigurationError } from "./errors.js";
+import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
@@ -100,7 +100,7 @@ export class EncryptableRecord {
     if (Configurable.config.supportUnencryptedData) return;
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
     if (colNames.length === 0 || colNames.includes(originalName)) return;
-    throw new ConfigurationError(
+    throw new Configuration(
       `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
     );
   }
@@ -296,7 +296,7 @@ export async function decryptAttributes(this: any): Promise<void> {
 /** @internal */
 export function validateEncryptionAllowed(this: any): void {
   if (Contexts.context.frozenEncryption) {
-    throw new ConfigurationError("can't be modified because it is encrypted");
+    throw new Configuration("can't be modified because it is encrypted");
   }
 }
 

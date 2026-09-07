@@ -1,6 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b } from "@blazetrails/ruby-compat";
+import { b, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -169,8 +169,7 @@ export async function internalBeginTransaction(
       );
     }
     if (!this.isSharedCache()) {
-      // eslint-disable-next-line blazetrails/rails-error-parity
-      throw new Error(
+      throw new StandardError(
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
       );
     }

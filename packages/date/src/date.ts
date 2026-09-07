@@ -1,4 +1,4 @@
-import { FloatDomainError, FrozenError } from "@blazetrails/ruby-compat";
+import { FloatDomainError, FrozenError, NoMethodError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
@@ -563,14 +563,6 @@ export function strftime(
 }
 
 export { ArgumentError };
-
-/** @internal */
-class NoMethodError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
 
 /** @internal */
 function rbFloat(val: unknown): number {

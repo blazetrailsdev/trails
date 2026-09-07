@@ -32,7 +32,7 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { NoMethodError, regexpEscape } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
@@ -113,7 +113,7 @@ describe("AssociationProxyTest", () => {
 
   it("prepend is not defined", async () => {
     const josh = new Author({ name: "Josh" }) as any;
-    expect(() => josh.posts.prepend(new Post())).toThrow();
+    expect(() => josh.posts.prepend(new Post())).toThrow(NoMethodError);
   });
 
   it("load does load target", async () => {

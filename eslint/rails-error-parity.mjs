@@ -201,13 +201,20 @@ const rule = {
     if (loadExclude().has(scope.rel)) return {};
 
     const exportedClasses = new Map();
+    // A name bound by an `import` shadows the global of the same spelling, so
+    // `throw new RangeError` after `import { RangeError } from "../errors.js"`
+    // is a ported class, not the native one.
+    const importedNames = new Set();
 
     return {
+      ImportSpecifier(node) {
+        importedNames.add(node.local.name);
+      },
       ThrowStatement(node) {
         const arg = node.argument;
         if (arg?.type !== "NewExpression") return;
         const name = newCalleeName(arg.callee);
-        if (!name || !NATIVE_ERRORS.has(name)) return;
+        if (!name || !NATIVE_ERRORS.has(name) || importedNames.has(name)) return;
         context.report({ node: arg, messageId: "bareThrow", data: { name } });
       },
       // Collect exported classes for the parity check. Runs on every in-scope

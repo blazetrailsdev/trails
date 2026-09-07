@@ -1,6 +1,7 @@
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
+import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
 
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -34,7 +35,7 @@ export class Config {
   excludedFromFilterParameters: string[] = [];
   previousSchemes: Scheme[] = [];
   extendQueries: boolean = false;
-  hashDigestClass: string = "SHA1";
+  hashDigestClass: DigestClass = OpenSSL.Digest.SHA1;
   compressor: Compressor = Zlib;
   forcedEncodingForDeterministicEncryption: string = "UTF-8";
 
@@ -50,7 +51,7 @@ export class Config {
 
   setSupportSha1ForNonDeterministicEncryption(value: boolean): void {
     if (value && this.hasPrimaryKey()) {
-      const sha1KeyGenerator = new KeyGenerator({ hashDigestClass: "SHA1" });
+      const sha1KeyGenerator = new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA1 });
       const sha1KeyProvider = new DerivedSecretKeyProvider(this.primaryKey, {
         keyGenerator: sha1KeyGenerator,
       });
@@ -122,7 +123,7 @@ export class Config {
     this.excludedFromFilterParameters = [];
     this.previousSchemes = [];
     this.forcedEncodingForDeterministicEncryption = "UTF-8";
-    this.hashDigestClass = "SHA1";
+    this.hashDigestClass = OpenSSL.Digest.SHA1;
     this.compressor = Zlib;
     this.extendQueries = false;
   }

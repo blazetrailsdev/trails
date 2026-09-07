@@ -1,5 +1,5 @@
 import { Session } from "@blazetrails/actionpack";
-import { File } from "@blazetrails/ruby-compat";
+import { File, OpenSSL } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
@@ -123,7 +123,7 @@ export class Configuration extends EngineConfiguration {
         if (this.respondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.useAuthenticatedMessageEncryption = true;
-          activeSupport.hashDigestClass = "SHA1";
+          activeSupport.hashDigestClass = OpenSSL.Digest.SHA1;
         }
 
         if (this.respondTo("actionController")) {
@@ -239,8 +239,8 @@ export class Configuration extends EngineConfiguration {
 
         if (this.respondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
-          activeSupport.hashDigestClass = "SHA256";
-          activeSupport.keyGeneratorHashDigestClass = "SHA256";
+          activeSupport.hashDigestClass = OpenSSL.Digest.SHA256;
+          activeSupport.keyGeneratorHashDigestClass = OpenSSL.Digest.SHA256;
           activeSupport.cacheFormatVersion = 7.0;
           activeSupport.executorAroundTestCase = true;
         }
@@ -296,7 +296,7 @@ export class Configuration extends EngineConfiguration {
           activeRecord.belongsToRequiredValidatesForeignKey = false;
           activeRecord.beforeCommittedOnAllRecords = true;
           activeRecord.defaultColumnSerializer = null;
-          activeRecord.encryption.hashDigestClass = "SHA256";
+          activeRecord.encryption.hashDigestClass = OpenSSL.Digest.SHA256;
           activeRecord.encryption.supportSha1ForNonDeterministicEncryption = false;
           activeRecord.marshallingFormatVersion = 7.1;
           activeRecord.runAfterTransactionCallbacksInOrderDefined = true;

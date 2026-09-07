@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { minutes, hours } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 import { IntegerType as Integer } from "./integer.js";
-import { RangeError as ActiveModelRangeError } from "../errors.js";
+import { RangeError } from "../errors.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 describe("IntegerTest", () => {
@@ -81,23 +81,19 @@ describe("IntegerTest", () => {
   });
 
   it("values below int min value are out of range", () => {
-    expect(() => new Integer().serialize(-2147483649)).toThrow(ActiveModelRangeError);
+    expect(() => new Integer().serialize(-2147483649)).toThrow(RangeError);
   });
 
   it("values above int max value are out of range", () => {
-    expect(() => new Integer().serialize(2147483648)).toThrow(ActiveModelRangeError);
+    expect(() => new Integer().serialize(2147483648)).toThrow(RangeError);
   });
 
   it("very small numbers are out of range", () => {
-    expect(() => new Integer().serialize(-9999999999999999999999999999999n)).toThrow(
-      ActiveModelRangeError,
-    );
+    expect(() => new Integer().serialize(-9999999999999999999999999999999n)).toThrow(RangeError);
   });
 
   it("very large numbers are out of range", () => {
-    expect(() => new Integer().serialize(9999999999999999999999999999999n)).toThrow(
-      ActiveModelRangeError,
-    );
+    expect(() => new Integer().serialize(9999999999999999999999999999999n)).toThrow(RangeError);
   });
 
   it("normal numbers are in range", () => {
@@ -120,15 +116,15 @@ describe("IntegerTest", () => {
 
     expect(type.serialize(9223372036854775807n)).toBe(9223372036854775807n);
     expect(type.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);
-    expect(() => type.serialize(-9999999999999999999999999999999n)).toThrow(ActiveModelRangeError);
-    expect(() => type.serialize(9999999999999999999999999999999n)).toThrow(ActiveModelRangeError);
+    expect(() => type.serialize(-9999999999999999999999999999999n)).toThrow(RangeError);
+    expect(() => type.serialize(9999999999999999999999999999999n)).toThrow(RangeError);
   });
 
   it("serialize_cast_value enforces range", () => {
     const type = new Integer();
 
-    expect(() => type.serializeCastValue(-2147483649)).toThrow(ActiveModelRangeError);
+    expect(() => type.serializeCastValue(-2147483649)).toThrow(RangeError);
 
-    expect(() => type.serializeCastValue(2147483648)).toThrow(ActiveModelRangeError);
+    expect(() => type.serializeCastValue(2147483648)).toThrow(RangeError);
   });
 });
