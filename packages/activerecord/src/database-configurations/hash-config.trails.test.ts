@@ -85,6 +85,17 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("inspect does not leave the driver load rejection unhandled", async () => {
+      register("trails_inspect_broken_adapter", () =>
+        Promise.reject(new Error("Cannot find module 'pg'")),
+      );
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "trails_inspect_broken_adapter",
+      });
+      expect(config.inspect()).toContain("adapter_class=trails_inspect_broken_adapter");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     it("inspect falls back to the adapter name while the adapter is still loading", () => {
       register("trails_inflight_adapter", () => new Promise<never>(() => {}));
       const config = new HashConfig("default_env", "primary", {
