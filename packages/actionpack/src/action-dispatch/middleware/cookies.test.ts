@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   ChainedCookieJars,
-  type ChainedCookieJarsHost,
   type CookieSerializer,
   type SerializedCookieJarsHost,
   CookieJar,
@@ -131,13 +130,13 @@ describe("Cookies middleware", () => {
   });
 });
 
-function chainedHost(env: Record<string, unknown>): ChainedCookieJarsHost {
+function chainedHost(env: Record<string, unknown>): ChainedCookieJars {
   return new CookieJar({
     env,
     getHeader: (k: string) => env[k],
     hasHeader: (k: string) => Object.hasOwn(env, k),
     cookies: {},
-  }) as unknown as ChainedCookieJarsHost;
+  }) as unknown as ChainedCookieJars;
 }
 
 function chainedJar(env: Record<string, unknown>): CookieJar {

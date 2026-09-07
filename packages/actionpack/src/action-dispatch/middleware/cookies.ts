@@ -69,9 +69,6 @@ export interface CookieResponse {
   deleteCookie(name: string, options: { path?: string; domain?: string }): void;
 }
 
-/** @internal */
-export type ChainedCookieJarsHost = ChainedCookieJars;
-
 export class ChainedCookieJars {
   declare request: RequestCookieMethodsHost;
   declare _permanent?: PermanentCookieJar;
