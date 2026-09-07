@@ -102,6 +102,30 @@ describe("Time", () => {
     expect(time.toTime().epochNanoseconds).toBe(1378266270000000000n);
   });
 
+  it("toTime keeps the wall clock a sub-minute offset names, as MRI's hour/min/sec do", () => {
+    const time = Time.new("2013-09-04 03:00:00 -00:44:30");
+    expect(time.toTime().toPlainDateTime().toString()).toBe("2013-09-04T03:00:00");
+    expect(time.toTime().hour).toBe(3);
+    expect(time.toTime().minute).toBe(0);
+    expect(time.toTime().second).toBe(0);
+    expect(time.toTime().toInstant().epochNanoseconds).toBe(1378266270000000000n);
+    expect(time.toTime().epochMilliseconds).toBe(1378266270000);
+    expect(time.utcOffset).toBe(-2670);
+  });
+
+  it("toTime keeps the wall clock for a positive sub-minute offset", () => {
+    const time = new Time(2008, 3, 1, 6, 0, 0, 32430);
+    expect(time.toTime().toPlainDateTime().toString()).toBe("2008-03-01T06:00:00");
+    expect(time.toTime().epochNanoseconds).toBe(BigInt(time.toI()) * 1000000000n);
+  });
+
+  it("toTime moves a sub-minute-offset receiver to another zone by its exact instant", () => {
+    const time = Time.new("2013-09-04 03:00:00 -00:44:30");
+    expect(time.toTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(
+      "2013-09-04T03:44:30",
+    );
+  });
+
   it("Time.new rejects an out-of-range offset", () => {
     expect(() => new Time(2008, 3, 1, 6, 0, 0, 86400)).toThrow(ArgumentError);
     expect(() => new Time(2008, 3, 1, 6, 0, 0, -86400)).toThrow(ArgumentError);

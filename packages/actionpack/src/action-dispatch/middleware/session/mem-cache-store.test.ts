@@ -43,7 +43,7 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
       "generateSid",
     ];
     for (const name of ownNames) {
-      expect(Object.prototype.hasOwnProperty.call(proto, name)).toBe(true);
+      expect(name in proto).toBe(true);
     }
   });
 

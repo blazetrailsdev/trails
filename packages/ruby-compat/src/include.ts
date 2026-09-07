@@ -196,6 +196,10 @@ export const initialize = Symbol.for("@blazetrails/ruby-compat:initialize");
 
 const instanceInitializers = Symbol.for("@blazetrails/ruby-compat:instanceInitializers");
 
+const prependedInstanceInitializers = Symbol.for(
+  "@blazetrails/ruby-compat:prependedInstanceInitializers",
+);
+
 /**
  * Run the `initialize` of every module included into `instance`'s class, in
  * include order — the order Ruby unwinds the `super` chain in, since a module
@@ -217,23 +221,31 @@ export function initializeIncludedModules(instance: object): void {
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, instanceInitializers)) continue;
-    chain.unshift(
-      (proto as Record<symbol, unknown>)[instanceInitializers] as Array<(this: object) => void>,
-    );
+    const level: Array<(this: object) => void> = [];
+    for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
+      if (!Object.prototype.hasOwnProperty.call(proto, registry)) continue;
+      level.push(
+        ...((proto as Record<symbol, unknown>)[registry] as Array<(this: object) => void>),
+      );
+    }
+    if (level.length !== 0) chain.unshift(level);
   }
   for (const initializers of chain) {
     for (const initializer of initializers) initializer.call(instance);
   }
 }
 
-function trackInstanceInitializer(proto: object, initializer: (this: object) => void): void {
-  let list = (proto as Record<symbol, unknown>)[instanceInitializers] as
+function trackInstanceInitializer(
+  proto: object,
+  initializer: (this: object) => void,
+  registry: symbol = instanceInitializers,
+): void {
+  let list = (proto as Record<symbol, unknown>)[registry] as
     | Array<(this: object) => void>
     | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, instanceInitializers)) {
+  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     list = [];
-    Object.defineProperty(proto, instanceInitializers, {
+    Object.defineProperty(proto, registry, {
       value: list,
       writable: true,
       configurable: true,
@@ -471,10 +483,15 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) return appendFeatures(klass);
-  const alreadyIncluded = isModuleMethodTablePresent(klass, mod);
+  if (isModuleMethodTablePresent(klass, mod)) {
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
+    }
+    return;
+  }
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
-  if (typeof instanceInitializer === "function" && !alreadyIncluded) {
+  if (typeof instanceInitializer === "function") {
     trackInstanceInitializer(klass.prototype, instanceInitializer);
   }
   if (mod instanceof Module) {
@@ -562,6 +579,13 @@ export type Extended<M extends object> = CallableMethods<M>;
  * `prepend_features` hook installs; it is not re-exported from the package
  * index, where `prepend.ts`'s helper owns the name.
  *
+ * A prepended module carries the same per-instance `initialize` an included one
+ * does, since Ruby reaches both through the same `super` chain — but it sits
+ * ABOVE the class, so its post-`super` body completes after every included
+ * module's. A module whose method table is already in the ancestry is skipped
+ * whole, the way `include_modules_at` skips one
+ * (vendor/ruby/class.c:1281,1291,1296).
+ *
  * Mirrors: Ruby's Module#prepend — vendor/ruby/eval.c:1196 `rb_mod_prepend`,
  * backed by vendor/ruby/class.c:1430 `rb_prepend_module`.
  *
@@ -571,6 +595,12 @@ export type Extended<M extends object> = CallableMethods<M>;
 export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
+  if (isModuleMethodTablePresent(klass, mod)) return;
+  trackIncludedModule(klass.prototype, mod);
+  const instanceInitializer = (mod as ModuleHooks)[initialize];
+  if (typeof instanceInitializer === "function") {
+    trackInstanceInitializer(klass.prototype, instanceInitializer, prependedInstanceInitializers);
+  }
   const source =
     mod instanceof Module
       ? carrierOf(mod)

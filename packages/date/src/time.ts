@@ -312,6 +312,36 @@ let seatedTime: {
   tzmodeUtc: boolean;
 } | null = null;
 
+/** @noRailsEquivalent PERMANENT */
+class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
+  #exactEpochNanoseconds: bigint;
+
+  constructor(instant: Temporal.Instant, utcOffset: number) {
+    const truncated = Math.sign(utcOffset) * Math.floor(Math.abs(utcOffset) / 60) * 60 || 0;
+    super(
+      instant.epochNanoseconds + BigInt(Math.round((utcOffset - truncated) * 1_000_000_000)),
+      of2str(utcOffset),
+    );
+    this.#exactEpochNanoseconds = instant.epochNanoseconds;
+    Object.defineProperty(this, "epochNanoseconds", {
+      value: instant.epochNanoseconds,
+      configurable: true,
+    });
+    Object.defineProperty(this, "epochMilliseconds", {
+      value: instant.epochMilliseconds,
+      configurable: true,
+    });
+  }
+
+  override toInstant(): Temporal.Instant {
+    return Temporal.Instant.fromEpochNanoseconds(this.#exactEpochNanoseconds);
+  }
+
+  override withTimeZone(timeZone: Temporal.TimeZoneLike): Temporal.ZonedDateTime {
+    return this.toInstant().toZonedDateTimeISO(timeZone as Temporal.TimeZoneLike & string);
+  }
+}
+
 export class Time {
   #plainMemo: Temporal.PlainDateTime | null;
   /** @internal */
@@ -1229,7 +1259,10 @@ export class Time {
   }
 
   toTime(): Temporal.ZonedDateTime {
-    return this.#instant.toZonedDateTimeISO(this.#timeZoneId ?? of2str(this.#utcOffset));
+    if (this.#timeZoneId != null) return this.#instant.toZonedDateTimeISO(this.#timeZoneId);
+    const utcOffset = this.#utcOffset;
+    if (utcOffset % 60 !== 0) return new SubMinuteOffsetZonedDateTime(this.#instant, utcOffset);
+    return this.#instant.toZonedDateTimeISO(of2str(utcOffset));
   }
 
   toDate(): Temporal.PlainDate {

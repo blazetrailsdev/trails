@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   include,
+  prepend,
   extend,
   included,
   extended,
@@ -99,6 +100,75 @@ describe("initializeIncludedModules", () => {
 
     expect(Object.hasOwn(new Sub(), "seated")).toBe(true);
   });
+
+  it("seats a prepended module's per-instance state as an own property", () => {
+    class Controller {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    prepend(Controller, {
+      [initialize](this: DynProps) {
+        this.dbRuntime = null;
+      },
+    });
+
+    const controller = new Controller();
+    expect(Object.hasOwn(controller, "dbRuntime")).toBe(true);
+    expect((controller as DynProps).dbRuntime).toBe(null);
+  });
+
+  it("runs a prepended module's initializer after those of included modules", () => {
+    const order: string[] = [];
+    class Controller {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    prepend(Controller, { [initialize]: () => order.push("prepended") });
+    include(Controller, { [initialize]: () => order.push("included") });
+
+    new Controller();
+    expect(order).toEqual(["included", "prepended"]);
+  });
+
+  it("does not re-register the initializer of an already-prepended module", () => {
+    let seatings = 0;
+    class Base {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    const mod = { [initialize]: () => void seatings++ };
+    prepend(Base, mod);
+    prepend(Base, mod);
+    class Sub extends Base {}
+    prepend(Sub, mod);
+
+    new Sub();
+    expect(seatings).toBe(1);
+  });
+});
+
+describe("prepend", () => {
+  it("does not re-copy an already-prepended module's members", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod = {
+      greet(): string {
+        return "module";
+      },
+    };
+    prepend(Klass, mod);
+    expect(new Klass().greet()).toBe("module");
+
+    (Klass.prototype as unknown as DynMethods).greet = () => "reopened";
+    prepend(Klass, mod);
+    expect(new Klass().greet()).toBe("reopened");
+  });
 });
 
 describe("include", () => {
@@ -111,6 +181,49 @@ describe("include", () => {
     };
     include(User, mod);
     expect(new (User as unknown as new () => DynMethods)().greet()).toBe("hello");
+  });
+
+  it("is a no-op when the same module is included twice", () => {
+    class User {}
+    const mod = {
+      greet() {
+        return "module";
+      },
+    };
+    include(User, mod);
+    (User.prototype as unknown as DynMethods).greet = () => "reopened";
+    include(User, mod);
+    expect((new User() as unknown as DynMethods).greet()).toBe("reopened");
+  });
+
+  it("is a no-op when a superclass already included the module", () => {
+    class Base {}
+    const mod = {
+      greet() {
+        return "module";
+      },
+    };
+    include(Base, mod);
+    class Sub extends Base {}
+    (Sub.prototype as unknown as DynMethods).greet = () => "sub";
+    include(Sub, mod);
+    expect((new Sub() as unknown as DynMethods).greet()).toBe("sub");
+  });
+
+  it("does not let a re-include clobber the class-body member it lost to", () => {
+    class User {
+      greet(): string {
+        return "class-body";
+      }
+    }
+    const mod = {
+      greet() {
+        return "module";
+      },
+    };
+    include(User, mod);
+    include(User, mod);
+    expect(new User().greet()).toBe("class-body");
   });
 
   it("does not replace methods already on the prototype", () => {
