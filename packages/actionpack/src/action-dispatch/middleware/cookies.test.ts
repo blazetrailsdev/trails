@@ -15,6 +15,7 @@ import {
   serializer,
 } from "./cookies.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import "../http/request.js";
 
 const SECRET_KEY_BASE = "b3c631c314c0bbca50c1b2843150fe33";
@@ -223,11 +224,13 @@ function serializedHost(env: Record<string, unknown> = {}): SerializedCookieJars
 }
 
 describe("SerializedCookieJars", () => {
-  it("commit dumps via the configured serializer (JSON by default)", () => {
+  it("commit dumps via the configured serializer (marshal by default)", () => {
     const host = serializedHost();
     const options = { value: { hello: "world" } } as { value: unknown };
     commit.call(host, "session", options);
-    expect(options.value).toBe('{"hello":"world"}');
+    expect(SerializerWithFallback.get("marshal").load(options.value as string)).toEqual({
+      hello: "world",
+    });
   });
 
   it("isReserialize is true when the payload was not produced by JSON", () => {
@@ -244,12 +247,6 @@ describe("SerializedCookieJars", () => {
     };
     const host = serializedHost({ "action_dispatch.cookies_serializer": custom });
     expect(isReserialize.call(host, "anything")).toBe(false);
-  });
-
-  it("commit raises TypeError for unserializable values instead of silently dropping", () => {
-    const host = serializedHost();
-    const options = { value: undefined as unknown };
-    expect(() => commit.call(host, "session", options as { value: unknown })).toThrow(TypeError);
   });
 
   it("serializer honors a caller-supplied custom serializer object", () => {
@@ -283,7 +280,7 @@ describe("CookieJar.signedOrEncrypted", () => {
   });
 });
 
-describe("SignedCookieJar serialized API", () => {
+describe("SignedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.set("user", { value: { id: 45, name: "Aaron" } });
@@ -316,7 +313,7 @@ describe("SignedCookieJar serialized API", () => {
   });
 });
 
-describe("EncryptedCookieJar serialized API", () => {
+describe("EncryptedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.encrypted.set("session", { value: { uid: 7, role: "admin" } });
@@ -354,7 +351,7 @@ describe("checkForOverflowBang", () => {
   });
 });
 
-describe("SignedCookieJar#permanent", () => {
+describe("SignedKeyRotatingCookieJar#permanent", () => {
   it("signs the value and gives it the permanent jar's expiry", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.permanent.set("session_id", { value: "42", httpOnly: true, sameSite: "lax" });

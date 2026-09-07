@@ -1,7 +1,7 @@
 export {
   CookieJar,
-  SignedCookieJar,
-  EncryptedCookieJar,
+  SignedKeyRotatingCookieJar,
+  EncryptedKeyRotatingCookieJar,
   PermanentCookieJar,
   type SetCookieOptions,
   type CookieExpires,

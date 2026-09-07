@@ -44,8 +44,8 @@ export { URL, type UrlOptions } from "./http/url.js";
 export {
   Cookies,
   CookieJar,
-  SignedCookieJar,
-  EncryptedCookieJar,
+  SignedKeyRotatingCookieJar,
+  EncryptedKeyRotatingCookieJar,
   PermanentCookieJar,
   type SetCookieOptions,
 } from "./middleware/cookies.js";
