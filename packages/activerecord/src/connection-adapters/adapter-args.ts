@@ -8,22 +8,22 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
+/** @internal */
+export const ADAPTER_ARG_FAMILIES = {
+  postgresql: "postgresql",
+  mysql2: "mysql",
+  sqlite3: "sqlite",
+  "node-sqlite": "sqlite",
+  "expo-sqlite": "sqlite",
+  libsql: "sqlite",
+  "libsql-remote": "sqlite",
+  "libsql-replica": "sqlite",
+} as const;
+
+const families: Record<string, string> = ADAPTER_ARG_FAMILIES;
+
 function normalizeAdapterName(name: string): string {
-  switch (name) {
-    case "postgresql":
-      return "postgresql";
-    case "mysql2":
-      return "mysql";
-    case "sqlite3":
-    case "node-sqlite":
-    case "expo-sqlite":
-    case "libsql":
-    case "libsql-remote":
-    case "libsql-replica":
-      return "sqlite";
-    default:
-      return name;
-  }
+  return families[name] ?? name;
 }
 
 function parseSqliteUrl(url: string): string {

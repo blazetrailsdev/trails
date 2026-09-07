@@ -73,7 +73,15 @@ export class DatabaseConfig {
   }
 
   inspect(): string {
-    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter=${this.adapter}>`;
+    const adapterClass = this.adapterClass();
+    let rendered: string | undefined;
+    if (adapterClass instanceof Promise) {
+      adapterClass.catch(() => {});
+      rendered = this.adapter;
+    } else {
+      rendered = adapterClass.name;
+    }
+    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
   }
 
   newConnection(): unknown {

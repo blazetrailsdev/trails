@@ -72,6 +72,40 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("inspect renders the resolved adapter class", async () => {
+      class TrailsInspectAdapter {}
+      register("trails_inspect_adapter", () => Promise.resolve(TrailsInspectAdapter) as never);
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "trails_inspect_adapter",
+      });
+      await resolve("trails_inspect_adapter");
+      await config.adapterClass();
+      expect(config.inspect()).toBe(
+        "#<HashConfig env_name=default_env name=primary adapter_class=TrailsInspectAdapter>",
+      );
+    });
+
+    it("inspect does not leave the driver load rejection unhandled", async () => {
+      register("trails_inspect_broken_adapter", () =>
+        Promise.reject(new Error("Cannot find module 'pg'")),
+      );
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "trails_inspect_broken_adapter",
+      });
+      expect(config.inspect()).toContain("adapter_class=trails_inspect_broken_adapter");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    it("inspect falls back to the adapter name while the adapter is still loading", () => {
+      register("trails_inflight_adapter", () => new Promise<never>(() => {}));
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "trails_inflight_adapter",
+      });
+      expect(config.inspect()).toBe(
+        "#<HashConfig env_name=default_env name=primary adapter_class=trails_inflight_adapter>",
+      );
+    });
+
     it("re-registering an adapter clears the recorded load failure", async () => {
       register("trails_refixed_adapter", () => Promise.reject(new Error("boom")));
       const config = new HashConfig("default_env", "primary", {

@@ -1,4 +1,5 @@
 import { AdapterNotFound } from "./errors.js";
+import { ADAPTER_ARG_FAMILIES } from "./connection-adapters/adapter-args.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 export interface ConnectionAdapters {
@@ -88,14 +89,18 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-register("sqlite3", sqlite3Loader);
-register("node-sqlite", nodeSqliteLoader);
-register("expo-sqlite", expoSqliteLoader);
-register("libsql", libsqlLoader);
-register("libsql-remote", libsqlRemoteLoader);
-register("libsql-replica", libsqlReplicaLoader);
-register("mysql2", mysql2Loader);
-register("postgresql", postgresqlLoader);
+const builtinLoaders: Record<keyof typeof ADAPTER_ARG_FAMILIES, AdapterLoader> = {
+  sqlite3: sqlite3Loader,
+  "node-sqlite": nodeSqliteLoader,
+  "expo-sqlite": expoSqliteLoader,
+  libsql: libsqlLoader,
+  "libsql-remote": libsqlRemoteLoader,
+  "libsql-replica": libsqlReplicaLoader,
+  mysql2: mysql2Loader,
+  postgresql: postgresqlLoader,
+};
+
+for (const [name, loader] of Object.entries(builtinLoaders)) register(name, loader);
 
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";

@@ -565,6 +565,7 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name) as Promise<new (arg: unknown) => DatabaseAdapter>;
 }
 
+/** @missingRailsCall Rails.env — PERMANENT */
 export const RAILS_ENV = (): string | undefined =>
   presence(getEnv("TRAILS_ENV")) ??
   (_railsEnv !== null ? _railsEnv : undefined) ??
