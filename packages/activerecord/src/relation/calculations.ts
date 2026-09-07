@@ -292,7 +292,6 @@ export function asyncMaximum(
 
 function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
   if (typeof memo !== "number" && typeof memo !== "bigint") {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new TypeError(
       `no implicit conversion of ${
         typeof value === "bigint" || Number.isInteger(value) ? "Integer" : "Float"

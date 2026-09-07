@@ -113,7 +113,6 @@ export abstract class Store {
       if ("timeout" in hash) hash["timeout"] = kernelFloat(hash["timeout"]);
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {
-      // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`Invalid :pool argument, expected Hash, got: ${rbInspect(poolOptions)}`);
     }
 

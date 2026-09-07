@@ -11,6 +11,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { _CollectionProxyCtor } from "./collection-proxy-slot.js";
+import { normalizeAssociationKey } from "./key-normalization.js";
 import { ownerForeignKeyColumns } from "./foreign-association.js";
 import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
@@ -628,13 +629,22 @@ export class CollectionAssociation extends Association {
     if (!records.some(isId)) return records as Base[];
     const ids = records.map((r) => (isId(r) ? r : (r as any).id));
     if (this.reflection.options.through) {
-      return Promise.resolve(this.loadTarget()).then((target) =>
-        ids.map((id) => {
-          const found = target.find((r) => String((r as any).id) === String(id));
-          if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
-          return found;
-        }),
-      );
+      const scope = this.scope();
+      return Promise.resolve(this.loadTarget()).then((target) => {
+        const records = ids
+          .map((id) =>
+            target.find(
+              (r) =>
+                String(normalizeAssociationKey((r as any).id)) ===
+                String(normalizeAssociationKey(id)),
+            ),
+          )
+          .filter((record): record is Base => record != null);
+        if (records.length !== ids.length) {
+          scope.raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
+        }
+        return records;
+      });
     }
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }

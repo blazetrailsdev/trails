@@ -1,5 +1,5 @@
 import {
-  ArgumentError as RubyArgumentError,
+  ArgumentError,
   cmp,
   isSymbol,
   kernelFloat,
@@ -13,7 +13,6 @@ import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesup
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
-import { ArgumentError } from "../attribute-assignment.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 type NumericValue = number | bigint | ((record: ValidatableRecord) => number) | string;
@@ -202,7 +201,7 @@ export function isNumber(
     return parseAsNumber(rawValue, precision, scale) !== undefined;
   } catch (error) {
     if (
-      error instanceof RubyArgumentError ||
+      error instanceof ArgumentError ||
       error instanceof ArgumentError ||
       error instanceof TypeError
     ) {
