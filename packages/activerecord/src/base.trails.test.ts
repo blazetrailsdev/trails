@@ -424,20 +424,20 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
 
 describe("ActiveRecord::Base#initialize seats included modules", () => {
   it("runs an included module's initialize at the core.rb:477 super", () => {
-    class Widget extends Base {
+    class Topic extends Base {
       static {
-        this._tableName = "widgets";
+        this._tableName = "topics";
         this.attribute("id", "integer");
       }
     }
-    include(Widget, {
+    include(Topic, {
       [initialize](this: Record<string, unknown>) {
         this.dbRuntime = null;
       },
     });
 
-    const widget = new Widget();
-    expect(Object.hasOwn(widget, "dbRuntime")).toBe(true);
-    expect((widget as unknown as Record<string, unknown>).dbRuntime).toBe(null);
+    const topic = new Topic();
+    expect(Object.hasOwn(topic, "dbRuntime")).toBe(true);
+    expect((topic as unknown as Record<string, unknown>).dbRuntime).toBe(null);
   });
 });
