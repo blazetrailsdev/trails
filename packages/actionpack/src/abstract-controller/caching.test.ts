@@ -16,9 +16,6 @@ class HostClass {
   static configAccessor = Configurable.ClassMethods.configAccessor;
   config = Configurable.config;
 
-  static performCaching = true;
-  static defaultStaticExtension = ".html";
-  static enableFragmentCacheLogging = false;
   static _viewCacheDependencies?: Array<(this: CachingHost) => unknown>;
 
   greeting = "hello";
@@ -26,13 +23,21 @@ class HostClass {
 
 include(HostClass, ConfigMethods);
 extend(HostClass, ConfigMethods);
+HostClass.configAccessor("defaultStaticExtension");
+HostClass.configAccessor("performCaching");
+HostClass.configAccessor("enableFragmentCacheLogging");
 
-const HostConfig = HostClass as unknown as typeof HostClass & { cacheStore: unknown };
+const HostConfig = HostClass as unknown as typeof HostClass & {
+  cacheStore: unknown;
+  performCaching: boolean;
+  defaultStaticExtension: string;
+};
 
 function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof ConfigMethods {
   HostClass.config().clear();
   if (store) HostConfig.cacheStore = store;
-  HostClass.performCaching = true;
+  HostConfig.performCaching = true;
+  HostConfig.defaultStaticExtension = ".html";
   HostClass._viewCacheDependencies = undefined;
   return new HostClass() as unknown as HostClass & CachingHost & typeof ConfigMethods;
 }
@@ -67,11 +72,16 @@ describe("AbstractController::Caching", () => {
     });
     it("is false when performCaching is off, even with a store", () => {
       const host = makeHost(new MemoryStore());
-      HostClass.performCaching = false;
+      HostConfig.performCaching = false;
       expect(cacheConfigured(host)).toBe(false);
     });
     it("is true when both are set", () => {
       expect(cacheConfigured(makeHost(new MemoryStore()))).toBe(true);
+    });
+    it("reads the instance's own store when only the instance carries one", () => {
+      const host = makeHost();
+      host.cacheStore = new MemoryStore();
+      expect(cacheConfigured(host)).toBe(true);
     });
   });
 
@@ -117,6 +127,13 @@ describe("AbstractController::Caching", () => {
       expect(second).toBe("rendered");
       expect(calls).toBe(1);
       expect(store.read("controller/page-1")).toBe("rendered");
+    });
+    it("fetches through a store set only on the instance", () => {
+      const host = makeHost();
+      const store = new MemoryStore();
+      host.cacheStore = store;
+      cache.call(host, "instance-page", () => "rendered");
+      expect(store.read("controller/instance-page")).toBe("rendered");
     });
     it("flattens array keys", () => {
       const store = new MemoryStore();
