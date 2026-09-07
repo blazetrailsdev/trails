@@ -3,6 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
+import { defaultValue } from "./type.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -331,7 +332,7 @@ describe("sync loadSchema / columnsHash", () => {
             warm = false;
           },
         },
-        lookupCastTypeFromColumn: () => null,
+        lookupCastTypeFromColumn: () => defaultValue(),
       },
     };
   }

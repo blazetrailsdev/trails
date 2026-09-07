@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { loadSchema, reloadSchemaFromCache } from "./model-schema.js";
+import { defaultValue } from "./type.js";
 
 type Cols = Record<string, { sqlType: string; name: string; default: null }>;
 
@@ -18,7 +19,7 @@ function makeAdapter(): unknown {
       dataSourceExists: async () => true,
       columnsHash: async () => columns,
     },
-    lookupCastTypeFromColumn: () => null,
+    lookupCastTypeFromColumn: () => defaultValue(),
   };
 }
 

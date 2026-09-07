@@ -6,12 +6,7 @@ import {
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
-import {
-  lookup as typeLookup,
-  defaultValue as typeDefaultValue,
-  adapterNameFrom,
-  type AdapterNameSource,
-} from "./type.js";
+import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
   cachedColumnsHash,
   isSchemaLoaded,
@@ -156,13 +151,9 @@ export function resolveTypeName(
 
 /** @internal */
 function typeForColumn(this: AnyClass, connection: unknown, column: unknown): ValueType {
-  const lookupCastTypeFromColumn = (
-    connection as { lookupCastTypeFromColumn?: (c: unknown) => ValueType }
-  )?.lookupCastTypeFromColumn;
-  let type =
-    (typeof lookupCastTypeFromColumn === "function"
-      ? lookupCastTypeFromColumn.call(connection, column)
-      : null) ?? typeDefaultValue();
+  let type = (
+    connection as { lookupCastTypeFromColumn(c: unknown): ValueType }
+  ).lookupCastTypeFromColumn(column);
 
   if (this.immutableStringsByDefault) {
     const toImmutableString = (type as { toImmutableString?: () => ValueType }).toImmutableString;

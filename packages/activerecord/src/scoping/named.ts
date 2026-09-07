@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../errors.js";
 import type { Base } from "../base.js";
 
@@ -66,7 +67,7 @@ export function scope<T extends typeof Base>(
 ): void {
   const modelClass = this as any;
 
-  if (!respondTo(body, "call")) {
+  if (!rbObjRespondTo(body, "call")) {
     throw new ArgumentError("The scope body needs to be callable.");
   }
 
@@ -88,7 +89,7 @@ export function scope<T extends typeof Base>(
 
   const extension = block;
 
-  if (respondTo(body, "toProc")) {
+  if (typeof body === "function") {
     singletonClassDefineMethod(modelClass, name, function (this: any, ...args: any[]) {
       let scope = this.all()._execScope(...args, body);
       if (extension) scope = scope.extending(extension);
@@ -101,16 +102,6 @@ export function scope<T extends typeof Base>(
       return scope;
     });
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-function respondTo(body: unknown, method: "call" | "toProc"): boolean {
-  if (typeof body === "function") return true;
-  if (body == null || typeof body !== "object") return false;
-  for (let o: object | null = body; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
-    if (Object.getOwnPropertyDescriptor(o, method)) return true;
-  }
-  return false;
 }
 
 /** @noRailsEquivalent PERMANENT */

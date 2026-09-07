@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { defaultValue } from "./type.js";
 
 class DoublingType extends ValueType {
   override type(): string {
@@ -20,7 +21,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
       columnsHash: async () => columns,
     },
     lookupCastTypeFromColumn(column: { sqlType: string }) {
-      return column.sqlType === "doubling" ? new DoublingType() : null;
+      return column.sqlType === "doubling" ? new DoublingType() : defaultValue();
     },
   };
 }
