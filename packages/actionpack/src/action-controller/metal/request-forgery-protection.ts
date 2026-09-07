@@ -133,7 +133,7 @@ export class CookieStore {
   }
 
   fetch(request: CsrfRequest): string | null {
-    const contents = request.cookieJar!().encrypted.get(this._cookieName);
+    const contents = request.cookieJar().encrypted.get(this._cookieName);
     if (contents == null) return null;
 
     let value: { token?: string; session_id?: { publicId?: string } };
@@ -148,7 +148,7 @@ export class CookieStore {
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
-    request.cookieJar!().encrypted.permanent.set(this._cookieName, {
+    request.cookieJar().encrypted.permanent.set(this._cookieName, {
       value: JSON.stringify({ token: csrfToken, session_id: request.session?.id?.() }),
       httpOnly: true,
       sameSite: "lax",
@@ -156,7 +156,7 @@ export class CookieStore {
   }
 
   reset(request: CsrfRequest): void {
-    request.cookieJar!().delete(this._cookieName);
+    request.cookieJar().delete(this._cookieName);
   }
 }
 
@@ -204,7 +204,7 @@ export interface CsrfRequest {
     id?(): { publicId?: string } | null | undefined;
     idWas?(): { publicId?: string } | null | undefined;
   };
-  cookieJar?(): CookieJar;
+  cookieJar(): CookieJar;
 }
 
 /** @internal */
