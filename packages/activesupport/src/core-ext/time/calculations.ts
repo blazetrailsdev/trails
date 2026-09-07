@@ -148,8 +148,8 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
       newTime = newTime.plus(0);
     }
 
-    let newTime2: RubyTime;
     const offsetDifference = newTime.utcOffset - this.utcOffset;
+    let newTime2: RubyTime;
     if (
       offsetDifference > 0 &&
       (newTime2 = newTime.plus(offsetDifference)).utcOffset === this.utcOffset

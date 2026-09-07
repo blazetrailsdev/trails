@@ -665,7 +665,7 @@ export class Parameters {
       if (value == null || value === false) return;
       if (!this.hasKey(key)) return;
       const result = this.permitValue(value, filter[key], options);
-      if (result != null) params._data[key] = result;
+      if (result != null) params.set(key, result);
     });
   }
 

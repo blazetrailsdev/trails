@@ -204,7 +204,6 @@ export interface CsrfRequest {
     id?(): { publicId?: string } | null | undefined;
     idWas?(): { publicId?: string } | null | undefined;
   };
-  cookies?: Record<string, string>;
   cookieJar?(): CookieJar;
 }
 
