@@ -500,33 +500,25 @@ describe("CookiesTest", () => {
   });
 
   it("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {
-    const legacy = {
-      dump: (v: unknown) => `m:${JSON.stringify(v)}`,
-      load: (dumped: string) => JSON.parse(dumped.slice(2)),
-      dumped: (_dumped: string) => true,
-    };
-    const hybrid = {
-      dump: (v: unknown) => JSON.stringify(v),
-      load: (dumped: string) =>
-        dumped.startsWith("m:") ? JSON.parse(dumped.slice(2)) : JSON.parse(dumped),
-      dumped: (dumped: string) => !dumped.startsWith("m:"),
-    };
-
     const marshalJar = new CookieJar(
-      cookieRequest({ "action_dispatch.cookies_serializer": legacy }),
+      cookieRequest({ "action_dispatch.cookies_serializer": "marshal" }),
     );
     marshalJar.signed.set("user_id", 45);
     const marshalValue = marshalJar.get("user_id")!;
 
     const jar = CookieJar.parse(
       `user_id=${marshalValue}`,
-      cookieRequest({ "action_dispatch.cookies_serializer": hybrid }),
+      cookieRequest({ "action_dispatch.cookies_serializer": "hybrid" }),
     );
 
     expect(jar.get("user_id")).not.toBe(45);
     expect(jar.signed.get("user_id")).toBe(45);
 
-    expect(jar.get("user_id")).not.toBe(marshalValue);
+    const jsonJar = CookieJar.parse(
+      `user_id=${jar.get("user_id")}`,
+      cookieRequest({ "action_dispatch.cookies_serializer": "json" }),
+    );
+    expect(jsonJar.signed.get("user_id")).toBe(45);
   });
 
   it("purpose metadata for signed cookies", () => {
@@ -629,8 +621,6 @@ describe("CookiesTest", () => {
   it.skip("signed cookie using message pack serializer", () => {});
 
   it.skip("signed cookie using marshal serializer can read from json dumped value", () => {});
-
-  it.skip("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {});
 
   it.skip("signed cookie using hybrid serializer can read from json dumped value", () => {});
 

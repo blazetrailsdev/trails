@@ -14,6 +14,10 @@ import { include, KeyError, rbEqual } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
+  SERIALIZERS,
+  SerializerWithFallback,
+} from "@blazetrails/activesupport/messages/serializer-with-fallback";
+import {
   InvalidMessage,
   MessageEncryptor,
   NullSerializer,
@@ -617,7 +621,7 @@ export const signedCookieDigest = requestEnvAccessor<string>(
 /** @internal */
 export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
 /** @internal */
-export const cookiesSerializer = requestEnvAccessor<string>("action_dispatch.cookies_serializer");
+export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
 /**
  * @internal
  * @missingRailsCall call — PERMANENT
@@ -676,8 +680,12 @@ const JSON_SERIALIZER: CookieSerializer = {
 /** @internal */
 export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   if (this._serializer) return this._serializer;
-  const configured = this.request.env["action_dispatch.cookies_serializer"];
-  if (
+  const configured = cookiesSerializer.call(this.request);
+  if (configured === "hybrid") {
+    this._serializer = SerializerWithFallback.get("json_allow_marshal");
+  } else if (typeof configured === "string") {
+    this._serializer = SerializerWithFallback.get(configured);
+  } else if (
     configured &&
     typeof configured === "object" &&
     typeof (configured as CookieSerializer).dump === "function" &&
@@ -692,7 +700,12 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 
 /** @internal */
 export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
-  return !serializer.call(this).dumped(dumped);
+  const configured = serializer.call(this);
+  return (
+    Object.values(SERIALIZERS).includes(configured as (typeof SERIALIZERS)["json"]) &&
+    configured !== SERIALIZERS.marshal &&
+    !configured.dumped(dumped)
+  );
 }
 
 /** @internal */

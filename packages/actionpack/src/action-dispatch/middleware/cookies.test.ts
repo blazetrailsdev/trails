@@ -231,9 +231,19 @@ describe("SerializedCookieJars", () => {
   });
 
   it("isReserialize is true when the payload was not produced by JSON", () => {
-    const host = serializedHost();
+    const host = serializedHost({ "action_dispatch.cookies_serializer": "json" });
     expect(isReserialize.call(host, "not-json")).toBe(true);
     expect(isReserialize.call(host, '{"ok":true}')).toBe(false);
+  });
+
+  it("isReserialize is false for a caller-supplied serializer object", () => {
+    const custom: CookieSerializer = {
+      dump: (v) => `!${String(v)}!`,
+      load: (s) => s.slice(1, -1),
+      dumped: (_s) => false,
+    };
+    const host = serializedHost({ "action_dispatch.cookies_serializer": custom });
+    expect(isReserialize.call(host, "anything")).toBe(false);
   });
 
   it("commit raises TypeError for unserializable values instead of silently dropping", () => {

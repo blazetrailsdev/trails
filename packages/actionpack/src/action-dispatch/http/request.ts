@@ -955,7 +955,7 @@ export interface Request {
   encryptedCookieCipher(): string | undefined;
   signedCookieDigest(): string | undefined;
   secretKeyBase(): string | undefined;
-  cookiesSerializer(): string | undefined;
+  cookiesSerializer(): unknown;
   cookiesSameSiteProtection(): unknown;
   cookiesDigest(): string | undefined;
   cookiesRotations(): unknown;
