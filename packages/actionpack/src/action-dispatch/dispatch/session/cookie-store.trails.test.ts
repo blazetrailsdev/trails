@@ -1,6 +1,7 @@
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { describe, expect, it } from "vitest";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-import { Cookies, COOKIES_APP_OPTIONS_KEY } from "../../middleware/cookies.js";
+import { Cookies } from "../../middleware/cookies.js";
 import { CookieStore } from "../../middleware/session/cookie-store.js";
 import { Request } from "../../http/request.js";
 
@@ -37,7 +38,10 @@ describe("CookieStore in a real stack", () => {
       PATH_INFO: "/",
       HTTP_HOST: "test.host",
       HTTP_COOKIE: cookie ?? "",
-      [COOKIES_APP_OPTIONS_KEY]: { secret: "a".repeat(64) },
+      "action_dispatch.key_generator": new KeyGenerator("a".repeat(64), { iterations: 2 }),
+      "action_dispatch.signed_cookie_salt": "signed cookie",
+      "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
+      "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
     } as unknown as RackEnv;
   }
 

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../cookies.js";
-import { cookiesSameSiteProtection } from "../middleware/cookies.js";
+import { cookiesSameSiteProtection, type RequestCookieMethodsHost } from "../middleware/cookies.js";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 function jarWithSameSiteProtection(
   proc: (request: { userAgent?: string }) => unknown,
@@ -21,6 +22,28 @@ function jarWithSameSiteProtection(
     cookiesSameSiteProtection,
   };
   return CookieJar.build(request as never, {});
+}
+
+const SECRET_KEY_BASE = "b3c631c314c0bbca50c1b2843150fe33";
+
+function cookieEnv(env: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    "action_dispatch.key_generator": new KeyGenerator(SECRET_KEY_BASE, { iterations: 2 }),
+    "action_dispatch.signed_cookie_salt": "signed cookie",
+    "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
+    "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+    ...env,
+  };
+}
+
+function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsHost {
+  const e = cookieEnv(env);
+  return {
+    env: e,
+    getHeader: (name: string) => e[name],
+    hasHeader: (name: string) => Object.hasOwn(e, name),
+    cookies: {},
+  };
 }
 
 function setCookieHeaders(jar: CookieJar): string[] {
@@ -48,7 +71,7 @@ describe("CookieJarTest", () => {
   });
 
   it("key is to s", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("foo", "bar");
     expect(jar.get("foo")).toBe("bar");
   });
@@ -91,7 +114,7 @@ describe("CookieJarTest", () => {
   });
 
   it("write doesnt set a nil header", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     const response = new Response();
     jar.write(response);
     expect(response.headers["set-cookie"]).toBeUndefined();
@@ -100,7 +123,7 @@ describe("CookieJarTest", () => {
 
 describe("CookiesMiddlewareTest", () => {
   it("sets expected cookie header", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     const headers = setCookieHeaders(jar);
     expect(headers.length).toBe(1);
@@ -111,14 +134,14 @@ describe("CookiesMiddlewareTest", () => {
 
 describe("CookiesTest", () => {
   it("setting cookie with same site strict", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("foo", { value: "bar", sameSite: "strict" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("samesite=strict");
   });
 
   it("setting cookie with same site nil", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("foo", { value: "bar", sameSite: null });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).not.toContain("samesite");
@@ -139,27 +162,27 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     expect(jar.get("user_name")).toBe("david");
   });
 
   it("setting the same value to cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     jar.set("user_name", "david");
     expect(jar.size).toBe(1);
   });
 
   it("setting the same value to permanent cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.permanent.set("user_name", "david");
     jar.permanent.set("user_name", "david");
     expect(jar.size).toBe(1);
   });
 
   it("setting cookie for fourteen days", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     jar.set("user_name", { value: "david", expires });
     const headers = setCookieHeaders(jar);
@@ -167,7 +190,7 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie expires from a Temporal.Instant", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     const instant = Temporal.Instant.from("2030-04-15T12:00:00Z");
     jar.set("user_name", { value: "david", expires: instant });
     const headers = setCookieHeaders(jar);
@@ -175,7 +198,7 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie for fourteen days with symbols", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", {
       value: "david",
       expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -184,7 +207,7 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie with http only", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", { value: "david", httpOnly: true });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("httponly");
@@ -198,14 +221,14 @@ describe("CookiesTest", () => {
   });
 
   it("not setting cookie with secure", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", { value: "david", secure: false });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).not.toContain("secure");
   });
 
   it("multiple cookies", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     jar.set("login", "yes");
     expect(jar.get("user_name")).toBe("david");
@@ -214,7 +237,7 @@ describe("CookiesTest", () => {
   });
 
   it("setting test cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("_test", "value");
     expect(jar.get("_test")).toBe("value");
   });
@@ -241,13 +264,13 @@ describe("CookiesTest", () => {
   });
 
   it("delete unexisting cookie return value", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     const val = jar.delete("nonexistent");
     expect(val).toBeUndefined();
   });
 
   it("delete unexisting cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.delete("nonexistent");
     expect(jar.has("nonexistent")).toBe(false);
   });
@@ -266,7 +289,7 @@ describe("CookiesTest", () => {
   });
 
   it("cookies persist throughout request", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("user_name", "david");
     expect(jar.get("user_name")).toBe("david");
     jar.set("login", "yes");
@@ -275,7 +298,7 @@ describe("CookiesTest", () => {
   });
 
   it("set permanent cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.permanent.set("user_name", "david");
     expect(jar.get("user_name")).toBe("david");
     const headers = setCookieHeaders(jar);
@@ -283,13 +306,13 @@ describe("CookiesTest", () => {
   });
 
   it("read permanent cookie", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.permanent.set("user_name", "david");
     expect(jar.permanent.get("user_name")).toBe("david");
   });
 
   it("signed cookie using default digest", () => {
-    const jar = new CookieJar({ secret: "test_secret_key_base_1234567890" });
+    const jar = new CookieJar(cookieRequest());
     jar.signed.set("user_id", "42");
     const raw = jar.get("user_id");
     expect(raw).toContain("--");
@@ -297,25 +320,23 @@ describe("CookiesTest", () => {
   });
 
   it("tampered with signed cookie", () => {
-    const jar = new CookieJar({ secret: "test_secret_key_base_1234567890" });
+    const jar = new CookieJar(cookieRequest());
     jar.signed.set("user_id", "42");
     jar.set("user_id", "99--fakesignature");
     expect(jar.signed.get("user_id")).toBeUndefined();
   });
 
   it("signed cookie round trip", () => {
-    const secret = "super_secret_key_12345678901234";
-    const jar1 = new CookieJar({ secret });
+    const jar1 = new CookieJar(cookieRequest());
     jar1.signed.set("session_id", "abc123");
     const raw = jar1.get("session_id")!;
 
-    const jar2 = CookieJar.parse(`session_id=${raw}`, { secret });
+    const jar2 = CookieJar.parse(`session_id=${raw}`, cookieRequest());
     expect(jar2.signed.get("session_id")).toBe("abc123");
   });
 
   it("encrypted cookie round trip", () => {
-    const secret = "super_secret_key_12345678901234";
-    const jar = new CookieJar({ secret });
+    const jar = new CookieJar(cookieRequest());
     jar.encrypted.set("data", "sensitive");
     const raw = jar.get("data");
     expect(raw).not.toBe("sensitive");
@@ -324,7 +345,7 @@ describe("CookiesTest", () => {
   });
 
   it("tampered encrypted cookie returns undefined", () => {
-    const jar = new CookieJar({ secret: "test_secret_key_base_1234567890" });
+    const jar = new CookieJar(cookieRequest());
     jar.encrypted.set("data", "secret");
     jar.set("data", "tampered--value");
     expect(jar.encrypted.get("data")).toBeUndefined();
@@ -349,7 +370,7 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie with no same site protection", () => {
-    const jar = new CookieJar();
+    const jar = new CookieJar(cookieRequest());
     jar.set("foo", { value: "bar" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).not.toContain("samesite");
@@ -411,18 +432,15 @@ describe("CookiesTest", () => {
   });
 
   it("signed cookie using default serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
-    const jar = new CookieJar({ secret });
+    const jar = new CookieJar(cookieRequest());
     jar.signed.set("user_id", 45);
     expect(jar.signed.get("user_id")).toBe(45);
   });
 
   it("signed cookie using json serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
     const mockRequest = {
-      env: { "action_dispatch.cookies_serializer": "json" },
+      env: cookieEnv({ "action_dispatch.cookies_serializer": "json" }),
       cookies: {},
-      cookiesAppOptions: { secret },
     };
     const jar = CookieJar.build(mockRequest as any, {});
     jar.signed.set("user_id", 45);
@@ -430,16 +448,14 @@ describe("CookiesTest", () => {
   });
 
   it("signed cookie using custom serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
     const customSerializer = {
       dump: (v: unknown) => `${v} was dumped`,
       load: (s: string) => `${s} and loaded`,
       dumped: (_s: string) => false,
     };
     const mockRequest = {
-      env: { "action_dispatch.cookies_serializer": customSerializer },
+      env: cookieEnv({ "action_dispatch.cookies_serializer": customSerializer }),
       cookies: {},
-      cookiesAppOptions: { secret },
     };
     const jar = CookieJar.build(mockRequest as any, {});
     jar.signed.set("user_id", "45");
@@ -447,24 +463,21 @@ describe("CookiesTest", () => {
   });
 
   it("accessing nonexistent signed cookie should not raise an invalid signature", () => {
-    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = new CookieJar(cookieRequest());
     expect(jar.signed.get("non_existent_attribute")).toBeUndefined();
   });
 
   it("encrypted cookie using default serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
-    const jar = new CookieJar({ secret });
+    const jar = new CookieJar(cookieRequest());
     jar.encrypted.set("foo", "bar");
     expect(jar.encrypted.get("foo")).toBe("bar");
     expect(jar.signed.get("foo")).toBeUndefined();
   });
 
   it("encrypted cookie using json serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
     const mockRequest = {
-      env: { "action_dispatch.cookies_serializer": "json" },
+      env: cookieEnv({ "action_dispatch.cookies_serializer": "json" }),
       cookies: {},
-      cookiesAppOptions: { secret },
     };
     const jar = CookieJar.build(mockRequest as any, {});
     jar.encrypted.set("foo", "bar");
@@ -472,29 +485,89 @@ describe("CookiesTest", () => {
   });
 
   it("encrypted cookie using custom serializer", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
     const customSerializer = {
       dump: (v: unknown) => `${v} was dumped`,
       load: (s: string) => `${s} and loaded`,
       dumped: (_s: string) => false,
     };
     const mockRequest = {
-      env: { "action_dispatch.cookies_serializer": customSerializer },
+      env: cookieEnv({ "action_dispatch.cookies_serializer": customSerializer }),
       cookies: {},
-      cookiesAppOptions: { secret },
     };
     const jar = CookieJar.build(mockRequest as any, {});
     jar.encrypted.set("foo", "bar");
     expect(jar.encrypted.get("foo")).toBe("bar was dumped and loaded");
   });
 
+  it("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {
+    const legacy = {
+      dump: (v: unknown) => `m:${JSON.stringify(v)}`,
+      load: (dumped: string) => JSON.parse(dumped.slice(2)),
+      dumped: (_dumped: string) => true,
+    };
+    const hybrid = {
+      dump: (v: unknown) => JSON.stringify(v),
+      load: (dumped: string) =>
+        dumped.startsWith("m:") ? JSON.parse(dumped.slice(2)) : JSON.parse(dumped),
+      dumped: (dumped: string) => !dumped.startsWith("m:"),
+    };
+
+    const marshalJar = new CookieJar(
+      cookieRequest({ "action_dispatch.cookies_serializer": legacy }),
+    );
+    marshalJar.signed.set("user_id", 45);
+    const marshalValue = marshalJar.get("user_id")!;
+
+    const jar = CookieJar.parse(
+      `user_id=${marshalValue}`,
+      cookieRequest({ "action_dispatch.cookies_serializer": hybrid }),
+    );
+
+    expect(jar.get("user_id")).not.toBe(45);
+    expect(jar.signed.get("user_id")).toBe(45);
+
+    expect(jar.get("user_id")).not.toBe(marshalValue);
+  });
+
+  it("purpose metadata for signed cookies", () => {
+    const jar = new CookieJar(cookieRequest());
+    jar.signed.set("discount_percentage", 50);
+    jar.signed.set("user_id", 45);
+    jar.set("discount_percentage", jar.get("user_id")!);
+    expect(jar.signed.get("discount_percentage")).toBe(45);
+
+    const withMetadata = new CookieJar(
+      cookieRequest({ "action_dispatch.use_cookies_with_metadata": true }),
+    );
+    withMetadata.signed.set("discount_percentage", 50);
+    withMetadata.signed.set("user_id", 45);
+    withMetadata.set("discount_percentage", withMetadata.get("user_id")!);
+    expect(withMetadata.signed.get("discount_percentage")).toBeUndefined();
+  });
+
+  it("purpose metadata for encrypted cookies", () => {
+    const jar = new CookieJar(cookieRequest());
+    jar.encrypted.set("discount_percentage", 50);
+    jar.encrypted.set("user_id", 45);
+    jar.set("discount_percentage", jar.get("user_id")!);
+    expect(jar.encrypted.get("discount_percentage")).toBe(45);
+
+    const withMetadata = new CookieJar(
+      cookieRequest({ "action_dispatch.use_cookies_with_metadata": true }),
+    );
+    withMetadata.encrypted.set("discount_percentage", 50);
+    withMetadata.encrypted.set("user_id", 45);
+    withMetadata.set("discount_percentage", withMetadata.get("user_id")!);
+    expect(withMetadata.encrypted.get("discount_percentage")).toBeUndefined();
+  });
+
   it("accessing nonexistent encrypted cookie should not raise invalid message", () => {
-    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = new CookieJar(cookieRequest());
     expect(jar.encrypted.get("non_existent_attribute")).toBeUndefined();
   });
 
   it("setting invalid encrypted cookie should return nil when accessing it", () => {
-    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = new CookieJar(cookieRequest());
     jar.set("foo", "invalid--9170e9a2394f1f2d5bca0f4b4309cf3f");
     expect(jar.encrypted.get("foo")).toBeUndefined();
   });
@@ -509,12 +582,12 @@ describe("CookiesTest", () => {
   });
 
   it("raise data overflow", () => {
-    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = new CookieJar(cookieRequest());
     expect(() => jar.signed.set("foo", "bye!".repeat(1024))).toThrow(/overflowed/);
   });
 
   it("tampered cookies", () => {
-    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = new CookieJar(cookieRequest());
     jar.signed.set("user_id", "45");
     jar.set("user_id", "tampered--fakesig");
     expect(() => jar.signed.get("user_id")).not.toThrow();
@@ -522,12 +595,12 @@ describe("CookiesTest", () => {
   });
 
   it("legacy signed cookie is treated as nil by signed cookie jar if tampered", () => {
-    const jar = CookieJar.parse("user_id=45", { secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = CookieJar.parse("user_id=45", cookieRequest());
     expect(jar.signed.get("user_id")).toBeUndefined();
   });
 
   it("legacy signed cookie is treated as nil by encrypted cookie jar if tampered", () => {
-    const jar = CookieJar.parse("foo=baz", { secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    const jar = CookieJar.parse("foo=baz", cookieRequest());
     expect(jar.encrypted.get("foo")).toBeUndefined();
   });
 

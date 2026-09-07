@@ -2,16 +2,14 @@ import { File, NoMethodError } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
-import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
+import { CookieJar, type RequestCookieMethodsHost } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
 import { UploadedFile } from "@blazetrails/rack-test";
 
 /** @internal */
-export interface TestProcessRequest {
+export interface TestProcessRequest extends RequestCookieMethodsHost {
   session: Record<string, unknown>;
   flash: FlashHash;
-  cookies: Record<string, string>;
-  cookiesAppOptions?: CookieJarOptions;
 }
 
 /** @internal */

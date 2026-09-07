@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  ChainedCookieJars,
   type ChainedCookieJarsHost,
   type CookieSerializer,
   type SerializedCookieJarsHost,
@@ -10,13 +11,34 @@ import {
   CookieOverflow,
   checkForOverflowBang,
   commit,
-  isPrepareUpgradeLegacyHmacAesCbcCookies,
   isReserialize,
-  isUpgradeLegacyHmacAesCbcCookies,
+  type RequestCookieMethodsHost,
   serializer,
-  signedOrEncrypted,
 } from "./cookies.js";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import "../http/request.js";
+
+const SECRET_KEY_BASE = "b3c631c314c0bbca50c1b2843150fe33";
+
+function cookieEnv(env: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    "action_dispatch.key_generator": new KeyGenerator(SECRET_KEY_BASE, { iterations: 2 }),
+    "action_dispatch.signed_cookie_salt": "signed cookie",
+    "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
+    "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+    ...env,
+  };
+}
+
+function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsHost {
+  const e = cookieEnv(env);
+  return {
+    env: e,
+    getHeader: (name: string) => e[name],
+    hasHeader: (name: string) => Object.hasOwn(e, name),
+    cookies: {},
+  };
+}
 
 function emptyResponse(): RackResponse {
   return [200, {}, bodyFromString("")];
@@ -34,7 +56,7 @@ describe("Cookies middleware", () => {
 
   it("flushes set/delete operations into a newline-joined set-cookie header", async () => {
     const cookies = new Cookies(async (env) => {
-      const jar = new CookieJar();
+      const jar = new CookieJar(cookieRequest());
       jar.set("session", "abc");
       jar.set("stale", "old");
       jar.delete("stale");
@@ -53,7 +75,7 @@ describe("Cookies middleware", () => {
 
   it("does not double-flush a jar that was already committed", async () => {
     const cookies = new Cookies(async (env) => {
-      const jar = new CookieJar();
+      const jar = new CookieJar(cookieRequest());
       jar.set("a", "1");
       jar.commitBang();
       env[COOKIES_KEY] = jar;
@@ -66,7 +88,7 @@ describe("Cookies middleware", () => {
 
   it("merges with an existing string set-cookie from the downstream app", async () => {
     const cookies = new Cookies(async (env) => {
-      const jar = new CookieJar();
+      const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
       return [200, { "set-cookie": "a=1; path=/" }, bodyFromString("")];
@@ -79,7 +101,7 @@ describe("Cookies middleware", () => {
 
   it("merges with an existing array set-cookie without comma-stringifying", async () => {
     const cookies = new Cookies(async (env) => {
-      const jar = new CookieJar();
+      const jar = new CookieJar(cookieRequest());
       jar.set("c", "3");
       env[COOKIES_KEY] = jar;
       return [
@@ -96,7 +118,7 @@ describe("Cookies middleware", () => {
 
   it("merges with an existing Set-Cookie that uses non-lowercase casing", async () => {
     const cookies = new Cookies(async (env) => {
-      const jar = new CookieJar();
+      const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
       return [200, { "Set-Cookie": "a=1; path=/" }, bodyFromString("")];
@@ -110,33 +132,32 @@ describe("Cookies middleware", () => {
 });
 
 function chainedHost(env: Record<string, unknown>): ChainedCookieJarsHost {
-  const jar = new CookieJar({ secret: "secret-key-base-for-tests" });
-  return {
-    request: {
-      env,
-      getHeader: (k: string) => env[k],
-      hasHeader: (k: string) => Object.hasOwn(env, k),
-      cookies: {},
-    },
-    signed: jar.signed,
-    encrypted: jar.encrypted,
-  };
+  return new CookieJar({
+    env,
+    getHeader: (k: string) => env[k],
+    hasHeader: (k: string) => Object.hasOwn(env, k),
+    cookies: {},
+  }) as unknown as ChainedCookieJarsHost;
+}
+
+function chainedJar(env: Record<string, unknown>): CookieJar {
+  return new CookieJar(cookieRequest(env));
 }
 
 describe("ChainedCookieJars predicates", () => {
   it("signedOrEncrypted prefers encrypted when secret_key_base is present", () => {
-    const host = chainedHost({ "action_dispatch.secret_key_base": "abc" });
-    expect(signedOrEncrypted.call(host)).toBe(host.encrypted);
+    const host = chainedJar({ "action_dispatch.secret_key_base": "abc" });
+    expect(host.signedOrEncrypted).toBe(host.encrypted);
   });
 
   it("signedOrEncrypted falls back to signed when secret_key_base is absent", () => {
-    const host = chainedHost({});
-    expect(signedOrEncrypted.call(host)).toBe(host.signed);
+    const host = chainedJar({});
+    expect(host.signedOrEncrypted).toBe(host.signed);
   });
 
   it("signedOrEncrypted treats blank secret_key_base as absent", () => {
-    const host = chainedHost({ "action_dispatch.secret_key_base": "" });
-    expect(signedOrEncrypted.call(host)).toBe(host.signed);
+    const host = chainedJar({ "action_dispatch.secret_key_base": "" });
+    expect(host.signedOrEncrypted).toBe(host.signed);
   });
 
   it("isUpgradeLegacyHmacAesCbcCookies requires every legacy slot to be set", () => {
@@ -146,7 +167,7 @@ describe("ChainedCookieJars predicates", () => {
       "action_dispatch.encrypted_cookie_salt": "s2",
       "action_dispatch.use_authenticated_cookie_encryption": true,
     });
-    expect(isUpgradeLegacyHmacAesCbcCookies.call(full)).toBe(true);
+    expect(ChainedCookieJars.prototype.isUpgradeLegacyHmacAesCbcCookies.call(full)).toBe(true);
 
     const missingFlag = chainedHost({
       "action_dispatch.secret_key_base": "abc",
@@ -154,14 +175,18 @@ describe("ChainedCookieJars predicates", () => {
       "action_dispatch.encrypted_cookie_salt": "s2",
       "action_dispatch.use_authenticated_cookie_encryption": false,
     });
-    expect(isUpgradeLegacyHmacAesCbcCookies.call(missingFlag)).toBe(false);
+    expect(ChainedCookieJars.prototype.isUpgradeLegacyHmacAesCbcCookies.call(missingFlag)).toBe(
+      false,
+    );
 
     const missingSalt = chainedHost({
       "action_dispatch.secret_key_base": "abc",
       "action_dispatch.encrypted_cookie_salt": "s2",
       "action_dispatch.use_authenticated_cookie_encryption": true,
     });
-    expect(isUpgradeLegacyHmacAesCbcCookies.call(missingSalt)).toBe(false);
+    expect(ChainedCookieJars.prototype.isUpgradeLegacyHmacAesCbcCookies.call(missingSalt)).toBe(
+      false,
+    );
   });
 
   it("isPrepareUpgradeLegacyHmacAesCbcCookies requires the encryption flag to be OFF", () => {
@@ -170,32 +195,32 @@ describe("ChainedCookieJars predicates", () => {
       "action_dispatch.authenticated_encrypted_cookie_salt": "aec",
       "action_dispatch.use_authenticated_cookie_encryption": false,
     });
-    expect(isPrepareUpgradeLegacyHmacAesCbcCookies.call(ready)).toBe(true);
+    expect(ChainedCookieJars.prototype.isPrepareUpgradeLegacyHmacAesCbcCookies.call(ready)).toBe(
+      true,
+    );
 
     const flagOn = chainedHost({
       "action_dispatch.secret_key_base": "abc",
       "action_dispatch.authenticated_encrypted_cookie_salt": "aec",
       "action_dispatch.use_authenticated_cookie_encryption": true,
     });
-    expect(isPrepareUpgradeLegacyHmacAesCbcCookies.call(flagOn)).toBe(false);
+    expect(ChainedCookieJars.prototype.isPrepareUpgradeLegacyHmacAesCbcCookies.call(flagOn)).toBe(
+      false,
+    );
 
     const missingSalt = chainedHost({
       "action_dispatch.secret_key_base": "abc",
       "action_dispatch.use_authenticated_cookie_encryption": false,
     });
-    expect(isPrepareUpgradeLegacyHmacAesCbcCookies.call(missingSalt)).toBe(false);
+    expect(
+      ChainedCookieJars.prototype.isPrepareUpgradeLegacyHmacAesCbcCookies.call(missingSalt),
+    ).toBe(false);
   });
 });
 
 function serializedHost(env: Record<string, unknown> = {}): SerializedCookieJarsHost {
-  return {
-    request: {
-      env,
-      getHeader: (k: string) => env[k],
-      hasHeader: (k: string) => Object.hasOwn(env, k),
-      cookies: {},
-    },
-  };
+  const jar = new CookieJar(cookieRequest(env));
+  return { request: jar.request, set: (name, options) => jar.set(name, options as never) };
 }
 
 describe("SerializedCookieJars", () => {
@@ -239,38 +264,25 @@ describe("SerializedCookieJars", () => {
 
 describe("CookieJar.signedOrEncrypted", () => {
   it("prefers encrypted when secret_key_base is present on the request", () => {
-    const jar = CookieJar.build(
-      {
-        env: { "action_dispatch.secret_key_base": "skb" },
-        cookies: {},
-        cookiesAppOptions: { secret: "s" },
-      },
-      {},
-    );
+    const jar = CookieJar.build(cookieRequest({ "action_dispatch.secret_key_base": "skb" }), {});
     expect(jar.signedOrEncrypted).toBeInstanceOf((jar.encrypted as object).constructor);
   });
 
   it("falls back to signed when secret_key_base is absent", () => {
-    const jar = CookieJar.build({ env: {}, cookies: {}, cookiesAppOptions: { secret: "s" } }, {});
+    const jar = CookieJar.build(cookieRequest(), {});
     expect(jar.signedOrEncrypted).toBeInstanceOf((jar.signed as object).constructor);
   });
 });
 
 describe("SignedCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
-    const jar = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      {},
-    );
+    const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.set("user", { value: { id: 45, name: "Aaron" } });
     expect(jar.signed.get("user")).toEqual({ id: 45, name: "Aaron" });
   });
 
   it("accepts a hash carrying value alongside cookie options", () => {
-    const jar = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      {},
-    );
+    const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.set("user_id", { value: 45, httpOnly: true });
     expect(jar.signed.get("user_id")).toBe(45);
   });
@@ -282,11 +294,7 @@ describe("SignedCookieJar serialized API", () => {
       dumped: (s) => s.startsWith("!") && s.endsWith("!"),
     };
     const jar = CookieJar.build(
-      {
-        env: { "action_dispatch.cookies_serializer": custom },
-        cookies: {},
-        cookiesAppOptions: { secret: "x".repeat(32) },
-      },
+      cookieRequest({ "action_dispatch.cookies_serializer": custom }),
       {},
     );
     jar.signed.set("k", "abc");
@@ -294,29 +302,20 @@ describe("SignedCookieJar serialized API", () => {
   });
 
   it("returns undefined when verification fails", () => {
-    const seeded = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      { user_id: "tampered--badmac" },
-    );
+    const seeded = CookieJar.build(cookieRequest(), { user_id: "tampered--badmac" });
     expect(seeded.signed.get("user_id")).toBeUndefined();
   });
 });
 
 describe("EncryptedCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
-    const jar = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      {},
-    );
+    const jar = CookieJar.build(cookieRequest(), {});
     jar.encrypted.set("session", { value: { uid: 7, role: "admin" } });
     expect(jar.encrypted.get("session")).toEqual({ uid: 7, role: "admin" });
   });
 
   it("returns undefined when decryption fails", () => {
-    const seeded = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      { session: "ffff--ffff" },
-    );
+    const seeded = CookieJar.build(cookieRequest(), { session: "ffff--ffff" });
     expect(seeded.encrypted.get("session")).toBeUndefined();
   });
 
@@ -327,11 +326,7 @@ describe("EncryptedCookieJar serialized API", () => {
       dumped: (s) => s.startsWith("!") && s.endsWith("!"),
     };
     const jar = CookieJar.build(
-      {
-        env: { "action_dispatch.cookies_serializer": custom },
-        cookies: {},
-        cookiesAppOptions: { secret: "x".repeat(32) },
-      },
+      cookieRequest({ "action_dispatch.cookies_serializer": custom }),
       {},
     );
     jar.encrypted.set("k", "abc");
@@ -352,10 +347,7 @@ describe("checkForOverflowBang", () => {
 
 describe("SignedCookieJar#permanent", () => {
   it("signs the value and gives it the permanent jar's expiry", () => {
-    const jar = CookieJar.build(
-      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
-      {},
-    );
+    const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.permanent.set("session_id", { value: "42", httpOnly: true, sameSite: "lax" });
     expect(jar.signed.get("session_id")).toBe("42");
     expect(jar.get("session_id")).toMatch(/--/);
