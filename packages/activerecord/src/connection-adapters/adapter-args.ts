@@ -12,7 +12,7 @@ function isRemoteLibsqlUrl(url: string): boolean {
  * @internal
  * @noRailsEquivalent PERMANENT
  */
-export const ADAPTER_ARG_FAMILIES: Readonly<Record<string, string>> = {
+export const ADAPTER_ARG_FAMILIES = {
   postgresql: "postgresql",
   mysql2: "mysql",
   sqlite3: "sqlite",
@@ -21,10 +21,12 @@ export const ADAPTER_ARG_FAMILIES: Readonly<Record<string, string>> = {
   libsql: "sqlite",
   "libsql-remote": "sqlite",
   "libsql-replica": "sqlite",
-};
+} as const;
+
+const families: Record<string, string> = ADAPTER_ARG_FAMILIES;
 
 function normalizeAdapterName(name: string): string {
-  return ADAPTER_ARG_FAMILIES[name] ?? name;
+  return families[name] ?? name;
 }
 
 function parseSqliteUrl(url: string): string {

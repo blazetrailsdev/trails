@@ -89,7 +89,7 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const builtinLoaders: Record<string, AdapterLoader> = {
+const builtinLoaders: Record<keyof typeof ADAPTER_ARG_FAMILIES, AdapterLoader> = {
   sqlite3: sqlite3Loader,
   "node-sqlite": nodeSqliteLoader,
   "expo-sqlite": expoSqliteLoader,
@@ -100,15 +100,7 @@ const builtinLoaders: Record<string, AdapterLoader> = {
   postgresql: postgresqlLoader,
 };
 
-for (const name of Object.keys(builtinLoaders)) {
-  if (!(name in ADAPTER_ARG_FAMILIES)) {
-    throw new AdapterNotFound(
-      `Adapter '${name}' is registered without a driver-argument family. ` +
-        `Add it to ADAPTER_ARG_FAMILIES in connection-adapters/adapter-args.ts.`,
-    );
-  }
-  register(name, builtinLoaders[name]);
-}
+for (const [name, loader] of Object.entries(builtinLoaders)) register(name, loader);
 
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
