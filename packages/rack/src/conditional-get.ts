@@ -31,21 +31,18 @@ export class ConditionalGet {
     return response;
   }
 
-  private fresh(env: Record<string, any>, headers: Record<string, string | string[]>): boolean {
+  private fresh(
+    env: Record<string, any>,
+    headers: Record<string, string | string[]>,
+  ): boolean | undefined {
     const noneMatch = env["HTTP_IF_NONE_MATCH"];
     if (noneMatch) {
       return this.isEtagMatches(noneMatch, headers);
     }
-
-    const modifiedSince = env["HTTP_IF_MODIFIED_SINCE"];
-    if (modifiedSince) {
-      const parsed = this.toRfc2822(modifiedSince);
-      if (parsed) {
-        return this.modifiedSince(parsed, headers);
-      }
+    let modifiedSince: string | Time | null = env["HTTP_IF_MODIFIED_SINCE"];
+    if (modifiedSince && (modifiedSince = this.toRfc2822(modifiedSince as string))) {
+      return this.modifiedSince(modifiedSince, headers);
     }
-
-    return false;
   }
 
   private isEtagMatches(noneMatch: string, headers: Record<string, string | string[]>): boolean {

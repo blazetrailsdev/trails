@@ -262,7 +262,7 @@ describe("SignedCookieJar serialized API", () => {
       { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
       {},
     );
-    jar.signed.set("user", { id: 45, name: "Aaron" });
+    jar.signed.set("user", { value: { id: 45, name: "Aaron" } });
     expect(jar.signed.get("user")).toEqual({ id: 45, name: "Aaron" });
   });
 
@@ -308,7 +308,7 @@ describe("EncryptedCookieJar serialized API", () => {
       { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
       {},
     );
-    jar.encrypted.set("session", { uid: 7, role: "admin" });
+    jar.encrypted.set("session", { value: { uid: 7, role: "admin" } });
     expect(jar.encrypted.get("session")).toEqual({ uid: 7, role: "admin" });
   });
 
