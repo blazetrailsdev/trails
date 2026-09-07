@@ -5,9 +5,9 @@ import { isWrappedSchema } from "../support/schema-types.js";
 export function doubleColumnsHash(
   tableName: string,
   extraColumns: Record<string, string[]> = {},
-): Record<string, { name: string }> {
+): Record<string, { name: string; isVirtual(): boolean }> {
   const table = TEST_SCHEMA[tableName];
   const columns = table === undefined ? {} : isWrappedSchema(table) ? table.columns : table;
   const names = ["id", ...Object.keys(columns), ...(extraColumns[tableName] ?? [])];
-  return Object.fromEntries(names.map((name) => [name, { name }]));
+  return Object.fromEntries(names.map((name) => [name, { name, isVirtual: () => false }]));
 }

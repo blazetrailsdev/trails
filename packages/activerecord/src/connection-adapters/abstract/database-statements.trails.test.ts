@@ -961,10 +961,11 @@ describe("returningColumnValues", () => {
 });
 
 describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) / combineMultiStatements", () => {
-  type FixtureColumn = { name: string; virtual?: boolean; autoIncrement?: boolean } & Record<
-    string,
-    unknown
-  >;
+  type FixtureColumn = {
+    name: string;
+    isVirtual?: () => boolean;
+    isAutoIncrement?: () => boolean;
+  } & Record<string, unknown>;
 
   type FixtureHost = DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
@@ -997,7 +998,13 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       typeCastedBinds,
       log,
       schemaCache: {
-        columnsHash: async (tableName: string) => tables[tableName],
+        columnsHash: async (tableName: string) =>
+          Object.fromEntries(
+            Object.entries(tables[tableName] ?? {}).map(([name, column]) => [
+              name,
+              { isVirtual: () => false, ...column },
+            ]),
+          ),
       },
       quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
       quoteTableName: q,
@@ -1107,14 +1114,20 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     });
 
     it("rejects virtual columns when the adapter supports them", async () => {
-      const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
+      const host = makeHost(
+        {},
+        { users: { ...USERS, upper: { name: "upper", isVirtual: () => true } } },
+      );
       host.supportsVirtualColumns = async () => true;
       const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
       expect(sql).not.toContain('"upper"');
     });
 
     it("keeps a virtual column when the adapter's async predicate resolves false", async () => {
-      const host = makeHost({}, { users: { ...USERS, upper: { name: "upper", virtual: true } } });
+      const host = makeHost(
+        {},
+        { users: { ...USERS, upper: { name: "upper", isVirtual: () => true } } },
+      );
       host.supportsVirtualColumns = async () => false;
       const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
       expect(sql).toContain('"upper"');
@@ -1144,7 +1157,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     it("calls default_insert_value for a column the fixture omits (mysql auto_increment)", async () => {
       const host = makeHost(
         {},
-        { users: { id: { name: "id", autoIncrement: true }, name: { name: "name" } } },
+        { users: { id: { name: "id", isAutoIncrement: () => true }, name: { name: "name" } } },
       );
       host.defaultInsertValue = mysqlDefaultInsertValue as (column: unknown) => unknown;
       const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
