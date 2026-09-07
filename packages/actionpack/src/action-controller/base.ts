@@ -915,7 +915,6 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
-extend(Base, ConfigMethods);
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
@@ -932,6 +931,8 @@ Base.prototype.expireFragment = expireFragment;
 
 classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 helperMethod(Base as unknown as HelpersClassMethods, "combinedFragmentCacheKey");
+
+extend(Base, ConfigMethods);
 
 const _Configurable = Base as unknown as {
   configAccessor(...names: string[]): void;
