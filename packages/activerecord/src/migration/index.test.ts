@@ -222,7 +222,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await expect(
         connection.addIndex("testings", "foo", { unqiue: true } as unknown as AddIndexOptions),
-      ).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      ).rejects.toThrow(ArgumentError);
     });
 
     it("unique index exists", async () => {

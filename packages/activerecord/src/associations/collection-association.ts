@@ -631,7 +631,7 @@ export class CollectionAssociation extends Association {
     if (this.reflection.options.through) {
       const scope = this.scope();
       return Promise.resolve(this.loadTarget()).then((target) => {
-        const records = ids
+        const found = ids
           .map((id) =>
             target.find(
               (r) =>
@@ -640,10 +640,10 @@ export class CollectionAssociation extends Association {
             ),
           )
           .filter((record): record is Base => record != null);
-        if (records.length !== ids.length) {
-          scope.raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
+        if (found.length !== ids.length) {
+          scope.raiseRecordNotFoundExceptionBang(ids, found.length, ids.length);
         }
-        return records;
+        return found;
       });
     }
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));

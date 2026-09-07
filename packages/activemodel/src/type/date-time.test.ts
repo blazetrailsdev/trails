@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime, strftime } from "@blazetrails/date";
 import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Types } from "../index.js";
 
 describe("DateTimeTest", () => {
@@ -48,7 +49,7 @@ describe("DateTimeTest", () => {
         error = e;
         throw e;
       }
-    }).toThrow(expect.objectContaining({ name: "ArgumentError" }));
+    }).toThrow(ArgumentError);
     expect((error as Error).message).toBe(
       `Provided hash ${toS({ ":a": 1 })} doesn't contain necessary keys: [1, 2, 3]`,
     );

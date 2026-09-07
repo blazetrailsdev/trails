@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   Base,
   IrreversibleOrderError,
@@ -2245,7 +2246,7 @@ describe("FinderTest", () => {
     expect(await Topic.exists(9999999999999999999999999999999n)).toBe(false);
     expect(await Topic.exists((new Topic() as any).id)).toBe(false);
 
-    await expect(Topic.exists([1, 2])).rejects.toMatchObject({ name: "ArgumentError" });
+    await expect(Topic.exists([1, 2])).rejects.toThrow(ArgumentError);
   });
 
   it("exists with scope", async () => {
