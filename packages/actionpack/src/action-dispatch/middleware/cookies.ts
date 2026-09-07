@@ -325,16 +325,13 @@ export class AbstractCookieJar {
   }
 
   set(name: string, options: unknown): SerializedSetOptions {
-    let opts: SerializedSetOptions;
-    if (isHash(options)) {
-      opts = options;
-    } else {
-      opts = { value: options };
+    if (!isHash(options)) {
+      options = { value: options };
     }
 
-    this.commit(name, opts);
-    this.parentJar.set(name, opts as SetCookieOptions);
-    return opts;
+    this.commit(name, options as SerializedSetOptions);
+    this.parentJar.set(name, options as SetCookieOptions);
+    return options as SerializedSetOptions;
   }
 
   get permanent(): PermanentCookieJar {
@@ -352,7 +349,6 @@ export class PermanentCookieJar extends AbstractCookieJar {
   private static readonly TWENTY_YEARS_MS = 20 * 365.25 * 24 * 60 * 60 * 1000;
 
   protected commit(_name: string, options: SerializedSetOptions): void {
-    // boundary: the cookie `Expires` attribute is serialized as an HTTP-date.
     options.expires = new Date(Date.now() + PermanentCookieJar.TWENTY_YEARS_MS);
   }
 }
