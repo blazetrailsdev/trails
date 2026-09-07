@@ -647,35 +647,18 @@ export async function insertFixture(
 }
 
 export async function insertFixturesSet(
-  this: DatabaseStatementsHost & Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
+  this: BuildFixtureHost,
   fixtureSet: Record<string, Record<string, unknown>[]>,
   tablesToDelete: string[] = [],
 ): Promise<void> {
-  const deleteStatements = tablesToDelete.map((t) => `DELETE FROM ${this.quoteTableName(t)}`);
-
-  const insertStatements: string[] = [];
-  for (const [tableName, fixtures] of Object.entries(fixtureSet)) {
-    if (fixtures.length === 0) continue;
-    for (const fixture of fixtures) {
-      const columns = Object.keys(fixture);
-      if (columns.length === 0) {
-        const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
-        insertStatements.push(`INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`);
-      } else {
-        const values = Object.values(fixture).map((v) => this.quote(withYamlFallback(v)));
-        insertStatements.push(
-          `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`,
-        );
-      }
-    }
-  }
-
-  const allStatements = [...deleteStatements, ...insertStatements];
+  const fixtureInserts = await buildFixtureStatements.call(this, fixtureSet);
+  const tableDeletes = tablesToDelete.map((table) => `DELETE FROM ${this.quoteTableName(table)}`);
+  const statements = [...tableDeletes, ...fixtureInserts];
 
   await this.transaction(
     async () => {
       await this.disableReferentialIntegrity(async () => {
-        await this.executeBatch(allStatements, "Fixtures Load");
+        await this.executeBatch(statements, "Fixtures Load");
       });
     },
     { requiresNew: true },
@@ -1185,20 +1168,23 @@ export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
 }
 
 /** @internal */
+type BuildFixtureHost = DatabaseStatementsHost &
+  Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
+    schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+    supportsVirtualColumns?(): Promise<boolean> | boolean;
+    defaultInsertValue?(column: unknown): unknown;
+    lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
+  };
+
+/** @internal */
 export async function buildFixtureSql(
-  this: DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
-      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
-      supportsVirtualColumns?(): Promise<boolean> | boolean;
-      defaultInsertValue?(column: unknown): unknown;
-      lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
-    },
+  this: BuildFixtureHost,
   fixtures: Record<string, unknown>[],
   tableName: string,
 ): Promise<string> {
   const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
   const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
-    ([, column]) => !(supportsVirtualColumns && (column as { virtual?: boolean }).virtual),
+    ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),
   );
   const columnNames = columns.map(([name]) => name);
 
@@ -1245,13 +1231,7 @@ export async function buildFixtureSql(
 
 /** @internal */
 export function buildFixtureStatements(
-  this: DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
-      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
-      supportsVirtualColumns?(): Promise<boolean> | boolean;
-      defaultInsertValue?(column: unknown): unknown;
-      lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
-    },
+  this: BuildFixtureHost,
   fixtureSet: Record<string, Record<string, unknown>[]>,
 ): Promise<string[]> {
   return Promise.all(

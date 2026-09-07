@@ -795,7 +795,7 @@ export class AbstractAdapter implements Quoting {
   lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
 
   setLockThread(lockThread: unknown): void {
-    this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : new NullLock();
+    this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : NullLock;
   }
 
   /** @internal */

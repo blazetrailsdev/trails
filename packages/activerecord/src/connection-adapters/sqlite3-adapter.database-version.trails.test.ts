@@ -18,6 +18,23 @@ describe("SQLite3Adapter database version", () => {
     expect(version.compare("3.8.0")).toBeGreaterThanOrEqual(0);
   });
 
+  it("a query issued from configureConnection runs on the connection being configured", async () => {
+    class QueryValueVersionAdapter extends BetterSQLite3Adapter {
+      override async getDatabaseVersion(): Promise<Version> {
+        return new Version(String(await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")));
+      }
+    }
+    adapter = new QueryValueVersionAdapter({ database: ":memory:" });
+    const holder = adapter.lock.synchronize(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return String(await adapter!.databaseVersion);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const probe = String(await adapter.databaseVersion);
+    expect(probe).toMatch(/^\d+\.\d+/);
+    expect(await holder).toBe(probe);
+  }, 8000);
+
   it("databaseVersion answers through the pool memo", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     const version = await adapter.getDatabaseVersion();

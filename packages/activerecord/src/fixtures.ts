@@ -1,13 +1,9 @@
-import {
-  insertFixturesSet,
-  type DatabaseStatementsHost,
-} from "./connection-adapters/abstract/database-statements.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecord } from "./ar-config.js";
 import { FixtureError, StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
-import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
 import {
   camelize,
@@ -371,8 +367,6 @@ function resolveEnums(reflectionClass: BaseClass, row: FixtureAttrs): void {
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
-type InsertHost = DatabaseStatementsHost &
-  Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
 /** @internal */
 export interface PreparedFixtureSet {
@@ -432,7 +426,11 @@ export async function insertPreparedFixtureSets(
   }
 
   try {
-    await insertFixturesSet.call(adapter as unknown as InsertHost, merged, Object.keys(merged));
+    await insertFixturesSet.call(
+      adapter as unknown as ThisParameterType<typeof insertFixturesSet>,
+      merged,
+      Object.keys(merged),
+    );
   } catch (err) {
     for (const p of prepared) p.rollback();
     throw err;

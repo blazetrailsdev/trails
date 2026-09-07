@@ -16,6 +16,7 @@ import { accountFixtureData } from "./accounts.js";
 import { developerFixtureData } from "./developers.js";
 import { projectFixtureData } from "./projects.js";
 import { developersProjectsFixtureData } from "./developers-projects.js";
+import { doubleColumnsHash } from "../double-columns.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -28,6 +29,9 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    schemaCache: { columnsHash: async (table: string) => doubleColumnsHash(table) },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
     },
@@ -64,15 +68,14 @@ function idOf(data: Record<string, { id?: number }>, label: string): number {
 }
 
 function findInsertWithPk(sqls: string[], pk: number): string | undefined {
-  const re = new RegExp(`VALUES\\s*\\(\\s*${pk}\\b`);
+  const re = new RegExp(`\\(\\s*${pk}\\b`);
   return sqls.find((s) => re.test(s));
 }
 
 function expectValueInRow(sql: string | undefined, fkId: number): void {
   expect(sql).toBeTruthy();
-  const valuesMatch = /VALUES\s*\(([^)]*)\)/.exec(sql ?? "");
-  const tuple = valuesMatch?.[1] ?? "";
-  const vals = tuple.split(",").map((v) => v.trim());
+  const tuples = [...(sql ?? "").matchAll(/\(([^)]*)\)/gu)].map((m) => m[1]);
+  const vals = tuples.flatMap((tuple) => tuple.split(",").map((v) => v.trim()));
   expect(vals).toContain(String(fkId));
 }
 
@@ -416,6 +419,15 @@ describe("developerFixtureData", () => {
   it("defineFixtures inserts david", async () => {
     const adapter = makeAdapter();
     const Developer = makeModel("developers");
+    Developer._reflections = {
+      sharedComputers: {
+        isThroughReflection: () => true,
+        parentReflection: { macro: "hasAndBelongsToMany" },
+        foreignKey: "computer_id",
+        klass: { tableName: "computers" },
+        throughReflection: { foreignKey: "developer_id", tableName: "computers_developers" },
+      },
+    };
     for (const k of Object.keys(developerFixtureData) as Array<keyof typeof developerFixtureData>) {
       seedRows(Developer, k, developerFixtureData, { name: developerFixtureData[k].name });
     }

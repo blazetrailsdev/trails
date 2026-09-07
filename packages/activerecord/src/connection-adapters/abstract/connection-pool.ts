@@ -1,6 +1,6 @@
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
-import { Executor, synchronize, type MonitorMixin } from "@blazetrails/activesupport";
+import { Executor } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
@@ -55,8 +55,6 @@ export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 
-  private readonly _mutex: MonitorMixin = { synchronize };
-
   private _serverVersion: unknown = null;
   private _schemaReflection: SchemaReflection | null = null;
 
@@ -89,10 +87,10 @@ export class NullPool implements AbstractPool {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      this._mutex.synchronize(async () => {
+      (async () => {
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
-      })
+      })()
     );
   }
 

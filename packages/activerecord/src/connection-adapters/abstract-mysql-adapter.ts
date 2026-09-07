@@ -3,6 +3,7 @@ import type {
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import {
+  defaultInsertValue as mysqlDefaultInsertValue,
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
   returningColumnValues as mysqlReturningColumnValues,
@@ -1491,9 +1492,13 @@ export interface AbstractMysqlAdapter {
 
   /** @internal */
   createTableDefinition(name: string, options?: Record<string, unknown>): MysqlTableDefinition;
+
+  /** @internal */
+  defaultInsertValue: typeof mysqlDefaultInsertValue;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
+AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
 AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

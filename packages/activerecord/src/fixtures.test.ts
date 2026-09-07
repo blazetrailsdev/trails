@@ -16,7 +16,18 @@ import { ActiveRecord } from "./ar-config.js";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
+import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
+
+const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
+  accounts: ["name"],
+  developers_projects: ["id"],
+  orders: ["status", "shop_id"],
+  posts: ["author"],
+  posts_tags: ["id", "post_id", "tag_id"],
+  users: ["name", "type"],
+  widgets: ["name"],
+};
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -29,6 +40,11 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    schemaCache: {
+      columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
+    },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
     },
@@ -312,7 +328,7 @@ describe("defineFixtures", () => {
     );
     expect(joinInsert).toBeDefined();
     expect(joinInsert).toContain(String(FixtureSet.identify("david")));
-    expect(joinInsert).toMatch(/, 1\)/);
+    expect(joinInsert).toMatch(/\(1, /);
     expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
   });
 

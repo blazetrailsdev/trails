@@ -39,6 +39,24 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       }
     });
 
+    it("sends the statements one at a time when the config negates MULTI_STATEMENTS", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        flags: ["-MULTI_STATEMENTS"],
+      } as never);
+      const rawExecute = vi.spyOn(testAdapter as never, "rawExecute").mockResolvedValue(undefined);
+      let calls: unknown[][];
+      try {
+        await testAdapter.executeBatch(["SELECT 1", "SELECT 2"], "Batch");
+      } finally {
+        calls = rawExecute.mock.calls.slice();
+        rawExecute.mockRestore();
+        await testAdapter.close();
+      }
+
+      expect(calls.map((call) => call[0])).toEqual(["SELECT 1", "SELECT 2"]);
+    });
+
     it("splits the statements against the server reported max_allowed_packet", async () => {
       const maxAllowedPacket = await adapter.maxAllowedPacket();
       expect(maxAllowedPacket).not.toBeNull();

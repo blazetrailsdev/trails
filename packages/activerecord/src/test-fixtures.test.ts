@@ -15,6 +15,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   leaseFixtureConnection,
@@ -30,6 +31,11 @@ async function resolvePrimaryModel(entry: {
   return models[0];
 }
 
+const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
+  accounts: ["name"],
+  posts: ["body"],
+};
+
 function makeAdapter(): DatabaseAdapter {
   return {
     execute: vi.fn(async () => []),
@@ -44,6 +50,11 @@ function makeAdapter(): DatabaseAdapter {
       await fn();
     },
     executeBatch: vi.fn(async () => {}),
+    schemaCache: {
+      columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
+    },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    quoteString: (v: string) => v.replace(/'/g, "''"),
     transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
