@@ -130,8 +130,8 @@ interface InternalBeginTransactionHost {
 }
 
 interface PerformQueryHost {
-  _cachedStatement(sql: string): Promise<SqliteStatement>;
-  _freshStatement(sql: string): Promise<SqliteStatement>;
+  _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
+  _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void;
   verifiedBang(): void;
   _statementLock: Promise<void> | null;
@@ -238,8 +238,8 @@ export async function performQuery(
     stmt = batch
       ? null
       : prepare
-        ? await this._cachedStatement(sql)
-        : await this._freshStatement(sql);
+        ? await this._cachedStatement(rawConnection, sql)
+        : await this._freshStatement(rawConnection, sql);
     if (stmt === null) {
       await rawConnection.exec(sql);
       result = Result.empty();

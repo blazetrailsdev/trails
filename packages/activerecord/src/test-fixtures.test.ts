@@ -30,6 +30,12 @@ async function resolvePrimaryModel(entry: {
   return models[0];
 }
 
+const DOUBLE_COLUMNS: Record<string, string[]> = {
+  accounts: ["id", "name"],
+  posts: ["id", "title", "body"],
+  topics: ["id", "title"],
+};
+
 function makeAdapter(): DatabaseAdapter {
   return {
     execute: vi.fn(async () => []),
@@ -44,6 +50,12 @@ function makeAdapter(): DatabaseAdapter {
       await fn();
     },
     executeBatch: vi.fn(async () => {}),
+    schemaCache: {
+      columnsHash: async (table: string) =>
+        Object.fromEntries((DOUBLE_COLUMNS[table] ?? []).map((name) => [name, { name }])),
+    },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    quoteString: (v: string) => v.replace(/'/g, "''"),
     transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,

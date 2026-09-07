@@ -443,11 +443,15 @@ describe("DatabaseStatements", () => {
       const executed: string[] = [];
       let transactionUsed = false;
       const { insertFixturesSet } = await import("./database-statements.js");
-      const host: DatabaseStatementsHost &
-        Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
+      const host = {
         ...hostDefaults,
         pool,
         typeCastedBinds,
+        log,
+        schemaCache: {
+          columnsHash: async () => ({ name: { name: "name" } }),
+        },
+        lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
         executeBatch: async (statements: string[]) => {
           executed.push(...statements);
         },
@@ -459,7 +463,8 @@ describe("DatabaseStatements", () => {
         quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
         quoteTableName: (n: string) => `"${n}"`,
         quoteColumnName: (n: string) => `"${n}"`,
-      };
+        quoteString: (v: string) => v.replace(/'/g, "''"),
+      } as unknown as ThisParameterType<typeof insertFixturesSet>;
 
       await insertFixturesSet.call(
         host,

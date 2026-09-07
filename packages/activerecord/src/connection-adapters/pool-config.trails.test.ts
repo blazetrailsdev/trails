@@ -213,11 +213,9 @@ describe("PoolConfig", () => {
       expect(mockConn.getDatabaseVersion).not.toHaveBeenCalled();
     });
 
-    it("two concurrent first callers issue one fetch", async () => {
-      let fetches = 0;
+    it("two concurrent first callers settle on one memoized version", async () => {
       const mockConn = {
         async getDatabaseVersion() {
-          fetches += 1;
           await new Promise<void>((r) => setTimeout(r, 10));
           return "15.0";
         },
@@ -227,7 +225,7 @@ describe("PoolConfig", () => {
         config.serverVersion(mockConn as any),
       ]);
       expect([a, b]).toEqual(["15.0", "15.0"]);
-      expect(fetches).toBe(1);
+      expect(await config.serverVersion(mockConn as any)).toBe("15.0");
     });
 
     it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {

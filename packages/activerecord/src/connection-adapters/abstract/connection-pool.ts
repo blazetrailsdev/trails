@@ -89,10 +89,10 @@ export class NullPool implements AbstractPool {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      this._mutex.synchronize(async () => {
+      (async () => {
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
-      })
+      })()
     );
   }
 

@@ -18,6 +18,24 @@ import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-
 import { currentAdapter } from "./support/adapter-helper.js";
 import "./relation.js";
 
+const DOUBLE_COLUMNS: Record<string, string[]> = {
+  authors: ["id", "name", "author_address_extra_id"],
+  categorizations: ["id", "author_id", "post_id"],
+  developers: ["id", "name"],
+  developers_projects: ["id", "developer_id", "project_id"],
+  fk_object_to_point_tos: ["id"],
+  fk_pointing_to_non_existent_objects: ["id", "fk_object_to_point_to_id"],
+  orders: ["id", "status", "shop_id"],
+  posts: ["id", "title", "author", "author_id"],
+  posts_tags: ["id", "post_id", "tag_id"],
+  projects: ["id", "name"],
+  subscribers: ["nick", "name"],
+  subscriptions: ["id", "subscriber_id"],
+  taggings: ["id", "taggable_id", "taggable_type"],
+  users: ["id", "name", "type"],
+  widgets: ["id", "name"],
+};
+
 function makeAdapter(): DatabaseAdapter {
   return {
     execute: vi.fn(async () => []),
@@ -29,6 +47,12 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    schemaCache: {
+      columnsHash: async (table: string) =>
+        Object.fromEntries((DOUBLE_COLUMNS[table] ?? []).map((name) => [name, { name }])),
+    },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
     },

@@ -81,10 +81,10 @@ export class PoolConfig {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      this.synchronize(async () => {
+      (async () => {
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
-      })
+      })()
     );
   }
 

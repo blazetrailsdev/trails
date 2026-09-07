@@ -289,23 +289,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteAffectedRows.call(this, result);
   }
 
-  async _freshStatement(sql: string): Promise<SqliteStatement> {
-    await this.ensureConnected();
-    const stmt = await this._rawConnection.prepare(sql);
+  async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
+    const stmt = await rawConnection.prepare(sql);
     this._maybeEnableReadBigInts(sql, stmt);
     return stmt;
   }
 
-  async _cachedStatement(sql: string): Promise<SqliteStatement> {
-    await this.ensureConnected();
+  async _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
     if (!this.preparedStatements) {
-      const stmt = await this._rawConnection.prepare(sql);
+      const stmt = await rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
       return stmt;
     }
     let stmt = this._statements.get(sql);
     if (!stmt) {
-      stmt = await this._rawConnection.prepare(sql);
+      stmt = await rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
       void this._statements.set(sql, stmt);
     }
