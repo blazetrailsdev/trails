@@ -200,11 +200,7 @@ export function isNumber(
   try {
     return parseAsNumber(rawValue, precision, scale) !== undefined;
   } catch (error) {
-    if (
-      error instanceof ArgumentError ||
-      error instanceof ArgumentError ||
-      error instanceof TypeError
-    ) {
+    if (error instanceof ArgumentError || error instanceof TypeError) {
       return false;
     }
     throw error;
