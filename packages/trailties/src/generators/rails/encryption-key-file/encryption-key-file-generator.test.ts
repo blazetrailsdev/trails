@@ -40,4 +40,23 @@ describe("EncryptionKeyFileGeneratorTest", () => {
     build().ignoreKeyFile("config/foo.key");
     expect(fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8")).toBe(after);
   });
+  it("ignore_key_file reads and appends the .gitignore at the destination root", () => {
+    const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-enc-key-other-"));
+    try {
+      fs.writeFileSync(path.join(otherDir, ".gitignore"), "\n/config/foo.key\n");
+      const generator = new EncryptionKeyFileGenerator({
+        cwd: otherDir,
+        output: (m) => lines.push(m),
+      });
+      generator.ignoreKeyFile("config/foo.key");
+
+      expect(fs.readFileSync(path.join(otherDir, ".gitignore"), "utf-8")).toBe(
+        "\n/config/foo.key\n",
+      );
+      expect(fs.existsSync(path.join(tmpDir, ".gitignore"))).toBe(false);
+      expect(lines).toEqual([]);
+    } finally {
+      fs.rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 import {
   Exception,
   InvalidAuthenticityToken,
@@ -37,9 +38,16 @@ import {
   type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
 
+const cookieJar = () => new CookieJar();
+
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
   return {
-    request: { method: "POST", origin: "https://example.com", baseUrl: "https://example.com" },
+    request: {
+      method: "POST",
+      origin: "https://example.com",
+      baseUrl: "https://example.com",
+      cookieJar,
+    },
     ...overrides,
   };
 }
@@ -71,7 +79,7 @@ describe("isValidRequestOrigin", () => {
     expect(isValidRequestOrigin.call(controller())).toBe(true);
     expect(
       isValidRequestOrigin.call(
-        controller({ request: { method: "POST", baseUrl: "https://example.com" } }),
+        controller({ request: { method: "POST", baseUrl: "https://example.com", cookieJar } }),
       ),
     ).toBe(true);
   });
@@ -79,7 +87,12 @@ describe("isValidRequestOrigin", () => {
     expect(
       isValidRequestOrigin.call(
         controller({
-          request: { method: "POST", origin: "https://evil.com", baseUrl: "https://example.com" },
+          request: {
+            method: "POST",
+            origin: "https://evil.com",
+            baseUrl: "https://example.com",
+            cookieJar,
+          },
         }),
       ),
     ).toBe(false);
@@ -87,7 +100,9 @@ describe("isValidRequestOrigin", () => {
   it("raises InvalidAuthenticityToken for 'null' origin", () => {
     expect(() =>
       isValidRequestOrigin.call(
-        controller({ request: { method: "POST", origin: "null", baseUrl: "https://example.com" } }),
+        controller({
+          request: { method: "POST", origin: "null", baseUrl: "https://example.com", cookieJar },
+        }),
       ),
     ).toThrow(InvalidAuthenticityToken);
   });
@@ -95,11 +110,15 @@ describe("isValidRequestOrigin", () => {
 
 describe("markForSameOriginVerificationBang / isMarkedForSameOriginVerification", () => {
   it("sets the flag based on GET", () => {
-    const get = controller({ request: { method: "GET", baseUrl: "https://example.com" } });
+    const get = controller({
+      request: { method: "GET", baseUrl: "https://example.com", cookieJar },
+    });
     markForSameOriginVerificationBang.call(get);
     expect(isMarkedForSameOriginVerification.call(get)).toBe(true);
 
-    const post = controller({ request: { method: "POST", baseUrl: "https://example.com" } });
+    const post = controller({
+      request: { method: "POST", baseUrl: "https://example.com", cookieJar },
+    });
     markForSameOriginVerificationBang.call(post);
     expect(isMarkedForSameOriginVerification.call(post)).toBe(false);
   });
@@ -113,7 +132,9 @@ describe("isNonXhrJavascriptResponse", () => {
     for (const mediaType of ["text/javascript", "application/javascript"]) {
       expect(
         isNonXhrJavascriptResponse.call(
-          controller({ request: { method: "GET", baseUrl: "https://example.com", mediaType } }),
+          controller({
+            request: { method: "GET", baseUrl: "https://example.com", cookieJar, mediaType },
+          }),
         ),
       ).toBe(true);
     }
@@ -125,6 +146,7 @@ describe("isNonXhrJavascriptResponse", () => {
           request: {
             method: "GET",
             baseUrl: "https://example.com",
+            cookieJar,
             mediaType: "text/javascript",
             xhr: true,
           },
@@ -134,7 +156,12 @@ describe("isNonXhrJavascriptResponse", () => {
     expect(
       isNonXhrJavascriptResponse.call(
         controller({
-          request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/html" },
+          request: {
+            method: "GET",
+            baseUrl: "https://example.com",
+            cookieJar,
+            mediaType: "text/html",
+          },
         }),
       ),
     ).toBe(false);
@@ -145,7 +172,12 @@ describe("verifySameOriginRequest", () => {
   it("raises when marked + non-xhr js response", () => {
     const c = controller({
       _markedForSameOriginVerification: true,
-      request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/javascript" },
+      request: {
+        method: "GET",
+        baseUrl: "https://example.com",
+        cookieJar,
+        mediaType: "text/javascript",
+      },
     });
     expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
   });
@@ -156,6 +188,7 @@ describe("verifySameOriginRequest", () => {
           request: {
             method: "GET",
             baseUrl: "https://example.com",
+            cookieJar,
             mediaType: "text/javascript",
           },
         }),
@@ -167,7 +200,12 @@ describe("verifySameOriginRequest", () => {
     const calls: string[] = [];
     const c = controller({
       _markedForSameOriginVerification: true,
-      request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/javascript" },
+      request: {
+        method: "GET",
+        baseUrl: "https://example.com",
+        cookieJar,
+        mediaType: "text/javascript",
+      },
       logger: { warn: (m) => calls.push(m) },
     });
     expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
@@ -179,7 +217,12 @@ describe("verifySameOriginRequest", () => {
     const calls: string[] = [];
     const c = controller({
       _markedForSameOriginVerification: true,
-      request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/javascript" },
+      request: {
+        method: "GET",
+        baseUrl: "https://example.com",
+        cookieJar,
+        mediaType: "text/javascript",
+      },
       logger: { warn: (m) => calls.push(m) },
       logWarningOnCsrfFailure: false,
     });
@@ -198,7 +241,12 @@ describe("unverifiedRequestWarningMessage", () => {
     expect(
       unverifiedRequestWarningMessage.call(
         controller({
-          request: { method: "POST", origin: "https://evil.com", baseUrl: "https://example.com" },
+          request: {
+            method: "POST",
+            origin: "https://evil.com",
+            baseUrl: "https://example.com",
+            cookieJar,
+          },
         }),
       ),
     ).toBe(
@@ -212,12 +260,12 @@ describe("isVerifiedRequest", () => {
     expect(isVerifiedRequest.call(controller({ allowForgeryProtection: false }))).toBe(true);
     expect(
       isVerifiedRequest.call(
-        controller({ request: { method: "GET", baseUrl: "https://example.com" } }),
+        controller({ request: { method: "GET", baseUrl: "https://example.com", cookieJar } }),
       ),
     ).toBe(true);
     expect(
       isVerifiedRequest.call(
-        controller({ request: { method: "HEAD", baseUrl: "https://example.com" } }),
+        controller({ request: { method: "HEAD", baseUrl: "https://example.com", cookieJar } }),
       ),
     ).toBe(true);
   });
@@ -238,6 +286,7 @@ describe("P20b/P20c smoke", () => {
       request: {
         method: "POST",
         baseUrl: "https://example.com",
+        cookieJar,
         path: "/posts",
         env: { "action_controller.csrf_token": generateCsrfToken() },
       },
@@ -279,6 +328,7 @@ describe("P20b/P20c smoke", () => {
       request: {
         method: "POST",
         baseUrl: "https://example.com",
+        cookieJar,
         path: "/posts/",
         env: { "action_controller.csrf_token": generateCsrfToken() },
       },
@@ -330,7 +380,9 @@ describe("P20b/P20c smoke", () => {
 
 describe("normalizeActionPath / normalizeRelativeActionPath", () => {
   const at = (path: string): CsrfController =>
-    ({ request: { method: "POST", baseUrl: "https://example.com", path } }) as CsrfController;
+    ({
+      request: { method: "POST", baseUrl: "https://example.com", cookieJar, path },
+    }) as CsrfController;
 
   it("strips trailing slash from absolute paths", () => {
     expect(normalizeActionPath.call(at("/current"), "/foo/bar/")).toBe("/foo/bar");

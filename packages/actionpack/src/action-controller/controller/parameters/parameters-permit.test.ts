@@ -123,13 +123,13 @@ describe("ParametersPermitTest", () => {
   it("key to empty array: permitted scalar values do not pass", () => {
     const params = new Parameters({ tags: "not_an_array" });
     const permitted = params.permit({ tags: [] });
-    expect(permitted.has("tags")).toBe(true);
+    expect(permitted.has("tags")).toBe(false);
   });
 
   it("key to empty array: arrays of non-permitted scalar do not pass", () => {
     const params = new Parameters({ tags: [{ bad: true }, { also_bad: true }] });
     const permitted = params.permit({ tags: [] });
-    expect(permitted.get("tags")).toEqual([]);
+    expect(permitted.has("tags")).toBe(false);
   });
 
   it("key to empty hash: arbitrary hashes are permitted", () => {

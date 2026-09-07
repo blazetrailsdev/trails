@@ -133,15 +133,30 @@ export class CookieStore {
   }
 
   fetch(request: CsrfRequest): string | null {
-    return request.cookies?.[this._cookieName] ?? null;
+    const contents = request.cookieJar().encrypted.get(this._cookieName);
+    if (contents == null) return null;
+
+    let value: { token?: string; session_id?: { publicId?: string } };
+    try {
+      value = JSON.parse(contents as string) as typeof value;
+    } catch {
+      return null;
+    }
+    if (value.session_id?.publicId !== request.session?.idWas?.()?.publicId) return null;
+
+    return value.token ?? null;
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
-    (request.cookies ??= {})[this._cookieName] = csrfToken;
+    request.cookieJar().encrypted.permanent.set(this._cookieName, {
+      value: JSON.stringify({ token: csrfToken, session_id: request.session?.id?.() }),
+      httpOnly: true,
+      sameSite: "lax",
+    });
   }
 
   reset(request: CsrfRequest): void {
-    delete request.cookies?.[this._cookieName];
+    request.cookieJar().delete(this._cookieName);
   }
 }
 
@@ -185,8 +200,11 @@ export interface CsrfRequest {
   xhr?: boolean;
   xCsrfToken?: string | null;
   env?: Record<string, unknown>;
-  session?: Record<string, unknown>;
-  cookies?: Record<string, string>;
+  session?: Record<string, unknown> & {
+    id?(): { publicId?: string } | null | undefined;
+    idWas?(): { publicId?: string } | null | undefined;
+  };
+  cookieJar(): CookieJar;
 }
 
 /** @internal */

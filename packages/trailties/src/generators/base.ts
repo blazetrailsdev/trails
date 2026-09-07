@@ -20,6 +20,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
+  log = Actions.log;
   generate = Actions.generate;
   git = Actions.git;
   afterInstall = Actions.afterInstall;
@@ -83,6 +84,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const updated = existing.slice(0, idx) + content + existing.slice(idx);
     File.write(fullPath, updated);
     this.output(`      insert  ${relativePath}`);
+  }
+
+  protected readFile(relativePath: string): string {
+    return File.read(File.join(this.cwd, relativePath));
   }
 
   protected fileExists(relativePath: string): boolean {

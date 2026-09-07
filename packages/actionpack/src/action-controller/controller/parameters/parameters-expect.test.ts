@@ -28,7 +28,7 @@ describe("ParametersExpectTest", () => {
   it("key to empty hash: permits all params", () => {
     const prefs = new Parameters({ theme: "dark", locale: "en" });
     const params = new Parameters({ prefs });
-    const result = params.expect({ prefs: [{}] });
+    const result = params.expect({ prefs: {} });
     expect(result).toBeInstanceOf(Parameters);
     expect((result as Parameters).get("theme")).toBe("dark");
     expect((result as Parameters).get("locale")).toBe("en");
@@ -45,8 +45,7 @@ describe("ParametersExpectTest", () => {
 
   it("key to array of keys: raises when params is an array", () => {
     const params = new Parameters({ items: ["a", "b"] });
-    const result = params.expect({ items: ["name"] });
-    expect(result).toBeDefined();
+    expect(() => params.expect({ items: ["name"] })).toThrow(ParameterMissing);
   });
 
   it("key to explicit array: returns permitted array", () => {
@@ -119,14 +118,12 @@ describe("ParametersExpectTest", () => {
 
   it("key to empty array: raises ParameterMissing on scalar", () => {
     const params = new Parameters({ tags: "not_array" });
-    const result = params.expect({ tags: [] });
-    expect(result).toBe("not_array");
+    expect(() => params.expect({ tags: [] })).toThrow(ParameterMissing);
   });
 
   it("key to non-scalar: raises ParameterMissing on scalar", () => {
     const params = new Parameters({ name: "John" });
-    const result = params.expect({ name: ["first"] });
-    expect(result).toBe("John");
+    expect(() => params.expect({ name: ["first"] })).toThrow(ParameterMissing);
   });
 
   it("key to empty hash: raises ParameterMissing on empty", () => {
@@ -136,8 +133,7 @@ describe("ParametersExpectTest", () => {
 
   it("key to empty hash: raises ParameterMissing on scalar", () => {
     const params = new Parameters({ prefs: "not_hash" });
-    const result = params.expect({ prefs: [{}] });
-    expect(result).toBeDefined();
+    expect(() => params.expect({ prefs: {} })).toThrow(ParameterMissing);
   });
 
   it("key: permitted scalar values", () => {

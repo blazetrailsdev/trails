@@ -140,18 +140,24 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
   } else if (this.isUtc()) {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
   } else if (this.zone != null) {
-    return RubyTime.local(
-      newSec,
-      newMin,
-      newHour,
-      newDay,
-      newMonth,
-      newYear,
-      null,
-      null,
-      this.isdst,
-      null,
-    );
+    let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, null, {
+      in: this.toTime().timeZoneId,
+    });
+
+    if (!Number.isInteger(newTime.utcOffset)) {
+      newTime = newTime.plus(0);
+    }
+
+    const offsetDifference = newTime.utcOffset - this.utcOffset;
+    let newTime2: RubyTime;
+    if (
+      offsetDifference > 0 &&
+      (newTime2 = newTime.plus(offsetDifference)).utcOffset === this.utcOffset
+    ) {
+      return newTime2;
+    } else {
+      return newTime;
+    }
   } else {
     return RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, this.utcOffset);
   }

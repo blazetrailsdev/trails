@@ -402,7 +402,7 @@ export class Time {
       return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
     if (typeof year === "string" && month === undefined) {
       const [y, mon, mday, hour, min, sec, zoneStr] = timeInitParse(year, options.precision ?? 9);
-      return new Time(y, mon, mday, hour, min, sec, zoneStr ?? inZone);
+      return new Time(y, mon, mday, hour, min, sec, zoneStr, options);
     }
     return new Time(
       year as number | string,
@@ -411,7 +411,8 @@ export class Time {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      (zone as string | number | null) ?? inZone,
+      zone as string | number | null,
+      options,
     );
   }
 
@@ -1105,6 +1106,7 @@ export class Time {
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
     zone: string | number | null = null,
+    options: TimeNewOptions = {},
   ) {
     if (seatedTime !== null) {
       const seat = seatedTime;
@@ -1150,10 +1152,19 @@ export class Time {
     this.#zoned = null;
     this.#plainMemo =
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
-    const utcOffset = zone == null ? nowTimeZoneId() : utcOffsetArgument(zone);
+    const zoneArgument = zone ?? options.in ?? null;
+    const zoneObject =
+      zone == null && typeof zoneArgument === "string" && isZoneIdentifier(zoneArgument)
+        ? zoneArgument
+        : null;
+    const utcOffset =
+      zoneObject ?? (zoneArgument == null ? nowTimeZoneId() : utcOffsetArgument(zoneArgument));
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
-    this.#tzmodeUtc = zone != null && this.#timeZoneId === "UTC";
-    const disambiguation = { disambiguation: "later" } as const;
+    this.#tzmodeUtc = zoneArgument != null && this.#timeZoneId === "UTC";
+    const disambiguation =
+      zoneObject == null
+        ? ({ disambiguation: "later" } as const)
+        : ({ disambiguation: "earlier" } as const);
     this.#utcOffsetMemo =
       typeof utcOffset === "number"
         ? utcOffset

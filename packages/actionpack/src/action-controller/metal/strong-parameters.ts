@@ -159,19 +159,15 @@ export class Parameters {
     throw new ParameterMissing(key, Object.keys(this._data));
   }
 
-  expect(...filters: (string | Record<string, (string | Record<string, unknown>)[]>)[]): unknown {
+  expect(...filters: (string | Record<string, unknown>)[]): unknown {
     const flatFilters = filters.flat();
-    const params = this._permitFilters(flatFilters as (string | Record<string, unknown>)[], {
-      suppressUnpermitted: true,
-    });
+    const params = this._permitFilters(flatFilters, { suppressUnpermitted: true });
     const keys = flatFilters.flatMap((f) => (typeof f === "string" ? [f] : Object.keys(f)));
     const values = keys.map((k) => params.require(k));
     return values.length === 1 ? values[0] : values;
   }
 
-  expectBang(
-    ...filters: (string | Record<string, (string | Record<string, unknown>)[]>)[]
-  ): unknown {
+  expectBang(...filters: (string | Record<string, unknown>)[]): unknown {
     try {
       return this.expect(...filters);
     } catch (e) {
@@ -665,59 +661,12 @@ export class Parameters {
     filter: Record<string, unknown>,
     options: { suppressUnpermitted?: boolean } = {},
   ): void {
-    if (Object.keys(filter).length === 0) {
-      for (const [ek, ev] of Object.entries(this._data)) {
-        params._data[ek] = ev;
-      }
-      return;
-    }
-    for (const [k, v] of Object.entries(filter)) {
-      if (!this.hasKey(k)) continue;
-      const val = this._data[k];
-
-      if (val instanceof Parameters) {
-        if (Array.isArray(v)) {
-          params._data[k] = val._permitFilters(v as (string | Record<string, unknown>)[], options);
-        } else {
-          params._data[k] = val;
-        }
-      } else if (Array.isArray(val)) {
-        if (Array.isArray(v) && v.length === 0) {
-          params._data[k] = val.filter((item) => isPermittedScalar(item));
-        } else if (Array.isArray(v)) {
-          params._data[k] = val.map((item) => {
-            if (item instanceof Parameters) {
-              return item._permitFilters(v as (string | Record<string, unknown>)[], options);
-            }
-            if (isPlainObject(item)) {
-              const nestedParams = new Parameters(item);
-              return nestedParams._permitFilters(
-                v as (string | Record<string, unknown>)[],
-                options,
-              );
-            }
-            return item;
-          });
-        } else {
-          params._data[k] = val;
-        }
-      } else if (isPlainObject(val)) {
-        if (Array.isArray(v) && v.length === 0) {
-          params._data[k] = val;
-        } else if (Array.isArray(v)) {
-          const nestedParams = new Parameters(val);
-          nestedParams._permitted = this._permitted;
-          params._data[k] = nestedParams._permitFilters(
-            v as (string | Record<string, unknown>)[],
-            options,
-          );
-        } else {
-          params._data[k] = val;
-        }
-      } else {
-        params._data[k] = val;
-      }
-    }
+    this.slice(...Object.keys(filter)).each((key, value) => {
+      if (value == null || value === false) return;
+      if (!this.hasKey(key)) return;
+      const result = this.permitValue(value, filter[key], options);
+      if (result != null) params.set(key, result);
+    });
   }
 
   private _unpermittedParameters(params: Parameters): void {
@@ -936,7 +885,11 @@ export class Parameters {
   }
 
   /** @internal */
-  permitValue(value: unknown, filter: unknown): unknown {
+  permitValue(
+    value: unknown,
+    filter: unknown,
+    options: { suppressUnpermitted?: boolean } = {},
+  ): unknown {
     if (Array.isArray(filter) && filter.length === 0) {
       return this.permitArrayOfScalars(value);
     }
@@ -946,13 +899,13 @@ export class Parameters {
       !Array.isArray(filter) &&
       Object.keys(filter as Record<string, unknown>).length === 0
     ) {
-      return this.permitHash(value, filter as Record<string, unknown>);
+      return this.permitHash(value, filter as Record<string, unknown>, options);
     }
     if (this.isArrayFilter(filter)) {
-      return this.permitArrayOfHashes(value, (filter as unknown[])[0]);
+      return this.permitArrayOfHashes(value, (filter as unknown[])[0], options);
     }
     if (this.isNonScalar(value)) {
-      return this.permitHashOrArray(value, filter);
+      return this.permitHashOrArray(value, filter, options);
     }
     return undefined;
   }
@@ -964,16 +917,25 @@ export class Parameters {
   }
 
   /** @internal */
-  permitArrayOfHashes(value: unknown, filter: unknown): unknown {
+  permitArrayOfHashes(
+    value: unknown,
+    filter: unknown,
+    options: { suppressUnpermitted?: boolean } = {},
+  ): unknown {
     return this.eachArrayElement(value, filter, (el) =>
-      el.permitFilters(
+      el._permitFilters(
         (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
+        options,
       ),
     );
   }
 
   /** @internal */
-  permitHash(value: unknown, filter: Record<string, unknown> | unknown): unknown {
+  permitHash(
+    value: unknown,
+    filter: Record<string, unknown> | unknown,
+    options: { suppressUnpermitted?: boolean } = {},
+  ): unknown {
     if (!(value instanceof Parameters)) return undefined;
     if (
       filter !== null &&
@@ -983,16 +945,21 @@ export class Parameters {
     ) {
       return this.permitAnyInParameters(value);
     }
-    return value.permitFilters(
+    return value._permitFilters(
       (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
+      options,
     );
   }
 
   /** @internal */
-  permitHashOrArray(value: unknown, filter: unknown): unknown {
-    const arr = this.permitArrayOfHashes(value, filter);
+  permitHashOrArray(
+    value: unknown,
+    filter: unknown,
+    options: { suppressUnpermitted?: boolean } = {},
+  ): unknown {
+    const arr = this.permitArrayOfHashes(value, filter, options);
     if (arr != null) return arr;
-    return this.permitHash(value, filter);
+    return this.permitHash(value, filter, options);
   }
 
   /** @internal */

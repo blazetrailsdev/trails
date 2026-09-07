@@ -10,12 +10,21 @@ export interface GeneratorActionsState {
   afterInstallCallbacks: Array<() => void | Promise<void>>;
 }
 
+/** @missingRailsCall say_status — PERMANENT */
+export function log(this: ActionsHost, ...args: unknown[]): void {
+  if (args.length === 1) {
+    this.output(String(args[0]));
+  } else {
+    this.output(`${String(args[0]).padStart(12)}  ${String(args[1] ?? "")}`);
+  }
+}
+
 export function generate(
   this: ActionsHost & GeneratorActionsState,
   what: string,
   ...args: string[]
 ): void {
-  this.output(`      generate  ${what}`);
+  log.call(this, "generate", what);
   this.pendingGenerators.push({ what, args });
 }
 
@@ -70,7 +79,7 @@ export function executeCommand(
   if (options.sudo) parts.push("sudo");
   parts.push(executor, ...splitArgs(command));
   const [bin, ...args] = parts;
-  this.output(`          ${executor}  ${command}`);
+  log.call(this, executor, command);
   const result = getChildProcess().spawnSync(bin, args, {
     cwd: this.cwd,
     env: { ...processEnv, TRAILS_ENV: envName, RAILS_ENV: envName } as NodeJS.ProcessEnv,
