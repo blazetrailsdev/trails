@@ -71,7 +71,7 @@ interface SupportsInsertReturningHost {
 }
 
 interface AutoIncrementColumnHost {
-  autoIncrement?: boolean;
+  isAutoIncrement?(): boolean;
 }
 
 /** @internal */
@@ -84,8 +84,8 @@ export async function isAnalyzeWithoutExplain(
 }
 
 /** @internal */
-export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLiteral | undefined {
-  if (column.autoIncrement) return undefined;
+export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLiteral | null {
+  if (column.isAutoIncrement?.()) return null;
   return abstractDefaultInsertValue(column);
 }
 

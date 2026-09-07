@@ -104,7 +104,7 @@ export async function executeBatch(
   const flags = host._config?.flags;
   const multiStatements =
     isMultiStatementsEnabled.call(host) ||
-    !(Array.isArray(flags) && flags.includes("-MULTI_STATEMENTS"));
+    (Array.isArray(flags) ? !flags.includes("-MULTI_STATEMENTS") : flags == null);
   const totalSql = multiStatements
     ? await combineMultiStatements.call(this, statements)
     : statements;

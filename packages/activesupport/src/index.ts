@@ -493,10 +493,7 @@ export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
 export { synchronize, Monitor, type MonitorMixin } from "./concurrency/monitor.js";
-export {
-  LoadInterlockAwareMonitor,
-  ThreadLoadInterlockAwareMonitor,
-} from "./concurrency/load-interlock-aware-monitor.js";
+export { LoadInterlockAwareMonitor } from "./concurrency/load-interlock-aware-monitor.js";
 export { DescendantsTracker } from "./descendants-tracker.js";
 export { Configurable, Configuration } from "./configurable.js";
 export {

@@ -16,24 +16,17 @@ import { ActiveRecord } from "./ar-config.js";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
+import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
-const DOUBLE_COLUMNS: Record<string, string[]> = {
-  authors: ["id", "name", "author_address_extra_id"],
-  categorizations: ["id", "author_id", "post_id"],
-  developers: ["id", "name"],
-  developers_projects: ["id", "developer_id", "project_id"],
-  fk_object_to_point_tos: ["id"],
-  fk_pointing_to_non_existent_objects: ["id", "fk_object_to_point_to_id"],
-  orders: ["id", "status", "shop_id"],
-  posts: ["id", "title", "author", "author_id"],
+const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
+  accounts: ["name"],
+  developers_projects: ["id"],
+  orders: ["status", "shop_id"],
+  posts: ["author"],
   posts_tags: ["id", "post_id", "tag_id"],
-  projects: ["id", "name"],
-  subscribers: ["nick", "name"],
-  subscriptions: ["id", "subscriber_id"],
-  taggings: ["id", "taggable_id", "taggable_type"],
-  users: ["id", "name", "type"],
-  widgets: ["id", "name"],
+  users: ["name", "type"],
+  widgets: ["name"],
 };
 
 function makeAdapter(): DatabaseAdapter {
@@ -48,8 +41,7 @@ function makeAdapter(): DatabaseAdapter {
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
     schemaCache: {
-      columnsHash: async (table: string) =>
-        Object.fromEntries((DOUBLE_COLUMNS[table] ?? []).map((name) => [name, { name }])),
+      columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
     quoteString: (v: string) => v.replace(/'/g, "''"),
@@ -336,7 +328,7 @@ describe("defineFixtures", () => {
     );
     expect(joinInsert).toBeDefined();
     expect(joinInsert).toContain(String(FixtureSet.identify("david")));
-    expect(joinInsert).toMatch(/, 1\)/);
+    expect(joinInsert).toMatch(/\(1, /);
     expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
   });
 

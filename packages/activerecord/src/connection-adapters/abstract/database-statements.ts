@@ -1184,7 +1184,7 @@ export async function buildFixtureSql(
 ): Promise<string> {
   const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
   const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
-    ([, column]) => !(supportsVirtualColumns && (column as { virtual?: boolean }).virtual),
+    ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),
   );
   const columnNames = columns.map(([name]) => name);
 

@@ -15,6 +15,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   leaseFixtureConnection,
@@ -30,10 +31,9 @@ async function resolvePrimaryModel(entry: {
   return models[0];
 }
 
-const DOUBLE_COLUMNS: Record<string, string[]> = {
-  accounts: ["id", "name"],
-  posts: ["id", "title", "body"],
-  topics: ["id", "title"],
+const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
+  accounts: ["name"],
+  posts: ["body"],
 };
 
 function makeAdapter(): DatabaseAdapter {
@@ -51,8 +51,7 @@ function makeAdapter(): DatabaseAdapter {
     },
     executeBatch: vi.fn(async () => {}),
     schemaCache: {
-      columnsHash: async (table: string) =>
-        Object.fromEntries((DOUBLE_COLUMNS[table] ?? []).map((name) => [name, { name }])),
+      columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
     quoteString: (v: string) => v.replace(/'/g, "''"),
