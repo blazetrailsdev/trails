@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import {
   quoteColumnName,
   typeCast as typeCastFn,
@@ -113,6 +113,24 @@ describe("MySQL quoting — typeCast", () => {
 
   it("throws on Date — Date is no longer accepted", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
+  });
+
+  it("hands a Time back as a Time rather than a quoted_date String", () => {
+    const value = RubyTime.utc(2026, 5, 8, 14, 32, 0);
+    expect(typeCast(value)).toBe(value);
+  });
+
+  it("hands a TimeWithZone back as a Time rather than a quoted_date String", () => {
+    const value = new TimeWithZone(
+      RubyTime.utc(2026, 5, 8, 14, 32, 0),
+      TimeZone.find("Central Time (US & Canada)")!,
+    );
+    expect(typeCast(value)).toBeInstanceOf(RubyTime);
+  });
+
+  it("hands a Date back unchanged rather than a quoted_date String", () => {
+    const value = Temporal.PlainDate.from("2026-05-08");
+    expect(typeCast(value)).toBe(value);
   });
 });
 

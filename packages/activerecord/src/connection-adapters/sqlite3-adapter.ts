@@ -18,10 +18,7 @@ import { ActiveRecord } from "../ar-config.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
-import {
-  SQLITE3_NATIVE_DATABASE_TYPES,
-  type NativeDatabaseTypes,
-} from "./abstract/native-database-types.js";
+import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
   dataSourceSql as sqliteDataSourceSql,
@@ -687,8 +684,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
+    string: { name: "varchar" },
+    text: { name: "text" },
+    integer: { name: "integer" },
+    float: { name: "float" },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    boolean: { name: "boolean" },
+    json: { name: "json" },
+  };
+
   nativeDatabaseTypes(): NativeDatabaseTypes {
-    return SQLITE3_NATIVE_DATABASE_TYPES;
+    return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
 
   get encoding(): string {

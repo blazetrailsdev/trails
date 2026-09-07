@@ -120,10 +120,7 @@ class MysqlBigInteger extends BigIntegerType {
 }
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
-import {
-  MYSQL_NATIVE_DATABASE_TYPES,
-  type NativeDatabaseTypes,
-} from "./abstract/native-database-types.js";
+import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
@@ -339,8 +336,26 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return false;
   }
 
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "bigint auto_increment PRIMARY KEY",
+    string: { name: "varchar", limit: 255 },
+    text: { name: "text" },
+    integer: { name: "int", limit: 4 },
+    bigint: { name: "bigint" },
+    float: { name: "float", limit: 24 },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    timestamp: { name: "timestamp" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    blob: { name: "blob" },
+    boolean: { name: "tinyint", limit: 1 },
+    json: { name: "json" },
+  };
+
   nativeDatabaseTypes(): NativeDatabaseTypes {
-    return MYSQL_NATIVE_DATABASE_TYPES;
+    return AbstractMysqlAdapter.NATIVE_DATABASE_TYPES;
   }
 
   /** @internal */
@@ -396,7 +411,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async commitDbTransaction(): Promise<void> {}
 
-  async execRollbackDbTransaction(): Promise<void> {}
+  async execRollbackDbTransaction(): Promise<void> {
+    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
+  }
 
   async execRestartDbTransaction(): Promise<void> {}
 
