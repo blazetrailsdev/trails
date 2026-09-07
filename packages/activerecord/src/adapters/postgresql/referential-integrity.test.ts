@@ -190,7 +190,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const result = await adapter.execute("SELECT 1 AS n");
           expect(result[0].n).toBe(1);
         } finally {
-          await adapter.commit();
+          await adapter.commitTransaction();
         }
       } finally {
         await adapter.execute(`DROP SCHEMA IF EXISTS referential_integrity_violation_test CASCADE`);
@@ -212,7 +212,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const result = await adapter.execute("SELECT 1 AS n");
           expect(result[0].n).toBe(1);
         } finally {
-          await adapter.commit();
+          await adapter.commitTransaction();
         }
       } finally {
         await adapter.execute(`DROP SCHEMA IF EXISTS referential_integrity_tx_test CASCADE`);

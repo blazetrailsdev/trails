@@ -33,7 +33,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
         expect(pool.length).toBe(2);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
 
@@ -46,7 +46,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
         expect(adapter._statements!.length).toBe(1);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
         await adapter.close();
       }
     });
@@ -60,7 +60,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true }),
         ).rejects.toThrow();
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
         await adapter.close();
       }
     });
@@ -91,7 +91,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const pool = adapter._statements!;
         expect(pool.length).toBe(1);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
         await adapter.execute(`DROP TABLE IF EXISTS \`sp_mut\``);
       }
     });
@@ -102,7 +102,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await closable.beginDbTransaction();
       await closable.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
       const pool = closable._statements!;
-      await closable.rollback();
+      await closable.rollbackDbTransaction();
       await closable.close();
       expect(() => pool.clear()).not.toThrow();
     });
@@ -163,7 +163,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(pool.length).toBe(0);
         expect(adapter._statements).toBe(pool);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
   });

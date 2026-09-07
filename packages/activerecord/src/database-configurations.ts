@@ -56,6 +56,10 @@ export function setConfigurationsStore(configs: DatabaseConfigurations): void {
   _configurations = configs;
 }
 
+function isHash(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export class DatabaseConfigurations {
   static dbConfigHandlers: DbConfigHandler[] = [];
 
@@ -174,10 +178,9 @@ export class DatabaseConfigurations {
 
   private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
     if (Array.isArray(configs)) return configs;
-    const defaultEnv = this.defaultEnv();
 
-    const dbConfigs = Object.entries(configs).flatMap(([envName, config]) =>
-      this._isThreeLevelConfig(config)
+    const dbConfigs: (HashConfig | null)[] = Object.entries(configs).flatMap(([envName, config]) =>
+      isHash(config) && Object.values(config).every(isHash)
         ? this.walkConfigs(String(envName), config as Record<string, DatabaseConfigOptions>)
         : this.buildDbConfigFromRawConfig(
             String(envName),
@@ -186,24 +189,14 @@ export class DatabaseConfigurations {
           ),
     );
 
-    if (!dbConfigs.some((c) => c.envName === defaultEnv)) {
-      const urlConfig = this.environmentUrlConfig(defaultEnv, "primary", {});
-      if (urlConfig) dbConfigs.push(urlConfig);
+    if (!dbConfigs.find((c) => c?.forCurrentEnv)) {
+      dbConfigs.push(this.environmentUrlConfig(this.defaultEnv(), "primary", {}));
     }
 
     return this.mergeDbEnvironmentVariables(
-      defaultEnv,
+      this.defaultEnv(),
       dbConfigs.filter((c) => c != null),
     );
-  }
-
-  private _isThreeLevelConfig(config: unknown): boolean {
-    if (typeof config !== "object" || config === null || Array.isArray(config)) return false;
-    const obj = config as Record<string, unknown>;
-    if ("adapter" in obj || "url" in obj || "database" in obj) return false;
-    const values = Object.values(obj);
-    if (values.length === 0) return false;
-    return values.every((v) => typeof v === "object" && v !== null && !Array.isArray(v));
   }
 
   /** @internal */

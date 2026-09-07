@@ -966,6 +966,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
       supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
+      lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     };
 
   const USERS: Record<string, FixtureColumn> = {
@@ -997,6 +998,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       quoteTableName: q,
       quoteColumnName: q,
       quoteString: (s: string) => s.replace(/'/g, "''"),
+      lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
     };
   }
 
@@ -1044,6 +1046,16 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       expect(sql).toContain("'Alice'");
       expect(sql).toContain("30");
       expect(sql).not.toContain("DEFAULT");
+    });
+
+    it("serializes a present value through the column cast type", async () => {
+      const host: FixtureHost = {
+        ...makeHost(),
+        lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => `cast:${value}` }),
+      };
+      const sql = await buildFixtureSql.call(host, [{ name: "Alice", age: 30 }], "users");
+      expect(sql).toContain("'cast:Alice'");
+      expect(sql).toContain("'cast:30'");
     });
 
     it("single-row: strips missing columns (DEFAULT-strip optimisation)", async () => {

@@ -428,13 +428,13 @@ describe("SchemaAdapter TM delegation", () => {
     expect(testAdapter.isTransactionOpen()).toBe(true);
     expect(testAdapter.openTransactions()).toBeGreaterThan(0);
 
-    await testAdapter.commit();
+    await testAdapter.commitTransaction();
     expect(testAdapter.isTransactionOpen()).toBe(false);
     expect(testAdapter.openTransactions()).toBe(0);
 
     await testAdapter.beginTransaction({ _lazy: false });
     expect(testAdapter.isTransactionOpen()).toBe(true);
-    await testAdapter.rollback();
+    await testAdapter.rollbackTransaction();
     expect(testAdapter.isTransactionOpen()).toBe(false);
   });
 });

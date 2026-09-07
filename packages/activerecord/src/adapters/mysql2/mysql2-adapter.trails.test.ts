@@ -199,7 +199,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
         ).rejects.toBeInstanceOf(ValueTooLong);
       } finally {
         await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-        await adapter.rollback().catch(() => {});
+        await adapter.rollbackTransaction().catch(() => {});
       }
     });
   });
@@ -265,7 +265,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       expect(logger.warn).toHaveBeenCalled();
     } finally {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-      await adapter.rollback().catch(() => {});
+      await adapter.rollbackTransaction().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
       Base.logger = previousLogger;
     }

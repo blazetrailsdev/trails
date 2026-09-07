@@ -286,6 +286,23 @@ describe("SchemaDumperTest", () => {
       for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
     },
   );
+
+  itIfSupports("check_constraints", "schema dumps check constraints", async () => {
+    const constraintDefinition = (await dumpCanonicalTable("products"))
+      .split(/\n/)
+      .filter((line) => /t\.checkConstraint.*products_price_check/.test(line))[0]
+      .trim();
+
+    if (adapterType === "mysql") {
+      expect(constraintDefinition).toMatch(
+        /^t\.checkConstraint\("`price` > `discounted_price`", \{ name: "products_price_check" \}\);$/,
+      );
+    } else {
+      expect(constraintDefinition).toMatch(
+        /^t\.checkConstraint\("price > discounted_price", \{ name: "products_price_check" \}\);$/,
+      );
+    }
+  });
 });
 
 describe("SchemaDumperTest", () => {
@@ -362,19 +379,6 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
-  itIfSupports("check_constraints", "schema dumps check constraints", async () => {
-    const testAdapter = Base.connection;
-    await testAdapter.createTable("dump_check_constraints", { force: true }, (t) => {
-      t.decimal("price");
-      t.decimal("discounted_price");
-    });
-    await testAdapter.addCheckConstraint("dump_check_constraints", "price > discounted_price", {
-      name: "products_price_check",
-    });
-    const output = await SchemaDumper.dumpTableSchema(testAdapter, "dump_check_constraints");
-    expect(output).toContain("products_price_check");
-    expect(output).toContain("t.checkConstraint");
-  });
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
     const testAdapter = Base.connection;
     await testAdapter.createTable("test_schema_exclusion", { id: false }, (t) => {

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "reconnect",
+    "call": "rollback",
+    "reason": "Driver-API difference, not a dropped delegation: Ruby's `@raw_connection.rollback` (sqlite3_adapter.rb:814) is the sqlite3 gem's own handle method; better-sqlite3 has no `rollback`, so the same statement is issued as `this._rawConnection.exec(\"ROLLBACK\")`."
+  }
+]

@@ -1191,6 +1191,7 @@ export async function buildFixtureSql(
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
       supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
+      lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     },
   fixtures: Record<string, unknown>[],
   tableName: string,
@@ -1209,11 +1210,13 @@ export async function buildFixtureSql(
       );
     }
 
-    return columns.map(([name, column]) =>
-      name in fixture
-        ? arelSql(this.quote(withYamlFallback(fixture[name])))
-        : (this.defaultInsertValue ?? defaultInsertValue).call(this, column),
-    );
+    return columns.map(([name, column]) => {
+      if (name in fixture) {
+        const type = this.lookupCastTypeFromColumn(column);
+        return arelSql(this.quote(withYamlFallback(type.serialize(fixture[name]))));
+      }
+      return (this.defaultInsertValue ?? defaultInsertValue).call(this, column);
+    });
   });
 
   const table = new Table(tableName);
@@ -1247,6 +1250,7 @@ export function buildFixtureStatements(
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
       supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
+      lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     },
   fixtureSet: Record<string, Record<string, unknown>[]>,
 ): Promise<string[]> {

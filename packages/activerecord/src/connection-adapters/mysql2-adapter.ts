@@ -558,25 +558,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this.beginDbTransaction();
   }
 
-  async commit(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.commitTransaction();
-    }
-    return this.commitDbTransaction();
-  }
-
   async commitDbTransaction(): Promise<void> {
     await this.internalExecute("COMMIT", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });
-  }
-
-  async rollback(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.rollbackTransaction();
-    }
-    return this.rollbackDbTransaction();
   }
 
   async rollbackDbTransaction(): Promise<void> {

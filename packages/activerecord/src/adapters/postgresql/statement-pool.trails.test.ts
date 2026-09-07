@@ -25,7 +25,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         expect(pool.length).toBe(2);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
 
@@ -37,7 +37,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await limited.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         expect(limited._statements.length).toBe(1);
       } finally {
-        await limited.rollback();
+        await limited.rollbackDbTransaction();
         await limited.close();
       }
     });
@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const pool = adapter._statements;
         expect(pool.length).toBe(1);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
         await adapter.exec(`DROP TABLE IF EXISTS "sp_exec_mut"`);
       }
     });
@@ -82,7 +82,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await pool.clear();
         expect(pool.length).toBe(0);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
 
@@ -151,7 +151,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(pool.length).toBe(0);
         expect(adapter._statements).toBe(pool);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
 
@@ -161,7 +161,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
       const pool = adapter._statements;
       expect(pool.length).toBe(2);
-      await adapter.rollback();
+      await adapter.rollbackDbTransaction();
       expect(adapter._statements).toBe(pool);
       await adapter.clearCacheBang();
       expect(pool.length).toBe(0);
@@ -172,7 +172,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const failedPool = adapter._statements;
       expect(failedPool.length).toBe(1);
-      await adapter.rollback();
+      await adapter.rollbackDbTransaction();
       await adapter.beginDbTransaction();
       try {
         await adapter.internalExecQuery("SELECT $1::int", "SQL", [2], { prepare: true });
@@ -182,7 +182,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.clearCacheBang();
         expect(newTxnPool.length).toBe(0);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
   });

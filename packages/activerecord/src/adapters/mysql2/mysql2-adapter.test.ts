@@ -336,7 +336,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       });
     } finally {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-      await adapter.rollback().catch(() => {});
+      await adapter.rollbackTransaction().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
       Base.logger = previousLogger;
     }
@@ -362,7 +362,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       });
     } finally {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
-      await adapter.rollback().catch(() => {});
+      await adapter.rollbackTransaction().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
       Base.logger = previousLogger;
     }

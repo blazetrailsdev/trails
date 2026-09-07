@@ -238,11 +238,11 @@ describeIfPg("PostgreSQLAdapter", () => {
               adapter2.execute(`SELECT * FROM "ex_lock" WHERE id = 1 FOR UPDATE`),
             ).rejects.toBeInstanceOf(LockWaitTimeout);
           } finally {
-            await adapter2.rollback();
+            await adapter2.rollbackTransaction();
           }
         });
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackTransaction();
       }
     });
     it("translate exception deadlock", async () => {
@@ -265,8 +265,8 @@ describeIfPg("PostgreSQLAdapter", () => {
             .map((r) => r.reason);
           expect(errors.some((e) => e instanceof Deadlocked)).toBe(true);
         } finally {
-          await adapter.rollback().catch(() => {});
-          await adapter2.rollback().catch(() => {});
+          await adapter.rollbackTransaction().catch(() => {});
+          await adapter2.rollbackTransaction().catch(() => {});
         }
       });
     });
@@ -307,7 +307,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
         await expect(sleepPromise).rejects.toBeInstanceOf(QueryCanceled);
       } finally {
-        await adapter.rollback().catch(() => {});
+        await adapter.rollbackTransaction().catch(() => {});
       }
     });
     it("rollback does not cancel a query issued by another chain", async () => {
@@ -502,14 +502,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
           await adapter.execute(`UPDATE "ex_ser" SET val = 1`);
 
-          await adapter.commit();
+          await adapter.commitDbTransaction();
 
           await adapter2.execute(`UPDATE "ex_ser" SET val = 2`);
 
-          await expect(adapter2.commit()).rejects.toBeInstanceOf(SerializationFailure);
+          await expect(adapter2.commitDbTransaction()).rejects.toBeInstanceOf(SerializationFailure);
         } catch (e) {
-          await adapter.rollback().catch(() => {});
-          await adapter2.rollback().catch(() => {});
+          await adapter.rollbackDbTransaction().catch(() => {});
+          await adapter2.rollbackDbTransaction().catch(() => {});
           if (!(e instanceof SerializationFailure)) throw e;
         }
       });
@@ -550,7 +550,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
         expect(rows.length).toBeGreaterThan(0);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
     it("prepared statements with multiple binds", async () => {
@@ -563,7 +563,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
         expect(rows.length).toBeGreaterThan(0);
       } finally {
-        await adapter.rollback();
+        await adapter.rollbackDbTransaction();
       }
     });
     it("prepared statements disabled", async () => {
@@ -867,7 +867,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`CREATE TABLE "ex_txn" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       await adapter.beginTransaction({ _lazy: false });
       await adapter.executeMutation(`INSERT INTO "ex_txn" ("val") VALUES ('committed')`);
-      await adapter.commit();
+      await adapter.commitTransaction();
       const rows = await adapter.execute(`SELECT "val" FROM "ex_txn"`);
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBe("committed");
@@ -878,7 +878,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('before')`);
       await adapter.beginTransaction({ _lazy: false });
       await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('during')`);
-      await adapter.rollback();
+      await adapter.rollbackTransaction();
       const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_rb"`);
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBe("before");
@@ -892,7 +892,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('b')`);
       await adapter.rollbackToSavepoint("sp1");
       await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('c')`);
-      await adapter.commit();
+      await adapter.commitTransaction();
       const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_sp" ORDER BY "id"`);
       expect(rows.map((r) => r.val)).toEqual(["a", "c"]);
     });
@@ -1056,7 +1056,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await expect(adapter.setConstraints("deferred")).resolves.toBeUndefined();
       } finally {
-        await adapter.commit();
+        await adapter.commitTransaction();
       }
     });
 
@@ -1072,7 +1072,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect((rows[0] as { iso: string }).iso.toLowerCase()).toBe("serializable");
       } finally {
-        await adapter.commit();
+        await adapter.commitDbTransaction();
       }
     });
 

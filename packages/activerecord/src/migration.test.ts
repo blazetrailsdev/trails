@@ -1084,9 +1084,9 @@ describe("MigrationTest", () => {
       expect(await im.tableExists()).toBe(true);
       await im.set("environment", "foo");
       expect(await im.get("environment")).toBe("foo");
-      await adapter.commit();
+      await adapter.commitTransaction();
     } catch (e) {
-      await adapter.rollback();
+      await adapter.rollbackTransaction();
       throw e;
     }
 
@@ -1096,9 +1096,9 @@ describe("MigrationTest", () => {
       expect(await im.tableExists()).toBe(true);
       await im.set("environment", "bar");
       expect(await im.get("environment")).toBe("bar");
-      await adapter.commit();
+      await adapter.commitTransaction();
     } catch (e) {
-      await adapter.rollback();
+      await adapter.rollbackTransaction();
       throw e;
     }
   });
@@ -1112,9 +1112,9 @@ describe("MigrationTest", () => {
       await sm.createTable();
       expect(await sm.tableExists()).toBeTruthy();
       expect(await sm.createVersion("foo")).toBe("foo");
-      await adapter.commit();
+      await adapter.commitTransaction();
     } catch (e) {
-      await adapter.rollback();
+      await adapter.rollbackTransaction();
       throw e;
     }
 
@@ -1126,9 +1126,9 @@ describe("MigrationTest", () => {
       await sm.createTable();
       expect(await sm.tableExists()).toBeTruthy();
       expect(await sm.createVersion("bar")).toBe("bar");
-      await adapter.commit();
+      await adapter.commitTransaction();
     } catch (e) {
-      await adapter.rollback();
+      await adapter.rollbackTransaction();
       throw e;
     }
 

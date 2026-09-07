@@ -987,9 +987,9 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.integer("logs_parsed", { default: 0 });
     });
 
-    await adapter.commit();
+    await adapter.commitTransaction();
   } catch (err) {
-    await adapter.rollback();
+    await adapter.rollbackTransaction();
     throw err;
   }
 }

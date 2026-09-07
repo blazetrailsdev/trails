@@ -406,20 +406,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.rawExecute(sql, name, binds, prepare, false, allowRetry, materializeTransactions);
   }
 
-  async commit(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.commitTransaction();
-    }
-    return this.commitDbTransaction();
-  }
-
-  async rollback(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.rollbackTransaction();
-    }
-    return this.rollbackDbTransaction();
-  }
-
   async createSavepoint(name: string): Promise<void> {
     await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
   }

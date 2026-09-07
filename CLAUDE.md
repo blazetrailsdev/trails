@@ -672,6 +672,63 @@ lazily-loading collection read — and it is ratified repo-wide here.
 Do not re-derive the decision per call site, and do not file a story to make
 them `Promise`.
 
+## Override arity (Ruby does not check it; TypeScript does)
+
+Ruby lets a subclass replace an inherited method's parameter list outright.
+`AbstractAdapter#fetch_type_metadata` takes one argument
+(`activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1717`),
+MySQL's override adds `extra` (`mysql/schema_statements.rb:221`), and
+PostgreSQL's replaces the list entirely with
+`(column_name, sql_type, oid, fmod)` (`postgresql/schema_statements.rb:995`).
+No arity check runs, so all three are legal and all three are read as the same
+method.
+
+TypeScript checks a derived member against the base member and rejects a
+derived signature that requires MORE arguments than the base publishes:
+
+```text
+TS2416: Property 'fetchTypeMetadata' in type 'SchemaStatements' is not
+assignable to the same property in base type 'SchemaStatements'.
+  Target signature provides too few arguments. Expected 4 or more, but got 1.
+```
+
+Every route around it was tried and each one loses more fidelity than it buys:
+
+- **An overload set** compiles, because TypeScript checks the override against
+  the WHOLE list — but the only arrangement that type-checks makes
+  `PostgreSQLAdapter` publish a 1-argument signature its body never answers.
+- **Optional parameters** on the override (`sqlType?: string`) satisfy the
+  arity check by declaring parameters Rails declares as required, and force
+  `undefined` narrowing into a body that is otherwise line-for-line.
+- **Defaults** on the override are worse still: they invent values Rails has no
+  counterpart for.
+- **Breaking the inheritance edge** — porting the override as a `this`-typed
+  module function, or as a class property — does not help: the check follows
+  any inheritance path, `override` keyword or not.
+
+So the base declares the Rails signature plus a rest parameter that carries the
+overrides' extra arguments and nothing else:
+
+```ts
+fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata
+```
+
+The rest parameter is named `_rest` and is never read. It is not extra API
+surface (`parity:api:extra` scores members, not parameters) and it is not a
+renamed Rails parameter (`parity:api:params` compares the positions Rails
+declares, which still spell Rails' identifiers), which is why none of the three
+existing JSDoc receipts — `@noRailsEquivalent` for extra surface,
+`@missingRailsCall` for an omitted call, `@missingRailsArgs` for a call site's
+argument shape — fits it: there is nothing for them to suppress. This section
+is its receipt.
+
+This is a genuine language shortcoming, not a preference, and it is ratified
+repo-wide here. Code carrying an override-arity rest parameter cites **this
+section**; a new instance is not a new decision to argue. Two rules bound it:
+the rest parameter exists ONLY to admit an override's wider list — never to let
+a caller pass arguments Rails has no parameter for — and it is spelled
+`..._rest: unknown[]`, so a grep finds every instance.
+
 ## Call-time constant resolution (Ruby autoload → the zero-import slot)
 
 Ruby resolves a constant named inside a method body when the method **runs**,

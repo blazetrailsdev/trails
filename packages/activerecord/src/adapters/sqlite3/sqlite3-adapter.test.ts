@@ -374,7 +374,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("transaction", async () => {
     await adapter.beginTransaction({ _lazy: false });
     await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('x')`);
-    await adapter.commit();
+    await adapter.commitTransaction();
     const rows = (await adapter.execute(`SELECT * FROM "items"`))!;
     expect(rows).toHaveLength(1);
   });

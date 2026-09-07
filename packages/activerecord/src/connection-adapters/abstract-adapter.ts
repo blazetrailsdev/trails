@@ -687,8 +687,6 @@ export interface AbstractAdapter {
   enableLazyTransactionsBang(): void;
   dirtyCurrentTransaction(): void;
   isTransactionOpen(): boolean;
-  commit(): Promise<void>;
-  rollback(): Promise<void>;
   createSavepoint(name: string): Promise<void>;
   releaseSavepoint(name: string): Promise<void>;
   rollbackToSavepoint(name: string): Promise<void>;

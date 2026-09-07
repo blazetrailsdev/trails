@@ -49,7 +49,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
-  ActiveRecordError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -961,35 +960,6 @@ export class PostgreSQLAdapter
 
   async beginDeferredTransaction(): Promise<void> {
     return this.beginDbTransaction();
-  }
-
-  async commit(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.commitTransaction();
-    }
-    if (!this._client) throw new ActiveRecordError("No active transaction");
-    return this.commitDbTransaction();
-  }
-
-  async rollback(): Promise<void> {
-    if (this._transactionManager.openTransactions > 0) {
-      return this._transactionManager.rollbackTransaction();
-    }
-    if (!this._client) throw new ActiveRecordError("No active transaction");
-    try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
-        allowRetry: false,
-        materializeTransactions: true,
-      });
-    } catch (e) {
-      if (PostgreSQLAdapter._isConnectionError(e)) {
-        this._discardRawConnection();
-        return;
-      }
-      throw e;
-    } finally {
-      this._client = null;
-    }
   }
 
   private static _isConnectionError(err: unknown): boolean {

@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
           await expect(adapter.setConstraints("immediate")).rejects.toThrow(InvalidForeignKey);
         } finally {
-          await adapter.rollback().catch(() => {});
+          await adapter.rollbackTransaction().catch(() => {});
         }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
@@ -58,7 +58,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             InvalidForeignKey,
           );
         } finally {
-          await adapter.rollback().catch(() => {});
+          await adapter.rollbackTransaction().catch(() => {});
         }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
@@ -94,7 +94,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             InvalidForeignKey,
           );
         } finally {
-          await adapter.rollback().catch(() => {});
+          await adapter.rollbackTransaction().catch(() => {});
         }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_m_ch`);
@@ -130,7 +130,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`),
           ).rejects.toThrow(InvalidForeignKey);
         } finally {
-          await adapter.rollback().catch(() => {});
+          await adapter.rollbackTransaction().catch(() => {});
         }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_s_ch`);
