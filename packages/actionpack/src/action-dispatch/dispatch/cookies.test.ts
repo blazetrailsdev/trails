@@ -2,6 +2,26 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../cookies.js";
+import { cookiesSameSiteProtection } from "../middleware/cookies.js";
+
+function jarWithSameSiteProtection(
+  proc: (request: { userAgent?: string }) => unknown,
+  userAgent?: string,
+): CookieJar {
+  const env: Record<string, unknown> = {
+    "action_dispatch.cookies_same_site_protection": proc,
+  };
+  const request = {
+    env,
+    getHeader: (name: string) => env[name],
+    hasHeader: (name: string) => name in env,
+    userAgent,
+    cookies: {},
+    cookiesAppOptions: {},
+    cookiesSameSiteProtection,
+  };
+  return CookieJar.build(request as never, {});
+}
 
 function setCookieHeaders(jar: CookieJar): string[] {
   const response = new Response();
@@ -105,14 +125,14 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie with specific same site strict", () => {
-    const jar = new CookieJar({ sameSite: "lax" });
+    const jar = jarWithSameSiteProtection(() => "lax");
     jar.set("foo", { value: "bar", sameSite: "strict" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("samesite=strict");
   });
 
   it("setting cookie with specific same site nil", () => {
-    const jar = new CookieJar({ sameSite: "lax" });
+    const jar = jarWithSameSiteProtection(() => "lax");
     jar.set("foo", { value: "bar", sameSite: null });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).not.toContain("samesite");
@@ -335,16 +355,16 @@ describe("CookiesTest", () => {
     expect(headers[0]).not.toContain("samesite");
   });
 
-  it("default sameSite from jar options", () => {
-    const jar = new CookieJar({ sameSite: "lax" });
-    jar.set("foo", "bar");
-    const headers = setCookieHeaders(jar);
-    expect(headers[0]).toContain("samesite=lax");
-  });
-
   it.skip("setting cookie with secure on onion address", () => {});
 
-  it.skip("setting cookie with same site protection proc normal user agent", () => {});
+  it("setting cookie with same site protection proc normal user agent", () => {
+    const jar = jarWithSameSiteProtection((request) =>
+      request.userAgent === "spooky browser" ? undefined : "strict",
+    );
+    jar.set("user_name", "david");
+    const headers = setCookieHeaders(jar);
+    expect(headers[0]).toContain("samesite=strict");
+  });
 
   function assertDeletedCookie(jar: CookieJar) {
     expect(jar.get("user_name")).toBeUndefined();
@@ -511,7 +531,15 @@ describe("CookiesTest", () => {
     expect(jar.encrypted.get("foo")).toBeUndefined();
   });
 
-  it.skip("setting cookie with same site protection proc special user agent", () => {});
+  it("setting cookie with same site protection proc special user agent", () => {
+    const jar = jarWithSameSiteProtection(
+      (request) => (request.userAgent === "spooky browser" ? undefined : "strict"),
+      "spooky browser",
+    );
+    jar.set("user_name", "david");
+    const headers = setCookieHeaders(jar);
+    expect(headers[0]).not.toContain("samesite");
+  });
 
   it.skip("setting cookie with misspelled same site protection raises", () => {});
 

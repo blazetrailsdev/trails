@@ -36,11 +36,13 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
 /** @internal */
 export const COOKIES_APP_OPTIONS_KEY = "action_dispatch.cookies_app_options";
 
+/** @internal */
+export const COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
+
 export interface CookieJarOptions {
   secret?: string;
   signedSecret?: string;
   encryptedSecret?: string;
-  sameSite?: "strict" | "lax" | "none" | null;
 }
 
 export interface SetCookieOptions {
@@ -169,7 +171,8 @@ export class CookieJar implements Iterable<[string, string]> {
     options.path ||= "/";
 
     if (!("sameSite" in options)) {
-      options.sameSite = this._options.sameSite;
+      options.sameSite =
+        this._request?.cookiesSameSiteProtection?.() as SetCookieOptions["sameSite"];
     }
 
     const request = this._request as unknown as { host?: string } | undefined;
@@ -294,30 +297,61 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 }
 
-export class PermanentCookieJar {
-  private jar: CookieJar;
-  private static readonly TWENTY_YEARS_MS = 20 * 365.25 * 24 * 60 * 60 * 1000;
+export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
 
-  constructor(jar: CookieJar) {
-    this.jar = jar;
-  }
-
-  set(key: string, valueOrOptions: string | SetCookieOptions): void {
-    // boundary: the cookie `Expires` attribute is serialized as an HTTP-date.
-    const expires = new Date(Date.now() + PermanentCookieJar.TWENTY_YEARS_MS);
-    if (typeof valueOrOptions === "string") {
-      this.jar.set(key, { value: valueOrOptions, expires });
-    } else {
-      this.jar.set(key, { ...valueOrOptions, expires: valueOrOptions.expires ?? expires });
-    }
-  }
-
-  get(key: string): string | undefined {
-    return this.jar.get(key);
-  }
+function isHash(value: unknown): value is SerializedSetOptions {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
+export class AbstractCookieJar {
+  protected parentJar: CookieJar | AbstractCookieJar;
+
+  constructor(parentJar: CookieJar | AbstractCookieJar) {
+    this.parentJar = parentJar;
+  }
+
+  get(name: string): unknown {
+    const data = this.parentJar.get(name);
+    if (data != null) {
+      const result = this.parse(name, data, `cookie.${name}`);
+
+      if (result == null) {
+        return this.parse(name, data);
+      } else {
+        return result;
+      }
+    }
+    return undefined;
+  }
+
+  set(name: string, options: unknown): SerializedSetOptions {
+    if (!isHash(options)) {
+      options = { value: options };
+    }
+
+    this.commit(name, options as SerializedSetOptions);
+    this.parentJar.set(name, options as SetCookieOptions);
+    return options as SerializedSetOptions;
+  }
+
+  get permanent(): PermanentCookieJar {
+    return new PermanentCookieJar(this);
+  }
+
+  protected parse(_name: string, data: unknown, _purpose?: string): unknown {
+    return data;
+  }
+
+  protected commit(_name: string, _options: SerializedSetOptions): void {}
+}
+
+export class PermanentCookieJar extends AbstractCookieJar {
+  private static readonly TWENTY_YEARS_MS = 20 * 365.25 * 24 * 60 * 60 * 1000;
+
+  protected commit(_name: string, options: SerializedSetOptions): void {
+    options.expires = new Date(Date.now() + PermanentCookieJar.TWENTY_YEARS_MS);
+  }
+}
 
 /** @internal */
 function makeSerializedHost(
@@ -333,54 +367,32 @@ function makeSerializedHost(
   };
 }
 
-/** @internal */
-function normalizeSerializedInput(input: unknown): SerializedSetOptions {
-  if (input !== null && typeof input === "object" && Object.hasOwn(input, "value")) {
-    return { ...(input as SerializedSetOptions) };
-  }
-  return { value: input };
-}
-
-export class SignedCookieJar {
-  private jar: CookieJar;
+export class SignedCookieJar extends AbstractCookieJar {
   private secret: string;
   private digest: string;
   private host: SerializedCookieJarsHost;
 
   constructor(
-    jar: CookieJar,
+    parentJar: CookieJar | AbstractCookieJar,
     secret: string,
     request?: RequestCookieMethodsHost,
     digest = "sha256",
   ) {
-    this.jar = jar;
+    super(parentJar);
     this.secret = secret;
     this.digest = digest;
     this.host = makeSerializedHost(request);
   }
 
-  set(key: string, valueOrOptions: unknown): void {
-    const options = normalizeSerializedInput(valueOrOptions);
-    commit.call(this.host, key, options);
-    const signed = this.sign(options.value as string);
-    checkForOverflowBang(key, { value: signed });
-    this.jar.set(key, { ...(options as SetCookieOptions), value: signed });
+  protected parse(name: string, signedMessage: unknown, _purpose?: string): unknown {
+    const data = this.verify(signedMessage as string);
+    return parse.call(this.host, name, data);
   }
 
-  get permanent(): PermanentCookieJar {
-    return new PermanentCookieJar(this as unknown as CookieJar);
-  }
-
-  get(key: string): unknown {
-    const raw = this.jar.get(key);
-    if (raw === undefined) return undefined;
-    const verified = this.verify(raw);
-    if (verified === undefined) return undefined;
-    try {
-      return serializer.call(this.host).load(verified);
-    } catch {
-      return undefined;
-    }
+  protected commit(name: string, options: SerializedSetOptions): void {
+    commit.call(this.host, name, options);
+    options.value = this.sign(options.value as string);
+    checkForOverflowBang(name, options as { value: string });
   }
 
   private sign(value: string): string {
@@ -403,39 +415,29 @@ export class SignedCookieJar {
   }
 }
 
-export class EncryptedCookieJar {
-  private jar: CookieJar;
+export class EncryptedCookieJar extends AbstractCookieJar {
   private secret: string;
   private host: SerializedCookieJarsHost;
 
-  constructor(jar: CookieJar, secret: string, request?: RequestCookieMethodsHost) {
-    this.jar = jar;
+  constructor(
+    parentJar: CookieJar | AbstractCookieJar,
+    secret: string,
+    request?: RequestCookieMethodsHost,
+  ) {
+    super(parentJar);
     this.secret = secret;
     this.host = makeSerializedHost(request);
   }
 
-  set(key: string, valueOrOptions: unknown): void {
-    const options = normalizeSerializedInput(valueOrOptions);
-    commit.call(this.host, key, options);
-    const encrypted = this.encrypt(options.value as string);
-    checkForOverflowBang(key, { value: encrypted });
-    this.jar.set(key, { ...(options as SetCookieOptions), value: encrypted });
+  protected parse(name: string, encryptedMessage: unknown, _purpose?: string): unknown {
+    const data = this.decrypt(encryptedMessage as string);
+    return parse.call(this.host, name, data);
   }
 
-  get permanent(): PermanentCookieJar {
-    return new PermanentCookieJar(this as unknown as CookieJar);
-  }
-
-  get(key: string): unknown {
-    const raw = this.jar.get(key);
-    if (raw === undefined) return undefined;
-    const decrypted = this.decrypt(raw);
-    if (decrypted === undefined) return undefined;
-    try {
-      return serializer.call(this.host).load(decrypted);
-    } catch {
-      return undefined;
-    }
+  protected commit(name: string, options: SerializedSetOptions): void {
+    commit.call(this.host, name, options);
+    options.value = this.encrypt(options.value as string);
+    checkForOverflowBang(name, options as { value: string });
   }
 
   private encrypt(value: string): string {
@@ -502,6 +504,7 @@ export interface RequestCookieMethodsHost {
   hasHeader(name: string): boolean;
   cookiesAppOptions?: CookieJarOptions;
   cookies: Record<string, string>;
+  cookiesSameSiteProtection?(): unknown;
 }
 
 const COOKIE_JAR_ENV = COOKIES_KEY;
@@ -559,10 +562,18 @@ export const signedCookieDigest = requestEnvAccessor<string>(
 export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
 /** @internal */
 export const cookiesSerializer = requestEnvAccessor<string>("action_dispatch.cookies_serializer");
-/** @internal */
-export const cookiesSameSiteProtection = requestEnvAccessor<unknown>(
-  "action_dispatch.cookies_same_site_protection",
-);
+/**
+ * @internal
+ * @missingRailsCall call — PERMANENT
+ */
+export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unknown {
+  return (
+    this.getHeader(COOKIES_SAME_SITE_PROTECTION) as
+      | ((request: unknown) => unknown)
+      | undefined
+      | null
+  )?.(this);
+}
 /** @internal */
 export const cookiesDigest = requestEnvAccessor<string>("action_dispatch.cookies_digest");
 /** @internal */
@@ -659,6 +670,21 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 /** @internal */
 export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
   return !serializer.call(this).dumped(dumped);
+}
+
+/** @internal */
+export function parse(this: SerializedCookieJarsHost, _name: string, dumped: unknown): unknown {
+  if (dumped != null) {
+    let value: unknown;
+    try {
+      value = serializer.call(this).load(dumped as string);
+    } catch {
+      return undefined;
+    }
+
+    return value;
+  }
+  return undefined;
 }
 
 /** @internal */
