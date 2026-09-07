@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { ADAPTER_ARG_FAMILIES, buildAdapterArg } from "./adapter-args.js";
-import "../connection-adapters.js";
 
 describe("buildAdapterArg", () => {
   describe("sqlite", () => {
