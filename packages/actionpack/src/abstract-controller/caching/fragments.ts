@@ -5,8 +5,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
 function cacheConfigured(host: FragmentsHost): boolean {
-  const cls = host.constructor;
-  return Boolean(cls.performCaching && cls.cacheStore);
+  return Boolean(host.performCaching && host.cacheStore);
 }
 
 export type FragmentCacheKeyBlock = (this: FragmentsHost) => unknown;
@@ -19,6 +18,8 @@ export interface FragmentsClassMethods {
 
 export interface FragmentsHost {
   constructor: FragmentsClassMethods;
+  cacheStore?: CacheStore | null;
+  performCaching?: boolean;
   urlFor?(options: unknown): string;
   instrumentName?(): string;
   instrumentPayload?(key: unknown): Record<string, unknown>;
@@ -91,7 +92,7 @@ export function writeFragment(
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   instrumentFragmentCache(this, "write_fragment", key, () => {
     content = toStr(content);
-    this.constructor.cacheStore!.write(key as string, content, options);
+    this.cacheStore!.write(key as string, content, options);
   });
   return content;
 }
@@ -100,7 +101,7 @@ export function readFragment(this: FragmentsHost, key: unknown, options?: CacheO
   if (!cacheConfigured(this)) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   return instrumentFragmentCache(this, "read_fragment", key, () =>
-    this.constructor.cacheStore!.read(key as string, options),
+    this.cacheStore!.read(key as string, options),
   );
 }
 
@@ -112,7 +113,7 @@ export function fragmentExist(
   if (!cacheConfigured(this)) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   return instrumentFragmentCache(this, "exist_fragment?", key, () =>
-    this.constructor.cacheStore!.exist(key as string, options),
+    this.cacheStore!.exist(key as string, options),
   );
 }
 
@@ -122,9 +123,9 @@ export function expireFragment(this: FragmentsHost, key: unknown, options?: Cach
 
   return instrumentFragmentCache(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
-      return this.constructor.cacheStore!.deleteMatched(key, options);
+      return this.cacheStore!.deleteMatched(key, options);
     } else {
-      return this.constructor.cacheStore!.delete(key as string, options);
+      return this.cacheStore!.delete(key as string, options);
     }
   });
 }

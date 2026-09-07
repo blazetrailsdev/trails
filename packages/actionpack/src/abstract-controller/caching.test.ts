@@ -1,54 +1,48 @@
 import { describe, it, expect } from "vitest";
-import { include, MemoryStore } from "@blazetrails/activesupport";
+import { Configurable, extend, include, MemoryStore } from "@blazetrails/activesupport";
 
 import {
   cache,
   cacheConfigured,
   ConfigMethods,
-  CACHING_DEFAULTS,
-  CACHING_SLOTS,
-  readFragment,
   viewCacheDependencies,
   viewCacheDependency,
-  writeFragment,
   type CachingHost,
 } from "./caching.js";
+import { readFragment, writeFragment } from "./caching/fragments.js";
 
 class HostClass {
-  static cacheStore: MemoryStore | null = null;
-  static performCaching = true;
-  static defaultStaticExtension = ".html";
-  static enableFragmentCacheLogging = false;
+  static config = Configurable.ClassMethods.config;
+  static configAccessor = Configurable.ClassMethods.configAccessor;
+  config = Configurable.config;
+
   static _viewCacheDependencies?: Array<(this: CachingHost) => unknown>;
 
   greeting = "hello";
 }
 
 include(HostClass, ConfigMethods);
+extend(HostClass, ConfigMethods);
+HostClass.configAccessor("defaultStaticExtension");
+HostClass.configAccessor("performCaching");
+HostClass.configAccessor("enableFragmentCacheLogging");
 
-function makeHost(store?: MemoryStore | null): HostClass & CachingHost & ConfigMethods {
-  HostClass.cacheStore = store ?? null;
-  HostClass.performCaching = true;
+const HostConfig = HostClass as unknown as typeof HostClass & {
+  cacheStore: unknown;
+  performCaching: boolean;
+  defaultStaticExtension: string;
+};
+
+function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof ConfigMethods {
+  HostClass.config().clear();
+  if (store) HostConfig.cacheStore = store;
+  HostConfig.performCaching = true;
+  HostConfig.defaultStaticExtension = ".html";
   HostClass._viewCacheDependencies = undefined;
-  return new HostClass() as unknown as HostClass & CachingHost & ConfigMethods;
+  return new HostClass() as unknown as HostClass & CachingHost & typeof ConfigMethods;
 }
 
 describe("AbstractController::Caching", () => {
-  describe("defaults", () => {
-    it("ships the Rails-shaped slot list and values", () => {
-      expect(CACHING_SLOTS).toEqual([
-        "defaultStaticExtension",
-        "performCaching",
-        "enableFragmentCacheLogging",
-      ]);
-      expect(CACHING_DEFAULTS).toEqual({
-        defaultStaticExtension: ".html",
-        performCaching: true,
-        enableFragmentCacheLogging: false,
-      });
-    });
-  });
-
   describe("cacheStore reader/writer", () => {
     it("reads the class-level slot", () => {
       const store = new MemoryStore();
@@ -56,14 +50,19 @@ describe("AbstractController::Caching", () => {
       expect(host.cacheStore).toBe(store);
     });
     it("returns null when no store is wired up", () => {
-      expect(makeHost().cacheStore).toBeNull();
+      expect(makeHost().cacheStore).toBeUndefined();
     });
-    it("cacheStore= assigns onto the class slot", () => {
+    it("cacheStore= writes the instance's own inheritable config copy", () => {
       const host = makeHost();
       const store = new MemoryStore();
       host.cacheStore = store;
-      expect(HostClass.cacheStore).toBe(store);
       expect(host.cacheStore).toBe(store);
+      expect(HostConfig.cacheStore).toBeUndefined();
+    });
+    it("cacheStore= on the class resolves through Cache.lookup_store", () => {
+      makeHost();
+      HostConfig.cacheStore = ":memory_store";
+      expect(HostConfig.cacheStore).toBeInstanceOf(MemoryStore);
     });
   });
 
@@ -73,11 +72,16 @@ describe("AbstractController::Caching", () => {
     });
     it("is false when performCaching is off, even with a store", () => {
       const host = makeHost(new MemoryStore());
-      HostClass.performCaching = false;
+      HostConfig.performCaching = false;
       expect(cacheConfigured(host)).toBe(false);
     });
     it("is true when both are set", () => {
       expect(cacheConfigured(makeHost(new MemoryStore()))).toBe(true);
+    });
+    it("reads the instance's own store when only the instance carries one", () => {
+      const host = makeHost();
+      host.cacheStore = new MemoryStore();
+      expect(cacheConfigured(host)).toBe(true);
     });
   });
 
@@ -123,6 +127,13 @@ describe("AbstractController::Caching", () => {
       expect(second).toBe("rendered");
       expect(calls).toBe(1);
       expect(store.read("controller/page-1")).toBe("rendered");
+    });
+    it("fetches through a store set only on the instance", () => {
+      const host = makeHost();
+      const store = new MemoryStore();
+      host.cacheStore = store;
+      cache.call(host, "instance-page", () => "rendered");
+      expect(store.read("controller/instance-page")).toBe("rendered");
     });
     it("flattens array keys", () => {
       const store = new MemoryStore();

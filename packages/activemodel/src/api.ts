@@ -1,4 +1,4 @@
-import { extend, include, included } from "@blazetrails/activesupport";
+import { extend, include, included, initializeIncludedModules } from "@blazetrails/activesupport";
 import {
   assignAttributes,
   setAttributes,
@@ -19,6 +19,8 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
   if (attributes != null) this.assignAttributes(attributes);
+
+  initializeIncludedModules(this);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.

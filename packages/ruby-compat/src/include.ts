@@ -183,8 +183,13 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  *
  * JavaScript has no construction hook a mixin can splice into, so the class at
  * the bottom of the chain calls `initializeIncludedModules(this)` where Ruby's
- * `initialize` calls `super` — `ActionController::Metal`'s constructor, the
- * port of `metal.rb:210-217`.
+ * `initialize` calls `super`. Every root whose Ruby `initialize` carries such a
+ * `super` does so: `ActionController::Metal` (`metal.rb:210-217`),
+ * `ActiveModel::API` (`api.rb:80-85`, which `ActiveRecord::Base`'s constructor
+ * reaches through its own `super` at `core.rb:477`), and `ActionView::Base`
+ * (`base.rb:244-259`). `AbstractController::Base` defines no `initialize`
+ * (`abstract_controller/base.rb`), so it has no `super` site to hook and a
+ * mixin included there is seated by whichever subclass root does.
  *
  * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
  * lifecycle name, and a string-named TS method spelled that way is drift.

@@ -1,29 +1,7 @@
 /** @internal */
 
 import { expandCacheKey, lookupStore } from "@blazetrails/activesupport/cache";
-import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
-
-import {
-  combinedFragmentCacheKey as _combinedFragmentCacheKey,
-  expireFragment as _expireFragment,
-  fragmentExist as _fragmentExist,
-  instrumentFragmentCache as _instrumentFragmentCache,
-  readFragment as _readFragment,
-  writeFragment as _writeFragment,
-  type FragmentsHost,
-} from "./caching/fragments.js";
-
-const SLOTS = ["defaultStaticExtension", "performCaching", "enableFragmentCacheLogging"] as const;
-
-export type CachingSlot = (typeof SLOTS)[number];
-
-export const CACHING_SLOTS: readonly CachingSlot[] = SLOTS;
-
-export const CACHING_DEFAULTS = {
-  defaultStaticExtension: ".html",
-  performCaching: true,
-  enableFragmentCacheLogging: false,
-} as const;
+import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activesupport";
 
 export type ViewCacheDependency = (this: CachingHost) => unknown;
 
@@ -37,22 +15,25 @@ export interface CachingClassMethods {
 
 export interface CachingHost {
   constructor: CachingClassMethods;
+  cacheStore?: CacheStore | null;
+  performCaching?: boolean;
 }
 
-export class ConfigMethods {
+type ConfigReceiver = { config(): Configuration & { cacheStore: CacheStore | null } };
+
+export const ConfigMethods = {
   get cacheStore(): CacheStore | null {
-    return (this as unknown as CachingHost).constructor.cacheStore ?? null;
-  }
+    return (this as unknown as ConfigReceiver).config().cacheStore;
+  },
 
   set cacheStore(store: unknown) {
-    (this as unknown as CachingHost).constructor.cacheStore = lookupStore(store);
-  }
-}
+    (this as unknown as ConfigReceiver).config().cacheStore = lookupStore(store);
+  },
+};
 
 /** @internal */
 export function cacheConfigured(host: CachingHost): boolean {
-  const cls = host.constructor;
-  return Boolean(cls.performCaching && cls.cacheStore);
+  return Boolean(host.performCaching && host.cacheStore);
 }
 
 export function viewCacheDependency(
@@ -85,44 +66,6 @@ export function cache<T>(
 
   if (!cacheConfigured(this)) return block();
 
-  const store = this.constructor.cacheStore!;
+  const store = this.cacheStore!;
   return store.fetch(expandCacheKey(key, "controller"), options, block) as T;
-}
-
-export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
-  return _combinedFragmentCacheKey.call(this, key);
-}
-
-export function writeFragment(
-  this: FragmentsHost,
-  key: unknown,
-  content: unknown,
-  options?: CacheOptions,
-): unknown {
-  return _writeFragment.call(this, key, content, options);
-}
-
-export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
-  return _readFragment.call(this, key, options);
-}
-
-export function fragmentExist(
-  this: FragmentsHost,
-  key: unknown,
-  options?: CacheOptions,
-): boolean | undefined {
-  return _fragmentExist.call(this, key, options);
-}
-
-export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
-  return _expireFragment.call(this, key, options);
-}
-
-export function instrumentFragmentCache<T>(
-  host: FragmentsHost,
-  name: string,
-  key: unknown,
-  block: () => T,
-): T {
-  return _instrumentFragmentCache(host, name, key, block);
 }

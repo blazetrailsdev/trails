@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryStore, Notifications } from "@blazetrails/activesupport";
+import {
+  Configurable,
+  MemoryStore,
+  Notifications,
+  extend,
+  include,
+} from "@blazetrails/activesupport";
+import { ConfigMethods } from "../caching.js";
 
 import {
   combinedFragmentCacheKey,
@@ -14,8 +21,10 @@ import {
 } from "./fragments.js";
 
 class HostClass {
-  static cacheStore: MemoryStore | null = null;
-  static performCaching = true;
+  static config = Configurable.ClassMethods.config;
+  static configAccessor = Configurable.ClassMethods.configAccessor;
+  config = Configurable.config;
+
   static fragmentCacheKeys: Array<(this: FragmentsHost) => unknown> | undefined;
 
   account = { id: 7 };
@@ -24,9 +33,19 @@ class HostClass {
   }
 }
 
+include(HostClass, ConfigMethods);
+extend(HostClass, ConfigMethods);
+HostClass.configAccessor("performCaching");
+
+const HostConfig = HostClass as unknown as typeof HostClass & {
+  cacheStore: unknown;
+  performCaching: boolean;
+};
+
 function makeHost(store?: MemoryStore): HostClass & FragmentsHost {
-  HostClass.cacheStore = store ?? null;
-  HostClass.performCaching = true;
+  HostClass.config().clear();
+  if (store) HostConfig.cacheStore = store;
+  HostConfig.performCaching = true;
   HostClass.fragmentCacheKeys = [];
   return new HostClass() as unknown as HostClass & FragmentsHost;
 }
@@ -149,7 +168,7 @@ describe("read/write/expire fragment", () => {
   });
 
   it("forwards options to exist?, delete and delete_matched", () => {
-    const store = HostClass.cacheStore!;
+    const store = HostConfig.cacheStore as MemoryStore;
     const exist = vi.spyOn(store, "exist");
     const del = vi.spyOn(store, "delete");
     const deleteMatched = vi.spyOn(store, "deleteMatched");
@@ -162,7 +181,7 @@ describe("read/write/expire fragment", () => {
   });
 
   it("returns content / undefined when caching is not configured", () => {
-    HostClass.performCaching = false;
+    HostConfig.performCaching = false;
     expect(writeFragment.call(host, "n", "body")).toBe("body");
     expect(readFragment.call(host, "n")).toBeUndefined();
     expect(fragmentExist.call(host, "n")).toBeUndefined();
