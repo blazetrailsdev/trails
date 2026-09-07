@@ -565,13 +565,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  async rollbackDbTransaction(): Promise<void> {
-    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
-  }
-
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
@@ -1043,7 +1036,7 @@ function isMysql2ConnectionError(e: unknown): boolean {
 (Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =
   mysql2CastResult;
 
-dirtiesQueryCache(Mysql2Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
+dirtiesQueryCache(Mysql2Adapter, "rollbackToSavepoint");
 dirtiesQueryCache(Mysql2Adapter, "execute");
 
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;

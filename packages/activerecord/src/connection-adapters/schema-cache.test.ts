@@ -8,7 +8,7 @@ import { SchemaStatements } from "./abstract/schema-statements.js";
 import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include } from "@blazetrails/activesupport";
 import { TableDefinition } from "./abstract/schema-definitions.js";
-import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./abstract/native-database-types.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
@@ -578,7 +578,7 @@ class MockAdapter {
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
-  nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite3"];
+  nativeDatabaseTypes = () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
   supportsCheckConstraints = async () => true;
   supportsIndexesInCreate = () => false;
   supportsPartialIndex = () => true;

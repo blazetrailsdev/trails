@@ -9,7 +9,7 @@ import {
 import type { TableDefinitionOf } from "./schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
-import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { Table, Visitors } from "@blazetrails/arel";
@@ -52,7 +52,7 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
-  adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite3"];
+  adapter["nativeDatabaseTypes"] ??= () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null
       ? "SELECT name FROM catalog"

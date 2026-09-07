@@ -152,20 +152,20 @@ export function columnNameWithOrderMatcher(): RegExp {
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof TimeWithZone) {
     if (ActiveRecord.defaultTimezone === "utc") {
-      return this.quotedDate(value.getutc());
+      return value.getutc();
     } else {
-      return this.quotedDate(value.getlocal());
+      return value.getlocal();
     }
   }
   if (value instanceof RubyTime) {
     if (ActiveRecord.defaultTimezone === "utc") {
-      return this.quotedDate(value.isUtc() ? value : value.getutc());
+      return value.isUtc() ? value : value.getutc();
     } else {
-      return this.quotedDate(value.isUtc() ? value.getlocal() : value);
+      return value.isUtc() ? value.getlocal() : value;
     }
   }
   if (value instanceof Temporal.PlainDate) {
-    return this.quotedDate(value);
+    return value;
   }
   return abstractTypeCast.call(this, value);
 }

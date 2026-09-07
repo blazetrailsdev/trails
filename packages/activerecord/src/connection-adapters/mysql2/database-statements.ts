@@ -5,6 +5,8 @@ import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/data
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 import type { StatementPool } from "../statement-pool.js";
 import { ActiveRecord } from "../../ar-config.js";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { TimeWithZone } from "@blazetrails/activesupport";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -51,6 +53,7 @@ interface PerformQueryHost {
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   _trackPrepared?(conn: unknown, sql: string): void;
+  quotedDate(value: unknown): string;
 }
 
 /** @internal */
@@ -138,6 +141,17 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   return false;
 }
 
+function driverBoundValue(this: PerformQueryHost, value: unknown): unknown {
+  if (
+    value instanceof TimeWithZone ||
+    value instanceof RubyTime ||
+    value instanceof Temporal.PlainDate
+  ) {
+    return this.quotedDate(value);
+  }
+  return value;
+}
+
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
@@ -160,6 +174,8 @@ export async function performQuery(
 
   if (prepare) this._trackPrepared?.(rawConnection, sql);
 
+  const driverBinds = typeCastedBinds.map((value) => driverBoundValue.call(this, value));
+
   let rawResult: unknown;
   let rawFields: mysql.FieldPacket[] | undefined;
   if (!hasBinds) {
@@ -171,7 +187,7 @@ export async function performQuery(
     try {
       [rawResult, rawFields] = (await rawConnection.execute(
         { sql, rowsAsArray: true } as any,
-        typeCastedBinds as any[],
+        driverBinds as any[],
       )) as [unknown, mysql.FieldPacket[]];
     } catch (err) {
       this._statements?.delete(sql);
@@ -180,7 +196,7 @@ export async function performQuery(
   } else {
     [rawResult, rawFields] = (await rawConnection.query(
       { sql, rowsAsArray: true } as any,
-      typeCastedBinds as any[],
+      driverBinds as any[],
     )) as [unknown, mysql.FieldPacket[]];
   }
 
