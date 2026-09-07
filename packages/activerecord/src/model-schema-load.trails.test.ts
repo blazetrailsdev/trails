@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
+import { defaultValue } from "./type.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -31,7 +32,7 @@ function makeAdapter(
     internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
-      return typeByColumn[column.sqlType] ?? null;
+      return typeByColumn[column.sqlType] ?? defaultValue();
     },
   };
 }
@@ -146,7 +147,7 @@ describe("loadSchemaFromAdapter", () => {
     const adapter = {
       internalSchemaCache: cache,
       schemaCache: cache,
-      lookupCastTypeFromColumn: () => null,
+      lookupCastTypeFromColumn: () => defaultValue(),
     };
     (Model as unknown as { adapter: unknown }).adapter = adapter;
 

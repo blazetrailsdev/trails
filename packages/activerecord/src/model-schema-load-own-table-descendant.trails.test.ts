@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { loadSchema } from "./model-schema.js";
+import { defaultValue } from "./type.js";
 
 type Cols = Record<string, { sqlType: string; name: string; default: null }>;
 
@@ -23,7 +24,7 @@ function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
         return tables[table];
       },
     },
-    lookupCastTypeFromColumn: () => null,
+    lookupCastTypeFromColumn: () => defaultValue(),
   };
 }
 
