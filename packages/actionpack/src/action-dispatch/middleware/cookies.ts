@@ -41,11 +41,6 @@ export interface CookieJarOptions {
   signedSecret?: string;
   encryptedSecret?: string;
   sameSite?: "strict" | "lax" | "none" | null;
-  secure?: boolean;
-  httpOnly?: boolean;
-  domain?: string;
-  path?: string;
-  expires?: CookieExpires;
 }
 
 export interface SetCookieOptions {
@@ -211,16 +206,15 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  delete(name: string, options?: { path?: string; domain?: string }): string | undefined {
+  delete(name: string, options: { path?: string; domain?: string } = {}): string | undefined {
     if (!this._cookies.has(name)) return undefined;
-    if (this._committed) return undefined;
-    const opts = options ?? {};
-    this.handleOptions(opts);
-    const val = this._cookies.get(name);
+
+    this.handleOptions(options);
+
+    const value = this._cookies.get(name);
     this._cookies.delete(name);
-    this._setCookies.delete(name);
-    this._deletedCookies.set(name, opts);
-    return val ?? undefined;
+    this._deletedCookies.set(name, options);
+    return value;
   }
 
   isDeleted(name: string, options: { path?: string; domain?: string } = {}): boolean {

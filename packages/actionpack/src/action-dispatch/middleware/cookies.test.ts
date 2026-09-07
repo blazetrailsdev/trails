@@ -46,8 +46,9 @@ describe("Cookies middleware", () => {
     const setCookie = headers["set-cookie"] as string[];
     expect(Array.isArray(setCookie)).toBe(true);
     expect(setCookie[0]).toContain("session=abc");
-    expect(setCookie[1]).toContain("stale=");
-    expect(setCookie).toHaveLength(2);
+    expect(setCookie[1]).toContain("stale=old");
+    expect(setCookie[2]).toContain("stale=");
+    expect(setCookie).toHaveLength(3);
   });
 
   it("does not double-flush a jar that was already committed", async () => {

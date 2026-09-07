@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QueryParser, Params } from "./query-parser.js";
+import { QueryParser, Params, ParamsTooDeepError, QueryLimitError } from "./query-parser.js";
 
 describe("Rack::QueryParser::Params", () => {
   it("does not write through Object.prototype for a __proto__ key", () => {
@@ -18,5 +18,14 @@ describe("Rack::QueryParser::Params", () => {
     const params = new Params();
     params["a"] = "1";
     expect(params.toParamsHash()).toEqual({ a: "1" });
+  });
+});
+
+describe("Rack::QueryParser::ParamsTooDeepError", () => {
+  it("is the same constant as QueryLimitError", () => {
+    expect(ParamsTooDeepError).toBe(QueryLimitError);
+    expect(new QueryLimitError("x")).toBeInstanceOf(ParamsTooDeepError);
+    expect(new ParamsTooDeepError("x")).toBeInstanceOf(QueryLimitError);
+    expect(new ParamsTooDeepError("x").name).toBe("QueryLimitError");
   });
 });

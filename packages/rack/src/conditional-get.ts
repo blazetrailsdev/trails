@@ -1,9 +1,5 @@
-/**
- * @boundary-file: parses RFC 7231 HTTP-date strings (`If-Modified-Since`,
- *   `Last-Modified`) for cache-freshness comparison using the runtime's
- *   `Date` parsing semantics.
- */
-
+import { Time } from "@blazetrails/date";
+import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -27,8 +23,9 @@ export class ConditionalGet {
       response[0] = 304;
       delete headers[CONTENT_TYPE];
       delete headers[CONTENT_LENGTH];
-      if (body && typeof body.close === "function") body.close();
-      response[2] = [];
+      response[2] = new BodyProxy([], () => {
+        if (body != null && typeof body.close === "function") body.close();
+      });
     }
 
     return response;
@@ -55,17 +52,16 @@ export class ConditionalGet {
     return headers[ETAG] === noneMatch;
   }
 
-  private modifiedSince(modifiedSince: Date, headers: Record<string, string | string[]>): boolean {
+  private modifiedSince(modifiedSince: Time, headers: Record<string, string | string[]>): boolean {
     const header = headers["last-modified"];
     const lastModified = this.toRfc2822(typeof header === "string" ? header : undefined);
-    return lastModified != null && modifiedSince >= lastModified;
+    return lastModified != null && modifiedSince.compare(lastModified)! >= 0;
   }
 
-  private toRfc2822(since: string | undefined): Date | null {
+  private toRfc2822(since: string | undefined): Time | null {
     if (since != null && since.length >= 16) {
       try {
-        const d = new Date(since);
-        return isNaN(d.getTime()) ? null : d;
+        return Time.rfc2822(since);
       } catch {
         return null;
       }

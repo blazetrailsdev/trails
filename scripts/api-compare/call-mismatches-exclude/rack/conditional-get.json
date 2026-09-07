@@ -1,9 +1,0 @@
-[
-  {
-    "package": "rack",
-    "tsFile": "conditional-get.ts",
-    "rubyName": "to_rfc2822",
-    "call": "rfc2822",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]
