@@ -1,5 +1,5 @@
 import {
-  ArgumentError as RubyArgumentError,
+  ArgumentError,
   Date as RubyDate,
   Temporal,
   Time as RubyTime,
@@ -11,7 +11,6 @@ import {
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { ArgumentError } from "../attribute-assignment.js";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -76,7 +75,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     try {
       timeHash = RubyDate._parse(string);
     } catch (error) {
-      if (!(error instanceof RubyArgumentError)) throw error;
+      if (!(error instanceof ArgumentError)) throw error;
     }
     if (!timeHash) return null;
 

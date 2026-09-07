@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -134,8 +134,8 @@ export class ObjectCall implements CallTemplate {
   ): unknown {
     const method = receiver[this.methodName];
     if (typeof method !== "function") {
-      throw new TypeError(
-        `undefined method '${this.methodName}' for callback object (kind/scope mismatch)`,
+      throw new NoMethodError(
+        `undefined method '${this.methodName}' for an instance of ${receiver.constructor.name}`,
       );
     }
     return (method as (this: unknown, arg: object, block?: (() => unknown) | null) => unknown).call(
@@ -204,7 +204,7 @@ export class InstanceExec2 implements CallTemplate {
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
-      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      if (!block) throw new ArgumentError();
       return f.call(target, target, block);
     };
   }
@@ -212,7 +212,7 @@ export class InstanceExec2 implements CallTemplate {
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
-      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      if (!block) throw new ArgumentError();
       return !f.call(target, target, block);
     };
   }
@@ -258,7 +258,10 @@ export namespace CallTemplate {
   ): CallTemplate {
     if (typeof filter === "string" || typeof filter === "symbol") {
       if (typeof filter === "string" && !filter.startsWith(":")) {
-        throw new Error(`Passing string to define a callback is not supported: ${filter}`);
+        throw new ArgumentError(
+          "Passing string to define a callback is not supported. See the `.set_callback` " +
+            "documentation to see supported values.",
+        );
       }
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
     } else if (filter instanceof Value) {
@@ -327,7 +330,9 @@ export class Before {
       if (!isThenable(r)) return env;
       if (opts?.strict === "sync") {
         swallowRejection(r);
-        throw new Error(`Async callback on sync chain "${chainName}" — before returned a Promise`);
+        throw new RuntimeError(
+          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+        );
       }
       return Promise.resolve(r).then(() => env);
     }
@@ -341,11 +346,11 @@ export class Before {
       if (isThenable(cbResult)) {
         swallowRejection(cbResult);
         if (opts?.strict === "sync") {
-          throw new Error(
+          throw new RuntimeError(
             `Async callback on sync chain "${chainName}" — before returned a Promise`,
           );
         }
-        throw new Error(
+        throw new RuntimeError(
           `Async before callback on chain "${chainName}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
             `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
@@ -366,7 +371,9 @@ export class Before {
     if (!isThenable(cbResult)) return env;
     if (opts?.strict === "sync") {
       swallowRejection(cbResult);
-      throw new Error(`Async callback on sync chain "${chainName}" — before returned a Promise`);
+      throw new RuntimeError(
+        `Async callback on sync chain "${chainName}" — before returned a Promise`,
+      );
     }
     return Promise.resolve(cbResult).then(
       () => env,
@@ -436,7 +443,9 @@ export class After {
       if (isThenable(r)) {
         if (opts?.strict === "sync") {
           swallowRejection(r);
-          throw new Error(`Async callback on sync chain "${chainName}" — after returned a Promise`);
+          throw new RuntimeError(
+            `Async callback on sync chain "${chainName}" — after returned a Promise`,
+          );
         }
         return Promise.resolve(r).then(() => env);
       }
@@ -736,7 +745,9 @@ export class CallbackSequence {
       if (isThenable(y)) {
         if (opts?.strict === "sync") {
           swallowRejection(y);
-          throw new Error(`Async callback on sync chain "${chainName}" — block returned a Promise`);
+          throw new RuntimeError(
+            `Async callback on sync chain "${chainName}" — block returned a Promise`,
+          );
         }
         return Promise.resolve(y).then((v) => {
           env.value = v;
@@ -821,7 +832,7 @@ export class CallbackSequence {
         if (opts?.strict === "sync") {
           swallowRejection(cbResult);
           swallowRejection(pendingProceed);
-          throw new Error(
+          throw new RuntimeError(
             `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
           );
         }
@@ -863,7 +874,9 @@ export class CallbackSequence {
     if (isThenable(y)) {
       if (opts?.strict === "sync") {
         swallowRejection(y);
-        throw new Error(`Async callback on sync chain "${chainName}" — block returned a Promise`);
+        throw new RuntimeError(
+          `Async callback on sync chain "${chainName}" — block returned a Promise`,
+        );
       }
       return Promise.resolve(y).then((v) => {
         env.value = v;
@@ -1163,7 +1176,7 @@ export namespace Callbacks {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
-      throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
+      throw new RuntimeError(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
     const mapped = filters.map((filter) =>
       Callback.build(
@@ -1242,7 +1255,7 @@ export namespace Callbacks {
       if (!isThenable(r)) return r;
       if (opts?.strict === "sync") {
         swallowRejection(r);
-        throw new Error("Async block on chain with no callbacks");
+        throw new RuntimeError("Async block on chain with no callbacks");
       }
       return r;
     }

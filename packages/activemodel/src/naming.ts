@@ -162,7 +162,6 @@ export class ModelName {
   match(pattern: unknown): boolean {
     if (typeof pattern === "string") pattern = new RegExp(pattern);
     if (!(pattern instanceof RegExp)) {
-      // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`wrong argument type ${builtinClassName(pattern)} (expected Regexp)`);
     }
     const savedLastIndex = pattern.lastIndex;

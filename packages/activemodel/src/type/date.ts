@@ -1,5 +1,5 @@
 import {
-  ArgumentError as RubyArgumentError,
+  ArgumentError,
   Date as RubyDate,
   Temporal,
   Time as RubyTime,
@@ -75,7 +75,7 @@ export class DateType extends ValueType<DateCastResult> {
     try {
       parts = RubyDate._parse(string, false);
     } catch (error) {
-      if (!(error instanceof RubyArgumentError)) throw error;
+      if (!(error instanceof ArgumentError)) throw error;
     }
     return parts ? this.newDate(parts.year, parts.mon, parts.mday) : null;
   }

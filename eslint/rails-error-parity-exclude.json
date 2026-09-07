@@ -117,7 +117,6 @@
   "packages/activerecord/src/type/adapter-specific-registry.ts",
   "packages/activerecord/src/validations/uniqueness.ts",
   "packages/ruby-compat/src/async-context-adapter.ts",
-  "packages/activesupport/src/callbacks.ts",
   "packages/ruby-compat/src/child-process-adapter.ts",
   "packages/activesupport/src/configurable.ts",
   "packages/activesupport/src/core-ext/big-decimal/conversions.ts",

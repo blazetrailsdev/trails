@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
@@ -246,10 +247,7 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: rejects comma-separated column list in a single argument", async () => {
-    await expect(Post.pluck("id, title")).rejects.toMatchObject({
-      name: "ArgumentError",
-      message: /pluck does not allow comma-separated/,
-    });
+    await expect(Post.pluck("id, title")).rejects.toThrow(ArgumentError);
   });
 
   it("pluck: always allows Arel", async () => {

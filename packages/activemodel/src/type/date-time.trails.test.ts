@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
@@ -285,9 +285,7 @@ describe("DateTimeType cast and serialize coverage", () => {
         return this.valueFromMultiparameterAssignment(values);
       }
     }
-    expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(
-      expect.objectContaining({ name: "ArgumentError" }),
-    );
+    expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(ArgumentError);
   });
 
   it("cast accepts numeric-keyed multiparameter hash and returns Temporal.Instant", () => {

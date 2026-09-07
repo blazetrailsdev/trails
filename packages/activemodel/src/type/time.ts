@@ -1,5 +1,5 @@
 import {
-  ArgumentError as RubyArgumentError,
+  ArgumentError,
   Date as RubyDate,
   Temporal,
   Time as RubyTime,
@@ -47,7 +47,7 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
       try {
         timeHash = RubyDate._parse(value as string);
       } catch (error) {
-        if (!(error instanceof RubyArgumentError)) throw error;
+        if (!(error instanceof ArgumentError)) throw error;
       }
       if (timeHash == null || timeHash.hour == null) return null;
     } else if (value instanceof TimeWithZone) {
@@ -89,7 +89,7 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
     try {
       timeHash = RubyDate._parse(dummyTimeValue);
     } catch (error) {
-      if (!(error instanceof RubyArgumentError)) throw error;
+      if (!(error instanceof ArgumentError)) throw error;
     }
     if (timeHash == null || timeHash.hour == null) return null;
 

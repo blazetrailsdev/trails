@@ -246,7 +246,7 @@ export class Batches {
   actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
     const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
     if (raise) {
-      throw new Error(Batches.ORDER_IGNORE_MESSAGE);
+      throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
     } else if (this.model.logger) {
       this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
     }
@@ -266,12 +266,12 @@ export async function ensureValidOptionsForBatchingBang(
 ): Promise<void> {
   if (start !== undefined && start !== null) {
     if (Array(start).length !== cursor.length) {
-      throw new Error(":start must contain one value per cursor column");
+      throw new ArgumentError(":start must contain one value per cursor column");
     }
   }
   if (finish !== undefined && finish !== null) {
     if (Array(finish).length !== cursor.length) {
-      throw new Error(":finish must contain one value per cursor column");
+      throw new ArgumentError(":finish must contain one value per cursor column");
     }
   }
 
@@ -289,7 +289,7 @@ export async function ensureValidOptionsForBatchingBang(
         isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
     );
     if (!uniqueIndex) {
-      throw new Error(":cursor must include a primary key or other unique column(s)");
+      throw new ArgumentError(":cursor must include a primary key or other unique column(s)");
     }
   }
 

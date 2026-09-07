@@ -628,13 +628,16 @@ export class CollectionAssociation extends Association {
     if (!records.some(isId)) return records as Base[];
     const ids = records.map((r) => (isId(r) ? r : (r as any).id));
     if (this.reflection.options.through) {
-      return Promise.resolve(this.loadTarget()).then((target) =>
-        ids.map((id) => {
-          const found = target.find((r) => String((r as any).id) === String(id));
-          if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
-          return found;
-        }),
-      );
+      const scope = this.scope();
+      return Promise.resolve(this.loadTarget()).then((target) => {
+        const found = ids
+          .map((id) => target.find((r) => String((r as any).id) === String(id)))
+          .filter((record): record is Base => record != null);
+        if (found.length !== ids.length) {
+          scope.raiseRecordNotFoundExceptionBang(ids, found.length, ids.length);
+        }
+        return found;
+      });
     }
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }

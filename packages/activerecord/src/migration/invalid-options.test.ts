@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterType } from "../test-adapter.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 function invalidAddColumnOptionExceptionMessage(key: string): string {
   const defaultKeys = [
@@ -84,7 +85,7 @@ describe("Migration", () => {
         t.references("some_table", { boringKey: true } as Record<string, unknown>);
       });
       let exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
 
@@ -92,7 +93,7 @@ describe("Migration", () => {
         boringKey: true,
       } as Record<string, unknown>);
       exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
     });
@@ -104,7 +105,7 @@ describe("Migration", () => {
         preccision: true,
       } as Record<string, unknown>);
       let exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("preccision"));
 
@@ -112,7 +113,7 @@ describe("Migration", () => {
         t.string("first_name", { index: { nema: "test" } } as Record<string, unknown>);
       });
       exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
     });
@@ -124,7 +125,7 @@ describe("Migration", () => {
         nema: "my_index",
       } as Record<string, unknown>);
       const exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
     });
@@ -136,7 +137,7 @@ describe("Migration", () => {
         liimit: true,
       } as Record<string, unknown>);
       const exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("liimit"));
     });
@@ -150,7 +151,7 @@ describe("Migration", () => {
         () => {},
       );
       const exception = (await work.catch((error: Error) => error)) as Error;
-      await expect(work).rejects.toThrow(expect.objectContaining({ name: "ArgumentError" }));
+      await expect(work).rejects.toThrow(ArgumentError);
 
       expect(exception.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));
     });
