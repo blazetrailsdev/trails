@@ -1,10 +1,77 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   LogSubscriber as BaseLogSubscriber,
+  MemoryStore,
   NotificationEvent,
   Notifications,
 } from "@blazetrails/activesupport";
+import { Base as ActionViewBase, type CacheHelperHost } from "@blazetrails/actionview";
 import { LogSubscriber } from "../log-subscriber.js";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
+import type { CachingClassMethods } from "../../abstract-controller/caching.js";
+
+type CachingView = ActionViewBase & CacheHelperHost;
+
+function renderInline(controller: Base, block: (view: CachingView) => void): void {
+  const view = new ActionViewBase(null, {}, controller) as CachingView;
+  block(view);
+  controller.render({ plain: view.outputBuffer.toStr() });
+}
+
+class LogSubscribersController extends Base {
+  async withFragmentCache() {
+    renderInline(this, (view) => {
+      view.cache("foo", {}, () => {
+        view.outputBuffer.append("bar");
+      });
+    });
+  }
+
+  async withFragmentCacheAndPercentInKey() {
+    renderInline(this, (view) => {
+      view.cache("foo%bar", {}, () => {
+        view.outputBuffer.append("Contains % sign in key");
+      });
+    });
+  }
+
+  async withFragmentCacheIfWithTrueCondition() {
+    renderInline(this, (view) => {
+      view.cacheIf(true, "foo", {}, () => {
+        view.outputBuffer.append("bar");
+      });
+    });
+  }
+
+  async withFragmentCacheIfWithFalseCondition() {
+    renderInline(this, (view) => {
+      view.cacheIf(false, "foo", {}, () => {
+        view.outputBuffer.append("bar");
+      });
+    });
+  }
+
+  async withFragmentCacheUnlessWithFalseCondition() {
+    renderInline(this, (view) => {
+      view.cacheUnless(false, "foo", {}, () => {
+        view.outputBuffer.append("bar");
+      });
+    });
+  }
+
+  async withFragmentCacheUnlessWithTrueCondition() {
+    renderInline(this, (view) => {
+      view.cacheUnless(true, "foo", {}, () => {
+        view.outputBuffer.append("bar");
+      });
+    });
+  }
+}
+
+Object.defineProperty(LogSubscribersController, "name", {
+  value: "Another::LogSubscribersController",
+});
 
 class CaptureLogger {
   messages: string[] = [];
@@ -27,16 +94,33 @@ function makeEvent(
 describe("ACLogSubscriberTest", () => {
   let subscriber: LogSubscriber;
   let logger: CaptureLogger;
+  let controller: TestCase;
+  let logs: string[];
+  let oldEnableFragmentCacheLogging: boolean;
 
   beforeEach(() => {
     subscriber = new LogSubscriber();
     logger = new CaptureLogger();
+    logs = logger.messages;
     vi.spyOn(BaseLogSubscriber, "logger", "get").mockReturnValue(logger as never);
+
+    const caching = Base as unknown as CachingClassMethods;
+    oldEnableFragmentCacheLogging = caching.enableFragmentCacheLogging!;
+    caching.enableFragmentCacheLogging = true;
+
+    controller = new TestCase(LogSubscribersController);
+    const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
+    controllerClass.cacheStore = new MemoryStore();
+    controllerClass.performCaching = true;
+    Notifications.unsubscribeAll();
+    LogSubscriber.attachTo("action_controller");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     Notifications.unsubscribeAll();
+    (Base as unknown as CachingClassMethods).enableFragmentCacheLogging =
+      oldEnableFragmentCacheLogging;
   });
 
   it("start processing", () => {
@@ -133,13 +217,65 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages[0]).toMatch(/company\.rb/);
   });
 
-  it.skip("with fragment cache", () => {});
-  it.skip("with fragment cache when log disabled", () => {});
-  it.skip("with fragment cache if with true", () => {});
-  it.skip("with fragment cache if with false", () => {});
-  it.skip("with fragment cache unless with true", () => {});
-  it.skip("with fragment cache unless with false", () => {});
-  it.skip("with fragment cache and percent in key", () => {});
+  it("with fragment cache", async () => {
+    await controller.get("withFragmentCache");
+
+    expect(logs.length).toBe(4);
+    expect(logs[1]).toMatch(/Read fragment views\/foo/);
+    expect(logs[2]).toMatch(/Write fragment views\/foo/);
+  });
+
+  it("with fragment cache when log disabled", async () => {
+    (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = false;
+    await controller.get("withFragmentCache");
+
+    expect(logs.length).toBe(2);
+    expect(logs[0]).toBe(
+      "Processing by Another::LogSubscribersController#withFragmentCache as HTML",
+    );
+    expect(logs[1]).toMatch(/Completed 200 OK in \d+ms/);
+    (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = true;
+  });
+
+  it("with fragment cache if with true", async () => {
+    await controller.get("withFragmentCacheIfWithTrueCondition");
+
+    expect(logs.length).toBe(4);
+    expect(logs[1]).toMatch(/Read fragment views\/foo/);
+    expect(logs[2]).toMatch(/Write fragment views\/foo/);
+  });
+
+  it("with fragment cache if with false", async () => {
+    await controller.get("withFragmentCacheIfWithFalseCondition");
+
+    expect(logs.length).toBe(2);
+    expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
+    expect(logs[2] ?? "").not.toMatch(/Write fragment views\/foo/);
+  });
+
+  it("with fragment cache unless with true", async () => {
+    await controller.get("withFragmentCacheUnlessWithTrueCondition");
+
+    expect(logs.length).toBe(2);
+    expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
+    expect(logs[2] ?? "").not.toMatch(/Write fragment views\/foo/);
+  });
+
+  it("with fragment cache unless with false", async () => {
+    await controller.get("withFragmentCacheUnlessWithFalseCondition");
+
+    expect(logs.length).toBe(4);
+    expect(logs[1]).toMatch(/Read fragment views\/foo/);
+    expect(logs[2]).toMatch(/Write fragment views\/foo/);
+  });
+
+  it("with fragment cache and percent in key", async () => {
+    await controller.get("withFragmentCacheAndPercentInKey");
+
+    expect(logs.length).toBe(4);
+    expect(logs[1]).toMatch(/Read fragment views\/foo/);
+    expect(logs[2]).toMatch(/Write fragment views\/foo/);
+  });
 
   it("process action with exception includes http status code", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 500 }, 5));

@@ -64,6 +64,28 @@ describe("assertionValueMismatch", () => {
     ).toBeNull();
   });
 
+  it("folds a snake_case name embedded in a sentence onto its camelCase spelling", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:Processing by Another::LogSubscribersController#with_fragment_cache as HTML"],
+        ["toBe"],
+        ["s:Processing by Another::LogSubscribersController#withFragmentCache as HTML"],
+        false,
+      ),
+    ).toBeNull();
+    // A different name in the same sentence still diverges.
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:Processing by Another::LogSubscribersController#with_fragment_cache as HTML"],
+        ["toBe"],
+        ["s:Processing by Another::LogSubscribersController#withOtherCache as HTML"],
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
   it("compares as an order-independent multiset per kind", () => {
     // Same two equality values, asserted in a different order → no divergence.
     expect(
