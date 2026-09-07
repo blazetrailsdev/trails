@@ -266,14 +266,14 @@ describe("ActionView::Base lookup_context delegation", () => {
 describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
   it("copies the controller's config with inheritable_copy", () => {
     const copy = { copied: true };
-    const controller = { config: { inheritableCopy: () => copy } };
+    const controller = { config: () => ({ inheritableCopy: () => copy }) };
     expect(new (Base.withEmptyTemplateCache())(null, {}, controller)._config).toBe(copy);
   });
 
   it("raises when a controller carries a config that cannot be copied", () => {
-    expect(() => new (Base.withEmptyTemplateCache())(null, {}, { config: {} } as never)).toThrow(
-      TypeError,
-    );
+    expect(
+      () => new (Base.withEmptyTemplateCache())(null, {}, { config: () => ({}) } as never),
+    ).toThrow(TypeError);
   });
 });
 

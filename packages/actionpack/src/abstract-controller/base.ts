@@ -1,4 +1,4 @@
-import { underscore } from "@blazetrails/activesupport";
+import { Configurable, extend, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
@@ -325,5 +325,8 @@ export class AbstractController {
     return (this.constructor as typeof AbstractController).actionMethods();
   }
 }
+
+include(AbstractController, Configurable);
+extend(AbstractController, Configurable.ClassMethods);
 
 _defineActionCallbacks(AbstractController.prototype);

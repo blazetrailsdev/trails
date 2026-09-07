@@ -3,6 +3,7 @@ import {
   Benchmark,
   Notifications,
   classAttribute,
+  extend,
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
@@ -55,19 +56,14 @@ import {
   isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
 import { helperMethod, type HelpersClassMethods } from "../abstract-controller/helpers.js";
-import { lookupStore } from "@blazetrails/activesupport/cache";
-import type { CacheStore } from "@blazetrails/activesupport";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
-  CACHING_DEFAULTS,
-  CACHING_SLOTS,
   ConfigMethods,
   cache,
   viewCacheDependencies,
   viewCacheDependency,
   type CachingClassMethods,
-  type CachingHost,
 } from "../abstract-controller/caching.js";
 import {
   combinedFragmentCacheKey,
@@ -919,16 +915,7 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
-const cacheStoreConfig = Symbol("cache_store");
-Object.defineProperty(Base, "cacheStore", {
-  configurable: true,
-  get(this: Record<symbol, unknown>): CacheStore | null {
-    return (this[cacheStoreConfig] as CacheStore | null) ?? null;
-  },
-  set(this: Record<symbol, unknown>, store: unknown) {
-    this[cacheStoreConfig] = lookupStore(store);
-  },
-});
+extend(Base, ConfigMethods);
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
@@ -946,22 +933,18 @@ Base.prototype.expireFragment = expireFragment;
 classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 helperMethod(Base as unknown as HelpersClassMethods, "combinedFragmentCacheKey");
 
-for (const slot of CACHING_SLOTS) {
-  Object.defineProperty(Base.prototype, slot, {
-    configurable: true,
-    get(this: CachingHost): unknown {
-      return (this.constructor as unknown as Record<string, unknown>)[slot];
-    },
-    set(this: CachingHost, value: unknown) {
-      (this.constructor as unknown as Record<string, unknown>)[slot] = value;
-    },
-  });
-}
+const _Configurable = Base as unknown as {
+  configAccessor(...names: string[]): void;
+} & CachingClassMethods;
 
-const _CachingConfig = Base as unknown as CachingClassMethods;
-_CachingConfig.defaultStaticExtension ??= CACHING_DEFAULTS.defaultStaticExtension;
-_CachingConfig.performCaching ??= CACHING_DEFAULTS.performCaching;
-_CachingConfig.enableFragmentCacheLogging = CACHING_DEFAULTS.enableFragmentCacheLogging;
+_Configurable.configAccessor("defaultStaticExtension");
+_Configurable.defaultStaticExtension ??= ".html";
+
+_Configurable.configAccessor("performCaching");
+if (_Configurable.performCaching == null) _Configurable.performCaching = true;
+
+_Configurable.configAccessor("enableFragmentCacheLogging");
+_Configurable.enableFragmentCacheLogging = false;
 
 classAttribute.call(Base, "_viewCacheDependencies", { default: [] });
 helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");

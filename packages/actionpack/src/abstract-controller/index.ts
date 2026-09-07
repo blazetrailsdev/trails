@@ -46,13 +46,10 @@ export {
   cache,
   cacheConfigured,
   ConfigMethods,
-  CACHING_DEFAULTS,
-  CACHING_SLOTS,
   viewCacheDependencies,
   viewCacheDependency,
   type CachingClassMethods,
   type CachingHost,
-  type CachingSlot,
   type ViewCacheDependency,
 } from "./caching.js";
 export {

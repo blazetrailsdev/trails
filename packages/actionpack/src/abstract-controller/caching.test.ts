@@ -1,21 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { include, MemoryStore } from "@blazetrails/activesupport";
+import { Configurable, extend, include, MemoryStore } from "@blazetrails/activesupport";
 
 import {
   cache,
   cacheConfigured,
   ConfigMethods,
-  CACHING_DEFAULTS,
-  CACHING_SLOTS,
-  readFragment,
   viewCacheDependencies,
   viewCacheDependency,
-  writeFragment,
   type CachingHost,
 } from "./caching.js";
+import { readFragment, writeFragment } from "./caching/fragments.js";
 
 class HostClass {
-  static cacheStore: MemoryStore | null = null;
+  static config = Configurable.ClassMethods.config;
+  static configAccessor = Configurable.ClassMethods.configAccessor;
+  config = Configurable.config;
+
   static performCaching = true;
   static defaultStaticExtension = ".html";
   static enableFragmentCacheLogging = false;
@@ -25,30 +25,19 @@ class HostClass {
 }
 
 include(HostClass, ConfigMethods);
+extend(HostClass, ConfigMethods);
 
-function makeHost(store?: MemoryStore | null): HostClass & CachingHost & ConfigMethods {
-  HostClass.cacheStore = store ?? null;
+const HostConfig = HostClass as unknown as typeof HostClass & { cacheStore: unknown };
+
+function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof ConfigMethods {
+  HostClass.config().clear();
+  if (store) HostConfig.cacheStore = store;
   HostClass.performCaching = true;
   HostClass._viewCacheDependencies = undefined;
-  return new HostClass() as unknown as HostClass & CachingHost & ConfigMethods;
+  return new HostClass() as unknown as HostClass & CachingHost & typeof ConfigMethods;
 }
 
 describe("AbstractController::Caching", () => {
-  describe("defaults", () => {
-    it("ships the Rails-shaped slot list and values", () => {
-      expect(CACHING_SLOTS).toEqual([
-        "defaultStaticExtension",
-        "performCaching",
-        "enableFragmentCacheLogging",
-      ]);
-      expect(CACHING_DEFAULTS).toEqual({
-        defaultStaticExtension: ".html",
-        performCaching: true,
-        enableFragmentCacheLogging: false,
-      });
-    });
-  });
-
   describe("cacheStore reader/writer", () => {
     it("reads the class-level slot", () => {
       const store = new MemoryStore();
@@ -56,14 +45,19 @@ describe("AbstractController::Caching", () => {
       expect(host.cacheStore).toBe(store);
     });
     it("returns null when no store is wired up", () => {
-      expect(makeHost().cacheStore).toBeNull();
+      expect(makeHost().cacheStore).toBeUndefined();
     });
-    it("cacheStore= assigns onto the class slot", () => {
+    it("cacheStore= writes the instance's own inheritable config copy", () => {
       const host = makeHost();
       const store = new MemoryStore();
       host.cacheStore = store;
-      expect(HostClass.cacheStore).toBe(store);
       expect(host.cacheStore).toBe(store);
+      expect(HostConfig.cacheStore).toBeUndefined();
+    });
+    it("cacheStore= on the class resolves through Cache.lookup_store", () => {
+      makeHost();
+      HostConfig.cacheStore = ":memory_store";
+      expect(HostConfig.cacheStore).toBeInstanceOf(MemoryStore);
     });
   });
 

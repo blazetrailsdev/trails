@@ -46,9 +46,8 @@ describe("AbstractController::Caching included into ActionController::Base", () 
     class LookupController extends Base {}
     const controller = new LookupController() as unknown as { cacheStore: unknown };
     controller.cacheStore = ":memory_store";
-    expect((LookupController as unknown as { cacheStore: unknown }).cacheStore).toBeInstanceOf(
-      MemoryStore,
-    );
+    expect(controller.cacheStore).toBeInstanceOf(MemoryStore);
+    expect((LookupController as unknown as { cacheStore: unknown }).cacheStore).toBeUndefined();
   });
 
   it("resolves a cache store assigned on the class too, from extend ConfigMethods", () => {

@@ -4,6 +4,7 @@ import {
   htmlEscapeOnce,
   htmlSafe,
   InheritableOptions,
+  initializeIncludedModules,
   jsonEscape,
   runLoadHooks,
   xmlNameEscape,
@@ -188,6 +189,9 @@ export class Base {
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof Helpers.assignController>[0]);
     this._prepareContext();
+
+    initializeIncludedModules(this);
+
     this.assign(assigns);
   }
 

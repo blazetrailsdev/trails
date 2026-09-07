@@ -9,7 +9,7 @@ export interface ControllerHelperHost {
 
 interface ControllerLike {
   request?: unknown;
-  config?: { inheritableCopy(): unknown };
+  config?(): { inheritableCopy(): unknown };
   defaultFormBuilder?: unknown;
   logger?: unknown;
   [key: string]: unknown;
@@ -50,7 +50,7 @@ export function assignController(
   this._controller = controller;
   if (controller) {
     if ("request" in controller) this._request = controller.request;
-    if ("config" in controller) this._config = controller.config!.inheritableCopy();
+    if ("config" in controller) this._config = controller.config!().inheritableCopy();
     if ("defaultFormBuilder" in controller)
       this._defaultFormBuilder = controller.defaultFormBuilder;
   } else {
