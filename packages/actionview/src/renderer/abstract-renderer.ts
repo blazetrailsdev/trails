@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File } from "@blazetrails/ruby-compat";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -133,12 +133,12 @@ export function localVariable(this: ObjectRenderingHost, path: string): string {
 
 /** @internal */
 export function raiseInvalidIdentifier(path: string): never {
-  throw new Error(IDENTIFIER_ERROR_MESSAGE.replace("%s", path));
+  throw new ArgumentError(IDENTIFIER_ERROR_MESSAGE.replace("%s", path));
 }
 
 /** @internal */
 export function raiseInvalidOptionAs(as: unknown): never {
-  throw new Error(OPTION_AS_ERROR_MESSAGE.replace("%s", String(as)));
+  throw new ArgumentError(OPTION_AS_ERROR_MESSAGE.replace("%s", String(as)));
 }
 
 /** @internal */

@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = (env: Record<string, any>) => any;
@@ -76,7 +76,7 @@ export class Builder {
   run(app: null, block: RackApp): this;
   run(app: RackApp | null, block?: RackApp): this {
     if (app && block) {
-      throw new Error("Both app and block given to run");
+      throw new ArgumentError("Both app and block given!");
     }
     this._run = block || app;
     return this;

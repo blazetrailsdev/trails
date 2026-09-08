@@ -1,4 +1,4 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, NotImplementedError } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { TemplateHandlers } from "../template/handlers.js";
@@ -60,7 +60,8 @@ export abstract class Resolver implements PathSetResolver {
     _details: LookupDetails,
     _locals: ReadonlyArray<string> = [],
   ): Template[] {
-    throw new Error(
+    // @nie disposition=keep-as-strategy-hook rails=actionview/lib/action_view/template/resolver.rb:85
+    throw new NotImplementedError(
       "Subclasses must implement a findTemplates(name, prefix, partial, details, locals = []) method",
     );
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Parser } from "./parser.js";
+import { BoundedIO, EmptyContentError, Parser } from "./parser.js";
 import { QueryParser } from "../query-parser.js";
+import { EOFError } from "@blazetrails/ruby-compat";
 
 const qp = QueryParser.makeDefault(100);
 
@@ -58,5 +59,19 @@ describe("Rack::Multipart::Parser encodings", () => {
       "--AaB03x--\r\n";
 
     expect(parseBody(body).params!["text"]).toBe("\u3042");
+  });
+
+  it("raises EOFError when the content length exceeds the actual body", () => {
+    const bounded = new BoundedIO({ read: (_size: number) => null }, 10);
+
+    let caught: unknown;
+    try {
+      bounded.read(10);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(EOFError);
+    expect(caught).not.toBeInstanceOf(EmptyContentError);
+    expect((caught as Error).message).toBe("bad content body");
   });
 });

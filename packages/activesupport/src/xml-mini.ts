@@ -2,7 +2,7 @@ import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { LoadError, StringIO } from "@blazetrails/ruby-compat";
 import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -423,8 +423,7 @@ export async function castBackendNameToModule(name: XmlMiniBackendName): Promise
       await module._require?.();
       return module;
     }
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(
+    throw new LoadError(
       backend ?? `cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`,
     );
   }

@@ -1,3 +1,5 @@
+import { LoadError } from "@blazetrails/ruby-compat";
+
 import type { CacheStore } from "./index.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -9,6 +11,10 @@ export function registerStoreClass(store: string, klass: new (...args: any[]) =>
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function lookupStoreClass(store: string): (new (...args: any[]) => CacheStore) | undefined {
-  return STORE_CLASSES.get(store);
+export function lookupStoreClass(store: string): new (...args: any[]) => CacheStore {
+  const klass = STORE_CLASSES.get(store);
+  if (klass === undefined) {
+    throw new LoadError(`cannot load such file -- active_support/cache/${store.slice(1)}`);
+  }
+  return klass;
 }

@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Scanner, type Token } from "./scanner.js";
 import {
   Cat,
@@ -81,7 +82,7 @@ export class Parser {
     this.advanceToken();
     const inner = this.parseExpressions();
     if (this._nextToken !== "RPAREN") {
-      throw new Error("missing right parenthesis.");
+      throw new ArgumentError("missing right parenthesis.");
     }
     const node = new Group(inner);
     this.advanceToken();

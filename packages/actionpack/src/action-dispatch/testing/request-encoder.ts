@@ -1,4 +1,4 @@
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, symbolToS } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;
@@ -35,7 +35,7 @@ export class RequestEncoder {
     responseParser: ResponseParser | null,
   ) {
     if (!MimeType.isRegistered(mimeName)) {
-      throw new Error(
+      throw new ArgumentError(
         `Can't register a request encoder for unregistered MIME Type: ${mimeName}. ` +
           `See \`MimeType.register\`.`,
       );

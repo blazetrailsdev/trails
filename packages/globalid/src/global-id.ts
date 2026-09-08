@@ -2,6 +2,7 @@ import { getApp } from "./config.js";
 import { GID, validateApp, type GidComponents } from "./uri/gid.js";
 import type { LocateOptions, LocatorLike, LocatorModel } from "./locator.js";
 import { constantize, Deprecation } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -130,7 +131,7 @@ export class GlobalID {
   get modelClass(): LocatorModel {
     const klass = constantize(this.modelName) as LocatorModel;
     if (isOrExtends(klass, GlobalID)) {
-      throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
+      throw new ArgumentError("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
     return klass;
   }
