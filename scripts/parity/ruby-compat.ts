@@ -54,7 +54,6 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#Float", "kernelFloat"],
   ["Kernel#Rational", "rational"],
   ["Range#cover?", "cover"],
-  ["String#delete", "stringDelete"],
   ["Regexp.escape", "regexpEscape"],
 ]);
 
@@ -103,6 +102,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#reject", { tsExport: "reject", receiver: "hash" }],
   ["Hash#slice", { tsExport: "slice", receiver: "hash" }],
   ["Hash#update", { tsExport: "update", receiver: "hash" }],
+  ["String#delete", { tsExport: "stringDelete", receiver: "string" }],
   ["String#succ", { tsExport: "succ", receiver: "string" }],
   ["Symbol#to_s", { tsExport: "symbolToS", receiver: "symbol" }],
 ]);

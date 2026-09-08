@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "unique_constraints",
+    "call": "delete",
+    "reason": "The body DOES call the port: `stringDelete(String(r.conkey), \"{}\")`. Rails' receiver is `row[\"conkey\"]`, an aref the extractor records as kind `expr`, so the receiver-keyed `String#delete` row cannot credit it."
+  }
+]

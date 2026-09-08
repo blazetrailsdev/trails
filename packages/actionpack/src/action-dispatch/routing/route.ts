@@ -22,11 +22,11 @@ export type MountableApp =
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
 export interface RouteOptions {
-  name?: string;
+  name?: string | null | false;
   constraints?: RouteConstraints;
   defaults?: Record<string, string | null>;
   format?: boolean;
-  as?: string;
+  as?: string | null | false;
   to?: string | MountableApp;
   controller?: string;
   action?: string;
@@ -106,7 +106,7 @@ export class Route {
     this.path = normalizePath(path);
     this.controller = controller;
     this.action = action;
-    this.name = options.name ?? options.as;
+    this.name = (options.name ?? options.as) || undefined;
     this.defaults = options.defaults ?? {};
     this.constraints = options.constraints ?? {};
     this.ip = options.ip ?? /(?:)/;

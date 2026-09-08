@@ -673,9 +673,9 @@ export class Mapper {
         : [options.via]
       : ["ALL"];
 
-    for (const method of methods) {
-      this.addRoute(method, path, options);
-    }
+    methods.forEach((method, i) => {
+      this.addRoute(method, path, i === 0 ? options : { ...options, as: null, name: null });
+    });
   }
 
   options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
@@ -993,9 +993,11 @@ export class Mapper {
     } else if (scopeModulePrefix && controller && !controller.includes("/")) {
       controller = scopeModulePrefix + "/" + controller;
     }
-    const explicitName = options.as !== undefined ? options.as : options.name;
+    const asGiven = options.as !== undefined ? options.as : options.name;
+    const asSuppressed = asGiven === null || asGiven === false;
+    const explicitName = asSuppressed ? undefined : asGiven;
     const inferredName =
-      options.as === undefined && options.name === undefined && !isRedirect
+      !asSuppressed && options.as === undefined && options.name === undefined && !isRedirect
         ? (() => {
             const cleaned = path.replace(/^\/+/, "").replace(/\(\.:format\)$/, "");
             const segs = cleaned.split("/").filter(Boolean);
