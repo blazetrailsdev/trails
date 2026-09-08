@@ -111,7 +111,9 @@ describe("Application", () => {
   });
 
   it("Application is abstract and cannot be instantiated directly", () => {
-    expect(() => new Application()).toThrow(/abstract/);
+    expect(() => new Application()).toThrow(
+      "Rails::Application is abstract, you cannot instantiate it directly.",
+    );
   });
 
   describe("register", () => {

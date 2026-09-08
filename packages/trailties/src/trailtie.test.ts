@@ -141,7 +141,9 @@ describe("Trailtie", () => {
     sealAgainstInheritance(AnonSealed);
     const Anon = class extends AnonSealed {};
     class Grand extends Anon {}
-    expect(() => Trailtie.register(Grand)).toThrow(/cannot inherit from a AnonSealed/);
+    expect(() => Trailtie.register(Grand)).toThrow(
+      "You cannot inherit from a Rails::Railtie child",
+    );
   });
 
   it("Configurable seals a class — single and multi-level inheritance", () => {
@@ -150,8 +152,10 @@ describe("Trailtie", () => {
     class Direct extends SealedTie {}
     class Mid extends SealedTie {}
     class Deep extends Mid {}
-    expect(() => Trailtie.register(Direct)).toThrow(/cannot inherit from a SealedTie/);
-    expect(() => Trailtie.register(Deep)).toThrow(/cannot inherit from a SealedTie/);
+    expect(() => Trailtie.register(Direct)).toThrow(
+      "You cannot inherit from a Rails::Railtie child",
+    );
+    expect(() => Trailtie.register(Deep)).toThrow("You cannot inherit from a Rails::Railtie child");
   });
 
   it("returns registered subclasses sorted by load order, excluding abstract entries", () => {

@@ -4,21 +4,11 @@ import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
-import { getRubyClassPath, setRubyClassPath } from "./ruby-class-path-slot.js";
+import { rubyClassPath, setRubyClassPath } from "./ruby-class-path-slot.js";
 
 const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Application"];
 
 let loadCounter = 0;
-
-/**
- * Ruby's `Module#name` (`vendor/ruby/variable.c:130` `rb_mod_name`), which
- * `abstract_railtie?` (`railtie.rb:173`) and `railtie_name` (`railtie.rb:178`)
- * both read. A TypeScript class name carries no namespace, so the path each
- * Railtie is defined under is declared through {@link setRubyClassPath}.
- */
-function rubyClassPath(klass: typeof Trailtie): string {
-  return getRubyClassPath(klass) ?? klass.name;
-}
 
 /** @internal */
 function generateRailtieName(string: string): string {
@@ -38,7 +28,9 @@ export class Trailtie extends Initializable {
     super();
     const klass = this.constructor as typeof Trailtie;
     if (klass.isAbstractRailtie()) {
-      throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
+      throw new RuntimeError(
+        `${rubyClassPath(klass)} is abstract, you cannot instantiate it directly.`,
+      );
     }
   }
 

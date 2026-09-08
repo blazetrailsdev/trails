@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { File, IO } from "@blazetrails/ruby-compat";
+import { File, IO, IOError } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -66,7 +66,7 @@ export class ResponseBuffer {
   }
 
   write(string: string): void {
-    if (this.closed) throw new Error("closed stream");
+    if (this.closed) throw new IOError("closed stream");
     this.strBody = null;
     this.response.commitBang();
     this.buf.push(string);

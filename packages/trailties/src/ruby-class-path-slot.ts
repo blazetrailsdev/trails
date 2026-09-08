@@ -9,3 +9,16 @@ export function setRubyClassPath(klass: unknown, path: string): void {
 export function getRubyClassPath(klass: unknown): string | undefined {
   return registry.get(klass);
 }
+
+/**
+ * Ruby's `Module#name` (`vendor/ruby/variable.c:130` `rb_mod_name`), which
+ * `abstract_railtie?` (`railtie.rb:173`), `railtie_name` (`railtie.rb:178`) and
+ * `Configurable::ClassMethods#inherited` (`railtie/configurable.rb:14`) all
+ * read. A TypeScript class name carries no namespace, so the path each Railtie
+ * is defined under is declared through {@link setRubyClassPath}.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyClassPath(klass: { name: string }): string {
+  return getRubyClassPath(klass) ?? klass.name;
+}
