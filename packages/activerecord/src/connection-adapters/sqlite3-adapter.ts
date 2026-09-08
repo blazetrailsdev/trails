@@ -1,7 +1,6 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { anybits, fetch, hasKey } from "@blazetrails/ruby-compat";
 import type {
-  SqliteBinds,
   SqliteConnection,
   SqliteDriver,
   SqliteOpenConfig,
@@ -342,37 +341,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     name: string | null = "SQL",
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
-    await this.ensureConnected();
-    await this.materializeTransactions();
-    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     try {
-      return await this.log(
-        sql,
-        name,
-        binds,
-        this.typeCastedBinds(binds) ?? [],
-        false,
-        async (payload) => {
-          try {
-            const counters = { affectedRows: 0, insertRowid: 0 as number | bigint };
-            await this.performQuery(this._rawConnection, sql, binds, driverBinds, {
-              prepare: false,
-              notificationPayload: payload,
-              counters,
-            });
-            const { affectedRows, insertRowid } = counters;
-            payload.row_count = affectedRows;
-
-            if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-              return Number(insertRowid);
-            }
-
-            return affectedRows;
-          } catch (e: any) {
-            throw this.translateExceptionClass(e, sql, binds);
-          }
-        },
-      );
+      await this.rawExecute(sql, name, binds);
+      if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+        return Number(this._lastInsertRowid);
+      }
+      return this._lastAffectedRows;
     } finally {
       this.dirtyCurrentTransaction();
     }
