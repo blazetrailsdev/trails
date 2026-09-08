@@ -4,6 +4,7 @@ import { NullPool } from "./abstract/connection-pool.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 import { Version } from "./abstract-adapter.js";
 import { Base } from "../base.js";
+import { Monitor } from "@blazetrails/activesupport";
 
 describe("ConnectionPool#server_version", () => {
   function adapterFetching(versions: string[]): Mysql2Adapter {
@@ -62,6 +63,7 @@ describe("ConnectionPool#server_version", () => {
     const connected = Promise.resolve();
     let fetches = 0;
     const connection = {
+      lock: new Monitor(),
       async getDatabaseVersion(): Promise<Version> {
         fetches += 1;
         await connected;
@@ -73,4 +75,25 @@ describe("ConnectionPool#server_version", () => {
     expect(String(await pool.serverVersion(connection))).toBe("8.0.35");
     expect(fetches).toBe(2);
   }, 5000);
+
+  it("two concurrent first callers issue one get_database_version", async () => {
+    const pool = new NullPool();
+    let fetches = 0;
+    const connection = {
+      lock: new Monitor(),
+      async getDatabaseVersion(): Promise<Version> {
+        fetches += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return new Version("8.0.35");
+      },
+    } as unknown as AbstractAdapter;
+
+    const [a, b] = await Promise.all([
+      pool.serverVersion(connection),
+      pool.serverVersion(connection),
+    ]);
+
+    expect([String(a), String(b)]).toEqual(["8.0.35", "8.0.35"]);
+    expect(fetches).toBe(1);
+  });
 });

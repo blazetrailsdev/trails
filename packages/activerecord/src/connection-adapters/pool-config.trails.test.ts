@@ -3,6 +3,7 @@ import { PoolConfig } from "./pool-config.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { SchemaReflection } from "./schema-cache.js";
+import { Monitor } from "@blazetrails/activesupport";
 
 function makeDbConfig(name = "primary") {
   return new HashConfig("default", name, {
@@ -196,7 +197,10 @@ describe("PoolConfig", () => {
 
   describe("serverVersion", () => {
     it("returns a function that caches the version from a connection", async () => {
-      const mockConn = { getDatabaseVersion: vi.fn().mockReturnValue("3.39.0") };
+      const mockConn = {
+        lock: new Monitor(),
+        getDatabaseVersion: vi.fn().mockReturnValue("3.39.0"),
+      };
       const version = await config.serverVersion(mockConn as any);
       expect(version).toBe("3.39.0");
       expect(mockConn.getDatabaseVersion).toHaveBeenCalledTimes(1);
@@ -207,15 +211,18 @@ describe("PoolConfig", () => {
 
     it("can be set directly via the setter", async () => {
       config.setServerVersion("15.0");
-      const mockConn = { getDatabaseVersion: vi.fn() };
+      const mockConn = { lock: new Monitor(), getDatabaseVersion: vi.fn() };
       const version = await config.serverVersion(mockConn as any);
       expect(version).toBe("15.0");
       expect(mockConn.getDatabaseVersion).not.toHaveBeenCalled();
     });
 
     it("two concurrent first callers settle on one memoized version", async () => {
+      let fetches = 0;
       const mockConn = {
+        lock: new Monitor(),
         async getDatabaseVersion() {
+          fetches += 1;
           await new Promise<void>((r) => setTimeout(r, 10));
           return "15.0";
         },
@@ -225,12 +232,14 @@ describe("PoolConfig", () => {
         config.serverVersion(mockConn as any),
       ]);
       expect([a, b]).toEqual(["15.0", "15.0"]);
+      expect(fetches).toBe(1);
       expect(await config.serverVersion(mockConn as any)).toBe("15.0");
     });
 
     it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {
       let fetches = 0;
       const mockConn = {
+        lock: new Monitor(),
         async getDatabaseVersion(): Promise<string> {
           fetches += 1;
           await Promise.resolve();
