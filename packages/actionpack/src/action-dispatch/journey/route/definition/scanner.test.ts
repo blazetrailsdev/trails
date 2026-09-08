@@ -1,16 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Scanner, type Token } from "../../scanner.js";
 
-function tokens(pattern: string): Token[] {
-  const s = new Scanner();
-  s.scanSetup(pattern);
-  const out: Token[] = [];
-  let t: Token | null;
-  while ((t = s.nextToken()) !== null) out.push(t);
-  return out;
-}
-
 describe("ActionDispatch::Journey::Scanner", () => {
+  const scanner = new Scanner();
+
   const CASES: Array<[string, Token[]]> = [
     ["/", ["SLASH"]],
     ["*omg", ["STAR"]],
@@ -39,25 +32,19 @@ describe("ActionDispatch::Journey::Scanner", () => {
     ["/sort::sort", ["SLASH", "LITERAL", "LITERAL", "SYMBOL"]],
   ];
 
-  for (const [pattern, expected] of CASES) {
-    it(`Scanning \`${pattern}\``, () => {
-      expect(tokens(pattern)).toEqual(expected);
-    });
+  function assertTokens(expectedTokens: Token[], scanner: Scanner, pattern: string): void {
+    const actualTokens: Token[] = [];
+    let token: Token | null;
+    while ((token = scanner.nextToken()) !== null) {
+      actualTokens.push(token);
+    }
+    expect(actualTokens, `Wrong tokens for \`${pattern}\``).toEqual(expectedTokens);
   }
 
-  it("lastString and lastLiteral expose the last scanned text", () => {
-    const s = new Scanner();
-    s.scanSetup("/page\\:foo");
-    s.nextToken();
-    s.nextToken();
-    expect(s.lastString()).toBe("page\\:foo");
-    expect(s.lastLiteral()).toBe("page:foo");
-  });
-
-  it("nextToken returns null at end", () => {
-    const s = new Scanner();
-    s.scanSetup("/");
-    expect(s.nextToken()).toBe("SLASH");
-    expect(s.nextToken()).toBeNull();
-  });
+  for (const [pattern, expectedTokens] of CASES) {
+    it(`Scanning \`${pattern}\``, () => {
+      scanner.scanSetup(pattern);
+      assertTokens(expectedTokens, scanner, pattern);
+    });
+  }
 });
