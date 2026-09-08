@@ -1,5 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
-import { rbBuiltinClassName, rbInspect } from "./object.js";
+import { rbBuiltinClassName, rbInspect, rbObjAsString } from "./object.js";
 
 const SPEC = /%([-+ #0]*)(\d*)(?:\.(\d+))?([a-zA-Z%])/g;
 
@@ -68,7 +68,7 @@ function generalFormat(magnitude: number, digits: number, alternate: boolean): s
   return mantissa.replace(/\.?0+$/, "") + (suffix ? `e${suffix}` : "");
 }
 
-function one(
+function formatSpec(
   flags: string,
   width: string,
   precision: string | undefined,
@@ -103,9 +103,9 @@ function one(
   } else if (conversion === "g" || conversion === "G") {
     body = generalFormat(magnitude, digits === 0 ? 1 : digits, alternate);
   } else if (conversion === "c") {
-    body = typeof value === "number" ? String.fromCodePoint(value) : String(value).charAt(0);
+    body = typeof value === "number" ? String.fromCodePoint(value) : rbObjAsString(value).charAt(0);
   } else {
-    body = conversion === "p" ? rbInspect(value) : String(value);
+    body = conversion === "p" ? rbInspect(value) : rbObjAsString(value);
     if (precision !== undefined) body = body.slice(0, digits);
   }
   if (integer && precision !== undefined) {
@@ -153,7 +153,7 @@ export function kernelSprintf(fmt: string, ...args: unknown[]): string {
       if (!CONVERSIONS.includes(conversion)) {
         throw new ArgumentError(`malformed format string - ${match}`);
       }
-      return one(flags, width, precision, conversion, args[index++]);
+      return formatSpec(flags, width, precision, conversion, args[index++]);
     },
   );
 }

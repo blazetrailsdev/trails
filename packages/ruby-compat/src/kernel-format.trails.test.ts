@@ -31,6 +31,20 @@ describe("kernelFormat / kernelSprintf", () => {
     expect(kernelFormat("100%% %c", 65)).toBe("100% A");
   });
 
+  it("renders nil through to_s rather than a language literal", () => {
+    expect(kernelFormat("%s", null)).toBe("");
+    expect(kernelFormat("%.3s", "abcdef")).toBe("abc");
+  });
+
+  it("pads to width on both sides and honours the alternate prefix", () => {
+    expect(kernelFormat("%5d", 42)).toBe("   42");
+    expect(kernelFormat("%-5d|", 42)).toBe("42   |");
+    expect(kernelFormat("%b", 5)).toBe("101");
+    expect(kernelFormat("%#x", 255)).toBe("0xff");
+    expect(kernelFormat("%010.4f", 3.14159)).toBe("00003.1416");
+    expect(kernelFormat("%+.2e", -1234.5)).toBe("-1.23e+03");
+  });
+
   it("sprintf is the same function under the other name", () => {
     expect(kernelSprintf("%04d", 7)).toBe(kernelFormat("%04d", 7));
   });
