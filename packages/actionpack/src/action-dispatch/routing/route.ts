@@ -83,8 +83,6 @@ export class Route {
   /** @internal */
   readonly requestMethodMatch: readonly VerbMatcher[];
   /** @internal */
-  private readonly _verbs: readonly string[];
-  /** @internal */
   private _app: Endpoint | undefined;
 
   private readonly paramNames: string[];
@@ -108,9 +106,8 @@ export class Route {
     action: string,
     options: RouteOptions = {},
   ) {
-    this._verbs = (Array.isArray(verb) ? verb : [verb as string]).map((v) => v.toUpperCase());
-    this.requestMethodMatch = this._verbs.map((v) =>
-      v === "ALL" ? VerbMatchers.All : JourneyRoute.verbMatcher(v),
+    this.requestMethodMatch = (Array.isArray(verb) ? verb : [verb as string]).map((v) =>
+      v.toUpperCase() === "ALL" ? VerbMatchers.All : JourneyRoute.verbMatcher(v.toUpperCase()),
     );
     this.path = normalizePath(path);
     this.controller = controller;
@@ -136,7 +133,12 @@ export class Route {
   }
 
   get verb(): string {
-    return this._verbs.join("|");
+    return this.verbs().join("|");
+  }
+
+  /** @internal */
+  private verbs(): string[] {
+    return this.requestMethodMatch.map((m) => (m === VerbMatchers.All ? "ALL" : m.verb));
   }
 
   get app(): Endpoint | undefined {
@@ -272,14 +274,12 @@ export class Route {
 
   /** @internal */
   private matchVerb(requestMethod: string): boolean {
-    return this.requestMethodMatch.some(
-      (m) => m.call({ requestMethod }) || (requestMethod === "HEAD" && m.verb === "GET"),
-    );
+    return this.requestMethodMatch.some((m) => m.call({ requestMethod }));
   }
 
   match(method: string, requestPath: string): MatchedRoute | null {
     const m = method.toUpperCase();
-    if (!this.matchVerb(m)) {
+    if (!this.matchVerb(m) && !(m === "HEAD" && this.matchVerb("GET"))) {
       return null;
     }
     if (this._journeyRouterUnbuildable) return null;
