@@ -398,8 +398,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  async beginDbTransaction(): Promise<void> {
-    await this.internalExecute("BEGIN", "TRANSACTION", [], {
+  async beginDbTransaction(): Promise<unknown> {
+    return this.internalExecute("BEGIN", "TRANSACTION", [], {
       allowRetry: true,
       materializeTransactions: false,
     });
@@ -414,8 +414,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  async commitDbTransaction(): Promise<void> {
-    await this.internalExecute("COMMIT", "TRANSACTION", [], {
+  async commitDbTransaction(): Promise<unknown> {
+    return this.internalExecute("COMMIT", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });
@@ -428,8 +428,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  async execRestartDbTransaction(): Promise<void> {
-    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
+  async execRestartDbTransaction(): Promise<unknown> {
+    return this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });

@@ -1,5 +1,4 @@
 import { Temporal } from "@blazetrails/date";
-import { kernelFormat as format } from "@blazetrails/ruby-compat";
 import {
   DateType,
   DateInfinity,
@@ -7,8 +6,10 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
+import { parsePostgresDate } from "../../abstract/temporal-wire.js";
 
 export class Date extends DateType {
+  /** @missingRailsCall format — PERMANENT */
   override castValue(
     value: unknown,
   ): Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType | null {
@@ -17,8 +18,11 @@ export class Date extends DateType {
       if (value === "infinity") return DateInfinity;
       if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
-        const rewritten = value.replace(/^\d+/, (year) => format("%04d", -Number(year) + 1));
-        return super.castValue(rewritten.replace(/ BC$/, ""));
+        try {
+          return parsePostgresDate(value);
+        } catch {
+          return null;
+        }
       }
     }
     return super.castValue(value);

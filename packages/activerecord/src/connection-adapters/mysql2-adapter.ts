@@ -529,7 +529,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  async beginDeferredTransaction(): Promise<void> {
+  async beginDeferredTransaction(): Promise<unknown> {
     return this.beginDbTransaction();
   }
 

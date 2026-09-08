@@ -945,6 +945,12 @@ export class ConnectionPool implements ReapablePool {
   private bulkMakeNewConnections = bulkMakeNewConnections;
   private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
   private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
+  private withNewConnectionsBlocked = withNewConnectionsBlocked;
+  private acquireConnection = acquireConnection;
+  private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
+  private adoptConnection = adoptConnection;
+  private checkoutNewConnection = checkoutNewConnection;
+
   private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
     try {
       c._runCheckoutCallbacks(() => {
@@ -958,12 +964,6 @@ export class ConnectionPool implements ReapablePool {
       throw err;
     }
   }
-
-  private withNewConnectionsBlocked = withNewConnectionsBlocked;
-  private acquireConnection = acquireConnection;
-  private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
-  private adoptConnection = adoptConnection;
-  private checkoutNewConnection = checkoutNewConnection;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
