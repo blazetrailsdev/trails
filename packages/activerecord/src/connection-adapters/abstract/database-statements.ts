@@ -1199,7 +1199,7 @@ export async function buildFixtureSql(
     return columns.map(([name, column]) => {
       if (name in fixture) {
         const type = this.lookupCastTypeFromColumn(column);
-        return arelSql(this.quote(withYamlFallback(type.serialize(fixture[name]))));
+        return withYamlFallback(type.serialize(fixture[name]));
       }
       return (this.defaultInsertValue ?? defaultInsertValue).call(this, column);
     });
