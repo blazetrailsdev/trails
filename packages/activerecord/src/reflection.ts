@@ -15,7 +15,7 @@ import {
   foreignKey as deriveForeignKey,
   merge,
 } from "@blazetrails/activesupport";
-import { except, mergeBang } from "@blazetrails/ruby-compat";
+import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
@@ -1774,10 +1774,8 @@ function reflectionClassFor(
       return HasOneReflection;
     case "belongsTo":
       return BelongsToReflection;
-    case "hasAndBelongsToMany":
-      return HasAndBelongsToManyReflection;
     default:
-      return AssociationReflection;
+      throw new RuntimeError(`Unsupported Macro: ${macro}`);
   }
 }
 

@@ -14,6 +14,7 @@ import {
 import { Association } from "./association.js";
 import { AssociationNotFoundError } from "./errors.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 
@@ -196,13 +197,9 @@ export class SingularAssociation extends Association {
 
   protected replace(record: Base | null): void;
   protected replace(record: Base | null, save: boolean): void | Promise<void>;
-  protected replace(record: Base | null, _save = true): void | Promise<void> {
-    if (record) {
-      this.setInverseInstance(record);
-    } else if (this.target) {
-      this.removeInverseInstance(this.target);
-    }
-    this.target = record;
+  protected replace(_record: Base | null, ..._rest: unknown[]): void | Promise<void> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/singular_association.rb:57
+    throw new NotImplementedError("Subclasses must implement a replace(record) method");
   }
 
   protected setNewRecord(record: Base): void | Promise<void> {

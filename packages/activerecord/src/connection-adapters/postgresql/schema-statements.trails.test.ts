@@ -143,6 +143,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(typeof seqName).toBe("string");
     });
 
+    it("default sequence name propagates a non-StatementInvalid error", async () => {
+      const boom = new Error("connection lost");
+      (adapter as unknown as { serialSequence: () => Promise<string | null> }).serialSequence =
+        () => {
+          throw boom;
+        };
+      try {
+        await expect(
+          adapter.defaultSequenceName(`${SCHEMA_NAME}.${TABLE_NAME}`, "id"),
+        ).rejects.toBe(boom);
+      } finally {
+        delete (adapter as unknown as { serialSequence?: unknown }).serialSequence;
+      }
+    });
+
     it("reset pk sequence", async () => {
       const tableName = `${SCHEMA_NAME}.${TABLE_NAME}`;
       const result = await adapter.pkAndSequenceFor(tableName);

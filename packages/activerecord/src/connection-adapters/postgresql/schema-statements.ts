@@ -16,6 +16,7 @@ import {
   type ColumnOptions,
   type ColumnType,
 } from "../abstract/schema-definitions.js";
+import { StatementInvalid } from "../../errors.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
@@ -1294,7 +1295,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
       const result = await this.serialSequence(tableName, pk);
       if (!result) return null;
       return Utils.extractSchemaQualifiedName(result).toString();
-    } catch {
+    } catch (error) {
+      if (!(error instanceof StatementInvalid)) throw error;
       return new Name(null, `${tableName}_${pk}_seq`).toString();
     }
   }
