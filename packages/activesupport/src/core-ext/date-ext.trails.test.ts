@@ -119,3 +119,18 @@ describe("date calculations coercion arms", () => {
     expect(DateExt.compareWithCoercion(date, TimeZone.find("UTC")!.local(2005, 2, 21))).toBe(0);
   });
 });
+
+describe("find_beginning_of_week!", () => {
+  it("renders the offending day the way Ruby interpolates it", () => {
+    expect(() => DateExt.findBeginningOfWeekBang(":sundy")).toThrow(
+      "Invalid beginning of week: sundy",
+    );
+    expect(() => DateExt.findBeginningOfWeekBang("monday")).toThrow(
+      "Invalid beginning of week: monday",
+    );
+  });
+
+  it("returns the week start it was given", () => {
+    expect(DateExt.findBeginningOfWeekBang(":friday")).toBe(":friday");
+  });
+});

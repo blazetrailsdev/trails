@@ -13,13 +13,13 @@ export type Comparable = DateOrTime | TimeWithZone | Temporal.Instant;
 export type DateOrInstant = Temporal.PlainDate | Temporal.Instant;
 
 export const DAYS_INTO_WEEK: Record<string, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
+  ":sunday": 0,
+  ":monday": 1,
+  ":tuesday": 2,
+  ":wednesday": 3,
+  ":thursday": 4,
+  ":friday": 5,
+  ":saturday": 6,
 };
 
 export const WEEKEND_DAYS = [6, 0];
@@ -312,7 +312,7 @@ export function nextWeekday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function nextWeekday(dateOrTime: Date): Temporal.Instant;
 export function nextWeekday(dateOrTime: DateOrTime): DateOrInstant {
   if (isOnWeekend(nextDay(dateOrTime))) {
-    return nextWeek(dateOrTime as Date, "monday", { sameTime: true });
+    return nextWeek(dateOrTime as Date, ":monday", { sameTime: true });
   } else {
     return nextDay(dateOrTime);
   }
@@ -351,7 +351,7 @@ export function prevWeekday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function prevWeekday(dateOrTime: Date): Temporal.Instant;
 export function prevWeekday(dateOrTime: DateOrTime): DateOrInstant {
   if (isOnWeekend(prevDay(dateOrTime))) {
-    return copyTimeTo(dateOrTime, beginningOfWeek(dateOrTime as Date, "friday"));
+    return copyTimeTo(dateOrTime, beginningOfWeek(dateOrTime as Date, ":friday"));
   } else {
     return prevDay(dateOrTime);
   }
@@ -406,7 +406,7 @@ export const atBeginningOfWeek = beginningOfWeek;
 export function monday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function monday(dateOrTime: Date): Temporal.Instant;
 export function monday(dateOrTime: DateOrTime): DateOrInstant {
-  return beginningOfWeek(dateOrTime as Date, "monday");
+  return beginningOfWeek(dateOrTime as Date, ":monday");
 }
 
 export function endOfWeek(dateOrTime: Temporal.PlainDate, startDay?: string): Temporal.PlainDate;
@@ -423,7 +423,7 @@ export const atEndOfWeek = endOfWeek;
 export function sunday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function sunday(dateOrTime: Date): Temporal.Instant;
 export function sunday(dateOrTime: DateOrTime): DateOrInstant {
-  return endOfWeek(dateOrTime as Date, "monday");
+  return endOfWeek(dateOrTime as Date, ":monday");
 }
 
 export function endOfMonth(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;

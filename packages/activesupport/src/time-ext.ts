@@ -26,15 +26,9 @@ import {
   nextWeek,
   prevWeek,
 } from "./core-ext/date-and-time/calculations.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat";
 
 export { nextWeek, prevWeek, lastWeek, beginningOfWeek, endOfWeek, allWeek };
-
-function dayIndex(day: string): number {
-  const idx = DAYS_INTO_WEEK[day.toLowerCase()];
-  if (idx === undefined) throw new KeyError(`key not found: :${day}`);
-  return idx;
-}
 
 function clone(date: Date): Date {
   return new Date(date.getTime());
@@ -170,7 +164,7 @@ export function prevDay(date: Date, days = 1): Temporal.Instant {
 export { nextDay as tomorrow, prevDay as yesterday };
 
 export function nextOccurring(date: Date, day: string): Temporal.Instant {
-  const targetDay = dayIndex(day);
+  const targetDay = fetch<number>(DAYS_INTO_WEEK, day);
   const d = clone(date);
   let diff = targetDay - d.getDay();
   if (diff <= 0) diff += 7;
@@ -179,7 +173,7 @@ export function nextOccurring(date: Date, day: string): Temporal.Instant {
 }
 
 export function prevOccurring(date: Date, day: string): Temporal.Instant {
-  const targetDay = dayIndex(day);
+  const targetDay = fetch<number>(DAYS_INTO_WEEK, day);
   const d = clone(date);
   let diff = d.getDay() - targetDay;
   if (diff <= 0) diff += 7;

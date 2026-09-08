@@ -303,14 +303,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = asDate(lastWeek(dt, "monday"));
+    const result = asDate(lastWeek(dt, ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
 
   it("date time should have correct last week for leap year", () => {
     const dt = d(2016, 3, 7);
-    const result = asDate(lastWeek(dt, "monday"));
+    const result = asDate(lastWeek(dt, ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });

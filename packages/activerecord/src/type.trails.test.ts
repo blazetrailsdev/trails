@@ -9,7 +9,7 @@ import {
   AdapterSpecificRegistry,
 } from "./type.js";
 import { Base } from "./base.js";
-import { ConnectionNotDefined } from "./errors.js";
+import { AdapterNotFound, ConnectionNotDefined } from "./errors.js";
 import { ValueType, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
 import "./connection-adapters/postgresql/type-map-init.js";
@@ -33,7 +33,7 @@ class AdapterType extends GenericType {
 }
 
 function modelWith(adapter: string | undefined) {
-  return { connectionDbConfig: () => (adapter === undefined ? undefined : { adapter }) };
+  return { connectionDbConfig: () => ({ adapter }) };
 }
 
 describe("Type.currentAdapterName", () => {
@@ -47,15 +47,15 @@ describe("Type.currentAdapterName", () => {
     expect(adapterNameFrom(modelWith("sqlite3"))).toBe("sqlite3");
   });
 
-  it("falls back to sqlite when the model has no configuration", () => {
-    expect(adapterNameFrom(modelWith(undefined))).toBe("sqlite3");
-    expect(
+  it("raises when the model has no configuration", () => {
+    expect(() =>
       adapterNameFrom({
         connectionDbConfig: () => {
           throw new ConnectionNotDefined("No database connection defined.");
         },
       }),
-    ).toBe("sqlite3");
+    ).toThrow(ConnectionNotDefined);
+    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(AdapterNotFound);
   });
 
   it("propagates errors other than a missing connection", () => {

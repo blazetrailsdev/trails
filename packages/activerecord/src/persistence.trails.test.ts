@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RecordInvalid, registerModel } from "./index.js";
+import { ActiveRecordError, RecordInvalid, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -7,6 +7,7 @@ import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
+import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { Company } from "./test-helpers/models/company.js";
@@ -257,6 +258,17 @@ describe("PersistenceTest (trails)", () => {
     expect(special.id).toBe(post.id);
     expect(() => (special as unknown as { title: string }).title).toThrow(
       /missing attribute|title/i,
+    );
+  });
+});
+
+describe("PersistenceTest#verifyReadonlyAttribute (trails)", () => {
+  fixtures(["minivans"]);
+
+  it("raises ActiveRecordError with Rails' message", async () => {
+    const minivan = await Minivan.find("m1");
+    await expect(minivan.updateColumn("color", "black")).rejects.toThrow(
+      new ActiveRecordError("color is marked as readonly"),
     );
   });
 });

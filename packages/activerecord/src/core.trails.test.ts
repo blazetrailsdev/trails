@@ -6,6 +6,7 @@ import { Reply } from "./test-helpers/models/reply.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -79,9 +80,9 @@ describe("connection checkout for directly-assigned adapters", () => {
       static tableName = "topics";
       static {
         this.connectionSpecificationName = "TopicWithDirectAdapter";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("approved", "boolean");
+        this.attribute("id", new IntegerType());
+        this.attribute("title", new StringType());
+        this.attribute("approved", new BooleanType());
         this.adapter = adp;
       }
     }

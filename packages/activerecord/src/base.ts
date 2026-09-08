@@ -33,7 +33,6 @@ import {
   type CallbackObject,
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
-import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Relation } from "./relation.js";
@@ -3249,8 +3248,6 @@ type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;
 void _arBaseUnscopedWire;
-
-setCurrentAdapterResolver(() => Base);
 
 DatabaseTasks._registerBase(Base);
 

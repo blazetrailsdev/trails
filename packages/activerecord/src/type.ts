@@ -11,8 +11,8 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
+import { _Base as Base } from "./base-slot.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import { ConnectionNotEstablished } from "./errors.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 
@@ -51,7 +51,6 @@ export const Value = ValueType;
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: ValueType | undefined;
-let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
 export interface AdapterNameSource {
   connectionDbConfig: () => { adapter?: string } | undefined;
@@ -77,14 +76,6 @@ export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
     _defaultValue = undefined;
   }
   return _registry;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
-  _currentAdapterResolver = resolver;
 }
 
 export function register(
@@ -122,21 +113,12 @@ export function defaultValue(): ValueType {
 }
 
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  let configAdapter: string | undefined;
-  try {
-    configAdapter = model.connectionDbConfig()?.adapter;
-  } catch (error) {
-    if (!(error instanceof ConnectionNotEstablished)) throw error;
-    return "sqlite3";
-  }
-  if (configAdapter === undefined) return "sqlite3";
-  return adapterNameFromConfig(configAdapter);
+  return adapterNameFromConfig(model.connectionDbConfig()!.adapter);
 }
 
 /** @internal */
 export function currentAdapterName(): AdapterName {
-  const base = _currentAdapterResolver?.();
-  return base ? adapterNameFrom(base) : "sqlite3";
+  return adapterNameFrom(Base!);
 }
 
 typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date
