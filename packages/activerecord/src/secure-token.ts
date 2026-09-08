@@ -4,7 +4,7 @@ import type { Base } from "./base.js";
 export class MinimumLengthError extends Error {
   constructor(message?: string) {
     super(message);
-    this.name = "MinimumLengthError";
+    this.name = "ActiveRecord::SecureToken::MinimumLengthError";
   }
 }
 

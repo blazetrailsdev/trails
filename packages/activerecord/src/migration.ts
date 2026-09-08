@@ -94,35 +94,35 @@ export interface ColumnExistsOptions {
 export class MigrationError extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
-    this.name = "MigrationError";
+    this.name = "ActiveRecord::MigrationError";
   }
 }
 
 export class IrreversibleMigration extends MigrationError {
   constructor(message = "This migration uses a feature that is not reversible.") {
     super(message);
-    this.name = "IrreversibleMigration";
+    this.name = "ActiveRecord::IrreversibleMigration";
   }
 }
 
 export class DuplicateMigrationVersionError extends MigrationError {
   constructor(version: string | number) {
     super(`Multiple migrations have the version number ${version}.`);
-    this.name = "DuplicateMigrationVersionError";
+    this.name = "ActiveRecord::DuplicateMigrationVersionError";
   }
 }
 
 export class DuplicateMigrationNameError extends MigrationError {
   constructor(name: string) {
     super(`Multiple migrations have the name ${name}.`);
-    this.name = "DuplicateMigrationNameError";
+    this.name = "ActiveRecord::DuplicateMigrationNameError";
   }
 }
 
 export class UnknownMigrationVersionError extends MigrationError {
   constructor(version: string | number) {
     super(`No migration with version number ${version}.`);
-    this.name = "UnknownMigrationVersionError";
+    this.name = "ActiveRecord::UnknownMigrationVersionError";
   }
 }
 
@@ -133,7 +133,7 @@ export class IllegalMigrationNameError extends MigrationError {
         ? `Illegal name for migration file: ${name}\n\t(only lower case letters, numbers, and '_' allowed).`
         : "Illegal name for migration.",
     );
-    this.name = "IllegalMigrationNameError";
+    this.name = "ActiveRecord::IllegalMigrationNameError";
   }
 }
 
@@ -147,7 +147,7 @@ export class InvalidMigrationTimestampError extends MigrationError {
         ? `Invalid timestamp ${version} for migration file: ${name}.`
         : "Invalid timestamp for migration.";
     super(`${prefix}\nTimestamp must be in form YYYYMMDDHHMMSS, and less than ${limit}.`);
-    this.name = "InvalidMigrationTimestampError";
+    this.name = "ActiveRecord::InvalidMigrationTimestampError";
   }
 }
 
@@ -169,7 +169,7 @@ export class PendingMigrationError extends MigrationError {
     } else {
       super(message);
     }
-    this.name = "PendingMigrationError";
+    this.name = "ActiveRecord::PendingMigrationError";
   }
 
   /** @internal */
@@ -192,21 +192,21 @@ export class ConcurrentMigrationError extends MigrationError {
 
   constructor(message = "Cannot run migrations because another migration is currently running.") {
     super(message);
-    this.name = "ConcurrentMigrationError";
+    this.name = "ActiveRecord::ConcurrentMigrationError";
   }
 }
 
 export class NoEnvironmentInSchemaError extends MigrationError {
   constructor(message = "Environment data not found in the schema.") {
     super(message);
-    this.name = "NoEnvironmentInSchemaError";
+    this.name = "ActiveRecord::NoEnvironmentInSchemaError";
   }
 }
 
 export class ProtectedEnvironmentError extends MigrationError {
   constructor(env: string) {
     super(`You are attempting to run a destructive action against your '${env}' database.`);
-    this.name = "ProtectedEnvironmentError";
+    this.name = "ActiveRecord::ProtectedEnvironmentError";
   }
 }
 
@@ -217,14 +217,14 @@ export class EnvironmentMismatchError extends MigrationError {
     msg += `If you are sure you want to continue, first set the environment using:\n\n`;
     msg += `        trails db environment:set`;
     super(`${msg}\n\n`);
-    this.name = "EnvironmentMismatchError";
+    this.name = "ActiveRecord::EnvironmentMismatchError";
   }
 }
 
 export class EnvironmentStorageError extends MigrationError {
   constructor(message = "Cannot store environment data.") {
     super(message);
-    this.name = "EnvironmentStorageError";
+    this.name = "ActiveRecord::EnvironmentStorageError";
   }
 }
 

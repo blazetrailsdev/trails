@@ -440,6 +440,16 @@ describe("FinderTest", () => {
   registerModel("Reply", CanonicalReply);
   const idOf = (r: unknown) => (r as { id: unknown }).id;
 
+  it("find passing active record object is not permitted", async () => {
+    const error = await Topic.find(await Topic.last()).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect((error as Error).message).toBe(
+      "You are passing an instance of ActiveRecord::Base to `find`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+  });
+
   it("find", async () => {
     expect((await Topic.find(1)).title).toBe(topics("first").title);
   });
@@ -1226,13 +1236,6 @@ describe("FinderTest", () => {
   it("find with ids with id out of range", async () => {
     const { Post } = makeModel();
     await expect(Post.find(99999999)).rejects.toThrow();
-  });
-
-  it("find passing active record object is not permitted", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "obj" });
-    const found = await Post.find(p.id!);
-    expect(found.id).toBe(p.id);
   });
 
   it("find on relation with large number", async () => {

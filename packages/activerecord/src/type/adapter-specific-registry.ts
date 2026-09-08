@@ -3,7 +3,7 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 export class TypeConflictError extends Error {
   constructor(message?: string) {
     super(message);
-    this.name = "TypeConflictError";
+    this.name = "ActiveRecord::TypeConflictError";
   }
 }
 

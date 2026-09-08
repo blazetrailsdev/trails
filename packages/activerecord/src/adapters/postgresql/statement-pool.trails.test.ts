@@ -88,7 +88,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("PreparedStatementCacheExpired is exported for txn-retry callers", async () => {
       const { PreparedStatementCacheExpired } = await import("../../errors.js");
-      expect(new PreparedStatementCacheExpired("test").name).toBe("PreparedStatementCacheExpired");
+      expect(new PreparedStatementCacheExpired("test").name).toBe(
+        "ActiveRecord::PreparedStatementCacheExpired",
+      );
     });
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {

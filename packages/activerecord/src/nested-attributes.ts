@@ -10,7 +10,7 @@ import { BooleanType } from "@blazetrails/activemodel";
 export class TooManyRecords extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
-    this.name = "TooManyRecords";
+    this.name = "ActiveRecord::NestedAttributes::TooManyRecords";
   }
 }
 

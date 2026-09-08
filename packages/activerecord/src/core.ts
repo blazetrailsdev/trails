@@ -21,18 +21,16 @@ import {
   ParameterFilter,
   isPlainObject,
   constantize,
-  pluralize,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
-import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import type { PrettyPrinter } from "./pretty-print.js";
-import { Table, Nodes } from "@blazetrails/arel";
+import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { buildPkWhereNode, columnsHash } from "./model-schema.js";
+import { columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
@@ -684,28 +682,6 @@ function relation(this: CoreHost): any {
   return (this as any).all();
 }
 
-function pkMatchKey(value: unknown): unknown {
-  return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
-}
-
-function raiseCouldntFindAll(
-  name: string,
-  pk: string,
-  ids: unknown[],
-  payload: unknown,
-  resultSize: number,
-  expectedSize: number,
-): never {
-  throw new RecordNotFound(
-    `Couldn't find all ${pluralize(name)} with '${pk}': ` +
-      `(${ids.flat(Infinity).join(", ")}) ` +
-      `(found ${resultSize} results, but was looking for ${expectedSize}).`,
-    name,
-    pk,
-    payload,
-  );
-}
-
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   await this.ensureSchemaLoaded();
   if (ids.length === 0) {
@@ -733,113 +709,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       ids[0],
     );
   }
-  if (ids.length > 1) {
-    if (this.compositePrimaryKey && ids.some((i) => !Array.isArray(i))) {
-      throw new ArgumentError(
-        `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
-          `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
-      );
-    }
-    if (this.compositePrimaryKey) {
-      const expectsArray = Array.isArray((ids[0] as unknown[])[0]);
-      const tuples = compactUniqTuples(ids);
-      if (tuples.length === 1 && !expectsArray) {
-        return (this as any).find(tuples[0]);
-      }
-      return (this as any).find(tuples);
-    }
-    return (this as any).find(ids);
-  }
-  const id = ids[0];
-
-  if (this.compositePrimaryKey && Array.isArray(id)) {
-    if (Array.isArray(id[0])) {
-      const tuples = compactUniqTuples(id) as unknown[][];
-      const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
-      const orCondition = whereNodes.reduce((left, right) => new Nodes.Or([left, right]));
-      const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
-      if (records.length !== tuples.length) {
-        raiseCouldntFindAll(
-          this.name,
-          String(this.primaryKey),
-          tuples,
-          id,
-          records.length,
-          tuples.length,
-        );
-      }
-      return records;
-    }
-    const pk = this.primaryKey as string[];
-    const whereConditions: Record<string, unknown> = {};
-    pk.forEach((col, i) => {
-      whereConditions[col] = (id as unknown[])[i];
-    });
-    const record = await this.all().where(whereConditions).first();
-    if (!record) {
-      raiseCouldntFindAll(this.name, String(this.primaryKey), id as unknown[], id, 0, 1);
-    }
-    return record;
-  }
-
-  if (Array.isArray(id)) {
-    if (id.length === 0) {
-      return [];
-    }
-    const compactedIds = compactUniqIds(id);
-    if (compactedIds.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${this.name} without an ID`,
-        this.name,
-        String(this.primaryKey),
-      );
-    }
-    if (compactedIds.length === 1) {
-      const single = compactedIds[0];
-      const record = await this.all()
-        .where({ [this.primaryKey as string]: single })
-        .first();
-      if (!record) {
-        throw new RecordNotFound(
-          `Couldn't find ${this.name} with '${String(this.primaryKey)}'=${String(single)}`,
-          this.name,
-          String(this.primaryKey),
-          single,
-        );
-      }
-      return [record];
-    }
-    const records = await this.all()
-      .where({ [this.primaryKey as string]: compactedIds })
-      .toArray();
-    const pkType = this.typeForAttribute(this.primaryKey as string);
-    const castIds = compactedIds.map((i) => pkType!.cast(i));
-    const idToRecord = new Map<unknown, any>();
-    for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
-    if (records.length !== castIds.length) {
-      raiseCouldntFindAll(
-        this.name,
-        String(this.primaryKey),
-        compactedIds,
-        compactedIds,
-        records.length,
-        compactedIds.length,
-      );
-    }
-    return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
-  }
-  const record = await this.all()
-    .where({ [this.primaryKey as string]: id })
-    .first();
-  if (!record) {
-    throw new RecordNotFound(
-      `Couldn't find ${this.name} with '${String(this.primaryKey)}'=${String(id)}`,
-      this.name,
-      String(this.primaryKey),
-      id,
-    );
-  }
-  return record;
+  return this.all().find(...ids);
 }
 
 export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {

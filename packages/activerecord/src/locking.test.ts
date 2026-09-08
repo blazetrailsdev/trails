@@ -183,7 +183,7 @@ describe("OptimisticLockingTest", () => {
       error = e;
     }
     expect(error).toBeDefined();
-    expect(error.name).toBe("StaleObjectError");
+    expect(error.name).toBe("ActiveRecord::StaleObjectError");
     expect(error.record).toBe(p2);
   });
 

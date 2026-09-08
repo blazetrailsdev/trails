@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { MismatchedForeignKey, StatementInvalid } from "./errors.js";
+import { DeleteRestrictionError } from "./associations/errors.js";
+import {
+  ActiveRecordError,
+  MismatchedForeignKey,
+  RecordNotFound,
+  StatementInvalid,
+} from "./errors.js";
+import { TooManyRecords } from "./nested-attributes.js";
 
 describe("MismatchedForeignKey setQuery (trails-only)", () => {
   it("rebuilds the exception with parsed details when built with a queryParser and no sql", () => {
@@ -67,5 +74,15 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
     expect(result).toBeInstanceOf(StatementInvalid);
     expect(result.sql).toBe("ALTER TABLE `x`");
     expect(result.binds).toEqual(["y"]);
+  });
+});
+
+describe("fully-qualified error names (trails-only)", () => {
+  it("names every ActiveRecord error the way Ruby's e.class.name does", () => {
+    expect(new StatementInvalid("x").name).toBe("ActiveRecord::StatementInvalid");
+    expect(new RecordNotFound("x").name).toBe("ActiveRecord::RecordNotFound");
+    expect(new ActiveRecordError("x").name).toBe("ActiveRecord::ActiveRecordError");
+    expect(new DeleteRestrictionError("cars").name).toBe("ActiveRecord::DeleteRestrictionError");
+    expect(new TooManyRecords("x").name).toBe("ActiveRecord::NestedAttributes::TooManyRecords");
   });
 });

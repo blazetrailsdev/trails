@@ -168,7 +168,6 @@ interface FinderRelation {
   /** @internal */
   readonly isEagerLoading: boolean;
   /** @internal */
-  _checkEagerLoadable(): void;
   /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
@@ -384,7 +383,6 @@ export async function exists(
     );
   }
   if (conditions === false || conditions === null || this.limitValue === 0) return false;
-  this._checkEagerLoadable();
   if (this.isEagerLoading) {
     return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
       relation.exists(conditions),
@@ -585,6 +583,13 @@ export async function findWithIds(this: FinderRelation, ids: unknown[]): Promise
 
 /** @internal */
 export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
+  if (isBaseInstance(id)) {
+    throw new ArgumentError(
+      "You are passing an instance of ActiveRecord::Base to `find`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+  }
+
   const pk = this.primaryKey;
   const relation = Array.isArray(pk)
     ? (this as any).where(buildPkWhere(pk, id as unknown[]))

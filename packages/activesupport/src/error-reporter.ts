@@ -26,12 +26,16 @@ type ErrorClass = abstract new (...args: any[]) => Error;
 
 type ErrorSubscriberClass = abstract new (...args: any[]) => ErrorSubscriber;
 
+const ABOVE_STANDARD_ERROR = Symbol.for("@blazetrails/activesupport:aboveStandardError");
+
 export class ErrorReporter {
   static readonly SEVERITIES: ErrorSeverity[] = ["error", "warning", "info"];
   static readonly DEFAULT_SOURCE = "application";
   static readonly DEFAULT_RESCUE: readonly ErrorClass[] = Object.freeze([Error]);
 
   static readonly UnexpectedError = class UnexpectedError extends Error {
+    readonly [ABOVE_STANDARD_ERROR] = true;
+
     constructor(message: string, options?: { cause?: unknown }) {
       super(message, options);
       this.name = "UnexpectedError";
@@ -243,7 +247,14 @@ function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
 }
 
 function rescues(errorClasses: readonly ErrorClass[], error: unknown): error is Error {
-  return errorClasses.some((cls) => error instanceof cls);
+  return errorClasses.some(
+    (cls) =>
+      error instanceof cls &&
+      !(
+        cls === Error &&
+        (error as unknown as Record<symbol, unknown>)[ABOVE_STANDARD_ERROR] === true
+      ),
+  );
 }
 
 function splitKwargs<O>(

@@ -8,7 +8,7 @@ export class ReadonlyAttributeError extends ActiveRecordError {
   readonly attribute: string;
   constructor(attribute: string) {
     super(attribute);
-    this.name = "ReadonlyAttributeError";
+    this.name = "ActiveRecord::ReadonlyAttributeError";
     this.attribute = attribute;
   }
 }

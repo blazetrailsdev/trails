@@ -976,7 +976,7 @@ runLoadHooks("active_record_fixture_set", FixtureSet);
 export class FixtureError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "FixtureError";
+    this.name = "ActiveRecord::Fixture::FixtureError";
   }
 }
 

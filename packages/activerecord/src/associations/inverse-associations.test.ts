@@ -737,7 +737,7 @@ describe("InverseHasManyTests", () => {
     await proxy.load();
     const err = await (proxy as any).find().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe("RecordNotFound");
+    expect(err.name).toBe("ActiveRecord::RecordNotFound");
     expect(err.model).toBe("Interest");
     expect(err.primaryKey).toBe("id");
   });

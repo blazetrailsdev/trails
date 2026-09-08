@@ -21,7 +21,7 @@ export class AssociationNotFoundError extends ConfigurationError {
     } else {
       super("Association was not found.");
     }
-    this.name = "AssociationNotFoundError";
+    this.name = "ActiveRecord::AssociationNotFoundError";
     this.record = record;
     this.associationName = associationName;
   }
@@ -80,7 +80,7 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
           )} in ${associatedClass == null ? reflection.className : associatedClass.name})`
         : "Could not find the inverse association.",
     );
-    this.name = "InverseOfAssociationNotFoundError";
+    this.name = "ActiveRecord::InverseOfAssociationNotFoundError";
     this.reflection = reflection;
     if (reflection == null) {
       this.associatedClass = null;
@@ -126,7 +126,7 @@ export class InverseOfAssociationRecursiveError extends ActiveRecordError {
           }) is recursive.`
         : "Inverse association is recursive.",
     );
-    this.name = "InverseOfAssociationRecursiveError";
+    this.name = "ActiveRecord::InverseOfAssociationRecursiveError";
     this.reflection = reflection;
   }
 }
@@ -163,7 +163,7 @@ export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
       this.ownerClass = null;
       this.reflection = null;
     }
-    this.name = "HasManyThroughAssociationNotFoundError";
+    this.name = "ActiveRecord::HasManyThroughAssociationNotFoundError";
   }
 
   get corrections(): string[] {
@@ -191,7 +191,7 @@ export class HasManyThroughAssociationPolymorphicSourceError extends ActiveRecor
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} which goes through the polymorphic association '${source}'.`,
     );
-    this.name = "HasManyThroughAssociationPolymorphicSourceError";
+    this.name = "ActiveRecord::HasManyThroughAssociationPolymorphicSourceError";
   }
 }
 
@@ -200,7 +200,7 @@ export class HasManyThroughAssociationPolymorphicThroughError extends ActiveReco
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} that has a polymorphic :through association.`,
     );
-    this.name = "HasManyThroughAssociationPolymorphicThroughError";
+    this.name = "ActiveRecord::HasManyThroughAssociationPolymorphicThroughError";
   }
 }
 
@@ -209,7 +209,7 @@ export class HasManyThroughAssociationPointlessSourceTypeError extends ActiveRec
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} with a :source_type but the :source '${source}' is not polymorphic.`,
     );
-    this.name = "HasManyThroughAssociationPointlessSourceTypeError";
+    this.name = "ActiveRecord::HasManyThroughAssociationPointlessSourceTypeError";
   }
 }
 
@@ -218,7 +218,7 @@ export class HasOneThroughCantAssociateThroughCollection extends ActiveRecordErr
     super(
       `Cannot have a has_one :through association '${association}' on ${owner} going through '${through}' which is a collection. Specify a has_one or belongs_to association instead.`,
     );
-    this.name = "HasOneThroughCantAssociateThroughCollection";
+    this.name = "ActiveRecord::HasOneThroughCantAssociateThroughCollection";
   }
 }
 
@@ -227,7 +227,7 @@ export class HasOneAssociationPolymorphicThroughError extends ActiveRecordError 
     super(
       `Cannot have a has_one :through association '${association}' on ${owner} that has a polymorphic :through association.`,
     );
-    this.name = "HasOneAssociationPolymorphicThroughError";
+    this.name = "ActiveRecord::HasOneAssociationPolymorphicThroughError";
   }
 }
 
@@ -236,7 +236,7 @@ export class HasManyThroughSourceAssociationNotFoundError extends ActiveRecordEr
     super(
       `Could not find the source association(s) :${source} on ${owner} through '${through}'. Try 'hasMany ${association}, { through: "${through}", source: "<source_name>" }' with a valid source association defined on ${through}.`,
     );
-    this.name = "HasManyThroughSourceAssociationNotFoundError";
+    this.name = "ActiveRecord::HasManyThroughSourceAssociationNotFoundError";
   }
 }
 
@@ -245,7 +245,7 @@ export class HasManyThroughOrderError extends ActiveRecordError {
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} which goes through '${through}' before the through association is defined.`,
     );
-    this.name = "HasManyThroughOrderError";
+    this.name = "ActiveRecord::HasManyThroughOrderError";
   }
 }
 
@@ -254,21 +254,21 @@ export class ThroughCantAssociateThroughHasOneOrManyReflection extends ActiveRec
     super(
       `Cannot modify association '${association}' on ${owner} because the source reflection is through a has_one or has_many reflection.`,
     );
-    this.name = "ThroughCantAssociateThroughHasOneOrManyReflection";
+    this.name = "ActiveRecord::ThroughCantAssociateThroughHasOneOrManyReflection";
   }
 }
 
 export class HasManyThroughCantAssociateThroughHasOneOrManyReflection extends ThroughCantAssociateThroughHasOneOrManyReflection {
   constructor(owner: string, association: string) {
     super(owner, association);
-    this.name = "HasManyThroughCantAssociateThroughHasOneOrManyReflection";
+    this.name = "ActiveRecord::HasManyThroughCantAssociateThroughHasOneOrManyReflection";
   }
 }
 
 export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends ThroughCantAssociateThroughHasOneOrManyReflection {
   constructor(owner: string, association: string) {
     super(owner, association);
-    this.name = "HasOneThroughCantAssociateThroughHasOneOrManyReflection";
+    this.name = "ActiveRecord::HasOneThroughCantAssociateThroughHasOneOrManyReflection";
   }
 }
 
@@ -321,7 +321,7 @@ export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
       message = "Association primary key doesn't match with foreign key.";
     }
     super(message);
-    this.name = "CompositePrimaryKeyMismatchError";
+    this.name = "ActiveRecord::CompositePrimaryKeyMismatchError";
   }
 }
 
@@ -330,7 +330,7 @@ export class AmbiguousSourceReflectionForThroughAssociation extends ActiveRecord
     super(
       `Ambiguous source reflection for through association '${association}' on ${owner}. Possible sources: ${sources.join(", ")}. Specify :source to resolve.`,
     );
-    this.name = "AmbiguousSourceReflectionForThroughAssociation";
+    this.name = "ActiveRecord::AmbiguousSourceReflectionForThroughAssociation";
   }
 }
 
@@ -343,21 +343,21 @@ export class ThroughNestedAssociationsAreReadonly extends ActiveRecordError {
     } else {
       super("Through nested associations are read-only.");
     }
-    this.name = "ThroughNestedAssociationsAreReadonly";
+    this.name = "ActiveRecord::ThroughNestedAssociationsAreReadonly";
   }
 }
 
 export class HasManyThroughNestedAssociationsAreReadonly extends ThroughNestedAssociationsAreReadonly {
   constructor(owner?: object | null, reflection?: { name: string } | null) {
     super(owner, reflection);
-    this.name = "HasManyThroughNestedAssociationsAreReadonly";
+    this.name = "ActiveRecord::HasManyThroughNestedAssociationsAreReadonly";
   }
 }
 
 export class HasOneThroughNestedAssociationsAreReadonly extends ThroughNestedAssociationsAreReadonly {
   constructor(owner?: object | null, reflection?: { name: string } | null) {
     super(owner, reflection);
-    this.name = "HasOneThroughNestedAssociationsAreReadonly";
+    this.name = "ActiveRecord::HasOneThroughNestedAssociationsAreReadonly";
   }
 }
 
@@ -366,7 +366,7 @@ export class EagerLoadPolymorphicError extends ActiveRecordError {
 
   constructor(reflection: string) {
     super(`Cannot eagerly load the polymorphic association :${reflection}.`);
-    this.name = "EagerLoadPolymorphicError";
+    this.name = "ActiveRecord::EagerLoadPolymorphicError";
     this.reflection = reflection;
   }
 }
@@ -378,7 +378,7 @@ export class DeleteRestrictionError extends ActiveRecordError {
         ? `Cannot delete record because of dependent ${name}`
         : "Delete restriction error.",
     );
-    this.name = "DeleteRestrictionError";
+    this.name = "ActiveRecord::DeleteRestrictionError";
   }
 }
 

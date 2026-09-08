@@ -40,7 +40,7 @@ export class ColumnNotSerializableError extends Error {
         `Usually it means that you are trying to use \`serialize\`\n` +
         `on a column that already implements serialization natively.`,
     );
-    this.name = "ColumnNotSerializableError";
+    this.name = "ActiveRecord::AttributeMethods::Serialization::ColumnNotSerializableError";
   }
 }
 
