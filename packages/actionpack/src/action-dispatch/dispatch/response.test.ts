@@ -186,15 +186,8 @@ describe("ResponseTest", () => {
   it("write after close", () => {
     const res = new Response();
     res.close();
-    const e = (() => {
-      try {
-        res.write("more");
-      } catch (error) {
-        return error;
-      }
-    })();
-    expect(e).toBeInstanceOf(IOError);
-    expect((e as IOError).message).toBe("closed stream");
+    expect(() => res.write("more")).toThrow(IOError);
+    expect(() => res.write("more")).toThrow("closed stream");
   });
 
   it("each isnt called if str body is written", () => {

@@ -1,7 +1,7 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
+import { rubyClassPath } from "../ruby-class-path-slot.js";
 import { ownState, readOwnState } from "./per-class-state.js";
-import { getRubyClassPath } from "../ruby-class-path-slot.js";
 
 const SEALED_KEY = "_sealedFromInheritance";
 
@@ -25,9 +25,7 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
   while (parent && parent !== Function.prototype && parent !== Object.prototype) {
     if (readOwnState<boolean>(parent, SEALED_KEY) === true) {
       const superclass = Object.getPrototypeOf(parent) as typeof Trailtie;
-      throw new RuntimeError(
-        `You cannot inherit from a ${getRubyClassPath(superclass) ?? superclass.name} child`,
-      );
+      throw new RuntimeError(`You cannot inherit from a ${rubyClassPath(superclass)} child`);
     }
     parent = Object.getPrototypeOf(parent) as typeof Trailtie | null;
   }
