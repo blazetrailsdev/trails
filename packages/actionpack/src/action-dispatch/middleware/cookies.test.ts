@@ -13,7 +13,13 @@ import {
   isReserialize,
   type RequestCookieMethodsHost,
   serializer,
+  keyGenerator,
+  signedCookieSalt,
+  authenticatedEncryptedCookieSalt,
 } from "./cookies.js";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { MessageEncryptor, NullSerializer } from "@blazetrails/activesupport/message-encryptor";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import "../http/request.js";
@@ -26,6 +32,7 @@ function cookieEnv(env: Record<string, unknown> = {}): Record<string, unknown> {
     "action_dispatch.signed_cookie_salt": "signed cookie",
     "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
     "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+    "action_dispatch.cookies_rotations": new RotationConfiguration(),
     ...env,
   };
 }
@@ -357,5 +364,94 @@ describe("SignedKeyRotatingCookieJar#permanent", () => {
     jar.signed.permanent.set("session_id", { value: "42", httpOnly: true, sameSite: "lax" });
     expect(jar.signed.get("session_id")).toBe("42");
     expect(jar.get("session_id")).toMatch(/--/);
+  });
+});
+
+describe("cookies_rotations", () => {
+  const marshal = SerializerWithFallback.get("marshal");
+
+  it("signed cookie rotating secret and digest", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const rotations = new RotationConfiguration();
+    rotations.rotate("signed", secret, { digest: "SHA1" });
+
+    const oldMessage = new MessageVerifier(secret, {
+      digest: "SHA1",
+      serializer: NullSerializer,
+    }).generate(marshal.dump(45));
+
+    const request = cookieRequest({
+      "action_dispatch.signed_cookie_digest": "SHA256",
+      "action_dispatch.cookies_rotations": rotations,
+    });
+    const jar = CookieJar.build(request, { user_id: oldMessage });
+
+    expect(jar.signed.get("user_id")).toBe(45);
+
+    const secretFromGenerator = keyGenerator
+      .call(request)!
+      .generateKey(signedCookieSalt.call(request)!) as string;
+    const verifier = new MessageVerifier(secretFromGenerator, {
+      digest: "SHA256",
+      serializer: NullSerializer,
+    });
+    expect(marshal.load(verifier.verify(jar.get("user_id")!) as string)).toBe(45);
+  });
+
+  it("rotating signed cookies digest", () => {
+    const rotations = new RotationConfiguration();
+    rotations.rotate("signed", { digest: "SHA1" });
+
+    const request = cookieRequest({
+      "action_dispatch.signed_cookie_digest": "SHA256",
+      "action_dispatch.cookies_rotations": rotations,
+    });
+    const oldSecret = keyGenerator
+      .call(request)!
+      .generateKey(signedCookieSalt.call(request)!) as string;
+    const oldValue = new MessageVerifier(oldSecret, {
+      digest: "SHA1",
+      serializer: NullSerializer,
+    }).generate(marshal.dump(45));
+
+    const jar = CookieJar.build(request, { user_id: oldValue });
+    expect(jar.signed.get("user_id")).toBe(45);
+
+    const verifier = new MessageVerifier(oldSecret, {
+      digest: "SHA256",
+      serializer: NullSerializer,
+    });
+    expect(marshal.load(verifier.verify(jar.get("user_id")!) as string)).toBe(45);
+  });
+
+  it("encrypted cookie rotating secret", () => {
+    const secret = Buffer.alloc(MessageEncryptor.keyLen("aes-256-gcm"), "s");
+    const rotations = new RotationConfiguration();
+    rotations.rotate("encrypted", secret, { cipher: "aes-256-gcm" });
+
+    const oldMessage = new MessageEncryptor(secret, {
+      cipher: "aes-256-gcm",
+      serializer: NullSerializer,
+    }).encryptAndSign(marshal.dump(45));
+
+    const request = cookieRequest({
+      "action_dispatch.encrypted_cookie_cipher": "aes-256-gcm",
+      "action_dispatch.use_authenticated_cookie_encryption": true,
+      "action_dispatch.authenticated_encrypted_cookie_salt": "authenticated encrypted cookie",
+      "action_dispatch.cookies_rotations": rotations,
+    });
+    const jar = CookieJar.build(request, { foo: oldMessage });
+
+    expect(jar.encrypted.get("foo")).toBe(45);
+
+    const keyLen = MessageEncryptor.keyLen("aes-256-gcm");
+    const secretFromGenerator = keyGenerator
+      .call(request)!
+      .generateKey(authenticatedEncryptedCookieSalt.call(request)!, keyLen) as Buffer;
+    const encryptor = new MessageEncryptor(secretFromGenerator, {
+      cipher: "aes-256-gcm",
+      serializer: NullSerializer,
+    });
+    expect(marshal.load(encryptor.decryptAndVerify(jar.get("foo")!) as string)).toBe(45);
   });
 });

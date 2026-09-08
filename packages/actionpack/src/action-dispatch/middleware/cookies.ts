@@ -11,7 +11,8 @@
  */
 
 import { include, KeyError, rbEqual } from "@blazetrails/ruby-compat";
-import { isPresent } from "@blazetrails/activesupport";
+import { extractOptionsBang, isPresent } from "@blazetrails/activesupport";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   SERIALIZERS,
@@ -441,11 +442,22 @@ export class SignedKeyRotatingCookieJar extends AbstractCookieJar {
       digest: this.signedCookieDigest(),
       serializer: NullSerializer,
     });
+
+    for (const entry of cookiesRotations.call(this.request)!.signed) {
+      const [secrets, options] = extractOptionsBang(entry);
+      this.verifier.rotate(...secrets, { serializer: NullSerializer, ...options });
+    }
   }
 
   protected parse(name: string, signedMessage: unknown, purpose?: string): unknown {
-    const data = this.verifier.verified(signedMessage as string, { purpose });
-    return parse.call(this, name, data);
+    let rotated = false;
+    const data = this.verifier.verified(signedMessage as string, {
+      purpose,
+      onRotation: () => {
+        rotated = true;
+      },
+    });
+    return parse.call(this, name, data, rotated);
   }
 
   protected commit(name: string, options: SerializedSetOptions): void {
@@ -483,12 +495,52 @@ export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
         serializer: NullSerializer,
       });
     }
+
+    for (const entry of cookiesRotations.call(this.request)!.encrypted) {
+      const [secrets, options] = extractOptionsBang(entry);
+      this.encryptor.rotate(...secrets, { serializer: NullSerializer, ...options });
+    }
+
+    if (this.isUpgradeLegacyHmacAesCbcCookies()) {
+      const legacyCipher = "aes-256-cbc";
+      const secret = keyGenerator
+        .call(this.request)!
+        .generateKey(
+          encryptedCookieSalt.call(this.request)!,
+          MessageEncryptor.keyLen(legacyCipher),
+        );
+      const signSecret = keyGenerator
+        .call(this.request)!
+        .generateKey(encryptedSignedCookieSalt.call(this.request)!);
+
+      this.encryptor.rotate(secret, signSecret, {
+        cipher: legacyCipher,
+        digest: digest.call(this),
+        serializer: NullSerializer,
+      });
+    } else if (this.isPrepareUpgradeLegacyHmacAesCbcCookies()) {
+      const futureCipher = this.encryptedCookieCipher();
+      const secret = keyGenerator
+        .call(this.request)!
+        .generateKey(
+          authenticatedEncryptedCookieSalt.call(this.request)!,
+          MessageEncryptor.keyLen(futureCipher),
+        );
+
+      this.encryptor.rotate(secret, null, { cipher: futureCipher, serializer: NullSerializer });
+    }
   }
 
   protected parse(name: string, encryptedMessage: unknown, purpose?: string): unknown {
+    let rotated = false;
     try {
-      const data = this.encryptor.decryptAndVerify(encryptedMessage as string, { purpose });
-      return parse.call(this, name, data);
+      const data = this.encryptor.decryptAndVerify(encryptedMessage as string, {
+        purpose,
+        onRotation: () => {
+          rotated = true;
+        },
+      });
+      return parse.call(this, name, data, rotated);
     } catch (error) {
       if (error instanceof InvalidMessage || error instanceof InvalidSignature) return undefined;
       throw error;
@@ -617,7 +669,9 @@ export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unkno
 /** @internal */
 export const cookiesDigest = requestEnvAccessor<string>("action_dispatch.cookies_digest");
 /** @internal */
-export const cookiesRotations = requestEnvAccessor<unknown>("action_dispatch.cookies_rotations");
+export const cookiesRotations = requestEnvAccessor<RotationConfiguration>(
+  "action_dispatch.cookies_rotations",
+);
 /** @internal */
 export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
   "action_dispatch.use_cookies_with_metadata",
@@ -636,6 +690,11 @@ export interface SerializedCookieJarsHost {
   request: RequestCookieMethodsHost;
   set(name: string, options: SerializedSetOptions): unknown;
   _serializer?: CookieSerializer;
+}
+
+/** @internal */
+export function digest(this: SerializedCookieJarsHost): string {
+  return cookiesDigest.call(this.request) ?? "SHA1";
 }
 
 /** @internal */

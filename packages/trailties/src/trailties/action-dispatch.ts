@@ -1,4 +1,5 @@
 import { type Deprecators } from "@blazetrails/activesupport";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   deprecator,
   X_REQUEST_ID,
@@ -38,7 +39,7 @@ export interface ActionDispatchConfig {
   ignoreLeadingBrackets: boolean | null;
   strictQueryStringSeparator: boolean | null;
   defaultHeaders: Record<string, string>;
-  cookiesRotations: unknown | null;
+  cookiesRotations: RotationConfiguration;
   alwaysWriteCookie?: boolean;
 }
 
@@ -90,7 +91,7 @@ export class Trailtie extends BaseTrailtie {
         "X-Permitted-Cross-Domain-Policies": "none",
         "Referrer-Policy": "strict-origin-when-cross-origin",
       },
-      cookiesRotations: null,
+      cookiesRotations: new RotationConfiguration(),
     } satisfies ActionDispatchConfig);
 
     this.config.set("contentSecurityPolicy", {
