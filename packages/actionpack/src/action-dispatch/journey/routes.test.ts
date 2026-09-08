@@ -26,7 +26,7 @@ function mappingFor(
 }
 
 describe("ActionDispatch::Journey::Routes", () => {
-  it("test_clear", () => {
+  it("clear", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
     expect(routes.isEmpty()).toBe(false);
@@ -44,7 +44,7 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.ast).not.toBe(ast);
   });
 
-  it("test_simulator_changes", () => {
+  it("simulator changes", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
     const sim = routes.simulator;
@@ -63,7 +63,7 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.anchoredRoutes.length).toBe(1);
   });
 
-  it("test_custom_anchored_not_partition_route", () => {
+  it("custom anchored not partition route", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo/:bar"));
     expect(routes.anchoredRoutes.length).toBe(1);

@@ -23,7 +23,7 @@ function pathFromString(p: string) {
 }
 
 describe("ActionDispatch::Journey::Route", () => {
-  it("test_initialize", () => {
+  it("initialize", () => {
     const app = { id: "app" };
     const path = pathFromString("/:controller(/:action(/:id(.:format)))");
     const defaults = {};
@@ -33,7 +33,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(route.defaults).toBe(defaults);
   });
 
-  it("test_route_adds_itself_as_memo", () => {
+  it("route adds itself as memo", () => {
     const app = { id: "app" };
     const path = pathFromString("/:controller(/:action(/:id(.:format)))");
     const route = new Route({ name: "name", app, path });
@@ -42,13 +42,13 @@ describe("ActionDispatch::Journey::Route", () => {
     }
   });
 
-  it("test_path_requirements_override_defaults", () => {
+  it("path requirements override defaults", () => {
     const path = buildPath(":name", { name: /love/ }, "/", true);
     const route = new Route({ name: "name", path, defaults: { name: "tender" } });
     expect((route.requirements["name"] as RegExp).source).toBe("love");
   });
 
-  it("test_ip_address", () => {
+  it("ip address", () => {
     const path = pathFromString("/messages/:id(.:format)");
     const route = new Route({
       name: "name",
@@ -59,7 +59,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(route.ip).toBe("192.168.1.1");
   });
 
-  it("test_default_ip", () => {
+  it("default ip", () => {
     const path = pathFromString("/messages/:id(.:format)");
     const route = new Route({
       name: "name",
@@ -70,7 +70,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect((route.ip as RegExp).source).toBe("(?:)");
   });
 
-  it("test_format_with_star", () => {
+  it("format with star", () => {
     const path = pathFromString("/:controller/*extra");
     const route = new Route({
       name: "name",
@@ -80,7 +80,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(route.format({ controller: "foo", extra: "himom" })).toBe("/foo/himom");
   });
 
-  it("test_connects_all_match", () => {
+  it("connects all match", () => {
     const path = pathFromString("/:controller(/:action(/:id(.:format)))");
     const route = new Route({
       name: "name",
@@ -91,19 +91,19 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(route.format({ controller: "foo", action: "bar", id: 10 })).toBe("/foo/bar/10");
   });
 
-  it("test_extras_are_not_included_if_optional", () => {
+  it("extras are not included if optional", () => {
     const path = pathFromString("/page/:id(/:action)");
     const route = new Route({ name: "name", path, defaults: { action: "show" } });
     expect(route.format({ id: 10 })).toBe("/page/10");
   });
 
-  it("test_extras_are_not_included_if_optional_with_parameter", () => {
+  it("extras are not included if optional with parameter", () => {
     const path = pathFromString("(/sections/:section)/pages/:id");
     const route = new Route({ name: "name", path, defaults: { action: "show" } });
     expect(route.format({ id: 10 })).toBe("/pages/10");
   });
 
-  it("test_extras_are_not_included_if_optional_parameter_is_nil", () => {
+  it("extras are not included if optional parameter is nil", () => {
     const path = pathFromString("(/sections/:section)/pages/:id");
     const route = new Route({ name: "name", path, defaults: { action: "show" } });
     expect(route.format({ id: 10, section: null })).toBe("/pages/10");
@@ -172,7 +172,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(route.isRequiresMatchingVerb()).toBe(false);
   });
 
-  it("test_score", () => {
+  it("score", () => {
     const defaults = { controller: "pages", action: "show" };
 
     const specificPath = pathFromString("/page/:id(/:action)(.:format)");

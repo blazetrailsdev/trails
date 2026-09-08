@@ -5,32 +5,32 @@ describe("ActionDispatch::Journey::Parser", () => {
   const parser = new Parser();
   const roundTrip = (str: string) => expect(parser.parse(str).toString()).toBe(str);
 
-  it("test_slash", () => {
+  it("slash", () => {
     expect(parser.parse("/").type).toBe("SLASH");
     roundTrip("/");
   });
-  it("test_segment", () => roundTrip("/foo"));
-  it("test_segments", () => roundTrip("/foo/bar"));
-  it("test_segment_symbol", () => roundTrip("/foo/:id"));
-  it("test_symbol", () => roundTrip("/:foo"));
-  it("test_group", () => roundTrip("(/:foo)"));
-  it("test_groups", () => roundTrip("(/:foo)(/:bar)"));
-  it("test_nested_groups", () => roundTrip("(/:foo(/:bar))"));
-  it("test_dot_symbol", () => roundTrip(".:format"));
-  it("test_dot_literal", () => roundTrip(".xml"));
-  it("test_segment_dot", () => roundTrip("/foo.:bar"));
-  it("test_segment_group_dot", () => roundTrip("/foo(.:bar)"));
-  it("test_segment_group", () => roundTrip("/foo(/:action)"));
-  it("test_segment_groups", () => roundTrip("/foo(/:action)(/:bar)"));
-  it("test_segment_nested_groups", () => roundTrip("/foo(/:action(/:bar))"));
-  it("test_group_followed_by_path", () => roundTrip("/foo(/:action)/:bar"));
-  it("test_star", () => {
+  it("segment", () => roundTrip("/foo"));
+  it("segments", () => roundTrip("/foo/bar"));
+  it("segment symbol", () => roundTrip("/foo/:id"));
+  it("symbol", () => roundTrip("/:foo"));
+  it("group", () => roundTrip("(/:foo)"));
+  it("groups", () => roundTrip("(/:foo)(/:bar)"));
+  it("nested groups", () => roundTrip("(/:foo(/:bar))"));
+  it("dot symbol", () => roundTrip(".:format"));
+  it("dot literal", () => roundTrip(".xml"));
+  it("segment dot", () => roundTrip("/foo.:bar"));
+  it("segment group dot", () => roundTrip("/foo(.:bar)"));
+  it("segment group", () => roundTrip("/foo(/:action)"));
+  it("segment groups", () => roundTrip("/foo(/:action)(/:bar)"));
+  it("segment nested groups", () => roundTrip("/foo(/:action(/:bar))"));
+  it("group followed by path", () => roundTrip("/foo(/:action)/:bar"));
+  it("star", () => {
     roundTrip("*foo");
     roundTrip("/*foo");
     roundTrip("/bar/*foo");
     roundTrip("/bar/(*foo)");
   });
-  it("test_or", () => {
+  it("or", () => {
     roundTrip("a|b");
     roundTrip("a|b|c");
     roundTrip("(a|b)|c");
@@ -38,7 +38,7 @@ describe("ActionDispatch::Journey::Parser", () => {
     roundTrip("*a|(b|c)");
     roundTrip("*a|:b|c");
   });
-  it("test_arbitrary", () => roundTrip("/bar/*foo#"));
-  it("test_literal_dot_paren", () => roundTrip("/sprockets.js(.:format)"));
-  it("test_groups_with_dot", () => roundTrip("/(:locale)(.:format)"));
+  it("arbitrary", () => roundTrip("/bar/*foo#"));
+  it("literal dot paren", () => roundTrip("/sprockets.js(.:format)"));
+  it("groups with dot", () => roundTrip("/(:locale)(.:format)"));
 });
