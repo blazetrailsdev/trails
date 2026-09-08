@@ -29,6 +29,7 @@ describe("ActionDispatch::Journey::Route", () => {
   });
 
   it("Route.verbMatcher returns an Unknown matcher for novel verbs", () => {
+    expect(Route.verbMatcher(":propfind").verb).toBe("PROPFIND");
     const m = Route.verbMatcher("propfind");
     expect(m.verb).toBe("PROPFIND");
     expect(m.call({ requestMethod: "PROPFIND" })).toBe(true);

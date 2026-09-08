@@ -1,5 +1,5 @@
 import { dasherize } from "@blazetrails/activesupport";
-import { block, deleteIf, dup, fetch, merge } from "@blazetrails/ruby-compat";
+import { block, deleteIf, dup, fetch, isSymbol, merge, symbolToS } from "@blazetrails/ruby-compat";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
@@ -106,7 +106,9 @@ export class Route {
     return fetch<VerbMatcher>(
       VERB_TO_CLASS as unknown as Record<string, unknown>,
       verb,
-      block<VerbMatcher>(() => new Unknown(dasherize(verb).toUpperCase())),
+      block<VerbMatcher>(
+        () => new Unknown(dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase()),
+      ),
     );
   }
 
