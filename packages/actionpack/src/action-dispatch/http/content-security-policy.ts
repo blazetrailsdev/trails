@@ -158,22 +158,20 @@ export class ContentSecurityPolicy {
   sandbox(...values: CSPSourceOrClear[]): this {
     if (values.length === 0) {
       this.directives.set("sandbox", true);
-      return this;
-    }
-    const first = values[0];
-    if (first === false || first == null) {
+    } else if (values[0] != null && values[0] !== false) {
+      this.directives.set("sandbox", values as CSPSource[]);
+    } else {
       this.directives.delete("sandbox");
-      return this;
     }
-    return this.setDirective("sandbox", values as CSPSource[]);
+    return this;
   }
   pluginTypes(...types: CSPSourceOrClear[]): this {
-    const first = types[0];
-    if (first === false || first == null) {
+    if (types[0] != null && types[0] !== false) {
+      this.directives.set("plugin-types", types as CSPSource[]);
+    } else {
       this.directives.delete("plugin-types");
-      return this;
     }
-    return this.setDirective("plugin-types", types as CSPSource[]);
+    return this;
   }
   reportUri(uri: CSPSource): this {
     this.directives.set("report-uri", [uri]);
