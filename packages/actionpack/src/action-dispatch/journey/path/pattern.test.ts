@@ -79,27 +79,27 @@ describe("ActionDispatch::Journey::Path::Pattern — names", () => {
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
-  it("test_to_regexp_match_non_optional", () => {
+  it("to regexp match non optional", () => {
     const p = buildPath("/:name", { name: /\d+/ });
     expect(p.isMatch("/123")).toBe(true);
     expect(p.isMatch("/")).toBe(false);
   });
 
-  it("test_to_regexp_with_group", () => {
+  it("to regexp with group", () => {
     const p = buildPath("/page/:name", { name: /(tender|love)/ });
     expect(p.isMatch("/page/tender")).toBe(true);
     expect(p.isMatch("/page/love")).toBe(true);
     expect(p.isMatch("/page/loving")).toBe(false);
   });
 
-  it("test_match_data_with_group", () => {
+  it("match data with group", () => {
     const p = buildPath("/page/:name", { name: /(tender|love)/ });
     const match = p.match("/page/tender")!;
     expect(match.at(1)).toBe("tender");
     expect(match.length).toBe(2);
   });
 
-  it("test_match_data_with_multi_group", () => {
+  it("match data with multi group", () => {
     const p = buildPath("/page/:name/:id", { name: /t(((ender|love)))()/ });
     const match = p.match("/page/tender/10")!;
     expect(match.at(1)).toBe("tender");
@@ -108,12 +108,12 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect([...match.captures]).toEqual(["tender", "10"]);
   });
 
-  it("test_star_with_custom_re", () => {
+  it("star with custom re", () => {
     const p = buildPath("/page/*foo", { foo: /\d+/ });
     expect(p.toRegexp().source).toBe(new RegExp(`^/page/(\\d+)$`).source);
   });
 
-  it("test_insensitive_regexp_with_group", () => {
+  it("insensitive regexp with group", () => {
     const p = buildPath("/page/:name/aaron", { name: /(tender|love)/i });
     expect(p.isMatch("/page/TENDER/aaron")).toBe(true);
     expect(p.isMatch("/page/loVE/aaron")).toBe(true);
@@ -153,19 +153,19 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(m.at(-1)).toBeUndefined();
   });
 
-  it("test_to_regexp_defaults", () => {
+  it("to regexp defaults", () => {
     const p = pathFromString("/:controller(/:action(/:id))");
     expect(p.toRegexp().source).toBe(
       new RegExp(`^/([^/.?]+)(?:/([^/.?]+)(?:/([^/.?]+))?)?$`).source,
     );
   });
 
-  it("test_failed_match", () => {
+  it("failed match", () => {
     const p = pathFromString("/:controller(/:action(/:id(.:format)))");
     expect(p.match("content")).toBeUndefined();
   });
 
-  it("test_match_controller", () => {
+  it("match controller", () => {
     const p = pathFromString("/:controller(/:action(/:id(.:format)))");
     const m = p.match("/content")!;
     expect(m.names).toEqual(["controller", "action", "id", "format"]);
@@ -175,7 +175,7 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(m.at(4)).toBeUndefined();
   });
 
-  it("test_match_controller_action", () => {
+  it("match controller action", () => {
     const p = pathFromString("/:controller(/:action(/:id(.:format)))");
     const m = p.match("/content/list")!;
     expect(m.at(1)).toBe("content");
@@ -183,7 +183,7 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(m.at(3)).toBeUndefined();
   });
 
-  it("test_match_controller_action_id", () => {
+  it("match controller action id", () => {
     const p = pathFromString("/:controller(/:action(/:id(.:format)))");
     const m = p.match("/content/list/10")!;
     expect(m.at(1)).toBe("content");
@@ -191,7 +191,7 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(m.at(3)).toBe("10");
   });
 
-  it("test_match_literal", () => {
+  it("match literal", () => {
     const p = pathFromString("/books(/:action(.:format))");
     const m = p.match("/books")!;
     expect(m.names).toEqual(["action", "format"]);
@@ -199,21 +199,21 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(m.at(2)).toBeUndefined();
   });
 
-  it("test_match_literal_with_action", () => {
+  it("match literal with action", () => {
     const p = pathFromString("/books(/:action(.:format))");
     const m = p.match("/books/list")!;
     expect(m.at(1)).toBe("list");
     expect(m.at(2)).toBeUndefined();
   });
 
-  it("test_match_literal_with_action_and_format", () => {
+  it("match literal with action and format", () => {
     const p = pathFromString("/books(/:action(.:format))");
     const m = p.match("/books/list.rss")!;
     expect(m.at(1)).toBe("list");
     expect(m.at(2)).toBe("rss");
   });
 
-  it("test_named_captures", () => {
+  it("named captures", () => {
     const p = pathFromString("/books(/:action(.:format))");
     const m = p.match("/books/list.rss")!;
     expect(m.namedCaptures).toEqual({ action: "list", format: "rss" });
@@ -221,7 +221,7 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — optional names", () => {
-  it("test_optional_names", () => {
+  it("optional names", () => {
     const cases: Array<[string, string[]]> = [
       ["/:foo(/:bar(/:baz))", ["bar", "baz"]],
       ["/:foo(/:bar)", ["bar"]],
@@ -235,7 +235,7 @@ describe("ActionDispatch::Journey::Path::Pattern — optional names", () => {
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
-  it("test_requirements_for_missing_keys_check", () => {
+  it("requirements for missing keys check", () => {
     const nameRegex = /test/;
     const p = buildPath("/page/:name", { name: nameRegex });
     const transformed = p.requirementsForMissingKeysCheck["name"];
@@ -251,7 +251,7 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
     expect(re.test("xbary")).toBe(false);
   });
 
-  it("test_requirements_for_missing_keys_check_memoization", () => {
+  it("requirements for missing keys check memoization", () => {
     const p = buildPath("/page/:name", { name: /test/ });
     expect(p.requirementsForMissingKeysCheck).toBe(p.requirementsForMissingKeysCheck);
   });

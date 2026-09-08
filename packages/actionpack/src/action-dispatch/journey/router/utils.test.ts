@@ -2,35 +2,35 @@ import { describe, it, expect } from "vitest";
 import { normalizePath, escapePath, escapeSegment, escapeFragment, unescapeUri } from "./utils.js";
 
 describe("ActionDispatch::Journey::Router::Utils", () => {
-  it("test_path_escape", () => {
+  it("path escape", () => {
     expect(escapePath("a/b c+d%")).toBe("a/b%20c+d%25");
   });
 
-  it("test_segment_escape", () => {
+  it("segment escape", () => {
     expect(escapeSegment("a/b c+d%")).toBe("a%2Fb%20c+d%25");
   });
 
-  it("test_fragment_escape", () => {
+  it("fragment escape", () => {
     expect(escapeFragment("a/b c+d%?e")).toBe("a/b%20c+d%25?e");
   });
 
-  it("test_uri_unescape", () => {
+  it("uri unescape", () => {
     expect(unescapeUri("a%2Fb%20c+d")).toBe("a/b c+d");
   });
 
-  it("test_uri_unescape_with_utf8_string", () => {
+  it("uri unescape with utf8 string", () => {
     expect(unescapeUri("%C5%A0a%C5%A1inkov%C3%A1")).toBe("Šašinková");
   });
 
-  it("test_normalize_path_not_greedy", () => {
+  it("normalize path not greedy", () => {
     expect(normalizePath("/foo%20bar%20baz")).toBe("/foo%20bar%20baz");
   });
 
-  it("test_normalize_path_uppercase", () => {
+  it("normalize path uppercase", () => {
     expect(normalizePath("/foo%aabar%aabaz")).toBe("/foo%AAbar%AAbaz");
   });
 
-  it("test_normalize_path_with_nil", () => {
+  it("normalize path with nil", () => {
     expect(normalizePath(null)).toBe("/");
   });
 

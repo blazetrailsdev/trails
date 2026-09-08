@@ -19,18 +19,18 @@ function tt(strings: string[]) {
 }
 
 describe("ActionDispatch::Journey::GTG::Builder", () => {
-  it("test_following_states_multi", () => {
+  it("following states multi", () => {
     const t = tt(["a|a"]);
     expect(t.move([[0, null]], "a", 0, 1).length).toBe(1);
   });
 
-  it("test_following_states_multi_regexp", () => {
+  it("following states multi regexp", () => {
     const t = tt([":a|b"]);
     expect(t.move([[0, null]], "fooo", 0, 4).length).toBe(1);
     expect(t.move([[0, null]], "b", 0, 1).length).toBe(2);
   });
 
-  it("test_multi_path", () => {
+  it("multi path", () => {
     const t = tt(["/:a/d", "/b/c"]);
     const steps: Array<[number, string]> = [
       [1, "/"],
@@ -45,7 +45,7 @@ describe("ActionDispatch::Journey::GTG::Builder", () => {
     }
   });
 
-  it("test_match_data_ambiguous", () => {
+  it("match data ambiguous", () => {
     const t = tt([
       "/articles(.:format)",
       "/articles/new(.:format)",
@@ -57,14 +57,14 @@ describe("ActionDispatch::Journey::GTG::Builder", () => {
     expect(memos.length).toBe(2);
   });
 
-  it("test_match_same_paths", () => {
+  it("match same paths", () => {
     const t = tt(["/articles/new(.:format)", "/articles/new(.:format)"]);
     const sim = new Simulator(t);
     const memos = sim.memos("/articles/new", () => []);
     expect(memos.length).toBe(2);
   });
 
-  it("test_catchall", () => {
+  it("catchall", () => {
     const t = tt(["/", "/*unmatched_route"]);
     const sim = new Simulator(t);
     expect(sim.memos("/test", () => []).length).toBe(1);

@@ -47,7 +47,7 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — set() regex anchorin
 });
 
 describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
-  it("test_to_json", () => {
+  it("to json", () => {
     const t = tt([
       "/articles(.:format)",
       "/articles/new(.:format)",
@@ -95,23 +95,23 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
     }
   });
 
-  it("test_simulate_gt", () => {
+  it("simulate gt", () => {
     const sim = simulatorFor(["/foo", "/bar"]);
     expect(sim.memos("/foo", () => []).length).toBeGreaterThan(0);
   });
 
-  it("test_simulate_gt_regexp", () => {
+  it("simulate gt regexp", () => {
     const sim = simulatorFor([":foo"]);
     expect(sim.memos("foo", () => []).length).toBeGreaterThan(0);
   });
 
-  it("test_simulate_gt_regexp_mix", () => {
+  it("simulate gt regexp mix", () => {
     const sim = simulatorFor(["/get", "/:method/foo"]);
     expect(sim.memos("/get", () => []).length).toBeGreaterThan(0);
     expect(sim.memos("/get/foo", () => []).length).toBeGreaterThan(0);
   });
 
-  it("test_simulate_optional", () => {
+  it("simulate optional", () => {
     const sim = simulatorFor(["/foo(/bar)"]);
     expect(sim.memos("/foo", () => []).length).toBeGreaterThan(0);
     expect(sim.memos("/foo/bar", () => []).length).toBeGreaterThan(0);
@@ -123,7 +123,7 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
     expect(sim.memos("/bar", () => []).length).toBeGreaterThan(0);
   });
 
-  it("test_match_data", () => {
+  it("match data", () => {
     const pathAsts = asts(["/get", "/:method/foo"]);
     const builder = new Builder(new Or(pathAsts));
     const sim = new Simulator(builder.transitionTable());
@@ -132,7 +132,7 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
     expect(sim.memos("/get/foo", () => [])).toEqual([pathAsts[1]]);
   });
 
-  it("test_match_data_ambiguous", () => {
+  it("match data ambiguous", () => {
     const pathAsts = asts([
       "/articles(.:format)",
       "/articles/new(.:format)",
