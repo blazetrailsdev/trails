@@ -3,7 +3,7 @@ import { X_CASCADE } from "../constants.js";
 import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
-import { Route, VerbMatchers } from "./route.js";
+import { Route } from "./route.js";
 import { Routes } from "./routes.js";
 import { Router, type RouterRequest, type RackishResponse } from "./router.js";
 
@@ -120,13 +120,13 @@ describe("ActionDispatch::Journey::Router", () => {
       name: "g",
       app: okApp("get"),
       path: pat("/x"),
-      requestMethodMatch: [VerbMatchers.for("GET")],
+      requestMethodMatch: [Route.verbMatcher("GET")],
     });
     const postRoute = new Route({
       name: "p",
       app: okApp("post"),
       path: pat("/x"),
-      requestMethodMatch: [VerbMatchers.for("POST")],
+      requestMethodMatch: [Route.verbMatcher("POST")],
     });
     const router = new Router(buildRoutes([getRoute, postRoute]));
     expect((await router.serve(req({ pathInfo: "/x", requestMethod: "POST" })))[2]).toEqual([
@@ -140,7 +140,7 @@ describe("ActionDispatch::Journey::Router", () => {
       name: "g",
       app: okApp("get"),
       path: pat("/x"),
-      requestMethodMatch: [VerbMatchers.for("GET")],
+      requestMethodMatch: [Route.verbMatcher("GET")],
     });
     const router = new Router(buildRoutes([getRoute]));
     expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[0]).toBe(200);

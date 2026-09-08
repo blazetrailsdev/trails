@@ -728,19 +728,20 @@ class TestExtractor
     return false if defines.empty?
 
     # Past this point the loop generates methods, so it is ours to account for
-    # whatever its receiver is: a receiver that isn't a literal array (a hash
-    # literal at journey/path/pattern_test.rb:27, a call chain at
-    # inflector_test.rb:68) is reported, not dropped.
-    receiver = call[1]
-    var = block_var_name(block[1])
-    elements = receiver.is_a?(Array) && receiver[0] == :array ? array_literal_values(receiver[1]) : nil
-    if var.nil? || elements.nil?
+    # whatever its receiver is: a receiver that isn't a literal array or hash (a
+    # call chain at inflector_test.rb:68) is reported, not dropped.
+    vars = block_var_names(block[1])
+    elements = loop_elements(call[1])
+    if vars.nil? || elements.nil?
       report_unexpanded_loop(node)
       return true
     end
 
     defines.each do |name_node, define_node|
-      names = elements.map { |value| interpolated_name(name_node, { var => value }) }
+      names = elements.map do |value|
+        bindings = loop_bindings(vars, value)
+        bindings && interpolated_name(name_node, bindings)
+      end
       if names.any?(&:nil?)
         report_unexpanded_loop(node)
         next
@@ -831,11 +832,14 @@ class TestExtractor
     nil
   end
 
-  # The values a loop iterates: an inline array literal, or a same-file
-  # `CONST = [...]` the receiver names.
+  # The values a loop iterates: an inline array literal, an inline hash literal
+  # (Ruby yields each pair as a two-element array, which the destructuring
+  # `loop_bindings` binds exactly as it binds an array-of-rows row), or a
+  # same-file `CONST = [...]` the receiver names.
   def loop_elements(receiver)
     return nil unless receiver.is_a?(Array)
     return array_literal_values(receiver[1]) if receiver[0] == :array
+    return hash_literal_pairs(receiver) if %i[hash bare_assoc_hash].include?(receiver[0])
 
     path = const_path(receiver)
     return nil unless path && path[:segments].length == 1
@@ -962,7 +966,12 @@ class TestExtractor
     return nil unless params.is_a?(Array) && params[0] == :params
     required = params[1]
     return nil unless required.is_a?(Array) && !required.empty?
-    names = required.map { |param| ident_name(param) }
+    # A nested destructuring parameter (`do |name, (request_path, expected)|` at
+    # journey/router_test.rb:341) consumes a position without binding a name the
+    # generated name can interpolate.
+    names = required.map do |param|
+      param.is_a?(Array) && param[0] == :mlhs ? "" : ident_name(param)
+    end
     names.any?(&:nil?) ? nil : names
   end
 
@@ -993,7 +1002,52 @@ class TestExtractor
       # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can
       # bind each position.
       array_literal_values(node[1])
+    when :hash, :bare_assoc_hash
+      # A hash VALUE (`{ controller: "content" }` at journey/router_test.rb:320)
+      # resolves only when every key and value does, since the loop reads it
+      # whole (`expected.keys`).
+      pairs = hash_literal_pairs(node)
+      pairs && pairs.none? { |(_, value)| value.nil? } ? pairs.to_h : nil
     end
+  end
+
+  # The literal key/value pairs of a hash literal, or nil when the node is not a
+  # hash literal or a KEY does not resolve. A value that does not resolve is
+  # kept as nil rather than failing the hash: `{ path => %r{...} }.each do
+  # |path, expected|` (journey/path/pattern_test.rb:16) interpolates only the
+  # key, and `interpolated_name` still returns nil — reporting the loop — for a
+  # name that does read the unresolved binding.
+  def hash_literal_pairs(node)
+    return nil unless node.is_a?(Array)
+    assocs =
+      case node[0]
+      when :hash
+        inner = node[1]
+        if inner.nil?
+          []
+        elsif inner.is_a?(Array) && inner[0] == :assoclist_from_args
+          inner[1]
+        end
+      when :bare_assoc_hash
+        node[1]
+      end
+    return nil unless assocs.is_a?(Array)
+
+    pairs = assocs.map do |assoc|
+      return nil unless assoc.is_a?(Array) && assoc[0] == :assoc_new
+      key = hash_key_value(assoc[1])
+      return nil if key.nil?
+      [key, array_element_value(assoc[2])]
+    end
+    pairs
+  end
+
+  # A hash key: `controller:` is Ripper's `@label`, anything else resolves as an
+  # array element does.
+  def hash_key_value(node)
+    return nil unless node.is_a?(Array)
+    return node[1].sub(/:\z/, "") if node[0] == :@label
+    array_element_value(node)
   end
 
   # `Module#name` (and `"#{klass}"`) is the constant's FULLY QUALIFIED name, not
@@ -1040,8 +1094,12 @@ class TestExtractor
   end
 
   # Evaluates the handful of expressions Rails interpolates into a generated test
-  # name: the block variable itself, `.name` / `.to_s` on it, and `.gsub` with two
-  # string literals (`klass.name.gsub('::', '_')`).
+  # name: the block variable itself, `.name` / `.to_s` on it, `.gsub` with two
+  # string literals (`klass.name.gsub('::', '_')`), `Regexp.escape` on a bound
+  # string (`:"test_to_regexp_#{Regexp.escape(path)}"` at
+  # journey/path/pattern_test.rb:28) and `.keys.map(&:to_s).join(<literal>)` on a
+  # bound hash (`"test_recognize_#{expected.keys.map(&:to_s).join('_')}"` at
+  # journey/router_test.rb:320).
   def eval_loop_expr(node, bindings)
     return nil unless node.is_a?(Array)
     case node[0]
@@ -1055,16 +1113,61 @@ class TestExtractor
     when :method_add_arg
       inner = node[1]
       return nil unless inner.is_a?(Array) && inner[0] == :call
-      return nil unless ident_name(inner[3]) == "gsub"
-      receiver = eval_loop_expr(inner[1], bindings)
-      return nil if receiver.nil?
       args = positional_args(node[2])
-      return nil unless args && args.length == 2
-      pattern = extract_string_content(args[0])
-      replacement = extract_string_content(args[1])
-      return nil if pattern.nil? || replacement.nil?
-      receiver.gsub(pattern, replacement)
+      case ident_name(inner[3])
+      when "gsub"
+        receiver = eval_loop_expr(inner[1], bindings)
+        return nil if receiver.nil?
+        return nil unless args && args.length == 2
+        pattern = extract_string_content(args[0])
+        replacement = extract_string_content(args[1])
+        return nil if pattern.nil? || replacement.nil?
+        receiver.gsub(pattern, replacement)
+      when "escape"
+        path = const_path(inner[1])
+        return nil unless path && !path[:rooted] && path[:segments] == ["Regexp"]
+        return nil unless args && args.length == 1
+        value = eval_loop_expr(args[0], bindings)
+        return nil if value.nil?
+        Regexp.escape(value)
+      when "join"
+        keys = eval_loop_key_strings(inner[1], bindings)
+        return nil if keys.nil?
+        return nil unless args && args.length == 1
+        separator = extract_string_content(args[0])
+        return nil if separator.nil?
+        keys.join(separator)
+      end
     end
+  end
+
+  # `<var>.keys.map(&:to_s)` over a bound hash, or nil for any other receiver —
+  # the one chain Rails interpolates a hash through
+  # (journey/router_test.rb:320).
+  def eval_loop_key_strings(node, bindings)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    map_call = node[1]
+    return nil unless map_call.is_a?(Array) && map_call[0] == :call
+    return nil unless ident_name(map_call[3]) == "map"
+    return nil unless block_pass_symbol(node[2]) == "to_s"
+
+    keys_call = map_call[1]
+    return nil unless keys_call.is_a?(Array) && keys_call[0] == :call
+    return nil unless ident_name(keys_call[3]) == "keys"
+    receiver = keys_call[1]
+    return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
+    bound = bindings[ident_name(receiver[1])]
+    bound.is_a?(Hash) ? bound.keys.map(&:to_s) : nil
+  end
+
+  # The symbol of a `&:sym` block-pass argument (`map(&:to_s)`), or nil.
+  def block_pass_symbol(node)
+    return nil unless node.is_a?(Array)
+    inner = node[0] == :arg_paren ? node[1] : node
+    return nil unless inner.is_a?(Array) && inner[0] == :args_add_block
+    symbol = inner[2]
+    return nil unless symbol.is_a?(Array) && symbol[0] == :symbol_literal
+    ident_name(symbol[1].is_a?(Array) && symbol[1][0] == :symbol ? symbol[1][1] : symbol[1])
   end
 
   def emit_define_method_case(name, define_node)

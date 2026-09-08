@@ -1,7 +1,7 @@
 import { Parser } from "../journey/parser.js";
 import { Ast } from "../journey/ast.js";
 import { Pattern } from "../journey/path/pattern.js";
-import { Route as JourneyRoute, VerbMatchers } from "../journey/route.js";
+import { Route as JourneyRoute } from "../journey/route.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import {
   Router as JourneyRouter,
@@ -39,7 +39,8 @@ export function buildJourneyRouter(
     const requirements = regexpRequirements(r.pathConstraints);
     const pattern = new Pattern(ast, requirements, SEPARATORS, r.anchor);
     const verb = (r.verb || "").toUpperCase();
-    const requestMethodMatch = !verb || verb === "ALL" ? undefined : [VerbMatchers.for(verb)];
+    const requestMethodMatch =
+      !verb || verb === "ALL" ? undefined : [JourneyRoute.verbMatcher(verb)];
     const name = r.name ?? `__r${i}`;
     const app = opts.app?.(r);
     journeyRoutes.addRoute(name, {

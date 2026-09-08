@@ -128,7 +128,7 @@ export class MatchData {
   }
 
   get captures(): readonly (string | undefined)[] {
-    return Array.from({ length: this.length - 1 }, (_, i) => this.at(i + 1));
+    return Array.from(new Array(this.length - 1), (_, i) => this.at(i + 1));
   }
 
   get namedCaptures(): Record<string, string | undefined> {

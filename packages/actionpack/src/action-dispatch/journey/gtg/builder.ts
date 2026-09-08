@@ -172,10 +172,9 @@ export class Builder {
     const table = new Map<Node, Node[]>();
     for (const n of this.ast) {
       if (n instanceof Cat) {
-        const right = this.firstpos(n.right);
         for (const i of this.lastpos(n.left as Node)) {
           const list = table.get(i) ?? [];
-          for (const r of right) list.push(r);
+          for (const r of this.firstpos(n.right)) list.push(r);
           table.set(i, list);
         }
       }

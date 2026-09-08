@@ -1,3 +1,4 @@
+import { any } from "@blazetrails/activesupport";
 import * as Visitors from "../visitors.js";
 
 export type NodeType = "LITERAL" | "SLASH" | "DOT" | "SYMBOL" | "GROUP" | "STAR" | "CAT" | "OR";
@@ -50,13 +51,12 @@ export abstract class Node {
     Visitors.Each.INSTANCE.accept(this, block);
   }
 
-  toDot(): string {
-    return Visitors.Dot.INSTANCE.render(this);
+  toString(): string {
+    return Visitors.String.INSTANCE.accept(this, "");
   }
 
-  toString(): string {
-    if (typeof this.left === "string") return this.left;
-    return this.left.toString();
+  toDot(): string {
+    return Visitors.Dot.INSTANCE.accept(this);
   }
 
   isSymbol(): boolean {
@@ -161,9 +161,6 @@ export class Group extends Unary {
   override isGroup(): boolean {
     return true;
   }
-  override toString(): string {
-    return `(${(this.left as Node).toString()})`;
-  }
 }
 
 export class Star extends Unary {
@@ -183,9 +180,6 @@ export class Star extends Unary {
   }
   override get name(): string {
     return this.left.name.replace(/[*:]/g, "");
-  }
-  override toString(): string {
-    return this.left.toString();
   }
 }
 
@@ -209,9 +203,6 @@ export class Cat extends Binary {
   override isCat(): boolean {
     return true;
   }
-  override toString(): string {
-    return `${(this.left as Node).toString()}${this.right.toString()}`;
-  }
 }
 
 export class Or extends Node {
@@ -226,9 +217,6 @@ export class Or extends Node {
 
   override get type(): NodeType {
     return "OR";
-  }
-  override toString(): string {
-    return this._children.map((c) => c.toString()).join("|");
   }
 }
 
@@ -263,7 +251,7 @@ export class Ast {
   }
 
   isGlob(): boolean {
-    return this.stars.length > 0;
+    return any(this.stars);
   }
 
   /** @internal */
