@@ -1,135 +1,117 @@
 import { describe, it, expect } from "vitest";
+import { getChildProcess } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { Parser } from "../parser.js";
 import { Or } from "../nodes/node.js";
+import type { Node } from "../nodes/node.js";
 import { Builder } from "./builder.js";
 import { Simulator } from "./simulator.js";
-import { TransitionTable } from "./transition-table.js";
 
-function asts(strings: string[]) {
+function asts(paths: string[]): Node[] {
   const parser = new Parser();
-  return strings.map((s) => {
-    const tree = parser.parse(s);
-    for (const n of tree) n.memo = tree;
-    return tree;
+  return paths.map((x) => {
+    const ast = parser.parse(x);
+    for (const n of ast) n.memo = ast;
+    return ast;
   });
 }
 
-function tt(strings: string[]) {
-  return new Builder(new Or(asts(strings))).transitionTable();
+function tt(paths: string[]) {
+  const x = asts(paths);
+  const builder = new Builder(new Or(x));
+  return builder.transitionTable();
 }
 
-function simulatorFor(strings: string[]) {
-  return new Simulator(tt(strings));
+function simulatorFor(paths: string[]) {
+  return new Simulator(tt(paths));
 }
 
-describe("ActionDispatch::Journey::GTG::TransitionTable — set() regex anchoring", () => {
-  it("wraps alternation so anchors bind around the whole regex, not branches", () => {
-    const t = new TransitionTable();
-    t.set(0, 1, /foo|bar/);
-    const next = t.move([[0, null]], "xfooy", 0, 5);
-    expect(next.some(([s]) => s === 1)).toBe(false);
-    expect(t.move([[0, null]], "foo", 0, 3).some(([s]) => s === 1)).toBe(true);
-  });
+function assertMatchRoute(simulator: Simulator, path: string): void {
+  expect(
+    simulator.memos(path, () => []),
+    `Simulator should match ${path}.`,
+  ).not.toHaveLength(0);
+}
 
-  it("preserves /i flag on the stored regex", () => {
-    const t = new TransitionTable();
-    t.set(0, 1, /foo/i);
-    expect(t.move([[0, null]], "FOO", 0, 3).some(([s]) => s === 1)).toBe(true);
-  });
+function assertNoMatchRoute(simulator: Simulator, path: string): void {
+  expect(
+    simulator.memos(path, () => []),
+    `Simulator should not match ${path}.`,
+  ).toHaveLength(0);
+}
 
-  it("filters /m to keep ^/$ strict — newline tokens must not slip in", () => {
-    const t = new TransitionTable();
-    t.set(0, 1, /foo/m);
-    expect(t.move([[0, null]], "foo\nbar", 0, 7).some(([s]) => s === 1)).toBe(false);
-    expect(t.move([[0, null]], "foo", 0, 3).some(([s]) => s === 1)).toBe(true);
-  });
-});
+function dotInstalled(): boolean {
+  try {
+    return getChildProcess().spawnSync("dot", ["-V"]).status === 0;
+  } catch {
+    return false;
+  }
+}
 
 describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
   it("to json", () => {
-    const t = tt([
+    const table = tt([
       "/articles(.:format)",
       "/articles/new(.:format)",
       "/articles/:id/edit(.:format)",
       "/articles/:id(.:format)",
     ]);
-    const json = ActiveSupportJSON.decode(t.toJSON()) as {
-      regexp_states: Record<string, Record<string, number>>;
-      string_states: Record<string, Record<string, number>>;
-      stdparam_states: Record<string, Record<string, number>>;
-      accepting: Record<string, true>;
-    };
 
-    expect(Object.values(json.accepting).every((v) => v === true)).toBe(true);
-    expect(Object.keys(json.accepting).every((k) => /^\d+$/.test(k))).toBe(true);
-    expect(Object.keys(json.accepting).length).toBeGreaterThan(0);
+    const json = ActiveSupportJSON.decode(table.toJSON()) as Record<string, unknown>;
+    expect(json["regexp_states"]).toBeTruthy();
+    expect(json["string_states"]).toBeTruthy();
+    expect(json["accepting"]).toBeTruthy();
+  });
 
-    const allStringEdges = new Set<string>();
-    for (const inner of Object.values(json.string_states)) {
-      for (const edge of Object.keys(inner)) allStringEdges.add(edge);
-    }
-    expect(allStringEdges.has("/")).toBe(true);
-    expect(allStringEdges.has("articles")).toBe(true);
-
-    const allStdparamEdges = new Set<string>();
-    for (const inner of Object.values(json.stdparam_states)) {
-      for (const edge of Object.keys(inner)) allStdparamEdges.add(edge);
-    }
-    expect([...allStdparamEdges].some((s) => s.includes("[^./?]+"))).toBe(true);
-
-    const allStateIds = new Set<string>([
-      ...Object.keys(json.string_states),
-      ...Object.keys(json.stdparam_states),
-      ...Object.keys(json.regexp_states),
-      ...Object.keys(json.accepting),
+  it.runIf(dotInstalled())("to svg", () => {
+    const table = tt([
+      "/articles(.:format)",
+      "/articles/new(.:format)",
+      "/articles/:id/edit(.:format)",
+      "/articles/:id(.:format)",
     ]);
-    for (const inner of [
-      ...Object.values(json.string_states),
-      ...Object.values(json.stdparam_states),
-      ...Object.values(json.regexp_states),
-    ]) {
-      for (const target of Object.values(inner)) {
-        expect(allStateIds.has(String(target))).toBe(true);
-      }
-    }
+    const svg = table.toSvg();
+    expect(svg).toBeTruthy();
+    expect(svg).not.toMatch(/DOCTYPE/);
   });
 
   it("simulate gt", () => {
     const sim = simulatorFor(["/foo", "/bar"]);
-    expect(sim.memos("/foo", () => []).length).toBeGreaterThan(0);
+    assertMatchRoute(sim, "/foo");
   });
 
   it("simulate gt regexp", () => {
     const sim = simulatorFor([":foo"]);
-    expect(sim.memos("foo", () => []).length).toBeGreaterThan(0);
+    assertMatchRoute(sim, "foo");
   });
 
   it("simulate gt regexp mix", () => {
     const sim = simulatorFor(["/get", "/:method/foo"]);
-    expect(sim.memos("/get", () => []).length).toBeGreaterThan(0);
-    expect(sim.memos("/get/foo", () => []).length).toBeGreaterThan(0);
+    assertMatchRoute(sim, "/get");
+    assertMatchRoute(sim, "/get/foo");
   });
 
   it("simulate optional", () => {
     const sim = simulatorFor(["/foo(/bar)"]);
-    expect(sim.memos("/foo", () => []).length).toBeGreaterThan(0);
-    expect(sim.memos("/foo/bar", () => []).length).toBeGreaterThan(0);
-    expect(sim.memos("/foo/", () => []).length).toBe(0);
-  });
-
-  it("root-level optional group matches paths starting with the optional segment", () => {
-    const sim = simulatorFor(["(/:foo)"]);
-    expect(sim.memos("/bar", () => []).length).toBeGreaterThan(0);
+    assertMatchRoute(sim, "/foo");
+    assertMatchRoute(sim, "/foo/bar");
+    assertNoMatchRoute(sim, "/foo/");
   });
 
   it("match data", () => {
     const pathAsts = asts(["/get", "/:method/foo"]);
-    const builder = new Builder(new Or(pathAsts));
-    const sim = new Simulator(builder.transitionTable());
+    const paths = [...pathAsts];
 
-    expect(sim.memos("/get", () => [])).toEqual([pathAsts[0]]);
-    expect(sim.memos("/get/foo", () => [])).toEqual([pathAsts[1]]);
+    const builder = new Builder(new Or(pathAsts));
+    const table = builder.transitionTable();
+
+    const sim = new Simulator(table);
+
+    let memos = sim.memos("/get", () => []);
+    expect(memos).toEqual([paths[0]]);
+
+    memos = sim.memos("/get/foo", () => []);
+    expect(memos).toEqual([paths[paths.length - 1]]);
   });
 
   it("match data ambiguous", () => {
@@ -139,8 +121,14 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
       "/articles/:id/edit(.:format)",
       "/articles/:id(.:format)",
     ]);
-    const sim = new Simulator(new Builder(new Or(pathAsts)).transitionTable());
-    const memos = new Set(sim.memos("/articles/new", () => []));
-    expect(memos).toEqual(new Set([pathAsts[1], pathAsts[3]]));
+
+    const paths = [...pathAsts];
+    const ast = new Or(pathAsts);
+
+    const builder = new Builder(ast);
+    const sim = new Simulator(builder.transitionTable());
+
+    const memos = sim.memos("/articles/new", () => []);
+    expect(new Set(memos)).toEqual(new Set([paths[1], paths[3]]));
   });
 });

@@ -209,6 +209,13 @@ class TestExtractor
     @helper_defs = {}
     collect_helper_defs(sexp, [])
 
+    # Same-file `CONST = [...]` array literals, so a loop whose receiver names a
+    # constant (`CASES.each do |pattern, expected_tokens|`,
+    # journey/route/definition/scanner_test.rb:70) resolves the same way an
+    # inline array literal does.
+    @const_arrays = {}
+    collect_const_arrays(sexp)
+
     @module_defs = Set.new
     collect_module_defs(sexp, [])
 
@@ -327,6 +334,7 @@ class TestExtractor
     end
     if iterator
       return if process_define_method_loop(iterator, block, node)
+      return if process_test_macro_loop(iterator, block, node)
     end
 
     # Fallback: walk children
@@ -732,7 +740,7 @@ class TestExtractor
     end
 
     defines.each do |name_node, define_node|
-      names = elements.map { |value| interpolated_name(name_node, var, value) }
+      names = elements.map { |value| interpolated_name(name_node, { var => value }) }
       if names.any?(&:nil?)
         report_unexpanded_loop(node)
         next
@@ -743,6 +751,150 @@ class TestExtractor
       end
     end
     true
+  end
+
+  # Rails also generates whole families from a literal table with the `test`
+  # macro rather than `define_method`:
+  #
+  #   CASES.each do |pattern, expected_tokens|
+  #     test "Scanning `#{pattern}`" do
+  #
+  # (journey/route/definition/scanner_test.rb:70-75, 25 entries). Without
+  # expanding the loop the interpolation collapses to its literal prefix and the
+  # whole family scores as ONE Rails test against a TS twin that ports every
+  # entry. Expand statically when the receiver resolves to a literal array and
+  # every generated description resolves; otherwise return false so the caller's
+  # fallback walk keeps the previous single-row behaviour. Returns true when the
+  # node was handled.
+  def process_test_macro_loop(call, block, node)
+    return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+
+    macros = []
+    collect_test_macros(block[2], macros)
+    return false if macros.empty?
+
+    vars = block_var_names(block[1])
+    elements = loop_elements(call[1])
+    return false if vars.nil? || elements.nil?
+
+    expanded = []
+    macros.each do |name_node, macro_node|
+      elements.each do |value|
+        bindings = loop_bindings(vars, value)
+        return false if bindings.nil?
+        desc = interpolated_name(name_node, bindings)
+        return false if desc.nil?
+        expanded << [desc, macro_node]
+      end
+    end
+
+    expanded.each { |desc, macro_node| emit_test_macro_case(desc, macro_node) }
+    true
+  end
+
+  # Every `test(<name>) do ... end` in a block body, as
+  # [name-argument string_literal node, method_add_block node].
+  def collect_test_macros(node, out)
+    return unless node.is_a?(Array)
+
+    if node[0] == :method_add_block
+      inner = node[1]
+      args =
+        if inner.is_a?(Array) && inner[0] == :command && ident_name(inner[1]) == "test"
+          inner[2]
+        elsif inner.is_a?(Array) && inner[0] == :method_add_arg &&
+              inner[1].is_a?(Array) && inner[1][0] == :fcall &&
+              ident_name(inner[1][1]) == "test"
+          inner[2]
+        end
+      if args
+        name_node = string_literal_node(args)
+        out << [name_node, node] if name_node
+        return
+      end
+    end
+
+    node.each { |child| collect_test_macros(child, out) if child.is_a?(Array) }
+  end
+
+  # The first `:string_literal` node under an argument list, which is what the
+  # `test` macro takes and what `interpolated_name` walks.
+  def string_literal_node(args)
+    return nil unless args.is_a?(Array)
+    return args if args[0] == :string_literal
+
+    args.each do |child|
+      next unless child.is_a?(Array)
+      found = string_literal_node(child)
+      return found if found
+    end
+    nil
+  end
+
+  # The values a loop iterates: an inline array literal, or a same-file
+  # `CONST = [...]` the receiver names.
+  def loop_elements(receiver)
+    return nil unless receiver.is_a?(Array)
+    return array_literal_values(receiver[1]) if receiver[0] == :array
+
+    path = const_path(receiver)
+    return nil unless path && path[:segments].length == 1
+    @const_arrays[path[:segments].first]
+  end
+
+  # Bind the block parameters to one element: a single parameter takes the whole
+  # element, several destructure it, exactly as Ruby's block arity does.
+  def loop_bindings(vars, value)
+    return { vars.first => value } if vars.length == 1
+    return nil unless value.is_a?(Array) && value.length >= vars.length
+    vars.each_with_index.to_h { |var, index| [var, value[index]] }
+  end
+
+  # Collect every same-file `CONST = [...]`, name → the array's literal element
+  # values (nil-valued when an element does not resolve, which `loop_elements`
+  # then reports as unexpandable).
+  def collect_const_arrays(node)
+    return unless node.is_a?(Array)
+
+    if node[0] == :assign
+      target = node[1]
+      value = node[2]
+      name = target.is_a?(Array) && target[0] == :var_field ? const_name(target[1]) : nil
+      if name && value.is_a?(Array) && value[0] == :array
+        values = array_literal_values(value[1])
+        @const_arrays[name] = values if values
+      end
+    end
+
+    node.each { |child| collect_const_arrays(child) if child.is_a?(Array) }
+  end
+
+  def emit_test_macro_case(desc, node)
+    line = extract_line(node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(node)
+
+    if @module_collect
+      @module_collect << {
+        description: desc, line: line, assertions: assertion_kinds.uniq,
+        assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
+        assertion_values: assertion_values,
+        body_gate: body_skip_gate(node)
+      }
+      return
+    end
+
+    @test_cases << add_gate({
+      path: (@describe_stack + [desc]).join(" > "),
+      description: desc,
+      ancestors: @describe_stack.dup,
+      file: @current_file,
+      line: line,
+      style: "test",
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
+    }, node)
   end
 
   # Every `define_method(<name>) do ... end` in a block body, as
@@ -798,12 +950,20 @@ class TestExtractor
   # The single block parameter (`do |klass|`), or nil when the block takes none
   # or takes several — neither is expandable.
   def block_var_name(block_var)
+    names = block_var_names(block_var)
+    names && names.length == 1 ? names.first : nil
+  end
+
+  # Every required block parameter (`do |pattern, expected_tokens|`), or nil
+  # when the block declares none — a loop with no parameter interpolates nothing.
+  def block_var_names(block_var)
     return nil unless block_var.is_a?(Array) && block_var[0] == :block_var
     params = block_var[1]
     return nil unless params.is_a?(Array) && params[0] == :params
     required = params[1]
-    return nil unless required.is_a?(Array) && required.length == 1
-    ident_name(required[0])
+    return nil unless required.is_a?(Array) && !required.empty?
+    names = required.map { |param| ident_name(param) }
+    names.any?(&:nil?) ? nil : names
   end
 
   # The literal values of an array literal's elements, or nil if any element is
@@ -829,6 +989,10 @@ class TestExtractor
     when :@tstring_content
       # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
       node[1]
+    when :array
+      # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can
+      # bind each position.
+      array_literal_values(node[1])
     end
   end
 
@@ -849,9 +1013,9 @@ class TestExtractor
     path[:segments].first == outermost ? name : "#{outermost}::#{name}"
   end
 
-  # The name `define_method` receives with the block variable bound to `value`,
-  # or nil when a segment doesn't resolve statically.
-  def interpolated_name(name_node, var, value)
+  # The name `define_method` (or the `test` macro) receives with the block
+  # variables bound, or nil when a segment doesn't resolve statically.
+  def interpolated_name(name_node, bindings)
     content = name_node[1]
     return nil unless content.is_a?(Array)
     parts = content[0] == :string_content ? content[1..] : [content]
@@ -865,7 +1029,7 @@ class TestExtractor
       when :string_embexpr
         stmts = part[1]
         return nil unless stmts.is_a?(Array) && stmts.length == 1
-        resolved = eval_loop_expr(stmts[0], var, value)
+        resolved = eval_loop_expr(stmts[0], bindings)
         return nil if resolved.nil?
         out << resolved
       else
@@ -878,20 +1042,21 @@ class TestExtractor
   # Evaluates the handful of expressions Rails interpolates into a generated test
   # name: the block variable itself, `.name` / `.to_s` on it, and `.gsub` with two
   # string literals (`klass.name.gsub('::', '_')`).
-  def eval_loop_expr(node, var, value)
+  def eval_loop_expr(node, bindings)
     return nil unless node.is_a?(Array)
     case node[0]
     when :var_ref, :vcall
-      ident_name(node[1]) == var ? value : nil
+      bound = bindings[ident_name(node[1])]
+      bound.is_a?(String) ? bound : nil
     when :call
-      receiver = eval_loop_expr(node[1], var, value)
+      receiver = eval_loop_expr(node[1], bindings)
       return nil if receiver.nil?
       %w[name to_s to_sym].include?(ident_name(node[3])) ? receiver : nil
     when :method_add_arg
       inner = node[1]
       return nil unless inner.is_a?(Array) && inner[0] == :call
       return nil unless ident_name(inner[3]) == "gsub"
-      receiver = eval_loop_expr(inner[1], var, value)
+      receiver = eval_loop_expr(inner[1], bindings)
       return nil if receiver.nil?
       args = positional_args(node[2])
       return nil unless args && args.length == 2
