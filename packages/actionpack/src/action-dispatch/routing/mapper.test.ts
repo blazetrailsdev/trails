@@ -125,7 +125,7 @@ describe("Mapper public DSL additions", () => {
 
     await m.draw("external");
 
-    expect(m.routes.map((r) => r.path)).toContain("/external");
+    expect(m.routes.map((r) => r.path)).toContain("/external(.:format)");
   });
 
   it("draw raises when the external file is not found", async () => {

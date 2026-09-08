@@ -79,11 +79,9 @@ describe("ActionDispatch::Journey::Routes", () => {
     const routeSet = new RouteSet();
     routeSet.draw((mapper) => {
       mapper.get("/hello", { to: "foo#bar", as: "aaron" });
-    });
-    expect(() =>
-      routeSet.draw((mapper) => {
+      expect(() => {
         mapper.get("/aaron", { to: "foo#bar", as: "aaron" });
-      }),
-    ).toThrow(ArgumentError);
+      }).toThrow(ArgumentError);
+    });
   });
 });

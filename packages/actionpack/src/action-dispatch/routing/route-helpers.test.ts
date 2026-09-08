@@ -226,7 +226,7 @@ describe("RouteHelpers", () => {
         r.resources("posts");
       });
       helpers = generateRouteHelpers(routeSet);
-      expect(() => helpers.post_path()).toThrow(/Missing required parameter/);
+      expect(() => helpers.post_path()).toThrow(/missing required keys: \[:id\]/);
     });
   });
 

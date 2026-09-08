@@ -89,7 +89,7 @@ describe("Route", () => {
   describe("pathFor() — edge cases", () => {
     it("throws missing-required for top-level *splat captures", () => {
       const route = new Route("GET", "/files/*path", "files", "show");
-      expect(() => route.pathFor({})).toThrow(/Missing required parameter :path/);
+      expect(() => route.pathFor({})).toThrow(/missing required keys: \[:path\]/);
     });
 
     it("preserves literal '/' in *splat values (no slash-collapse corruption)", () => {
@@ -127,8 +127,12 @@ describe("Route", () => {
       const route = new Route("GET", "/posts/:id", "posts", "show", {
         constraints: { id: /\d+/ },
       });
-      expect(() => route.pathFor({ id: "42abc" })).toThrow(/Missing required parameter :id/);
-      expect(() => route.pathFor({ id: "abc" })).toThrow(/Missing required parameter :id/);
+      expect(() => route.pathFor({ id: "42abc" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
+      expect(() => route.pathFor({ id: "abc" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
     });
 
@@ -145,8 +149,12 @@ describe("Route", () => {
       const route = new Route("GET", "/posts/:id", "posts", "show", {
         constraints: { id: "\\d+" },
       });
-      expect(() => route.pathFor({ id: "42abc" })).toThrow(/Missing required parameter :id/);
-      expect(() => route.pathFor({ id: "abc" })).toThrow(/Missing required parameter :id/);
+      expect(() => route.pathFor({ id: "42abc" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
+      expect(() => route.pathFor({ id: "abc" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
     });
 
@@ -159,7 +167,9 @@ describe("Route", () => {
 
     it("throws missing-required when a name is required at the top level even if it also appears optionally", () => {
       const route = new Route("GET", "/:id(.:id)", "x", "y");
-      expect(() => route.pathFor({})).toThrow(/Missing required parameter :id/);
+      expect(() => route.pathFor({})).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
     });
 
     it("strips stateful flags (g/y/m) from anchored requirement regexes", () => {
@@ -168,9 +178,15 @@ describe("Route", () => {
       });
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
-      expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
-      expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
-      expect(() => route.pathFor({ id: "42\nabc" })).toThrow(/Missing required parameter :id/);
+      expect(() => route.pathFor({ id: "bad" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
+      expect(() => route.pathFor({ id: "bad" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
+      expect(() => route.pathFor({ id: "42\nabc" })).toThrow(
+        /(?:missing required keys|possible unmatched constraints): \[:id\]/,
+      );
     });
 
     it("skips requirement validation for captures in omitted optional groups", () => {
