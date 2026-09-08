@@ -104,7 +104,10 @@ export class SchemaCache {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE extractor-does-not-model-private-class-method
+   */
   static async read<T>(filename: string, callback: (data: string) => T): Promise<T> {
     if (File.extname(filename) === ".gz") {
       return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
