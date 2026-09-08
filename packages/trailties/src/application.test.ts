@@ -432,6 +432,24 @@ describe("Trails.application integration (boot-app fixture)", () => {
     expect(await bodyToString(body)).toContain('<a href="/posts">All posts</a>');
   });
 
+  it("calls a named route helper from a controller action with lazily drawn routes", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppHelpers extends BootApp {}
+    Application.register(BootAppHelpers);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/link",
+    });
+    expect(status).toBe(200);
+    expect(JSON.parse(await bodyToString(body))).toEqual({ href: "/posts" });
+  });
+
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
     class BootAppDebug extends BootApp {}

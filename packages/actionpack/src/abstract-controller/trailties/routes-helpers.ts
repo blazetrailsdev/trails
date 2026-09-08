@@ -17,15 +17,34 @@ export function withRoutesHelpers(
 ): (cls: RoutesHelpersControllerClass) => void {
   return (cls) => {
     const namespaceBuilder = findTrailtieUrlHelpers(cls);
-    const mod = namespaceBuilder
-      ? namespaceBuilder(includePathHelpers)
-      : routes.urlHelpers(includePathHelpers);
-    const proto = cls.prototype as Record<string, unknown>;
-    for (const name in mod) {
-      const fn = (mod as Record<string, unknown>)[name];
-      if (typeof fn === "function") proto[name] = fn;
-    }
-    cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
+    const urlHelpersModule = (): HelperMethodsModule =>
+      namespaceBuilder
+        ? namespaceBuilder(includePathHelpers)
+        : routes.urlHelpers(includePathHelpers);
+    const proto = cls.prototype;
+    Object.setPrototypeOf(
+      proto,
+      new Proxy(Object.getPrototypeOf(proto) as object, {
+        get(target, key, receiver) {
+          if (typeof key === "string") {
+            const mod = urlHelpersModule() as Record<string, unknown>;
+            const helper = mod[key];
+            if (typeof helper === "function") {
+              return function (this: { _routes?: unknown }, ...args: unknown[]): unknown {
+                const host = this?._routes ? this : mod;
+                return (helper as (this: unknown, ...a: unknown[]) => unknown).apply(host, args);
+              };
+            }
+          }
+          return Reflect.get(target, key, receiver);
+        },
+        has(target, key) {
+          if (typeof key === "string" && key in (urlHelpersModule() as object)) return true;
+          return Reflect.has(target, key);
+        },
+      }),
+    );
+    cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
   };
 }
 

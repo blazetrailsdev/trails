@@ -436,7 +436,8 @@ export class InsertAll {
 
 export interface InsertBuilder {
   readonly model: ModelClass;
-  into(): Promise<string>;
+  into(): string;
+  valuesList(): Promise<string>;
   conflictTarget(): string;
   returning(): string | undefined;
   updatableColumns(): string[];
@@ -445,7 +446,6 @@ export interface InsertBuilder {
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
   readonly keys: Set<string>;
-  quotedTableName(): string;
 }
 
 export class Builder implements InsertBuilder {
@@ -496,11 +496,6 @@ export class Builder implements InsertBuilder {
     return this._connection.quoteColumnName(column);
   }
 
-  /** @internal */
-  private quoteTable(name: string): string {
-    return this._connection.quoteTableName(name);
-  }
-
   returning(): string | undefined {
     const ret = this._insertAll.returning;
     if (!ret) return undefined;
@@ -530,20 +525,11 @@ export class Builder implements InsertBuilder {
     return this._insertAll.keys;
   }
 
-  async into(): Promise<string> {
-    const tableName = this.quoteTable(String(this.model.arelTable.name));
-    const keys = [...this._insertAll.keysIncludingTimestamps()];
-    if (keys.length === 0) {
-      if (this._insertAll.inserts.length > 1) {
-        throw new Error("Bulk insert with no explicit columns is not supported");
-      }
-      return `INTO ${tableName} ${this._connection.emptyInsertStatementValue()}`;
-    }
-    const compiledValues = this._visitor().compile(await this.valuesList());
-    return `INTO ${tableName} (${this.columnsList()}) ${compiledValues}`;
+  into(): string {
+    return `INTO ${this.model.quotedTableName()} (${this.columnsList()})`;
   }
 
-  async valuesList(): Promise<Nodes.ValuesList> {
+  async valuesList(): Promise<string> {
     const types = await this.extractTypesFromColumnsOn(this.model.tableName, [
       ...this._insertAll.keysIncludingTimestamps(),
     ]);
@@ -554,7 +540,7 @@ export class Builder implements InsertBuilder {
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });
-    return new Nodes.ValuesList(rows);
+    return this._visitor().compile(new Nodes.ValuesList(rows));
   }
 
   conflictTarget(): string {
@@ -584,7 +570,7 @@ export class Builder implements InsertBuilder {
         (columnName) =>
           `${columnName}=(CASE WHEN (${this.updatableColumns()
             .map(block)
-            .join(" AND ")}) THEN ${this.quotedTableName()}.${columnName} ELSE ${String(
+            .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
             this._connection.highPrecisionCurrentTimestamp(),
           )} END),`,
       )
@@ -594,14 +580,6 @@ export class Builder implements InsertBuilder {
   /** @internal */
   private touchTimestampAttribute(columnName: string): boolean {
     return !this._insertAll.updatableColumns().includes(columnName);
-  }
-
-  /**
-   * @internal Mirrors Rails `insert.model.quoted_table_name`.
-   * @noRailsEquivalent CONVERGEABLE `insert.model.quoted_table_name` (insert_all.rb:235) as a Builder method rather than a chained send.
-   */
-  quotedTableName(): string {
-    return this.quoteTable(String(this.model.arelTable.name));
   }
 
   rawUpdateSql(): Nodes.SqlLiteral | undefined {
