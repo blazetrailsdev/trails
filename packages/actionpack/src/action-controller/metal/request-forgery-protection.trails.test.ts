@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.js";
@@ -16,6 +17,7 @@ import {
 function buildRequest(): NullSessionRequest {
   const env: Record<string, unknown> = {
     "action_dispatch.key_generator": new KeyGenerator("x".repeat(32), { iterations: 2 }),
+    "action_dispatch.cookies_rotations": new RotationConfiguration(),
     "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
     "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
   };
