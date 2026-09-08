@@ -91,6 +91,25 @@ describe("withRoutesHelpers", () => {
     }
   });
 
+  it("crosses the module's methods and _routes, but not its other members", () => {
+    const routeSet = { generate: () => "/posts" };
+    const mod = {
+      _supportsPath: true,
+      _routes: routeSet,
+      postsPath: () => "/posts",
+    } as unknown as HelperMethodsModule;
+    const cls = makeClass();
+    withRoutesHelpers({ urlHelpers: () => mod })(cls);
+    const proto = cls.prototype as {
+      _supportsPath?: unknown;
+      _routes?: unknown;
+      postsPath?: () => string;
+    };
+    expect(proto._supportsPath).toBeUndefined();
+    expect(proto._routes).toBe(routeSet);
+    expect(proto.postsPath?.()).toBe("/posts");
+  });
+
   it("multiple wirings layer on the same prototype without clobbering unrelated entries", () => {
     const A: HelperMethodsModule = { a: () => "a" };
     const B: HelperMethodsModule = { b: () => "b" };
