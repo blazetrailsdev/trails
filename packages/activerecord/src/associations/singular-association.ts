@@ -195,9 +195,7 @@ export class SingularAssociation extends Association {
     return record;
   }
 
-  protected replace(record: Base | null): void;
-  protected replace(record: Base | null, save: boolean): void | Promise<void>;
-  protected replace(_record: Base | null, ..._rest: unknown[]): void | Promise<void> {
+  protected replace(record: Base | null, ..._rest: unknown[]): void | Promise<void> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/singular_association.rb:57
     throw new NotImplementedError("Subclasses must implement a replace(record) method");
   }
