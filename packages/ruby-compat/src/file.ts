@@ -90,6 +90,17 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/file.c:7440` — `File::PATH_SEPARATOR`, the `';'` of a DOSISH
+   * build and `':'` everywhere else. The platform answer comes from the
+   * registered path backend's separator, as `ALT_SEPARATOR` above does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::PATH_SEPARATOR`.
+   */
+  static get PATH_SEPARATOR(): string {
+    return getPath().sep === "\\" ? ";" : ":";
+  }
+
+  /**
    * `vendor/ruby/file.c:7841` — `File::LOCK_EX`, the exclusive-lock operation
    * `File#flock` takes (`file.c:5198`).
    *

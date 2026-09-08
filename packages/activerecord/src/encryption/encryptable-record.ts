@@ -47,7 +47,7 @@ export class EncryptableRecord {
   /**
    * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
    * re-runs its bookkeeping on every `_defaultAttributes` rebuild. The `scheme`
-   * is kept in each entry for `encryptFixtureRows` (define-fixtures.ts).
+   * is kept in each entry for the encrypted-attribute type rebuild.
    * @internal
    * @noRailsEquivalent CONVERGEABLE bookkeeping for the decorate_attributes block Ruby replays lazily (encryption/encryptable_record.rb:87-92).
    */

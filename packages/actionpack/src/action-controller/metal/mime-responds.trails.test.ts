@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { Collector } from "./mime-responds.js";
-import { UnknownFormat } from "./exceptions.js";
+import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 
 describe("Collector#isAnyResponse", () => {
   it("is false when the negotiated format has its own handler", () => {
@@ -95,6 +96,7 @@ describe("Base#respondTo", () => {
   function controller(format: string): Base {
     const base = new Base();
     base.request = new Request({ HTTP_ACCEPT: format }) as unknown as Base["request"];
+    base.setResponseBang(new Response());
     return base;
   }
 
@@ -119,5 +121,25 @@ describe("Base#respondTo", () => {
     });
 
     expect(called).toBe(true);
+  });
+
+  it("raises RespondToMismatchError when the response media type differs from the negotiated format", () => {
+    const base = controller("application/json");
+    base.contentType = "text/html";
+
+    expect(() =>
+      base.respondTo((format) => {
+        format.json(() => undefined);
+      }),
+    ).toThrow(RespondToMismatchError);
+  });
+
+  it("sets the rendered content type from the negotiated format", () => {
+    const base = controller("application/json");
+    base.respondTo((format) => {
+      format.json(() => undefined);
+    });
+
+    expect(base.contentType).toMatch(/^json/);
   });
 });

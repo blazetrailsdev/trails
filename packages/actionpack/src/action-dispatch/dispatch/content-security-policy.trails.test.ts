@@ -13,4 +13,16 @@ describe("ContentSecurityPolicyTest", () => {
     policy.reportUri(null as unknown as string);
     expect(() => policy.build()).toThrow("Unexpected content security policy source: null");
   });
+
+  it("plugin_types emits a mapping keyword verbatim", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.pluginTypes(":self");
+    expect(policy.build()).toBe("plugin-types :self");
+  });
+
+  it("sandbox emits a mapping keyword verbatim", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.sandbox(":self");
+    expect(policy.build()).toBe("sandbox :self");
+  });
 });

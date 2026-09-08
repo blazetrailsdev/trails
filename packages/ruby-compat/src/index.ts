@@ -86,6 +86,7 @@ export { FloatDomainError } from "./float-domain-error.js";
 export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
 export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
+export { RbConfig } from "./rb-config.js";
 export {
   registerZlibAdapter,
   getZlib,

@@ -17,24 +17,23 @@ export type DateOrTime =
 
 /** @missingRailsArgs acts_like? — PERMANENT */
 export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
+export function inTimeZone(dateOrTime: Date, zone?: unknown): TimeWithZone | Date;
 export function inTimeZone(
-  dateOrTime: Date | Temporal.Instant,
+  dateOrTime: Temporal.Instant,
   zone?: unknown,
 ): TimeWithZone | Temporal.Instant;
 export function inTimeZone(dateOrTime: RubyTime, zone?: unknown): TimeWithZone | RubyTime;
 export function inTimeZone(dateOrTime: TimeWithZone, zone?: unknown): TimeWithZone;
 export function inTimeZone(
-  dateOrTime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+  dateOrTime: Temporal.PlainDateTime,
   zone?: unknown,
-): TimeWithZone | Temporal.Instant;
+): TimeWithZone | Temporal.PlainDateTime;
 export function inTimeZone(
-  dateOrTime: DateOrTime,
+  dateOrTime: Temporal.ZonedDateTime,
   zone?: unknown,
-): TimeWithZone | Temporal.Instant | RubyTime;
-export function inTimeZone(
-  dateOrTime: DateOrTime,
-  zone: unknown = currentZone(),
-): TimeWithZone | Temporal.Instant | RubyTime {
+): TimeWithZone | Temporal.ZonedDateTime;
+export function inTimeZone(dateOrTime: DateOrTime, zone?: unknown): DateOrTime;
+export function inTimeZone(dateOrTime: DateOrTime, zone: unknown = currentZone()): DateOrTime {
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.inTimeZone(zone);
 
   const timeZone = findZoneBang(zone);
@@ -43,9 +42,7 @@ export function inTimeZone(
   if (timeZone) {
     return timeWithZone(dateOrTime, time, timeZone);
   }
-  if (time === null) return toTime(dateOrTime as Temporal.PlainDate);
-  // boundary: a Ruby ::Time is returned as `self`; the zoneless Temporal values trails also admits carry no zone to keep.
-  return time instanceof RubyTime ? time : asInstant(time);
+  return time !== null ? time : toTime(dateOrTime as Temporal.PlainDate);
 }
 
 /** @internal */

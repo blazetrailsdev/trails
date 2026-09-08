@@ -3,10 +3,12 @@ import {
   type FormatHandler,
 } from "../../action-dispatch/respond-to.js";
 import { UnknownFormat } from "./exceptions.js";
+import { symbolToS } from "@blazetrails/ruby-compat";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
   private _requestVariant: string | string[] | null;
+  private _response: FormatHandler | undefined;
 
   constructor(mimes: string[] = [], variant: string | string[] | null = null) {
     super();
@@ -49,13 +51,33 @@ export class Collector extends DispatchCollector {
     return !this.handlerFor(this.format) && this.hasAnyHandler;
   }
 
-  negotiateFormat(request: { accept?: string; format?: string; variant?: string }): string | null {
+  negotiateFormat(request: {
+    accept?: string;
+    format?: string | { symbol?: string | null } | null;
+    variant?: unknown;
+  }): string | null {
+    const requested = Array.isArray(request.variant) ? request.variant[0] : request.variant;
     const variant =
-      request.variant ??
+      (typeof requested === "string" ? requested : undefined) ??
       (Array.isArray(this._requestVariant) ? this._requestVariant[0] : this._requestVariant) ??
       undefined;
-    const result = this.negotiate({ accept: request.accept, format: request.format, variant });
+    const format =
+      typeof request.format === "string"
+        ? request.format
+        : request.format?.symbol != null
+          ? symbolToS(request.format.symbol)
+          : undefined;
+    const result = this.negotiate({ accept: request.accept || undefined, format, variant });
+    this._response = result?.handler;
     return result?.format ?? null;
+  }
+
+  /**
+   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsCall new — CONVERGEABLE collector-response-drops-the-variant-collector-arms
+   */
+  get response(): FormatHandler | undefined {
+    return this._response;
   }
 }
 
