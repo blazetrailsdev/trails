@@ -260,12 +260,13 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
-    initializeIncludedModules(this);
 
     this.asyncExecutor = this.buildAsyncExecutor();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
+
+    initializeIncludedModules(this);
   }
 
   inspect(): string {
