@@ -18,13 +18,13 @@
     "tsFile": "dependency-tracker/tse-tracker.ts",
     "rubyName": "render_dependencies",
     "call": "call",
-    "reason": "RubyTracker#render_dependencies, which parity:api falls back onto this file; unported - see actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
+    "reason": "Homonym: ERBTracker#render_dependencies (erb_tracker.rb:88-98) is what this body ports, and it makes neither call. The flag comes from RubyTracker#render_dependencies (ruby_tracker.rb:26-34), whose file has no TS counterpart yet, so parity:api falls its methods onto this one. Porting it retires this row: actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
   },
   {
     "package": "actionview",
     "tsFile": "dependency-tracker/tse-tracker.ts",
     "rubyName": "render_dependencies",
     "call": "new",
-    "reason": "RubyTracker#render_dependencies, which parity:api falls back onto this file; unported - see actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
+    "reason": "Homonym: ERBTracker#render_dependencies (erb_tracker.rb:88-98) is what this body ports, and it makes neither call. The flag comes from RubyTracker#render_dependencies (ruby_tracker.rb:26-34), whose file has no TS counterpart yet, so parity:api falls its methods onto this one. Porting it retires this row: actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
   }
 ]

@@ -27,7 +27,7 @@ export class WildcardResolver {
 
     const paths: TemplatePath[] = [];
     for (const resolver of this.viewPaths as PathSet) {
-      paths.push(...(resolver.allTemplatePaths?.() ?? []));
+      paths.push(...resolver.allTemplatePaths!());
     }
 
     const uniqPaths = new Map<string, TemplatePath>();

@@ -4,27 +4,30 @@ import type { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
 
-const IDENTIFIER = "[\\p{Alphabetic}_][\\p{Alphabetic}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*";
-
-const VARIABLE_OR_METHOD_CHAIN = `(?:\\$|@{1,2})?(?:${IDENTIFIER}\\.)*(?<dynamic>${IDENTIFIER})`;
-
-const STRING = `(?<quote>['"])(?<static>.*?)\\k<quote>`;
-
-const PARTIAL_HASH_KEY = `(?:\\bpartial:|:partial\\s*=>)\\s*`;
-
-const LAYOUT_HASH_KEY = `(?:\\blayout:|:layout\\s*=>)\\s*`;
-
 /** @internal */
 export class TSETracker {
   static EXPLICIT_DEPENDENCY = /# Template Dependency: (\S+)/g;
 
+  static IDENTIFIER = /[\p{Alphabetic}_][\p{Alphabetic}\p{Nd}\p{Mn}\p{Mc}\p{Pc}]*/u;
+
+  static VARIABLE_OR_METHOD_CHAIN = new RegExp(
+    `(?:\\$|@{1,2})?(?:${this.IDENTIFIER.source}\\.)*(?<dynamic>${this.IDENTIFIER.source})`,
+    "u",
+  );
+
+  static STRING = /(?<quote>['"])(?<static>.*?)\k<quote>/su;
+
+  static PARTIAL_HASH_KEY = /(?:\bpartial:|:partial\s*=>)\s*/u;
+
+  static LAYOUT_HASH_KEY = /(?:\blayout:|:layout\s*=>)\s*/u;
+
   static RENDER_ARGUMENTS = new RegExp(
-    `^(?:\\s*\\(?\\s*)(?:.*?${PARTIAL_HASH_KEY}|${LAYOUT_HASH_KEY})?(?:${STRING}|${VARIABLE_OR_METHOD_CHAIN})`,
+    `^(?:\\s*\\(?\\s*)(?:.*?${this.PARTIAL_HASH_KEY.source}|${this.LAYOUT_HASH_KEY.source})?(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
     "su",
   );
 
   static LAYOUT_DEPENDENCY = new RegExp(
-    `^(?:\\s*\\(?\\s*)(?:.*?${LAYOUT_HASH_KEY})(?:${STRING}|${VARIABLE_OR_METHOD_CHAIN})`,
+    `^(?:\\s*\\(?\\s*)(?:.*?${this.LAYOUT_HASH_KEY.source})(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
     "su",
   );
 

@@ -6,11 +6,13 @@ import type { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
 
+export type NestedDependencies = ReadonlyArray<string | NestedDependencies>;
+
 export interface DigestorOptions {
   name: string;
   format?: string | null;
   finder: LookupContext;
-  dependencies?: string[] | null;
+  dependencies?: NestedDependencies | null;
 }
 
 interface Logger {
@@ -23,8 +25,8 @@ export class Digestor {
     if (dependencies == null || dependencies.length === 0) {
       cacheKey = `${name}.${format ?? ""}`;
     } else {
-      const dependenciesSuffix = dependencies
-        .flat()
+      const dependenciesSuffix = (dependencies as readonly unknown[])
+        .flat(Infinity)
         .filter((dependency) => dependency != null)
         .join(".");
       cacheKey = `${name}.${format ?? ""}.${dependenciesSuffix}`;
@@ -38,7 +40,7 @@ export class Digestor {
     const root = this.tree(path.toString(), finder, path.isPartial());
     if (dependencies) {
       for (const injectedDep of dependencies) {
-        root.children.push(new Injected(injectedDep, null, null));
+        root.children.push(new Injected(injectedDep as string, null, null));
       }
     }
     const digest = root.digest(finder);
@@ -66,26 +68,20 @@ export class Digestor {
       !interpolated &&
       (template = this.findTemplate(finder, path.name, [path.prefix], partial, []))
     ) {
-      const node = seen[template.identifier];
+      let node = seen[template.identifier];
       if (node) {
         return node;
       } else {
-        const created = (seen[template.identifier] = Node.create(
-          name,
-          logicalName,
-          template,
-          partial,
-        ));
+        node = seen[template.identifier] = Node.create(name, logicalName, template, partial);
 
         const deps = DependencyTracker.findDependencies(name, template, finder.viewPaths);
-        const uniqDeps: Record<string, true> = {};
-        for (const depFile of deps) {
-          const key = depFile.replace(/\/_/g, "/");
-          if (uniqDeps[key]) continue;
-          uniqDeps[key] = true;
-          created.children.push(this.tree(depFile, finder, true, seen));
+        for (const depFile of deps.filter(
+          (n, i) =>
+            deps.findIndex((dep) => dep.replace(/\/_/g, "/") === n.replace(/\/_/g, "/")) === i,
+        )) {
+          node.children.push(this.tree(depFile, finder, true, seen));
         }
-        return created;
+        return node;
       }
     } else {
       if (!interpolated) {
