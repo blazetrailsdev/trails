@@ -6,6 +6,7 @@ import { normalizePath as journeyNormalizePath } from "../journey/router/utils.j
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
+import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
 import type { Endpoint } from "./endpoint.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -23,10 +24,10 @@ export type MountableApp =
 export interface RouteOptions {
   name?: string;
   constraints?: RouteConstraints;
-  defaults?: Record<string, string>;
+  defaults?: Record<string, string | null>;
   format?: boolean;
   as?: string;
-  to?: string;
+  to?: string | MountableApp;
   controller?: string;
   action?: string;
   only?: ResourceAction | ResourceAction[];
@@ -67,7 +68,7 @@ export class Route {
   readonly name: string | undefined;
   readonly controller: string;
   readonly action: string;
-  readonly defaults: Record<string, string>;
+  readonly defaults: Record<string, string | null>;
   readonly constraints: RouteConstraints;
   readonly ip: string | RegExp;
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
@@ -86,7 +87,7 @@ export class Route {
   /** @internal */
   private _pathFormatter: Format | null = null;
   /** @internal */
-  private _requiredParamNames: readonly string[] | null = null;
+  private _requiredParts: readonly string[] | null = null;
   /** @internal */
   private _pathTree: unknown = null;
   /** @internal */
@@ -171,6 +172,13 @@ export class Route {
 
   get pathParamNames(): readonly string[] {
     return this.paramNames.slice();
+  }
+
+  get requiredParts(): readonly string[] {
+    if (this._requiredParts === null) {
+      this._requiredParts = topLevelSymbolNames(new Parser().parse(this.path));
+    }
+    return this._requiredParts;
   }
 
   get requestConstraints(): Record<string, unknown> {
@@ -279,7 +287,6 @@ export class Route {
       }
       const pattern = new Pattern(ast, reqs, PATHFOR_SEPARATORS, this.anchor);
       this._pathFormatter = pattern.buildFormatter();
-      this._requiredParamNames = topLevelSymbolNames(tree);
       const safeReqs: Record<string, RegExp> = Object.create(null);
       for (const name of Object.keys(reqs)) {
         const re = reqs[name];
@@ -288,24 +295,20 @@ export class Route {
       }
       this._pathRequirements = safeReqs;
     }
-    for (const name of this._requiredParamNames!) {
+    for (const name of this.requiredParts) {
       if (!Object.hasOwn(params, name) || params[name] == null) {
-        throw new Error(
+        throw new UrlGenerationError(
+          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
+        );
+      }
+      const re = this._pathRequirements![name];
+      if (re && !re.test(String(params[name]))) {
+        throw new UrlGenerationError(
           `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
         );
       }
     }
     const emitted = computeEmittedSymbols(this._pathTree, params);
-    for (const [name, re] of Object.entries(this._pathRequirements!)) {
-      if (!Object.hasOwn(params, name)) continue;
-      if (!emitted.has(name)) continue;
-      const v = params[name];
-      if (v != null && !re.test(String(v))) {
-        throw new Error(
-          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
-        );
-      }
-    }
     const hash: Record<string, unknown> = Object.create(null);
     for (const [k, v] of Object.entries(params)) {
       if (v != null) hash[k] = String(v);

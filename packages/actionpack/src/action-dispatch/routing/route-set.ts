@@ -722,24 +722,50 @@ export class RouteSet {
     _methodName?: string | null,
   ): string {
     const opts: Record<string, unknown> = { ...options };
+    if (opts["controller"] != null) opts["action"] ??= "index";
     for (const key of ["controller", "action", "id"] as const) {
       if (opts[key] == null && recall[key] != null) opts[key] = recall[key];
       else if (opts[key] == null) break;
     }
     let route: Route | undefined;
     if (routeName) route = this.namedRoutes.get(routeName);
-    route ??= this.routes.find(
-      (r) => r.controller === opts["controller"] && r.action === opts["action"],
-    );
+    route ??= this.routes.find((r) => {
+      const parts = new Set<string>(r.pathParamNames);
+      if (!parts.has("controller") && r.controller !== opts["controller"]) return false;
+      if (!parts.has("action") && r.action !== opts["action"]) return false;
+      return true;
+    });
     if (!route) {
       throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
     }
-    const captureParams: Record<string, unknown> = Object.create(null);
-    for (const name of route.pathParamNames) {
-      const v = opts[name];
-      if (v != null) captureParams[name] = v;
+    const parameterizedParts = this.extractParameterizedParts(route, opts, recall);
+    return route.pathFor(parameterizedParts as Record<string, string | number>);
+  }
+
+  /** @internal */
+  private extractParameterizedParts(
+    route: Route,
+    options: Record<string, unknown>,
+    recall: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const parameterizedParts: Record<string, unknown> = { ...recall, ...options };
+
+    const parts = route.pathParamNames;
+    let kept = parts.length;
+    while (kept > 0) {
+      const part = parts[kept - 1];
+      if (Object.hasOwn(options, part) && (options[part] ?? recall[part]) != null) break;
+      kept--;
     }
-    return route.pathFor(captureParams as Record<string, string | number>);
+    const keysToKeep = new Set<string>([...parts.slice(0, kept), ...route.requiredParts]);
+
+    for (const badKey of Object.keys(parameterizedParts)) {
+      if (!keysToKeep.has(badKey)) delete parameterizedParts[badKey];
+    }
+    for (const k of Object.keys(parameterizedParts)) {
+      if (parameterizedParts[k] == null) delete parameterizedParts[k];
+    }
+    return parameterizedParts;
   }
 
   isOptimizeRoutesGeneration(): boolean {
