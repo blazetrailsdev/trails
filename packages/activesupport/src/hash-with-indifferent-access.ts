@@ -275,7 +275,6 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     }
 
     if (hash === null) {
-      // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError("no implicit conversion of nil into Hash");
     } else if (NOT_GIVEN === hash) {
       for (const key of [...this.keys()]) this.set(block!(key), this.delete(key));
@@ -394,7 +393,6 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       if (obj == null) return undefined;
       if (Array.isArray(obj)) {
         if (typeof identifier !== "number") {
-          // eslint-disable-next-line blazetrails/rails-error-parity
           throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
         }
         obj = obj[identifier < 0 ? obj.length + identifier : identifier];
@@ -404,7 +402,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       if (typeof dig === "function") {
         return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
       }
-      // eslint-disable-next-line blazetrails/rails-error-parity
+
       throw new TypeError(`${rbObjClass(obj)} does not have #dig method`);
     }
     return obj;

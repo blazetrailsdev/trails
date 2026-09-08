@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/date";
+import * as Arel from "@blazetrails/arel";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
@@ -135,9 +136,8 @@ export class InsertAll {
     this.updateSql = undefined;
     this.onDuplicate = options.onDuplicate;
 
-    if (options.onDuplicate !== undefined) this.disallowRawSqlBang(options.onDuplicate);
-    if (options.returning !== undefined && options.returning !== false)
-      this.disallowRawSqlBang(options.returning);
+    this.disallowRawSqlBang(options.onDuplicate);
+    this.disallowRawSqlBang(options.returning);
 
     if (options.returning !== undefined) {
       this.returning =
@@ -412,12 +412,14 @@ export class InsertAll {
 
   /** @internal */
   private disallowRawSqlBang(value: unknown, permit: RegExp = COLUMN_NAME_WITH_ORDER): void {
-    if (value instanceof Nodes.SqlLiteral) return;
-    if (typeof value !== "string") return;
+    if (typeof value !== "string" || Arel.arelNode(value)) return;
     if (permit.test(value)) return;
-    throw new Error(
-      `Dangerous query method called with raw SQL string: ${value}. ` +
-        "Known-safe values can be passed by wrapping them in Arel.sql().",
+
+    throw new ArgumentError(
+      "Dangerous query method (method whose arguments are used as raw " +
+        `SQL) called: ${value}. ` +
+        "Known-safe values can be passed " +
+        "by wrapping them in Arel.sql().",
     );
   }
 

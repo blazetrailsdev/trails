@@ -2,7 +2,9 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./enumerable-utils.js";
 
-const LOCAL_ENVIRONMENTS = ["development", "test"];
+export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
+
+export const LOCAL_ENVIRONMENTS = ["development", "test"];
 
 export class EnvironmentInquirer extends StringInquirer {
   #local: boolean;
@@ -12,14 +14,24 @@ export class EnvironmentInquirer extends StringInquirer {
 
     super(env);
 
+    for (const defaultEnv of DEFAULT_ENVIRONMENTS) {
+      (this as unknown as Record<string, boolean>)[defaultEnv] = env === defaultEnv;
+    }
+
     this.#local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
-  isLocal(): boolean {
+  "local?"(): boolean {
     return this.#local;
   }
+}
 
-  "local?"(): boolean {
-    return this.isLocal();
-  }
+for (const env of DEFAULT_ENVIRONMENTS) {
+  Object.defineProperty(EnvironmentInquirer.prototype, `${env}?`, {
+    configurable: true,
+    writable: true,
+    value: function (this: Record<string, boolean>): boolean {
+      return this[env];
+    },
+  });
 }

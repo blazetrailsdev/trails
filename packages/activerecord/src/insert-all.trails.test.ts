@@ -106,3 +106,18 @@ describe("InsertAll::Builder format_columns", () => {
     expect(formatColumns("lower(external_id)")).toBe("lower(external_id)");
   });
 });
+
+describe("InsertAll disallow_raw_sql!", () => {
+  fixtures([]);
+
+  it("raises ArgumentError with the Rails message for a raw SQL on_duplicate", async () => {
+    await expect(
+      Book.upsertAll([{ name: "Rework", author_id: 1 }], {
+        onDuplicate: "name = name || ';'" as "update",
+      }),
+    ).rejects.toThrow(
+      "Dangerous query method (method whose arguments are used as raw SQL) called: " +
+        "name = name || ';'. Known-safe values can be passed by wrapping them in Arel.sql().",
+    );
+  });
+});

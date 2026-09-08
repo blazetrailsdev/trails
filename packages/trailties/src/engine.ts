@@ -212,7 +212,7 @@ Engine.initializer(
 );
 
 Engine.initializer("make_routes_lazy", { before: "bootstrap_hook" }, function (this: Engine) {
-  if (_Trails!.env.isLocal()) this.config.routeSetClass = LazyRouteSet;
+  if (_Trails!.env["local?"]()) this.config.routeSetClass = LazyRouteSet;
 });
 
 Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {

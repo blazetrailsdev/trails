@@ -70,7 +70,7 @@ describe("StringInquirer", () => {
     const env = new EnvironmentInquirer("development");
     expect(env).toBeInstanceOf(String);
     expect(env).toBeInstanceOf(StringInquirer);
-    expect(env.isLocal()).toBe(true);
+    expect(env["local?"]()).toBe(true);
     expect((env as any)["development?"]()).toBe(true);
   });
 
