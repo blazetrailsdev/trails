@@ -33,7 +33,7 @@ class AdapterType extends GenericType {
 }
 
 function modelWith(adapter: string | undefined) {
-  return { connectionDbConfig: () => (adapter === undefined ? undefined : { adapter }) };
+  return { connectionDbConfig: () => ({ adapter }) };
 }
 
 describe("Type.currentAdapterName", () => {
@@ -48,7 +48,6 @@ describe("Type.currentAdapterName", () => {
   });
 
   it("raises when the model has no configuration", () => {
-    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(AdapterNotFound);
     expect(() =>
       adapterNameFrom({
         connectionDbConfig: () => {
@@ -56,6 +55,7 @@ describe("Type.currentAdapterName", () => {
         },
       }),
     ).toThrow(ConnectionNotDefined);
+    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(AdapterNotFound);
   });
 
   it("propagates errors other than a missing connection", () => {

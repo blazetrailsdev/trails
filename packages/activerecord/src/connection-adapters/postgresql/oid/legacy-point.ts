@@ -26,10 +26,6 @@ export class LegacyPoint extends ValueType {
     return super.serialize(value);
   }
 
-  deserialize(value: unknown): unknown {
-    return this.cast(value);
-  }
-
   private numberForPoint(number: unknown): string {
     const s = String(number);
     return s.endsWith(".0") ? s.slice(0, -2) : s;
