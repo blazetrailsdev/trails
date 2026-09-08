@@ -5,6 +5,7 @@ import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
+import { Route as JourneyRoute, VerbMatchers, type VerbMatcher } from "../journey/route.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
@@ -37,6 +38,7 @@ export interface RouteOptions {
   redirectEndpoint?: Redirect;
   pathNames?: { new?: string; edit?: string };
   anchor?: boolean;
+  scopeOptions?: Record<string, unknown>;
   shallow?: boolean;
   internal?: boolean;
   on?: string;
@@ -63,7 +65,6 @@ export interface MatchedRoute {
 }
 
 export class Route {
-  readonly verb: string;
   readonly path: string;
   readonly name: string | undefined;
   readonly controller: string;
@@ -76,8 +77,11 @@ export class Route {
   /** @internal */
   readonly formatted: boolean;
   readonly internal: boolean;
+  readonly scopeOptions: Record<string, unknown>;
   /** @internal */
   readonly to: MountableApp | undefined;
+  /** @internal */
+  readonly requestMethodMatch: readonly VerbMatcher[];
   /** @internal */
   private _app: Endpoint | undefined;
 
@@ -96,13 +100,15 @@ export class Route {
   private _journeyRouterUnbuildable = false;
 
   constructor(
-    verb: string,
+    verb: string | readonly string[],
     path: string,
     controller: string,
     action: string,
     options: RouteOptions = {},
   ) {
-    this.verb = verb.toUpperCase();
+    this.requestMethodMatch = (Array.isArray(verb) ? verb : [verb as string]).map((v) =>
+      v.toUpperCase() === "ALL" ? VerbMatchers.All : JourneyRoute.verbMatcher(v.toUpperCase()),
+    );
     this.path = normalizePath(path);
     this.controller = controller;
     this.action = action;
@@ -120,9 +126,19 @@ export class Route {
     this.anchor = options.anchor !== false;
     this.formatted = options.format !== false;
     this.internal = options.internal === true;
+    this.scopeOptions = options.scopeOptions ?? {};
     this.to = options.app;
 
     this.paramNames = collectParamNamesFromJourneyAst(this.path);
+  }
+
+  get verb(): string {
+    return this.verbs().join("|");
+  }
+
+  /** @internal */
+  private verbs(): string[] {
+    return this.requestMethodMatch.map((m) => (m === VerbMatchers.All ? "ALL" : m.verb));
   }
 
   get app(): Endpoint | undefined {
@@ -256,9 +272,14 @@ export class Route {
     return s;
   }
 
+  /** @internal */
+  private matchVerb(requestMethod: string): boolean {
+    return this.requestMethodMatch.some((m) => m.call({ requestMethod }));
+  }
+
   match(method: string, requestPath: string): MatchedRoute | null {
     const m = method.toUpperCase();
-    if (this.verb !== "ALL" && this.verb !== m && !(m === "HEAD" && this.verb === "GET")) {
+    if (!this.matchVerb(m) && !(m === "HEAD" && this.matchVerb("GET"))) {
       return null;
     }
     if (this._journeyRouterUnbuildable) return null;
