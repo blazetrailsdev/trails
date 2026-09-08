@@ -384,7 +384,7 @@ describe("TestRouter", () => {
       ...missingParameters,
     };
 
-    const message = `missing required keys: [:${missingKey}]`;
+    const message = `No route matches {:action=>"show", :controller=>"tasks"}, missing required keys: [:${missingKey}]`;
 
     let error: Error | undefined;
     expect(() => {
@@ -395,8 +395,7 @@ describe("TestRouter", () => {
         throw e;
       }
     }).toThrow(UrlGenerationError);
-    expect(error!.message).toMatch(/^No route matches \{/);
-    expect(error!.message).toContain(message);
+    expect(error!.message).toEqual(message);
   });
 
   it("generate uses recall if needed", () => {
