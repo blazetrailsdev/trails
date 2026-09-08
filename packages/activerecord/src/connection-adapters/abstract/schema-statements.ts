@@ -1324,8 +1324,9 @@ export class SchemaStatements {
   }
 
   async changeTableComment(_tableName: string, _commentOrChanges: CommentOrChanges): Promise<void> {
-    throw new Error(
-      `NotImplementedError: ${this.constructor.name} does not support changing table comments`,
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1528
+    throw new NotImplementedError(
+      `${this.constructor.name} does not support changing table comments`,
     );
   }
 
@@ -1334,8 +1335,9 @@ export class SchemaStatements {
     _columnName: string,
     _commentOrChanges: CommentOrChanges,
   ): Promise<void> {
-    throw new Error(
-      `NotImplementedError: ${this.constructor.name} does not support changing column comments`,
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1538
+    throw new NotImplementedError(
+      `${this.constructor.name} does not support changing column comments`,
     );
   }
 

@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { AbstractControllerError } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
@@ -70,7 +71,7 @@ export function _normalizeArgs(action?: unknown, options: RenderOptions = {}): R
     if ((action as { permitted: () => boolean }).permitted()) {
       return action as RenderOptions;
     }
-    throw new Error("render parameters are not permitted");
+    throw new ArgumentError("render parameters are not permitted");
   }
   if (action != null && typeof action === "object" && !Array.isArray(action)) {
     return action as RenderOptions;

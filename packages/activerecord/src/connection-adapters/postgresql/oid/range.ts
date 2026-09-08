@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Range } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;
@@ -42,7 +42,7 @@ export class RangeType extends ValueType<Range<unknown>> {
     const to = this.typeCastSingle(extracted.to);
 
     if (!isInfinity(from) && extracted.excludeStart) {
-      throw new Error(
+      throw new ArgumentError(
         `The Ruby Range object does not support excluding the beginning of a Range. (unsupported value: '${value}')`,
       );
     }

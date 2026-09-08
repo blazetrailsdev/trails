@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { assertValidKeys, throwAbort } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
@@ -138,7 +139,8 @@ export class Association {
   }
 
   static macro(): string {
-    throw new Error("NotImplementedError");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/builder/association.rb:62
+    throw new NotImplementedError();
   }
 
   static validOptions(_options: Record<string, unknown>): string[] {
@@ -209,7 +211,8 @@ export class Association {
   static defineChangeTrackingMethods(_model: any, _reflection: any): void {}
 
   static validDependentOptions(): string[] {
-    throw new Error("NotImplementedError");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/builder/association.rb:127
+    throw new NotImplementedError();
   }
 
   static checkDependentOptions(dependent: string, model: any): void {

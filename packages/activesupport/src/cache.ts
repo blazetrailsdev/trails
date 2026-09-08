@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, toParam } from "./hash-utils.js";
 import { env } from "@blazetrails/ruby-compat";
 import { MemoryStore } from "./cache/memory-store.js";
@@ -71,13 +71,14 @@ function retrieveCacheKey(key: unknown): string {
 
 /** @internal */
 function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
-  const klass = lookupStoreClass(store);
-  if (klass === undefined) {
-    const name = store.slice(1);
-    throw new RuntimeError(
-      `Could not find cache store adapter for ${name} ` +
-        `(cannot load such file -- active_support/cache/${name})`,
-    );
+  try {
+    return lookupStoreClass(store);
+  } catch (e) {
+    if (e instanceof LoadError) {
+      throw new RuntimeError(
+        `Could not find cache store adapter for ${store.slice(1)} (${e.message})`,
+      );
+    }
+    throw e;
   }
-  return klass;
 }

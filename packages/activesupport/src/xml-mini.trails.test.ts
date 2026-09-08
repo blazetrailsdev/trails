@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LoadError } from "@blazetrails/ruby-compat";
 import {
   _parseBinary,
   _parseFile,
@@ -56,6 +57,7 @@ describe("XmlMini", () => {
   });
 
   it("cast_backend_name_to_module raises for an unknown backend name", async () => {
+    await expect(castBackendNameToModule("NoSuchEngine")).rejects.toThrow(LoadError);
     await expect(castBackendNameToModule("NoSuchEngine")).rejects.toThrow(
       "cannot load such file -- active_support/xml_mini/nosuchengine",
     );

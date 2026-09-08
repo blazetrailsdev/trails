@@ -11,6 +11,7 @@ import {
   Unary,
 } from "../nodes/node.js";
 import { TransitionTable, type Edge } from "./transition-table.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 const DUMMY_END_NODE = new Dummy("<end>");
 
@@ -109,7 +110,7 @@ export class Builder {
       return this.isNullable(node.left as Node) && this.isNullable(node.right);
     if (node instanceof Terminal) return !node.left;
     if (node instanceof Unary) return this.isNullable(node.left as Node);
-    throw new Error(`unknown nullable: ${node.type}`);
+    throw new ArgumentError(`unknown nullable: ${node.type}`);
   }
 
   firstpos(node: Node): readonly Node[] {
@@ -136,7 +137,7 @@ export class Builder {
     }
     if (node instanceof Unary) return this.firstpos(node.left as Node);
     if (node instanceof Terminal) return this.isNullable(node) ? [] : [node];
-    throw new Error(`unknown firstpos: ${node.type}`);
+    throw new ArgumentError(`unknown firstpos: ${node.type}`);
   }
 
   lastpos(node: Node): readonly Node[] {
@@ -163,7 +164,7 @@ export class Builder {
     }
     if (node instanceof Terminal) return this.isNullable(node) ? [] : [node];
     if (node instanceof Unary) return this.lastpos(node.left as Node);
-    throw new Error(`unknown lastpos: ${node.type}`);
+    throw new ArgumentError(`unknown lastpos: ${node.type}`);
   }
 
   /** @internal */

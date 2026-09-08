@@ -12,7 +12,7 @@ import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { _CollectionProxyCtor } from "./collection-proxy-slot.js";
 import { ownerForeignKeyColumns } from "./foreign-association.js";
-import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
+import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 
 export class CollectionAssociation extends Association {
@@ -676,7 +676,8 @@ export class CollectionAssociation extends Association {
 
   /** @internal */
   protected deleteRecords(_records: Base[], _method: string): Promise<number> | number {
-    throw new Error(`deleteRecords must be implemented by ${this.constructor.name}`);
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:415
+    throw new NotImplementedError();
   }
 
   /** @internal */

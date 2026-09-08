@@ -5,6 +5,7 @@ import { Session } from "../request/session.js";
 import { MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -650,14 +651,14 @@ describe("RequestVariant", () => {
     const req = new Request({});
     expect(() => {
       req.variant = 123 as any;
-    }).toThrow();
+    }).toThrow(ArgumentError);
   });
 
   it("setting variant to an array containing a non-symbol value", () => {
     const req = new Request({});
     expect(() => {
       req.variant = ["phone", 123] as any;
-    }).toThrow();
+    }).toThrow(ArgumentError);
   });
 });
 
