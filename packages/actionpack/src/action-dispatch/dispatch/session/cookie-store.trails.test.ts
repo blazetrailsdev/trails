@@ -1,4 +1,5 @@
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, expect, it } from "vitest";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Cookies } from "../../middleware/cookies.js";
@@ -39,6 +40,7 @@ describe("CookieStore in a real stack", () => {
       HTTP_HOST: "test.host",
       HTTP_COOKIE: cookie ?? "",
       "action_dispatch.key_generator": new KeyGenerator("a".repeat(64), { iterations: 2 }),
+      "action_dispatch.cookies_rotations": new RotationConfiguration(),
       "action_dispatch.signed_cookie_salt": "signed cookie",
       "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
       "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",

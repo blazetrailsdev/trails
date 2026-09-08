@@ -107,7 +107,10 @@ export class MessageEncryptor extends Codec {
     return this.createMessage(value, options);
   }
 
-  decryptAndVerify(message: string, options: ExpectedMetadataOptions = {}): unknown {
+  decryptAndVerify(
+    message: string,
+    options: ExpectedMetadataOptions & RotatableOptions = {},
+  ): unknown {
     return this.catchAndRaise("invalid_message_format", { as: InvalidMessage }, () =>
       this.catchAndRaise("invalid_message_serialization", { as: InvalidMessage }, () =>
         this.catchAndIgnore("invalid_message_content", () => this.readMessage(message, options)),

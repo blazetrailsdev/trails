@@ -1,4 +1,5 @@
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
@@ -13,6 +14,7 @@ function buildApp(routes: RouteSet): RackApp {
   const cookies = new Cookies((e: RackEnv) => store.call(e));
   return (e: RackEnv) => {
     e["action_dispatch.key_generator"] = new KeyGenerator("a".repeat(64), { iterations: 2 });
+    e["action_dispatch.cookies_rotations"] = new RotationConfiguration();
     e["action_dispatch.signed_cookie_salt"] = "signed cookie";
     e["action_dispatch.encrypted_cookie_salt"] = "encrypted cookie";
     e["action_dispatch.encrypted_signed_cookie_salt"] = "signed encrypted cookie";

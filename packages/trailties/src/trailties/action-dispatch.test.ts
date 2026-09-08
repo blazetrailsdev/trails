@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Deprecators } from "@blazetrails/activesupport";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
@@ -29,7 +30,7 @@ describe("ActionDispatch::Trailtie", () => {
   let app: { deprecators: Deprecators };
 
   beforeEach(() => {
-    savedConfig = structuredClone(cfg());
+    savedConfig = { ...cfg() };
     savedCspConfig = {
       ...(Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig),
     };
@@ -65,7 +66,7 @@ describe("ActionDispatch::Trailtie", () => {
     expect(c.debugExceptionLogLevel).toBe("fatal");
     expect(c.httpAuthSalt).toBe("http authentication");
     expect(c.defaultHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
-    expect(c.cookiesRotations).toBeNull();
+    expect(c.cookiesRotations).toBeInstanceOf(RotationConfiguration);
   });
 
   it("runInitializers copies config onto framework holders", async () => {

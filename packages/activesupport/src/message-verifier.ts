@@ -28,7 +28,7 @@ interface MessageVerifierOptions extends RotatableOptions {
 
 type GenerateOptions = MetadataOptions;
 
-type VerifyOptions = ExpectedMetadataOptions;
+type VerifyOptions = ExpectedMetadataOptions & RotatableOptions;
 
 const SEPARATOR = "--";
 

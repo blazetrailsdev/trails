@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../cookies.js";
@@ -29,6 +30,7 @@ const SECRET_KEY_BASE = "b3c631c314c0bbca50c1b2843150fe33";
 function cookieEnv(env: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     "action_dispatch.key_generator": new KeyGenerator(SECRET_KEY_BASE, { iterations: 2 }),
+    "action_dispatch.cookies_rotations": new RotationConfiguration(),
     "action_dispatch.signed_cookie_salt": "signed cookie",
     "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
     "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
