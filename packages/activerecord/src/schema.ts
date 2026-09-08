@@ -1,13 +1,9 @@
-import { getEnv, isPresent } from "@blazetrails/activesupport";
+import { isPresent } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Current } from "./migration.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
-import { DEFAULT_ENV } from "./connection-handling.js";
 
 export interface SchemaDefineInfo {
   version?: string | number;
-  environment?: string;
 }
 
 export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current<A> {
@@ -41,15 +37,14 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
       this.connection = connection;
       await block(this as Schema<A>);
 
-      const schemaMigration = new SchemaMigration(this.connectionPool);
-      await schemaMigration.createTable();
+      await this.connectionPool.schemaMigration.createTable();
       if (isPresent(info.version)) {
         await connection.assumeMigratedUptoVersion(info.version!);
       }
-      const currentEnvironment =
-        info.environment ?? getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DEFAULT_ENV();
-      const internalMetadata = new InternalMetadata(this.connectionPool);
-      await internalMetadata.createTableAndSetFlags(currentEnvironment);
+
+      await this.connectionPool.internalMetadata.createTableAndSetFlags(
+        this.connectionPool.migrationContext.currentEnvironment,
+      );
     });
   }
 

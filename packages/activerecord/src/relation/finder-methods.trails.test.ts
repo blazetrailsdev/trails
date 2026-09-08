@@ -634,8 +634,26 @@ describe("raise_record_not_found_exception! — composite key id rendering", () 
     } catch (e) {
       const err = e as RecordNotFound;
       expect(err.message).toBe(
-        "Couldn't find all Orders with 'shop_id,id': (1, 2, 3, 4) (found 0 results, but was looking for 2).",
+        `Couldn't find all Orders with '["shop_id", "id"]': (1, 2, 3, 4) (found 0 results, but was looking for 2).`,
       );
+    }
+  });
+
+  it("renders a composite key the way Ruby's Array#to_s does — inspected", () => {
+    const rel: any = {
+      _model: orderModelStub,
+      model: orderModelStub,
+      primaryKey: orderModelStub.primaryKey,
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+    };
+    try {
+      rel.raiseRecordNotFoundExceptionBang([[1, 2]], 0, 1);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=1,2`);
+      expect(err.primaryKey).toEqual(["shop_id", "id"]);
     }
   });
 });

@@ -531,8 +531,7 @@ export class PostgreSQLAdapter
     if (!this._typeMapEagerLoaded) {
       this._typeMapEagerLoaded = true;
       this._typeMap = null;
-      this._regtypeOids.clear();
-      await this.initializeTypeMap();
+      await this.reloadTypeMap();
     }
   }
 
@@ -563,14 +562,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   get typeMap(): HashLookupTypeMap {
-    if (this._typeMap == null) {
-      const m = (this._typeMap = new HashLookupTypeMap());
-      (this.constructor as typeof PostgreSQLAdapter).initializeTypeMap(m);
-      registerClassWithPrecision(m, "time", TimeType, { timezone: this._defaultTimezone });
-      registerClassWithPrecision(m, "timestamp", Timestamp, { timezone: this._defaultTimezone });
-      registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);
-    }
-    return this._typeMap;
+    return this._typeMap!;
   }
 
   private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {

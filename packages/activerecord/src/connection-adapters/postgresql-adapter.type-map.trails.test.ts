@@ -10,8 +10,11 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 describe("PostgreSQLAdapter#typeMap", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+    await adapter.reloadTypeMap();
+    loadSpy.mockRestore();
   });
 
   afterEach(async () => {
@@ -34,8 +37,11 @@ describe("PostgreSQLAdapter#typeMap", () => {
 describe("PostgreSQLAdapter#getOidType", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+    await adapter.reloadTypeMap();
+    loadSpy.mockRestore();
   });
 
   afterEach(async () => {
@@ -65,8 +71,11 @@ describe("PostgreSQLAdapter#getOidType", () => {
 describe("PostgreSQLAdapter#castResult", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+    await adapter.reloadTypeMap();
+    loadSpy.mockRestore();
   });
 
   afterEach(async () => {
@@ -97,8 +106,11 @@ describe("PostgreSQLAdapter#castResult", () => {
 describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+    await adapter.reloadTypeMap();
+    loadSpy.mockRestore();
   });
 
   afterEach(async () => {

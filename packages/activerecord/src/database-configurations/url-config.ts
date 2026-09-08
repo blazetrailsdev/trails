@@ -42,8 +42,7 @@ export class UrlConfig extends HashConfig {
       url == null ||
       url.startsWith("jdbc:") ||
       url.startsWith("http:") ||
-      url.startsWith("https:") ||
-      /^[A-Za-z]:[\\/]/.test(url)
+      url.startsWith("https:")
     ) {
       return { url };
     }

@@ -102,4 +102,15 @@ describe("ConnectionUrlResolver", () => {
       expect(hash.adapter).toBe("postgresql");
     });
   });
+
+  it("treats a slash-leading scheme-only URL as a path, not an opaque", () => {
+    expect(new ConnectionUrlResolver("C:/db/x.sqlite3").toHash()).toMatchObject({
+      adapter: "c",
+      database: "db/x.sqlite3",
+    });
+    expect(new ConnectionUrlResolver("sqlite3:/foo/bar").toHash()).toMatchObject({
+      adapter: "sqlite3",
+      database: "/foo/bar",
+    });
+  });
 });

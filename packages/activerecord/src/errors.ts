@@ -157,10 +157,10 @@ export class ReadOnlyError extends ActiveRecordError {
 
 export class RecordNotFound extends ActiveRecordError {
   readonly model: string;
-  readonly primaryKey?: string;
+  readonly primaryKey?: string | string[];
   readonly id?: unknown;
 
-  constructor(message?: string, model?: string, primaryKey?: string, id?: unknown) {
+  constructor(message?: string, model?: string, primaryKey?: string | string[], id?: unknown) {
     super(message);
     this.name = "RecordNotFound";
     this.model = model ?? "Record";
