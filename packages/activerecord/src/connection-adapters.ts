@@ -8,12 +8,12 @@ export interface ConnectionAdapters {
 
 type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
-const adapters = new Map<string, AdapterLoader>();
+const adapters = new Map<string, [AdapterLoader, string]>();
 const resolved = new Map<string, AdapterClass | Promise<AdapterClass>>();
 const resolveErrors = new Map<string, unknown>();
 
-export function register(name: string, loader: AdapterLoader): void {
-  adapters.set(name, loader);
+export function register(name: string, path: string, loader: AdapterLoader): void {
+  adapters.set(name, [loader, path]);
   resolved.delete(name);
   resolveErrors.delete(name);
 }
@@ -22,7 +22,7 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
   const cached = resolved.get(adapterName ?? "");
   if (cached) return cached;
 
-  const loader = adapters.get(adapterName ?? "");
+  const [loader, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
 
   if (!loader) {
     throw new AdapterNotFound(
@@ -48,12 +48,10 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
         typeof (err as { url?: unknown }).url === "string"
           ? (err as { url: string }).url
           : (/^Cannot find (?:module|package) '([^']+)'/.exec(message)?.[1] ?? null);
-      const pathToAdapter =
-        /import[\w$]*\(\s*["']([^"']+)["']/.exec(loader.toString())?.[1] ?? null;
       const loadError =
         (err as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
         errorPath !== null &&
-        pathToAdapter !== null &&
+        pathToAdapter !== undefined &&
         (errorPath.startsWith("file:")
           ? new URL(errorPath).pathname.endsWith(pathToAdapter.replace(/^\.+/, ""))
           : errorPath === pathToAdapter || pathToAdapter.startsWith(`${errorPath}/`))
@@ -89,18 +87,18 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const builtinLoaders: Record<keyof typeof ADAPTER_ARG_FAMILIES, AdapterLoader> = {
-  sqlite3: sqlite3Loader,
-  "node-sqlite": nodeSqliteLoader,
-  "expo-sqlite": expoSqliteLoader,
-  libsql: libsqlLoader,
-  "libsql-remote": libsqlRemoteLoader,
-  "libsql-replica": libsqlReplicaLoader,
-  mysql2: mysql2Loader,
-  postgresql: postgresqlLoader,
+const builtinLoaders: Record<keyof typeof ADAPTER_ARG_FAMILIES, [string, AdapterLoader]> = {
+  sqlite3: ["./connection-adapters/better-sqlite3-adapter.js", sqlite3Loader],
+  "node-sqlite": ["./connection-adapters/node-sqlite-adapter.js", nodeSqliteLoader],
+  "expo-sqlite": ["./connection-adapters/expo-sqlite-adapter.js", expoSqliteLoader],
+  libsql: ["./connection-adapters/libsql-adapter.js", libsqlLoader],
+  "libsql-remote": ["./connection-adapters/libsql-remote-adapter.js", libsqlRemoteLoader],
+  "libsql-replica": ["./connection-adapters/libsql-replica-adapter.js", libsqlReplicaLoader],
+  mysql2: ["./connection-adapters/mysql2-adapter.js", mysql2Loader],
+  postgresql: ["./connection-adapters/postgresql-adapter.js", postgresqlLoader],
 };
 
-for (const [name, loader] of Object.entries(builtinLoaders)) register(name, loader);
+for (const [name, [path, loader]] of Object.entries(builtinLoaders)) register(name, path, loader);
 
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";

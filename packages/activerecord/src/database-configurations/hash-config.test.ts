@@ -5,7 +5,11 @@ import * as connectionAdapters from "../connection-adapters.js";
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import "../connection-handling.js";
 
-connectionAdapters.register("abstract", async () => AbstractAdapter as any);
+connectionAdapters.register(
+  "abstract",
+  "./connection-adapters/abstract-adapter.js",
+  async () => AbstractAdapter as any,
+);
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTest", () => {

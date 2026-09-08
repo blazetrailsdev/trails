@@ -129,6 +129,21 @@ describe("URI::RFC2396_Parser#escape", () => {
   });
 });
 
+describe("URI::RFC2396_Parser#unescape", () => {
+  it("decodes every escape and leaves the rest alone", () => {
+    expect(RFC2396_PARSER.unescape("a%20b%2Fc")).toBe("a b/c");
+    expect(RFC2396_PARSER.unescape("a+b")).toBe("a+b");
+  });
+
+  it("decodes a multibyte character from its UTF-8 bytes", () => {
+    expect(RFC2396_PARSER.unescape("a%20b%C3%A9")).toBe("a bé");
+  });
+
+  it("takes a caller's own escaped set", () => {
+    expect(RFC2396_PARSER.unescape("a%40b%2Fc", /%40/)).toBe("a@b%2Fc");
+  });
+});
+
 describe("URI::RFC2396_Parser#split", () => {
   it("splits an absolute URI against regexp[:ABS_URI]", () => {
     const abs = ["http", null, "a.example.com", "8080", null, "/p", null, "q", "f"];

@@ -11,7 +11,11 @@ describe("RegistrationTest", () => {
     expect(() => ConnectionAdapters.resolve(name)).toThrow(
       /Database configuration specifies nonexistent 'fake_reg_a' adapter\. Available adapters are:/,
     );
-    ConnectionAdapters.register(name, async () => FakeActiveRecordAdapter as any);
+    ConnectionAdapters.register(
+      name,
+      "./fake-active-record-adapter.js",
+      async () => FakeActiveRecordAdapter as any,
+    );
     const klass = await ConnectionAdapters.resolve(name);
     expect(klass.name).toBe("FakeActiveRecordAdapter");
   });
@@ -22,7 +26,11 @@ describe("RegistrationTest", () => {
     expect(() => ConnectionAdapters.resolve(name)).toThrow(
       /Database configuration specifies nonexistent 'fake_reg_b' adapter\. Available adapters are:/,
     );
-    ConnectionAdapters.register(name, async () => FakeActiveRecordAdapter as any);
+    ConnectionAdapters.register(
+      name,
+      "./fake-active-record-adapter.js",
+      async () => FakeActiveRecordAdapter as any,
+    );
     const klass = await ConnectionAdapters.resolve(name);
     expect(klass.name).toBe("FakeActiveRecordAdapter");
   });
@@ -33,7 +41,11 @@ describe("RegistrationTest", () => {
     expect(() => ConnectionAdapters.resolve(name)).toThrow(
       /Database configuration specifies nonexistent 'fake_reg_c' adapter\. Available adapters are:/,
     );
-    ConnectionAdapters.register(name, async () => FakeActiveRecordAdapter as any);
+    ConnectionAdapters.register(
+      name,
+      "./fake-active-record-adapter.js",
+      async () => FakeActiveRecordAdapter as any,
+    );
     const klass = await ConnectionAdapters.resolve(name);
     expect(klass.name).toBe("FakeActiveRecordAdapter");
   });
