@@ -44,6 +44,11 @@ export class ConnectionUrlResolver {
       } catch {
         throw new Error(`Invalid database URL: ${redactUrl(url)}`);
       }
+    } else if (rest.startsWith("/")) {
+      this._emptyAuthority = true;
+      this._opaque = null;
+      this._parsed = new URL(`http://placeholder${rest}`);
+      this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
     } else {
       this._emptyAuthority = false;
       const queryIdx = rest.indexOf("?");

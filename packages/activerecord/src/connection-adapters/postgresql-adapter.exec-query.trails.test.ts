@@ -9,8 +9,17 @@ import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
 
 const UUID_OID = 2950;
 
-function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): PostgreSQLAdapter {
+async function loadTypeMap(adapter: PostgreSQLAdapter): Promise<void> {
+  const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+  await adapter.reloadTypeMap();
+  loadSpy.mockRestore();
+}
+
+async function makeAdapter(
+  queryImpl: (...args: unknown[]) => Promise<unknown>,
+): Promise<PostgreSQLAdapter> {
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+  await loadTypeMap(adapter);
   const fakeClient = { query: queryImpl, release: () => {} };
   (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
   adapter.verifiedBang();
@@ -32,7 +41,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("returns a Result with columnTypes resolved from the type_map", async () => {
-    adapter = makeAdapter(async () => ({
+    adapter = await makeAdapter(async () => ({
       rows: [[1, "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"]],
       fields: [
         { name: "id", dataTypeID: 23 },
@@ -46,7 +55,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("castValues() applies Uuid.deserialize to normalize case and braces", async () => {
-    adapter = makeAdapter(async () => ({
+    adapter = await makeAdapter(async () => ({
       rows: [["{A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11}"]],
       fields: [{ name: "guid", dataTypeID: UUID_OID }],
     }));
@@ -55,7 +64,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("preserves duplicate column names via positional rows", async () => {
-    adapter = makeAdapter(async () => ({
+    adapter = await makeAdapter(async () => ({
       rows: [["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"]],
       fields: [
         { name: "guid", dataTypeID: UUID_OID },
@@ -71,7 +80,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("returns a Result with empty fields when the driver reports none", async () => {
-    adapter = makeAdapter(async () => ({ rows: [], fields: [] }));
+    adapter = await makeAdapter(async () => ({ rows: [], fields: [] }));
     const result = await adapter.execQuery("CREATE TABLE x (id int)");
     expect(result).toBeInstanceOf(Result);
     expect(result.length).toBe(0);
@@ -80,7 +89,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("selectAll delegates through execQuery so the PG override wins", async () => {
-    adapter = makeAdapter(async () => ({
+    adapter = await makeAdapter(async () => ({
       rows: [["A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"]],
       fields: [{ name: "guid", dataTypeID: UUID_OID }],
     }));
@@ -90,7 +99,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("materializes a pending lazy transaction", async () => {
-    adapter = makeAdapter(async () => ({ rows: [], fields: [] }));
+    adapter = await makeAdapter(async () => ({ rows: [], fields: [] }));
     const materializeSpy = vi
       .spyOn(
         adapter as unknown as { materializeTransactions: () => Promise<void> },
@@ -105,9 +114,9 @@ describe("PostgreSQLAdapter#execQuery", () => {
 describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-    vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
+    await loadTypeMap(adapter);
     adapter.typeMap.aliasType(UUID_OID, "uuid");
   });
 
@@ -139,8 +148,9 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
   const INT4_OID = 23;
   const fakeResult = { fields: [{ name: "n", dataTypeID: INT4_OID }], rows: [[1]] };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    await loadTypeMap(adapter);
     adapter.typeMap.aliasType(INT4_OID, "int4");
     capturedQueryArg = undefined;
     const fakeClient = {
@@ -325,7 +335,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
   it("reads currval on the session that ran its own INSERT", async () => {
     let sequence = 0;
     let currval = 0;
-    adapter = makeAdapter(async (sql: unknown) => {
+    adapter = await makeAdapter(async (sql: unknown) => {
       const text = typeof sql === "string" ? sql : String((sql as { text: string }).text);
       if (text.includes("INSERT INTO")) {
         await Promise.resolve();

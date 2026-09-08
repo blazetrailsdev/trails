@@ -11,6 +11,7 @@ import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
 import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
+import { rubyInspectArray } from "./ruby-inspect.js";
 
 const ONE_AS_ONE = "1 AS one";
 
@@ -89,25 +90,6 @@ export function normalizeFindArgs(
   return { ids, wantArray, tuples: null };
 }
 
-function formatNotFoundAllMessage(
-  name: string,
-  key: string,
-  messageIds: string,
-  conditions: string,
-  resultSize: number | undefined,
-  expectedSize: number | undefined,
-  notFoundIds: unknown[] | undefined,
-): string {
-  let error = `Couldn't find all ${pluralize(name)} with '${key}': `;
-  error += `(${messageIds})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
-  if (notFoundIds) {
-    error +=
-      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
-  }
-  return error;
-}
-
 interface FinderRelation {
   model: FinderRelation["_model"];
   table: { get(name: string): Nodes.Node };
@@ -150,7 +132,7 @@ interface FinderRelation {
     ids?: unknown,
     resultSize?: number,
     expectedSize?: number,
-    key?: string,
+    key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
   /** @internal */
@@ -439,7 +421,7 @@ export function raiseRecordNotFoundExceptionBang(
   ids?: unknown,
   resultSize?: number,
   expectedSize?: number,
-  key?: string,
+  key?: string | string[],
   notFoundIds?: unknown[],
 ): never {
   const conditions = this.whereClause.isEmpty()
@@ -447,7 +429,9 @@ export function raiseRecordNotFoundExceptionBang(
     : ` [${this.arel().whereSql(this.model)?.value ?? ""}]`;
 
   const name = this.model.name;
-  key ??= String(this.model.primaryKey);
+  key ??= this.model.primaryKey;
+  const keyToS = Array.isArray(key) ? rubyInspectArray(key) : key;
+  const idsToS = Array.isArray(ids) ? rubyInspectArray(ids) : ids;
 
   if (ids === undefined || ids === null) {
     throw new RecordNotFound(
@@ -460,22 +444,20 @@ export function raiseRecordNotFoundExceptionBang(
   const wrapped = wrap(ids);
   if (wrapped.length === 1) {
     throw new RecordNotFound(
-      `Couldn't find ${name} with '${key}'=${ids}${conditions}`,
+      `Couldn't find ${name} with '${keyToS}'=${idsToS}${conditions}`,
       name,
       key,
       ids,
     );
   }
 
-  const error = formatNotFoundAllMessage(
-    name,
-    key,
-    (ids as unknown[]).flat(Infinity).join(", "),
-    conditions,
-    resultSize,
-    expectedSize,
-    notFoundIds,
-  );
+  let error = `Couldn't find all ${pluralize(name)} with '${keyToS}': `;
+  error += `(${(ids as unknown[]).flat(Infinity).join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  if (notFoundIds) {
+    error +=
+      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
+      ` with ${pluralize(keyToS, notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
+  }
   throw new RecordNotFound(error, name, key, ids);
 }
 

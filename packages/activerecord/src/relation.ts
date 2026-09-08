@@ -1969,7 +1969,7 @@ export interface Relation<T extends Base>
     ids?: unknown,
     resultSize?: number,
     expectedSize?: number,
-    key?: string,
+    key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
   unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;

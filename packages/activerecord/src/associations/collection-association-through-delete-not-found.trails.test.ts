@@ -22,6 +22,6 @@ describe("CollectionAssociation#coerceToRecords through branch", () => {
     const notFound = error as RecordNotFound;
     expect(notFound.model).toBe("Person");
     expect(notFound.primaryKey).toBe("id");
-    expect(notFound.message).toContain("Couldn't find Person with 'id'=245324523");
+    expect(notFound.message).toContain("Couldn't find Person with 'id'=[245324523]");
   });
 });

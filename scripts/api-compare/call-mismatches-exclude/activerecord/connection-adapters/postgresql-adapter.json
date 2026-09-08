@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "configure_connection",
+    "call": "internal_execute",
+    "reason": "Pre-existing: `configure_connection` runs before the adapter can service a pooled query, so its SET statements go straight to the pg client (`client.query`) rather than through `internalExecute` (postgresql_adapter.rb:980-991)."
+  }
+]

@@ -37,7 +37,7 @@ describe("CollectionAssociation#find not-found path", () => {
     const notFound = error as RecordNotFound;
     expect(notFound.model).toBe("Client");
     expect(notFound.primaryKey).toBe("id");
-    expect(notFound.message).toContain("Couldn't find Client with 'id'=245324523");
+    expect(notFound.message).toContain("Couldn't find Client with 'id'=[245324523]");
   });
 
   it("raises RecordNotFound reporting found/expected counts when one of several ids misses", async () => {
