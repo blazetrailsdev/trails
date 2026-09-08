@@ -1006,7 +1006,6 @@ function isMysql2ConnectionError(e: unknown): boolean {
 (Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =
   mysql2CastResult;
 
-
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
 
 Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {

@@ -2704,7 +2704,6 @@ PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).isWarningIgnored = pgIsWarningIgnored;
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
-
 include(PostgreSQLAdapter, SchemaStatements);
 
 PostgreSQLAdapter.prototype.performQuery = function (
