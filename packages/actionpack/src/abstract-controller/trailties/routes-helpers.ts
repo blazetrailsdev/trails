@@ -26,20 +26,14 @@ export function withRoutesHelpers(
       proto,
       new Proxy(Object.getPrototypeOf(proto) as object, {
         get(target, key, receiver) {
-          if (typeof key === "string") {
-            const mod = urlHelpersModule() as Record<string, unknown>;
-            const helper = mod[key];
-            if (typeof helper === "function") {
-              return function (this: { _routes?: unknown }, ...args: unknown[]): unknown {
-                const host = this?._routes ? this : mod;
-                return (helper as (this: unknown, ...a: unknown[]) => unknown).apply(host, args);
-              };
-            }
+          const mod = urlHelpersModule();
+          if (typeof key === "string" && isEnumerableMember(mod, key)) {
+            return (mod as Record<string, unknown>)[key];
           }
           return Reflect.get(target, key, receiver);
         },
         has(target, key) {
-          if (typeof key === "string" && key in (urlHelpersModule() as object)) return true;
+          if (typeof key === "string" && isEnumerableMember(urlHelpersModule(), key)) return true;
           return Reflect.has(target, key);
         },
       }),
@@ -50,6 +44,15 @@ export function withRoutesHelpers(
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
+}
+
+function isEnumerableMember(mod: HelperMethodsModule, key: string): boolean {
+  let current: object | null = mod;
+  while (current && current !== Object.prototype) {
+    if (Object.prototype.propertyIsEnumerable.call(current, key)) return true;
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return false;
 }
 
 function findTrailtieUrlHelpers(
