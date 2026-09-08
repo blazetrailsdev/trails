@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { NullLock } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
@@ -86,6 +87,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const queries: [string, string | null | undefined][] = [];
     adapter.supportsRenameColumn = () => false;
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.quoteTableName = (s: string) => `\`${s}\``;
@@ -145,6 +147,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     const events: string[] = [];
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     adapter.supportsRenameColumn = () => true;
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
@@ -401,6 +404,7 @@ async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) 
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
   const adapter = Object.create(AbstractMysqlAdapter.prototype);
   adapter.pool = new NullPool();
+  adapter.lock = NullLock;
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
   Object.assign(adapter, overrides);
@@ -624,6 +628,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.3");
@@ -641,6 +646,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.4");
