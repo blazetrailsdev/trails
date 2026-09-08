@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Request } from "../request.js";
 import { Response } from "../response.js";
 import { IOError } from "@blazetrails/ruby-compat";
+import { assertRaises } from "@blazetrails/activesupport";
 
 function withTempFile<T>(contents: string, fn: (path: string) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "trails-response-"));
@@ -183,11 +184,14 @@ describe("ResponseTest", () => {
     expect(res.body).toBe("hello world");
   });
 
-  it("write after close", () => {
+  it("write after close", async () => {
     const res = new Response();
     res.close();
-    expect(() => res.write("more")).toThrow(IOError);
-    expect(() => res.write("more")).toThrow("closed stream");
+
+    const e = await assertRaises([IOError], {}, () => {
+      res.write("more");
+    });
+    expect(e.message).toBe("closed stream");
   });
 
   it("each isnt called if str body is written", () => {
