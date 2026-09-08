@@ -140,9 +140,6 @@ describe("SafeBufferTest", () => {
     expect(underscore(buf.toString())).toBe("my_test");
   });
 
-  it.skip("Should not return safe buffer from ");
-  it.skip("Should not return safe buffer from !");
-
   it("can assign value into zero-index", () => {
     const buffer = new SafeBuffer("012345", true);
     buffer.set(0, "<");
@@ -283,9 +280,6 @@ describe("SafeBufferTest", () => {
     const buf = htmlSafe("MyTest");
     expect(underscore(buf.toString())).toBe("my_test");
   });
-
-  it.skip("Should not return safe buffer from ");
-  it.skip("Should not return safe buffer from !");
 
   it("can assign value into zero-index", () => {
     const buffer = new SafeBuffer("012345", true);

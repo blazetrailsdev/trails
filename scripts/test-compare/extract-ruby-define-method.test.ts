@@ -119,7 +119,7 @@ describe("Ruby extractor define_method loop expansion", () => {
   it("reports a loop whose name interpolation is not statically evaluable", () => {
     const { cases, unexpandedLoops } = extract(`
   [:a, :b].each do |path|
-    define_method(:"test_names_#{Regexp.escape(path)}") do
+    define_method(:"test_names_#{path.upcase}") do
       assert_equal 1, 1
     end
   end
@@ -135,15 +135,72 @@ describe("Ruby extractor define_method loop expansion", () => {
       assert_equal 1, 1
     end
   end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
+  });
 
+  it("expands a hash literal receiver, one case per pair", () => {
+    const { cases, unexpandedLoops } = extract(`
+  {
+    "/:controller(/:action)" => %r{a},
+    "/:controller/foo"       => %r{b},
+  }.each do |path, expected|
+    define_method(:"test_to_regexp_#{Regexp.escape(path)}") do
+      assert_equal expected, path
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "to regexp /:controller\\(/:action\\)",
+      "to regexp /:controller/foo",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands a hash literal receiver whose name reads the bound hash value", () => {
+    const { cases, unexpandedLoops } = extract(`
+  {
+    "/content"      => { controller: "content" },
+    "/content/list" => { controller: "content", action: "list" },
+  }.each do |request_path, expected|
+    define_method("test_recognize_#{expected.keys.map(&:to_s).join('_')}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "recognize controller",
+      "recognize controller action",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands a hash literal receiver whose block destructures the value", () => {
+    const { cases, unexpandedLoops } = extract(`
+  {
+    segment: ["/a", { segment: "a" }],
+    splat: ["/b", { splat: "b" }]
+  }.each do |name, (request_path, expected)|
+    define_method("test_recognize_#{name}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual(["recognize segment", "recognize splat"]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("reports a hash literal receiver whose name reads an unresolved value", () => {
+    const { cases, unexpandedLoops } = extract(`
   { "/:controller" => /a/ }.each do |path, expected|
-    define_method(:"test_to_regexp_#{path}") do
+    define_method(:"test_to_regexp_#{expected}") do
       assert_equal 1, 1
     end
   end
 `);
     expect(cases).toEqual([]);
-    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3", "cases/foo_test.rb:9"]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
   });
 
   it("neither expands nor reports a loop that generates ordinary helpers", () => {

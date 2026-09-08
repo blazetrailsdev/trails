@@ -116,7 +116,7 @@ describe("ActionDispatch::Journey::Format", () => {
 describe("ActionDispatch::Journey::Visitors::Dot", () => {
   it("emits a digraph string with node and edge labels", () => {
     const tree = new Cat(new SymbolNode(":a"), new SymbolNode(":b"));
-    const dot = DotVisitor.INSTANCE.render(tree);
+    const dot = DotVisitor.INSTANCE.accept(tree);
     expect(dot).toContain("digraph parse_tree");
     expect(dot).toContain('label="○"');
     expect(dot).toContain('label=":a"');

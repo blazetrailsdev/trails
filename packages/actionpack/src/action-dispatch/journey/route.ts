@@ -1,4 +1,5 @@
-import { deleteIf, dup, merge } from "@blazetrails/ruby-compat";
+import { dasherize } from "@blazetrails/activesupport";
+import { block, deleteIf, dup, fetch, isSymbol, merge, symbolToS } from "@blazetrails/ruby-compat";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
@@ -42,28 +43,20 @@ export class Unknown implements VerbMatcher {
   }
 }
 
-const AllVerbMatcher: VerbMatcher = {
-  verb: "",
+const All: VerbMatcher = {
   call: () => true,
+  verb: "",
 };
 
-const VERB_MATCHERS = new Map<string, VerbMatcher>();
-for (const v of VERBS) {
-  const m = makeStaticMatcher(v);
-  VERB_MATCHERS.set(v, m);
-  VERB_MATCHERS.set(v.toLowerCase(), m);
+const VERB_TO_CLASS: Record<string, VerbMatcher> = { ":all": All };
+for (const verb of VERBS) {
+  const klass = makeStaticMatcher(verb);
+  VERB_TO_CLASS[verb] = klass;
+  VERB_TO_CLASS[verb.toLowerCase()] = klass;
+  VERB_TO_CLASS[`:${verb.toLowerCase()}`] = klass;
 }
-VERB_MATCHERS.set("all", AllVerbMatcher);
 
-export const VerbMatchers = {
-  ALL: AllVerbMatcher,
-  for(verb: string | symbol): VerbMatcher {
-    const key = typeof verb === "symbol" ? (verb.description ?? "") : verb;
-    const found = VERB_MATCHERS.get(key);
-    if (found) return found;
-    return new Unknown(String(verb).replace(/_/g, "-").toUpperCase());
-  },
-};
+export const VerbMatchers = { All, Unknown, VERB_TO_CLASS };
 
 export interface RouteOptions {
   name: string;
@@ -108,8 +101,15 @@ export class Route {
   /** @internal */
   private _requiredDefaultsCache: Record<string, unknown> | null = null;
 
-  static verbMatcher(verb: string | symbol): VerbMatcher {
-    return VerbMatchers.for(verb);
+  /** @missingRailsArgs fetch — PERMANENT */
+  static verbMatcher(verb: string): VerbMatcher {
+    return fetch<VerbMatcher>(
+      VERB_TO_CLASS as unknown as Record<string, unknown>,
+      verb,
+      block<VerbMatcher>(
+        () => new Unknown(dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase()),
+      ),
+    );
   }
 
   constructor(opts: RouteOptions) {
@@ -122,7 +122,7 @@ export class Route {
     this.scopeOptions = opts.scopeOptions ?? {};
     this.internal = opts.internal ?? false;
     this.sourceLocation = opts.sourceLocation ?? null;
-    this._requestMethodMatch = opts.requestMethodMatch ?? [AllVerbMatcher];
+    this._requestMethodMatch = opts.requestMethodMatch ?? [VerbMatchers.All];
     this._requiredDefaults = opts.requiredDefaults ?? [];
     this._pathFormatter = this.path.buildFormatter();
     this.ast = this.path.ast!.root;
@@ -231,7 +231,7 @@ export class Route {
   }
 
   isRequiresMatchingVerb(): boolean {
-    return !this._requestMethodMatch.every((m) => m === AllVerbMatcher);
+    return !this._requestMethodMatch.every((m) => m === VerbMatchers.All);
   }
 
   get verb(): string {

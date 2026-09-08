@@ -11,6 +11,7 @@ export class Parameter {
     readonly escaper: Escaper,
   ) {}
 
+  /** @missingRailsCall call — PERMANENT */
   escape(value: unknown): string {
     return this.escaper(globalThis.String(value));
   }
@@ -143,9 +144,9 @@ export class Visitor {
   }
 }
 
-export class FunctionalVisitor<S = unknown> {
-  accept(node: Node, seed: S): S {
-    return this.visit(node, seed);
+export class FunctionalVisitor<S = unknown, A = S> {
+  accept(node: Node, seed: S): A {
+    return this.visit(node, seed) as unknown as A;
   }
 
   visit(node: Node, seed: S): S {
@@ -305,17 +306,12 @@ function dotId(node: Node): number {
   return id;
 }
 
-export class Dot extends FunctionalVisitor<DotSeed> {
+export class Dot extends FunctionalVisitor<DotSeed, string> {
   static readonly INSTANCE = new Dot();
 
-  override accept(node: Node, seed: DotSeed = [[], []]): DotSeed {
+  override accept(node: Node, seed: DotSeed = [[], []]): string {
     super.accept(node, seed);
     const [nodes, edges] = seed;
-    return [nodes, edges];
-  }
-
-  render(node: Node): string {
-    const [nodes, edges] = this.accept(node);
     return `  digraph parse_tree {
     size="8,5"
     node [shape = none];
