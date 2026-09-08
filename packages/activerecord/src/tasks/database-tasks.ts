@@ -39,7 +39,7 @@ function baseClass(): typeof Base {
 export class DatabaseNotSupported extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "DatabaseNotSupported";
+    this.name = "ActiveRecord::Tasks::DatabaseNotSupported";
   }
 }
 

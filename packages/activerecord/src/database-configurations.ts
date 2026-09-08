@@ -12,7 +12,7 @@ import { UrlConfig } from "./database-configurations/url-config.js";
 export class InvalidConfigurationError extends Error {
   constructor(message?: string) {
     super(message);
-    this.name = "InvalidConfigurationError";
+    this.name = "ActiveRecord::DatabaseConfigurations::InvalidConfigurationError";
   }
 }
 

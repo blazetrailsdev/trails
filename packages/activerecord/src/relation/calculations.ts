@@ -121,7 +121,6 @@ interface CalculationRelation {
     block: (relation: CalculationRelation, joinDependency: JoinDependency) => R | Promise<R>,
   ): Promise<R>;
   calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
-  _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
   loaded: boolean;
   /** @internal */
@@ -778,7 +777,6 @@ export async function executeSimpleCalculation(
     );
     [sql, binds] = compileManagerWithBinds(rel, queryBuilder);
   } else {
-    rel._checkEagerLoadable();
     let joined = rel;
     if (rel.isEagerLoading) {
       await rel.applyJoinDependency({ eagerLoading: rel.groupValues.length === 0 }, (r) => {
@@ -844,7 +842,6 @@ export async function executeGroupedCalculation(
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
   columnName = aggregateTarget(columnName);
-  rel._checkEagerLoadable();
   let groupFields: unknown[] = rel.groupValues;
   if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
   let association: any = null;

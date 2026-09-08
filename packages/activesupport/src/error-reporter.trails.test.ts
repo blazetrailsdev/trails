@@ -36,3 +36,43 @@ describe("ErrorReporter constructor binding", () => {
     expect(second.events.length).toBe(1);
   });
 });
+
+describe("UnexpectedError is above the default rescue", () => {
+  it("surfaces out of an enclosing handle under debugMode", () => {
+    const subscriber = new ErrorSubscriber();
+    const reporter = new ErrorReporter(subscriber);
+    reporter.debugMode = true;
+
+    expect(() =>
+      reporter.handle(() => {
+        reporter.unexpected("boom");
+      }),
+    ).toThrow(ErrorReporter.UnexpectedError);
+    expect(subscriber.events.length).toBe(0);
+  });
+
+  it("surfaces out of an enclosing record under debugMode", () => {
+    const subscriber = new ErrorSubscriber();
+    const reporter = new ErrorReporter(subscriber);
+    reporter.debugMode = true;
+
+    expect(() =>
+      reporter.record(() => {
+        reporter.unexpected("boom");
+      }),
+    ).toThrow(ErrorReporter.UnexpectedError);
+    expect(subscriber.events.length).toBe(0);
+  });
+
+  it("is still rescued when passed explicitly", () => {
+    const subscriber = new ErrorSubscriber();
+    const reporter = new ErrorReporter(subscriber);
+    reporter.debugMode = true;
+
+    reporter.handle(ErrorReporter.UnexpectedError, () => {
+      reporter.unexpected("boom");
+    });
+
+    expect(subscriber.events.length).toBe(1);
+  });
+});

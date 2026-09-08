@@ -3,49 +3,49 @@ export { NotImplementedError } from "@blazetrails/ruby-compat";
 export class ActiveRecordError extends Error {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "ActiveRecordError";
+    this.name = "ActiveRecord::ActiveRecordError";
   }
 }
 
 export class SubclassNotFound extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "SubclassNotFound";
+    this.name = "ActiveRecord::SubclassNotFound";
   }
 }
 
 export class AssociationTypeMismatch extends ActiveRecordError {
   constructor(expected: string, actual: string) {
     super(`${expected} expected, got ${actual}`);
-    this.name = "AssociationTypeMismatch";
+    this.name = "ActiveRecord::AssociationTypeMismatch";
   }
 }
 
 export class SerializationTypeMismatch extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "SerializationTypeMismatch";
+    this.name = "ActiveRecord::SerializationTypeMismatch";
   }
 }
 
 export class AdapterNotSpecified extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "AdapterNotSpecified";
+    this.name = "ActiveRecord::AdapterNotSpecified";
   }
 }
 
 export class TableNotSpecified extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "TableNotSpecified";
+    this.name = "ActiveRecord::TableNotSpecified";
   }
 }
 
 export class AdapterNotFound extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "AdapterNotFound";
+    this.name = "ActiveRecord::AdapterNotFound";
   }
 }
 
@@ -58,7 +58,7 @@ export class AdapterError extends ActiveRecordError {
 
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
-    this.name = "AdapterError";
+    this.name = "ActiveRecord::AdapterError";
     this._connectionPool = options?.connectionPool;
   }
 
@@ -76,7 +76,7 @@ export class ConnectionNotEstablished extends AdapterError {
   constructor(message?: string | Error, options?: { connectionPool?: unknown; cause?: unknown }) {
     const cause = options?.cause ?? (message instanceof Error ? message : undefined);
     super(message instanceof Error ? message.message : message, { ...options, cause });
-    this.name = "ConnectionNotEstablished";
+    this.name = "ActiveRecord::ConnectionNotEstablished";
     this._poolSet = options?.connectionPool !== undefined;
   }
 
@@ -92,14 +92,14 @@ export class ConnectionNotEstablished extends AdapterError {
 export class ConnectionTimeoutError extends ConnectionNotEstablished {
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message, options);
-    this.name = "ConnectionTimeoutError";
+    this.name = "ActiveRecord::ConnectionTimeoutError";
   }
 }
 
 export class ExclusiveConnectionTimeoutError extends ConnectionTimeoutError {
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message, options);
-    this.name = "ExclusiveConnectionTimeoutError";
+    this.name = "ActiveRecord::ExclusiveConnectionTimeoutError";
   }
 }
 
@@ -122,7 +122,7 @@ export class ConnectionNotDefined extends ConnectionNotEstablished {
       connectionPool: options?.connectionPool,
       cause: options?.cause,
     });
-    this.name = "ConnectionNotDefined";
+    this.name = "ActiveRecord::ConnectionNotDefined";
     this.connectionName = options?.connectionName;
     this.role = options?.role;
     this.shard = options?.shard;
@@ -132,7 +132,7 @@ export class ConnectionNotDefined extends ConnectionNotEstablished {
 export class DatabaseConnectionError extends ConnectionNotEstablished {
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message ?? "Database connection error", options);
-    this.name = "DatabaseConnectionError";
+    this.name = "ActiveRecord::DatabaseConnectionError";
   }
 
   static hostnameError(hostname: string): DatabaseConnectionError {
@@ -151,7 +151,7 @@ export class DatabaseConnectionError extends ConnectionNotEstablished {
 export class ReadOnlyError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "ReadOnlyError";
+    this.name = "ActiveRecord::ReadOnlyError";
   }
 }
 
@@ -162,7 +162,7 @@ export class RecordNotFound extends ActiveRecordError {
 
   constructor(message?: string, model?: string, primaryKey?: string | string[], id?: unknown) {
     super(message);
-    this.name = "RecordNotFound";
+    this.name = "ActiveRecord::RecordNotFound";
     this.model = model ?? "Record";
     this.primaryKey = primaryKey;
     this.id = id;
@@ -181,7 +181,7 @@ export class RecordNotSaved extends ActiveRecordError {
 
   constructor(message?: string, record?: object) {
     super(message);
-    this.name = "RecordNotSaved";
+    this.name = "ActiveRecord::RecordNotSaved";
     this.record = record;
   }
 }
@@ -191,7 +191,7 @@ export class RecordNotDestroyed extends ActiveRecordError {
 
   constructor(message?: string, record?: object) {
     super(message);
-    this.name = "RecordNotDestroyed";
+    this.name = "ActiveRecord::RecordNotDestroyed";
     this.record = record;
   }
 }
@@ -203,7 +203,7 @@ export class SoleRecordExceeded extends ActiveRecordError {
 
   constructor(record?: { name?: string }) {
     super(`Wanted only one ${record?.name ?? "record"}`);
-    this.name = "SoleRecordExceeded";
+    this.name = "ActiveRecord::SoleRecordExceeded";
     this.record = record;
   }
 }
@@ -218,7 +218,7 @@ export class StatementInvalid extends AdapterError {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, { connectionPool: options?.connectionPool, cause: options?.cause });
-    this.name = "StatementInvalid";
+    this.name = "ActiveRecord::StatementInvalid";
     this.sql = options?.sql;
     this.binds = options?.binds;
     this._querySet = options?.sql != null;
@@ -240,7 +240,7 @@ export class QueryAborted extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "QueryAborted";
+    this.name = "ActiveRecord::QueryAborted";
   }
 }
 
@@ -251,7 +251,7 @@ export class ConnectionFailed extends QueryAborted {
   ) {
     const cause = options?.cause ?? (message instanceof Error ? message : undefined);
     super(message instanceof Error ? message.message : message, { ...options, cause });
-    this.name = "ConnectionFailed";
+    this.name = "ActiveRecord::ConnectionFailed";
   }
 }
 
@@ -261,14 +261,14 @@ export class TransactionRollbackError extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "TransactionRollbackError";
+    this.name = "ActiveRecord::TransactionRollbackError";
   }
 }
 
 export class AsynchronousQueryInsideTransactionError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "AsynchronousQueryInsideTransactionError";
+    this.name = "ActiveRecord::AsynchronousQueryInsideTransactionError";
   }
 }
 
@@ -278,7 +278,7 @@ export class SerializationFailure extends TransactionRollbackError {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "SerializationFailure";
+    this.name = "ActiveRecord::SerializationFailure";
   }
 }
 
@@ -288,7 +288,7 @@ export class Deadlocked extends TransactionRollbackError {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "Deadlocked";
+    this.name = "ActiveRecord::Deadlocked";
   }
 }
 
@@ -298,7 +298,7 @@ export class LockWaitTimeout extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "LockWaitTimeout";
+    this.name = "ActiveRecord::LockWaitTimeout";
   }
 }
 
@@ -308,7 +308,7 @@ export class StatementTimeout extends QueryAborted {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "StatementTimeout";
+    this.name = "ActiveRecord::StatementTimeout";
   }
 }
 
@@ -318,7 +318,7 @@ export class AdapterTimeout extends QueryAborted {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "AdapterTimeout";
+    this.name = "ActiveRecord::AdapterTimeout";
   }
 }
 
@@ -328,7 +328,7 @@ export class QueryCanceled extends QueryAborted {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "QueryCanceled";
+    this.name = "ActiveRecord::QueryCanceled";
   }
 }
 
@@ -338,7 +338,7 @@ export class WrappedDatabaseException extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "WrappedDatabaseException";
+    this.name = "ActiveRecord::WrappedDatabaseException";
   }
 }
 
@@ -348,7 +348,7 @@ export class RecordNotUnique extends WrappedDatabaseException {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "RecordNotUnique";
+    this.name = "ActiveRecord::RecordNotUnique";
   }
 }
 
@@ -358,7 +358,7 @@ export class InvalidForeignKey extends WrappedDatabaseException {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "InvalidForeignKey";
+    this.name = "ActiveRecord::InvalidForeignKey";
   }
 }
 
@@ -435,7 +435,7 @@ export class MismatchedForeignKey extends StatementInvalid {
     }
 
     super(msg, rest);
-    this.name = "MismatchedForeignKey";
+    this.name = "ActiveRecord::MismatchedForeignKey";
     this._originalMessage = originalMessage;
     this._queryParser = queryParser;
     this.fkDetails = {
@@ -471,7 +471,7 @@ export class NotNullViolation extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "NotNullViolation";
+    this.name = "ActiveRecord::NotNullViolation";
   }
 }
 
@@ -481,14 +481,14 @@ export class ValueTooLong extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "ValueTooLong";
+    this.name = "ActiveRecord::ValueTooLong";
   }
 }
 
 export class PreparedStatementInvalid extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "PreparedStatementInvalid";
+    this.name = "ActiveRecord::PreparedStatementInvalid";
   }
 }
 
@@ -498,7 +498,7 @@ export class PreparedStatementCacheExpired extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "PreparedStatementCacheExpired";
+    this.name = "ActiveRecord::PreparedStatementCacheExpired";
   }
 }
 
@@ -508,7 +508,7 @@ export class NoDatabaseError extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message ?? "Database not found", options);
-    this.name = "NoDatabaseError";
+    this.name = "ActiveRecord::NoDatabaseError";
   }
 
   static dbError(dbName: string): NoDatabaseError {
@@ -521,7 +521,7 @@ export class NoDatabaseError extends StatementInvalid {
 export class DatabaseVersionError extends ActiveRecordError {
   constructor(message?: string) {
     super(message ?? "Unknown database version");
-    this.name = "DatabaseVersionError";
+    this.name = "ActiveRecord::DatabaseVersionError";
   }
 }
 
@@ -531,7 +531,7 @@ export class RangeError extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message, options);
-    this.name = "RangeError";
+    this.name = "ActiveRecord::RangeError";
   }
 }
 
@@ -541,7 +541,7 @@ export class DatabaseAlreadyExists extends StatementInvalid {
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
     super(message ?? "Database already exists", options);
-    this.name = "DatabaseAlreadyExists";
+    this.name = "ActiveRecord::DatabaseAlreadyExists";
   }
 }
 
@@ -556,7 +556,7 @@ export class StaleObjectError extends ActiveRecordError {
     } else {
       super("Stale object error.");
     }
-    this.name = "StaleObjectError";
+    this.name = "ActiveRecord::StaleObjectError";
     this.record = record;
     this.attemptedAction = attemptedAction;
   }
@@ -565,35 +565,35 @@ export class StaleObjectError extends ActiveRecordError {
 export class ConfigurationError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "ConfigurationError";
+    this.name = "ActiveRecord::ConfigurationError";
   }
 }
 
 export class ReadOnlyRecord extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "ReadOnlyRecord";
+    this.name = "ActiveRecord::ReadOnlyRecord";
   }
 }
 
 export class StrictLoadingViolationError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "StrictLoadingViolationError";
+    this.name = "ActiveRecord::StrictLoadingViolationError";
   }
 }
 
 export class Rollback extends ActiveRecordError {
   constructor() {
     super("Rollback");
-    this.name = "Rollback";
+    this.name = "ActiveRecord::Rollback";
   }
 }
 
 export class DangerousAttributeError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "DangerousAttributeError";
+    this.name = "ActiveRecord::DangerousAttributeError";
   }
 }
 
@@ -603,7 +603,7 @@ export class AttributeAssignmentError extends ActiveRecordError {
 
   constructor(message?: string, exception?: Error, attribute?: string) {
     super(message, exception ? { cause: exception } : undefined);
-    this.name = "AttributeAssignmentError";
+    this.name = "ActiveRecord::AttributeAssignmentError";
     this.exception = exception;
     this.attribute = attribute;
   }
@@ -612,21 +612,21 @@ export class AttributeAssignmentError extends ActiveRecordError {
 export class TransactionIsolationError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "TransactionIsolationError";
+    this.name = "ActiveRecord::TransactionIsolationError";
   }
 }
 
 export class UnmodifiableRelation extends ActiveRecordError {
   constructor(message = "This relation is unmodifiable", options?: ErrorOptions) {
     super(message, options);
-    this.name = "UnmodifiableRelation";
+    this.name = "ActiveRecord::UnmodifiableRelation";
   }
 }
 
 export class IrreversibleOrderError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "IrreversibleOrderError";
+    this.name = "ActiveRecord::IrreversibleOrderError";
   }
 }
 
@@ -637,7 +637,7 @@ export class UnknownAttributeError extends ActiveRecordError {
   constructor(record: object, attribute: string) {
     const model = record?.constructor?.name ?? "Record";
     super(`unknown attribute '${attribute}' for ${model}.`);
-    this.name = "UnknownAttributeError";
+    this.name = "ActiveModel::UnknownAttributeError";
     this.record = record;
     this.attribute = attribute;
   }
@@ -658,7 +658,7 @@ export class SQLWarning extends AdapterError {
     connectionPool?: unknown,
   ) {
     super(message ?? "SQL Warning", { connectionPool });
-    this.name = "SQLWarning";
+    this.name = "ActiveRecord::SQLWarning";
     this.code = code ?? null;
     this.level = level ?? null;
     this.sql = sql;
@@ -671,7 +671,7 @@ export class UnknownAttributeReference extends ActiveRecordError {
       message ??
         "Dangerous query method (method whose arguments are used as raw SQL) called with non-attribute argument(s)",
     );
-    this.name = "UnknownAttributeReference";
+    this.name = "ActiveRecord::UnknownAttributeReference";
   }
 }
 
@@ -696,7 +696,7 @@ export class UnknownPrimaryKey extends ActiveRecordError {
       msg = "Unknown primary key.";
     }
     super(msg);
-    this.name = "UnknownPrimaryKey";
+    this.name = "ActiveRecord::UnknownPrimaryKey";
     this.model = model ?? null;
   }
 }
@@ -706,7 +706,7 @@ export class MultiparameterAssignmentErrors extends ActiveRecordError {
 
   constructor(errors: Error[] = []) {
     super("Multiparameter assignment errors");
-    this.name = "MultiparameterAssignmentErrors";
+    this.name = "ActiveRecord::MultiparameterAssignmentErrors";
     this.errors = errors;
   }
 }

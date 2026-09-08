@@ -106,7 +106,7 @@ export class EventBuffer {
 export class Canceled extends ActiveRecordError {
   constructor(message = "Canceled") {
     super(message);
-    this.name = "Canceled";
+    this.name = "ActiveRecord::FutureResult::Canceled";
   }
 }
 

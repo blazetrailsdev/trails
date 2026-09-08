@@ -126,14 +126,16 @@ export class TransactionState {
 export class InstrumentationNotStartedError extends ActiveRecordError {
   constructor(message = "Called finish on a transaction that hasn't started") {
     super(message);
-    this.name = "InstrumentationNotStartedError";
+    this.name =
+      "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationNotStartedError";
   }
 }
 
 export class InstrumentationAlreadyStartedError extends ActiveRecordError {
   constructor(message = "Called start on an already started transaction") {
     super(message);
-    this.name = "InstrumentationAlreadyStartedError";
+    this.name =
+      "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationAlreadyStartedError";
   }
 }
 

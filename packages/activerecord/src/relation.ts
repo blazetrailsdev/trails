@@ -700,13 +700,6 @@ export class Relation<T extends Base> {
     return new ExplainProxy(this, options);
   }
 
-  /** @internal */
-  _checkEagerLoadable(): void {
-    if (!this.isEagerLoading) return;
-    const specs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-    new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
-  }
-
   async updateAll(
     updates: Record<string, unknown> | string | [string, ...unknown[]],
   ): Promise<number> {

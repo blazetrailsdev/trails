@@ -39,7 +39,7 @@ export class RecordInvalid extends ActiveRecordError {
       message = "Record invalid";
     }
     super(message);
-    this.name = "RecordInvalid";
+    this.name = "ActiveRecord::RecordInvalid";
     this.record = record;
   }
 }

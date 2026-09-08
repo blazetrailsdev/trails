@@ -144,7 +144,7 @@ export const ActiveRecord = {
         break;
       case "log":
         _dbWarningsAction = (warning) => {
-          let warningMessage = `[ActiveRecord::${warning.name}] ${warning.message}`;
+          let warningMessage = `[${warning.name}] ${warning.message}`;
           if (warning.code) warningMessage += ` (${warning.code})`;
           const logger = getBase().logger as { warn: (msg: string) => void };
           logger.warn(warningMessage);

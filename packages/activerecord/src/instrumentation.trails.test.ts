@@ -25,7 +25,7 @@ describe("Instrumentation exception payload (trails)", () => {
     const failed = payloads.filter((p) => p.exception_object !== undefined);
     expect(failed).toHaveLength(1);
     const [className, message] = failed[0].exception as [string, string];
-    expect(className).toBe("StatementInvalid");
+    expect(className).toBe("ActiveRecord::StatementInvalid");
     expect(message).toMatch(/definitely_not_a_table/);
     expect(failed[0].exception_object).toBeInstanceOf(StatementInvalid);
     expect((failed[0].exception_object as Error).message).toBe(message);

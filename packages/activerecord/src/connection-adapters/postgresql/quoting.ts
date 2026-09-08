@@ -27,7 +27,7 @@ import { rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
     super(msg);
-    this.name = "IntegerOutOf64BitRange";
+    this.name = "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting::IntegerOutOf64BitRange";
   }
 }
 
