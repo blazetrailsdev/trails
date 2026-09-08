@@ -176,13 +176,13 @@ export class Node {
 export class Partial extends Node {}
 
 export class Missing extends Node {
-  override digest(_finder: LookupContext, _: Node[] = []): string {
+  override digest(finder: LookupContext, _: Node[] = []): string {
     return "";
   }
 }
 
 export class Injected extends Node {
-  override digest(_finder: LookupContext, _: Node[] = []): string {
+  override digest(finder: LookupContext, _: Node[] = []): string {
     return this.name;
   }
 }

@@ -4,7 +4,7 @@ import type { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
 
-const IDENTIFIER = "[A-Za-z_][A-Za-z0-9_]*";
+const IDENTIFIER = "[\\p{Alphabetic}_][\\p{Alphabetic}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*";
 
 const VARIABLE_OR_METHOD_CHAIN = `(?:\\$|@{1,2})?(?:${IDENTIFIER}\\.)*(?<dynamic>${IDENTIFIER})`;
 
@@ -20,12 +20,12 @@ export class TSETracker {
 
   static RENDER_ARGUMENTS = new RegExp(
     `^(?:\\s*\\(?\\s*)(?:.*?${PARTIAL_HASH_KEY}|${LAYOUT_HASH_KEY})?(?:${STRING}|${VARIABLE_OR_METHOD_CHAIN})`,
-    "s",
+    "su",
   );
 
   static LAYOUT_DEPENDENCY = new RegExp(
     `^(?:\\s*\\(?\\s*)(?:.*?${LAYOUT_HASH_KEY})(?:${STRING}|${VARIABLE_OR_METHOD_CHAIN})`,
-    "s",
+    "su",
   );
 
   static supportsViewPaths(): boolean {

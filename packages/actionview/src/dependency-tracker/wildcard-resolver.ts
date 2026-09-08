@@ -1,4 +1,5 @@
 import type { PathSet } from "../path-set.js";
+import type { TemplatePath } from "../template-path.js";
 
 /** @internal */
 export class WildcardResolver {
@@ -24,12 +25,17 @@ export class WildcardResolver {
   private resolvedWildcardDependencies(): string[] {
     const prefixes = this.wildcardDependencies.map((query) => query.slice(0, -2));
 
-    const paths = [];
+    const paths: TemplatePath[] = [];
     for (const resolver of this.viewPaths as PathSet) {
       paths.push(...(resolver.allTemplatePaths?.() ?? []));
     }
 
-    return [...new Set(paths)]
+    const uniqPaths = new Map<string, TemplatePath>();
+    for (const path of paths) {
+      if (!uniqPaths.has(path.virtual)) uniqPaths.set(path.virtual, path);
+    }
+
+    return [...uniqPaths.values()]
       .filter((path) => prefixes.includes(path.prefix))
       .map((path) => path.toString())
       .sort();

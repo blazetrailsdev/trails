@@ -56,15 +56,13 @@ interface DigestOptions {
 
 describe("TemplateDigestorTest", () => {
   let templates: Record<string, string>;
-  let resolver: FixtureResolver;
   let _finder: LookupContext;
 
   beforeEach(() => {
     DetailsKey.clear();
     templates = { ...FIXTURES };
-    resolver = new FixtureResolver(templates);
     _finder = new LookupContext();
-    _finder.addResolver(resolver);
+    _finder.addResolver(new FixtureResolver(templates));
   });
 
   function finder(): LookupContext {
@@ -99,14 +97,14 @@ describe("TemplateDigestorTest", () => {
 
   function assertDigestDifference(templateName: string, block: () => void): void {
     const previousDigest = digest(templateName);
-    resolver.clearCache();
+    for (const path of finder().viewPaths) path.clearCache?.();
     finder().digestCache().clear();
 
     block();
 
     expect(digest(templateName), "digest didn't change").not.toBe(previousDigest);
     finder().digestCache().clear();
-    resolver.clearCache();
+    for (const path of finder().viewPaths) path.clearCache?.();
   }
 
   it("top level change reflected", () => {
