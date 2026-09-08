@@ -466,7 +466,7 @@ export interface AbstractAdapter {
       | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
     options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
-  removeConstraint(tableName: string, constraintName: string): Promise<void>;
+  removeConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   /** @internal */
   validColumnDefinitionOptions(): string[];
   updateTableDefinition(tableName: string, base?: unknown): Table;

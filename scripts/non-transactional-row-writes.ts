@@ -84,7 +84,15 @@ export const TRANSACTIONAL_WIRING = [
   "setupAdapterSuite(",
 ];
 
-const NON_BANG_WRITE_PATTERNS = [".create(", ".insert", ".update(", "INSERT INTO", ".save()"];
+const NON_BANG_WRITE_PATTERNS = [
+  ".create(",
+  ".insert",
+  ".update(",
+  "INSERT INTO",
+  ".save()",
+  ".createOrFindBy(",
+  ".firstOrCreate(",
+];
 
 /**
  * The writers whose trails spelling is the Rails bang method with a `Bang`
@@ -92,7 +100,9 @@ const NON_BANG_WRITE_PATTERNS = [".create(", ".insert", ".update(", "INSERT INTO
  * `first_or_create!`. They write exactly the rows their non-bang twins do, and
  * none of them is matched by a non-bang pattern: `.createBang(` does not
  * contain `.create(`. `insert!` / `insert_all!` need no entry, because the
- * paren-less `.insert` already prefixes `.insertBang`.
+ * paren-less `.insert` already prefixes `.insertBang`. Each of these also has a
+ * non-bang entry in {@link NON_BANG_WRITE_PATTERNS}: Rails defines the pairs
+ * together (`relation.rb:174,182,249,264`) and both spellings write the row.
  */
 export const BANG_WRITERS = ["create", "update", "save", "createOrFindBy", "firstOrCreate"];
 

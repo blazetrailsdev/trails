@@ -2,7 +2,7 @@ import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { compactBlank, first, singularize, wrap } from "@blazetrails/activesupport";
-import { OpenSSL, valuesAt } from "@blazetrails/ruby-compat";
+import { OpenSSL, stringDelete, valuesAt } from "@blazetrails/ruby-compat";
 import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -964,7 +964,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const opts = typeof expression === "object" && expression !== null ? expression : options;
     const exclNameToDelete = (
       await this.exclusionConstraintForBang(tableName, { ...opts, expression: expr ?? undefined })
-    ).name!;
+    ).name;
     await this.removeConstraint(tableName, exclNameToDelete);
   }
 
@@ -1082,7 +1082,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         : options;
     const uniqueNameToDelete = (
       await this.uniqueConstraintForBang(tableName, { ...opts, column: column ?? undefined })
-    ).name!;
+    ).name;
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
@@ -1106,7 +1106,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return Promise.all(
       uniqueInfo.toArray().map(async (row) => {
         const r = row;
-        const conkey = String(r.conkey).replace(/[{}]/g, "").split(",").map(Number);
+        const conkey = stringDelete(String(r.conkey), "{}").split(",").map(Number);
         const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
         const nullsNotDistinct = (r.constraintdef as string).startsWith(
           "UNIQUE NULLS NOT DISTINCT",

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { RouteSet } from "./route-set.js";
 
 describe("Resource routing", () => {
@@ -481,13 +482,14 @@ describe("Resource routing", () => {
       }
     });
 
-    it("duplicate named route uses last-write-wins (Rails parity)", () => {
+    it("duplicate explicit route name raises ArgumentError (Rails parity)", () => {
       const routes = new RouteSet();
-      routes.draw((map) => {
-        map.get("/foo", { to: "pages#foo", as: "foo" });
-        map.get("/bar", { to: "pages#bar", as: "foo" });
-      });
-      expect(routes.pathFor("foo", {})).toBe("/bar");
+      expect(() =>
+        routes.draw((map) => {
+          map.get("/foo", { to: "pages#foo", as: "foo" });
+          map.get("/bar", { to: "pages#bar", as: "foo" });
+        }),
+      ).toThrow(ArgumentError);
     });
   });
 });

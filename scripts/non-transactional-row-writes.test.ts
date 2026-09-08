@@ -142,6 +142,21 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(true);
   });
 
+  it("catches a non-bang find-or-create writer", () => {
+    const src = `describe("x", () => {
+  it("writes", async () => {
+    await Book.createOrFindBy({ name: "Emma" });
+    await Book.where({ name: "Emma" }).firstOrCreate();
+  });
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([
+      ".createOrFindBy(",
+      ".firstOrCreate(",
+    ]);
+    expect(isOffender(src)).toBe(true);
+  });
+
   it("catches a raw INSERT INTO in a template literal", () => {
     const src = `describe("x", () => {
   it("inserts", async () => {
