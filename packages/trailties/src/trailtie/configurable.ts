@@ -24,8 +24,9 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
   let parent = Object.getPrototypeOf(subclass) as typeof Trailtie | null;
   while (parent && parent !== Function.prototype && parent !== Object.prototype) {
     if (readOwnState<boolean>(parent, SEALED_KEY) === true) {
+      const superclass = Object.getPrototypeOf(parent) as typeof Trailtie;
       throw new RuntimeError(
-        `You cannot inherit from a ${getRubyClassPath(parent) ?? parent.name} child`,
+        `You cannot inherit from a ${getRubyClassPath(superclass) ?? superclass.name} child`,
       );
     }
     parent = Object.getPrototypeOf(parent) as typeof Trailtie | null;
