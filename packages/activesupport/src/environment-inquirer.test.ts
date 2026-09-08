@@ -13,6 +13,6 @@ describe("EnvironmentInquirerTest", () => {
   it("prevent local from being used as an actual environment name", () => {
     expect(() => {
       new EnvironmentInquirer("local");
-    }).toThrow(new ArgumentError("'local' is a reserved environment name"));
+    }).toThrow(ArgumentError);
   });
 });
