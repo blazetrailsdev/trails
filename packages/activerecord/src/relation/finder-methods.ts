@@ -168,7 +168,6 @@ interface FinderRelation {
   /** @internal */
   readonly isEagerLoading: boolean;
   /** @internal */
-  /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: any) => R | Promise<R>,

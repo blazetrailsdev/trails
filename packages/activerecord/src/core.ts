@@ -684,32 +684,22 @@ function relation(this: CoreHost): any {
 
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   await this.ensureSchemaLoaded();
-  if (ids.length === 0) {
-    throw new RecordNotFound(
-      `Couldn't find ${this.name} without an ID`,
-      this.name,
-      String(this.primaryKey),
-    );
-  }
-  if (
-    ids.length === 1 &&
-    !this.isScopeAttributes() &&
-    this.primaryKey != null &&
-    !this.compositePrimaryKey &&
-    !Array.isArray(ids[0]) &&
-    !StatementCache.unsupportedValue(ids[0])
-  ) {
-    const pk = this.primaryKey as string;
-    const record = await cachedFindBy.call(this, [pk], [ids[0]]);
-    if (record) return record;
-    throw new RecordNotFound(
-      `Couldn't find ${this.name} with '${pk}'=${String(ids[0])}`,
-      this.name,
-      pk,
-      ids[0],
-    );
-  }
-  return this.all().find(...ids);
+  if (ids.length !== 1) return this.all().find(...ids);
+  if (this.primaryKey == null || this.isScopeAttributes()) return this.all().find(...ids);
+
+  const id = ids[0];
+
+  if (StatementCache.unsupportedValue(id)) return this.all().find(...ids);
+
+  const primaryKey = this.primaryKey as string;
+  const record = await cachedFindBy.call(this, [primaryKey], [id]);
+  if (record) return record;
+  throw new RecordNotFound(
+    `Couldn't find ${this.name} with '${primaryKey}'=${String(id)}`,
+    this.name,
+    primaryKey,
+    id,
+  );
 }
 
 export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
