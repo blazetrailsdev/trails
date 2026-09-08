@@ -80,4 +80,11 @@ describe("ActionDispatch::Routing::Route", () => {
     expect(route.match("POST", "/search")).not.toBeNull();
     expect(route.match("DELETE", "/search")).toBeNull();
   });
+
+  it("a permissive constraint does not make an absent required key present", () => {
+    const route = new Route("GET", "/posts/:id", "posts", "show", {
+      constraints: { id: /.*/ },
+    });
+    expect(() => route.pathFor({})).toThrow(/missing required keys: \[:id\]/);
+  });
 });

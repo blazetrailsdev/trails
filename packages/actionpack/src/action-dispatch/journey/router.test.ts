@@ -79,7 +79,7 @@ describe("TestRouter", () => {
 
     const r = list[0];
 
-    expect(String(r.path.spec)).toEqual("/whois/:domain");
+    expect(String(r.path.spec)).toEqual("/whois/:domain(.:format)");
   });
 
   it("required parts verified are anchored", () => {
@@ -138,7 +138,7 @@ describe("TestRouter", () => {
       }
     }).toThrow(UrlGenerationError);
 
-    expect(error!.message).toMatch(/Missing required parameter :id/);
+    expect(error!.message).toMatch(/missing required keys: \[:id\]/);
   });
 
   it("does not include missing keys message", () => {
@@ -155,7 +155,7 @@ describe("TestRouter", () => {
       }
     }).toThrow(UrlGenerationError);
 
-    expect(error!.message).not.toMatch(/Missing required parameter :$/);
+    expect(error!.message).not.toMatch(/missing required keys: \[\]/);
   });
 
   it("x cascade", async () => {
@@ -384,7 +384,7 @@ describe("TestRouter", () => {
       ...missingParameters,
     };
 
-    const message = `Missing required parameter :${missingKey} for route "/:controller/:action/:name"`;
+    const message = `No route matches {:action=>"show", :controller=>"tasks"}, missing required keys: [:${missingKey}]`;
 
     let error: Error | undefined;
     expect(() => {

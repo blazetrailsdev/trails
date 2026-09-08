@@ -650,9 +650,6 @@ export class RouteSet {
   evalBlock(block: DrawCallback): void {
     const mapper = new Mapper(this);
     block(mapper);
-    for (const route of mapper.routes) {
-      this.addRoute(route, route.name);
-    }
     this._journeyRouter = null;
   }
 

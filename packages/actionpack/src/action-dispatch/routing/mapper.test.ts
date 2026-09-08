@@ -125,7 +125,26 @@ describe("Mapper public DSL additions", () => {
 
     await m.draw("external");
 
-    expect(m.routes.map((r) => r.path)).toContain("/external");
+    expect(m.routes.map((r) => r.path)).toContain("/external(.:format)");
+  });
+
+  it("root routes through match_root_route and keeps the bare slash", () => {
+    const m = new Mapper();
+    m.root("pages#home");
+
+    expect(m.routes.map((r) => r.path)).toContain("/");
+    expect(m.routes.find((r) => r.path === "/")!.name).toBe("root");
+  });
+
+  it("root nested in resources does not yet get the resources? scope wrap", () => {
+    const m = new Mapper();
+    m.resources("products", () => {
+      m.root("products#root");
+    });
+    const root = m.routes.find((r) => r.action === "root")!;
+
+    expect(root.path).toBe("/products/:product_id(.:format)");
+    expect(root.name).toBe("product_root");
   });
 
   it("draw raises when the external file is not found", async () => {

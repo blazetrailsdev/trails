@@ -979,7 +979,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(() => routes.pathFor("post")).toThrow(/Missing required parameter/);
+    expect(() => routes.pathFor("post")).toThrow(/missing required keys: \[:id\]/);
   });
 
   it("resource with slugs in ids", () => {

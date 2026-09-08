@@ -26,7 +26,7 @@ export class MissingRoute {
     readonly constraints: Record<string, unknown>,
     readonly missingKeys: readonly string[],
     readonly unmatchedKeys: readonly string[],
-    readonly routes: FormatterHost,
+    readonly routes: FormatterHost | undefined,
     readonly name: string | null,
   ) {}
 
@@ -44,10 +44,10 @@ export class MissingRoute {
     );
     let msg = `No route matches ${rubyInspectHash(sorted)}`;
     if (this.missingKeys.length > 0) {
-      msg += `, missing required keys: ${rubyInspectArray([...this.missingKeys].sort())}`;
+      msg += `, missing required keys: ${rubyInspectSymbolArray([...this.missingKeys].sort())}`;
     }
     if (this.unmatchedKeys.length > 0) {
-      msg += `, possible unmatched constraints: ${rubyInspectArray([...this.unmatchedKeys].sort())}`;
+      msg += `, possible unmatched constraints: ${rubyInspectSymbolArray([...this.unmatchedKeys].sort())}`;
     }
     return msg;
   }
@@ -229,7 +229,8 @@ export class Formatter {
           (missing ??= []).push(key);
         }
       } else {
-        if (!test.test(String(parts[key] ?? ""))) {
+        const v = parts[key];
+        if (v == null || !test.test(String(v))) {
           (missing ??= []).push(key);
         }
       }
@@ -296,6 +297,10 @@ function toS(v: unknown): string {
 function rubyInspectHash(entries: [string, unknown][]): string {
   const parts = entries.map(([k, v]) => `:${k}=>${rubyInspect(v)}`);
   return `{${parts.join(", ")}}`;
+}
+
+function rubyInspectSymbolArray(names: readonly string[]): string {
+  return `[${names.map((name) => `:${name}`).join(", ")}]`;
 }
 
 function rubyInspectArray(arr: readonly unknown[]): string {

@@ -7,7 +7,7 @@ import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 import { Route as JourneyRoute, VerbMatchers, type VerbMatcher } from "../journey/route.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
-import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+import { MissingRoute } from "../journey/formatter.js";
 import { Request } from "../http/request.js";
 import type { Endpoint } from "./endpoint.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -316,18 +316,28 @@ export class Route {
       }
       this._pathRequirements = safeReqs;
     }
-    for (const name of this.requiredParts) {
-      if (!Object.hasOwn(params, name) || params[name] == null) {
-        throw new UrlGenerationError(
-          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
-        );
+    let missingKeys: string[] | null = null;
+    const tests = this._pathRequirements!;
+    for (const key of this.requiredParts) {
+      if (tests[key] == null) {
+        const v = params[key] as unknown;
+        if (v == null || v === false) {
+          (missingKeys ??= []).push(key);
+        }
+      } else {
+        const v = params[key] as unknown;
+        if (v == null || !tests[key].test(String(v))) {
+          (missingKeys ??= []).push(key);
+        }
       }
-      const re = this._pathRequirements![name];
-      if (re && !re.test(String(params[name]))) {
-        throw new UrlGenerationError(
-          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
-        );
-      }
+    }
+    if (missingKeys && missingKeys.length > 0) {
+      const constraintKeys = Object.keys(params);
+      const unmatchedKeys = missingKeys.filter((k) => constraintKeys.includes(k));
+      missingKeys = missingKeys.filter((k) => !unmatchedKeys.includes(k));
+      new MissingRoute(params, missingKeys, unmatchedKeys, undefined, this.name ?? null).path(
+        "pathFor",
+      );
     }
     const emitted = computeEmittedSymbols(this._pathTree, params);
     const hash: Record<string, unknown> = Object.create(null);

@@ -44,6 +44,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 /** @internal */
 interface RouteSetLike {
   namedRoutes?: { get(name: string): unknown };
+  addRoute?(route: Route, name?: string | null): unknown;
   resourcesPathNames?: Record<string, string>;
   drawPaths?: string[];
   defaultUrlOptions?: Record<string, unknown>;
@@ -135,6 +136,27 @@ export interface ConstraintsRequest {
   env: Record<string, unknown>;
 }
 
+/** @internal */
+class Mapping {
+  static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)(?=\n?$)/;
+
+  static normalizePath(path: string, format: boolean | undefined): string {
+    path = Mapper.normalizePath(path);
+
+    if (format === true) {
+      return `${path}.:format`;
+    } else if (Mapping.optionalFormat(path, format)) {
+      return `${path}(.:format)`;
+    } else {
+      return path;
+    }
+  }
+
+  static optionalFormat(path: string, format: boolean | undefined): boolean {
+    return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
+  }
+}
+
 export class Mapper {
   readonly routes: Route[] = [];
   private scopeStack: ScopeFrame[] = [];
@@ -190,13 +212,10 @@ export class Mapper {
     this.addRoute("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  root(to: string): void {
-    const [controller, action] = parseEndpoint(to);
-    this.routes.push(
-      new Route("GET", this.currentPrefix() + "/", controller, action, {
-        name: this.prefixedName("root"),
-      }),
-    );
+  root(path: string, options: RouteOptions = {}): void {
+    options.to = path;
+
+    this.matchRootRoute(options);
   }
 
   resources(
@@ -256,7 +275,7 @@ export class Mapper {
     const editPath = pathNames.edit ?? "edit";
 
     if (allowed.has("index")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", basePath, controller, "index", {
           name: routeName(name),
           constraints,
@@ -265,11 +284,11 @@ export class Mapper {
     }
 
     if (allowed.has("create")) {
-      this.routes.push(new Route("POST", basePath, controller, "create", { constraints }));
+      this.addRouteToSet(new Route("POST", basePath, controller, "create", { constraints }));
     }
 
     if (allowed.has("new")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: routeName(`new_${singular}`),
           constraints,
@@ -305,7 +324,7 @@ export class Mapper {
     }
 
     if (allowed.has("edit")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
           name: shallowName(`edit_${singular}`),
           constraints,
@@ -314,7 +333,7 @@ export class Mapper {
     }
 
     if (allowed.has("show")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
           name: singular !== name ? shallowName(singular) : undefined,
           constraints,
@@ -323,16 +342,16 @@ export class Mapper {
     }
 
     if (allowed.has("update")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
-      this.routes.push(
+      this.addRouteToSet(
         new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
     }
 
     if (allowed.has("destroy")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints }),
       );
     }
@@ -369,7 +388,7 @@ export class Mapper {
     const editPath = pathNames.edit ?? "edit";
 
     if (allowed.has("new")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: routeName(`new_${name}`),
         }),
@@ -377,11 +396,11 @@ export class Mapper {
     }
 
     if (allowed.has("create")) {
-      this.routes.push(new Route("POST", basePath, controller, "create"));
+      this.addRouteToSet(new Route("POST", basePath, controller, "create"));
     }
 
     if (allowed.has("show")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", basePath, controller, "show", {
           name: routeName(name),
         }),
@@ -389,7 +408,7 @@ export class Mapper {
     }
 
     if (allowed.has("edit")) {
-      this.routes.push(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${editPath}`, controller, "edit", {
           name: routeName(`edit_${name}`),
         }),
@@ -397,12 +416,12 @@ export class Mapper {
     }
 
     if (allowed.has("update")) {
-      this.routes.push(new Route("PATCH", basePath, controller, "update"));
-      this.routes.push(new Route("PUT", basePath, controller, "update"));
+      this.addRouteToSet(new Route("PATCH", basePath, controller, "update"));
+      this.addRouteToSet(new Route("PUT", basePath, controller, "update"));
     }
 
     if (allowed.has("destroy")) {
-      this.routes.push(new Route("DELETE", basePath, controller, "destroy"));
+      this.addRouteToSet(new Route("DELETE", basePath, controller, "destroy"));
     }
 
     if (cb) {
@@ -625,17 +644,17 @@ export class Mapper {
     const controller = frame?.resourceController ?? "";
     const editPath = frame?.resourcePathNames?.edit ?? this.actionPath("edit");
     if (actions.includes("edit")) {
-      this.routes.push(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+      this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
     }
     if (actions.includes("show")) {
-      this.routes.push(new Route("GET", memberPath, controller, "show"));
+      this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
     }
     if (actions.includes("update")) {
-      this.routes.push(new Route("PATCH", memberPath, controller, "update"));
-      this.routes.push(new Route("PUT", memberPath, controller, "update"));
+      this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
+      this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
     }
     if (actions.includes("destroy")) {
-      this.routes.push(new Route("DELETE", memberPath, controller, "destroy"));
+      this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
     }
   }
 
@@ -967,7 +986,11 @@ export class Mapper {
 
   private addRoute(verb: string | readonly string[], path: string, options: RouteOptions): void {
     if (options.on !== undefined) assertValidOnOption(options.on);
-    const fullPath = RFC2396_PARSER.escape(this.currentPrefix() + "/" + path.replace(/^\/+/, ""));
+    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+    const fullPath = Mapping.normalizePath(
+      RFC2396_PARSER.escape(this.currentPrefix() + "/" + path.replace(/^\/+/, "")),
+      formatted,
+    );
     const scopeTo = this._scope.get("to") as string | undefined;
     const scopeController = this._scope.get("controller") as string | undefined;
     const scopeAction = this._scope.get("action") as string | undefined;
@@ -1031,7 +1054,7 @@ export class Mapper {
         ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
         : undefined;
 
-    this.routes.push(
+    this.addRouteToSet(
       new Route(verb, fullPath, controller, action, {
         ...options,
         app: toApp ?? options.app,
@@ -1042,6 +1065,12 @@ export class Mapper {
         scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
       }),
     );
+  }
+
+  /** @internal */
+  private addRouteToSet(route: Route): void {
+    this.routes.push(route);
+    this._set?.addRoute?.(route, route.name);
   }
 
   private currentPrefix(): string {
@@ -1287,9 +1316,7 @@ export class Mapper {
 
   /** @internal */
   hasNamedRoute(name: string): boolean {
-    return (
-      this.routes.some((r) => r.name === name) || this._set?.namedRoutes?.get(name) !== undefined
-    );
+    return this._set?.namedRoutes?.get(name) !== undefined;
   }
 
   /** @internal */
