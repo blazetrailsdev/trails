@@ -22,7 +22,7 @@ describe("ActionDispatch::Routing::RouteSet generation", () => {
   it("keeps a trailing part named only by the enclosing scope", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
-      r.scope({ page: "1" } as unknown as Parameters<typeof r.scope>[0], (m) => {
+      r.scope({ page: "1" }, (m) => {
         m.get("/posts(/:page)", { to: "posts#index", as: "posts" });
       });
     });

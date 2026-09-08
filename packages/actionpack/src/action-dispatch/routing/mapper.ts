@@ -1518,6 +1518,7 @@ interface ScopeOptions {
   module?: string;
   shallowPath?: string;
   shallowPrefix?: string;
+  [key: string]: unknown;
 }
 
 interface MountOptions extends RouteOptions {
