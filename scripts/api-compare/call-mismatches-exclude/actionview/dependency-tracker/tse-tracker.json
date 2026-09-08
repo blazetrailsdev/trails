@@ -12,19 +12,5 @@
     "rubyName": "explicit_dependencies",
     "call": "flatten",
     "reason": "String#scan returns nested match arrays that flatten collapses; String#matchAll yields one match object per hit, so the TS body maps the capture directly."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "dependency-tracker/tse-tracker.ts",
-    "rubyName": "render_dependencies",
-    "call": "call",
-    "reason": "Homonym: ERBTracker#render_dependencies (erb_tracker.rb:88-98) is what this body ports, and it makes neither call. The flag comes from RubyTracker#render_dependencies (ruby_tracker.rb:26-34), whose file has no TS counterpart yet, so parity:api falls its methods onto this one. Porting it retires this row: actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "dependency-tracker/tse-tracker.ts",
-    "rubyName": "render_dependencies",
-    "call": "new",
-    "reason": "Homonym: ERBTracker#render_dependencies (erb_tracker.rb:88-98) is what this body ports, and it makes neither call. The flag comes from RubyTracker#render_dependencies (ruby_tracker.rb:26-34), whose file has no TS counterpart yet, so parity:api falls its methods onto this one. Porting it retires this row: actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
   }
 ]

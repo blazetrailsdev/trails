@@ -1841,9 +1841,10 @@ describe("selectMisplacedFile", () => {
       ).toBeNull();
     }
     // Only-shrink registry: `activesupport:deprecation/deprecators.rb` left it
-    // when `deprecation/deprecators.ts` landed, so it is now empty.
+    // when `deprecation/deprecators.ts` landed.
     expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(false);
-    expect(NAME_COLLISION_CLUSTERS.size).toBe(0);
+    expect(NAME_COLLISION_CLUSTERS.has("actionview:dependency_tracker/ruby_tracker.rb")).toBe(true);
+    expect(NAME_COLLISION_CLUSTERS.size).toBe(1);
   });
 
   it("leaves an unregistered bucket's cluster alone", () => {

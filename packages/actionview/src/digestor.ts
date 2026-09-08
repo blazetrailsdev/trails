@@ -154,6 +154,7 @@ export class Node {
           return digest;
         }
       })
+      .flat(Infinity)
       .join("-");
   }
 
