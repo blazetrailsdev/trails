@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import * as Arel from "@blazetrails/arel";
-import { Nodes, Visitors } from "@blazetrails/arel";
+import { Nodes } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { UnknownAttributeError } from "./errors.js";
@@ -540,7 +540,7 @@ export class Builder implements InsertBuilder {
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });
-    return this._visitor().compile(new Nodes.ValuesList(rows));
+    return this._connection.visitor.compile(new Nodes.ValuesList(rows));
   }
 
   conflictTarget(): string {
@@ -584,11 +584,5 @@ export class Builder implements InsertBuilder {
 
   rawUpdateSql(): Nodes.SqlLiteral | undefined {
     return this._insertAll.updateSql;
-  }
-
-  private _visitor(): Visitors.ToSql {
-    const v = this._connection.visitor;
-    if (v) return v;
-    return this._connection.arelVisitor();
   }
 }

@@ -5,59 +5,13 @@ import {
   isBlank,
   pluralize,
 } from "@blazetrails/activesupport";
-import { ArgumentError, IntegerType, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { lookup as arTypeLookup } from "./type.js";
+import { ArgumentError, ValueType, defaultValue } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods, isDangerousAttributeMethod } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 type EnumValue = number | string | boolean | null;
-
-function inferSubtype(values: Iterable<EnumValue>): string {
-  let sawValue = false;
-  let allNumbers = true;
-  let allBooleans = true;
-  for (const v of values) {
-    if (v === null || v === undefined) continue;
-    sawValue = true;
-    if (typeof v !== "number") allNumbers = false;
-    if (typeof v !== "boolean") allBooleans = false;
-  }
-  if (!sawValue) return "integer";
-  if (allNumbers) return "integer";
-  if (allBooleans) return "boolean";
-  return "string";
-}
-
-function subtypeInstance(subtype: string): ValueType<unknown> {
-  try {
-    return arTypeLookup(subtype);
-  } catch {
-    return new IntegerType();
-  }
-}
-
-function enumTypeFrom(
-  name: string,
-  mapping: Record<string, EnumValue>,
-  reflected: ValueType | null,
-  raiseOnInvalidValues: boolean,
-): EnumType {
-  let subtype: ValueType<unknown>;
-  if (reflected instanceof EnumType) {
-    subtype = reflected.subtypeType();
-  } else {
-    const rv = reflected!;
-    subtype = rv.type() == null ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
-  }
-  return new EnumType(
-    name,
-    new HashWithIndifferentAccess<EnumValue>(mapping),
-    subtype,
-    raiseOnInvalidValues,
-  );
-}
 
 /**
  * Register an EnumType in the attribute set and install the label-returning
@@ -92,7 +46,13 @@ export function installEnumAttribute(
           " via `attribute`.",
       );
     }
-    return enumTypeFrom(name, mapping, subtype, raiseOnInvalidValues);
+    if (subtype instanceof EnumType) subtype = subtype.subtypeType();
+    return new EnumType(
+      name,
+      new HashWithIndifferentAccess<EnumValue>(mapping),
+      subtype!,
+      raiseOnInvalidValues,
+    );
   });
 
   Object.defineProperty(klass.prototype, name, {
