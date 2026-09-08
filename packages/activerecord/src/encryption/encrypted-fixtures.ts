@@ -52,7 +52,6 @@ function processPreservedOriginalColumns(
 }
 
 export const EncryptedFixtures: PrependModule = {
-  /** @internal */
   initialize(super_: (...args: unknown[]) => unknown, ...args: never[]): unknown {
     const [fixture, modelClass] = args as unknown as [FixtureRow, FixtureModelClass];
     const host = this as unknown as EncryptedFixtureHost;

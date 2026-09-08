@@ -1738,7 +1738,7 @@ export class AbstractAdapter implements Quoting {
         } catch {
           return false;
         }
-        return stat.isFile() && stat.isExecutable!();
+        return stat.isFile() && stat.isExecutable();
       }),
     );
 

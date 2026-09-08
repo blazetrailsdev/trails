@@ -22,11 +22,11 @@ export interface FsStatResult {
   isFIFO?(): boolean;
   /**
    * Ruby's `File::Stat#executable?` (`vendor/ruby/file.c:2244`
-   * `rb_stat_executable_p`), which is `eaccess(X_OK)` on the named file. Node's
-   * `fs.Stats` carries no such predicate, so the node backend derives it from
-   * `mode` and a backend that cannot answer omits it.
+   * `rb_stat_executable_p`), which is `eaccess(X_OK)` on the named file. Every
+   * Ruby `File::Stat` answers it, so every backend must: node's `fs.Stats`
+   * carries no such predicate and the node backend derives it from `mode`.
    */
-  isExecutable?(): boolean;
+  isExecutable(): boolean;
   size: number;
   atime: Date;
   mtime: Date;

@@ -932,17 +932,13 @@ export class FixtureSet {
 }
 
 export class Fixture {
-  fixture!: FixtureAttrs;
   modelClass!: BaseClass | null;
+  fixture!: FixtureAttrs;
 
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
     this.initialize(fixture, modelClass);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
   initialize(fixture: FixtureAttrs, modelClass: BaseClass | null): void {
     this.fixture = fixture;
     this.modelClass = modelClass;

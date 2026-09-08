@@ -836,6 +836,23 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`ActiveRecord::Fixture#initialize` (fixtures.rb:817-820) is the method " +
+      "`ActiveRecord::Encryption::EncryptedFixtures` prepends onto " +
+      "(encrypted_fixtures.rb:6-11), so in Ruby the module's `initialize` runs " +
+      "first and reaches the class's own through `super`. TypeScript has no " +
+      "expression for that: `prepend()` (packages/ruby-compat/src/prepend.ts) " +
+      "wraps methods on the prototype and cannot wrap a constructor, so the " +
+      "port keeps the Rails name as an `initialize` method the constructor " +
+      "delegates to — the same shape " +
+      "`ActiveSupport::Messages::Rotator#initialize` above already carries. " +
+      "Scoped to fixtures.rb so a real class's `initialize` is still expected " +
+      "to map to a `constructor`.",
+    names: ["initialize"],
+    rubyFiles: ["fixtures.rb", "encryption/encrypted_fixtures.rb"],
+    tsMirrorName: "initialize",
+  },
+  {
+    reason:
       "ActiveSupport::Dependencies (dependencies.rb), " +
       "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
       "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
