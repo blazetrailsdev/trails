@@ -668,8 +668,8 @@ export function _inlinePolymorphicKeys(
       );
     }
   }
-  const scalarOwnerKey = Array.isArray(primaryKey) ? "id" : primaryKey;
-  return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
+  const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+  return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
 }
 
 /** @internal */

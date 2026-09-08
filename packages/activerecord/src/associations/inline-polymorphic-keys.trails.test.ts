@@ -22,4 +22,15 @@ describe("_inlinePolymorphicKeys", () => {
         "You need to explicitly set the query constraints for this association.",
     );
   });
+
+  it("keys a composite-primary-key owner against every primary key column", () => {
+    const pk = ["shard_key", "sharded_id"];
+    const ctor = { name: "ShardedOwner", primaryKey: pk } as unknown as typeof Base;
+    const options = {} as unknown as AssociationOptions;
+
+    expect(_inlinePolymorphicKeys(ctor, options, pk, "imageable_id")).toEqual({
+      fkCols: ["imageable_id"],
+      ownerKeyCols: pk,
+    });
+  });
 });

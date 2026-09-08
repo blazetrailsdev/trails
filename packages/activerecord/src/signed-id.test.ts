@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, registerModel } from "./index.js";
@@ -201,7 +202,7 @@ describe("SignedIdTest", () => {
     (Account as any)._signedIdVerifier = null;
 
     try {
-      expect(() => (account as any).signedId()).toThrow();
+      expect(() => (account as any).signedId()).toThrow(ArgumentError);
     } finally {
       Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
     }
@@ -212,7 +213,7 @@ describe("SignedIdTest", () => {
     (Account as any)._signedIdVerifier = null;
 
     try {
-      expect(() => (account as any).signedId()).toThrow();
+      expect(() => (account as any).signedId()).toThrow(ArgumentError);
     } finally {
       Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
     }

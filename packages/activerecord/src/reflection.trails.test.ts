@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Base, reflectOnAssociation, registerModel } from "./index.js";
 import {
   configureEncryption,
@@ -223,6 +224,17 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(NeMember, "neClubs") as ThroughReflection;
     expect(() => ref.sourceReflectionName()).toThrow(
       "Missing model class NeMembership for the NeMember#neMemberships association.",
+    );
+  });
+});
+
+describe("Reflection.create", () => {
+  it("raises Unsupported Macro for a macro reflection_class_for has no case for", () => {
+    class Widget extends Base {}
+    registerModel(Widget);
+
+    expect(() => create("hasAndBelongsToMany" as never, "gadgets", null, {}, Widget)).toThrow(
+      new RuntimeError("Unsupported Macro: hasAndBelongsToMany"),
     );
   });
 });

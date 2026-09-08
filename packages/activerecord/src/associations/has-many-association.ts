@@ -454,24 +454,6 @@ export function scope(
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
 
-  if (options.as && !reflection) {
-    if (Array.isArray(foreignKey)) {
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        associationPrimaryKey: () => primaryKey,
-        foreignKey,
-      });
-    }
-    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        associationPrimaryKey: () => primaryKey,
-        foreignKey,
-      });
-    }
-  }
   const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
@@ -492,7 +474,23 @@ export function scope(
     rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, assocDef.scope, record, reflection.scope);
   } else {
-    if (Array.isArray(foreignKey)) {
+    if (options.as) {
+      const typeCol = `${underscore(options.as)}_type`;
+      let fkCols: string[];
+      let ownerKeyCols: string[];
+      if (Array.isArray(foreignKey)) {
+        const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+        fkCols = foreignKey;
+        ownerKeyCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
+      } else {
+        ({ fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey));
+      }
+      const conditions: Record<string, unknown> = { [typeCol]: ctor.polymorphicName() };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      rel = _scopeForAssociation(targetModel).where(conditions);
+    } else if (Array.isArray(foreignKey)) {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
@@ -506,19 +504,6 @@ export function scope(
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
         conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
-      }
-      rel = _scopeForAssociation(targetModel).where(conditions);
-    } else if (options.as) {
-      const typeCol = `${underscore(options.as)}_type`;
-      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
-        ctor,
-        options,
-        primaryKey,
-        foreignKey,
-      );
-      const conditions: Record<string, unknown> = { [typeCol]: ctor.polymorphicName() };
-      for (let i = 0; i < fkCols.length; i++) {
-        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
       }
       rel = _scopeForAssociation(targetModel).where(conditions);
     } else {
