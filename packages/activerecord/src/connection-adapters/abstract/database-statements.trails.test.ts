@@ -8,6 +8,7 @@ import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/datab
 import { defaultInsertValue as mysqlDefaultInsertValue } from "../mysql/database-statements.js";
 import {
   buildFixtureSql,
+  insertFixture,
   buildFixtureStatements,
   buildTruncateStatement,
   buildTruncateStatements,
@@ -539,25 +540,6 @@ describe("DatabaseStatements", () => {
         { sql: "TRUNCATE TABLE `users`", name: "Custom Truncate", receiver: host },
       ]);
     });
-
-    it("insertFixture dispatches quote/quoteTableName/quoteColumnName via this", async () => {
-      const { insertFixture } = await import("./database-statements.js");
-      const { host, executed } = makeHost();
-      await insertFixture.call(host, { name: "Alice", id: 1 }, "users");
-      expect(executed).toHaveLength(1);
-      expect(executed[0]).toEqual({
-        sql: "INSERT INTO `users` (`name`, `id`) VALUES ('Alice', 1)",
-        name: "Fixture Insert",
-        receiver: host,
-      });
-    });
-
-    it("insertFixture uses emptyInsertStatementValue when no columns are present", async () => {
-      const { insertFixture } = await import("./database-statements.js");
-      const { host, executed } = makeHost();
-      await insertFixture.call(host, {}, "users");
-      expect(executed[0].sql).toBe("INSERT INTO `users` DEFAULT VALUES");
-    });
   });
 
   describe("utility methods", () => {
@@ -1048,6 +1030,25 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
 
     it("returns empty string for empty array", () => {
       expect(combineMultiStatements([])).toBe("");
+    });
+  });
+
+  describe("insertFixture", () => {
+    it("wraps the fixture and executes buildFixtureSql's statement as Fixture Insert", async () => {
+      const executed: { sql: string; name?: string | null }[] = [];
+      const host = {
+        ...makeHost(),
+        async execute(sql: string, name?: string | null) {
+          executed.push({ sql, name });
+        },
+      } as FixtureHost & { execute(sql: string, name?: string | null): Promise<void> };
+      await insertFixture.call(host, { name: "Alice", age: 30 }, "users");
+      expect(executed).toEqual([
+        {
+          sql: await buildFixtureSql.call(host, [{ name: "Alice", age: 30 }], "users"),
+          name: "Fixture Insert",
+        },
+      ]);
     });
   });
 

@@ -28,6 +28,7 @@ const ROOT = path.resolve(__dirname, "..");
 
 // Kept in sync with the rule's enrollment block in eslint.config.mjs.
 const ENROLLED = [
+  "packages/actionview/src/**/*.test.ts",
   "packages/arel/src/**/*.test.ts",
   "packages/date/src/**/*.test.ts",
   "packages/did-you-mean/src/**/*.test.ts",

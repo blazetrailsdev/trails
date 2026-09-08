@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "insert_fixture",
-    "call": "build_fixture_sql",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "insert_fixture",
-    "call": "wrap",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "last_inserted_id",
     "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."

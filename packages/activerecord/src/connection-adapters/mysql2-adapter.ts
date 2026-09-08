@@ -515,13 +515,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  async beginDbTransaction(): Promise<void> {
-    await this.internalExecute("BEGIN", "TRANSACTION", [], {
-      materializeTransactions: false,
-      allowRetry: true,
-    });
-  }
-
   override isSavepointErrorsInvalidateTransactions(): boolean {
     return true;
   }
@@ -536,15 +529,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  async beginDeferredTransaction(): Promise<void> {
+  async beginDeferredTransaction(): Promise<unknown> {
     return this.beginDbTransaction();
-  }
-
-  async commitDbTransaction(): Promise<void> {
-    await this.internalExecute("COMMIT", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
   }
 
   override async internalExecute(

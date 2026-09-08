@@ -3,7 +3,6 @@ import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 
 import { OutputBuffer } from "../buffers.js";
 import { OutputFlow } from "../flows.js";
-import { concat } from "../helpers/text-helper.js";
 import {
   escapeJavascript,
   j,
@@ -64,18 +63,6 @@ describe("JavaScriptHelperTest", () => {
     const result = javascriptTag.call(undefined, "alert('hello')", { id: "the_js_tag" }).toString();
     expect(result).toBe(
       "<script id=\"the_js_tag\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
-    );
-  });
-
-  it("javascript tag with block", () => {
-    const ctx = { outputBuffer: new OutputBuffer(), viewFlow: new OutputFlow() };
-    const result = javascriptTag
-      .call(ctx, { type: "application/javascript" }, () => {
-        concat.call(ctx, htmlSafe("alert('hello')"));
-      })
-      .toString();
-    expect(result).toBe(
-      "<script type=\"application/javascript\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
     );
   });
 

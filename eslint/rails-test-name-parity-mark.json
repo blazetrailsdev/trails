@@ -1,4 +1,9 @@
 {
+  "packages/actionview/src/buffers.test.ts": 36,
+  "packages/actionview/src/template/sanitize-helper.test.ts": 1,
+  "packages/actionview/src/template/tag-helper.test.ts": 9,
+  "packages/actionview/src/template/text-helper.test.ts": 16,
+  "packages/actionview/src/template/tse-util.test.ts": 5,
   "packages/date/src/test-date-attr.test.ts": 1,
   "packages/date/src/test-date-parse.test.ts": 1,
   "packages/date/src/test-date-strftime.test.ts": 3,

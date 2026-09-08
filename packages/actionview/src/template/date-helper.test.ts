@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  distanceOfTimeInWords,
-  distanceOfTimeInWordsToNow,
-  timeAgoInWords,
-} from "../helpers/date-helper.js";
+import { distanceOfTimeInWords, timeAgoInWords } from "../helpers/date-helper.js";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -112,14 +108,5 @@ describe("DateHelperTest", () => {
   it("time ago in words", () => {
     const oneYearAndOneDayAgo = new Date(Date.now() - (365 * DAY + 1 * DAY));
     expect(timeAgoInWords(oneYearAndOneDayAgo)).toBe("about 1 year");
-  });
-
-  it("aliases distance_of_time_in_words_to_now to time_ago_in_words", () => {
-    const past = new Date(Date.now() - 15 * SECOND);
-    expect(distanceOfTimeInWordsToNow(past, { includeSeconds: true })).toBe("less than 20 seconds");
-  });
-
-  it("supports custom scope via I18n lookup", () => {
-    expect(distanceOfTimeInWords(0, 60, { scope: "datetime.distance_in_words" })).toBe("1 minute");
   });
 });

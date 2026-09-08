@@ -195,7 +195,11 @@ export class ConnectionPoolConfiguration {
     this._threadQueryCaches.deleteStore(contextId);
   }
 
-  checkoutAndVerify(connection: QueryCacheHost): QueryCacheHost {
+  checkoutAndVerify(
+    super_: (connection: QueryCacheHost) => unknown,
+    connection: QueryCacheHost,
+  ): QueryCacheHost {
+    super_(connection);
     if (!connection._queryCache) connection._queryCache = this.queryCache;
     return connection;
   }

@@ -4,6 +4,7 @@ import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import {
   Executor,
   include,
+  prepend,
   initializeIncludedModules,
   type Included,
 } from "@blazetrails/activesupport";
@@ -411,10 +412,7 @@ export class ConnectionPool implements ReapablePool {
         }
         lease.connection = pinned;
       } else {
-        lease.connection = checkoutAndVerify(
-          this,
-          this.acquireConnectionSync(this.checkoutTimeout),
-        );
+        lease.connection = this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout));
       }
     }
     return lease.connection;
@@ -537,7 +535,7 @@ export class ConnectionPool implements ReapablePool {
     checkoutTimeout ??= this.checkoutTimeout;
     const pinned = this._resolvePinnedConnection();
     if (!pinned) {
-      return checkoutAndVerify(this, await this.acquireConnection(checkoutTimeout));
+      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     }
 
     await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
@@ -952,12 +950,26 @@ export class ConnectionPool implements ReapablePool {
   private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
   private adoptConnection = adoptConnection;
   private checkoutNewConnection = checkoutNewConnection;
+
+  private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
+    try {
+      c._runCheckoutCallbacks(() => {
+        c.cleanBang();
+      });
+      return c;
+    } catch (err) {
+      this.remove(c);
+      c.disconnectBang();
+      this._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
+      throw err;
+    }
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
 export interface ConnectionPool extends Omit<
   Included<ConnectionPoolConfiguration>,
-  "_resolvePinnedConnection" | "enableQueryCache" | "disableQueryCache"
+  "_resolvePinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
 > {
   readonly queryCache: Store;
   readonly queryCacheEnabled: boolean;
@@ -966,6 +978,9 @@ export interface ConnectionPool extends Omit<
   disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
 }
 include(ConnectionPool, ConnectionPoolConfiguration);
+prepend(ConnectionPool.prototype, {
+  checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,
+});
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
   const c = conn as Partial<TransactionAwareConnection>;
@@ -1196,28 +1211,4 @@ function checkoutNewConnection(this: Pool): DatabaseAdapter {
     );
   }
   return this.newConnection();
-}
-
-/** @internal */
-function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
-  try {
-    const conn = c as unknown as {
-      cleanBang?: () => void;
-      clean?: () => void;
-      _runCheckoutCallbacks?: (block: () => void) => void;
-    };
-    const cleanBlock = () => {
-      if (typeof conn.cleanBang === "function") conn.cleanBang();
-      else conn.clean?.();
-    };
-    if (typeof conn._runCheckoutCallbacks === "function") conn._runCheckoutCallbacks(cleanBlock);
-    else cleanBlock();
-    pool.checkoutAndVerify(c as unknown as QueryCacheHost);
-    return c;
-  } catch (err) {
-    pool.remove(c);
-    (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
-    pool._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
-    throw err;
-  }
 }
