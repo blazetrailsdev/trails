@@ -47,7 +47,7 @@ export class Digestor {
   }
 
   static logger(): Logger {
-    return (_Base?.logger as Logger | null) ?? NullLogger;
+    return (_Base!.logger as Logger | null) ?? NullLogger;
   }
 
   static tree(
@@ -78,11 +78,11 @@ export class Digestor {
         ));
 
         const deps = DependencyTracker.findDependencies(name, template, finder.viewPaths);
-        const uniqueDeps: Record<string, string> = {};
-        for (const n of deps) {
-          uniqueDeps[n.replace(/\/_/g, "/")] ??= n;
-        }
-        for (const depFile of Object.values(uniqueDeps)) {
+        const uniqDeps: Record<string, true> = {};
+        for (const depFile of deps) {
+          const key = depFile.replace(/\/_/g, "/");
+          if (uniqDeps[key]) continue;
+          uniqDeps[key] = true;
           created.children.push(this.tree(depFile, finder, true, seen));
         }
         return created;
@@ -139,9 +139,7 @@ export class Node {
   }
 
   digest(finder: LookupContext, stack: Node[] = []): string {
-    return Digest.hexdigest(
-      `${this.template?.source ?? ""}-${this.dependencyDigest(finder, stack)}`,
-    );
+    return Digest.hexdigest(`${this.template!.source}-${this.dependencyDigest(finder, stack)}`);
   }
 
   dependencyDigest(finder: LookupContext, stack: Node[]): string {

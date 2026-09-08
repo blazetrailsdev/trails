@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { Base } from "../base.js";
 import { Digestor } from "../digestor.js";
-import { LookupContext } from "../lookup-context.js";
-import { DetailsKey } from "../lookup-context.js";
+import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-
-void Base;
 
 const FIXTURES: Record<string, string> = {
   "comments/_comment.html.tse": "Great story!",
