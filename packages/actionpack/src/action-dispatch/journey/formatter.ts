@@ -205,8 +205,8 @@ export class Formatter {
   private nonRecursive(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
     const routes: [number, Route][] = [];
     const queue: CacheNode[] = [cache];
-    for (let i = 0; i < queue.length; i++) {
-      const c = queue[i];
+    while (queue.length > 0) {
+      const c = queue.shift()!;
       routes.push(...c.routes);
       for (const [k, v] of Object.entries(options)) {
         const key = pairKey(k, v);

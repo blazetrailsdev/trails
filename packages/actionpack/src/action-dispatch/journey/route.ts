@@ -35,10 +35,10 @@ function makeStaticMatcher(verb: Verb): VerbMatcher {
   };
 }
 
-class UnknownVerbMatcher implements VerbMatcher {
+export class Unknown implements VerbMatcher {
   constructor(readonly verb: string) {}
-  call(req: VerbRequest): boolean {
-    return this.verb === req.requestMethod;
+  call(request: VerbRequest): boolean {
+    return this.verb === request.requestMethod;
   }
 }
 
@@ -61,7 +61,7 @@ export const VerbMatchers = {
     const key = typeof verb === "symbol" ? (verb.description ?? "") : verb;
     const found = VERB_MATCHERS.get(key);
     if (found) return found;
-    return new UnknownVerbMatcher(String(verb).replace(/_/g, "-").toUpperCase());
+    return new Unknown(String(verb).replace(/_/g, "-").toUpperCase());
   },
 };
 
@@ -125,7 +125,7 @@ export class Route {
     this._requestMethodMatch = opts.requestMethodMatch ?? [AllVerbMatcher];
     this._requiredDefaults = opts.requiredDefaults ?? [];
     this._pathFormatter = this.path.buildFormatter();
-    this.ast = this.path.spec;
+    this.ast = this.path.ast!.root;
     this.path.ast!.route = this;
   }
 

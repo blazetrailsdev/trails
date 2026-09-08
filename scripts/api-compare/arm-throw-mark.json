@@ -13,12 +13,11 @@
     }
   },
   "actiondispatch": {
-    "total": 8,
+    "total": 7,
     "byFile": {
       "http/param-builder.ts": 1,
       "http/permissions-policy.ts": 1,
       "http/request.ts": 3,
-      "journey/gtg/transition-table.ts": 1,
       "middleware/debug-exceptions.ts": 1,
       "routing/route-set.ts": 1
     }
