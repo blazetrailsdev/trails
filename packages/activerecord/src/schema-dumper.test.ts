@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
@@ -576,13 +577,11 @@ describe("SchemaDumperTest", () => {
         foreignKeys: async (t: string) =>
           t === "books"
             ? [
-                {
-                  fromTable: "books",
-                  toTable: "authors",
+                new ForeignKeyDefinition("books", "authors", {
                   column: "author_id",
                   primaryKey: "id",
                   name: "fk_books_author_id",
-                },
+                }),
               ]
             : [],
       };
@@ -606,13 +605,11 @@ describe("SchemaDumperTest", () => {
       foreignKeys: async (t: string) =>
         t === "books"
           ? [
-              {
-                fromTable: "books",
-                toTable: "authors",
+              new ForeignKeyDefinition("books", "authors", {
                 column: "author_id",
                 primaryKey: "id",
                 name: "fk_books_author_id",
-              },
+              }),
             ]
           : [],
     };

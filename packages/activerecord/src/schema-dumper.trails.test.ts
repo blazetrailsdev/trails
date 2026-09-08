@@ -7,6 +7,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { ValueType } from "@blazetrails/activemodel";
 import { Column } from "./connection-adapters/column.js";
 import { SqlTypeMetadata } from "./connection-adapters/sql-type-metadata.js";
+import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {
   return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }), true, {
@@ -214,13 +215,11 @@ describe("SchemaDumper trails-only cases", () => {
       columns: async (_t: string) => [column("id", "integer")],
       indexes: async () => [],
       foreignKeys: async () => [
-        {
-          fromTable: "books",
-          toTable: "authors",
+        new ForeignKeyDefinition("books", "authors", {
           column: "author_id",
           primaryKey: "id",
           name: fkName,
-        },
+        }),
       ],
     });
     const autoName = "fk_rails_abc123def4";
