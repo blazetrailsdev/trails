@@ -1,16 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.loadAdditionalTypes();
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leasePgAdapter();
   });
 
   describe("PostgresqlTypeLookupTest", () => {

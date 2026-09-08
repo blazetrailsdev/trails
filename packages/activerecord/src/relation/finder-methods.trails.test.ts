@@ -652,7 +652,7 @@ describe("raise_record_not_found_exception! — composite key id rendering", () 
       expect.fail("should have thrown");
     } catch (e) {
       const err = e as RecordNotFound;
-      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=1,2`);
+      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=[[1, 2]]`);
       expect(err.primaryKey).toEqual(["shop_id", "id"]);
     }
   });

@@ -431,6 +431,7 @@ export function raiseRecordNotFoundExceptionBang(
   const name = this.model.name;
   key ??= this.model.primaryKey;
   const keyToS = Array.isArray(key) ? rubyInspectArray(key) : key;
+  const idsToS = Array.isArray(ids) ? rubyInspectArray(ids) : ids;
 
   if (ids === undefined || ids === null) {
     throw new RecordNotFound(
@@ -443,7 +444,7 @@ export function raiseRecordNotFoundExceptionBang(
   const wrapped = wrap(ids);
   if (wrapped.length === 1) {
     throw new RecordNotFound(
-      `Couldn't find ${name} with '${keyToS}'=${ids}${conditions}`,
+      `Couldn't find ${name} with '${keyToS}'=${idsToS}${conditions}`,
       name,
       key,
       ids,
