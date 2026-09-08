@@ -1,7 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { ActiveRecord } from "../ar-config.js";
 import { File } from "@blazetrails/ruby-compat";
 import { setTrailsRoot, trailsRoot } from "@blazetrails/activesupport";
+import { AbstractAdapter } from "./abstract-adapter.js";
 import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
@@ -10,6 +11,19 @@ import type { DatabaseConfigOptions } from "../database-configurations/database-
 
 const dbConfig = (hash: Record<string, unknown>): HashConfig =>
   new HashConfig("test", "primary", hash as DatabaseConfigOptions);
+
+beforeEach(() => {
+  vi.spyOn(AbstractAdapter, "findCmdAndExec").mockImplementation(
+    (commands: string | string[], ...args: string[]) => [
+      Array.isArray(commands) ? commands[0] : commands,
+      ...args,
+    ],
+  );
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("AbstractMysqlAdapter.dbconsole option keys", () => {
   const config = dbConfig({

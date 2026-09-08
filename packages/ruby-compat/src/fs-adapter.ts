@@ -20,6 +20,13 @@ export interface FsStatResult {
   isBlockDevice?(): boolean;
   isSocket?(): boolean;
   isFIFO?(): boolean;
+  /**
+   * Ruby's `File::Stat#executable?` (`vendor/ruby/file.c:2244`
+   * `rb_stat_executable_p`), which is `eaccess(X_OK)` on the named file. Node's
+   * `fs.Stats` carries no such predicate, so the node backend derives it from
+   * `mode` and a backend that cannot answer omits it.
+   */
+  isExecutable?(): boolean;
   size: number;
   atime: Date;
   mtime: Date;
@@ -250,7 +257,10 @@ function tryAutoRegisterNode(): boolean {
       readdir(path: string): Promise<string[]>;
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
     };
+    const withExecutable = (stat: FsStatResult): FsStatResult =>
+      Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
     const fs: FsAdapter = Object.assign({}, nodeFs, {
+      statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
       cwd: () => proc.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(
@@ -261,7 +271,7 @@ function tryAutoRegisterNode(): boolean {
             throw error;
           },
         ),
-      stat: (p: string) => fsPromises.stat(p),
+      stat: (p: string) => fsPromises.stat(p).then(withExecutable),
       lstat: (p: string) => fsPromises.lstat(p),
       readFile: (p: string, enc?: string) =>
         enc ? fsPromises.readFile(p, enc) : fsPromises.readFile(p),

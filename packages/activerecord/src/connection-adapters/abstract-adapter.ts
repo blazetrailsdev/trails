@@ -22,7 +22,14 @@ import {
   Notifications,
   NullLock,
 } from "@blazetrails/activesupport";
-import { Process, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Process,
+  RbConfig,
+  abort,
+  env,
+  rbObjAsString as toS,
+} from "@blazetrails/ruby-compat";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 
@@ -1710,17 +1717,36 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @missingRailsCall exec — PERMANENT
-   * @missingRailsCall split — PERMANENT
    * @missingRailsCall empty? — PERMANENT
    */
   static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
-    const cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
-    if (cmds.length === 0) {
-      throw new Error(
-        `Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`,
-      );
+    let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
+
+    const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
+    const ext = RbConfig.CONFIG["EXEEXT"];
+    if (ext !== "") {
+      cmds = cmds.map((cmd) => `${cmd}${ext}`);
     }
-    return [cmds[0], ...args];
+
+    let fullPathCommand: string | null = null;
+    const found = cmds.find((cmd) =>
+      dirsOnPath.find((path) => {
+        fullPathCommand = File.join(path, cmd);
+        let stat;
+        try {
+          stat = File.stat(fullPathCommand);
+        } catch {
+          return false;
+        }
+        return stat.isFile() && stat.isExecutable!();
+      }),
+    );
+
+    if (found != null) {
+      return [fullPathCommand!, ...args];
+    } else {
+      abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
+    }
   }
 
   static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
