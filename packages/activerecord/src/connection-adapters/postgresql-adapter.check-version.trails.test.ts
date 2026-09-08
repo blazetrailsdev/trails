@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NullLock } from "@blazetrails/activesupport";
 
 describe("PostgreSQLAdapter#checkVersion", () => {
   it("raises when the warmed version is too old", async () => {
@@ -8,6 +9,7 @@ describe("PostgreSQLAdapter#checkVersion", () => {
       typeof PostgreSQLAdapter
     >;
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     (adapter as unknown as { getDatabaseVersion: () => number }).getDatabaseVersion = () => 90_2_00;
     await expect(adapter.checkVersion()).rejects.toThrow(
       "Your version of PostgreSQL (90200) is too old. Active Record supports PostgreSQL >= 9.3.",
@@ -21,6 +23,7 @@ describe("PostgreSQLAdapter#checkVersion", () => {
       typeof PostgreSQLAdapter
     >;
     adapter.pool = new NullPool();
+    adapter.lock = NullLock;
     (adapter as unknown as { getDatabaseVersion: () => number }).getDatabaseVersion = () => 9_03_00;
     await expect(adapter.checkVersion()).resolves.toBeUndefined();
   });
