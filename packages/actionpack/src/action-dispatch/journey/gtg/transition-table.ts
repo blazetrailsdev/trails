@@ -1,9 +1,11 @@
 import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
-import { ArgumentError, getChildProcess, rbObjClass } from "@blazetrails/ruby-compat";
+import { Base, Template, TseHandler } from "@blazetrails/actionview";
+import { ArgumentError, File, getChildProcess, rbObjClass } from "@blazetrails/ruby-compat";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
-import { renderVisualizer } from "../visualizer.js";
 import type { GtgState, TransitionTableLike } from "./simulator.js";
+
+const __dir__ = new URL(".", import.meta.url).pathname;
 
 export type Edge = string | RegExp;
 
@@ -203,28 +205,47 @@ export class TransitionTable implements TransitionTableLike, DotHost {
       .replace(/height="[^"]*"/, "");
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   visualizer(paths: readonly Node[], title = "FSM"): string {
-    const sampled = sample(paths, 3);
-    const funRoutes = sampled.map((ast) => {
+    const vizDir = File.join(__dir__, "..", "visualizer");
+    const fsmJs = File.read(File.join(vizDir, "fsm.js"));
+    const fsmCss = File.read(File.join(vizDir, "fsm.css"));
+    const tse = File.read(File.join(vizDir, "index.html.tse"));
+    const states = `function tt() { return ${this.toJSON()}; }`;
+
+    const funRoutes = sample(paths, 3).map((ast) => {
       const out: string[] = [];
-      for (const node of ast) {
-        if (node instanceof SymbolNode) {
-          if (node.left === ":id") out.push(String(Math.floor(Math.random() * 100)));
-          else if (node.left === ":format") out.push(Math.random() < 0.5 ? "xml" : "json");
+      for (const n of ast) {
+        if (n instanceof SymbolNode) {
+          if (n.left === ":id") out.push(String(Math.floor(Math.random() * 100)));
+          else if (n.left === ":format") out.push(sample(["xml", "json"], 1)[0]);
           else out.push("omg");
-        } else if (node instanceof Terminal) {
-          const sym = node.symbol;
+        } else if (n instanceof Terminal) {
+          const sym = n.symbol;
           if (typeof sym === "string") out.push(sym);
         }
       }
       return out.join("");
     });
-    return renderVisualizer({
+
+    const stylesheets = [fsmCss];
+    const svg = this.toSvg();
+    const javascripts = [states, fsmJs];
+
+    const template = new Template({
+      source: tse,
+      identifier: File.join(vizDir, "index.html.tse"),
+      handler: new TseHandler(),
+      format: "html",
+      locals: ["title", "funRoutes", "stylesheets", "svg", "javascripts", "paths"],
+    });
+    return template.render(Base.withEmptyTemplateCache().empty(), {
       title,
-      states: `function tt() { return ${this.toJSON()}; }`,
-      svg: this.toSvg(),
       funRoutes,
-      paths: paths.map((p) => p.toString()),
+      stylesheets,
+      svg,
+      javascripts,
+      paths,
     });
   }
 

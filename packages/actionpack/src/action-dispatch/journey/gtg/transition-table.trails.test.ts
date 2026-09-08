@@ -96,3 +96,14 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — toJSON structure", (
     expect(sim.memos("/bar", () => []).length).toBeGreaterThan(0);
   });
 });
+
+describe("ActionDispatch::Journey::GTG::TransitionTable — visualizer", () => {
+  it("renders index.html.tse with the fsm.css and fsm.js shipped beside it", () => {
+    const html = tt(["/articles(.:format)"]).visualizer(asts(["/articles(.:format)"]), "FSM");
+    expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
+    expect(html).toContain("<title>FSM</title>");
+    expect(html).toContain('font-family: "Helvetica Neue"');
+    expect(html).toContain("function tt() { return ");
+    expect(html).toContain("function reset_graph()");
+  });
+});
