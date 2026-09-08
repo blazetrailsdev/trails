@@ -2699,7 +2699,7 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
-(PostgreSQLAdapter.prototype as any).execute = pgExecute;
+PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;
 (PostgreSQLAdapter.prototype as any).beginDbTransaction = pgBeginDbTransaction;
 (PostgreSQLAdapter.prototype as any).beginIsolatedDbTransaction = pgBeginIsolatedDbTransaction;
