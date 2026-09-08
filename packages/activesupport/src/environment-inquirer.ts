@@ -7,7 +7,7 @@ export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
 export const LOCAL_ENVIRONMENTS = ["development", "test"];
 
 export class EnvironmentInquirer extends StringInquirer {
-  private local: boolean;
+  #local: boolean;
 
   constructor(env: string) {
     if (env === "local") throw new ArgumentError("'local' is a reserved environment name");
@@ -18,11 +18,11 @@ export class EnvironmentInquirer extends StringInquirer {
       (this as unknown as Record<string, boolean>)[defaultEnv] = env === defaultEnv;
     }
 
-    this.local = isIn(env, LOCAL_ENVIRONMENTS);
+    this.#local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
   "local?"(): boolean {
-    return this.local;
+    return this.#local;
   }
 }
 
