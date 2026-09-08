@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
-import { RoutingError } from "../../action-controller/metal/exceptions.js";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
@@ -90,7 +89,9 @@ describe("RouteDispatcher", () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/x/:action", { defaults: { controller: "posts" } }));
 
-    await expect(routes.serve(makeReq("/x/index"))).rejects.toThrow(RoutingError);
+    await expect(routes.serve(makeReq("/x/index"))).rejects.toThrow(
+      /uninitialized constant PostsController/,
+    );
   });
 
   it("returns 404 X-Cascade when no route matches", async () => {

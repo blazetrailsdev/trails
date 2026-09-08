@@ -13,7 +13,7 @@ import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { underscore } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fetch } from "@blazetrails/ruby-compat";
 
@@ -818,7 +818,10 @@ export class Mapper {
           "Ambiguous route definition. Both :path and the route path were specified as strings.",
         );
       }
-      to = this.getToFromPath(p, to, routeOptions.action);
+      to =
+        typeof to === "string" || to === undefined
+          ? this.getToFromPath(p, to, routeOptions.action)
+          : to;
       this.decomposedMatch(
         p,
         controller,
@@ -861,7 +864,7 @@ export class Mapper {
     controller: string | undefined,
     options: RouteOptions & { on?: string },
     _path: string | undefined,
-    to: string | undefined,
+    to: string | MountableApp | undefined,
     via: string | string[],
     formatted: boolean | undefined,
     anchor: boolean,
@@ -955,12 +958,13 @@ export class Mapper {
 
   private addRoute(verb: string, path: string, options: RouteOptions): void {
     if (options.on !== undefined) assertValidOnOption(options.on);
-    const fullPath = this.currentPrefix() + "/" + path.replace(/^\/+/, "");
+    const fullPath = RFC2396_PARSER.escape(this.currentPrefix() + "/" + path.replace(/^\/+/, ""));
     const scopeTo = this._scope.get("to") as string | undefined;
     const scopeController = this._scope.get("controller") as string | undefined;
     const scopeAction = this._scope.get("action") as string | undefined;
+    const toApp = typeof options.to === "string" ? undefined : options.to;
     const effectiveTo =
-      options.to ??
+      (typeof options.to === "string" ? options.to : undefined) ??
       scopeTo ??
       (scopeController && scopeAction ? `${scopeController}#${scopeAction}` : undefined);
     const effectiveController = options.controller ?? scopeController;
@@ -1016,6 +1020,7 @@ export class Mapper {
     this.routes.push(
       new Route(verb, fullPath, controller, action, {
         ...options,
+        app: toApp ?? options.app,
         name: fullName,
         redirect: redirectTarget,
         redirectEndpoint,

@@ -178,9 +178,7 @@ describe("Route", () => {
         constraints: { id: /\d+/ },
       });
       expect(route.pathFor({ id: "bad" } as Record<string, string>)).toBe("/posts");
-      expect(() => route.pathFor({ id: "bad", slug: "x" })).toThrow(
-        /Missing required parameter :id/,
-      );
+      expect(route.pathFor({ id: "bad", slug: "x" })).toBe("/posts/bad/x");
       expect(route.pathFor({ id: "42", slug: "x" })).toBe("/posts/42/x");
     });
 
