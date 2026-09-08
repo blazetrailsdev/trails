@@ -281,7 +281,7 @@ export class Configuration extends EngineConfiguration {
         this.precompileFilterParameters = true;
         this.domTestingDefaultHtmlVersion = ":html4";
 
-        if (Trails.env.isLocal()) {
+        if (Trails.env["local?"]()) {
           this.logFileSize = 100 * 1024 * 1024;
         }
 
