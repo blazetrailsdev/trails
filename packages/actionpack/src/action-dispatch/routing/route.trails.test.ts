@@ -72,4 +72,12 @@ describe("ActionDispatch::Routing::Route", () => {
     const route = new Route("GET", "/posts", "posts", "index");
     expect(route.ip).toEqual(/(?:)/);
   });
+
+  it("a route built from a multi-verb via answers every listed verb", () => {
+    const route = new Route(["GET", "POST"], "/search", "search", "index");
+    expect(route.verb).toBe("GET|POST");
+    expect(route.match("GET", "/search")).not.toBeNull();
+    expect(route.match("POST", "/search")).not.toBeNull();
+    expect(route.match("DELETE", "/search")).toBeNull();
+  });
 });

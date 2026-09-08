@@ -1,3 +1,4 @@
+import { isPresent } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { InvalidURIError, rbInspect, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
@@ -50,6 +51,10 @@ import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
 
 /** @internal */
+function toS(v: unknown): string {
+  return v == null ? "" : String(v);
+}
+
 function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const ka = Object.keys(a);
   if (ka.length !== Object.keys(b).length) return false;
@@ -750,6 +755,20 @@ export class RouteSet {
       throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
     }
     const parameterizedParts = this.extractParameterizedParts(route, opts, recall);
+
+    const defaults = route.defaults;
+    const requiredParts = route.requiredParts;
+    const parts = [...route.pathParamNames];
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const key = parts[i];
+      const partVal = parameterizedParts[key];
+      if (defaults[key] == null && isPresent(partVal)) break;
+      if (toS(partVal) !== toS(defaults[key])) continue;
+      if (requiredParts.includes(key)) break;
+      delete parameterizedParts[key];
+    }
+
     return route.pathFor(parameterizedParts as Record<string, string | number>);
   }
 
@@ -765,7 +784,11 @@ export class RouteSet {
     let kept = parts.length;
     while (kept > 0) {
       const part = parts[kept - 1];
-      if (Object.hasOwn(options, part) && (options[part] ?? recall[part]) != null) break;
+      if (
+        (Object.hasOwn(options, part) || Object.hasOwn(route.scopeOptions, part)) &&
+        (options[part] ?? recall[part]) != null
+      )
+        break;
       kept--;
     }
     const keysToKeep = new Set<string>([...parts.slice(0, kept), ...route.requiredParts]);

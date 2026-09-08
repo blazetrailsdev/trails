@@ -38,9 +38,7 @@ export function buildJourneyRouter(
     const ast = new Ast(tree, true);
     const requirements = regexpRequirements(r.pathConstraints);
     const pattern = new Pattern(ast, requirements, SEPARATORS, r.anchor);
-    const verb = (r.verb || "").toUpperCase();
-    const requestMethodMatch =
-      !verb || verb === "ALL" ? undefined : [JourneyRoute.verbMatcher(verb)];
+    const requestMethodMatch = r.requestMethodMatch;
     const name = r.name ?? `__r${i}`;
     const app = opts.app?.(r);
     journeyRoutes.addRoute(name, {

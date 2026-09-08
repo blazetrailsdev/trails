@@ -493,6 +493,16 @@ export class Mapper {
         frame.shallowPrefix as string,
       );
     }
+    const leftover: Record<string, unknown> = { ...(options as Record<string, unknown>) };
+    for (const option of this._scope.options()) {
+      if (option === "options") break;
+      if (option === "blocks") continue;
+      delete leftover[option];
+    }
+    frame.options = this.mergeOptionsScope(
+      this._scope.get("options") as Record<string, unknown> | undefined,
+      leftover,
+    );
     this._scope = this._scope.newChild(frame);
     this.scopeStack.push({
       path: prefix,
@@ -673,9 +683,7 @@ export class Mapper {
         : [options.via]
       : ["ALL"];
 
-    methods.forEach((method, i) => {
-      this.addRoute(method, path, i === 0 ? options : { ...options, as: null, name: null });
-    });
+    this.addRoute(methods, path, options);
   }
 
   options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
@@ -957,7 +965,7 @@ export class Mapper {
     { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
   > = new Map();
 
-  private addRoute(verb: string, path: string, options: RouteOptions): void {
+  private addRoute(verb: string | readonly string[], path: string, options: RouteOptions): void {
     if (options.on !== undefined) assertValidOnOption(options.on);
     const fullPath = RFC2396_PARSER.escape(this.currentPrefix() + "/" + path.replace(/^\/+/, ""));
     const scopeTo = this._scope.get("to") as string | undefined;
@@ -1031,6 +1039,7 @@ export class Mapper {
         redirect: redirectTarget,
         redirectEndpoint,
         defaults: mergedDefaults,
+        scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
       }),
     );
   }
