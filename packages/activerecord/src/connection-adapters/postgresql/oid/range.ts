@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { ArgumentError, Range } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, rbEqual } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;
@@ -147,21 +147,24 @@ export function unquoteRangeBound(value: string): string {
   return value;
 }
 
+const INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);
+
 /** @internal */
 function sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
   return [
-    from === -Infinity && !infiniteFloatRangeCovers(to) ? null : from,
-    to === Infinity && !infiniteFloatRangeCovers(from) ? null : to,
+    rbEqual(from, -Infinity) && !INFINITE_FLOAT_RANGE.cover(to) ? null : from,
+    rbEqual(to, Infinity) && !INFINITE_FLOAT_RANGE.cover(from) ? null : to,
   ];
 }
 
 /** @internal */
 function isInfinity(value: unknown): boolean {
+  const fn = (value as { isInfinite?: unknown })?.isInfinite;
+  if (typeof fn === "function") {
+    const result = (fn as () => unknown).call(value);
+    return result != null && result !== false;
+  }
   return value === Infinity || value === -Infinity;
-}
-
-function infiniteFloatRangeCovers(value: unknown): boolean {
-  return typeof value === "number" && !Number.isNaN(value);
 }
 
 function inspect(value: unknown): string {

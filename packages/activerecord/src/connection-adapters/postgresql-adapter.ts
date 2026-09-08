@@ -68,7 +68,6 @@ import {
 } from "../errors.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { SchemaStatements, type CreateDatabaseOptions } from "./postgresql/schema-statements.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
@@ -1160,18 +1159,6 @@ export class PostgreSQLAdapter
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }
-  }
-
-  async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   static nativeDatabaseTypes(this: typeof PostgreSQLAdapter): NativeDatabaseTypes {
@@ -2716,8 +2703,6 @@ PostgreSQLAdapter.prototype.execute = pgExecute;
   AbstractAdapter.prototype.isWarningIgnored;
 (PostgreSQLAdapter.prototype as any).isWarningIgnored = pgIsWarningIgnored;
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
-
-dirtiesQueryCache(PostgreSQLAdapter, "rollbackToSavepoint");
 
 include(PostgreSQLAdapter, SchemaStatements);
 

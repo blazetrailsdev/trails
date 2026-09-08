@@ -1,4 +1,3 @@
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
   type ColumnType,
   type ColumnOptions,
@@ -87,13 +86,6 @@ export class SchemaCreation {
   /** @internal */
   protected supportsUniqueConstraints(): boolean {
     return this.conn.supportsUniqueConstraints();
-  }
-
-  /** @internal */
-  protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
-    if (isSymbol(o)) return this.conn.quoteColumnName(symbolToS(o));
-    if (typeof o === "string") return o;
-    return o.map((c) => this.conn.quoteColumnName(isSymbol(c) ? symbolToS(c) : c)).join(", ");
   }
 
   /**
@@ -219,7 +211,10 @@ export class SchemaCreation {
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
     if ((await this.supportsIndexInclude()) && index.include != null) {
-      parts.push(`INCLUDE (${await this.quotedIncludeColumns(index.include)})`);
+      const pg = this as unknown as {
+        quotedIncludeColumns(o: string | string[]): Promise<string>;
+      };
+      parts.push(`INCLUDE (${await pg.quotedIncludeColumns(index.include)})`);
     }
     if ((await this.supportsNullsNotDistinct()) && index.nullsNotDistinct)
       parts.push("NULLS NOT DISTINCT");

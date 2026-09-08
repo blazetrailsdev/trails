@@ -27,6 +27,10 @@ const s = () =>
     useForeignKeys: () => true,
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
+    quotedIncludeColumnsForIndex: async (columnNames: string | string[]) =>
+      (typeof columnNames === "string" ? [columnNames] : columnNames)
+        .map((n) => `"${n.replace(/^:/, "")}"`)
+        .join(", "),
     quoteDefaultExpression: (v: unknown) => ` DEFAULT ${typeof v === "string" ? `'${v}'` : v}`,
     typeToSql: (type: string, options: Record<string, unknown> = {}) => {
       if (type === "decimal") {

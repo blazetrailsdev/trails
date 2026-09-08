@@ -1,5 +1,5 @@
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { Notifications } from "@blazetrails/activesupport";
+import { initialize, Notifications } from "@blazetrails/activesupport";
 import {
   toSqlAndBinds,
   arelFromRelation,
@@ -181,24 +181,11 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
 }
 
 export class ConnectionPoolConfiguration {
-  private _threadQueryCaches = new QueryCacheRegistry();
-  private _queryCacheMaxSize: number | null;
-  private _queryCacheVersion = { value: 0 };
-  private _pinnedConnection: () => unknown;
-
-  constructor(queryCache?: unknown, pinnedConnection: () => unknown = () => null) {
-    this._pinnedConnection = pinnedConnection;
-    if (queryCache === 0 || queryCache === false) {
-      this._queryCacheMaxSize = null;
-    } else if (typeof queryCache === "number") {
-      this._queryCacheMaxSize = queryCache;
-    } else if (queryCache == null) {
-      this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
-    } else {
-      this._queryCacheMaxSize = null;
-    }
-    ACTIVE_CACHE_CONFIGS.add(new WeakRef(this));
-  }
+  declare dbConfig: { queryCache?: unknown };
+  declare _threadQueryCaches: QueryCacheRegistry;
+  declare _queryCacheMaxSize: number | null;
+  declare _queryCacheVersion: { value: number };
+  declare _resolvePinnedConnection: () => unknown;
 
   /**
    * @internal
@@ -282,7 +269,7 @@ export class ConnectionPoolConfiguration {
   }
 
   clearQueryCache(): void {
-    if (this._pinnedConnection()) {
+    if (this._resolvePinnedConnection()) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();
@@ -294,6 +281,24 @@ export class ConnectionPoolConfiguration {
     });
   }
 }
+
+(ConnectionPoolConfiguration as unknown as Record<symbol, unknown>)[initialize] = function (
+  this: ConnectionPoolConfiguration,
+): void {
+  this._queryCacheVersion = { value: 0 };
+  this._threadQueryCaches = new QueryCacheRegistry();
+  const queryCache = this.dbConfig?.queryCache;
+  if (queryCache === 0 || queryCache === false) {
+    this._queryCacheMaxSize = null;
+  } else if (typeof queryCache === "number") {
+    this._queryCacheMaxSize = queryCache;
+  } else if (queryCache == null) {
+    this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
+  } else {
+    this._queryCacheMaxSize = null;
+  }
+  ACTIVE_CACHE_CONFIGS.add(new WeakRef(this));
+};
 
 export function queryCache(this: QueryCacheHost): Store | null {
   return this._queryCache;

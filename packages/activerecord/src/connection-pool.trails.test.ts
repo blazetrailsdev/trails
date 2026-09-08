@@ -936,11 +936,8 @@ describe("ConnectionPoolConfiguration query cache", () => {
   describe("execution-context exit eviction", () => {
     it("evicts the per-context Store from _threadQueryCaches when the context exits", async () => {
       const pool = makePool(1);
-      const registry = (
-        pool as unknown as {
-          _cacheConfig: { _threadQueryCaches: { _caches: Map<string, Store> } };
-        }
-      )._cacheConfig._threadQueryCaches;
+      const registry = (pool as unknown as { _threadQueryCaches: { _caches: Map<string, Store> } })
+        ._threadQueryCaches;
 
       let seenSize = -1;
       await withExecutionContext(async () => {

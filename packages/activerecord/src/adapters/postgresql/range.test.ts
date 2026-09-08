@@ -429,6 +429,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((r.begin as BigDecimal).toString("F")).toBe("0.1");
       expect((r.end as BigDecimal).toString("F")).toBe("0.2");
       expect(r.excludeEnd).toBe(false);
+
+      const third = numRange.castValue("[0.1,)")!;
+      expect((third.begin as BigDecimal).toString("F")).toBe("0.1");
+      expect((third.end as BigDecimal).isInfinite()).toBe(1);
+
+      const fourth = numRange.castValue("[,]")!;
+      expect((fourth.begin as BigDecimal).isInfinite()).toBe(-1);
+      expect((fourth.end as BigDecimal).isInfinite()).toBe(1);
     });
 
     it("tsrange values", () => {

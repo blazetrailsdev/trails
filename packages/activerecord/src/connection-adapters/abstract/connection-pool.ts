@@ -1,6 +1,11 @@
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
-import { Executor } from "@blazetrails/activesupport";
+import {
+  Executor,
+  include,
+  initializeIncludedModules,
+  type Included,
+} from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
@@ -217,6 +222,7 @@ export class ExecutorHooks {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `prepend QueryCache::ConnectionPoolConfiguration` (connection_pool.rb:218); the class/interface merge is how `include()` surfaces on the type side.
 export class ConnectionPool implements ReapablePool {
   readonly poolConfig: PoolConfig;
   readonly dbConfig: HashConfig;
@@ -243,7 +249,6 @@ export class ConnectionPool implements ReapablePool {
   private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
   /** @internal */
   private _fixturePin: { connection: DatabaseAdapter; depth: number } | null = null;
-  private _cacheConfig: ConnectionPoolConfiguration;
 
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
@@ -255,14 +260,13 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
-    this._cacheConfig = new ConnectionPoolConfiguration(this.dbConfig.queryCache, () =>
-      this._resolvePinnedConnection(),
-    );
 
     this.asyncExecutor = this.buildAsyncExecutor();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
+
+    initializeIncludedModules(this);
   }
 
   inspect(): string {
@@ -355,41 +359,6 @@ export class ConnectionPool implements ReapablePool {
 
   get migrationContext(): MigrationContext {
     return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
-  }
-
-  get queryCache(): Store {
-    return this._cacheConfig.queryCache;
-  }
-
-  get queryCacheEnabled(): boolean {
-    return this._cacheConfig.queryCacheEnabled;
-  }
-
-  get dirtiesQueryCache(): boolean {
-    return this._cacheConfig.dirtiesQueryCache;
-  }
-
-  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
-    return this._cacheConfig.enableQueryCache(fn);
-  }
-
-  disableQueryCache<T>(
-    fn: () => T | Promise<T>,
-    options: { dirties?: boolean } = {},
-  ): T | Promise<T> {
-    return this._cacheConfig.disableQueryCache(fn, options);
-  }
-
-  enableQueryCacheBang(): void {
-    this._cacheConfig.enableQueryCacheBang();
-  }
-
-  disableQueryCacheBang(): void {
-    this._cacheConfig.disableQueryCacheBang();
-  }
-
-  clearQueryCache(): void {
-    this._cacheConfig.clearQueryCache();
   }
 
   get activeConnection(): DatabaseAdapter | null {
@@ -974,6 +943,19 @@ export class ConnectionPool implements ReapablePool {
   private checkoutNewConnection = checkoutNewConnection;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
+export interface ConnectionPool extends Omit<
+  Included<ConnectionPoolConfiguration>,
+  "_resolvePinnedConnection" | "enableQueryCache" | "disableQueryCache"
+> {
+  readonly queryCache: Store;
+  readonly queryCacheEnabled: boolean;
+  readonly dirtiesQueryCache: boolean;
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
+}
+include(ConnectionPool, ConnectionPoolConfiguration);
+
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
   const c = conn as Partial<TransactionAwareConnection>;
   return (
@@ -1219,7 +1201,7 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
     };
     if (typeof conn._runCheckoutCallbacks === "function") conn._runCheckoutCallbacks(cleanBlock);
     else cleanBlock();
-    pool._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
+    pool.checkoutAndVerify(c as unknown as QueryCacheHost);
     return c;
   } catch (err) {
     pool.remove(c);
