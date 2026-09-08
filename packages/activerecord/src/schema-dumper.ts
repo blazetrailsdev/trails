@@ -1,6 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
-import type { Column as PostgreSQLColumn } from "./connection-adapters/postgresql/column.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -115,6 +114,7 @@ const DSL_HELPER_METHODS = new Set([
   "polygon",
   "circle",
   "virtual",
+  "enum",
 ]);
 
 class AdapterSchemaSource implements SchemaSource {
@@ -498,12 +498,9 @@ export abstract class SchemaDumper {
           Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
         if (this._isDslHelper(type)) {
           tbl.push(`    t.${type}(${JSON.stringify(column.name)}${optStr});`);
-        } else if ((column as Partial<PostgreSQLColumn>).isEnum?.() === true && type === "enum") {
-          tbl.push(`    t.enum(${JSON.stringify(column.name)}${optStr});`);
         } else {
-          const colType = type === "enum" ? (column.sqlType ?? type) : type;
           tbl.push(
-            `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(colType)}${optStr});`,
+            `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(type)}${optStr});`,
           );
         }
       }

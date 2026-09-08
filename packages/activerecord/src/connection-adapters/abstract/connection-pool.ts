@@ -572,6 +572,13 @@ export class ConnectionPool implements ReapablePool {
     return conn;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  seatConnection(conn: DatabaseAdapter): void {
+    this.adoptConnection(conn);
+    if (this._checkedOut.has(conn)) return;
+    this._available?.add(conn);
+  }
+
   checkin(conn: DatabaseAdapter): void {
     if (this._isConnectionPinned(conn)) return;
     this.connectionLease().clear(conn);
