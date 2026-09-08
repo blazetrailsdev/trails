@@ -947,21 +947,13 @@ export class ConnectionPool implements ReapablePool {
   private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
   private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
     try {
-      const conn = c as unknown as {
-        cleanBang?: () => void;
-        clean?: () => void;
-        _runCheckoutCallbacks?: (block: () => void) => void;
-      };
-      const cleanBlock = () => {
-        if (typeof conn.cleanBang === "function") conn.cleanBang();
-        else conn.clean?.();
-      };
-      if (typeof conn._runCheckoutCallbacks === "function") conn._runCheckoutCallbacks(cleanBlock);
-      else cleanBlock();
+      c._runCheckoutCallbacks(() => {
+        c.cleanBang();
+      });
       return c;
     } catch (err) {
       this.remove(c);
-      (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+      c.disconnectBang();
       this._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
       throw err;
     }
@@ -987,7 +979,7 @@ export interface ConnectionPool extends Omit<
 }
 include(ConnectionPool, ConnectionPoolConfiguration);
 prepend(ConnectionPool.prototype, {
-  checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify as never,
+  checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,
 });
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
