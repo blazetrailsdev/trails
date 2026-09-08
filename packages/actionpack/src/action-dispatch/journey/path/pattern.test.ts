@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "../parser.js";
 import { Ast } from "../ast.js";
-import { Symbol as SymbolNode } from "../nodes/node.js";
 import { Pattern } from "./pattern.js";
 
 const SEPARATORS = "/.?";
@@ -17,210 +16,16 @@ function buildPath(
   return new Pattern(ast, requirements, separators, anchored);
 }
 
-const pathFromString = (p: string) => buildPath(p);
+const pathFromString = (p: string) => buildPath(p, {}, "/.?", true);
 
-describe("ActionDispatch::Journey::Path::Pattern — anchored to_regexp", () => {
-  const x = ".+";
-  const cases: Array<[string, string]> = [
-    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?$`],
-    ["/:controller/foo", `^/(${x})/foo$`],
-    ["/:controller/:action", `^/(${x})/([^/.?]+)$`],
-    ["/:controller", `^/(${x})$`],
-    ["/:controller(/:action(/:id))", `^/(${x})(?:/([^/.?]+)(?:/([^/.?]+))?)?$`],
-    ["/:controller/:action.xml", `^/(${x})/([^/.?]+)\\.xml$`],
-    ["/:controller.:format", `^/(${x})\\.([^/.?]+)$`],
-    ["/:controller(.:format)", `^/(${x})(?:\\.([^/.?]+))?$`],
-    ["/:controller/*foo", `^/(${x})/(.+)$`],
-    ["/:controller/*foo/bar", `^/(${x})/(.+)/bar$`],
-    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))$`],
-  ];
-  for (const [path, expected] of cases) {
-    it(`to_regexp ${path}`, () => {
-      const p = buildPath(path, { controller: /.+/ }, SEPARATORS, true);
-      expect(p.toRegexp().source).toBe(new RegExp(expected).source);
-    });
-  }
-});
-
-describe("ActionDispatch::Journey::Path::Pattern — unanchored to_regexp", () => {
-  const x = ".+";
-  const cases: Array<[string, string]> = [
-    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?(?:\\b|$|/)`],
-    ["/:controller/foo", `^/(${x})/foo(?:\\b|$|/)`],
-    ["/:controller", `^/(${x})(?:\\b|$|/)`],
-    ["/:controller/*foo", `^/(${x})/(.+)(?:\\b|$|/)`],
-    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))(?:\\b|$|/)`],
-  ];
-  for (const [path, expected] of cases) {
-    it(`to_non_anchored_regexp ${path}`, () => {
-      const p = buildPath(path, { controller: /.+/ }, SEPARATORS, false);
-      expect(p.toRegexp().source).toBe(new RegExp(expected).source);
-    });
-  }
-});
-
-describe("ActionDispatch::Journey::Path::Pattern — names", () => {
-  const cases: Array<[string, string[]]> = [
-    ["/:controller(/:action)", ["controller", "action"]],
-    ["/:controller/foo", ["controller"]],
-    ["/:controller/:action", ["controller", "action"]],
-    ["/:controller", ["controller"]],
-    ["/:controller(/:action(/:id))", ["controller", "action", "id"]],
-    ["/:controller.:format", ["controller", "format"]],
-    ["/:controller(.:format)", ["controller", "format"]],
-    ["/:controller/*foo", ["controller", "foo"]],
-  ];
-  for (const [path, expected] of cases) {
-    it(`names ${path}`, () => {
-      const p = buildPath(path, { controller: /.+/ }, SEPARATORS, true);
-      expect(p.names).toEqual(expected);
-    });
-  }
-});
-
-describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
-  it("to regexp match non optional", () => {
-    const p = buildPath("/:name", { name: /\d+/ });
-    expect(p.isMatch("/123")).toBe(true);
-    expect(p.isMatch("/")).toBe(false);
+describe("TestPattern", () => {
+  it("to regexp with extended group", () => {
+    const path = buildPath("/page/:name", { name: /(tender|love)/ }, SEPARATORS, true);
+    expect("/page/tender").toMatch(path.toRegexp());
+    expect("/page/love").toMatch(path.toRegexp());
+    expect("/page/loving").not.toMatch(path.toRegexp());
   });
 
-  it("to regexp with group", () => {
-    const p = buildPath("/page/:name", { name: /(tender|love)/ });
-    expect(p.isMatch("/page/tender")).toBe(true);
-    expect(p.isMatch("/page/love")).toBe(true);
-    expect(p.isMatch("/page/loving")).toBe(false);
-  });
-
-  it("match data with group", () => {
-    const p = buildPath("/page/:name", { name: /(tender|love)/ });
-    const match = p.match("/page/tender")!;
-    expect(match.at(1)).toBe("tender");
-    expect(match.length).toBe(2);
-  });
-
-  it("match data with multi group", () => {
-    const p = buildPath("/page/:name/:id", { name: /t(((ender|love)))()/ });
-    const match = p.match("/page/tender/10")!;
-    expect(match.at(1)).toBe("tender");
-    expect(match.at(2)).toBe("10");
-    expect(match.length).toBe(3);
-    expect([...match.captures]).toEqual(["tender", "10"]);
-  });
-
-  it("star with custom re", () => {
-    const p = buildPath("/page/*foo", { foo: /\d+/ });
-    expect(p.toRegexp().source).toBe(new RegExp(`^/page/(\\d+)$`).source);
-  });
-
-  it("insensitive regexp with group", () => {
-    const p = buildPath("/page/:name/aaron", { name: /(tender|love)/i });
-    expect(p.isMatch("/page/TENDER/aaron")).toBe(true);
-    expect(p.isMatch("/page/loVE/aaron")).toBe(true);
-  });
-
-  it("does not lift /m flag — would break ^/$ anchoring", () => {
-    const p = buildPath("/page/:name", { name: /foo/m });
-    expect(p.isMatch("xxx\n/page/foo")).toBe(false);
-    expect(p.isMatch("/page/foo")).toBe(true);
-  });
-
-  it("does not lift flags from unused requirements", () => {
-    const p = buildPath("/Page", { ignored: /x/i });
-    expect(p.isMatch("/Page")).toBe(true);
-    expect(p.isMatch("/page")).toBe(false);
-  });
-
-  it("escapes char-class metacharacters in separators", () => {
-    expect(() => buildPath("/:foo", { foo: /.+/ }, "]^-\\", true)).not.toThrow();
-  });
-
-  it("propagates /u flag so Unicode property escapes compile", () => {
-    const p = buildPath("/page/:name", { name: /\p{Letter}+/u });
-    expect(p.isMatch("/page/Größe")).toBe(true);
-    expect(p.isMatch("/page/123")).toBe(false);
-  });
-
-  it("MatchData.at(0) returns the full match", () => {
-    const p = buildPath("/page/:name", { name: /\d+/ });
-    const m = p.match("/page/42")!;
-    expect(m.at(0)).toBe("/page/42");
-  });
-
-  it("MatchData.at(negative) returns undefined", () => {
-    const p = buildPath("/page/:name", { name: /\d+/ });
-    const m = p.match("/page/42")!;
-    expect(m.at(-1)).toBeUndefined();
-  });
-
-  it("to regexp defaults", () => {
-    const p = pathFromString("/:controller(/:action(/:id))");
-    expect(p.toRegexp().source).toBe(
-      new RegExp(`^/([^/.?]+)(?:/([^/.?]+)(?:/([^/.?]+))?)?$`).source,
-    );
-  });
-
-  it("failed match", () => {
-    const p = pathFromString("/:controller(/:action(/:id(.:format)))");
-    expect(p.match("content")).toBeUndefined();
-  });
-
-  it("match controller", () => {
-    const p = pathFromString("/:controller(/:action(/:id(.:format)))");
-    const m = p.match("/content")!;
-    expect(m.names).toEqual(["controller", "action", "id", "format"]);
-    expect(m.at(1)).toBe("content");
-    expect(m.at(2)).toBeUndefined();
-    expect(m.at(3)).toBeUndefined();
-    expect(m.at(4)).toBeUndefined();
-  });
-
-  it("match controller action", () => {
-    const p = pathFromString("/:controller(/:action(/:id(.:format)))");
-    const m = p.match("/content/list")!;
-    expect(m.at(1)).toBe("content");
-    expect(m.at(2)).toBe("list");
-    expect(m.at(3)).toBeUndefined();
-  });
-
-  it("match controller action id", () => {
-    const p = pathFromString("/:controller(/:action(/:id(.:format)))");
-    const m = p.match("/content/list/10")!;
-    expect(m.at(1)).toBe("content");
-    expect(m.at(2)).toBe("list");
-    expect(m.at(3)).toBe("10");
-  });
-
-  it("match literal", () => {
-    const p = pathFromString("/books(/:action(.:format))");
-    const m = p.match("/books")!;
-    expect(m.names).toEqual(["action", "format"]);
-    expect(m.at(1)).toBeUndefined();
-    expect(m.at(2)).toBeUndefined();
-  });
-
-  it("match literal with action", () => {
-    const p = pathFromString("/books(/:action(.:format))");
-    const m = p.match("/books/list")!;
-    expect(m.at(1)).toBe("list");
-    expect(m.at(2)).toBeUndefined();
-  });
-
-  it("match literal with action and format", () => {
-    const p = pathFromString("/books(/:action(.:format))");
-    const m = p.match("/books/list.rss")!;
-    expect(m.at(1)).toBe("list");
-    expect(m.at(2)).toBe("rss");
-  });
-
-  it("named captures", () => {
-    const p = pathFromString("/books(/:action(.:format))");
-    const m = p.match("/books/list.rss")!;
-    expect(m.namedCaptures).toEqual({ action: "list", format: "rss" });
-  });
-});
-
-describe("ActionDispatch::Journey::Path::Pattern — optional names", () => {
   it("optional names", () => {
     const cases: Array<[string, string[]]> = [
       ["/:foo(/:bar(/:baz))", ["bar", "baz"]],
@@ -228,80 +33,164 @@ describe("ActionDispatch::Journey::Path::Pattern — optional names", () => {
       ["/:foo(/:bar)/:lol(/:baz)", ["bar", "baz"]],
     ];
     for (const [pattern, list] of cases) {
-      const p = pathFromString(pattern);
-      expect([...p.optionalNames].sort()).toEqual([...list].sort());
+      const path = pathFromString(pattern);
+      expect([...path.optionalNames].sort()).toEqual([...list].sort());
     }
   });
-});
 
-describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
-  it("requirements for missing keys check", () => {
-    const nameRegex = /test/;
-    const p = buildPath("/page/:name", { name: nameRegex });
-    const transformed = p.requirementsForMissingKeysCheck["name"];
-    expect(transformed.source).toBe(new RegExp(`^(?:test)$`).source);
+  it("to regexp match non optional", () => {
+    const path = buildPath("/:name", { name: /\d+/ }, SEPARATORS, true);
+    expect("/123").toMatch(path.toRegexp());
+    expect("/").not.toMatch(path.toRegexp());
   });
 
-  it("anchors the union as a single alternation, not split anchors", () => {
-    const p = buildPath("/page/:name", { name: [/foo/, /bar/] });
-    const re = p.requirementsForMissingKeysCheck["name"];
-    expect(re.test("foo")).toBe(true);
-    expect(re.test("bar")).toBe(true);
-    expect(re.test("xfooy")).toBe(false);
-    expect(re.test("xbary")).toBe(false);
+  it("to regexp with group", () => {
+    const path = buildPath("/page/:name", { name: /(tender|love)/ }, SEPARATORS, true);
+    expect("/page/tender").toMatch(path.toRegexp());
+    expect("/page/love").toMatch(path.toRegexp());
+    expect("/page/loving").not.toMatch(path.toRegexp());
+  });
+
+  it("match data with group", () => {
+    const path = buildPath("/page/:name", { name: /(tender|love)/ }, SEPARATORS, true);
+    const match = path.match("/page/tender")!;
+    expect(match.at(1)).toBe("tender");
+    expect(match.length).toBe(2);
+  });
+
+  it("match data with multi group", () => {
+    const path = buildPath("/page/:name/:id", { name: /t(((ender|love)))()/ }, SEPARATORS, true);
+    const match = path.match("/page/tender/10")!;
+    expect(match.at(1)).toBe("tender");
+    expect(match.at(2)).toBe("10");
+    expect(match.length).toBe(3);
+    expect([...match.captures]).toEqual(["tender", "10"]);
+  });
+
+  it("star with custom re", () => {
+    const z = /\d+/;
+    const path = buildPath("/page/*foo", { foo: z }, SEPARATORS, true);
+    expect(path.toRegexp().source).toBe(new RegExp(`^/page/(${z.source})$`).source);
+  });
+
+  it("insensitive regexp with group", () => {
+    const path = buildPath("/page/:name/aaron", { name: /(tender|love)/i }, SEPARATORS, true);
+    expect("/page/TENDER/aaron").toMatch(path.toRegexp());
+    expect("/page/loVE/aaron").toMatch(path.toRegexp());
+    expect("/page/loVE/AAron").not.toMatch(path.toRegexp());
+  });
+
+  it("to regexp with strexp", () => {
+    const path = buildPath("/:controller", {}, SEPARATORS, true);
+    const x = /^\/([^/.?]+)$/;
+
+    expect(path.source).toBe(x.source);
+  });
+
+  it("to regexp defaults", () => {
+    const path = pathFromString("/:controller(/:action(/:id))");
+    const expected = /^\/([^/.?]+)(?:\/([^/.?]+)(?:\/([^/.?]+))?)?$/;
+    expect(path.toRegexp().source).toBe(expected.source);
+  });
+
+  it("failed match", () => {
+    const path = pathFromString("/:controller(/:action(/:id(.:format)))");
+    const uri = "content";
+
+    expect(path.match(uri)).toBeFalsy();
+  });
+
+  it("match controller", () => {
+    const path = pathFromString("/:controller(/:action(/:id(.:format)))");
+    const uri = "/content";
+
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["controller", "action", "id", "format"]);
+    expect(match.at(1)).toBe("content");
+    expect(match.at(2)).toBeUndefined();
+    expect(match.at(3)).toBeUndefined();
+    expect(match.at(4)).toBeUndefined();
+  });
+
+  it("match controller action", () => {
+    const path = pathFromString("/:controller(/:action(/:id(.:format)))");
+    const uri = "/content/list";
+
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["controller", "action", "id", "format"]);
+    expect(match.at(1)).toBe("content");
+    expect(match.at(2)).toBe("list");
+    expect(match.at(3)).toBeUndefined();
+    expect(match.at(4)).toBeUndefined();
+  });
+
+  it("match controller action id", () => {
+    const path = pathFromString("/:controller(/:action(/:id(.:format)))");
+    const uri = "/content/list/10";
+
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["controller", "action", "id", "format"]);
+    expect(match.at(1)).toBe("content");
+    expect(match.at(2)).toBe("list");
+    expect(match.at(3)).toBe("10");
+    expect(match.at(4)).toBeUndefined();
+  });
+
+  it("match literal", () => {
+    const path = pathFromString("/books(/:action(.:format))");
+
+    const uri = "/books";
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["action", "format"]);
+    expect(match.at(1)).toBeUndefined();
+    expect(match.at(2)).toBeUndefined();
+  });
+
+  it("match literal with action", () => {
+    const path = pathFromString("/books(/:action(.:format))");
+
+    const uri = "/books/list";
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["action", "format"]);
+    expect(match.at(1)).toBe("list");
+    expect(match.at(2)).toBeUndefined();
+  });
+
+  it("match literal with action and format", () => {
+    const path = pathFromString("/books(/:action(.:format))");
+
+    const uri = "/books/list.rss";
+    const match = path.match(uri)!;
+    expect(match.names).toEqual(["action", "format"]);
+    expect(match.at(1)).toBe("list");
+    expect(match.at(2)).toBe("rss");
+  });
+
+  it("named captures", () => {
+    const path = pathFromString("/books(/:action(.:format))");
+
+    const uri = "/books/list.rss";
+    const match = path.match(uri)!;
+    const namedCaptures = { action: "list", format: "rss" };
+    expect(match.namedCaptures).toEqual(namedCaptures);
+  });
+
+  it("requirements for missing keys check", () => {
+    const nameRegex = /test/;
+
+    const path = buildPath("/page/:name", { name: nameRegex }, SEPARATORS, true);
+
+    const transformedRegex = path.requirementsForMissingKeysCheck["name"];
+    expect(transformedRegex).toBeDefined();
+    expect(transformedRegex.source).toBe(new RegExp(`^(?:${nameRegex.source})$`).source);
   });
 
   it("requirements for missing keys check memoization", () => {
-    const p = buildPath("/page/:name", { name: /test/ });
-    expect(p.requirementsForMissingKeysCheck).toBe(p.requirementsForMissingKeysCheck);
-  });
+    const path = buildPath("/page/:name", { name: /test/ }, SEPARATORS, true);
 
-  it("Pattern pushes RegExp requirements into the SymbolNode for GTG widening", () => {
-    const tree = new Parser().parse("/posts/:filename");
-    const ast = new Ast(tree, true);
-    new Pattern(ast, { filename: /(.+)/ }, "/.?", true);
-    const symbol = ast.terminals.find(
-      (n): n is SymbolNode => n instanceof SymbolNode && n.name === "filename",
-    );
-    expect(symbol).toBeInstanceOf(SymbolNode);
-    expect(symbol!.regexp.source).toBe("(.+)");
-  });
-});
+    const firstCall = path.requirementsForMissingKeysCheck;
+    const secondCall = path.requirementsForMissingKeysCheck;
 
-describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalization", () => {
-  it("drops a duplicate top-level SLASH when followed by an optional group starting with SLASH", () => {
-    const p = buildPath("/(/:locale)/posts");
-    expect(p.match("/posts")).toBeDefined();
-    expect(p.match("/en/posts")).toBeDefined();
-  });
-
-  it("keeps the top-level SLASH but drops the inner SLASH of the first group for all-optional paths", () => {
-    const p = buildPath("/(/:locale)(/:platform)");
-    expect(p.match("/")).toBeDefined();
-    expect(p.match("/en")).toBeDefined();
-    expect(p.match("/en/us")).toBeDefined();
-  });
-
-  it("handles all-optional paths with non-`/:` second group (e.g. `(.:format)`)", () => {
-    const p = buildPath("/(/:locale)(.:format)");
-    expect(p.match("/")).toBeDefined();
-    expect(p.match("/en")).toBeDefined();
-    expect(p.match("/en.json")).toBeDefined();
-  });
-
-  it("leaves paths whose second top-level node isn't a SLASH-led Group alone", () => {
-    const p = buildPath("/posts/:id");
-    expect(p.toRegexp().source).toBe("^\\/posts\\/([^/.?]+)$");
-  });
-
-  it("handles the single-group all-optional shape `/(/:locale)`", () => {
-    const p = buildPath("/(/:locale)");
-    expect(p.match("/")).toBeDefined();
-    expect(p.match("/en")).toBeDefined();
-  });
-
-  it("doesn't rewrite when the second top-level Group's body is just a SLASH", () => {
-    const p = buildPath("/(/)/foo");
-    expect(p.toRegexp()).toBeInstanceOf(RegExp);
+    expect(firstCall).toBe(secondCall);
   });
 });

@@ -10,9 +10,16 @@ function escapeCharClass(s: string): string {
   return s.replace(/[\]\\^-]/g, "\\$&");
 }
 
+function regexpToS(r: RegExp): string {
+  let scoped = "";
+  if (r.flags.includes("i")) scoped += "i";
+  if (r.flags.includes("s")) scoped += "s";
+  return scoped === "" ? r.source : `(?${scoped}:${r.source})`;
+}
+
 function regexUnion(re: RegExp | RegExp[]): string {
   const arr = Array.isArray(re) ? re : [re];
-  return arr.map((r) => r.source).join("|");
+  return arr.map(regexpToS).join("|");
 }
 
 function combinedFlagsFor(
@@ -26,7 +33,7 @@ function combinedFlagsFor(
     for (const r of arr) for (const f of r.flags) seen.add(f);
   }
   const out: string[] = [];
-  for (const f of "isd") if (seen.has(f)) out.push(f);
+  for (const f of "d") if (seen.has(f)) out.push(f);
   if (!outer && seen.has("m")) out.push("m");
   if (seen.has("v")) out.push("v");
   else if (seen.has("u")) out.push("u");
