@@ -277,11 +277,9 @@ export class Pattern {
     if (this._offsets == null) {
       const offsets: number[] = [0];
 
-      for (const symbolNode of [...this.spec].filter((n) => n.isSymbol())) {
-        const node = symbolNode.toSym();
-
-        if (hasKey(this.requirements, node)) {
-          const reqs = this.requirements[node];
+      for (const node of [...this.spec].filter((n) => n.isSymbol())) {
+        if (hasKey(this.requirements, node.toSym())) {
+          const reqs = this.requirements[node.toSym()];
           const re = new RegExp(
             `(?:${regexUnion(reqs)})|`,
             combinedFlagsFor([reqs], { outer: false }),
