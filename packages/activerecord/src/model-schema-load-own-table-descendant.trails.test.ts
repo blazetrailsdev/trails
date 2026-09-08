@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 import { registerSubclass } from "./inheritance.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
@@ -11,7 +12,7 @@ function col(name: string): Cols[string] {
 }
 
 function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
-  return {
+  return adapterDouble({
     internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: (table: string) => {
@@ -25,7 +26,7 @@ function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
       },
     },
     lookupCastTypeFromColumn: () => defaultValue(),
-  };
+  });
 }
 
 const tables: Record<string, Cols> = {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
 import { registerSubclass } from "./inheritance.js";
 
@@ -18,13 +19,13 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
     columnsHash: async () => columns,
     primaryKeys: async () => null,
   };
-  return {
+  return adapterDouble({
     internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "uuid" ? new UuidType() : null;
     },
-  };
+  });
 }
 
 const own = <T>(host: object, key: string): T | undefined =>

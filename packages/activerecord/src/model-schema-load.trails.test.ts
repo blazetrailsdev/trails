@@ -3,6 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -28,13 +29,13 @@ function makeAdapter(
     getCachedColumnsHash: () => hash,
     isCached: () => true,
   };
-  return {
+  return adapterDouble({
     internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return typeByColumn[column.sqlType] ?? defaultValue();
     },
-  };
+  });
 }
 
 describe("loadSchemaFromAdapter", () => {
@@ -105,11 +106,11 @@ describe("loadSchemaFromAdapter", () => {
       columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       primaryKeys: async () => null,
     };
-    const adapter = {
+    const adapter = adapterDouble({
       internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
-    };
+    });
     (Model as unknown as { adapter: unknown }).adapter = adapter;
 
     await loadSchemaFromAdapter.call(Model);
@@ -124,11 +125,11 @@ describe("loadSchemaFromAdapter", () => {
       primaryKeys: async () => null,
       getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
     };
-    const adapter = {
+    const adapter = adapterDouble({
       internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
-    };
+    });
     (Model as unknown as { adapter: unknown }).adapter = adapter;
 
     await loadSchemaFromAdapter.call(Model);
@@ -144,11 +145,11 @@ describe("loadSchemaFromAdapter", () => {
       primaryKeys: async () => null,
       getCachedColumnsHash: () => mysteryHash,
     };
-    const adapter = {
+    const adapter = adapterDouble({
       internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => defaultValue(),
-    };
+    });
     (Model as unknown as { adapter: unknown }).adapter = adapter;
 
     await loadSchemaFromAdapter.call(Model);

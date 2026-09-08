@@ -9,6 +9,7 @@ import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 import { Range } from "@blazetrails/ruby-compat";
+import { adapterDouble } from "../test-helpers/adapter-double.js";
 
 fixtures({});
 
@@ -88,17 +89,20 @@ describe("TimeZoneConversionTest", () => {
       published_at: { sqlType: "datetime" },
       title: { sqlType: "string" },
     } as Record<string, unknown>;
-    const adapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => cols,
-        getCachedColumnsHash: () => cols,
-        isCached: () => true,
-      },
+    const cache = {
+      dataSourceExists: async () => true,
+      columnsHash: async () => cols,
+      getCachedColumnsHash: () => cols,
+      isCached: () => true,
+      primaryKeys: async () => null,
+    };
+    const adapter = adapterDouble({
+      internalSchemaCache: cache,
+      schemaCache: cache,
       lookupCastTypeFromColumn(col: { sqlType: string }) {
         return col.sqlType === "datetime" ? datetimeType : stringType;
       },
-    };
+    });
     class Post extends Base {
       static {
         this.timeZoneAwareAttributes = true;

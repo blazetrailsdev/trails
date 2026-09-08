@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "../base.js";
+import { adapterDouble } from "../test-helpers/adapter-double.js";
 
 describe("per-instance @primary_key slot", () => {
   it("seats the record's primary key from the class at init_internals", () => {
@@ -31,9 +32,9 @@ describe("per-instance @primary_key slot", () => {
 
     expect((record as unknown as { _primaryKey?: string })._primaryKey).toBe("id");
 
-    (ColdToy as unknown as { adapter: unknown }).adapter = {
+    (ColdToy as unknown as { adapter: unknown }).adapter = adapterDouble({
       internalSchemaCache: { getCachedPrimaryKeys: () => "toy_id" },
-    };
+    });
     const spy = vi.spyOn(
       record as unknown as { _readAttribute(n: string): unknown },
       "_readAttribute",

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 import { loadSchema, reloadSchemaFromCache } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 
@@ -12,7 +13,7 @@ function col(name: string): Cols[string] {
 const columns: Cols = { id: col("id"), title: col("title") };
 
 function makeAdapter(): unknown {
-  return {
+  return adapterDouble({
     internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => undefined,
@@ -20,7 +21,7 @@ function makeAdapter(): unknown {
       columnsHash: async () => columns,
     },
     lookupCastTypeFromColumn: () => defaultValue(),
-  };
+  });
 }
 
 describe("loadSchema — subclass left stale by an ancestor invalidation", () => {
