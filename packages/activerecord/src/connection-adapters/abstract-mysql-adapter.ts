@@ -841,7 +841,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (await this.supportsInsertRawAliasSyntax()) {
       const quotedTableName = insert.model.quotedTableName();
       const valuesAlias = this.quoteTableName(`${parameterize(insert.model.tableName)}_values`);
-      sql = `INSERT ${await insert.into()} AS ${valuesAlias}`;
+      sql = `INSERT ${insert.into()} ${await insert.valuesList()} AS ${valuesAlias}`;
 
       if (insert.skipDuplicates()) {
         if (noOpColumn) {
@@ -850,7 +850,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       } else if (insert.updateDuplicates()) {
         const raw = insert.rawUpdateSql();
         if (raw) {
-          sql = `INSERT ${await insert.into()} ON DUPLICATE KEY UPDATE ${raw.value}`;
+          sql = `INSERT ${insert.into()} ${await insert.valuesList()} ON DUPLICATE KEY UPDATE ${raw.value}`;
         } else {
           sql += " ON DUPLICATE KEY UPDATE ";
           sql += insert.touchModelTimestampsUnless(
@@ -863,7 +863,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         }
       }
     } else {
-      sql = `INSERT ${await insert.into()}`;
+      sql = `INSERT ${insert.into()} ${await insert.valuesList()}`;
 
       if (insert.skipDuplicates()) {
         if (noOpColumn) {

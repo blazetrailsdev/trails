@@ -386,9 +386,8 @@ export class Transaction {
 
   get records(): unknown[] | null {
     if (this._lazyEnrollmentRecords) {
-      if (!this._records) this._records = [];
       for (const value of this._lazyEnrollmentRecords.values()) {
-        this._records.push(value);
+        this._records!.push(value);
       }
       this._lazyEnrollmentRecords = null;
     }

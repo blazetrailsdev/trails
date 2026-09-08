@@ -17,20 +17,47 @@ export function withRoutesHelpers(
 ): (cls: RoutesHelpersControllerClass) => void {
   return (cls) => {
     const namespaceBuilder = findTrailtieUrlHelpers(cls);
-    const mod = namespaceBuilder
-      ? namespaceBuilder(includePathHelpers)
-      : routes.urlHelpers(includePathHelpers);
-    const proto = cls.prototype as Record<string, unknown>;
-    for (const name in mod) {
-      const fn = (mod as Record<string, unknown>)[name];
-      if (typeof fn === "function") proto[name] = fn;
-    }
-    cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
+    const urlHelpersModule = (): HelperMethodsModule =>
+      namespaceBuilder
+        ? namespaceBuilder(includePathHelpers)
+        : routes.urlHelpers(includePathHelpers);
+    const proto = cls.prototype;
+    Object.setPrototypeOf(
+      proto,
+      new Proxy(Object.getPrototypeOf(proto) as object, {
+        get(target, key, receiver) {
+          if (typeof key === "string") {
+            const member = includedMember(urlHelpersModule(), key);
+            if (member !== undefined) return member;
+          }
+          return Reflect.get(target, key, receiver);
+        },
+        has(target, key) {
+          if (typeof key === "string" && includedMember(urlHelpersModule(), key) !== undefined) {
+            return true;
+          }
+          return Reflect.has(target, key);
+        },
+      }),
+    );
+    cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
   };
 }
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
+}
+
+function includedMember(mod: HelperMethodsModule, key: string): unknown {
+  let current: object | null = mod;
+  while (current && current !== Object.prototype) {
+    if (Object.prototype.propertyIsEnumerable.call(current, key)) {
+      const value = (mod as Record<string, unknown>)[key];
+      return typeof value === "function" || key === "_routes" ? value : undefined;
+    }
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return undefined;
 }
 
 function findTrailtieUrlHelpers(

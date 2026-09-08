@@ -1392,7 +1392,7 @@ export class PostgreSQLAdapter
   }
 
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    let sql = `INSERT ${await insert.into()}`;
+    let sql = `INSERT ${insert.into()} ${await insert.valuesList()}`;
 
     if (insert.skipDuplicates()) {
       sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
@@ -1404,7 +1404,7 @@ export class PostgreSQLAdapter
       } else {
         sql += insert.touchModelTimestampsUnless(
           (column) =>
-            `${insert.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
+            `${insert.model.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
         );
         sql += insert
           .updatableColumns()
