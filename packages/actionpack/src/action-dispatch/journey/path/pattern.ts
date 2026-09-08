@@ -10,16 +10,16 @@ function escapeCharClass(s: string): string {
   return s.replace(/[\]\\^-]/g, "\\$&");
 }
 
-function regexpToS(r: RegExp): string {
-  let scoped = "";
-  if (r.flags.includes("i")) scoped += "i";
-  if (r.flags.includes("s")) scoped += "s";
-  return scoped === "" ? r.source : `(?${scoped}:${r.source})`;
-}
-
 function regexUnion(re: RegExp | RegExp[]): string {
   const arr = Array.isArray(re) ? re : [re];
-  return arr.map(regexpToS).join("|");
+  return arr
+    .map((r) => {
+      let scoped = "";
+      if (r.flags.includes("i")) scoped += "i";
+      if (r.flags.includes("s")) scoped += "s";
+      return scoped === "" ? r.source : `(?${scoped}:${r.source})`;
+    })
+    .join("|");
 }
 
 function combinedFlagsFor(
