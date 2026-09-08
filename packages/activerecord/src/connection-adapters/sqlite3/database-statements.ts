@@ -219,12 +219,10 @@ export async function performQuery(
     prepare,
     notificationPayload,
     batch = false,
-    counters,
   }: {
     prepare: boolean;
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
-    counters?: { affectedRows: number; insertRowid: number | bigint };
   },
 ): Promise<Result> {
   const acquired = acquireStatementLock(this);
@@ -264,10 +262,6 @@ export async function performQuery(
   }
   this._lastAffectedRows = affectedRows;
   this._lastInsertRowid = insertRowid;
-  if (counters) {
-    counters.affectedRows = affectedRows;
-    counters.insertRowid = insertRowid;
-  }
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;
   return result;
