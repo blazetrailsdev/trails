@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Scanner, type Token } from "../../scanner.js";
 
 describe("ActionDispatch::Journey::Scanner", () => {
-  const scanner = new Scanner();
+  let scanner: Scanner;
+
+  beforeEach(() => {
+    scanner = new Scanner();
+  });
 
   const CASES: Array<[string, Token[]]> = [
     ["/", ["SLASH"]],
