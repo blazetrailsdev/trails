@@ -44,7 +44,6 @@ function processPreservedOriginalColumns(
       EncryptableRecord.sourceAttributeFromPreservedAttribute(attributeName);
     if (sourceAttributeName !== undefined) {
       const cleanValue = this.cleanValues[sourceAttributeName];
-      if (cleanValue === undefined) continue;
       const type = modelClass!.typeForAttribute(attributeName);
       const encryptedValue = type.serialize(cleanValue);
       fixture[attributeName] = encryptedValue;
