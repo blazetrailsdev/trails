@@ -2525,12 +2525,6 @@ export interface PostgreSQLAdapter {
 
   createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 
-  /** @noRailsEquivalent PERMANENT */
-  createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
-
-  /** @noRailsEquivalent PERMANENT */
-  dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
-
   dropDatabase(name: string): Promise<void>;
 
   recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
@@ -2705,7 +2699,7 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
-(PostgreSQLAdapter.prototype as any).execute = pgExecute;
+PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;
 (PostgreSQLAdapter.prototype as any).beginDbTransaction = pgBeginDbTransaction;
 (PostgreSQLAdapter.prototype as any).beginIsolatedDbTransaction = pgBeginIsolatedDbTransaction;
@@ -2724,7 +2718,6 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
 dirtiesQueryCache(PostgreSQLAdapter, "rollbackToSavepoint");
-dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 include(PostgreSQLAdapter, SchemaStatements);
 

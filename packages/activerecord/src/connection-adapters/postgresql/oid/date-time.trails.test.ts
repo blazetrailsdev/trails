@@ -77,9 +77,18 @@ describe("PostgreSQL::OID::DateTime", () => {
 
   it("rejects BC timestamps with out-of-range components", () => {
     expect(type.castValue("0044-13-01 00:00:00 BC")).toBeNull();
-    expect(type.castValue("0044-02-31 00:00:00 BC")).toBeNull();
     expect(type.castValue("0044-01-01 25:00:00 BC")).toBeNull();
-    expect(type.castValue("0044-01-01 00:00:60 BC")).toBeNull();
+  });
+
+  it("rolls a BC day past the month end over, as ::Time does", () => {
+    const result = type.castValue("0044-02-31 00:00:00 BC") as RubyTime;
+    expect(result.year).toBe(-43);
+    expect(result.mon).toBe(3);
+    expect(result.mday).toBe(3);
+
+    const sixty = type.castValue("0044-01-01 00:00:60 BC") as RubyTime;
+    expect(sixty.min).toBe(1);
+    expect(sixty.sec).toBe(0);
   });
 
   it("preserves microsecond precision in BC timestamps", () => {

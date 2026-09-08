@@ -2172,6 +2172,7 @@ function ensureAbstractAdapterMixinsApplied(): void {
   dirtiesQueryCache(
     AbstractAdapter,
     "execQuery",
+    "execute",
     "create",
     "insert",
     "update",

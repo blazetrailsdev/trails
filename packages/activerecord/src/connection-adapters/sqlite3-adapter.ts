@@ -1841,8 +1841,6 @@ SQLite3Adapter.prototype.defaultInsertValue = sqliteDefaultInsertValue;
 SQLite3Adapter.prototype.explain = sqliteExplain;
 SQLite3Adapter.prototype.isWriteQuery = sqliteIsWriteQuery;
 
-dirtiesQueryCache(SQLite3Adapter, "execute");
-
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
 SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
 

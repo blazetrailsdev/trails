@@ -85,26 +85,18 @@ interface ExecuteHost extends PerformQueryHost {
 export async function execute(
   this: ExecuteHost,
   sql: string,
-  name: string | null = "SQL",
+  name: string | null = null,
   { allowRetry = false }: { allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
-  sql = this.preprocessQuery(sql);
   try {
-    return await this.log(sql, name, [], [], false, async (payload) => {
-      try {
-        return await this.withRawConnection({ allowRetry }, async (conn) => {
-          const client = conn as pg.Client;
-          const result = await this._performQuery(client, sql, [], [], {
-            prepare: false,
-            notificationPayload: payload,
-          });
-          return result?.rows ?? [];
-        });
-      } catch (e) {
-        const translated = this.translateExceptionClass(e, sql, []) as Error;
-        throw translated;
-      }
-    });
+    const result = (await AbstractAdapter.prototype.execute.call(this, sql, name, {
+      allowRetry,
+    })) as { fields?: Array<{ name: string }>; rows?: unknown[][] } | null | undefined;
+    if (result == null) return [];
+    return new Result(
+      (result.fields ?? []).map((f) => f.name),
+      result.rows ?? [],
+    ).toArray();
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }
@@ -354,7 +346,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
       }
     }
   } else if (binds == null || binds.length === 0) {
-    raw = await query(rawConnection, rowMode ? { text: sql, rowMode } : sql);
+    raw = await query(rawConnection, rowMode && sql != null ? { text: sql, rowMode } : sql);
   } else {
     raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
   }

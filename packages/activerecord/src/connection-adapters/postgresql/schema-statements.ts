@@ -1166,48 +1166,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return result;
   }
 
-  async createRange(
-    name: string,
-    options: { subtype: string; subtypeDiff?: string },
-  ): Promise<void> {
-    const [schema, rangeName] = this.extractSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(rangeName)}`
-      : this.quoteColumnName(rangeName);
-    const quoteQualifiedIdentifier = (identifier: string, param: string) => {
-      if (/[\s()]/.test(identifier)) {
-        throw new ArgumentError(
-          `PostgreSQLAdapter#createRange: ${param} must be a simple or schema-qualified identifier ` +
-            `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
-        );
-      }
-      const parts = identifier.match(/[^".]+|"[^"]*"/g) ?? [];
-      if (parts.length === 0 || parts.length > 2) {
-        throw new ArgumentError(
-          `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
-        );
-      }
-      const [s, t] = this.extractSchemaQualifiedName(identifier);
-      return s ? `${this.quoteColumnName(s)}.${this.quoteColumnName(t)}` : this.quoteColumnName(t);
-    };
-    const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
-    if (options.subtypeDiff) {
-      parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
-    }
-    await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
-    await this.reloadTypeMap();
-  }
-
-  async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const [schema, rangeName] = this.extractSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(rangeName)}`
-      : this.quoteColumnName(rangeName);
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
-    await this.reloadTypeMap();
-  }
-
   override async primaryKey(tableName: string): Promise<string | string[] | null> {
     const [schema, table] = this.extractSchemaQualifiedName(tableName);
 

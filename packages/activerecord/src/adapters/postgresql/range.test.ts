@@ -40,10 +40,19 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
-    await adapter.dropRange("floatrange", { ifExists: true });
-    await adapter.dropRange("stringrange", { ifExists: true });
-    await adapter.createRange("floatrange", { subtype: "float8", subtypeDiff: "float8mi" });
-    await adapter.createRange("stringrange", { subtype: "varchar" });
+    await adapter.execute(`DROP TYPE IF EXISTS floatrange`);
+    await adapter.execute(`DROP TYPE IF EXISTS stringrange`);
+    await adapter.execute(`
+      CREATE TYPE floatrange AS RANGE (
+          subtype = float8,
+          subtype_diff = float8mi
+      )
+    `);
+    await adapter.execute(`
+      CREATE TYPE stringrange AS RANGE (
+          subtype = varchar
+      )
+    `);
     await adapter.exec(`
       CREATE TABLE postgresql_ranges (
         id serial primary key,
@@ -86,8 +95,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
-    await adapter.dropRange("floatrange", { ifExists: true });
-    await adapter.dropRange("stringrange", { ifExists: true });
+    await adapter.execute(`DROP TYPE IF EXISTS floatrange`);
+    await adapter.execute(`DROP TYPE IF EXISTS stringrange`);
   });
 
   describe("PostgresqlRangeTest", () => {
