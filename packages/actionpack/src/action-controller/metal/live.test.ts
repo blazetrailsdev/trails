@@ -16,6 +16,7 @@ import {
   sendStream,
   responseBody,
 } from "./live.js";
+import { IOError } from "@blazetrails/ruby-compat";
 
 function makeResponse() {
   return new Response();
@@ -62,7 +63,7 @@ describe("ActionController::Live::Buffer", () => {
   it("write after close raises (matches Rails IOError-on-closed-stream)", () => {
     const buf = new Buffer(makeResponse());
     buf.close();
-    expect(() => buf.write("x")).toThrow(/closed stream/);
+    expect(() => buf.write("x")).toThrow(IOError);
   });
 
   it("close commits the underlying response", () => {

@@ -38,7 +38,9 @@ export class Trailtie extends Initializable {
     super();
     const klass = this.constructor as typeof Trailtie;
     if (klass.isAbstractRailtie()) {
-      throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
+      throw new RuntimeError(
+        `${rubyClassPath(klass)} is abstract, you cannot instantiate it directly.`,
+      );
     }
   }
 

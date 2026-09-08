@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Request } from "../request.js";
 import { Response } from "../response.js";
+import { IOError } from "@blazetrails/ruby-compat";
 
 function withTempFile<T>(contents: string, fn: (path: string) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "trails-response-"));
@@ -185,7 +186,15 @@ describe("ResponseTest", () => {
   it("write after close", () => {
     const res = new Response();
     res.close();
-    expect(() => res.write("more")).toThrow();
+    const e = (() => {
+      try {
+        res.write("more");
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(e).toBeInstanceOf(IOError);
+    expect((e as IOError).message).toBe("closed stream");
   });
 
   it("each isnt called if str body is written", () => {

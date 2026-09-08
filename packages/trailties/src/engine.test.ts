@@ -69,7 +69,9 @@ afterEach(() => {
 
 describe("Engine", () => {
   it("Engine is abstract and cannot be instantiated directly", () => {
-    expect(() => new Engine()).toThrow(/abstract/);
+    expect(() => new Engine()).toThrow(
+      "Rails::Engine is abstract, you cannot instantiate it directly.",
+    );
   });
 
   it("engine_name aliases railtie_name", () => {

@@ -3,7 +3,7 @@ import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
 import type { Headers } from "@blazetrails/rack";
-import { merge } from "@blazetrails/ruby-compat";
+import { IOError, merge } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends Error {
   constructor(message?: string) {
@@ -55,7 +55,7 @@ export class Buffer {
       this._response.deleteHeader("Content-Length");
     }
 
-    if (this._closed) throw new Error("closed stream");
+    if (this._closed) throw new IOError("closed stream");
     this._response.commitBang();
     this._buf.push(string);
 
