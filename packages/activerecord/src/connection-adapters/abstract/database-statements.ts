@@ -40,7 +40,7 @@ import {
   TransactionManager,
 } from "./transaction.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, wrap } from "@blazetrails/activesupport";
 import { Result } from "../../result.js";
 import {
   FutureResult,
@@ -611,39 +611,14 @@ export async function resetSequenceBang(
 ): Promise<void> {}
 
 export async function insertFixture(
-  this: DatabaseStatementsHost &
-    Required<Pick<DatabaseStatementsHost, "execute">> &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
+  this: BuildFixtureHost & Required<Pick<DatabaseStatementsHost, "execute">>,
   fixture: Record<string, unknown>,
   tableName: string,
 ): Promise<unknown> {
-  const columns = Object.keys(fixture);
-
-  const host = this as unknown as {
-    columns?: (t: string) => Promise<Array<{ name: string }>>;
-    lookupCastTypeFromColumn?: (c: unknown) => { serialize?(v: unknown): unknown } | null;
-  };
-  const tableColumns = typeof host.columns === "function" ? await host.columns(tableName) : [];
-  const columnsByName = new Map(tableColumns.map((c) => [c.name, c]));
-  const values = Object.entries(fixture).map(([name, v]) => {
-    const column = columnsByName.get(name);
-    const type =
-      column && typeof host.lookupCastTypeFromColumn === "function"
-        ? host.lookupCastTypeFromColumn(column)
-        : null;
-    if (type && typeof type.serialize === "function") {
-      return this.quote(withYamlFallback(type.serialize(v)));
-    }
-    return this.quote(withYamlFallback(v));
-  });
-
-  const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
-  const sql =
-    columns.length > 0
-      ? `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`
-      : `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
-
-  return this.execute(sql, "Fixture Insert");
+  return this.execute(
+    await buildFixtureSql.call(this, wrap<Record<string, unknown>>(fixture), tableName),
+    "Fixture Insert",
+  );
 }
 
 export async function insertFixturesSet(
@@ -1217,11 +1192,12 @@ export async function buildFixtureSql(
         manager.columns.push(table.get(column));
       }
     });
-    manager.values = manager.createValues(newValues);
+    valuesList.push(newValues);
   } else {
     columnNames.forEach((column) => manager.columns.push(table.get(column)));
-    manager.values = manager.createValuesList(valuesList);
   }
+
+  manager.values = manager.createValuesList(valuesList);
 
   const visitor =
     ((this as any)?.visitor as Visitors.ToSql | undefined) ??

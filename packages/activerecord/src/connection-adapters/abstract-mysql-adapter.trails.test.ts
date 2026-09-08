@@ -747,3 +747,55 @@ describe("AbstractMysqlAdapter#beginIsolatedDbTransaction", () => {
     expect(seen).toEqual(["SET TRANSACTION ISOLATION LEVEL READ COMMITTED", "BEGIN"]);
   });
 });
+
+describe("AbstractMysqlAdapter transaction statements", () => {
+  function makeAdapter() {
+    const executed: { sql: string; name: string | null; opts: unknown }[] = [];
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter;
+    (adapter as unknown as { internalExecute: unknown }).internalExecute = async (
+      sql: string,
+      name: string | null,
+      _binds: unknown[],
+      opts: unknown,
+    ) => {
+      executed.push({ sql, name, opts });
+    };
+    return { adapter, executed };
+  }
+
+  it("beginDbTransaction issues BEGIN with allowRetry and no materialization", async () => {
+    const { adapter, executed } = makeAdapter();
+    await adapter.beginDbTransaction();
+    expect(executed).toEqual([
+      {
+        sql: "BEGIN",
+        name: "TRANSACTION",
+        opts: { allowRetry: true, materializeTransactions: false },
+      },
+    ]);
+  });
+
+  it("commitDbTransaction issues COMMIT and materializes transactions", async () => {
+    const { adapter, executed } = makeAdapter();
+    await adapter.commitDbTransaction();
+    expect(executed).toEqual([
+      {
+        sql: "COMMIT",
+        name: "TRANSACTION",
+        opts: { allowRetry: false, materializeTransactions: true },
+      },
+    ]);
+  });
+
+  it("restartDbTransaction issues ROLLBACK AND CHAIN", async () => {
+    const { adapter, executed } = makeAdapter();
+    await (adapter as unknown as { restartDbTransaction(): Promise<void> }).restartDbTransaction();
+    expect(executed).toEqual([
+      {
+        sql: "ROLLBACK AND CHAIN",
+        name: "TRANSACTION",
+        opts: { allowRetry: false, materializeTransactions: true },
+      },
+    ]);
+  });
+});

@@ -398,7 +398,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  async beginDbTransaction(): Promise<void> {}
+  async beginDbTransaction(): Promise<void> {
+    await this.internalExecute("BEGIN", "TRANSACTION", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
+  }
 
   /** @missingRailsArgs fetch — PERMANENT */
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
@@ -409,7 +414,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  async commitDbTransaction(): Promise<void> {}
+  async commitDbTransaction(): Promise<void> {
+    await this.internalExecute("COMMIT", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
+  }
 
   async execRollbackDbTransaction(): Promise<void> {
     await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
@@ -418,7 +428,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  async execRestartDbTransaction(): Promise<void> {}
+  async execRestartDbTransaction(): Promise<void> {
+    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
+  }
 
   emptyInsertStatementValue(_primaryKey?: string): string {
     return "VALUES ()";

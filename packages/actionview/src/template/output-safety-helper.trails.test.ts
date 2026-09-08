@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
 
-import { toSentence } from "../helpers/output-safety-helper.js";
+import { raw, toSentence } from "../helpers/output-safety-helper.js";
+import { SafeBuffer } from "@blazetrails/activesupport";
+import { OutputBuffer } from "../buffers.js";
 
 I18n.setEnforceAvailableLocales(false);
 
@@ -50,5 +52,22 @@ describe("OutputSafetyHelperI18nTest", () => {
     expect(() => toSentence(["one", "two"], { passing: "invalid option" } as never)).toThrowError(
       "Unknown key: :passing. Valid keys are: :wordsConnector, :twoWordsConnector, :lastWordConnector, :locale",
     );
+  });
+});
+
+describe("OutputSafetyHelperTest", () => {
+  it("raw returns SafeBuffer from OutputBuffer without String() coercion", () => {
+    const buf = new OutputBuffer();
+    buf.safeAppend("<b>hi</b>");
+    const result = raw(buf);
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toBe("<b>hi</b>");
+  });
+
+  it("raw always returns an html-safe result even from an unsafe SafeBuffer", () => {
+    const unsafe = new SafeBuffer("<b>ok</b>");
+    const result = raw(unsafe);
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toBe("<b>ok</b>");
   });
 });

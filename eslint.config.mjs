@@ -566,6 +566,7 @@ export default defineConfig(
     ? [
         {
           files: [
+            "packages/actionview/src/**/*.test.ts",
             "packages/arel/src/**/*.test.ts",
             "packages/date/src/**/*.test.ts",
             "packages/did-you-mean/src/**/*.test.ts",

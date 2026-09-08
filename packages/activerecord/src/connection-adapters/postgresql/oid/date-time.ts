@@ -1,4 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
+import { kernelFormat as format } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {
@@ -11,18 +12,13 @@ import {
 type PgDateTimeResult = RubyTime | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTime extends ArDateTime {
-  /** @missingRailsCall format — CONVERGEABLE kernel-format-is-not-ported */
   override castValue(value: unknown): PgDateTimeResult | null {
     if (value === null || value === undefined) return null;
     if (typeof value === "string") {
       if (value === "infinity") return DateInfinity;
       if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
-        const rewritten = value.replace(/^\d+/, (year) => {
-          const biased = -Number(year) + 1;
-          const sign = biased < 0 ? "-" : "";
-          return sign + String(Math.abs(biased)).padStart(4 - sign.length, "0");
-        });
+        const rewritten = value.replace(/^\d+/, (year) => format("%04d", -Number(year) + 1));
         return super.castValue(rewritten.replace(/ BC$/, ""));
       }
     }
