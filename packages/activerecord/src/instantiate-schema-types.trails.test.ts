@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 import { defaultValue } from "./type.js";
 
 class DoublingType extends ValueType {
@@ -13,17 +14,20 @@ class DoublingType extends ValueType {
 }
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
-  return {
-    internalSchemaCache: {
-      isCached: () => true,
-      getCachedColumnsHash: () => columns,
-      dataSourceExists: async () => true,
-      columnsHash: async () => columns,
-    },
+  const cache = {
+    isCached: () => true,
+    getCachedColumnsHash: () => columns,
+    dataSourceExists: async () => true,
+    columnsHash: async () => columns,
+    primaryKeys: async () => null,
+  };
+  return adapterDouble({
+    internalSchemaCache: cache,
+    schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "doubling" ? new DoublingType() : defaultValue();
     },
-  };
+  });
 }
 
 describe("_instantiate routes row values through adapter-resolved types", () => {

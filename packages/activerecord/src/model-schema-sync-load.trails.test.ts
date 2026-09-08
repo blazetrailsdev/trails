@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
 import { defaultValue } from "./type.js";
@@ -12,7 +13,7 @@ class UuidType extends ValueType {
 }
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
-  return {
+  return adapterDouble({
     internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
@@ -22,7 +23,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "uuid" ? new UuidType() : null;
     },
-  };
+  });
 }
 
 describe("sync loadSchema / columnsHash", () => {

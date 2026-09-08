@@ -36,6 +36,7 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -2216,7 +2217,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
   const migration = new (class extends Migration {
     async change() {}
   })(undefined, 20240101000000);
-  (migration as any).adapter = {
+  (migration as any).adapter = adapterDouble({
     execute: async () => [],
     executeMutation: async (s: string) => {
       sql.push(s);
@@ -2231,7 +2232,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
     quoteColumnName: (n: string) => `"${n.replace(/"/g, '""')}"`,
     quoteTableName: (n: string) => `"${n.replace(/"/g, '""')}"`,
     quoteDefaultExpression: quoteDefaultExpression,
-  };
+  });
   return { migration, sql };
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
+import { adapterDouble } from "./test-helpers/adapter-double.js";
 
 const attributeNamesOf = (klass: unknown): string[] =>
   Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
@@ -114,17 +115,20 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    const adapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
-        getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
-        isCached: () => true,
-      },
+    const cache = {
+      dataSourceExists: async () => true,
+      columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
+      getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
+      isCached: () => true,
+      primaryKeys: async () => null,
+    };
+    const adapter = adapterDouble({
+      internalSchemaCache: cache,
+      schemaCache: cache,
       lookupCastTypeFromColumn(col: { sqlType: string }) {
         return col.sqlType === "uuid" ? new UuidT() : null;
       },
-    };
+    });
     (Shape as unknown as { adapter: unknown }).adapter = adapter;
 
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
