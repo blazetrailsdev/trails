@@ -329,12 +329,9 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/array/inquiry.rb": "array-inquirer.ts",
   "activesupport:core_ext/string/inquiry.rb": "string-inquirer.ts",
   "activesupport:inflector/transliterate.rb": "transliterate.ts",
-  // ARTest's `expand_config` (config.rb:26) is ported at connection.ts, next to
-  // the CONNECTIONS entries it expands: it is typed on `NamedConnection` and
+  // ARTest's `expand_config` is typed on `NamedConnection` and
   // `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports
-  // from config.ts — so moving it to config.ts would CREATE an import cycle.
-  // config.rb's other three members are scoped-skipped (no config.yml in
-  // trails), so this bucket measures `expand_config` alone.
+  // from config.ts — porting it to config.ts would CREATE an import cycle.
   "activerecord-test-support:config.rb": "connection.ts",
 };
 

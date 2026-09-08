@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { access } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   snakeToCamel,
   rubyMethodToTs,
@@ -591,6 +594,18 @@ describe("SCOPED_SKIP_GROUPS", () => {
       for (const name of g.names) {
         for (const file of g.rubyFiles) expect(isScopedSkip(name, file)).toBe(true);
         expect(isScopedSkip(name, "some/other/unrelated.rb")).toBe(false);
+      }
+    }
+  });
+
+  it("cites only trails paths that exist (a reason naming a moved file is stale)", async () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+    for (const g of SCOPED_SKIP_GROUPS) {
+      for (const cited of g.reason.match(/packages\/[a-z-]+\/src\/[A-Za-z0-9/_.-]+\.ts/g) ?? []) {
+        await expect(
+          access(join(root, cited)),
+          `${cited} (${g.rubyFiles[0]})`,
+        ).resolves.toBeUndefined();
       }
     }
   });
