@@ -43,6 +43,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 
 /** @internal */
 interface RouteSetLike {
+  namedRoutes?: { get(name: string): unknown };
   resourcesPathNames?: Record<string, string>;
   drawPaths?: string[];
   defaultUrlOptions?: Record<string, unknown>;
@@ -1009,7 +1010,10 @@ export class Mapper {
         : undefined;
     const name = explicitName ?? inferredName;
     const namePrefix = this.currentNamePrefix();
-    const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
+    let fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
+    if (explicitName === undefined && fullName && this.hasNamedRoute(fullName)) {
+      fullName = undefined;
+    }
 
     const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
     const mergedDefaults =
@@ -1272,7 +1276,9 @@ export class Mapper {
 
   /** @internal */
   hasNamedRoute(name: string): boolean {
-    return this.routes.some((r) => r.name === name);
+    return (
+      this.routes.some((r) => r.name === name) || this._set?.namedRoutes?.get(name) !== undefined
+    );
   }
 
   /** @internal */

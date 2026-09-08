@@ -1162,7 +1162,7 @@ export class SchemaStatements {
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
   }
 
-  async removeConstraint(tableName: string, constraintName: string): Promise<void> {
+  async removeConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
     const at = this.createAlterTable(tableName);
     at.dropConstraint(constraintName);
     await this.execute(await this.schemaCreation.accept(at));

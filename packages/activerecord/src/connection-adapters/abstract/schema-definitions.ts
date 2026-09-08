@@ -733,7 +733,7 @@ export class AlterTable {
   readonly foreignKeyDrops: (string | undefined)[] = [];
   readonly checkConstraintAdds: CheckConstraintDefinition[] = [];
   readonly checkConstraintDrops: (string | undefined)[] = [];
-  readonly constraintDrops: string[] = [];
+  readonly constraintDrops: (string | undefined)[] = [];
   constructor(td: TableDefinition) {
     this._td = td;
   }
@@ -765,7 +765,7 @@ export class AlterTable {
     this.checkConstraintDrops.push(constraintName);
   }
 
-  dropConstraint(constraintName: string): void {
+  dropConstraint(constraintName: string | undefined): void {
     this.constraintDrops.push(constraintName);
   }
 }

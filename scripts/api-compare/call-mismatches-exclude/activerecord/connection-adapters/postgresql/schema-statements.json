@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
-    "rubyName": "unique_constraints",
-    "call": "delete",
-    "reason": "Ruby `String#delete(\"{}\")` on the `conkey` array literal (schema_statements.rb:709) is `String#replace(/[{}]/g, \"\")` in JS."
-  }
-]

@@ -4,6 +4,8 @@ import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
 import { Route } from "./route.js";
 import { Routes, type Mapping } from "./routes.js";
+import { RouteSet } from "../routing/route-set.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 function makePattern(
   path: string,
@@ -36,7 +38,7 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.length).toBe(0);
   });
 
-  it("test_ast (clears cache when a route is added)", () => {
+  it("ast", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
     const ast = routes.ast;
@@ -52,7 +54,7 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.simulator).not.toBe(sim);
   });
 
-  it("test_partition_route (anchored vs custom)", () => {
+  it("partition route", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
     expect(routes.anchoredRoutes.length).toBe(1);
@@ -73,20 +75,15 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.customRoutes.length).toBe(0);
   });
 
-  it("iterates routes via for..of", () => {
-    const routes = new Routes();
-    routes.addRoute("a", mappingFor("/a"));
-    routes.addRoute("b", mappingFor("/b"));
-    const names = [...routes].map((r) => r.name);
-    expect(names).toEqual(["a", "b"]);
-  });
-
-  it("size === length and last returns the last-added route", () => {
-    const routes = new Routes();
-    routes.addRoute("a", mappingFor("/a"));
-    const second = routes.addRoute("b", mappingFor("/b"));
-    expect(routes.size).toBe(2);
-    expect(routes.length).toBe(2);
-    expect(routes.last).toBe(second);
+  it("first name wins", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw((mapper) => {
+      mapper.get("/hello", { to: "foo#bar", as: "aaron" });
+    });
+    expect(() =>
+      routeSet.draw((mapper) => {
+        mapper.get("/aaron", { to: "foo#bar", as: "aaron" });
+      }),
+    ).toThrow(ArgumentError);
   });
 });

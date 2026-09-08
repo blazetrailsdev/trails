@@ -41,6 +41,7 @@ import { RoutingError, UrlGenerationError } from "../../action-controller/metal/
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { normalizePath, unescapeUri } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
@@ -690,7 +691,17 @@ export class RouteSet {
 
   addRoute(mapping: Route, name?: string | null): Route {
     if (name && !ROUTE_NAME_RE.test(name)) {
-      throw new Error(`Invalid route name: '${name}'`);
+      throw new ArgumentError(`Invalid route name: '${name}'`);
+    }
+
+    if (name && this.namedRoutes.get(name)) {
+      throw new ArgumentError(
+        `Invalid route name, already in use: '${name}' \n` +
+          "You may have defined two routes with the same name using the `:as` option, or " +
+          "you may be overriding a route already defined by a resource with the same naming. " +
+          "For the latter, you can restrict the routes created with `resources` as explained here: \n" +
+          "https://guides.rubyonrails.org/routing.html#restricting-the-routes-created",
+      );
     }
     mapping.app = this._app(mapping);
     this.routes.push(mapping);

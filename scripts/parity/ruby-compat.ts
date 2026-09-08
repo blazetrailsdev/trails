@@ -54,6 +54,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#Float", "kernelFloat"],
   ["Kernel#Rational", "rational"],
   ["Range#cover?", "cover"],
+  ["String#delete", "stringDelete"],
   ["Regexp.escape", "regexpEscape"],
 ]);
 

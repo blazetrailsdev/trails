@@ -295,7 +295,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitDropConstraint(name: string): string {
+  protected visitDropConstraint(name: string | undefined): string {
     return `DROP CONSTRAINT ${this.conn.quoteColumnName(name)}`;
   }
 
