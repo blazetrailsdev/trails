@@ -106,7 +106,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
 }
 
-register("transaction_aware_test", async () => TransactionAwareTestAdapter);
+register(
+  "transaction_aware_test",
+  "./connection-adapters/transaction-aware-test-adapter.js",
+  async () => TransactionAwareTestAdapter,
+);
 await resolve("transaction_aware_test");
 
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {

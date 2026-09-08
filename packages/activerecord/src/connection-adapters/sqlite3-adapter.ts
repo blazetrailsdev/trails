@@ -49,7 +49,7 @@ import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
-import { IntegerType, FloatType } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, IntegerType, FloatType } from "@blazetrails/activemodel";
 import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
@@ -103,10 +103,9 @@ import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js"
 
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   let bindsAsFloat = false;
-  if (value && typeof value === "object" && "valueForDatabase" in value) {
-    const attr = value as { valueForDatabase: unknown; type?: unknown };
-    bindsAsFloat = attr.type instanceof FloatType;
-    value = attr.valueForDatabase;
+  if (value instanceof ModelAttribute) {
+    bindsAsFloat = value.type instanceof FloatType;
+    value = value.valueForDatabase;
   }
   return sqliteTypeCast.call(this, value, bindsAsFloat);
 }

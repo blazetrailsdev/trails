@@ -331,7 +331,7 @@ export class File extends IO {
     const file = new File(
       getFs().openSync(fileName, vmode.replace(/b/g, ""), opt?.perm),
       fileName,
-      vmode,
+      mode,
     );
     if (vmode.includes("b")) file.binmode();
     if (estr !== null) file.setEncoding(estr);

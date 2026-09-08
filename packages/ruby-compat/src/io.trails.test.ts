@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
 import { IO, puts } from "./io.js";
+import { stderr } from "./process-adapter.js";
 
 describe("IO", () => {
   it("binwrite writes the string and answers its byte count", () => {
@@ -170,6 +171,30 @@ describe("IO", () => {
         file.internalEncoding()?.name ?? null,
       ]).toEqual([argument, external, internal]);
       file.close();
+    }
+  });
+
+  it("a bom| mode prefix opens under the encoding it names", () => {
+    // vendor/ruby/io.c:6480-6483, 6671-6681
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    File.open(path, "r:bom|utf-8", (file) => {
+      expect(file.externalEncoding()).toBe(Encoding.find("UTF-8"));
+    });
+  });
+
+  it("a bom| prefix on a non-UTF encoding warns and keeps that encoding", () => {
+    // vendor/ruby/io.c:6678 — rb_enc_warn "BOM with non-UTF encoding %s is nonsense".
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    const write = vi.spyOn(stderr, "write").mockReturnValue(true);
+    try {
+      File.open(path, "r:bom|euc-jp", (file) => {
+        expect(file.externalEncoding()).toBe(Encoding.find("EUC-JP"));
+      });
+      expect(write).toHaveBeenCalledWith("BOM with non-UTF encoding euc-jp is nonsense\n");
+    } finally {
+      write.mockRestore();
     }
   });
 

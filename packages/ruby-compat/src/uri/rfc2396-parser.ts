@@ -137,6 +137,31 @@ export class RFC2396Parser {
     });
   }
 
+  /**
+   * `unescape` (`vendor/ruby/lib/uri/rfc2396_parser.rb:318`).
+   *
+   * Ruby's block yields one raw byte per escape and tags the result with the
+   * String's own encoding, so the bytes are accumulated across the whole
+   * string and decoded once at the end — the round-trip `escape`'s `b()`
+   * already implies. As in `escape`, a caller's own Regexp is re-made global
+   * because `gsub` replaces every match and `replace` does not.
+   */
+  unescape(str: string, escaped: RegExp = this.regexp.ESCAPED): string {
+    if (!escaped.flags.includes("g")) {
+      escaped = new RegExp(escaped.source, `${escaped.flags}g`);
+    }
+    const encoder = new TextEncoder();
+    const bytes: number[] = [];
+    let last = 0;
+    for (const m of str.matchAll(escaped)) {
+      for (const uc of encoder.encode(str.slice(last, m.index))) bytes.push(uc);
+      bytes.push(parseInt(m[0].slice(1, 3), 16));
+      last = m.index + m[0].length;
+    }
+    for (const uc of encoder.encode(str.slice(last))) bytes.push(uc);
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
+
   /** `initialize_pattern` (`vendor/ruby/lib/uri/rfc2396_parser.rb:338`). */
   private initializePattern(opts: RFC2396ParserOptions = {}): Record<string, string> {
     const ret: Record<string, string> = {};

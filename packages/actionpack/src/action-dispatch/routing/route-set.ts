@@ -1,5 +1,5 @@
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { InvalidURIError, rbInspect } from "@blazetrails/ruby-compat";
+import { InvalidURIError, rbInspect, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
@@ -42,7 +42,7 @@ import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { normalizePath, unescapeUri } from "../journey/router/utils.js";
+import { normalizePath } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
@@ -835,7 +835,7 @@ export class RouteSet {
       Object.assign(params, extras);
       for (const [key, value] of Object.entries(params)) {
         if (typeof value === "string") {
-          params[key] = unescapeUri(value);
+          params[key] = RFC2396_PARSER.unescape(value);
         }
       }
       req.pathParameters = params;

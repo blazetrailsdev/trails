@@ -4,6 +4,7 @@ import type { Column as PostgreSQLColumn } from "./connection-adapters/postgresq
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
+import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import type { ValueType } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
@@ -788,49 +789,24 @@ export abstract class SchemaDumper {
     const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
     const fks = (await fn.call(host, table)) ?? [];
     if (fks.length === 0) return;
-    type Fk = {
-      fromTable?: string;
-      toTable: string;
-      column?: string;
-      primaryKey?: string;
-      name?: string;
-      onUpdate?: string;
-      onDelete?: string;
-      deferrable?: boolean | string;
-      validate?: boolean;
-    };
-    const fkIgnorePattern = (this.constructor as typeof SchemaDumper).fkIgnorePattern;
     const columnFor = (host as { foreignKeyColumnFor?: (t: string, c: string) => string })
       .foreignKeyColumnFor;
     const statements: string[] = [];
-    for (const fk of fks as Fk[]) {
-      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? table));
+    for (const fk of fks as ForeignKeyDefinition[]) {
+      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable));
       const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
       const opts: string[] = [];
       const inferredColumn = columnFor ? columnFor.call(host, fk.toTable, "id") : undefined;
       if (fk.column && fk.column !== inferredColumn) {
         opts.push(`column: ${JSON.stringify(fk.column)}`);
       }
-      const isCustomPrimaryKey =
-        "isCustomPrimaryKey" in (fk as object)
-          ? (fk as unknown as { isCustomPrimaryKey: boolean }).isCustomPrimaryKey
-          : fk.primaryKey != null && fk.primaryKey !== "id";
-      if (isCustomPrimaryKey && fk.primaryKey)
-        opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      const exportName =
-        "isExportNameOnSchemaDump" in (fk as object)
-          ? (fk as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
-          : fk.name != null && !statelessTest(fkIgnorePattern, fk.name);
-      if (exportName && fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
+      if (fk.isCustomPrimaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
+      if (fk.isExportNameOnSchemaDump) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
       if (fk.deferrable !== undefined && fk.deferrable !== false)
         opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
-      const isValidate =
-        "isValidate" in (fk as object)
-          ? (fk as unknown as { isValidate: boolean | null }).isValidate
-          : fk.validate;
-      if (isValidate == null || isValidate === false) opts.push("validate: false");
+      if (fk.isValidate == null || fk.isValidate === false) opts.push("validate: false");
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }

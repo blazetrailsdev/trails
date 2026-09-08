@@ -4,6 +4,8 @@ import { getFs, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
+import { stderr } from "./process-adapter.js";
+import { verbose } from "./verbose.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
@@ -184,15 +186,39 @@ const FMODE_TRUNC = 0x00000800;
 /** `FMODE_TEXTMODE` (`vendor/ruby/include/ruby/io.h:351`). */
 const FMODE_TEXTMODE = 0x00001000;
 
+/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/include/ruby/io.h:368`). */
+const FMODE_SETENC_BY_BOM = 0x00100000;
+
+/** `bom_prefix` (`vendor/ruby/io.c:6431`). */
+const bomPrefix = "bom|";
+
+/** `utf_prefix` (`vendor/ruby/io.c:6432`). */
+const utfPrefix = "utf-";
+
+/** `bom_prefix_len` (`vendor/ruby/io.c:6433`). */
+const bomPrefixLen = bomPrefix.length;
+
+/** `utf_prefix_len` (`vendor/ruby/io.c:6434`). */
+const utfPrefixLen = utfPrefix.length;
+
+/** `io_encname_bom_p` (`vendor/ruby/io.c:6437`). */
+function ioEncnameBomP(name: string, len: number): boolean {
+  return len > bomPrefixLen && name.slice(0, bomPrefixLen).toLowerCase() === bomPrefix;
+}
+
+/**
+ * `rb_enc_warn` (`vendor/ruby/error.c:428`), which writes nothing at all while
+ * `$VERBOSE` is `nil` and terminates the message with a newline.
+ */
+function rbEncWarn(message: string): void {
+  if (verbose() == null) return;
+  stderr.write(`${message}\n`);
+}
+
 /**
  * `rb_io_modestr_fmode` (`vendor/ruby/io.c:6443`) — the `FMODE_*` flags a mode
  * string names, which `rb_io_extract_modeenc` (`io.c:6881`) records on the
  * stream as `fptr->mode`.
- *
- * The `:` arm stops at the encoding half without `io_encname_bom_p`'s
- * `FMODE_SETENC_BY_BOM` (`io.c:6480-6483`): no member of this partial `rb_io_t`
- * reads that flag, and `File.open` splits the encoding half off before it gets
- * here, so detecting a BOM would add a code path nothing enters.
  */
 function rbIoModestrFmode(modestr: string): number {
   let fmode = 0;
@@ -213,8 +239,16 @@ function rbIoModestrFmode(modestr: string): number {
 
   while (m < modestr.length) {
     const c = modestr[m++];
-    if (c === ":") break;
     switch (c) {
+      case ":": {
+        const rest = modestr.slice(m);
+        const p = rest.indexOf(":");
+        if (ioEncnameBomP(rest, p === -1 ? rest.length : p)) {
+          fmode |= FMODE_SETENC_BY_BOM;
+        }
+        m = modestr.length;
+        break;
+      }
       case "b":
         fmode |= FMODE_BINMODE;
         break;
@@ -253,6 +287,7 @@ function rbIoModestrFmode(modestr: string): number {
 function rbIoExtIntToEncs(
   ext: Encoding | null | undefined,
   intern: Encoding | null | undefined,
+  fmode = 0,
 ): { enc: Encoding | null; enc2: Encoding | null } {
   let defaultExt = false;
   if (ext == null) {
@@ -264,34 +299,54 @@ function rbIoExtIntToEncs(
   } else if (intern === undefined) {
     intern = Encoding.defaultInternal;
   }
-  if (intern == null || intern === ext) {
+  if (intern == null || (!(fmode & FMODE_SETENC_BY_BOM) && intern === ext)) {
     return { enc: defaultExt && intern !== ext ? null : ext, enc2: null };
   }
   return { enc: intern, enc2: ext };
 }
 
 /**
- * `parse_mode_enc` (`vendor/ruby/io.c:6786`), which reads one string as `"enc"`,
+ * `parse_mode_enc` (`vendor/ruby/io.c:6656`), which reads one string as `"enc"`,
  * `"enc2:enc"` or `"enc:-"` — the form both a mode string's encoding half and
- * `IO#set_encoding`'s one-argument String take.
+ * `IO#set_encoding`'s one-argument String take — and strips the `"bom|"` prefix
+ * `rb_io_modestr_fmode` already flagged, keeping `FMODE_SETENC_BY_BOM` only for
+ * a UTF encoding (`io.c:6671-6681`).
+ *
+ * MRI's `fmode_p` is an in/out pointer, `NULL` where the caller has no mode to
+ * thread (`io_encoding_set`, `io.c:11706`); here it is the `fmode` argument and
+ * the `fmode` the result carries back.
  */
-function parseModeEnc(estr: string): { enc: Encoding | null; enc2: Encoding | null } {
+function parseModeEnc(
+  estr: string,
+  fmodeIn = 0,
+): { enc: Encoding | null; enc2: Encoding | null; fmode: number } {
+  let fmode = fmodeIn;
   const p = estr.lastIndexOf(":");
-  const len = p === -1 ? estr.length : p;
+  const internName = p === -1 ? null : estr.slice(p + 1);
+  let len = p === -1 ? estr.length : p;
+  if (fmode & FMODE_SETENC_BY_BOM || ioEncnameBomP(estr, len)) {
+    estr = estr.slice(bomPrefixLen);
+    len -= bomPrefixLen;
+    if (estr.slice(0, utfPrefixLen).toLowerCase() === utfPrefix) {
+      fmode |= FMODE_SETENC_BY_BOM;
+    } else {
+      rbEncWarn(`BOM with non-UTF encoding ${estr} is nonsense`);
+      fmode &= ~FMODE_SETENC_BY_BOM;
+    }
+  }
   const ext = len === 0 ? undefined : Encoding.find(estr.slice(0, len));
 
   let intern: Encoding | null | undefined;
-  if (p !== -1) {
-    const name = estr.slice(p + 1);
-    if (name === "-") {
+  if (internName !== null) {
+    if (internName === "-") {
       intern = null;
     } else {
-      const idx2 = Encoding.find(name);
-      intern = idx2 === ext ? null : idx2;
+      const idx2 = Encoding.find(internName);
+      intern = !(fmode & FMODE_SETENC_BY_BOM) && idx2 === ext ? null : idx2;
     }
   }
 
-  return rbIoExtIntToEncs(ext, intern);
+  return { ...rbIoExtIntToEncs(ext, intern, fmode), fmode };
 }
 
 /**

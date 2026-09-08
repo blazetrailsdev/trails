@@ -25,7 +25,9 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("validate reports a registered adapter whose loader failed", async () => {
-      register("trails_broken_adapter", () => Promise.reject(new Error("Cannot find module 'pg'")));
+      register("trails_broken_adapter", "./trails-broken-adapter.js", () =>
+        Promise.reject(new Error("Cannot find module 'pg'")),
+      );
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_broken_adapter",
       });
@@ -40,7 +42,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("validate reports a registered adapter whose own path does not resolve", async () => {
-      register("trails_mispathed_adapter", async () => {
+      register("trails_mispathed_adapter", "./no-such-adapter.js", async () => {
         await import("./no-such-adapter.js" as string);
         return null as never;
       });
@@ -50,7 +52,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("validate reports a registered adapter whose package does not resolve", async () => {
-      register("trails_unpackaged_adapter", async () => {
+      register("trails_unpackaged_adapter", "@blazetrails/no-such-adapter/index.js", async () => {
         await import("@blazetrails/no-such-adapter/index.js" as string);
         return null as never;
       });
@@ -60,7 +62,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("validate reports a registered adapter whose own dependency does not resolve", async () => {
-      register("trails_depless_adapter", async () => {
+      register("trails_depless_adapter", "./trails-depless-adapter.js", async () => {
         await import("./hash-config.js");
         throw Object.assign(
           new Error("Cannot find package 'mysql2' imported from /adapters/mysql2-adapter.js"),
@@ -74,7 +76,11 @@ describe("DatabaseConfigurations", () => {
 
     it("inspect renders the resolved adapter class", async () => {
       class TrailsInspectAdapter {}
-      register("trails_inspect_adapter", () => Promise.resolve(TrailsInspectAdapter) as never);
+      register(
+        "trails_inspect_adapter",
+        "./trails-inspect-adapter.js",
+        () => Promise.resolve(TrailsInspectAdapter) as never,
+      );
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_inspect_adapter",
       });
@@ -86,7 +92,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("inspect does not leave the driver load rejection unhandled", async () => {
-      register("trails_inspect_broken_adapter", () =>
+      register("trails_inspect_broken_adapter", "./trails-inspect-broken-adapter.js", () =>
         Promise.reject(new Error("Cannot find module 'pg'")),
       );
       const config = new HashConfig("default_env", "primary", {
@@ -97,7 +103,11 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("inspect falls back to the adapter name while the adapter is still loading", () => {
-      register("trails_inflight_adapter", () => new Promise<never>(() => {}));
+      register(
+        "trails_inflight_adapter",
+        "./trails-inflight-adapter.js",
+        () => new Promise<never>(() => {}),
+      );
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_inflight_adapter",
       });
@@ -107,14 +117,20 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("re-registering an adapter clears the recorded load failure", async () => {
-      register("trails_refixed_adapter", () => Promise.reject(new Error("boom")));
+      register("trails_refixed_adapter", "./trails-refixed-adapter.js", () =>
+        Promise.reject(new Error("boom")),
+      );
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_refixed_adapter",
       });
       await expect(resolve("trails_refixed_adapter")).rejects.toThrow();
       expect(() => config.validateBang()).toThrow();
 
-      register("trails_refixed_adapter", () => Promise.resolve(class {}) as never);
+      register(
+        "trails_refixed_adapter",
+        "./trails-refixed-adapter.js",
+        () => Promise.resolve(class {}) as never,
+      );
       expect(config.validateBang()).toBe(true);
     });
   });
