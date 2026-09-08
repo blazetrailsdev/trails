@@ -747,7 +747,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Nine instances exist and are the only ones:
+where Ruby resolves the constant. Ten instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
@@ -785,6 +785,12 @@ where Ruby resolves the constant. Nine instances exist and are the only ones:
   `annotate_rendered_view_with_filenames` (`handlers/erb.rb:86-89`). The cycle
   is closed by `template.rb:178`'s `extend Template::Handlers`, whose port
   constructs the handler at `template.ts` class-static time.
+- `activerecord/src/fixture-error-slot.ts` — `FixtureError`, read by
+  `connection-adapters/abstract/database-statements.ts` for `build_fixture_sql`'s
+  unknown-column raise (`abstract/database_statements.rb:615`, the constant
+  declared at `fixtures.rb:809`). The cycle is closed by `fixtures.ts` needing
+  `Base` at runtime (`fixtures.ts:720,940`), so `database-statements.ts` cannot
+  import `fixtures.ts` back.
 - `activerecord/src/base-slot.ts` — `Base`, read by `dynamic-matchers.ts`,
   `connection-handling.ts` and `core.ts` for Rails' `self == Base`
   (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
@@ -810,3 +816,35 @@ site — the JS analogue of that `NameError`. A `throw` explaining that the call
 deep-imported the module is invented surface: it is a guard Rails does not have,
 in a body that is otherwise line-for-line. This is the one place the decision is
 recorded; do not re-derive it per slot or per call site.
+
+## Method visibility is not a runtime fact in JS (`basic_obj_respond_to`'s `pub`)
+
+Ruby's `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864-2879`) takes a
+`pub` flag and hands it to `method_boundp`, so `respond_to?(:m)` and
+`respond_to?(:m, true)` can answer differently for the same receiver: the first
+sees public and protected methods, the second also sees private ones. Visibility
+is a property of the method entry, readable at run time.
+
+JS has no such fact to read, and both of its would-be carriers fail in opposite
+directions:
+
+- A `#private` field or method is not a string-named property at all, so
+  `"#x" in obj` is false — it is invisible at BOTH `pub` values, where Ruby
+  reports it at `pub = 0`. There is no reflection API that reaches it; that is
+  the point of the syntax.
+- A TS `private` / `protected` member is a compile-time annotation with no
+  runtime residue: it is emitted as an ordinary property, so `in` reports it at
+  BOTH `pub` values, where Ruby hides it at `pub = 1`.
+
+So `mid in Object(obj)` is the whole of `method_boundp` here, and `pub` cannot
+change its answer. The parameter is still declared and still plumbed — Rails'
+`ActiveModel::AttributeMethods#respond_to?`
+(`activemodel/lib/active_model/attribute_methods.rb:528-533`) makes two `super`
+calls that differ only in it, and dropping it collapses them into one call
+eslint's `no-dupe-else-if` rejects as a dead branch — but its body is
+`void pub;`.
+
+This is a genuine language shortcoming, not a preference, and it is ratified
+repo-wide here. `basicObjRespondTo` (`packages/ruby-compat/src/object.ts`) cites
+**this section**; a call site that passes `pub` is not re-deriving the decision,
+and there is no story to make `in` visibility-aware.

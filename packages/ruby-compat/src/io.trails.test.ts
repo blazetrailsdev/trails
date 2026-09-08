@@ -140,6 +140,33 @@ describe("IO", () => {
     });
   });
 
+  it("read dispatches the UTF-16 and UTF-32 dummy seats on the BOM", () => {
+    // vendor/ruby/enc/trans/utf_16_32.trans:278,327 fun_si_from_utf_16 / fun_si_from_utf_32.
+    const dir = mkdtempSync(join(tmpdir(), "trails-io-"));
+    const cases: [string, string, number[]][] = [
+      ["u16be.bin", "UTF-16", [0xfe, 0xff, 0, 0x68, 0, 0x69]],
+      ["u16le.bin", "UTF-16", [0xff, 0xfe, 0x68, 0, 0x69, 0]],
+      ["u32be.bin", "UTF-32", [0, 0, 0xfe, 0xff, 0, 0, 0, 0x68, 0, 0, 0, 0x69]],
+      ["u32le.bin", "UTF-32", [0xff, 0xfe, 0, 0, 0x68, 0, 0, 0, 0x69, 0, 0, 0]],
+    ];
+    for (const [name, encoding, bytes] of cases) {
+      const path = join(dir, name);
+      writeFileSync(path, Uint8Array.from(bytes));
+      File.open(path, `rb:${encoding}`, (file) => {
+        expect(file.read()).toBe("hi");
+      });
+    }
+
+    const nobom = join(dir, "nobom.bin");
+    writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
+    File.open(nobom, "rb:UTF-16", (file) => {
+      expect(() => file.read()).toThrow("code converter not found (UTF-16 to UTF-8)");
+    });
+    File.open(nobom, "rb:UTF-32", (file) => {
+      expect(() => file.read()).toThrow("code converter not found (UTF-32 to UTF-8)");
+    });
+  });
+
   it("read falls back to Encoding.default_external where the stream carries none", () => {
     // vendor/ruby/io.c:1010 io_read_encoding.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "default.txt");

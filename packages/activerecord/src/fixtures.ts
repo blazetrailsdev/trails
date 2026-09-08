@@ -2,7 +2,7 @@ import { insertFixturesSet } from "./connection-adapters/abstract/database-state
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecord } from "./ar-config.js";
-import { FixtureError, StatementInvalid } from "./errors.js";
+import { StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
 import {
@@ -19,8 +19,7 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { defaultValue, type ValueType } from "@blazetrails/activemodel";
-
-export { FixtureError };
+import { _setFixtureError } from "./fixture-error-slot.js";
 
 /** @internal */
 export class FixtureSetPrimaryKeyError extends Error {
@@ -973,3 +972,12 @@ export class FixtureSet {
 }
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
+
+export class FixtureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FixtureError";
+  }
+}
+
+_setFixtureError(FixtureError);

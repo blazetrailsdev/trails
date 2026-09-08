@@ -161,7 +161,6 @@ const capabilities: SqliteDriverCapabilities = {
   concurrentStatements: true,
   foreignKeysOnByDefault: false,
   immediateTransactions: true,
-  sharedCache: false,
 };
 
 export const betterSqlite3Driver: SqliteDriver = {
