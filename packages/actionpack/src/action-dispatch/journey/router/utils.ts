@@ -11,31 +11,33 @@ const UNSAFE_PATH = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/gu;
 const UNSAFE_SEGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@]/gu;
 const UNSAFE_FRAGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/?]/gu;
 
-function pctEncodeByte(b: number): string {
-  return "%" + b.toString(16).toUpperCase().padStart(2, "0");
+const DEC2HEX = Array.from(
+  { length: 256 },
+  (_, i) => "%" + i.toString(16).toUpperCase().padStart(2, "0"),
+);
+
+/** @internal */
+function escape(component: string, pattern: RegExp): string {
+  return component.replace(pattern, (unsafe) => percentEncode(unsafe));
 }
 
-function pctEncode(unsafe: string): string {
-  const enc = new TextEncoder().encode(unsafe);
-  let out = "";
-  for (const b of enc) out += pctEncodeByte(b);
-  return out;
-}
-
-function escapeWith(component: string, pattern: RegExp): string {
-  return component.replace(pattern, (m) => pctEncode(m));
+/** @internal */
+function percentEncode(unsafe: string): string {
+  let safe = "";
+  for (const b of new TextEncoder().encode(unsafe)) safe += DEC2HEX[b];
+  return safe;
 }
 
 export function escapePath(path: string): string {
-  return escapeWith(path, UNSAFE_PATH);
+  return escape(path, UNSAFE_PATH);
 }
 
 export function escapeSegment(segment: string): string {
-  return escapeWith(segment, UNSAFE_SEGMENT);
+  return escape(segment, UNSAFE_SEGMENT);
 }
 
 export function escapeFragment(fragment: string): string {
-  return escapeWith(fragment, UNSAFE_FRAGMENT);
+  return escape(fragment, UNSAFE_FRAGMENT);
 }
 
 export function rackEscape(value: string): string {

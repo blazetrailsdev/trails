@@ -113,18 +113,11 @@ export class MatchData {
   readonly names: readonly string[];
   private readonly _offsets: readonly number[];
   private readonly _match: RegExpMatchArray;
-  private readonly _input: string;
 
-  constructor(
-    names: readonly string[],
-    offsets: readonly number[],
-    match: RegExpMatchArray,
-    input: string,
-  ) {
+  constructor(names: readonly string[], offsets: readonly number[], match: RegExpMatchArray) {
     this.names = names;
     this._offsets = offsets;
     this._match = match;
-    this._input = input;
   }
 
   get captures(): readonly (string | undefined)[] {
@@ -154,7 +147,7 @@ export class MatchData {
   postMatch(): string {
     const matched = this._match[0] ?? "";
     const start = (this._match.index ?? 0) + matched.length;
-    return this._input.slice(start);
+    return (this._match.input ?? "").slice(start);
   }
 
   toString(): string {
@@ -200,7 +193,7 @@ export class Pattern {
 
   eagerLoadBang(): void {
     void this.requiredNames;
-    void this._computeOffsets();
+    void this.offsets;
     void this.toRegexp();
     this.ast = null;
   }
@@ -247,7 +240,7 @@ export class Pattern {
     const re = this.toRegexp();
     const m = other.match(re);
     if (!m) return undefined;
-    return new MatchData(this.names, this._computeOffsets(), m, other);
+    return new MatchData(this.names, this.offsets, m);
   }
 
   isMatch(other: string): boolean {
@@ -281,29 +274,28 @@ export class Pattern {
 
   /** @internal */
   private get offsets(): readonly number[] {
-    return this._computeOffsets();
-  }
+    if (this._offsets == null) {
+      const offsets: number[] = [0];
 
-  /** @internal */
-  private _computeOffsets(): readonly number[] {
-    if (this._offsets) return this._offsets;
-    const offsets: number[] = [0];
-    for (const n of this.spec) {
-      if (!n.isSymbol()) continue;
-      const name = n.toSym();
-      if (hasKey(this.requirements, name)) {
-        const reqs = this.requirements[name];
-        const src = regexUnion(reqs);
-        const re = new RegExp(`(?:${src})|`, combinedFlagsFor([reqs], { outer: false }));
-        const m = re.exec("");
-        const groupCount = m ? m.length - 1 : 0;
-        offsets.push(groupCount + offsets[offsets.length - 1]);
-      } else {
-        offsets.push(offsets[offsets.length - 1]);
+      for (const symbolNode of [...this.spec].filter((n) => n.isSymbol())) {
+        const node = symbolNode.toSym();
+
+        if (hasKey(this.requirements, node)) {
+          const reqs = this.requirements[node];
+          const re = new RegExp(
+            `(?:${regexUnion(reqs)})|`,
+            combinedFlagsFor([reqs], { outer: false }),
+          );
+          const m = re.exec("");
+          offsets.push((m ? m.length - 1 : 0) + offsets[offsets.length - 1]);
+        } else {
+          offsets.push(offsets[offsets.length - 1]);
+        }
       }
+
+      this._offsets = offsets;
     }
-    this._offsets = offsets;
-    return offsets;
+    return this._offsets;
   }
 }
 

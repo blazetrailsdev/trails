@@ -1,14 +1,13 @@
 export type Token = "SLASH" | "DOT" | "LPAREN" | "RPAREN" | "OR" | "SYMBOL" | "STAR" | "LITERAL";
 
-const STATIC_TOKENS: Record<string, Token> = {
-  ".": "DOT",
-  "/": "SLASH",
-  "(": "LPAREN",
-  ")": "RPAREN",
-  "|": "OR",
-  ":": "SYMBOL",
-  "*": "STAR",
-};
+const STATIC_TOKENS: (Token | undefined)[] = new Array(150);
+STATIC_TOKENS[".".charCodeAt(0)] = "DOT";
+STATIC_TOKENS["/".charCodeAt(0)] = "SLASH";
+STATIC_TOKENS["(".charCodeAt(0)] = "LPAREN";
+STATIC_TOKENS[")".charCodeAt(0)] = "RPAREN";
+STATIC_TOKENS["|".charCodeAt(0)] = "OR";
+STATIC_TOKENS[":".charCodeAt(0)] = "SYMBOL";
+STATIC_TOKENS["*".charCodeAt(0)] = "STAR";
 
 const WORD = /\w+/y;
 const LITERAL_RUN = /(?:[\w%\-~!$&'*+,;=@]|\\[:()])+/y;
@@ -44,9 +43,14 @@ export class Scanner {
   }
 
   /** @internal */
+  peekByte(): number {
+    return this._str.charCodeAt(this._pos);
+  }
+
+  /** @internal */
   private scan(): Token | null {
-    const ch = this._str[this._pos];
-    const staticTok = STATIC_TOKENS[ch];
+    const nextByte = this.peekByte();
+    const staticTok = STATIC_TOKENS[nextByte];
 
     if (staticTok !== undefined && (staticTok !== "SYMBOL" || this.isNextByteIsNotAToken())) {
       this._pos += 1;
@@ -75,7 +79,6 @@ export class Scanner {
 
   /** @internal */
   private isNextByteIsNotAToken(): boolean {
-    const next = this._str[this._pos + 1];
-    return next === undefined || STATIC_TOKENS[next] === undefined;
+    return STATIC_TOKENS[this._str.charCodeAt(this._pos + 1)] === undefined;
   }
 }

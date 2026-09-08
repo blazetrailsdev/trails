@@ -1,5 +1,5 @@
 import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
-import { getChildProcess } from "@blazetrails/ruby-compat";
+import { ArgumentError, getChildProcess, rbObjClass } from "@blazetrails/ruby-compat";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
 import { renderVisualizer } from "../visualizer.js";
@@ -77,31 +77,37 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     const nextStates: Array<readonly [number, number | null]> = [];
 
     const tok = fullString.slice(startIndex, endIndex);
-    const tokenMatchesDefault = DEFAULT_EXP_ANCHORED.test(tok);
+    const tokenMatchesDefaultComponent = DEFAULT_EXP_ANCHORED.test(tok);
 
     for (const [s, previousStart] of t) {
+      let states: Map<RegExp, number> | Map<string, number> | undefined;
       if (previousStart === null) {
-        if (tokenMatchesDefault) {
-          const stds = this._stdparamStates.get(s);
-          if (stds) {
-            for (const [, v] of stds) {
-              if (v != null) nextStates.push([v, null] as const);
-            }
+        if (tokenMatchesDefaultComponent && (states = this._stdparamStates.get(s))) {
+          for (const [, v] of states) {
+            if (v != null) nextStates.push([v, null] as const);
           }
         }
-        const strs = this._stringStates.get(s);
-        if (strs && strs.has(tok)) {
-          nextStates.push([strs.get(tok)!, null] as const);
+
+        if ((states = this._stringStates.get(s))) {
+          if (states.get(tok) != null) nextStates.push([states.get(tok)!, null] as const);
         }
       }
 
-      const regs = this._regexpStates.get(s);
-      if (regs) {
-        const sliceStart = previousStart ?? startIndex;
-        const curr = fullString.slice(sliceStart, endIndex);
-        for (const [re, v] of regs) {
-          if (v != null && re.test(curr)) nextStates.push([v, null] as const);
+      if ((states = this._regexpStates.get(s))) {
+        let sliceStart;
+        if (previousStart === null) {
+          sliceStart = startIndex;
+        } else {
+          sliceStart = previousStart;
         }
+
+        const sliceLength = endIndex - sliceStart;
+        const currSlice = fullString.slice(sliceStart, sliceStart + sliceLength);
+
+        for (const [re, v] of states) {
+          if (v != null && re.test(currSlice)) nextStates.push([v, null] as const);
+        }
+
         nextStates.push([s, sliceStart] as const);
       }
     }
@@ -110,23 +116,20 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   set(from: number, to: number, sym: Edge): void {
-    if (sym instanceof RegExp) {
-      const map = this.statesHashFor(sym);
-      let inner = map.get(from);
-      if (!inner) {
-        inner = new Map();
-        map.set(from, inner);
-      }
-      const anchored = isDefaultExp(sym) ? DEFAULT_EXP_ANCHORED : anchorPreservingFlags(sym);
-      inner.set(anchored, to);
-    } else {
-      let inner = this._stringStates.get(from);
-      if (!inner) {
-        inner = new Map();
-        this._stringStates.set(from, inner);
-      }
-      inner.set(sym, to);
+    const statesHash = this.statesHashFor(sym);
+    let toMappings = statesHash.get(from);
+    if (!toMappings) {
+      toMappings = new Map();
+      statesHash.set(from, toMappings);
     }
+    if (sym instanceof RegExp) {
+      if (isDefaultExp(sym)) {
+        sym = DEFAULT_EXP_ANCHORED;
+      } else {
+        sym = anchorPreservingFlags(sym);
+      }
+    }
+    toMappings.set(sym, to);
   }
 
   states(): readonly number[] {
@@ -226,8 +229,18 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   /** @internal */
-  private statesHashFor(sym: RegExp): Map<number, Map<RegExp, number>> {
-    return isDefaultExp(sym) ? this._stdparamStates : this._regexpStates;
+  private statesHashFor(sym: Edge): Map<number, Map<Edge, number>> {
+    if (typeof sym === "string") {
+      return this._stringStates as Map<number, Map<Edge, number>>;
+    } else if (sym instanceof RegExp) {
+      if (isDefaultExp(sym)) {
+        return this._stdparamStates as Map<number, Map<Edge, number>>;
+      } else {
+        return this._regexpStates as Map<number, Map<Edge, number>>;
+      }
+    } else {
+      throw new ArgumentError(`unknown symbol: ${rbObjClass(sym)}`);
+    }
   }
 }
 
