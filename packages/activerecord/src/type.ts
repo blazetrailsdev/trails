@@ -12,7 +12,6 @@ import {
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import { ConnectionNotEstablished } from "./errors.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 
@@ -122,21 +121,12 @@ export function defaultValue(): ValueType {
 }
 
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  let configAdapter: string | undefined;
-  try {
-    configAdapter = model.connectionDbConfig()?.adapter;
-  } catch (error) {
-    if (!(error instanceof ConnectionNotEstablished)) throw error;
-    return "sqlite3";
-  }
-  if (configAdapter === undefined) return "sqlite3";
-  return adapterNameFromConfig(configAdapter);
+  return adapterNameFromConfig(model.connectionDbConfig()?.adapter);
 }
 
 /** @internal */
 export function currentAdapterName(): AdapterName {
-  const base = _currentAdapterResolver?.();
-  return base ? adapterNameFrom(base) : "sqlite3";
+  return adapterNameFrom(_currentAdapterResolver!());
 }
 
 typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date

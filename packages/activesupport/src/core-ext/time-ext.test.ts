@@ -780,7 +780,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("last week", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(lastWeek(new Date(2005, 2, 1, 15, 15, 10), "monday"));
+      const result = asDate(lastWeek(new Date(2005, 2, 1, 15, 15, 10), ":monday"));
       expect(result.getDay()).toBe(1);
       expect(result.getDate()).toBe(21);
     });
@@ -788,7 +788,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight start", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek(new Date(2006, 3, 2, 23, 1, 0), "monday"));
+      const result = asDate(nextWeek(new Date(2006, 3, 2, 23, 1, 0), ":monday"));
       expect(result.getDate()).toBe(3);
       expect(result.getMonth()).toBe(3);
     });
@@ -796,7 +796,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek(new Date(2006, 9, 29, 23, 1, 0), "monday"));
+      const result = asDate(nextWeek(new Date(2006, 9, 29, 23, 1, 0), ":monday"));
       expect(result.getDate()).toBe(30);
       expect(result.getMonth()).toBe(9);
     });

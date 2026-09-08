@@ -15,7 +15,14 @@ export type SslOptions = {
   secureCookies?: boolean;
   redirect?: unknown;
 };
-type WeekDay = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
+type WeekDay =
+  | ":sunday"
+  | ":monday"
+  | ":tuesday"
+  | ":wednesday"
+  | ":thursday"
+  | ":friday"
+  | ":saturday";
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
 export class Configuration extends EngineConfiguration {
@@ -31,7 +38,7 @@ export class Configuration extends EngineConfiguration {
   forceSsl = false;
   sslOptions: SslOptions = {};
   timeZone = "UTC";
-  beginningOfWeek: WeekDay = "monday";
+  beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
   logLevel: LogLevel = "debug";
   logFormatter: unknown = null;

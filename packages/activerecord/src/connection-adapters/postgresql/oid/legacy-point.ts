@@ -1,47 +1,37 @@
+import { kernelFloat } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
-export class LegacyPoint extends ValueType<[number, number]> {
+export class LegacyPoint extends ValueType {
   override type(): string {
     return "point";
   }
 
-  cast(value: unknown): [number, number] | null {
-    if (value == null) return null;
-    if (globalThis.Array.isArray(value) && value.length === 2) {
-      return [Number(value[0]), Number(value[1])];
-    }
+  cast(value: unknown): unknown {
     if (typeof value === "string") {
-      if (value === "") return null;
-      return this.parsePoint(value);
+      if (value.startsWith("(") && value.endsWith(")")) {
+        value = value.slice(1, -1);
+      }
+      return this.cast((value as string).split(","));
     }
-    return null;
+    if (globalThis.Array.isArray(value)) {
+      return value.map((v) => kernelFloat(v));
+    }
+    return value;
   }
 
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (globalThis.Array.isArray(value) && value.length === 2) {
+  override serialize(value: unknown): unknown {
+    if (globalThis.Array.isArray(value)) {
       return `(${this.numberForPoint(value[0])},${this.numberForPoint(value[1])})`;
     }
-    if (typeof value === "string") return value;
-    return null;
+    return super.serialize(value);
   }
 
-  deserialize(value: unknown): [number, number] | null {
+  deserialize(value: unknown): unknown {
     return this.cast(value);
   }
 
   private numberForPoint(number: unknown): string {
     const s = String(number);
     return s.endsWith(".0") ? s.slice(0, -2) : s;
-  }
-
-  private parsePoint(str: string): [number, number] | null {
-    const cleaned = str.replace(/[()]/g, "").trim();
-    const parts = cleaned.split(",").map((s) => s.trim());
-    if (parts.length !== 2) return null;
-    const x = parseFloat(parts[0]);
-    const y = parseFloat(parts[1]);
-    if (isNaN(x) || isNaN(y)) return null;
-    return [x, y];
   }
 }

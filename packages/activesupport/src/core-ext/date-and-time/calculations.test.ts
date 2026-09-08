@@ -314,7 +314,7 @@ describe("DateAndTimeBehavior", () => {
       dateTimeInit(2005, 2, 28, 0, 0, 0),
     );
     expectSame(
-      { date: nextWeek(feb.date, "friday"), time: nextWeek(feb.time, "friday") },
+      { date: nextWeek(feb.date, ":friday"), time: nextWeek(feb.time, ":friday") },
       dateTimeInit(2005, 3, 4, 0, 0, 0),
     );
     const oct = dateTimeInit(2006, 10, 23, 0, 0, 0);
@@ -323,19 +323,19 @@ describe("DateAndTimeBehavior", () => {
       dateTimeInit(2006, 10, 30, 0, 0, 0),
     );
     expectSame(
-      { date: nextWeek(oct.date, "wednesday"), time: nextWeek(oct.time, "wednesday") },
+      { date: nextWeek(oct.date, ":wednesday"), time: nextWeek(oct.time, ":wednesday") },
       dateTimeInit(2006, 11, 1, 0, 0, 0),
     );
   });
 
   it("next_week_with_default_beginning_of_week_set", () => {
-    withBwDefault("tuesday", () => {
+    withBwDefault(":tuesday", () => {
       const from = new Date(2012, 2, 21);
       for (const [day, y, m, d] of [
-        ["wednesday", 2012, 3, 28],
-        ["saturday", 2012, 3, 31],
-        ["tuesday", 2012, 3, 27],
-        ["monday", 2012, 4, 2],
+        [":wednesday", 2012, 3, 28],
+        [":saturday", 2012, 3, 31],
+        [":tuesday", 2012, 3, 27],
+        [":monday", 2012, 4, 2],
       ] as [string, number, number, number][]) {
         expect(nextWeek(from, day).epochMilliseconds).toBe(new Date(y, m - 1, d).getTime());
       }
@@ -346,30 +346,30 @@ describe("DateAndTimeBehavior", () => {
     const feb = dateTimeInit(2005, 2, 22, 15, 15, 10);
     expectSame(
       {
-        date: nextWeek(feb.date, "monday", { sameTime: true }),
-        time: nextWeek(feb.time, "monday", { sameTime: true }),
+        date: nextWeek(feb.date, ":monday", { sameTime: true }),
+        time: nextWeek(feb.time, ":monday", { sameTime: true }),
       },
       dateTimeInit(2005, 2, 28, 15, 15, 10),
     );
     expectSame(
       {
-        date: nextWeek(feb.date, "friday", { sameTime: true }),
-        time: nextWeek(feb.time, "friday", { sameTime: true }),
+        date: nextWeek(feb.date, ":friday", { sameTime: true }),
+        time: nextWeek(feb.time, ":friday", { sameTime: true }),
       },
       dateTimeInit(2005, 3, 4, 15, 15, 10),
     );
     const oct = dateTimeInit(2006, 10, 23, 0, 0, 0);
     expectSame(
       {
-        date: nextWeek(oct.date, "monday", { sameTime: true }),
-        time: nextWeek(oct.time, "monday", { sameTime: true }),
+        date: nextWeek(oct.date, ":monday", { sameTime: true }),
+        time: nextWeek(oct.time, ":monday", { sameTime: true }),
       },
       dateTimeInit(2006, 10, 30, 0, 0, 0),
     );
     expectSame(
       {
-        date: nextWeek(oct.date, "wednesday", { sameTime: true }),
-        time: nextWeek(oct.time, "wednesday", { sameTime: true }),
+        date: nextWeek(oct.date, ":wednesday", { sameTime: true }),
+        time: nextWeek(oct.time, ":wednesday", { sameTime: true }),
       },
       dateTimeInit(2006, 11, 1, 0, 0, 0),
     );
@@ -429,11 +429,11 @@ describe("DateAndTimeBehavior", () => {
       dateTimeInit(2005, 2, 21, 0, 0, 0),
     );
     expectSame(
-      { date: prevWeek(march.date, "tuesday"), time: prevWeek(march.time, "tuesday") },
+      { date: prevWeek(march.date, ":tuesday"), time: prevWeek(march.time, ":tuesday") },
       dateTimeInit(2005, 2, 22, 0, 0, 0),
     );
     expectSame(
-      { date: prevWeek(march.date, "friday"), time: prevWeek(march.time, "friday") },
+      { date: prevWeek(march.date, ":friday"), time: prevWeek(march.time, ":friday") },
       dateTimeInit(2005, 2, 25, 0, 0, 0),
     );
     const nov = dateTimeInit(2006, 11, 6, 0, 0, 0);
@@ -443,19 +443,19 @@ describe("DateAndTimeBehavior", () => {
     );
     const nov23 = dateTimeInit(2006, 11, 23, 0, 0, 0);
     expectSame(
-      { date: prevWeek(nov23.date, "wednesday"), time: prevWeek(nov23.time, "wednesday") },
+      { date: prevWeek(nov23.date, ":wednesday"), time: prevWeek(nov23.time, ":wednesday") },
       dateTimeInit(2006, 11, 15, 0, 0, 0),
     );
   });
 
   it("prev_week_with_default_beginning_of_week", () => {
-    withBwDefault("tuesday", () => {
+    withBwDefault(":tuesday", () => {
       const from = new Date(2012, 2, 21);
       for (const [day, y, m, d] of [
-        ["wednesday", 2012, 3, 14],
-        ["saturday", 2012, 3, 17],
-        ["tuesday", 2012, 3, 13],
-        ["monday", 2012, 3, 19],
+        [":wednesday", 2012, 3, 14],
+        [":saturday", 2012, 3, 17],
+        [":tuesday", 2012, 3, 13],
+        [":monday", 2012, 3, 19],
       ] as [string, number, number, number][]) {
         expect(prevWeek(from, day).epochMilliseconds).toBe(new Date(y, m - 1, d).getTime());
       }
@@ -465,9 +465,9 @@ describe("DateAndTimeBehavior", () => {
   it("prev_week_at_same_time", () => {
     const march = dateTimeInit(2005, 3, 1, 15, 15, 10);
     for (const [day, y, m, d] of [
-      ["monday", 2005, 2, 21],
-      ["tuesday", 2005, 2, 22],
-      ["friday", 2005, 2, 25],
+      [":monday", 2005, 2, 21],
+      [":tuesday", 2005, 2, 22],
+      [":friday", 2005, 2, 25],
     ] as [string, number, number, number][]) {
       expectSame(
         {
@@ -553,18 +553,18 @@ describe("DateAndTimeBehavior", () => {
       [7, 6],
     ]) {
       const at = dateTimeInit(2011, 11, d, 0, 0, 0);
-      expect(daysToWeekStart(at.date, "tuesday")).toBe(expected);
-      expect(daysToWeekStart(at.time, "tuesday")).toBe(expected);
+      expect(daysToWeekStart(at.date, ":tuesday")).toBe(expected);
+      expect(daysToWeekStart(at.time, ":tuesday")).toBe(expected);
     }
 
     for (const [d, startDay] of [
-      [3, "monday"],
-      [4, "tuesday"],
-      [5, "wednesday"],
-      [6, "thursday"],
-      [7, "friday"],
-      [8, "saturday"],
-      [9, "sunday"],
+      [3, ":monday"],
+      [4, ":tuesday"],
+      [5, ":wednesday"],
+      [6, ":thursday"],
+      [7, ":friday"],
+      [8, ":saturday"],
+      [9, ":sunday"],
     ] as [number, string][]) {
       const at = dateTimeInit(2011, 11, d, 0, 0, 0);
       expect(daysToWeekStart(at.date, startDay)).toBe(3);
@@ -573,7 +573,7 @@ describe("DateAndTimeBehavior", () => {
   });
 
   it("days_to_week_start_with_default_set", () => {
-    withBwDefault("friday", () => {
+    withBwDefault(":friday", () => {
       for (const [d, expected] of [
         [8, 6],
         [7, 5],
@@ -664,13 +664,13 @@ describe("DateAndTimeBehavior", () => {
   it("next_occurring", () => {
     const from = dateTimeInit(2017, 12, 14, 3, 14, 15);
     for (const [day, d] of [
-      ["monday", 18],
-      ["tuesday", 19],
-      ["wednesday", 20],
-      ["thursday", 21],
-      ["friday", 15],
-      ["saturday", 16],
-      ["sunday", 17],
+      [":monday", 18],
+      [":tuesday", 19],
+      [":wednesday", 20],
+      [":thursday", 21],
+      [":friday", 15],
+      [":saturday", 16],
+      [":sunday", 17],
     ] as [string, number][]) {
       expectSame(
         { date: nextOccurring(from.date, day), time: nextOccurring(from.time, day) },
@@ -682,13 +682,13 @@ describe("DateAndTimeBehavior", () => {
   it("prev_occurring", () => {
     const from = dateTimeInit(2017, 12, 14, 3, 14, 15);
     for (const [day, d] of [
-      ["monday", 11],
-      ["tuesday", 12],
-      ["wednesday", 13],
-      ["thursday", 7],
-      ["friday", 8],
-      ["saturday", 9],
-      ["sunday", 10],
+      [":monday", 11],
+      [":tuesday", 12],
+      [":wednesday", 13],
+      [":thursday", 7],
+      [":friday", 8],
+      [":saturday", 9],
+      [":sunday", 10],
     ] as [string, number][]) {
       expectSame(
         { date: prevOccurring(from.date, day), time: prevOccurring(from.time, day) },
@@ -698,7 +698,7 @@ describe("DateAndTimeBehavior", () => {
   });
 
   it("monday_with_default_beginning_of_week_set", () => {
-    withBwDefault("saturday", () => {
+    withBwDefault(":saturday", () => {
       const from = dateTimeInit(2012, 9, 18, 0, 0, 0);
       expectSame(
         { date: monday(from.date), time: monday(from.time) },
@@ -708,7 +708,7 @@ describe("DateAndTimeBehavior", () => {
   });
 
   it("sunday_with_default_beginning_of_week_set", () => {
-    withBwDefault("wednesday", () => {
+    withBwDefault(":wednesday", () => {
       const from = dateTimeInit(2012, 9, 19, 0, 0, 0);
       expectSame(
         { date: sunday(from.date), time: sunday(from.time) },

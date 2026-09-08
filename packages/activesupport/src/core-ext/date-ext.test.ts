@@ -206,7 +206,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("next week in calendar reform", () => {
-    expect(nextWeek(pd(1582, 9, 30), "friday").toString()).toEqual(pd(1582, 10, 8).toString());
+    expect(nextWeek(pd(1582, 9, 30), ":friday").toString()).toEqual(pd(1582, 10, 8).toString());
     expect(nextWeek(pd(1582, 10, 4)).toString()).toEqual(pd(1582, 10, 11).toString());
   });
 
@@ -237,9 +237,9 @@ describe("DateExtCalculationsTest", () => {
   it("last week", () => {
     expect(toDate(asDate(lastWeek(d(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
     expect(toDate(asDate(lastWeek(d(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
-    expect(toDate(asDate(lastWeek(d(2010, 2, 19), "friday")))).toEqual(pd(2010, 2, 12));
-    expect(toDate(asDate(lastWeek(d(2010, 2, 19), "saturday")))).toEqual(pd(2010, 2, 13));
-    expect(toDate(asDate(lastWeek(d(2010, 3, 4), "saturday")))).toEqual(pd(2010, 2, 27));
+    expect(toDate(asDate(lastWeek(d(2010, 2, 19), ":friday")))).toEqual(pd(2010, 2, 12));
+    expect(toDate(asDate(lastWeek(d(2010, 2, 19), ":saturday")))).toEqual(pd(2010, 2, 13));
+    expect(toDate(asDate(lastWeek(d(2010, 3, 4), ":saturday")))).toEqual(pd(2010, 2, 27));
   });
 
   it("last quarter on 31st", () => {
@@ -381,7 +381,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("all week", () => {
     expect(rubyRange(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
-    expect(rubyRange(allWeek(d(2011, 6, 7), "sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
+    expect(rubyRange(allWeek(d(2011, 6, 7), ":sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
   });
 
   it("all month", () => {

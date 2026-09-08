@@ -28,7 +28,6 @@ import {
   RecordInvalid,
   type ValidationContextArg,
 } from "./validations.js";
-import { ReadonlyAttributeError } from "./readonly-attributes.js";
 import { ScopeRegistry } from "./scoping.js";
 
 interface PersistenceHost {
@@ -1145,8 +1144,8 @@ export async function _createRecord(
 
 /** @internal */
 export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
-  if ((this.constructor as any).readonlyAttributeQ?.(name)) {
-    throw new ReadonlyAttributeError(name);
+  if ((this.constructor as any).readonlyAttributeQ(name)) {
+    throw new ActiveRecordError(`${name} is marked as readonly`);
   }
 }
 

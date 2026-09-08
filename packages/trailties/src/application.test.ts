@@ -506,7 +506,7 @@ describe("Application::Configuration", () => {
     expect(c.considerAllRequestsLocal).toBe(false);
     expect(c.apiOnly).toBe(false);
     expect(c.timeZone).toBe("UTC");
-    expect(c.beginningOfWeek).toBe("monday");
+    expect(c.beginningOfWeek).toBe(":monday");
     expect(c.logLevel).toBe("debug");
     expect(c.publicFileServer).toEqual({ enabled: true, indexName: "index", headers: null });
     expect(c.assumeSsl).toBe(false);
