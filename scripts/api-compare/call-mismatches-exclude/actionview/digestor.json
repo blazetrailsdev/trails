@@ -2,15 +2,8 @@
   {
     "package": "actionview",
     "tsFile": "digestor.ts",
-    "rubyName": "digest",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "digestor.ts",
-    "rubyName": "digest",
-    "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "to_dep_map",
+    "call": "any?",
+    "reason": "Array#any? with no block is an emptiness test; the TS body spells it `this.children.length > 0`."
   }
 ]

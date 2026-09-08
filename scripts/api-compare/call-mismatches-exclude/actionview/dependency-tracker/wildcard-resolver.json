@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "dependency-tracker/wildcard-resolver.ts",
+    "rubyName": "resolve",
+    "call": "empty?",
+    "reason": "Array#empty? spelled `this.wildcardDependencies.length === 0`; JS arrays have no empty? method."
+  }
+]

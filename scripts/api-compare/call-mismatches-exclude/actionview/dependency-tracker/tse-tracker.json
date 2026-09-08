@@ -1,0 +1,30 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "dependency-tracker/tse-tracker.ts",
+    "rubyName": "add_static_dependency",
+    "call": "new",
+    "reason": "StringScanner.new is Ruby stdlib with no JS counterpart; the interpolation walk is spelled with an index over the string, keeping pre_match's whole-string semantics."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "dependency-tracker/tse-tracker.ts",
+    "rubyName": "explicit_dependencies",
+    "call": "flatten",
+    "reason": "String#scan returns nested match arrays that flatten collapses; String#matchAll yields one match object per hit, so the TS body maps the capture directly."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "dependency-tracker/tse-tracker.ts",
+    "rubyName": "render_dependencies",
+    "call": "call",
+    "reason": "RubyTracker#render_dependencies, which parity:api falls back onto this file; unported - see actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "dependency-tracker/tse-tracker.ts",
+    "rubyName": "render_dependencies",
+    "call": "new",
+    "reason": "RubyTracker#render_dependencies, which parity:api falls back onto this file; unported - see actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported."
+  }
+]
