@@ -317,14 +317,14 @@ export class Route {
       this._pathRequirements = safeReqs;
     }
     let missingKeys: string[] | null = null;
+    const tests = this._pathRequirements!;
     for (const key of this.requiredParts) {
-      const tests = this._pathRequirements![key];
-      if (tests == null) {
-        if (!Object.hasOwn(params, key) || params[key] == null) {
+      if (tests[key] == null) {
+        if (params[key] == null) {
           (missingKeys ??= []).push(key);
         }
       } else {
-        if (!tests.test(String(params[key] ?? ""))) {
+        if (!tests[key].test(String(params[key] ?? ""))) {
           (missingKeys ??= []).push(key);
         }
       }
