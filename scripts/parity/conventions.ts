@@ -329,6 +329,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/array/inquiry.rb": "array-inquirer.ts",
   "activesupport:core_ext/string/inquiry.rb": "string-inquirer.ts",
   "activesupport:inflector/transliterate.rb": "transliterate.ts",
+  // ARTest's `expand_config` is typed on `NamedConnection` and
+  // `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports
+  // from config.ts — porting it to config.ts would CREATE an import cycle.
+  "activerecord-test-support:config.rb": "connection.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */
@@ -762,39 +766,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveModel::Dirty#as_json (dirty.rb:264-268) exists only to add " +
-      "`mutations_from_database` / `mutations_before_last_save` to the " +
-      "serializer's `except:` list. Those names leak into Ruby's output because " +
-      "`Serialization#serializable_hash` reads `attributes`, which for a plain " +
-      "ActiveModel is commonly `instance_values` — and the mutation trackers are " +
-      "ivars on the model itself. In trails the trackers are not attributes: " +
-      "they live on a separate `DirtyTracker` object reachable only via " +
-      "`_dirty`, and `asJson` serializes through `serializableHash` over the " +
-      "declared attribute set, so the exclusion is inherent and a ported " +
-      "override would be a no-op. Scoped to dirty.rb so it cannot silence a " +
-      "genuine `as_json` gap elsewhere.",
-    names: ["as_json"],
-    rubyFiles: ["dirty.rb"],
-  },
-  {
-    reason:
-      "Calculations#build_count_subquery is realized inline inside trails' " +
-      "performCount (calculations.ts) — the limit/offset count path builds the " +
-      "subquery there rather than as a separate named method.",
-    names: ["build_count_subquery"],
-    rubyFiles: ["relation.rb", "relation/calculations.rb"],
-  },
-  {
-    reason:
-      "Calculations#perform_calculation is ported as the module-level free " +
-      "function performCalculation (calculations.ts), which matches against " +
-      "calculations.rb but is not an instance method on the Relation class " +
-      "surface that relation.rb compares against.",
-    names: ["perform_calculation"],
-    rubyFiles: ["relation.rb"],
-  },
-  {
-    reason:
       "AdapterHelper's four hand-written capability predicates are rendered by " +
       "packages/activerecord/src/support/supports.ts as entries in one " +
       "feature-keyed table (`default_expression`, `non_unique_constraint_name`, " +
@@ -820,16 +791,11 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "is expressed directly as the CONNECTIONS table in " +
       "packages/activerecord/src/support/connection.ts and the sub-setting " +
       "readers in config.ts — so there is no file to locate, copy from " +
-      "config.example.yml, or parse. `expand_config` (config.rb:26, private " +
-      "under config.rb's `private` at :13) IS ported, at connection.ts:269, " +
-      "next to the CONNECTIONS entries it expands: it is typed on " +
-      "`NamedConnection` and `ARUNIT_ENTRY_NAMES`, both declared in " +
-      "connection.ts, which already imports from config.ts — so moving it to " +
-      "config.ts would CREATE an import cycle, and dragging those declarations " +
-      "along would relocate the `connections:` vocabulary out of the file " +
-      "mirroring connection.rb. Scoped to config.rb, the only Ruby file in the " +
-      "tree that defines these names.",
-    names: ["config", "config_file", "read_config", "expand_config"],
+      "config.example.yml, or parse. Scoped to config.rb, the only Ruby file " +
+      "in the tree that defines these names. `expand_config` is NOT skipped: " +
+      "it is ported at connection.ts and pairs there now that the " +
+      "reopened-module bucketing is fixed.",
+    names: ["config", "config_file", "read_config"],
     rubyFiles: ["config.rb"],
   },
   {
@@ -838,7 +804,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "is an `initialize` on a module Rails installs with `prepend`, so it runs " +
       "as part of the *host's* constructor chain via `super`. TypeScript has no " +
       "expression for that: `prepend()` " +
-      "(packages/activesupport/src/prepend.ts) wraps methods on the prototype " +
+      "(packages/ruby-compat/src/prepend.ts) wraps methods on the prototype " +
       "and cannot wrap a constructor, so the port keeps the Rails name as an " +
       "exported `initialize` function that each rotatable class calls from its " +
       "own constructor (message-verifier.ts, message-encryptor.ts). There is no " +
@@ -948,7 +914,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "as a global side effect on a third-party package; the cost recorded there " +
       "is the Rails file path for these members. Scoped to the three " +
       "acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a " +
-      "trails-owned class and IS ported (time-with-zone.ts:955).",
+      "trails-owned class and IS ported (time-with-zone.ts:858).",
     names: ["acts_like_date?", "acts_like_time?"],
     rubyFiles: [
       "core_ext/date/acts_like.rb",
@@ -1172,7 +1138,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`headers.ts` already spells `Hash#key(value)` — the value-to-key lookup " +
       "Headers inherits rather than redefines, and which rack's own suite " +
       "exercises — at that name, so the mapped site is occupied by a DIFFERENT " +
-      "Ruby method. The faithful port of the alias is `hasKey` (headers.ts:77), " +
+      "Ruby method. The faithful port of the alias is `hasKey` (headers.ts:52), " +
       "the port of the `has_key?` it aliases; a second declaration could only " +
       "be a synonym under a name Rails does not have. Scoped to headers.rb so " +
       "`key?` stays expected wherever the spelling is free. `include?` and " +
