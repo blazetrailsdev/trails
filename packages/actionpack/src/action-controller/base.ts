@@ -14,7 +14,9 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import { MissingFile, UnknownFormat } from "./metal/exceptions.js";
+import { MissingFile, RespondToMismatchError, UnknownFormat } from "./metal/exceptions.js";
+import { _processFormat } from "../abstract-controller/rendering.js";
+import { _setRenderedContentType } from "./metal/rendering.js";
 import { defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -484,16 +486,18 @@ export class Base extends Metal {
     const collector = new Collector(mimes as string[], this.request?.variant ?? null);
     if (block) block(collector);
 
-    const symbol = this.request?.format?.symbol;
-    const format = symbol != null ? symbolToS(symbol) : undefined;
-    const accept = this.request?.getHeader("accept") ?? undefined;
-
-    const result = collector.negotiate({ format, accept });
-    if (!result) {
+    const format = collector.negotiateFormat(this.request ?? {});
+    if (format != null) {
+      if (this.mediaType && this.mediaType !== format) {
+        throw new RespondToMismatchError();
+      }
+      _processFormat.call(this, format);
+      if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
+      const response = collector.response;
+      if (response) response();
+    } else {
       throw new UnknownFormat();
     }
-
-    result.handler();
   }
 
   set notice(value: string) {
