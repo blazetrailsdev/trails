@@ -3,7 +3,7 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
@@ -31,7 +31,9 @@ export function setBeginningOfWeek(weekStart: string): void {
 
 export function findBeginningOfWeekBang(weekStart: string): string {
   if (!Object.prototype.hasOwnProperty.call(DAYS_INTO_WEEK, weekStart)) {
-    throw new ArgumentError(`Invalid beginning of week: ${symbolToS(weekStart)}`);
+    throw new ArgumentError(
+      `Invalid beginning of week: ${isSymbol(weekStart) ? symbolToS(weekStart) : weekStart}`,
+    );
   }
   return weekStart;
 }
