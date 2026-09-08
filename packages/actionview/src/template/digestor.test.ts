@@ -21,13 +21,13 @@ const FIXTURES: Record<string, string> = {
   "messages/actions/_move.html.tse": "",
   "messages/edit.html.tse": `<%= render              "header" %>
 <%= render    partial:  "form" %>
-<%= render              @message %>
-<%= render ( @message.events ) %>
-<%= render    :partial =>    "comments/comment", :collection => @message.comments %>
+<%= render              this.message %>
+<%= render ( this.message.events ) %>
+<%= render    partial:    "comments/comment", collection: this.message.comments %>
 `,
   "messages/_form.html.tse": "",
   "messages/_header.html.tse": "",
-  "messages/index.html.tse": "<%= render @messages %>\n<%= render @events %>\n",
+  "messages/index.html.tse": "<%= render this.messages %>\n<%= render this.events %>\n",
   "messages/_message.html.tse": "THIS BE WHERE THEM MESSAGE GO, YO!",
   "messages/peek.html.tse": `<%# Template Dependency: messages/message %>
 <%= render "comments/comments" %>
@@ -38,7 +38,7 @@ const FIXTURES: Record<string, string> = {
 
 <%= render "messages/actions/move" %>
 
-<%= render @message.history.events %>
+<%= render this.message.history.events %>
 
 <%= render "something_missing"   %>
 <%= render "something_missing_1" %>

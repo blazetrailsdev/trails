@@ -8,18 +8,18 @@ import { WildcardResolver } from "./wildcard-resolver.js";
 export class TSETracker {
   static EXPLICIT_DEPENDENCY = /# Template Dependency: (\S+)/g;
 
-  static IDENTIFIER = /[\p{Alphabetic}_][\p{Alphabetic}\p{Nd}\p{Mn}\p{Mc}\p{Pc}]*/u;
+  static IDENTIFIER = /[\p{ID_Start}$_][\p{ID_Continue}$]*/u;
 
   static VARIABLE_OR_METHOD_CHAIN = new RegExp(
-    `(?:\\$|@{1,2})?(?:${this.IDENTIFIER.source}\\.)*(?<dynamic>${this.IDENTIFIER.source})`,
+    `(?:${this.IDENTIFIER.source}\\.)*(?<dynamic>${this.IDENTIFIER.source})`,
     "u",
   );
 
-  static STRING = /(?<quote>['"])(?<static>.*?)\k<quote>/su;
+  static STRING = /(?<quote>['"`])(?<static>.*?)\k<quote>/su;
 
-  static PARTIAL_HASH_KEY = /(?:\bpartial:|:partial\s*=>)\s*/u;
+  static PARTIAL_HASH_KEY = /(?:\bpartial:)\s*/u;
 
-  static LAYOUT_HASH_KEY = /(?:\blayout:|:layout\s*=>)\s*/u;
+  static LAYOUT_HASH_KEY = /(?:\blayout:)\s*/u;
 
   static RENDER_ARGUMENTS = new RegExp(
     `^(?:\\s*\\(?\\s*)(?:.*?${this.PARTIAL_HASH_KEY.source}|${this.LAYOUT_HASH_KEY.source})?(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
@@ -103,12 +103,12 @@ export class TSETracker {
     dependency: string | undefined,
     quoteType: string | undefined,
   ): void {
-    if (quoteType === '"' && dependency != null && dependency.includes("#{")) {
+    if (quoteType === "`" && dependency != null && dependency.includes("${")) {
       let pos = 0;
       let wildcardDependency = "";
 
       while (pos < dependency.length) {
-        const interpolation = dependency.indexOf("#{", pos);
+        const interpolation = dependency.indexOf("${", pos);
         if (interpolation >= 0) {
           let unmatchedBrackets = 1;
           wildcardDependency += dependency.slice(0, interpolation);
