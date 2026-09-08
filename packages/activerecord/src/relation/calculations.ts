@@ -733,16 +733,16 @@ function buildCountSubquery(
   distinct: boolean,
 ): SelectManager {
   const isAll = columnName === ":all";
-  let columnAlias: Nodes.Node;
+  let columnAlias: Nodes.SqlLiteral;
   if (isAll) {
     columnAlias = new Nodes.SqlLiteral("*");
     if (!distinct) relation.selectValues = [new Nodes.SqlLiteral("1 AS one")];
   } else {
     columnAlias = new Nodes.SqlLiteral("count_column");
     const column = aggregateColumn(relation, columnName) as Nodes.Node & {
-      as(alias: string): Nodes.Node;
+      as(alias: Nodes.SqlLiteral): Nodes.Node;
     };
-    relation.selectValues = [column.as("count_column")];
+    relation.selectValues = [column.as(columnAlias)];
   }
 
   const subqueryAlias = "subquery_for_count";
