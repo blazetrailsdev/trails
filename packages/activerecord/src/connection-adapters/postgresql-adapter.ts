@@ -2525,12 +2525,6 @@ export interface PostgreSQLAdapter {
 
   createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 
-  /** @noRailsEquivalent PERMANENT */
-  createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
-
-  /** @noRailsEquivalent PERMANENT */
-  dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
-
   dropDatabase(name: string): Promise<void>;
 
   recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
@@ -2724,7 +2718,6 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
 dirtiesQueryCache(PostgreSQLAdapter, "rollbackToSavepoint");
-dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 include(PostgreSQLAdapter, SchemaStatements);
 

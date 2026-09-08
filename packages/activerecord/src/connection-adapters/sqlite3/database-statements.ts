@@ -7,7 +7,6 @@ import { Result } from "../../result.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
-  execute as abstractExecute,
   type DatabaseStatementsHost,
   type ExplainOption,
 } from "../abstract/database-statements.js";
@@ -98,7 +97,7 @@ export async function execute(
   name?: string | null,
   options?: { allowRetry?: boolean },
 ): Promise<Record<string, unknown>[] | undefined> {
-  const result = (await abstractExecute.call(
+  const result = (await AbstractAdapter.prototype.execute.call(
     this as DatabaseStatementsHost,
     sql,
     name,
