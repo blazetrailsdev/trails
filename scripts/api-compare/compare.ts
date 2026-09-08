@@ -2933,9 +2933,19 @@ function isPackageBarrel(file: string): boolean {
  * Keyed `<package>:<ruby file>`. Only-shrink: a row leaves when the file is
  * ported, never when a better justification is found for keeping it.
  *
- * Currently empty.
+ * `dependency_tracker/ruby_tracker.rb` is the sibling-interface shape: every one
+ * of its nine members shares a name with a member of `ERBTracker`, whose port
+ * IS `dependency-tracker/tse-tracker.ts`, so the vote lands the whole bucket
+ * there and reads it 9/9 ported. Nothing in that file ports RubyTracker —
+ * `render_dependencies` needs `RenderParser::Default` (`ruby_tracker.rb:29-33`),
+ * which is unported — so the credit is a coincidence of names and the bucket
+ * must read as missing. It leaves when
+ * `actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported`
+ * lands `dependency-tracker/ruby-tracker.ts`.
  */
-export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([]);
+export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
+  "actionview:dependency_tracker/ruby_tracker.rb",
+]);
 
 /**
  * Whether a Ruby file has SOME real TS counterpart the compare can point at:

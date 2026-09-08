@@ -1,32 +1,190 @@
-/** @internal */
+import { Digest } from "@blazetrails/activesupport/digest";
 
+import { _Base } from "./base-slot.js";
+import { DependencyTracker } from "./dependency-tracker.js";
 import type { LookupContext } from "./lookup-context.js";
+import type { Template } from "./template.js";
+import { TemplatePath } from "./template-path.js";
+
+export type NestedDependencies = ReadonlyArray<string | NestedDependencies>;
 
 export interface DigestorOptions {
   name: string;
   format?: string | null;
   finder: LookupContext;
-  dependencies?: string[] | null;
+  dependencies?: NestedDependencies | null;
+}
+
+interface Logger {
+  error(message: string): void;
 }
 
 export class Digestor {
+  static digest({ name, format = null, finder, dependencies = null }: DigestorOptions): string {
+    let cacheKey: string;
+    if (dependencies == null || dependencies.length === 0) {
+      cacheKey = `${name}.${format ?? ""}`;
+    } else {
+      const dependenciesSuffix = (dependencies as readonly unknown[])
+        .flat(Infinity)
+        .filter((dependency) => dependency != null)
+        .join(".");
+      cacheKey = `${name}.${format ?? ""}.${dependenciesSuffix}`;
+    }
+
+    const digestCache = finder.digestCache();
+    const cached = digestCache.get(cacheKey);
+    if (cached != null) return cached;
+
+    const path = TemplatePath.parse(name);
+    const root = this.tree(path.toString(), finder, path.isPartial());
+    if (dependencies) {
+      for (const injectedDep of dependencies) {
+        root.children.push(new Injected(injectedDep as string, null, null));
+      }
+    }
+    const digest = root.digest(finder);
+    digestCache.set(cacheKey, digest);
+    return digest;
+  }
+
+  static logger(): Logger {
+    return (_Base!.logger as Logger | null) ?? NullLogger;
+  }
+
+  static tree(
+    name: string,
+    finder: LookupContext,
+    partial = false,
+    seen: Record<string, Node> = {},
+  ): Node {
+    const logicalName = name.replace(/\/_/g, "/");
+    const interpolated = name.includes("#");
+
+    const path = TemplatePath.parse(name);
+
+    let template: Template | null;
+    if (
+      !interpolated &&
+      (template = this.findTemplate(finder, path.name, [path.prefix], partial, []))
+    ) {
+      let node = seen[template.identifier];
+      if (node) {
+        return node;
+      } else {
+        node = seen[template.identifier] = Node.create(name, logicalName, template, partial);
+
+        const deps = DependencyTracker.findDependencies(name, template, finder.viewPaths);
+        for (const depFile of deps.filter(
+          (n, i) =>
+            deps.findIndex((dep) => dep.replace(/\/_/g, "/") === n.replace(/\/_/g, "/")) === i,
+        )) {
+          node.children.push(this.tree(depFile, finder, true, seen));
+        }
+        return node;
+      }
+    } else {
+      if (!interpolated) {
+        this.logger().error(`  Couldn't find template for digesting: ${name}`);
+      }
+
+      return (seen[name] ??= new Missing(name, logicalName, null));
+    }
+  }
+
   /** @internal */
-  static digest({ name, format, finder }: DigestorOptions): string {
-    const slash = name.lastIndexOf("/");
-    const prefix = slash >= 0 ? name.slice(0, slash) : "";
-    const action = slash >= 0 ? name.slice(slash + 1) : name;
-    const fmt = format ?? "html";
-    const source = finder.findTemplate(action, [prefix], [fmt])?.source ?? "";
-    return fnv1a64Hex(`${name}|${format ?? ""}|${source}`);
+  private static findTemplate(
+    finder: LookupContext,
+    name: string,
+    prefixes: ReadonlyArray<string>,
+    partial: boolean,
+    keys: ReadonlyArray<string>,
+  ): Template | null {
+    return finder.disableCache(
+      () => (finder.findAll(name, prefixes, partial, keys)[0] as Template) ?? null,
+    );
   }
 }
 
-function fnv1a64Hex(input: string): string {
-  let hash = 0xcbf29ce484222325n;
-  const prime = 0x100000001b3n;
-  const mask = 0xffffffffffffffffn;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash ^ BigInt(input.charCodeAt(i))) * prime) & mask;
+export class Node {
+  readonly name: string;
+  readonly logicalName: string | null;
+  readonly template: Template | null;
+  readonly children: Node[];
+
+  static create(
+    name: string,
+    logicalName: string | null,
+    template: Template | null,
+    partial: boolean,
+  ): Node {
+    const klass = partial ? Partial : Node;
+    return new klass(name, logicalName, template, []);
   }
-  return hash.toString(16).padStart(16, "0");
+
+  constructor(
+    name: string,
+    logicalName: string | null,
+    template: Template | null,
+    children: Node[] = [],
+  ) {
+    this.name = name;
+    this.logicalName = logicalName;
+    this.template = template;
+    this.children = children;
+  }
+
+  digest(finder: LookupContext, stack: Node[] = []): string {
+    return Digest.hexdigest(`${this.template!.source}-${this.dependencyDigest(finder, stack)}`);
+  }
+
+  dependencyDigest(finder: LookupContext, stack: Node[]): string {
+    return this.children
+      .map((node) => {
+        if (stack.includes(node)) {
+          return false;
+        } else {
+          let digest = finder.digestCache().get(node.name);
+          if (digest == null) {
+            stack.push(node);
+            digest = node.digest(finder, stack);
+            stack.pop();
+            finder.digestCache().set(node.name, digest);
+          }
+          return digest;
+        }
+      })
+      .flat(Infinity)
+      .join("-");
+  }
+
+  toDepMap(seen: Set<Node> = new Set()): unknown {
+    if (!seen.has(this)) {
+      seen.add(this);
+      return this.children.length > 0
+        ? { [this.name]: this.children.map((c) => c.toDepMap(seen)) }
+        : this.name;
+    } else {
+      return this.name;
+    }
+  }
+}
+
+export class Partial extends Node {}
+
+export class Missing extends Node {
+  override digest(finder: LookupContext, _: Node[] = []): string {
+    return "";
+  }
+}
+
+export class Injected extends Node {
+  override digest(finder: LookupContext, _: Node[] = []): string {
+    return this.name;
+  }
+}
+
+export class NullLogger {
+  static debug(_: string): void {}
+  static error(_: string): void {}
 }
