@@ -215,15 +215,7 @@ export class Mapper {
   root(path: string, options: RouteOptions = {}): void {
     options.to = path;
 
-    if (this._scope.scopeLevel === "resources") {
-      this.withScopeLevel("root", () => {
-        this.pathScope(this.parentResource()!.path, () => {
-          this.matchRootRoute(options);
-        });
-      });
-    } else {
-      this.matchRootRoute(options);
-    }
+    this.matchRootRoute(options);
   }
 
   resources(
