@@ -425,9 +425,9 @@ describe("cookies_rotations", () => {
   });
 
   it("encrypted cookie rotating secret", () => {
-    const secret = Buffer.alloc(MessageEncryptor.keyLen("aes-256-gcm"), "s");
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
     const rotations = new RotationConfiguration();
-    rotations.rotate("encrypted", secret, { cipher: "aes-256-gcm" });
+    rotations.rotate("encrypted", secret, { digest: "SHA1" });
 
     const oldMessage = new MessageEncryptor(secret, {
       cipher: "aes-256-gcm",
