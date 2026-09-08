@@ -2,49 +2,46 @@ import { quotingHost } from "../../support/quoting-host.js";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import {
-  formatInstantForSql,
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
-  formatInstantForSqlMysql,
-  formatPlainDateTimeForSqlMysql,
   formatPlainTimeForSqlMysql,
 } from "./sql-datetime.js";
-import { quote as quoteFn, typeCast as typeCastFn } from "./quoting.js";
+import { quote as quoteFn, quotedDate, typeCast as typeCastFn } from "./quoting.js";
 import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
 
 const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(quotingHost(), value);
 
-describe("formatInstantForSql", () => {
+describe("quotedDate", () => {
   it("formats a whole-second instant", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 
   it("pads millisecond precision to a fixed 6-digit microsecond field", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123000");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123000");
   });
 
   it("preserves microsecond precision", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123456");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123456");
   });
 
   it("caps fractional seconds at microseconds (drops nanoseconds)", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123456");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123456");
   });
 
   it("preserves the smallest possible non-zero value (1 µs)", () => {
     const v = Temporal.Instant.from("2024-01-01T00:00:00.000001Z");
-    expect(formatInstantForSql(v)).toBe("2024-01-01 00:00:00.000001");
+    expect(quotedDate(v)).toBe("2024-01-01 00:00:00.000001");
   });
 
   it("converts a non-UTC instant to UTC when default_timezone is utc (the default)", () => {
     const v = Temporal.Instant.from("2026-04-26T16:23:55+02:00");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 });
 
@@ -135,16 +132,6 @@ describe("typeCast of Temporal bind values", () => {
 });
 
 describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
-  it("formatInstantForSqlMysql drops nanoseconds", () => {
-    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(formatInstantForSqlMysql(v)).toBe("2026-04-26 14:23:55.123456");
-  });
-
-  it("formatPlainDateTimeForSqlMysql drops nanoseconds", () => {
-    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.123456789");
-    expect(formatPlainDateTimeForSqlMysql(v)).toBe("2026-04-26 14:23:55.123456");
-  });
-
   it("formatPlainTimeForSqlMysql drops nanoseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000000001");
     expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55");
@@ -159,14 +146,12 @@ describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
 describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   it("emits a fixed 6-digit field for a half-second (.5 → .500000)", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.5Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.500000");
-    expect(formatInstantForSqlMysql(v)).toBe("2026-04-26 14:23:55.500000");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.500000");
   });
 
   it("omits the fractional part when usec == 0", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
-    expect(formatInstantForSqlMysql(v)).toBe("2026-04-26 14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 
   it("omits the fractional part for a whole-second PlainTime (.000 → omitted)", () => {

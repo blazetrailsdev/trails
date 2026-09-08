@@ -10,7 +10,7 @@ import {
   DateInfinity,
   DateNegativeInfinity,
 } from "./temporal-wire.js";
-import { formatInstantForSql } from "./sql-datetime.js";
+import { quotedDate } from "./quoting.js";
 import { ActiveRecord } from "../../ar-config.js";
 
 describe("parsePostgresInstant", () => {
@@ -208,13 +208,13 @@ describe("naive parsers honor ActiveRecord.default_timezone", () => {
     const wireString = "2026-06-15 12:00:00";
     const parsed = parsePostgresTimestampAsInstant(wireString) as Temporal.Instant;
     expect(parsed).toBeInstanceOf(Temporal.Instant);
-    expect(formatInstantForSql(parsed)).toBe(wireString);
+    expect(quotedDate(parsed)).toBe(wireString);
   });
 
   it("MySQL DATETIME round-trips symmetrically with formatInstantForSql under local", () => {
     ActiveRecord.defaultTimezone = "local";
     const wireString = "2026-06-15 12:00:00";
     const parsed = parseMysqlDatetimeAsInstant(wireString) as Temporal.Instant;
-    expect(formatInstantForSql(parsed)).toBe(wireString);
+    expect(quotedDate(parsed)).toBe(wireString);
   });
 });
