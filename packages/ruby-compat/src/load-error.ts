@@ -9,4 +9,4 @@
  */
 export class LoadError extends Error {}
 
-Object.defineProperty(LoadError.prototype, "name", { value: "LoadError" });
+LoadError.prototype.name = "LoadError";

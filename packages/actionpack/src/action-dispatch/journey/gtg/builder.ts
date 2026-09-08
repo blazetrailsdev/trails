@@ -110,7 +110,7 @@ export class Builder {
       return this.isNullable(node.left as Node) && this.isNullable(node.right);
     if (node instanceof Terminal) return !node.left;
     if (node instanceof Unary) return this.isNullable(node.left as Node);
-    throw new ArgumentError(`unknown nullable: ${node.type}`);
+    throw new ArgumentError(`unknown nullable: ${node.constructor.name}`);
   }
 
   firstpos(node: Node): readonly Node[] {
@@ -137,7 +137,7 @@ export class Builder {
     }
     if (node instanceof Unary) return this.firstpos(node.left as Node);
     if (node instanceof Terminal) return this.isNullable(node) ? [] : [node];
-    throw new ArgumentError(`unknown firstpos: ${node.type}`);
+    throw new ArgumentError(`unknown firstpos: ${node.constructor.name}`);
   }
 
   lastpos(node: Node): readonly Node[] {
@@ -164,7 +164,7 @@ export class Builder {
     }
     if (node instanceof Terminal) return this.isNullable(node) ? [] : [node];
     if (node instanceof Unary) return this.lastpos(node.left as Node);
-    throw new ArgumentError(`unknown lastpos: ${node.type}`);
+    throw new ArgumentError(`unknown lastpos: ${node.constructor.name}`);
   }
 
   /** @internal */
