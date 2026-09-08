@@ -138,7 +138,7 @@ export interface ConstraintsRequest {
 
 /** @internal */
 class Mapping {
-  static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)$/;
+  static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)(?=\n?$)/;
 
   static normalizePath(path: string, format: boolean | undefined): string {
     path = Mapper.normalizePath(path);
@@ -212,13 +212,18 @@ export class Mapper {
     this.addRoute("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  root(to: string): void {
-    const [controller, action] = parseEndpoint(to);
-    this.addRouteToSet(
-      new Route("GET", this.currentPrefix() + "/", controller, action, {
-        name: this.prefixedName("root"),
-      }),
-    );
+  root(path: string, options: RouteOptions = {}): void {
+    options.to = path;
+
+    if (this._scope.scopeLevel === "resources") {
+      this.withScopeLevel("root", () => {
+        this.pathScope(this.parentResource()!.path, () => {
+          this.matchRootRoute(options);
+        });
+      });
+    } else {
+      this.matchRootRoute(options);
+    }
   }
 
   resources(

@@ -128,6 +128,14 @@ describe("Mapper public DSL additions", () => {
     expect(m.routes.map((r) => r.path)).toContain("/external(.:format)");
   });
 
+  it("root routes through match_root_route and keeps the bare slash", () => {
+    const m = new Mapper();
+    m.root("pages#home");
+
+    expect(m.routes.map((r) => r.path)).toContain("/");
+    expect(m.routes.find((r) => r.path === "/")!.name).toBe("root");
+  });
+
   it("draw raises when the external file is not found", async () => {
     const m = new Mapper();
     m._drawPaths.push("/nonexistent/config/routes");

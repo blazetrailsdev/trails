@@ -320,11 +320,13 @@ export class Route {
     const tests = this._pathRequirements!;
     for (const key of this.requiredParts) {
       if (tests[key] == null) {
-        if (params[key] == null) {
+        const v = params[key] as unknown;
+        if (v == null || v === false) {
           (missingKeys ??= []).push(key);
         }
       } else {
-        if (!tests[key].test(String(params[key] ?? ""))) {
+        const v = params[key] as unknown;
+        if (v == null || !tests[key].test(String(v))) {
           (missingKeys ??= []).push(key);
         }
       }

@@ -229,7 +229,8 @@ export class Formatter {
           (missing ??= []).push(key);
         }
       } else {
-        if (!test.test(String(parts[key] ?? ""))) {
+        const v = parts[key];
+        if (v == null || !test.test(String(v))) {
           (missing ??= []).push(key);
         }
       }
