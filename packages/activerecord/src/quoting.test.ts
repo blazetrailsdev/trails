@@ -30,10 +30,7 @@ const quoteTableNameForAssignment = (table: string, attr: string): string =>
   quoteTableNameForAssignmentFn.call(HOST, table, attr);
 const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
   quotedTimeFn.call(HOST, value);
-import {
-  formatInstantForSql,
-  formatPlainTimeForSql,
-} from "./connection-adapters/abstract/sql-datetime.js";
+import { formatPlainTimeForSql } from "./connection-adapters/abstract/sql-datetime.js";
 import { ActiveRecord } from "./ar-config.js";
 import { NotImplementedError } from "./errors.js";
 
@@ -59,12 +56,12 @@ describe("QuotingTest", () => {
 
   it("quoted date", () => {
     const d = Temporal.PlainDateTime.from("2026-04-07T00:00:00");
-    expect(formatInstantForSql(d.toZonedDateTime("UTC").toInstant())).toBe("2026-04-07 00:00:00");
+    expect(quotedDate(d.toZonedDateTime("UTC").toInstant())).toBe("2026-04-07 00:00:00");
   });
 
   it("quoted timestamp utc", () => {
     const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
-    expect(formatInstantForSql(t)).toBe("2026-04-07 15:30:00");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
 
   it("quoted time utc", () => {
@@ -262,7 +259,7 @@ describe("QuoteBooleanTest", () => {
 
   it("quoted date includes microseconds when present", () => {
     const t = Temporal.Instant.from("2026-04-07T15:30:45.123456Z");
-    expect(formatInstantForSql(t)).toBe("2026-04-07 15:30:45.123456");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:45.123456");
   });
 
   it("quoted time extracts time portion", () => {

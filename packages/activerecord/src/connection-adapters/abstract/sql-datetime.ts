@@ -51,10 +51,6 @@ export function defaultSqlTimezone(): string {
   return ActiveRecord.defaultTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId();
 }
 
-export function formatInstantForSql(value: Temporal.Instant): string {
-  return toFsDbWithUsec(strftimeSubject(value.toZonedDateTimeISO(defaultSqlTimezone())));
-}
-
 export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string {
   return toFsDbWithUsec(strftimeSubject(value));
 }
@@ -78,8 +74,6 @@ export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
   return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
-export const formatInstantForSqlMysql = formatInstantForSql;
-export const formatPlainDateTimeForSqlMysql = formatPlainDateTimeForSql;
 export const formatPlainTimeForSqlMysql = formatPlainTimeForSql;
 
 function microsecondFraction(usec: number): string {
