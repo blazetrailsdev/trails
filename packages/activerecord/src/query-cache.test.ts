@@ -54,8 +54,7 @@ function assertCache(
 }
 
 function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
-  return (pool as unknown as { _cacheConfig: { _queryCacheMaxSize: number | null } })._cacheConfig
-    ._queryCacheMaxSize;
+  return (pool as unknown as { _queryCacheMaxSize: number | null })._queryCacheMaxSize;
 }
 
 function cleanUpConnectionHandler(): void {

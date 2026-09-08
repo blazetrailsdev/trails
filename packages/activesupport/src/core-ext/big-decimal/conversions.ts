@@ -154,10 +154,35 @@ export class BigDecimal {
     );
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * Ruby's `BigDecimal#<=>` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:1657`
+   * `BigDecimal_comp`), which coerces an Integer or Float operand through
+   * `GetVpValueWithPrec` rather than answering nil for it. This is the
+   * `compareTo` spelling `ruby-compat`'s `cmp` dispatches on, so a BigDecimal
+   * orders against a Float — which `Range#cover?` needs for
+   * `INFINITE_FLOAT_RANGE.cover?(BigDecimal("Infinity"))`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  compareTo(other: unknown): number | null {
+    if (other instanceof BigDecimal) return this.compare(other);
+    if (typeof other === "bigint") return this.compare(new BigDecimal(other));
+    if (typeof other === "number") {
+      if (Number.isNaN(other)) return null;
+      return this.compare(new BigDecimal(other));
+    }
+    return null;
+  }
+
+  /**
+   * Ruby's `BigDecimal#==` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:1673`
+   * `BigDecimal_eq`), which is `<=>`-based and so is true for an equal
+   * Integer or Float.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   equals(other: unknown): boolean {
-    if (!(other instanceof BigDecimal)) return false;
-    return this.compare(other) === 0;
+    return this.compareTo(other) === 0;
   }
 
   /** @noRailsEquivalent PERMANENT */

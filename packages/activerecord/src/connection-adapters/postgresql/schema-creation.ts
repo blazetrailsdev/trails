@@ -1,4 +1,4 @@
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { wrap } from "@blazetrails/activesupport";
 import {
   SchemaCreation as AbstractSchemaCreation,
@@ -24,6 +24,7 @@ type PgTableDef = AbstractTableDefinition & {
 /** @internal */
 export interface PgSchemaCreationHost extends SchemaCreationConn {
   typeToSql(type: string, options?: Record<string, unknown>): string;
+  quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string>;
 }
 
 /** @internal */
@@ -218,20 +219,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return result;
   }
 
-  /** @internal */
   protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
-    const host = this.conn as PgSchemaCreationHost & {
-      quotedIncludeColumnsForIndex?(columns: string | string[]): Promise<string>;
-    };
-    if (typeof host.quotedIncludeColumnsForIndex === "function") {
-      return host.quotedIncludeColumnsForIndex(o);
-    }
-    if (typeof o === "string") return this.conn.quoteColumnName(isSymbol(o) ? symbolToS(o) : o);
-    return o.map((c) => this.conn.quoteColumnName(isSymbol(c) ? symbolToS(c) : c)).join(", ");
+    return this.conn.quotedIncludeColumnsForIndex(o);
   }
 
   /** @internal */
-  protected override async quotedIncludeColumns(o: string | string[]): Promise<string> {
+  protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
     return typeof o === "string" && !isSymbol(o) ? o : this.quotedIncludeColumnsForIndex(o);
   }
 

@@ -34,7 +34,6 @@ import {
   removeCheckConstraint as sqliteRemoveCheckConstraint,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   StatementInvalid,
@@ -399,18 +398,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
     return this.rawExecute(sql, name, binds, prepare, false, allowRetry, materializeTransactions);
-  }
-
-  async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   override quote(value: unknown): string {
@@ -1829,7 +1816,6 @@ function isInvalidAlterTableType(type: string, options: Record<string, unknown>)
   );
 }
 
-dirtiesQueryCache(SQLite3Adapter, "rollbackToSavepoint");
 SQLite3Adapter.prototype.beginDbTransaction = sqliteBeginDbTransaction;
 SQLite3Adapter.prototype.beginDeferredTransaction = sqliteBeginDeferredTransaction;
 SQLite3Adapter.prototype.beginIsolatedDbTransaction = sqliteBeginIsolatedDbTransaction;

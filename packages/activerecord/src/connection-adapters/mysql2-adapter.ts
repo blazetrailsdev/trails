@@ -15,7 +15,6 @@ import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
   AdapterError,
@@ -597,18 +596,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT \`${name}\``, "TRANSACTION");
-  }
-
-  async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT \`${name}\``, "TRANSACTION");
-  }
-
-  async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT \`${name}\``, "TRANSACTION");
-  }
-
   async explain(
     sql: string,
     binds: unknown[] = [],
@@ -1019,7 +1006,6 @@ function isMysql2ConnectionError(e: unknown): boolean {
 (Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =
   mysql2CastResult;
 
-dirtiesQueryCache(Mysql2Adapter, "rollbackToSavepoint");
 
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
 
