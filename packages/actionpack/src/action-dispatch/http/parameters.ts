@@ -109,7 +109,7 @@ export function parseFormattedParameters(
   if (this.contentLength === 0 || this.contentMimeType === null || !this.rawPost) {
     return fallback();
   }
-  const strategy = parsers[this.contentMimeType.symbol as string];
+  const strategy = parsers[this.contentMimeType.symbol!];
   if (!strategy) return fallback();
 
   try {
