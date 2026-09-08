@@ -157,7 +157,6 @@ const remoteCapabilities: SqliteDriverCapabilities = {
   concurrentStatements: false,
   foreignKeysOnByDefault: false,
   immediateTransactions: false,
-  sharedCache: false,
 };
 
 export const libsqlRemoteDriver: SqliteDriver = {
@@ -218,7 +217,6 @@ const replicaCapabilities: SqliteDriverCapabilities = {
   concurrentStatements: false,
   foreignKeysOnByDefault: false,
   immediateTransactions: false,
-  sharedCache: false,
 };
 
 export const libsqlReplicaDriver: SqliteDriver = {
@@ -237,7 +235,6 @@ const capabilities: SqliteDriverCapabilities = {
   concurrentStatements: true,
   foreignKeysOnByDefault: false,
   immediateTransactions: true,
-  sharedCache: false,
 };
 
 export const libsqlDriver: SqliteDriver = {

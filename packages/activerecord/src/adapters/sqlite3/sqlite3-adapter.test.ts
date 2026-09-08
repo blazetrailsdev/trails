@@ -777,7 +777,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         concurrentStatements: true,
         foreignKeysOnByDefault: false,
         immediateTransactions: false,
-        sharedCache: false,
       },
       open: () => Promise.reject(new Error("sync only")),
       openSync: (config: SqliteOpenConfig) => {

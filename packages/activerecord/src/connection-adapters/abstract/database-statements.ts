@@ -26,10 +26,10 @@ import {
   AsynchronousQueryInsideTransactionError,
   ActiveRecordError,
   Rollback,
-  FixtureError,
   ConnectionNotEstablished,
   ConnectionFailed,
 } from "../../errors.js";
+import { _FixtureError } from "../../fixture-error-slot.js";
 
 import type { Quoting } from "./quoting.js";
 import type { ConnectionPool, NullPool } from "./connection-pool.js";
@@ -1191,7 +1191,7 @@ export async function buildFixtureSql(
   const valuesList = fixtures.map((fixture) => {
     const unknownColumns = Object.keys(fixture).filter((name) => !columnNames.includes(name));
     if (unknownColumns.length > 0) {
-      throw new FixtureError(
+      throw new _FixtureError!(
         `table "${tableName}" has no columns named ${unknownColumns.map((name) => rubyInspect(name)).join(", ")}.`,
       );
     }

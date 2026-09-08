@@ -9,6 +9,7 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
+  SQLite3Constants,
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
@@ -155,7 +156,15 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
-  return new nodeSqlite.DatabaseSync(config.database, opts);
+  return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+}
+
+function sharedCacheDatabase(config: SqliteOpenConfig): string {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
+  if (config.database.startsWith("file:")) {
+    return `${config.database}${config.database.includes("?") ? "&" : "?"}cache=shared`;
+  }
+  return `file:${config.database}?cache=shared`;
 }
 
 const capabilities: SqliteDriverCapabilities = {
@@ -165,7 +174,6 @@ const capabilities: SqliteDriverCapabilities = {
   concurrentStatements: true,
   foreignKeysOnByDefault: false,
   immediateTransactions: true,
-  sharedCache: false,
 };
 
 export const nodeSqliteDriver: SqliteDriver = {

@@ -704,7 +704,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   isSharedCache(): boolean {
-    if (!this.resolveDriverFactory().capabilities.sharedCache) return false;
     return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
   }
 
@@ -1561,6 +1560,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       readOnly: this._readonly,
       strict: this._strict,
       timeout: this.castTimeout(),
+      flags: cfg.flags,
       noMutex: cfg.noMutex,
       driverOptions: cfg.driverOptions,
     };

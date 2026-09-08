@@ -2,7 +2,7 @@ import { it, expect, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SQLite3Constants } from "../../sqlite-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { NodeSQLiteAdapter } from "../../connection-adapters/node-sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
 const openAdapters: SQLite3Adapter[] = [];
@@ -23,7 +23,7 @@ function sharedCacheFlags(): number {
 }
 
 async function withConn(options: { flags?: number } = {}): Promise<SQLite3Adapter> {
-  const adapter = new BetterSQLite3Adapter(":memory:", options);
+  const adapter = new NodeSQLiteAdapter(":memory:", options);
   openAdapters.push(adapter);
   await adapter.connectBang();
   return adapter;
@@ -37,7 +37,7 @@ function readUncommitted(conn: SQLite3Adapter): boolean {
 }
 
 describeIfSqlite("SQLite3TransactionTest", () => {
-  it.skip("shared_cached? is true when cache-mode is enabled", async () => {
+  it("shared_cached? is true when cache-mode is enabled", async () => {
     const conn = await withConn({ flags: sharedCacheFlags() });
     expect(conn.isSharedCache()).toBe(true);
   });
@@ -69,7 +69,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     expect(error?.message).toMatch("You need to enable the shared-cache mode");
   });
 
-  it.skip("opens a `read_uncommitted` transaction", async () => {
+  it("opens a `read_uncommitted` transaction", async () => {
     const conn1 = await withConn({ flags: sharedCacheFlags() });
     await conn1.execute(
       `CREATE TABLE IF NOT EXISTS "zines" ("id" INTEGER PRIMARY KEY, "title" TEXT)`,
@@ -88,7 +88,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     await conn1.execute(`DROP TABLE IF EXISTS "zines"`);
   });
 
-  it.skip("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
+  it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
     const conn = await withConn({ flags: sharedCacheFlags() });
     expect(readUncommitted(conn)).toBe(false);
     await conn.beginIsolatedDbTransaction(":read_uncommitted");
@@ -98,7 +98,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     expect(readUncommitted(conn)).toBe(false);
   });
 
-  it.skip("reset the read_uncommitted PRAGMA when a transaction is committed", async () => {
+  it("reset the read_uncommitted PRAGMA when a transaction is committed", async () => {
     const conn = await withConn({ flags: sharedCacheFlags() });
     expect(readUncommitted(conn)).toBe(false);
     await conn.beginIsolatedDbTransaction(":read_uncommitted");
@@ -108,7 +108,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     expect(readUncommitted(conn)).toBe(false);
   });
 
-  it.skip("set the read_uncommitted PRAGMA to its previous value", async () => {
+  it("set the read_uncommitted PRAGMA to its previous value", async () => {
     const conn = await withConn({ flags: sharedCacheFlags() });
     (conn as any)._rawConnection.exec("PRAGMA read_uncommitted=ON");
     expect(readUncommitted(conn)).toBe(true);

@@ -41,6 +41,10 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
  * has no JS analogue and `method_boundp` never reports the `2` (undefined
  * method) case for one.
  *
+ * `pub` is declared and plumbed but cannot be read: JS carries no runtime
+ * notion of method visibility, so `in` answers the same at both values. See
+ * CLAUDE.md, "Method visibility is not a runtime fact in JS".
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
  * (`vendor/ruby/vm_method.c:2864`).
  */

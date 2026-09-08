@@ -3,6 +3,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Rollback, StatementInvalid } from "../../errors.js";
+import { FixtureError } from "../../fixtures.js";
 import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
 import { defaultInsertValue as mysqlDefaultInsertValue } from "../mysql/database-statements.js";
 import {
@@ -1134,6 +1135,9 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     });
 
     it("raises FixtureError naming the unknown columns", async () => {
+      await expect(
+        buildFixtureSql.call(makeHost(), [{ name: "Alice", nope: 1 }], "users"),
+      ).rejects.toThrow(FixtureError);
       await expect(
         buildFixtureSql.call(makeHost(), [{ name: "Alice", nope: 1 }], "users"),
       ).rejects.toThrow(`table "users" has no columns named "nope".`);

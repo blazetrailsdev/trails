@@ -101,7 +101,10 @@ function binaryBytes(string: string): Uint8Array {
  * raises what `rb_econv_open_exc` (`vendor/ruby/transcode.c:2097-2105`) raises
  * — the treatment {@link doWriteconv} already gives the write half — rather
  * than leaking `TextDecoder`'s own `RangeError`; the two UTF-32 seats are
- * decoded here instead, being a four-byte-per-code-point read.
+ * decoded here instead, being a four-byte-per-code-point read, and the two
+ * dummy seats `UTF-16` and `UTF-32` dispatch on the BOM the way
+ * {@link funSiFromUtf16} and {@link funSiFromUtf32} do, so a BOM-prefixed
+ * stream reads through the concrete seat the BOM names.
  */
 function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
   if (enc === Encoding.ASCII_8BIT) return binaryString(bytes, length);
@@ -110,9 +113,55 @@ function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
     if (enc.name === "UTF-32BE" || enc.name === "UTF-32LE") {
       return utf32Str(read, enc.name === "UTF-32LE");
     }
+    if (enc.name === "UTF-16") {
+      const sp = funSiFromUtf16(read);
+      if (sp !== 0) {
+        return new TextDecoder(sp === LE ? "utf-16le" : "utf-16be").decode(read.subarray(2));
+      }
+    }
+    if (enc.name === "UTF-32") {
+      const sp = funSiFromUtf32(read);
+      if (sp !== 0) return utf32Str(read.subarray(4), sp === LE);
+    }
     throw new ConverterNotFoundError(`code converter not found (${enc} to UTF-8)`);
   }
   return new TextDecoder(enc.decoderLabel).decode(read);
+}
+
+/** `BE` (`vendor/ruby/enc/trans/utf_16_32.trans:281`). */
+const BE = 1;
+
+/** `LE` (`vendor/ruby/enc/trans/utf_16_32.trans:282`). */
+const LE = 2;
+
+/**
+ * `fun_si_from_utf_16` (`vendor/ruby/enc/trans/utf_16_32.trans:278`) — the
+ * state function MRI's dummy `UTF-16` decodes through: a leading `FE FF`
+ * re-points the stream at the `UTF-16BE` seat and `FF FE` at the `UTF-16LE`
+ * one, the BOM itself producing no output (`ZERObt`), and a stream carrying
+ * neither takes the `INVALID` arm. The registry row stays `null` because
+ * WHATWG's `utf-16` label is a plain alias of `utf-16le` and mojibakes
+ * BE-BOM'd bytes; the BOM dispatch is what the row is missing, not a label.
+ */
+function funSiFromUtf16(s: Uint8Array): number {
+  if (s.length >= 2) {
+    if (s[0] === 0xfe && s[1] === 0xff) return BE;
+    if (s[0] === 0xff && s[1] === 0xfe) return LE;
+  }
+  return 0;
+}
+
+/**
+ * `fun_si_from_utf_32` (`vendor/ruby/enc/trans/utf_16_32.trans:327`), the
+ * four-byte twin of {@link funSiFromUtf16}: `00 00 FE FF` re-points at the
+ * `UTF-32BE` seat and `FF FE 00 00` at the `UTF-32LE` one.
+ */
+function funSiFromUtf32(s: Uint8Array): number {
+  if (s.length >= 4) {
+    if (s[0] === 0 && s[1] === 0 && s[2] === 0xfe && s[3] === 0xff) return BE;
+    if (s[0] === 0xff && s[1] === 0xfe && s[2] === 0 && s[3] === 0) return LE;
+  }
+  return 0;
 }
 
 /**

@@ -88,7 +88,6 @@ export interface SqliteDriverCapabilities {
   readonly concurrentStatements: boolean;
   readonly foreignKeysOnByDefault: boolean;
   readonly immediateTransactions: boolean;
-  readonly sharedCache: boolean;
 }
 
 export interface SqliteDriver {
