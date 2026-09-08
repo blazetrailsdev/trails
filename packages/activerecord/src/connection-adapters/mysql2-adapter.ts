@@ -459,43 +459,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return mysql2AffectedRows.call(this as any, rawResult);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE mysql2-raw-execute-override-has-no-rails-counterpart
-   */
-  override async rawExecute(
-    sql: string,
-    name: string | null = null,
-    binds: unknown[] = [],
-    prepare = false,
-    async = false,
-    allowRetry = false,
-    materializeTransactions = true,
-    batch = false,
-  ): Promise<unknown> {
-    const driverSql = this.mysqlQuote(sql);
-    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-    try {
-      return await AbstractAdapter.prototype.rawExecute.call(
-        this,
-        driverSql,
-        name,
-        binds,
-        prepare,
-        async,
-        allowRetry,
-        materializeTransactions,
-        batch,
-      );
-    } catch (e: any) {
-      throw e instanceof MismatchedForeignKey
-        ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
-        : e instanceof ActiveRecordError
-          ? e
-          : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
-    }
-  }
-
+  /** @noRailsEquivalent CONVERGEABLE mysql2-execute-override-only-shapes-driver-rows */
   async execute(
     sql: string,
     name: string | null = null,
