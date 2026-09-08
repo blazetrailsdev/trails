@@ -14,11 +14,9 @@ import {
   underscore,
   uuidV5,
 } from "@blazetrails/activesupport";
-import { Zlib } from "@blazetrails/ruby-compat";
-import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
-import { EncryptableRecord } from "./encryption/encryptable-record.js";
+import { Zlib, prepend } from "@blazetrails/ruby-compat";
+import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { Configurable } from "./encryption/configurable.js";
-import { defaultValue, type ValueType } from "@blazetrails/activemodel";
 import { _setFixtureError } from "./fixture-error-slot.js";
 
 /** @internal */
@@ -462,44 +460,6 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
-function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
-  const encryptedAttrs = ModelClass.encryptedAttributes ?? new Set<string>();
-  const typeMap = new Map<string, EncryptedAttributeType>();
-  const pending: Array<{ name: string; scheme: unknown }> =
-    (ModelClass as any)._pendingEncryptions ?? [];
-  for (const { name, scheme } of pending) {
-    const existingType = (ModelClass as any).typeForAttribute(name) as ValueType;
-    const castType =
-      existingType instanceof EncryptedAttributeType
-        ? existingType.castType
-        : existingType === defaultValue()
-          ? undefined
-          : existingType;
-    typeMap.set(name, new EncryptedAttributeType({ scheme: scheme as any, castType }));
-  }
-
-  for (const row of rows) {
-    const cleanValues: Record<string, unknown> = {};
-    for (const attrName of encryptedAttrs) {
-      if (!(attrName in row)) continue;
-      const cleanValue = row[attrName];
-      cleanValues[attrName] = cleanValue;
-      const type = typeMap.get(attrName);
-      if (!type) continue;
-      row[attrName] = type.serialize(cleanValue);
-    }
-    for (const attrName of encryptedAttrs) {
-      const sourceAttrName = EncryptableRecord.sourceAttributeFromPreservedAttribute(attrName);
-      if (sourceAttrName === undefined) continue;
-      const cleanValue = cleanValues[sourceAttrName];
-      if (cleanValue === undefined) continue;
-      const type = typeMap.get(attrName);
-      if (!type) continue;
-      row[attrName] = type.serialize(cleanValue);
-    }
-  }
-}
-
 export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
   ModelClass: T,
@@ -806,7 +766,7 @@ export async function prepareModelFixtures(
   }
 
   if (Configurable.config.encryptFixtures && isPresent(ModelClass.encryptedAttributes)) {
-    encryptFixtureRows(ModelClass, rows);
+    for (const row of rows) new Fixture(row, ModelClass);
   }
 
   const tables: Record<string, FixtureAttrs[]> = { [tableName]: rows };
@@ -971,7 +931,27 @@ export class FixtureSet {
   }
 }
 
-runLoadHooks("active_record_fixture_set", FixtureSet);
+export class Fixture {
+  fixture!: FixtureAttrs;
+  modelClass!: BaseClass | null;
+
+  constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
+    this.initialize(fixture, modelClass);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  initialize(fixture: FixtureAttrs, modelClass: BaseClass | null): void {
+    this.fixture = fixture;
+    this.modelClass = modelClass;
+  }
+
+  get className(): string | undefined {
+    return this.modelClass ? this.modelClass.name : undefined;
+  }
+}
 
 export class FixtureError extends Error {
   constructor(message: string) {
@@ -981,3 +961,7 @@ export class FixtureError extends Error {
 }
 
 _setFixtureError(FixtureError);
+
+prepend(Fixture.prototype, EncryptedFixtures);
+
+runLoadHooks("active_record_fixture_set", FixtureSet);
