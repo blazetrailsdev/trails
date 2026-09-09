@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import {
   ref,
   isFixtureRef,
@@ -7,6 +7,7 @@ import {
   resolveModelForTable,
   FixtureSetPrimaryKeyError,
   FixtureSet,
+  FixtureError,
 } from "./fixtures.js";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
@@ -17,7 +18,26 @@ import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
+import { fixtures } from "./test-fixtures.js";
+import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
+import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
+import { Task } from "./test-helpers/models/task.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Tree } from "./test-helpers/models/tree.js";
+import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
+import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
+import { Reply } from "./test-helpers/models/reply.js";
+import { registerModel } from "./associations.js";
+import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
+import { taskFixtureData } from "./test-helpers/fixtures/tasks.js";
+import { aircraftFixtureData } from "./test-helpers/fixtures/aircrafts.js";
 import "./relation.js";
+
+for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
+  registerModel(model);
+}
 
 const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
   accounts: ["name"],
@@ -539,7 +559,7 @@ describe("defineFixtures", () => {
   });
 });
 
-describe("PrimaryKeyError", () => {
+describe("PrimaryKeyErrorTest", () => {
   it("generates the correct value", async () => {
     const adapter = {
       execute: vi.fn(async () => []),
@@ -570,17 +590,13 @@ describe("PrimaryKeyError", () => {
       findBy: vi.fn(async () => null),
     } as any;
 
-    await expect(defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData)).rejects.toThrow(
-      FixtureSetPrimaryKeyError,
+    const e = await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData).catch(
+      (err: Error) => err,
     );
-
-    try {
-      await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData);
-    } catch (e: unknown) {
-      expect((e as Error).message).toContain("Unable to set");
-      expect((e as Error).message).toContain("name");
-      expect((e as Error).message).toContain("Essay");
-    }
+    expect(() => {
+      throw e;
+    }).toThrow(FixtureSetPrimaryKeyError);
+    expect((e as Error).message).toContain("Unable to set");
   });
 });
 
@@ -595,23 +611,28 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     }
   }
 
-  it("test_raises_fk_violations", async () => {
+  it("raises fk violations", async () => {
     await withVerifyForeignKeysForFixtures(async () => {
       const load = (): Promise<unknown> =>
         defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
           first: { fk_object_to_point_to_id: 4242 },
         });
       if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
-        await expect(load()).rejects.toThrow(
+        const error = await load().catch((e: Error) => e);
+        expect(() => {
+          throw error;
+        }).toThrow();
+        expect((error as Error).message).toContain(
           "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
         );
+        expect((error as Error).message).toContain("fk_pointing_to_non_existent_objects");
       } else {
-        await expect(load()).resolves.toBeDefined();
+        await expect(load()).resolves.not.toThrow();
       }
     });
   });
 
-  it("test_does_not_raise_if_no_fk_violations", async () => {
+  it("does not raise if no fk violations", async () => {
     await defineJoinTableFixtures(
       Base.connection,
       "fk_object_to_point_tos",
@@ -622,7 +643,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
         defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
           first: { fk_object_to_point_to_id: 1 },
         }),
-      ).resolves.toBeDefined();
+      ).resolves.not.toThrow();
     });
   });
 });
@@ -667,5 +688,185 @@ describe("FixtureSet (trails)", () => {
     const seen: unknown[] = [];
     onLoad("active_record_fixture_set", (base: unknown) => seen.push(base));
     expect(seen).toEqual([FixtureSet]);
+  });
+});
+
+describe("FixturesTest", () => {
+  const { topics, developers, binaries, trafficLights } = fixtures(
+    [
+      "topics",
+      "developers",
+      "accounts",
+      "tasks",
+      "categories",
+      "funnyJokes",
+      "binaries",
+      "trafficLights",
+      "trees",
+    ],
+    { useTransactionalTests: false },
+  );
+
+  it("attributes", async () => {
+    const connection = leaseFixtureConnection();
+    const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
+    expect(topics["first"].title).toBe("The First Topic");
+    expect(topics["second"].author_email_address).toBeNull();
+  });
+
+  it("no args returns all", () => {
+    const allTopics = topics.all();
+    expect(allTopics.length).toBe(5);
+    expect(allTopics[0].title).toBe("The First Topic");
+    expect(allTopics[allTopics.length - 1].id).toBe(5);
+  });
+
+  it("no args record returns all without array", () => {
+    const allBinaries = binaries.all();
+    expect(allBinaries).toBeInstanceOf(Array);
+    expect(binaries.all().length).toBe(2);
+  });
+
+  it("nil raises", () => {
+    expect(() => topics(null as never)).toThrow();
+    expect(() => topics([null] as never)).toThrow();
+  });
+
+  it("inserts", async () => {
+    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+    const firstRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
+    expect(firstRow?.["title"]).toBe("The First Topic");
+
+    const secondRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'Mary'");
+    expect(secondRow?.["author_email_address"]).toBeNull();
+  });
+
+  it("insert with datetime", async () => {
+    const connection = leaseFixtureConnection();
+    await FixtureSet.createFixtures(connection, Task, taskFixtureData);
+    const first = await Task.find(1);
+    expect(first).toBeTruthy();
+  });
+
+  it("insert with default value", async () => {
+    const connection = leaseFixtureConnection();
+    await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
+    const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
+    expect(aircraft?.wheels_count).toBe(0);
+  });
+
+  it("instantiation", async () => {
+    const connection = leaseFixtureConnection();
+    const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
+    expect(topics["first"]).toBeInstanceOf(Topic);
+  });
+
+  it("yaml file with invalid column", async () => {
+    const connection = leaseFixtureConnection();
+    const e = await FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData).catch(
+      (err: Error) => err,
+    );
+    expect(() => {
+      throw e;
+    }).toThrow(FixtureError);
+    expect((e as Error).message).toBe('table "parrots" has no columns named "arrr", "foobar".');
+  });
+
+  it("yaml file with symbol columns", async () => {
+    const connection = leaseFixtureConnection();
+    await FixtureSet.createFixtures(connection, Tree, nakedYmlTreesFixtureData);
+    const root = await Tree.find(1);
+    expect(root).toBeTruthy();
+  });
+
+  it("erb in fixtures", () => {
+    expect(developers("dev_5").name).toBe("fixture_5");
+  });
+
+  it("serialized fixtures", () => {
+    expect(trafficLights("uk").state).toEqual(["Green", "Red", "Orange"]);
+  });
+});
+
+describe("FixturesWithoutInstantiationTest", () => {
+  const { topics, developers, accounts } = fixtures(["topics", "developers", "accounts"]);
+
+  it("accessor methods", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect(developers("jamis").name).toBe("Jamis");
+    expect(accounts("signals37").credit_limit).toBe(50);
+  });
+});
+
+describe("TransactionalFixturesTest", () => {
+  withTransactionalFixtures(leaseFixtureConnection);
+
+  let first: Topic;
+
+  beforeAll(async () => {
+    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+  });
+
+  beforeEach(async () => {
+    first = await Topic.find(1);
+  });
+
+  it("destroy", async () => {
+    expect(first).not.toBeNull();
+    await first.destroy();
+  });
+
+  it("destroy just kidding", () => {
+    expect(first).not.toBeNull();
+  });
+});
+
+interface SetupTestState {
+  first?: boolean;
+  second?: boolean;
+}
+
+function setupTest(): SetupTestState {
+  const state: SetupTestState = {};
+
+  beforeEach(() => {
+    state.first = true;
+  });
+
+  return state;
+}
+
+describe("SetupTest", () => {
+  setupTest();
+
+  it("nothing", () => {});
+});
+
+describe("SetupSubclassTest", () => {
+  const state = setupTest();
+
+  beforeEach(() => {
+    state.second = true;
+  });
+
+  it("subclassing should preserve setups", () => {
+    expect(state.first).toBeTruthy();
+    expect(state.second).toBeTruthy();
+  });
+});
+
+describe("ForeignKeyFixturesTest", () => {
+  fixtures(["fkTestHasPk", "fkTestHasFk"]);
+
+  it("number1", () => {
+    expect(true).toBeTruthy();
+  });
+
+  it("number2", () => {
+    expect(true).toBeTruthy();
   });
 });

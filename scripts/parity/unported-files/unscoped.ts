@@ -119,14 +119,210 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "/fixtures.rb",
-    testFile: "/fixtures_test.rb",
     reason:
       "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB " +
       "with named-row references and ERB preprocessing). The JS/TS ecosystem uses " +
       "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures. " +
       "Anchored: unanchored, this pattern also swallowed test_fixtures.rb, " +
       "encryption/encrypted_fixtures.rb and activesupport's testing/file_fixtures.rb, " +
-      "which carry (or need) their own rows.",
+      "which carry (or need) their own rows. Source-only since story " +
+      "port-fixtures-test-cases-first-half: fixtures_test.rb is enrolled per case " +
+      "by the rows below.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: [
+      "bulk insert",
+      "bulk insert multiple table with a multi statement query",
+      "bulk insert with a multi statement query in a nested transaction",
+      "bulk insert with a multi statement query raises an exception when any insert fails",
+      "bulk insert with multi statements disabled",
+      "bulk insert with multi statements enabled",
+      "insert fixture set when max allowed packet is bigger than fixtures set size",
+      "insert fixtures set concat total sql into a single packet smaller than max allowed packet",
+      "insert fixtures set raises an error when max allowed packet is smaller than fixtures set size",
+      "insert fixtures set split the total sql into two chunks smaller than max allowed packet",
+    ],
+    reason:
+      "Multi-statement INSERT batching, gated in Rails on " +
+      "current_adapter?(:Mysql2Adapter, :TrilogyAdapter, :PostgreSQLAdapter) " +
+      "(fixtures_test.rb:87). They assert one INSERT query per load and the " +
+      "max_allowed_packet chunking around it; trails' insertFixturesSet emits per-table " +
+      "batches through executeBatch and carries no packet-size budget, so there is no " +
+      "chunk boundary to assert and no single-query claim to make. CONVERGEABLE " +
+      "port-fixtures-bulk-insert-and-packet-chunking-cases: trails has maxAllowedPacket() " +
+      "and packet-aware MySQL execution, so these ten converge rather than stay excluded.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: [
+      "broken yaml exception",
+      "clean fixtures",
+      "create fixtures",
+      "create symbol fixtures",
+      "dirty dirty yaml file",
+      "inserts with pre and suffix",
+      "multiple clean fixtures",
+      "nonexistent fixture file",
+      "omap fixtures",
+      "subsubdir file with arbitrary name",
+      "yaml file with one invalid fixture",
+      "yml file in subdirectory",
+    ],
+    reason:
+      "Each loads fixtures from a .yml path on disk — FixtureSet.create_fixtures(dir, name) " +
+      "or FixtureSet.new(nil, name, Klass, FIXTURES_ROOT + ...) — and asserts on the parse " +
+      "or the layout: a Psych omap, a Tempfile of malformed YAML, a path that must not " +
+      "exist, a subdirectory, an arbitrarily named subsubdir file. trails' canonical corpus " +
+      "is TS modules under test-helpers/fixtures/, so there is no fixture file to point a " +
+      "path at and no YAML parse to fail.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "HasManyThroughFixture",
+    tests: [
+      "has and belongs to many order",
+      "has many through with default table name on join table",
+      "has many through with join table name changed to match habtm table name",
+    ],
+    reason:
+      "All three build FixtureSet.new(nil, 'parrots', klass, File.join(FIXTURES_ROOT, " +
+      "'parrots')) and compare #table_rows (fixtures_test.rb:668,687,695). Same missing " +
+      "surfaces as the row above plus the instance form below: a fixture directory on " +
+      "disk, and a per-set object exposing table_rows.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: ["empty yaml fixture", "empty yaml fixture with a comment in it"],
+    reason:
+      "Both assert ActiveRecord::FixtureSet.new(nil, name, Klass, path) is non-nil " +
+      "(fixtures_test.rb:522,526). trails' FixtureSet (fixtures.ts:896) is a static-only " +
+      "class with no instance form: there is no constructor to call and no per-set object " +
+      "to be non-nil. Porting them needs FixtureSet#initialize, which reads the .yml the " +
+      "row above already excludes.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: ["complete instantiation", "fixtures from root yml with instantiation"],
+    reason:
+      "Both read an ivar that use_instantiated_fixtures = true assigns per fixture row — " +
+      "@first.title, @unknown.credit_limit (fixtures_test.rb:43,511,515). trails never " +
+      "instantiates ivars: useFixtures (test-fixtures.ts:189-206) returns an accessor " +
+      "closure and nothing else, so there is no ivar to read.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesWithoutInstantiationTest",
+    tests: [
+      "fixtures from root yml without instantiation",
+      "visibility of accessor method",
+      "without complete instantiation",
+    ],
+    reason:
+      "The mirror image of the row above: these assert the ABSENCE of those ivars under " +
+      "use_instantiated_fixtures = false, and that the accessor is private — " +
+      "defined?(@first), respond_to?(:topics, false) (fixtures_test.rb:756-773). trails has " +
+      "only the non-instantiating mode, so the flag selects nothing and there is no ivar " +
+      "whose absence could be observed; JS also has no runtime method visibility to test " +
+      "(see CLAUDE.md, 'Method visibility is not a runtime fact in JS'). 'accessor " +
+      "methods', the case in this class that asserts the accessor itself, IS ported.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesWithoutInstanceInstantiationTest",
+    tests: ["without instance instantiation"],
+    reason:
+      "Asserts defined?(@first) is false under use_instantiated_fixtures = :no_instances " +
+      "(fixtures_test.rb:796-803) — the third value of a flag trails does not have. Same " +
+      "missing surface as the two rows above.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesWithoutInstantiationTest",
+    tests: ["accessor methods with multiple args", "reloading fixtures through accessor methods"],
+    reason:
+      "Accessor shapes trails' single-name closure does not have: topics(:first, :second) " +
+      "returning a 2-element collection, and topics(:first, true) forcing a reload, the " +
+      "latter asserted with assert_called on the stored fixture's #find " +
+      "(fixtures_test.rb:781-798). CONVERGEABLE " +
+      "variadic-and-force-reload-fixture-accessor: Rails' accessor takes (*fixture_names, " +
+      "force_reload) at test_fixtures.rb:294-321; this is missing API, not a language limit.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: [
+      "fixture method and private alias",
+      "fixture method does not clash with a test case method",
+      "fixtures are set up with database env variable",
+    ],
+    reason:
+      "Each builds an anonymous Class.new(ActiveRecord::TestCase), declares fixtures inside " +
+      "it, and calls test_case.new(:test_fixtures).run to assert the result passed " +
+      "(fixtures_test.rb:604-646). Minitest's runnable-per-instance model has no vitest " +
+      "counterpart: a describe is registered at collection time and cannot be constructed " +
+      "and run from inside another test.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesResetPkSequenceTest",
+    tests: [
+      "create fixtures resets sequences when not cached",
+      "resets to min pk with default pk and sequence",
+      "resets to min pk with specified pk and sequence",
+    ],
+    reason:
+      "The whole class is gated on Account.lease_connection.respond_to?(:reset_pk_sequence!) " +
+      "(fixtures_test.rb:715), which is PostgreSQL-only. trails has resetPkSequenceBang on " +
+      "the PG adapter alone (postgresql/schema-statements.ts:1402); on sqlite and MySQL " +
+      "there is no sequence to reset, so the class does not run there in Rails either. " +
+      "CONVERGEABLE port-fixtures-reset-pk-sequence-cases: the method exists, so the " +
+      "adapter gate is the port rather than the exclusion.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "MultipleFixturesTest",
+    tests: ["fixture table names"],
+    reason:
+      "Asserts fixture_table_names returns the merged, sorted table list after two separate " +
+      "fixtures declarations (fixtures_test.rb:826). trails' fixtures() returns accessors " +
+      "and exposes no fixtureTableNames reader, so there is nothing to assert against. " +
+      "CONVERGEABLE implement-fixture-table-names: the merge-and-dedupe behaviour these " +
+      "two cases specify is Rails' `self.fixture_table_names |= table_names` " +
+      "(test_fixtures.rb:38-52).",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "OverlappingFixturesTest",
+    tests: ["fixture table names"],
+    reason:
+      "Same missing fixtureTableNames reader as the row above, for the overlapping-" +
+      "declarations case (fixtures_test.rb:859). CONVERGEABLE implement-fixture-table-names.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesTest",
+    tests: [
+      "auto value on primary key",
+      "binary in fixtures",
+      "insert with default function",
+      "logger level invariant",
+    ],
+    reason:
+      "One-off surfaces. 'auto value on primary key' calls insert_fixtures_set with a " +
+      "positional row array and no labels, which trails' label-keyed prepare path has no " +
+      "shape for. 'binary in fixtures' reads ASSETS_ROOT + '/flowers.jpg' off disk. " +
+      "'insert with default function' asserts a CURRENT_TIMESTAMP column default within " +
+      "1.1s of Time.now, which has no stable cross-adapter read back through the attribute " +
+      "reader. 'logger level invariant' swaps ActiveRecord::Base.logger for " +
+      "ActiveSupport::Logger.new(nil) and asserts the level survives a fixture load. " +
+      "CONVERGEABLE converge-fixtures-test-grouped-one-off-exclusions: insertFixturesSet, " +
+      "Base.logger and Logger#level all exist, so at least two of these four converge and " +
+      "the group is split into per-case rows there.",
   },
   {
     pattern: "fixture_set",
