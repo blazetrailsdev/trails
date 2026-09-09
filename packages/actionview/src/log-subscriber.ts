@@ -47,16 +47,16 @@ export class Start implements UtilsHost {
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (!this.logger()) return;
+    let qualifier: string | undefined;
+    if (name === "render_template.action_view") {
+      qualifier = "";
+    } else if (name === "render_layout.action_view") {
+      qualifier = "layout ";
+    }
+
+    if (qualifier === undefined) return;
+
     this.logger()!.debug(() => {
-      let qualifier: string | undefined;
-      if (name === "render_template.action_view") {
-        qualifier = "";
-      } else if (name === "render_layout.action_view") {
-        qualifier = "layout ";
-      }
-
-      if (qualifier === undefined) return "";
-
       let message = `  Rendering ${qualifier}${this.fromRailsRoot(payload["identifier"] as string)}`;
       if (payload["layout"] != null && payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(payload["layout"] as string)}`;
@@ -115,7 +115,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
       }
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       if (event.payload["cache_hit"] != null) {
-        message += ` ${this.cacheMessage(event.payload)}`;
+        message += ` ${this.cacheMessage(event.payload) ?? ""}`;
       }
       return message;
     });
@@ -132,7 +132,10 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
 
   /** @missingRailsArgs round — PERMANENT */
   renderCollection(event: Event): void {
-    const identifier = (event.payload["identifier"] as string | null) || "templates";
+    const identifier =
+      event.payload["identifier"] != null && event.payload["identifier"] !== false
+        ? (event.payload["identifier"] as string)
+        : "templates";
 
     this._debug(() => {
       let message = `  Rendered collection of ${this.fromRailsRoot(identifier)}`;
