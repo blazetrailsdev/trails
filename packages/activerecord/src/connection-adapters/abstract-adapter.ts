@@ -597,7 +597,7 @@ export interface AbstractAdapter {
   rollbackDbTransaction(): Promise<void>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  isWriteQuery(sql: string): boolean;
+  isWriteQuery(sql: string | null): boolean;
   emptyInsertStatementValue(pk?: string | null): string;
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
   cacheableQuery(
@@ -674,7 +674,11 @@ export interface AbstractAdapter {
   /** @internal */
   preprocessQuery(sql: string): string;
 
-  execute(sql: string, name?: string | null, kwargs?: { allowRetry?: boolean }): Promise<unknown>;
+  execute(
+    sql: string | null,
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean },
+  ): Promise<unknown>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
@@ -1199,7 +1203,7 @@ export class AbstractAdapter implements Quoting {
     return this.pool.schemaReflection;
   }
 
-  checkIfWriteQuery(sql: string): void {
+  checkIfWriteQuery(sql: string | null): void {
     if (this.isPreventingWrites() && this.isWriteQuery(sql)) {
       throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
     }

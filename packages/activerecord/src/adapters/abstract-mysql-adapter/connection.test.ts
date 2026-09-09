@@ -15,6 +15,7 @@ import {
   ConnectionNotEstablished,
 } from "../../errors.js";
 import mysql from "mysql2/promise";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {
   (
@@ -90,8 +91,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     }, 10_000);
     it("execute after disconnect reconnects", async () => {
       await adapter.disconnectBang();
-      const rows = await adapter.execute("SELECT 1+2 AS v");
-      expect(rows[0].v).toBe(3);
+      const result = (await adapter.execute("SELECT 1+2 AS v")) as Mysql2RawResult;
+      expect(result.rows![0][0]).toBe(3);
     });
 
     it("quote after disconnect reconnects", async () => {
@@ -142,8 +143,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("wait timeout as string", async () => {
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
       try {
-        const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
-        expect(parseInt(rows[0].v as string, 10)).toBe(60);
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.wait_timeout AS v",
+        )) as Mysql2RawResult;
+        expect(parseInt(result.rows![0][0] as string, 10)).toBe(60);
       } finally {
         await testAdapter.close();
       }
@@ -153,17 +156,21 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       url.searchParams.set("wait_timeout", "60");
       const testAdapter = new Mysql2Adapter(url.toString());
       try {
-        const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
-        expect(parseInt(rows[0].v as string, 10)).toBe(60);
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.wait_timeout AS v",
+        )) as Mysql2RawResult;
+        expect(parseInt(result.rows![0][0] as string, 10)).toBe(60);
       } finally {
         await testAdapter.close();
       }
     });
 
     it("character set connection is configured", async () => {
-      const rows = await adapter.execute("SHOW VARIABLES LIKE 'character_set_connection'");
-      expect(rows).toHaveLength(1);
-      expect(rows[0].Value).toBeDefined();
+      const result = (await adapter.execute(
+        "SHOW VARIABLES LIKE 'character_set_connection'",
+      )) as Mysql2RawResult;
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows![0][1]).toBeDefined();
     });
 
     it("collation connection is configured", async () => {
@@ -171,14 +178,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(v).not.toBeNull();
     });
     it("mysql default in strict mode", async () => {
-      const rows = await adapter.execute("SELECT @@SESSION.sql_mode AS v");
-      expect(String(rows[0].v)).toMatch(/STRICT_ALL_TABLES/);
+      const result = (await adapter.execute("SELECT @@SESSION.sql_mode AS v")) as Mysql2RawResult;
+      expect(String(result.rows![0][0])).toMatch(/STRICT_ALL_TABLES/);
     });
     it("mysql strict mode disabled", async () => {
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: false });
       try {
-        const rows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
-        expect(String(rows[0].v)).not.toMatch(/STRICT_ALL_TABLES/);
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2RawResult;
+        expect(String(result.rows![0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
         await testAdapter.close();
       }
@@ -186,9 +195,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("mysql strict mode specified default", async () => {
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: ":default" });
       try {
-        const globalRows = await testAdapter.execute("SELECT @@GLOBAL.sql_mode AS v");
-        const sessionRows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
-        expect(sessionRows[0].v).toBe(globalRows[0].v);
+        const globalResult = (await testAdapter.execute(
+          "SELECT @@GLOBAL.sql_mode AS v",
+        )) as Mysql2RawResult;
+        const sessionResult = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2RawResult;
+        expect(sessionResult.rows![0][0]).toBe(globalResult.rows![0][0]);
       } finally {
         await testAdapter.close();
       }
@@ -199,8 +212,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         variables: { sql_mode: "ansi" },
       });
       try {
-        const rows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
-        expect(String(rows[0].v)).not.toMatch(/STRICT_ALL_TABLES/);
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2RawResult;
+        expect(String(result.rows![0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
         await testAdapter.close();
       }
@@ -230,8 +245,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         variables: { default_week_format: 3 },
       });
       try {
-        const rows = await testAdapter.execute("SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v");
-        expect(parseInt(rows[0].v as string, 10)).toBe(3);
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2RawResult;
+        expect(parseInt(result.rows![0][0] as string, 10)).toBe(3);
       } finally {
         await testAdapter.close();
       }
@@ -242,9 +259,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         variables: { default_week_format: ":default" },
       });
       try {
-        const globalRows = await testAdapter.execute("SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v");
-        const sessionRows = await testAdapter.execute("SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v");
-        expect(sessionRows[0].v).toBe(globalRows[0].v);
+        const globalResult = (await testAdapter.execute(
+          "SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2RawResult;
+        const sessionResult = (await testAdapter.execute(
+          "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2RawResult;
+        expect(sessionResult.rows![0][0]).toBe(globalResult.rows![0][0]);
       } finally {
         await testAdapter.close();
       }
@@ -379,7 +400,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const a = new Mysql2Adapter({ host: "localhost", user: "baduser", database: "test" });
       stubCreateConnection(makeDriverError(1045));
       try {
-        const err = await a.execute("SELECT 1").catch((e) => e);
+        const err = (await a.execute("SELECT 1").catch((e: Error) => e)) as Error;
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("baduser");
       } finally {
@@ -391,7 +412,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const a = new Mysql2Adapter("mysql://myuser:pw@localhost/test");
       stubCreateConnection(makeDriverError(1045));
       try {
-        const err = await a.execute("SELECT 1").catch((e) => e);
+        const err = (await a.execute("SELECT 1").catch((e: Error) => e)) as Error;
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("myuser");
       } finally {
@@ -403,7 +424,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const a = new Mysql2Adapter("mysql://root@myhost.example.com/test");
       stubCreateConnection(makeDriverError(2003));
       try {
-        const err = await a.execute("SELECT 1").catch((e) => e);
+        const err = (await a.execute("SELECT 1").catch((e: Error) => e)) as Error;
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("myhost.example.com");
       } finally {

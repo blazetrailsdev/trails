@@ -1033,17 +1033,17 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.executeMutation(
           `INSERT INTO ${conn.quoteTableName(rockets)} (name) VALUES ('myrocket')`,
         );
-        const rows = (await conn.execute(
-          `SELECT id FROM ${conn.quoteTableName(rockets)}`,
-        )) as Array<{ id: number }>;
+        const rows = (
+          await conn.selectAll(`SELECT id FROM ${conn.quoteTableName(rockets)}`)
+        ).toArray() as Array<{ id: number }>;
         await conn.executeMutation(
           `INSERT INTO ${conn.quoteTableName(astronauts)} (rocket_id) VALUES (${rows[0].id})`,
         );
       },
       rocketName: async (conn: AbstractAdapter): Promise<string> => {
-        const rows = (await conn.execute(
-          `SELECT name FROM ${conn.quoteTableName(rockets)} ORDER BY id`,
-        )) as Array<{ name: string }>;
+        const rows = (
+          await conn.selectAll(`SELECT name FROM ${conn.quoteTableName(rockets)} ORDER BY id`)
+        ).toArray() as Array<{ name: string }>;
         return rows[0].name;
       },
     };

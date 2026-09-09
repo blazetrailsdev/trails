@@ -3,6 +3,7 @@ import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
 import { fixtures } from "../../test-fixtures.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures([]);
@@ -54,17 +55,17 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await conn.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
 
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute(
+        const result = (await conn.execute(
           "SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594'",
-        );
-        expect(rows).toHaveLength(1);
+        )) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(1);
       });
     });
 
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("SHOW FULL FIELDS FROM `engines`");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
@@ -78,15 +79,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("doesnt error when a describe query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("DESCRIBE engines");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("DESCRIBE engines")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
     it("doesnt error when a desc query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("DESC engines");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("DESC engines")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
@@ -94,25 +95,27 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await conn.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
 
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute(
+        const result = (await conn.execute(
           "/*action:index*/(\n( SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594' ) )",
-        );
-        expect(rows).toHaveLength(1);
+        )) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(1);
       });
     });
 
     it("doesnt error when a use query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const dbRows = await conn.execute("SELECT DATABASE() AS db");
-        const dbName = dbRows[0].db as string;
+        const dbResult = (await conn.execute("SELECT DATABASE() AS db")) as Mysql2RawResult;
+        const dbName = dbResult.rows![0][0] as string;
         await expect(conn.execute(`USE \`${dbName}\``)).resolves.toBeDefined();
       });
     });
 
     it("doesnt error when a kill query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("SELECT CONNECTION_ID() as connection_id");
-        const connId = rows[0].connection_id;
+        const result = (await conn.execute(
+          "SELECT CONNECTION_ID() as connection_id",
+        )) as Mysql2RawResult;
+        const connId = result.rows![0][0];
         await expect(conn.execute(`KILL QUERY ${connId}`)).rejects.toBeInstanceOf(QueryCanceled);
       });
     });

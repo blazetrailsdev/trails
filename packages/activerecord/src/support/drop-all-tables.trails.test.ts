@@ -11,21 +11,27 @@ let adapter: DatabaseAdapter;
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (typeRegistryKeyFor(a) === "sqlite3") {
     return (
-      (await a.execute(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-      )) as Array<{ name: string }>
+      (
+        await a.selectAll(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+        )
+      ).toArray() as Array<{ name: string }>
     ).map((r) => r.name);
   } else if (typeRegistryKeyFor(a) === "postgresql") {
     return (
-      (await a.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
-      )) as Array<{ tablename: string }>
+      (
+        await a.selectAll(
+          `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
+        )
+      ).toArray() as Array<{ tablename: string }>
     ).map((r) => r.tablename);
   } else {
     return (
-      (await a.execute(
-        `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-      )) as Array<{ name?: string; TABLE_NAME?: string }>
+      (
+        await a.selectAll(
+          `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+        )
+      ).toArray() as Array<{ name?: string; TABLE_NAME?: string }>
     ).map((r) => (r.name ?? r.TABLE_NAME)!);
   }
 }
@@ -107,14 +113,14 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 describe("resetTestTables", () => {
   it("truncates canonical tables (keeps shape) instead of dropping them", async () => {
     await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4242)`);
-    expect(
-      ((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length,
-    ).toBeGreaterThan(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBeGreaterThan(
+      0,
+    );
 
     await resetTestTables(adapter);
 
     expect(await listTables(adapter)).toContain("articles");
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
   });
 
   it("drops bespoke (non-canonical) tables so their shape can't leak", async () => {
@@ -254,10 +260,10 @@ describe("purge-only pre-snapshot path", () => {
   it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
     const { dropAllTablesModule } = await freshModules();
     await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4243)`);
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(1);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(1);
 
     await dropAllTablesModule.purgeToCanonicalTables(adapter);
 
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
   });
 });

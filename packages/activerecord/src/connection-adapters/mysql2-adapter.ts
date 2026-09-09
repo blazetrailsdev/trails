@@ -458,24 +458,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return mysql2AffectedRows.call(this as any, rawResult);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-execute-override-only-shapes-driver-rows */
-  async execute(
-    sql: string,
-    name: string | null = null,
-    { allowRetry = false }: { allowRetry?: boolean } = {},
-  ): Promise<Record<string, unknown>[]> {
-    const raw = (await AbstractAdapter.prototype.execute.call(this, sql, name, {
-      allowRetry,
-    })) as Mysql2RawResult | null | undefined;
-    if (raw?.rows == null) return [];
-    const names = raw.fields.map((f) => f.name);
-    return raw.rows.map((row) => {
-      const obj: Record<string, unknown> = {};
-      for (let i = 0; i < names.length; i++) obj[names[i]] = row[i];
-      return obj;
-    });
-  }
-
   async executeMutation(
     sql: string,
     binds: unknown[] = [],

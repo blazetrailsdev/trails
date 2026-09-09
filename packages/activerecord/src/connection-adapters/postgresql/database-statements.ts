@@ -52,18 +52,18 @@ export async function explain(
   return printer.pp(result);
 }
 
-export function isWriteQuery(sql: string): boolean {
+export function isWriteQuery(sql: string | null): boolean {
   try {
-    return !READ_QUERY.test(sql);
+    return !READ_QUERY.test(sql as string);
   } catch (error) {
     if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql));
+    return !READ_QUERY.test(b(sql as string));
   }
 }
 
 /** @internal */
 interface ExecuteHost extends PerformQueryHost {
-  preprocessQuery(sql: string): string;
+  preprocessQuery(sql: string | null): string | null;
   log<T>(
     sql: string,
     name: string | null,
@@ -84,7 +84,7 @@ interface ExecuteHost extends PerformQueryHost {
 
 export async function execute(
   this: ExecuteHost,
-  sql: string,
+  sql: string | null,
   name: string | null = null,
   { allowRetry = false }: { allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
@@ -277,11 +277,11 @@ export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
 
 function query(
   rawConnection: pg.Client,
-  config: string | Record<string, unknown>,
+  config: string | Record<string, unknown> | null,
 ): Promise<pg.QueryResult | pg.QueryResult[]> {
   return (
     rawConnection.query as unknown as (
-      c: string | Record<string, unknown>,
+      c: string | Record<string, unknown> | null,
     ) => Promise<pg.QueryResult | pg.QueryResult[]>
   )(config);
 }
@@ -289,10 +289,10 @@ function query(
 /** @internal */
 export interface PerformQueryHost extends HandleWarningsHost {
   updateTypemapForDefaultTimezone(): Promise<void>;
-  prepareStatement(sql: string, binds: unknown[], rawConnection: pg.Client): Promise<string>;
+  prepareStatement(sql: string | null, binds: unknown[], rawConnection: pg.Client): Promise<string>;
   isCachedPlanFailure(pgerror: unknown): boolean;
   isInTransaction(): boolean;
-  sqlKey(sql: string): string;
+  sqlKey(sql: string | null): string;
   _statements: StatementPool;
   verifiedBang(): void;
   /** @internal */
@@ -303,7 +303,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
 export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
   this: PerformQueryHost,
   rawConnection: pg.Client,
-  sql: string,
+  sql: string | null,
   binds: unknown[],
   typeCastedBinds: unknown[],
   {
@@ -325,7 +325,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
         notificationPayload.statement_name = stmtKey;
         raw = await query(rawConnection, {
           name: stmtKey,
-          text: sql,
+          text: sql as string,
           values: typeCastedBinds,
           rowMode,
         });
@@ -335,7 +335,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
           if (this.isInTransaction()) {
             throw new PreparedStatementCacheExpired(
               (error as { message?: string })?.message ?? "cached plan expired",
-              { sql, binds, cause: error },
+              { sql: sql as string, binds, cause: error },
             );
           } else {
             await this._statements.delete(this.sqlKey(sql));

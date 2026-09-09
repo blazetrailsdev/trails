@@ -20,12 +20,12 @@ describe("useTransactionalTests — DML isolation", () => {
 
   it("inserts a row that is visible within the same test", async () => {
     await conn().executeMutation(`INSERT INTO txn_smoke_users (id, name) VALUES (1, 'alice')`);
-    const rows = await conn().execute(`SELECT * FROM txn_smoke_users`);
+    const rows = (await conn().selectAll(`SELECT * FROM txn_smoke_users`)).toArray();
     expect(rows).toHaveLength(1);
   });
 
   it("sees no rows — previous insert was rolled back in afterEach", async () => {
-    const rows = await conn().execute(`SELECT * FROM txn_smoke_users`);
+    const rows = (await conn().selectAll(`SELECT * FROM txn_smoke_users`)).toArray();
     expect(rows).toHaveLength(0);
   });
 });
@@ -39,7 +39,7 @@ describe.skipIf(adapterType === "mysql")(
       await conn().executeMutation(
         `CREATE TABLE txn_smoke_ddl (id INTEGER PRIMARY KEY, label TEXT)`,
       );
-      const rows = await conn().execute(`SELECT 1 AS ok FROM txn_smoke_ddl`);
+      const rows = (await conn().selectAll(`SELECT 1 AS ok FROM txn_smoke_ddl`)).toArray();
       expect(rows).toHaveLength(0);
     });
 

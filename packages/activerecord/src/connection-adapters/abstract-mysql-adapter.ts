@@ -694,7 +694,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return arelSql("CURRENT_TIMESTAMP(6)");
   }
 
-  override isWriteQuery(sql: string): boolean {
+  override isWriteQuery(sql: string | null): boolean {
     return mysqlIsWriteQuery(sql);
   }
 

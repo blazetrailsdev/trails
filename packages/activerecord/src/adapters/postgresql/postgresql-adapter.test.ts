@@ -632,7 +632,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raise error when cannot translate exception", async () => {
-      await expect(adapter.execute(null as never)).rejects.toBeInstanceOf(TypeError);
+      await expect(adapter.execute(null)).rejects.toBeInstanceOf(TypeError);
     });
 
     it("translate no connection exception to not established", async () => {

@@ -889,7 +889,7 @@ export class PostgreSQLAdapter
   /** @internal */
   declare performQuery: (
     rawConnection: pg.Client,
-    sql: string,
+    sql: string | null,
     binds: unknown[],
     typeCastedBinds: unknown[],
     options: { prepare: boolean; notificationPayload?: Record<string, unknown> },
@@ -1128,7 +1128,7 @@ export class PostgreSQLAdapter
       prepare?: boolean;
     } = {},
   ): Promise<unknown> {
-    sql = preprocessQuery.call(this as any, sql);
+    sql = preprocessQuery.call(this as any, sql) as string;
     try {
       if (materializeTransactions) await this.materializeTransactions();
       const hasBinds = binds.length > 0;
@@ -2184,7 +2184,7 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  sqlKey(sql: string): string {
+  sqlKey(sql: string | null): string {
     return `${this._schemaSearchPathMemo ?? ""}-${sql}`;
   }
 
@@ -2192,7 +2192,7 @@ export class PostgreSQLAdapter
    * @internal
    * @missingRailsCall translate_exception_class — PERMANENT
    */
-  async prepareStatement(sql: string, _binds: unknown[], _conn: pg.Client): Promise<string> {
+  async prepareStatement(sql: string | null, _binds: unknown[], _conn: pg.Client): Promise<string> {
     const pool = this._statements;
     const key = this.sqlKey(sql);
     if (pool.isKey(key)) return pool.get(key)!.name;
@@ -2286,10 +2286,10 @@ export interface PostgreSQLAdapter {
 
   explain(arel: string, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
-  isWriteQuery(sql: string): boolean;
+  isWriteQuery(sql: string | null): boolean;
 
   execute(
-    sql: string,
+    sql: string | null,
     name?: string | null,
     options?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;

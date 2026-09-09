@@ -3,23 +3,9 @@ import type {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
-import type { Column as AbstractColumn } from "../column.js";
 import type { Column } from "./column.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
-  /** @internal */
-  protected override resolvePrimaryKeyColumns(
-    tableName: string,
-    columns: AbstractColumn[],
-  ): AbstractColumn[] {
-    const order = this.primaryKeyOrderCache[tableName];
-    if (order === undefined) return super.resolvePrimaryKeyColumns(tableName, columns);
-    const byName = new Map(columns.map((c) => [c.name, c]));
-    return order
-      .map((name) => byName.get(name))
-      .filter((c): c is AbstractColumn => c !== undefined);
-  }
-
   /** @internal */
   protected override prepareColumnOptions(column: Column): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column);

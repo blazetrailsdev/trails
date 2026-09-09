@@ -127,7 +127,7 @@ export interface DatabaseStatementsHost {
   affectedRows(rawResult: unknown): number;
   /** @internal */
   lastInsertedId?(result: Result): unknown;
-  isWriteQuery(sql: string): boolean;
+  isWriteQuery(sql: string | null): boolean;
   currentTransaction(): Transaction | NullTransaction;
   withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
@@ -155,7 +155,7 @@ export interface DatabaseStatementsHost {
   transaction<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
   pool: ConnectionPool | NullPool;
   /** @internal */
-  checkIfWriteQuery?(sql: string): void;
+  checkIfWriteQuery?(sql: string | null): void;
   /** @internal */
   supportsInsertReturning?(): boolean | Promise<boolean>;
   /** @internal */
@@ -163,7 +163,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   primaryKey?(table: string): string | null | Promise<string | null>;
   /** @internal */
-  preprocessQuery?(sql: string): string;
+  preprocessQuery?(sql: string | null): string | null;
   /** @internal */
   asyncEnabled?(): boolean;
   /** @internal */
@@ -512,7 +512,10 @@ export function resetTransaction(
   self._transactionManager = new TransactionManager(self);
 }
 
-export function markTransactionWrittenIfWrite(this: DatabaseStatementsHost, sql: string): void {
+export function markTransactionWrittenIfWrite(
+  this: DatabaseStatementsHost,
+  sql: string | null,
+): void {
   const transaction = this.currentTransaction();
   if (transaction.open) {
     (transaction as Transaction).written ||= this.isWriteQuery(sql);
@@ -911,7 +914,7 @@ export const DatabaseStatements = {
     return this.affectedRows(await this.internalExecute(sql, name, binds));
   },
 
-  isWriteQuery(_sql: string): boolean {
+  isWriteQuery(_sql: string | null): boolean {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:118
     throw new NotImplementedError();
   },
@@ -1042,7 +1045,7 @@ export async function rawExecute(
 export function performQuery(
   this: DatabaseStatementsHost,
   _rawConnection: unknown,
-  _sql: string,
+  _sql: string | null,
   _binds: unknown[],
   _typeCastedBinds: unknown[],
   _options: {
@@ -1074,11 +1077,11 @@ export function affectedRows(rawResult: any): never {
 }
 
 /** @internal */
-export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
+export function preprocessQuery(this: DatabaseStatementsHost, sql: string | null): string | null {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
   for (const transformer of ActiveRecord.queryTransformers) {
-    sql = transformer.call(sql, this);
+    sql = transformer.call(sql as string, this);
   }
 
   return sql;
@@ -1258,7 +1261,7 @@ export function select(
       );
     }
 
-    sql = this.preprocessQuery ? this.preprocessQuery(sql) : sql;
+    sql = (this.preprocessQuery ? this.preprocessQuery(sql) : sql) as string;
     const futureResult = new (async as FutureResultClass)(
       this.pool as unknown as FutureResultPool,
       [sql, name, binds],

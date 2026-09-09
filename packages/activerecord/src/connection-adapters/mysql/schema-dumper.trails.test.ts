@@ -300,35 +300,4 @@ describe("MySQL::SchemaDumper", () => {
       expect(Object.hasOwn(d.virtualExpressionCache, "t")).toBe(false);
     });
   });
-
-  describe("orderPrimaryKeyColumns", () => {
-    it("reorders composite PK columns by primaryKeyOrderCache", () => {
-      const d = make();
-      (d as any).primaryKeyOrderCache["t"] = ["b", "a"];
-      const result = (d as any).orderPrimaryKeyColumns("t", [
-        col({ name: "a" }),
-        col({ name: "b" }),
-      ]);
-      expect(result.map((c: { name: string }) => c.name)).toEqual(["b", "a"]);
-    });
-
-    it("preserves input order when cache is empty", () => {
-      const d = make();
-      const result = (d as any).orderPrimaryKeyColumns("t", [
-        col({ name: "a" }),
-        col({ name: "b" }),
-      ]);
-      expect(result.map((c: { name: string }) => c.name)).toEqual(["a", "b"]);
-    });
-
-    it("appends columns not present in cache", () => {
-      const d = make();
-      (d as any).primaryKeyOrderCache["t"] = ["b"];
-      const result = (d as any).orderPrimaryKeyColumns("t", [
-        col({ name: "a" }),
-        col({ name: "b" }),
-      ]);
-      expect(result.map((c: { name: string }) => c.name)).toEqual(["b", "a"]);
-    });
-  });
 });

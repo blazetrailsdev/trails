@@ -6,6 +6,7 @@ import {
 } from "../abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../base.js";
 import { ReadOnlyError } from "../../errors.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   let adapter: Mysql2Adapter;
@@ -25,14 +26,20 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
-    await expect(adapter.execute(`CREATE TABLE pq_ddl (id integer)`)).resolves.toEqual([]);
+    expect(
+      ((await adapter.execute(`CREATE TABLE pq_ddl (id integer)`)) as Mysql2RawResult).rows,
+    ).toBeNull();
     await adapter.execute(`DROP TABLE pq_ddl`);
-    await expect(adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`)).resolves.toEqual([]);
+    expect(
+      ((await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`)) as Mysql2RawResult).rows,
+    ).toBeNull();
   });
 
   it("execute still returns rows for a row-returning statement", async () => {
     await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
-    await expect(adapter.execute(`SELECT nick FROM pq`)).resolves.toEqual([{ nick: "a" }]);
+    expect(((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2RawResult).rows).toEqual([
+      ["a"],
+    ]);
   });
 
   it("executeMutation sources affected rows through the affectedRows port", async () => {
@@ -68,7 +75,7 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+      expect(((await adapter.execute(`SELECT * FROM pq`)) as Mysql2RawResult).rows).toEqual([]);
     });
   });
   it("internalExecute prepares when prepare is true", async () => {
