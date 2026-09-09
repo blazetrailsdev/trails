@@ -798,6 +798,7 @@ jobs:
           scripts/mixin-declaration-drift.test.ts
           scripts/mysql-grant-namespaces.test.ts
           scripts/stale-story-references.test.ts
+          scripts/start-worktree.test.ts
           scripts/closing-story-references.test.ts
           scripts/non-transactional-row-writes.test.ts
           scripts/ruby-compat-leaf.test.ts
