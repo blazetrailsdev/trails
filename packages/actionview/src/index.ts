@@ -57,6 +57,15 @@ export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.j
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
 export { OutputFlow } from "./flows.js";
+export { Context } from "./context.js";
+export { convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
+export { JOIN, NEW, domClass, domId, recordKeyForDomId } from "./record-identifier.js";
+export { Text } from "./template/text.js";
+export { HTML } from "./template/html.js";
+export { RawFile } from "./template/raw-file.js";
+export { Renderable } from "./template/renderable.js";
+export { Inline } from "./template/inline.js";
+export { Html } from "./template/handlers/html.js";
 
 export { PathSet, type PathSetResolver } from "./path-set.js";
 export { TemplatePath } from "./template-path.js";
