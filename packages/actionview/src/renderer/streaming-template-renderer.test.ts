@@ -16,7 +16,7 @@ function makeLookupContext(): LookupContext {
   return new LookupContext();
 }
 
-const ctx: ViewContext = {};
+const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 async function collectChunks(gen: AsyncGenerator<string>): Promise<string[]> {
   const chunks: string[] = [];

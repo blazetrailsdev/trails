@@ -22,7 +22,7 @@ export interface ViewContext {
   _layoutFor?(name?: string): string;
   viewFlow?: { set(key: string, content: string): void };
   prefixPartialPathWithControllerNamespace?: boolean;
-  viewRenderer?: { cacheHits: Record<string, unknown> };
+  viewRenderer: { cacheHits: Record<string, unknown> };
 }
 
 export interface RenderOptions {

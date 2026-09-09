@@ -91,7 +91,7 @@ export class PartialRenderer extends AbstractRenderer {
           view.viewFlow?.set("layout", content);
           content = await layout.render(view, locals);
         }
-        payload["cache_hit"] = view.viewRenderer?.cacheHits[template.virtualPath as string];
+        payload["cache_hit"] = view.viewRenderer.cacheHits[template.virtualPath as string];
         return this.buildRenderedTemplate(content, template);
       },
     );

@@ -352,7 +352,7 @@ export class Fanout {
       groups = new Map(groups);
       for (const [groupClass, subscriptions] of silenceableGroups) {
         const activeSubscriptions = subscriptions.filter((s) => {
-          const silenced = (s as unknown as { silenced(name: string): unknown }).silenced(name);
+          const silenced = (s as unknown as { isSilenced(name: string): unknown }).isSilenced(name);
           return silenced == null || silenced === false;
         });
         if (activeSubscriptions.length > 0) {
@@ -452,7 +452,7 @@ export class Evented<D = Delegate> {
   constructor(pattern: string | RegExp | null, delegate: D) {
     this.pattern = Matcher.wrap(pattern);
     this.delegate = delegate;
-    this.silenceable = typeof (delegate as { silenced?: unknown })?.silenced === "function";
+    this.silenceable = typeof (delegate as { isSilenced?: unknown })?.isSilenced === "function";
     this.canPublish = typeof (delegate as { publish?: unknown })?.publish === "function";
     this.canPublishEvent =
       typeof (delegate as { publishEvent?: unknown })?.publishEvent === "function";
@@ -478,7 +478,7 @@ export class Evented<D = Delegate> {
 
   isSilenced(name: string): boolean {
     if (!this.silenceable) return false;
-    const silenced = (this.delegate as { silenced(name: string): unknown }).silenced(name);
+    const silenced = (this.delegate as { isSilenced(name: string): unknown }).isSilenced(name);
     return silenced != null && silenced !== false;
   }
 

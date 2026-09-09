@@ -13,7 +13,7 @@ function makeFakeTemplate(body = "body"): RenderableTemplate {
   };
 }
 
-const ctx: ViewContext = {};
+const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 describe("PartialRenderer", () => {
   let lc: LookupContext;

@@ -53,7 +53,10 @@ describe("ActionView::LogSubscriber", () => {
       render: async () => "Hello world",
     };
 
-    await new Renderer(new LookupContext()).render({}, { template });
+    await new Renderer(new LookupContext()).render(
+      { viewRenderer: { cacheHits: {} } },
+      { template },
+    );
 
     expect(logger.logged("debug")).toEqual(["  Rendering test/hello_world.tse"]);
     expect(logger.logged("info")).toHaveLength(1);
@@ -153,5 +156,12 @@ describe("ActionView::LogSubscriber", () => {
 
     Base.logger = null;
     expect(start.isSilenced("render_template.action_view")).toBe(true);
+
+    Notifications.instrument(
+      "render_template.action_view",
+      { identifier: "/srv/app/app/views/test/hello_world.tse" },
+      () => undefined,
+    );
+    expect(logger.logged("debug")).toEqual([]);
   });
 });
