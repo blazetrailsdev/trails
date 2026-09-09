@@ -158,6 +158,17 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: not_a_real_pragma");
   });
 
+  it("cannot run a second statement smuggled through a pragma value", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    adapter = new BetterSQLite3Adapter(":memory:", {
+      pragmas: { synchronous: "FULL; DROP TABLE sqlite_master" },
+    });
+    await adapter.connectBang();
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SQLite pragma 'synchronous' failed"),
+    );
+  });
+
   it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.connectBang();
