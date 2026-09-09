@@ -116,6 +116,7 @@ export {
 export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelFloat } from "./kernel-float.js";
+export { format, sprintf } from "./kernel-format.js";
 export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { KeyError } from "./key-error.js";
