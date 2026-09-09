@@ -1168,6 +1168,72 @@ describe("CI runs every tooling test suite", () => {
     expect(offenders).toEqual([]);
   });
 
+  // Preflight's failure report reads `toJSON(steps)`, which carries only
+  // `id:`-bearing steps — so a check added without an id fails the run but
+  // vanishes from the annotation that explains it, right as the cancel below
+  // turns every other job grey.
+  it("gives every preflight check step an id the failure report can name", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { steps: { name?: string; id?: string; uses?: string }[] } };
+    };
+    const unnamed = wf.jobs.preflight.steps
+      .filter((s) => s.name !== undefined && s.id === undefined)
+      .map((s) => s.name);
+    expect(unnamed).toEqual(["Report which preflight checks failed", "Cancel the rest of the run"]);
+  });
+
+  // The cancel discards every other lane's result, which is the point on a PR
+  // (push a fix, get a fresh run) and a loss everywhere else: `main`, the
+  // Monday sweep and workflow_dispatch exist for the full-suite signal and the
+  // timing report, and none is re-triggered by pushing.
+  it("cancels a failed preflight run on pull_request events only", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { permissions: Record<string, string>; steps: { name?: string }[] } };
+    };
+    const cancel = wf.jobs.preflight.steps.find(
+      (s) => s.name === "Cancel the rest of the run",
+    ) as unknown as { if: string; run: string; "continue-on-error": boolean };
+
+    expect(cancel.if.replace(/\s+/g, " ")).toBe(
+      "${{ failure() && github.event_name == 'pull_request' }}",
+    );
+    expect(cancel.run).toContain("actions/runs/$GITHUB_RUN_ID/cancel");
+    expect(cancel["continue-on-error"]).toBe(true);
+    expect(wf.jobs.preflight.permissions.actions).toBe("write");
+  });
+
+  // The declared `actions: write` is a ceiling, not a floor: on a public repo
+  // a fork PR and a Dependabot PR both run with a read-only GITHUB_TOKEN, so
+  // the cancel 403s and those runs keep every expensive lane. That limit is
+  // accepted (the alternative is a second `workflow_run` workflow), so what is
+  // pinned is that it stays SAID — a `continue-on-error` step that swallowed
+  // the 403 in silence would send someone hunting a phantom bug.
+  it("says out loud when a read-only token blocks the preflight cancel", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { steps: { name?: string; run?: string }[] } };
+    };
+    const run =
+      wf.jobs.preflight.steps.find((s) => s.name === "Cancel the rest of the run")?.run ?? "";
+
+    expect(run).toMatch(/::warning::/);
+    expect(run).toMatch(/read-only/);
+    expect(run).toMatch(/fork PR or a Dependabot PR/);
+
+    // Pin the discriminator itself, not just the wording it guards: the
+    // read-only diagnosis is only honest for an AUTHENTICATED token missing
+    // the scope. A 401 is missing/invalid auth and a 5xx is the API being
+    // down; naming forks for either misdirects.
+    const [, pattern] = run.match(/grep -qiE '([^']+)' <<</) ?? [];
+    expect(pattern, "cancel step classifies its error with a grep -qiE").toBeDefined();
+    const discriminator = new RegExp(pattern, "i");
+
+    expect(discriminator.test("gh: Resource not accessible by integration (HTTP 403)")).toBe(true);
+    expect(discriminator.test("HTTP 403: Forbidden")).toBe(true);
+    expect(discriminator.test("HTTP 401: Bad credentials")).toBe(false);
+    expect(discriminator.test("HTTP 503: no server is currently available")).toBe(false);
+    expect(discriminator.test("HTTP 404: Not Found")).toBe(false);
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
