@@ -227,7 +227,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
   ): Promise<RenderedCollection | EmptyCollection> {
     void block;
     const identifier = (template && template.identifier) || path;
-    return Notifications.instrument(
+    return Notifications.instrument<Promise<RenderedCollection | EmptyCollection>>(
       "render_collection.action_view",
       {
         identifier,
@@ -266,8 +266,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
 
         return this.buildRenderedCollection(collectionBody, spacer);
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- block return type
-    ) as any;
+    );
   }
 
   /** @internal */
