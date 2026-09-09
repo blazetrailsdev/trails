@@ -382,6 +382,12 @@ function toInteger(val: unknown): bigint {
   return BigInt(kernelInteger(val));
 }
 
+/**
+ * The `'d'`/`'i'`/`'u'`/`'o'`/`'x'`/`'X'`/`'b'`/`'B'` conversions
+ * (`vendor/ruby/sprintf.c:541`), including the `..` two's complement form a
+ * negative value takes in a non-decimal base without a sign flag
+ * (`vendor/ruby/sprintf.c:659`).
+ */
 function formatInteger(
   val: unknown,
   conv: string,
@@ -501,6 +507,10 @@ function exactDecimal(x: number): { digits: string; exp: number } {
   return { digits, exp: digits.length + exp2 };
 }
 
+/**
+ * `|x| = m * 2 ** exp2` — the IEEE 754 fields `word0` / `word1`
+ * (`vendor/ruby/missing/dtoa.c:2740`) read for a finite, non-zero double.
+ */
 function decompose(x: number): { m: bigint; exp2: number } {
   const view = new DataView(new ArrayBuffer(8));
   view.setFloat64(0, Math.abs(x));
@@ -535,6 +545,16 @@ function roundAt(digits: string, exp: number, keep: number): { digits: string; e
   return { digits: raised, exp };
 }
 
+/**
+ * The `'f'` conversion (`vendor/ruby/sprintf.c:790`) and the `'e'`/`'E'`/
+ * `'g'`/`'G'`/`'a'`/`'A'` ones MRI hands to `BSD_vfprintf`
+ * (`vendor/ruby/sprintf.c:884`).
+ *
+ * A non-finite value is `Inf`, never `Infinity`, and is space-filled whatever
+ * the `0` flag says (`vendor/ruby/sprintf.c:886`). `%a`'s `0x` prefix stands
+ * where an integer conversion's does, so a `0` flag fills BETWEEN it and the
+ * digits (`vendor/ruby/vsnprintf.c:1183`).
+ */
 function formatFloat(
   val: unknown,
   conv: string,
@@ -589,14 +609,14 @@ const QUICK_MAX = 14;
  * for `%f`) and mode 2 (`ndigits` significant, for `%e` and `%g`). The result
  * is `|x| = 0.digits * 10 ** exp`.
  *
- * The floating-point fast path (`dtoa.c:2895`) is ported rather than skipped
+ * The floating-point fast path (`vendor/ruby/missing/dtoa.c:2895`) is ported rather than skipped
  * because it is observable: its rounding decision is taken on the SCALED
  * DOUBLE within a tolerance `eps`, so a value whose exact expansion is a hair
  * under a tie — `0.35`, whose double is `0.34999999999999997…` — still reads
  * as a tie there and rounds half to even on the last generated digit, giving
  * `format("%.1f", 0.35) == "0.4"` where rounding the exact expansion gives
  * `"0.3"`. Where the fast path cannot decide within `eps` it gives up
- * (`fast_failed`, `dtoa.c:2994`) and the exact expansion answers, which is why
+ * (`fast_failed`, `vendor/ruby/missing/dtoa.c:2994`) and the exact expansion answers, which is why
  * `format("%.1f", 0.05)` is `"0.1"`.
  */
 function dtoa(x: number, mode: 2 | 3, ndigits: number): { digits: string; exp: number } {
