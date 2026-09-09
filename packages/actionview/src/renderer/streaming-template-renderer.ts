@@ -40,17 +40,15 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     }
 
     const layoutName = options.layout;
-    const layout =
-      layoutName != null && layoutName !== false
-        ? this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? "html"])
-        : null;
 
     try {
-      if (!layout) {
+      if (layoutName == null || layoutName === false) {
         const body = await template.render(context, locals);
         yield body;
         return;
       }
+
+      const layout = this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? "html"]);
 
       yield* this.delayedRender(context, template, layout, locals);
     } catch (err) {
@@ -66,7 +64,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
   private async *delayedRender(
     context: ViewContext,
     template: RenderableTemplate,
-    layout: RenderableTemplate,
+    layout: RenderableTemplate | null,
     locals: Record<string, unknown>,
   ): AsyncGenerator<string> {
     const sentinel = `\x00STREAM_YIELD_${Date.now()}_${Math.random()}\x00`;
@@ -75,14 +73,21 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
       _layoutFor: (name?: string) => (name ? (context._layoutFor?.(name) ?? "") : sentinel),
     };
 
-    const handle = Notifications.buildHandle("render_template.action_view", {
+    const payload: Record<string, unknown> = {
       identifier: template.identifier,
       layout: layout && layout.virtualPath,
       locals,
-    });
+    };
+    const handle = Notifications.buildHandle("render_template.action_view", payload);
     handle.start();
 
     try {
+      if (!layout) {
+        const templateBody = await template.render(context, locals);
+        yield templateBody;
+        return;
+      }
+
       const layoutBody = await layout.render(streamingContext, locals);
       const sentinelIdx = layoutBody.indexOf(sentinel);
 
@@ -102,6 +107,13 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
       yield templateBody;
 
       yield layoutSuffix;
+    } catch (e) {
+      payload.exception = [
+        e instanceof Error ? e.name : String(e),
+        e instanceof Error ? e.message : String(e),
+      ];
+      payload.exception_object = e;
+      throw e;
     } finally {
       handle.finish();
     }
