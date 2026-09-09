@@ -192,8 +192,8 @@ export class FileSystemResolver extends Resolver {
   }
 
   /** @internal */
-  protected buildUnboundTemplate(template: string, logical?: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(logical ?? template.slice(this._path.length + 1));
+  protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
+    const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
 
@@ -215,19 +215,12 @@ export class FileSystemResolver extends Resolver {
   protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
     if (path.name.includes(".")) return [];
 
-    const dashed = path.virtual.replace(/[^/]*\//g, (segment) => segment.replace(/_/g, "-"));
-    const spellings = dashed === path.virtual ? [path.virtual] : [dashed, path.virtual];
+    const paths = this.templateGlob(`${this.escapeEntry(path.virtual)}*`);
     const templates: TemplateWithDetails[] = [];
 
-    for (const spelling of spellings) {
-      for (const template of this.templateGlob(`${this.escapeEntry(spelling)}*`)) {
-        const suffix = template.slice(this._path.length + 1 + spelling.length);
-        const built = this.buildUnboundTemplate(
-          template,
-          spelling === path.virtual ? undefined : `${path.virtual}${suffix}`,
-        );
-        if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
-      }
+    for (const template of paths) {
+      const built = this.buildUnboundTemplate(template);
+      if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
     }
 
     return templates;

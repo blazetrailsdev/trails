@@ -112,11 +112,17 @@ describe("ControllerGeneratorTest", () => {
     expect(fs.existsSync(path.join(tmpDir, "app/views/admin/account"))).toBe(true);
   });
 
-  it("writes the kebab-cased view directory the lookup now asks for first", () => {
+  it("writes the view directory the implicit lookup asks for", () => {
     const gen = makeGen();
     gen.run("RfcPages", ["show"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages/show.html.tse"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(false);
+  });
+
+  it("keeps the controller file kebab-cased while its view directory is not", () => {
+    const gen = makeGen();
+    gen.run("RfcPages", ["show"]);
+    expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
   });
 
   it("actions are turned into methods", () => {
