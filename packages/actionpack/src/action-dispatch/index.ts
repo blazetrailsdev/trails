@@ -28,11 +28,6 @@ export {
   escapeSegment,
   escapeFragment,
   unescapeUri,
-  urlFor,
-  urlOptions,
-  optimizeRoutesGeneration,
-  polymorphicPath,
-  polymorphicUrl,
   HelperMethodBuilder,
   UrlFor,
 } from "./routing/index.js";
