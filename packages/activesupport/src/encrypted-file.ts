@@ -92,7 +92,7 @@ export class EncryptedFile {
     const fs = getFs();
     const path = await this.resolveContentPath();
     if (key !== null && (await fs.exists(path))) {
-      return this.decrypt((await fs.readFile!(path, "utf8")).trim());
+      return this.decrypt((await fs.readFile(path, "utf8")).trim());
     }
     throw new MissingContentError(path);
   }
@@ -125,7 +125,7 @@ export class EncryptedFile {
 
         await block(tmpPath);
 
-        const updatedContents = await fs.readFile!(tmpPath, "utf8");
+        const updatedContents = await fs.readFile(tmpPath, "utf8");
 
         if (updatedContents !== contents) await this.write(updatedContents);
       },
@@ -162,7 +162,7 @@ export class EncryptedFile {
     this.keyFileChecked = true;
     const fs = getFs();
     if (!(await fs.exists(this.keyPath))) return null;
-    this.keyFileContents = (await fs.readFile!(this.keyPath, "utf8")).trim();
+    this.keyFileContents = (await fs.readFile(this.keyPath, "utf8")).trim();
     return this.keyFileContents;
   }
 
