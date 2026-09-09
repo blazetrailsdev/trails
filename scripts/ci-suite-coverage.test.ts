@@ -1168,6 +1168,40 @@ describe("CI runs every tooling test suite", () => {
     expect(offenders).toEqual([]);
   });
 
+  // Preflight's failure report reads `toJSON(steps)`, which carries only
+  // `id:`-bearing steps — so a check added without an id fails the run but
+  // vanishes from the annotation that explains it, right as the cancel below
+  // turns every other job grey.
+  it("gives every preflight check step an id the failure report can name", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { steps: { name?: string; id?: string; uses?: string }[] } };
+    };
+    const unnamed = wf.jobs.preflight.steps
+      .filter((s) => s.name !== undefined && s.id === undefined)
+      .map((s) => s.name);
+    expect(unnamed).toEqual(["Report which preflight checks failed", "Cancel the rest of the run"]);
+  });
+
+  // The cancel discards every other lane's result, which is the point on a PR
+  // (push a fix, get a fresh run) and a loss everywhere else: `main`, the
+  // Monday sweep and workflow_dispatch exist for the full-suite signal and the
+  // timing report, and none is re-triggered by pushing.
+  it("cancels a failed preflight run on pull_request events only", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { permissions: Record<string, string>; steps: { name?: string }[] } };
+    };
+    const cancel = wf.jobs.preflight.steps.find(
+      (s) => s.name === "Cancel the rest of the run",
+    ) as unknown as { if: string; run: string; "continue-on-error": boolean };
+
+    expect(cancel.if.replace(/\s+/g, " ")).toBe(
+      "${{ failure() && github.event_name == 'pull_request' }}",
+    );
+    expect(cancel.run).toContain("actions/runs/$GITHUB_RUN_ID/cancel");
+    expect(cancel["continue-on-error"]).toBe(true);
+    expect(wf.jobs.preflight.permissions.actions).toBe("write");
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
