@@ -111,3 +111,54 @@ describe("FixtureResolver", () => {
     expect(resolver.allTemplatePaths().map((path) => path.virtual)).toEqual(["posts/index"]);
   });
 });
+
+describe("FileSystemResolver view-directory spelling", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    const fs = getFs();
+    const path = getPath();
+    const os = await getOsAsync();
+    dir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}fs-resolver-spelling-`);
+    await fs.mkdir!(path.join(dir, "rfc-pages"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "rfc-pages", "show.html.tse"), "<h1>Kebab</h1>");
+    await fs.mkdir!(path.join(dir, "story_pages"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "story_pages", "show.html.tse"), "<h1>Underscore</h1>");
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+
+  afterEach(async () => {
+    TemplateHandlers.clear();
+    const fs = getFs();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("finds a template the generator wrote to a kebab-cased directory", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.isExists("show", ["rfc_pages"])).toBe(true);
+    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.source).toBe("<h1>Kebab</h1>");
+  });
+
+  it("reports the underscored virtual path for a kebab-cased directory", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath).toBe("rfc_pages/show");
+  });
+
+  it("still finds a template in an underscored directory", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("show", ["story_pages"], ["html"])?.source).toBe("<h1>Underscore</h1>");
+  });
+
+  it("does not invent a template for a directory that exists in neither spelling", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.isExists("show", ["missing_pages"])).toBe(false);
+  });
+});

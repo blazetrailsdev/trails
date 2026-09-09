@@ -1,4 +1,3 @@
-import { dasherize } from "@blazetrails/activesupport";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
@@ -82,10 +81,7 @@ export class ClassMethods {
 
   /** @internal */
   static localPrefixes(this: ViewPathsClass): string[] {
-    const path = this.controllerPath();
-    if (typeof path !== "string") return [path];
-    const dashed = dasherize(path);
-    return dashed === path ? [path] : [dashed, path];
+    return [this.controllerPath()];
   }
 }
 

@@ -110,34 +110,3 @@ describe("ViewPaths", () => {
     expect(controller.templateExists("missing", ["posts"])).toBe(false);
   });
 });
-
-describe("localPrefixes", () => {
-  const prefixesFor = (controllerPath: string): string[] =>
-    ClassMethods.localPrefixes.call({
-      controllerPath: () => controllerPath,
-    } as unknown as ViewPathsClass);
-
-  test("looks under the kebab-cased directory first", () => {
-    expect(prefixesFor("rfc_pages")[0]).toBe("rfc-pages");
-  });
-
-  test("keeps the underscored directory as a fallback", () => {
-    expect(prefixesFor("rfc_pages")).toEqual(["rfc-pages", "rfc_pages"]);
-  });
-
-  test("returns one prefix when a name has no separator to respell", () => {
-    expect(prefixesFor("account")).toEqual(["account"]);
-  });
-
-  test("respells every segment of a namespaced controller", () => {
-    expect(prefixesFor("admin/rfc_pages")).toEqual(["admin/rfc-pages", "admin/rfc_pages"]);
-  });
-
-  test("carries a missing controller path through untouched", () => {
-    expect(
-      ClassMethods.localPrefixes.call({
-        controllerPath: () => undefined as unknown as string,
-      } as unknown as ViewPathsClass),
-    ).toEqual([undefined]);
-  });
-});

@@ -108,6 +108,22 @@ function compareSortKeys(
   return 0;
 }
 
+/** @internal */
+function mapPrefix(virtual: string, map: (prefix: string) => string): string {
+  const at = virtual.lastIndexOf("/");
+  return at < 0 ? virtual : map(virtual.slice(0, at)) + virtual.slice(at);
+}
+
+/** @internal */
+function dasherizePrefix(virtual: string): string {
+  return mapPrefix(virtual, (prefix) => prefix.replace(/_/g, "-"));
+}
+
+/** @internal */
+function underscorePrefix(entry: string): string {
+  return mapPrefix(entry, (prefix) => prefix.replace(/-/g, "_"));
+}
+
 export class FileSystemResolver extends Resolver {
   private templatesCache = new Map<string, TemplateWithDetails[]>();
   private pathParser = new PathParser();
@@ -193,7 +209,7 @@ export class FileSystemResolver extends Resolver {
 
   /** @internal */
   protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
+    const parsed = this.pathParser.parse(underscorePrefix(template.slice(this._path.length + 1)));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
 
@@ -215,15 +231,22 @@ export class FileSystemResolver extends Resolver {
   protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
     if (path.name.includes(".")) return [];
 
-    const paths = this.templateGlob(`${this.escapeEntry(path.virtual)}*`);
     const templates: TemplateWithDetails[] = [];
 
-    for (const template of paths) {
+    for (const template of this.templateEntries(path.virtual)) {
       const built = this.buildUnboundTemplate(template);
       if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
     }
 
     return templates;
+  }
+
+  /** @internal */
+  protected templateEntries(virtual: string): string[] {
+    const found = this.templateGlob(`${this.escapeEntry(virtual)}*`);
+    const dashed = dasherizePrefix(virtual);
+    if (dashed === virtual) return found;
+    return [...found, ...this.templateGlob(`${this.escapeEntry(dashed)}*`)];
   }
 
   /** @internal */
