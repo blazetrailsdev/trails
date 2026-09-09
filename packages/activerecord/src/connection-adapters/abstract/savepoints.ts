@@ -1,13 +1,13 @@
 export function createSavepointSql(name: string | null): string {
-  return `SAVEPOINT ${name}`;
+  return `SAVEPOINT ${name ?? ""}`;
 }
 
 export function execRollbackToSavepointSql(name: string | null): string {
-  return `ROLLBACK TO SAVEPOINT ${name}`;
+  return `ROLLBACK TO SAVEPOINT ${name ?? ""}`;
 }
 
 export function releaseSavepointSql(name: string | null): string {
-  return `RELEASE SAVEPOINT ${name}`;
+  return `RELEASE SAVEPOINT ${name ?? ""}`;
 }
 
 export interface SavepointHost {

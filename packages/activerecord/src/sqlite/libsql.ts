@@ -128,7 +128,10 @@ export interface SyncableSqliteConnection extends SqliteConnection {
 function sharedCacheDatabase(config: SqliteOpenConfig): string {
   if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
   if (config.database.startsWith("file:")) {
-    return `${config.database}${config.database.includes("?") ? "&" : "?"}cache=shared`;
+    const hash = config.database.indexOf("#");
+    const body = hash === -1 ? config.database : config.database.slice(0, hash);
+    const fragment = hash === -1 ? "" : config.database.slice(hash);
+    return `${body}${body.includes("?") ? "&" : "?"}cache=shared${fragment}`;
   }
   return `file:${config.database}?cache=shared`;
 }

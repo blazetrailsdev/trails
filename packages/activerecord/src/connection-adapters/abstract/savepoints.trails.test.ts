@@ -33,6 +33,12 @@ describe("Savepoints", () => {
     it("releaseSavepointSql", () => {
       expect(releaseSavepointSql("active_record_1")).toBe("RELEASE SAVEPOINT active_record_1");
     });
+
+    it("interpolates a null name the way Ruby interpolates nil", () => {
+      expect(createSavepointSql(null)).toBe("SAVEPOINT ");
+      expect(execRollbackToSavepointSql(null)).toBe("ROLLBACK TO SAVEPOINT ");
+      expect(releaseSavepointSql(null)).toBe("RELEASE SAVEPOINT ");
+    });
   });
 
   describe("adapter methods", () => {

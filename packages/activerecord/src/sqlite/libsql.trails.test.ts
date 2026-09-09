@@ -689,4 +689,23 @@ describe("SqliteDriver — libsql binds unsupplied placeholders as NULL", () => 
     await a.exec("DROP TABLE IF EXISTS shared_cache_probe");
     for (const c of conns) await c.close();
   });
+
+  it("keeps the shared-cache option ahead of a URI fragment", async () => {
+    const conns: SqliteConnection[] = [];
+    for (let i = 0; i < 2; i++) {
+      conns.push(
+        await libsqlDriver.open({
+          database: "file::memory:#frag",
+          flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+        }),
+      );
+    }
+    const [a, b] = conns;
+    await a.exec("CREATE TABLE fragment_probe (x INTEGER)");
+    await b.exec("PRAGMA read_uncommitted=ON");
+    const probe = await b.prepare("SELECT count(*) AS n FROM fragment_probe");
+    expect(await probe.all()).toEqual([{ n: 0 }]);
+    await a.exec("DROP TABLE IF EXISTS fragment_probe");
+    for (const c of conns) await c.close();
+  });
 });
