@@ -150,7 +150,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "(fixtures_test.rb:87). They assert one INSERT query per load and the " +
       "max_allowed_packet chunking around it; trails' insertFixturesSet emits per-table " +
       "batches through executeBatch and carries no packet-size budget, so there is no " +
-      "chunk boundary to assert and no single-query claim to make.",
+      "chunk boundary to assert and no single-query claim to make. CONVERGEABLE " +
+      "port-fixtures-bulk-insert-and-packet-chunking-cases: trails has maxAllowedPacket() " +
+      "and packet-aware MySQL execution, so these ten converge rather than stay excluded.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -246,7 +248,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Accessor shapes trails' single-name closure does not have: topics(:first, :second) " +
       "returning a 2-element collection, and topics(:first, true) forcing a reload, the " +
       "latter asserted with assert_called on the stored fixture's #find " +
-      "(fixtures_test.rb:781-798).",
+      "(fixtures_test.rb:781-798). CONVERGEABLE " +
+      "variadic-and-force-reload-fixture-accessor: Rails' accessor takes (*fixture_names, " +
+      "force_reload) at test_fixtures.rb:294-321; this is missing API, not a language limit.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -275,7 +279,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "The whole class is gated on Account.lease_connection.respond_to?(:reset_pk_sequence!) " +
       "(fixtures_test.rb:715), which is PostgreSQL-only. trails has resetPkSequenceBang on " +
       "the PG adapter alone (postgresql/schema-statements.ts:1402); on sqlite and MySQL " +
-      "there is no sequence to reset, so the class does not run there in Rails either.",
+      "there is no sequence to reset, so the class does not run there in Rails either. " +
+      "CONVERGEABLE port-fixtures-reset-pk-sequence-cases: the method exists, so the " +
+      "adapter gate is the port rather than the exclusion.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -284,7 +290,10 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Asserts fixture_table_names returns the merged, sorted table list after two separate " +
       "fixtures declarations (fixtures_test.rb:826). trails' fixtures() returns accessors " +
-      "and exposes no fixtureTableNames reader, so there is nothing to assert against.",
+      "and exposes no fixtureTableNames reader, so there is nothing to assert against. " +
+      "CONVERGEABLE implement-fixture-table-names: the merge-and-dedupe behaviour these " +
+      "two cases specify is Rails' `self.fixture_table_names |= table_names` " +
+      "(test_fixtures.rb:38-52).",
   },
   {
     testFile: "fixtures_test.rb",
@@ -292,7 +301,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["fixture table names"],
     reason:
       "Same missing fixtureTableNames reader as the row above, for the overlapping-" +
-      "declarations case (fixtures_test.rb:859).",
+      "declarations case (fixtures_test.rb:859). CONVERGEABLE implement-fixture-table-names.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -310,7 +319,10 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "'insert with default function' asserts a CURRENT_TIMESTAMP column default within " +
       "1.1s of Time.now, which has no stable cross-adapter read back through the attribute " +
       "reader. 'logger level invariant' swaps ActiveRecord::Base.logger for " +
-      "ActiveSupport::Logger.new(nil) and asserts the level survives a fixture load.",
+      "ActiveSupport::Logger.new(nil) and asserts the level survives a fixture load. " +
+      "CONVERGEABLE converge-fixtures-test-grouped-one-off-exclusions: insertFixturesSet, " +
+      "Base.logger and Logger#level all exist, so at least two of these four converge and " +
+      "the group is split into per-case rows there.",
   },
   {
     pattern: "fixture_set",

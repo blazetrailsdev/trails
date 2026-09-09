@@ -590,13 +590,12 @@ describe("PrimaryKeyErrorTest", () => {
       findBy: vi.fn(async () => null),
     } as any;
 
-    await expect(defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData)).rejects.toThrow(
-      FixtureSetPrimaryKeyError,
-    );
-
     const e = await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData).catch(
       (err: Error) => err,
     );
+    expect(() => {
+      throw e;
+    }).toThrow(FixtureSetPrimaryKeyError);
     expect((e as Error).message).toContain("Unable to set");
   });
 });
@@ -619,8 +618,10 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
           first: { fk_object_to_point_to_id: 4242 },
         });
       if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
-        await expect(load()).rejects.toThrow();
         const error = await load().catch((e: Error) => e);
+        expect(() => {
+          throw error;
+        }).toThrow();
         expect((error as Error).message).toContain(
           "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
         );
@@ -766,12 +767,12 @@ describe("FixturesTest", () => {
 
   it("yaml file with invalid column", async () => {
     const connection = leaseFixtureConnection();
-    await expect(
-      FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData),
-    ).rejects.toThrow(FixtureError);
     const e = await FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData).catch(
       (err: Error) => err,
     );
+    expect(() => {
+      throw e;
+    }).toThrow(FixtureError);
     expect((e as Error).message).toBe('table "parrots" has no columns named "arrr", "foobar".');
   });
 
