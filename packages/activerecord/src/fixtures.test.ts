@@ -816,26 +816,38 @@ describe("TransactionalFixturesTest", () => {
   });
 });
 
+interface SetupTestState {
+  first?: boolean;
+  second?: boolean;
+}
+
+const setupTestSetup = (state: SetupTestState): void => {
+  state.first = true;
+};
+
 describe("SetupTest", () => {
-  const state: { first?: boolean; second?: boolean } = {};
+  const state: SetupTestState = {};
 
   beforeEach(() => {
-    state.first = true;
+    setupTestSetup(state);
   });
 
   it("nothing", () => {
     expect(state.first).toBe(true);
   });
+});
 
-  describe("SetupSubclassTest", () => {
-    beforeEach(() => {
-      state.second = true;
-    });
+describe("SetupSubclassTest", () => {
+  const state: SetupTestState = {};
 
-    it("subclassing should preserve setups", () => {
-      expect(state.first).toBe(true);
-      expect(state.second).toBe(true);
-    });
+  beforeEach(() => {
+    setupTestSetup(state);
+    state.second = true;
+  });
+
+  it("subclassing should preserve setups", () => {
+    expect(state.first).toBe(true);
+    expect(state.second).toBe(true);
   });
 });
 
