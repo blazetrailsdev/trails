@@ -27,6 +27,9 @@
       "default": "./dist/range.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc"
   }
