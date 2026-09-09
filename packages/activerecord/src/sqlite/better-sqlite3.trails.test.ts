@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
+import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../sqlite-adapter.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 
@@ -213,5 +213,29 @@ describe("SqliteDriver — better-sqlite3 binds unsupplied placeholders as NULL"
     expect(await select.all(["alpha"])).toEqual([]);
     const update = await driver.prepare("UPDATE doodads SET name = ? WHERE id = ?");
     expect((await update.run(["beta"])).changes).toBe(0);
+  });
+
+  it("shared-cache open either shares a cache or fails to open", async () => {
+    const conns: SqliteConnection[] = [];
+    try {
+      for (let i = 0; i < 2; i++) {
+        conns.push(
+          await betterSqlite3Driver.open({
+            database: "file::memory:?cache=shared",
+            flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+          }),
+        );
+      }
+    } catch (e) {
+      expect((e as Error).message).toContain("SQLITE_OPEN_SHAREDCACHE");
+      return;
+    }
+    const [a, b] = conns;
+    await a.exec("CREATE TABLE shared_cache_probe (x INTEGER)");
+    await b.exec("PRAGMA read_uncommitted=ON");
+    const probe = await b.prepare("SELECT count(*) AS n FROM shared_cache_probe");
+    expect(await probe.all()).toEqual([{ n: 0 }]);
+    await a.exec("DROP TABLE IF EXISTS shared_cache_probe");
+    for (const c of conns) await c.close();
   });
 });

@@ -6,7 +6,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`
+    await adapter.execute(`
       CREATE TABLE pg_case_insensitive_defaults (
         char1 char(1),
         char2 varchar(50),
@@ -16,7 +16,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.exec("DROP TABLE IF EXISTS pg_case_insensitive_defaults");
+    await adapter.execute("DROP TABLE IF EXISTS pg_case_insensitive_defaults");
     await adapter.close();
   });
 

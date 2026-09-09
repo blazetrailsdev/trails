@@ -5,8 +5,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_bit_strings`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_bit_strings`);
+    await adapter.execute(`
       CREATE TABLE postgresql_bit_strings (
         id serial primary key,
         a_bit bit(8) DEFAULT B'00000011',
@@ -17,7 +17,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_bit_strings`);
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_bit_strings`);
     await adapter.close();
   });
 
@@ -49,12 +49,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("bit string invalid", async () => {
       await expect(
-        adapter.exec(`INSERT INTO postgresql_bit_strings (a_bit) VALUES (B'0000000011')`),
+        adapter.execute(`INSERT INTO postgresql_bit_strings (a_bit) VALUES (B'0000000011')`),
       ).rejects.toThrow();
     });
 
     it("varbit string", async () => {
-      await adapter.exec(
+      await adapter.execute(
         `INSERT INTO postgresql_bit_strings (a_bit, a_bit_varying) VALUES (B'11111111', B'1111')`,
       );
       const rows = await adapter.execute(`SELECT a_bit, a_bit_varying FROM postgresql_bit_strings`);
@@ -92,10 +92,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("assigning invalid hex string raises exception", async () => {
       await expect(
-        adapter.exec(`INSERT INTO postgresql_bit_strings (a_bit) VALUES ('FF')`),
+        adapter.execute(`INSERT INTO postgresql_bit_strings (a_bit) VALUES ('FF')`),
       ).rejects.toThrow();
       await expect(
-        adapter.exec(`INSERT INTO postgresql_bit_strings (a_bit_varying) VALUES ('F')`),
+        adapter.execute(`INSERT INTO postgresql_bit_strings (a_bit_varying) VALUES ('F')`),
       ).rejects.toThrow();
     });
   });

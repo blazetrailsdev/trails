@@ -48,24 +48,6 @@ export class UrlConfig extends HashConfig {
     }
     return new ConnectionUrlResolver(url).toHash();
   }
-
-  override get database(): string | undefined {
-    const explicit = super.database;
-    if (explicit !== undefined) return explicit;
-    return databaseFromUrl(this.url);
-  }
-}
-
-function databaseFromUrl(url: string): string | undefined {
-  if (!url) return undefined;
-  if (/^[A-Za-z]:[\\/]/.test(url)) return url;
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname.replace(/^\//, "");
-    return path || undefined;
-  } catch {
-    return url;
-  }
 }
 
 function camelizeUrlKeys(hash: Record<string, unknown>): void {

@@ -19,7 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = Base.connection as PostgreSQLAdapter;
   });
   afterAll(async () => {
-    await adapter.exec(
+    await adapter.execute(
       `DROP TABLE IF EXISTS ex_relations, ex_authors, ex_books, ex_explains, op_authors, op_posts CASCADE`,
     );
   });
@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("name", "string");
         }
       }
-      await adapter.exec(`CREATE TABLE "ex_relations" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.execute(`CREATE TABLE "ex_relations" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await ExRelation.create({ name: "r" });
       const plan = await ExRelation.all().explain();
       expect(typeof plan).toBe("string");
@@ -63,8 +63,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       ExAuthor.hasMany("exBooks", { className: "ExBook" });
       registerModel(ExAuthor);
       registerModel(ExBook);
-      await adapter.exec(`CREATE TABLE "ex_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      await adapter.exec(
+      await adapter.execute(`CREATE TABLE "ex_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.execute(
         `CREATE TABLE "ex_books" ("id" SERIAL PRIMARY KEY, "title" TEXT, "ex_author_id" INTEGER)`,
       );
       const a = (await ExAuthor.create({ name: "A" })) as any;
@@ -84,7 +84,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("name", "string");
         }
       }
-      await adapter.exec(`CREATE TABLE "ex_explains" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.execute(`CREATE TABLE "ex_explains" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await ExExplain.create({ name: "test" });
       const explain = await ExExplain.where({ id: 1 }).explain(":analyze", ":buffers");
       expect(explain).toMatch(
@@ -137,8 +137,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       OpAuthor.hasMany("opPosts", { className: "OpPost" });
       registerModel(OpAuthor);
       registerModel(OpPost);
-      await adapter.exec(`CREATE TABLE "op_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      await adapter.exec(
+      await adapter.execute(`CREATE TABLE "op_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.execute(
         `CREATE TABLE "op_posts" ("id" SERIAL PRIMARY KEY, "title" TEXT, "op_author_id" INTEGER)`,
       );
       const author = (await OpAuthor.create({ name: "A" })) as any;

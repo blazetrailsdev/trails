@@ -15,8 +15,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlIntegerTest", () => {
     beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "pg_integers"`);
-      await adapter.exec(`
+      await adapter.execute(`DROP TABLE IF EXISTS "pg_integers"`);
+      await adapter.execute(`
         CREATE TABLE "pg_integers" (
           "id"    SERIAL PRIMARY KEY,
           "quota" BIGINT NOT NULL DEFAULT ${TWO_GB}
@@ -25,12 +25,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "pg_integers"`);
+      await adapter.execute(`DROP TABLE IF EXISTS "pg_integers"`);
     });
 
     beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "pg_int_types"`);
-      await adapter.exec(`
+      await adapter.execute(`DROP TABLE IF EXISTS "pg_int_types"`);
+      await adapter.execute(`
         CREATE TABLE "pg_int_types" (
           "small"  SMALLINT DEFAULT 1,
           "medium" INTEGER  DEFAULT 2,
@@ -40,7 +40,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "pg_int_types"`);
+      await adapter.execute(`DROP TABLE IF EXISTS "pg_int_types"`);
     });
 
     it("integer types", async () => {
@@ -65,8 +65,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     const BIG = 2n ** 62n;
 
     beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "bigint_rt"`);
-      await adapter.exec(`
+      await adapter.execute(`DROP TABLE IF EXISTS "bigint_rt"`);
+      await adapter.execute(`
         CREATE TABLE "bigint_rt" (
           "id"    SERIAL PRIMARY KEY,
           "score" BIGINT NOT NULL
@@ -75,7 +75,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "bigint_rt"`);
+      await adapter.execute(`DROP TABLE IF EXISTS "bigint_rt"`);
     });
 
     it("preserves exact value above Number.MAX_SAFE_INTEGER", async () => {

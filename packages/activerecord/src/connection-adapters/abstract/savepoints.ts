@@ -1,20 +1,13 @@
-function validateSavepointName(name: string | null): string {
-  if (name == null || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid savepoint name: ${name}`);
-  }
-  return name;
-}
-
 export function createSavepointSql(name: string | null): string {
-  return `SAVEPOINT ${validateSavepointName(name)}`;
+  return `SAVEPOINT ${name}`;
 }
 
 export function execRollbackToSavepointSql(name: string | null): string {
-  return `ROLLBACK TO SAVEPOINT ${validateSavepointName(name)}`;
+  return `ROLLBACK TO SAVEPOINT ${name}`;
 }
 
 export function releaseSavepointSql(name: string | null): string {
-  return `RELEASE SAVEPOINT ${validateSavepointName(name)}`;
+  return `RELEASE SAVEPOINT ${name}`;
 }
 
 export interface SavepointHost {

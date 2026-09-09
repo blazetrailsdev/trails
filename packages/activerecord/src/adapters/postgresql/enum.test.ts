@@ -47,10 +47,10 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
-    await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
+    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
+    await adapter.execute(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.createEnum("mood", ["sad", "ok", "happy"]);
-    await adapter.exec(`
+    await adapter.execute(`
       CREATE TABLE "postgresql_enums" (
         "id" SERIAL PRIMARY KEY,
         "current_mood" mood
@@ -59,14 +59,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     void PostgresqlEnum.resetColumnInformation();
   });
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
-    await adapter.exec(
+    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
+    await adapter.execute(
       `DROP TABLE IF EXISTS postgresql_enums_in_other_schema, test_schema, postgresql_enums_in_test_schema CASCADE`,
     );
-    await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
-    await adapter.exec(`DROP TYPE IF EXISTS "feeling" CASCADE`);
-    await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
-    await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
+    await adapter.execute(`DROP TYPE IF EXISTS "mood" CASCADE`);
+    await adapter.execute(`DROP TYPE IF EXISTS "feeling" CASCADE`);
+    await adapter.execute(`DROP TYPE IF EXISTS "unused" CASCADE`);
+    await adapter.execute(`DROP TYPE IF EXISTS "color" CASCADE`);
     await adapter.setSchemaSearchPath(defaultSearchPath);
     adapter.internalSchemaCache?.clear();
     void PostgresqlEnum.resetColumnInformation();
@@ -84,7 +84,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum defaults", async () => {
-      await adapter.exec(
+      await adapter.execute(
         `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy'`,
       );
       void PostgresqlEnum.resetColumnInformation();
@@ -95,7 +95,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum mapping", async () => {
-      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      await adapter.execute(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const enumRecord = await PostgresqlEnum.first();
       expect((enumRecord as any).readAttribute("current_mood")).toBe("sad");
       (enumRecord as any).writeAttribute("current_mood", "happy");
@@ -106,7 +106,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("invalid enum update", async () => {
-      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      await adapter.execute(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const enumRecord = await PostgresqlEnum.first();
       expect(() => {
         (enumRecord as any).current_mood = "angry";
@@ -114,7 +114,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("no oid warning", async () => {
-      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      await adapter.execute(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       await PostgresqlEnum.first();
       expect(warn).not.toHaveBeenCalled();
@@ -139,7 +139,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump", async () => {
-      await adapter.exec(
+      await adapter.execute(
         `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy' NOT NULL`,
       );
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
@@ -230,7 +230,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("enum type scoped to schemas", async () => {
       await withTestSchema(adapter, "test_schema", async () => {
         await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
-        await adapter.exec(`
+        await adapter.execute(`
           CREATE TABLE "postgresql_enums_in_other_schema" (
             "id" SERIAL PRIMARY KEY,
             "current_mood" mood_in_other_schema DEFAULT 'happy' NOT NULL
@@ -245,7 +245,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("test_schema");
       try {
         await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
-        await adapter.exec(`
+        await adapter.execute(`
           CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
             "id" SERIAL PRIMARY KEY,
             "current_mood" "test_schema"."mood_in_other_schema"
@@ -271,7 +271,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await withTestSchema(adapter, "test_schema", async () => {
           await adapter.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
-          await adapter.exec(`
+          await adapter.execute(`
             CREATE TABLE "postgresql_enums_in_test_schema" (
               "id" SERIAL PRIMARY KEY,
               "current_mood" mood_in_test_schema

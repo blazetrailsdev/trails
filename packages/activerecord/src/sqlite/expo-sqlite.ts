@@ -8,9 +8,11 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
+  SQLite3Constants,
   type SqliteStatement,
 } from "../sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
+import { ConfigurationError } from "../errors.js";
 
 /** @internal */
 interface ExpoSQLiteStatement {
@@ -183,6 +185,11 @@ export const expoSqliteDriver: SqliteDriver = {
     if (!expoSqlite) {
       throw new Error(
         "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
+      );
+    }
+    if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+      throw new ConfigurationError(
+        "SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver",
       );
     }
     const db = await expoSqlite.openDatabaseAsync(config.database, {

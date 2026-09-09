@@ -39,7 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.execute(`DROP TYPE IF EXISTS floatrange`);
     await adapter.execute(`DROP TYPE IF EXISTS stringrange`);
     await adapter.execute(`
@@ -53,7 +53,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           subtype = varchar
       )
     `);
-    await adapter.exec(`
+    await adapter.execute(`
       CREATE TABLE postgresql_ranges (
         id serial primary key,
         date_range daterange,
@@ -94,7 +94,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     setZone(null);
   });
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.execute(`DROP TYPE IF EXISTS floatrange`);
     await adapter.execute(`DROP TYPE IF EXISTS stringrange`);
   });
@@ -315,7 +315,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).not.toContain('t.int4range("int4_range"');
     });
     it("range migration", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
+      await adapter.execute(`DROP TABLE IF EXISTS range_migration_test`);
       try {
         await adapter.createTable("range_migration_test", (t: any) => {
           t.int4range("i4");

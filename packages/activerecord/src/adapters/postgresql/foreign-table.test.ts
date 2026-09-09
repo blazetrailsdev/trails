@@ -30,8 +30,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async (ctx) => {
     adapter = Base.connection as PostgreSQLAdapter;
 
-    await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors");
-    await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE");
+    await adapter.execute("DROP FOREIGN TABLE IF EXISTS foreign_professors");
+    await adapter.execute("DROP SERVER IF EXISTS foreign_server CASCADE");
     try {
       await adapter.enableExtension("postgres_fdw");
     } catch {
@@ -39,7 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       return;
     }
     const fdwDb = String(ARUnit2Model.connectionDbConfig().database);
-    await adapter.exec(
+    await adapter.execute(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (dbname ${quoteLit(fdwDb)})`,
     );
@@ -48,10 +48,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     const userMappingOpts = fdwPassword
       ? `OPTIONS (user ${quoteLit(fdwUser)}, password ${quoteLit(fdwPassword)})`
       : `OPTIONS (user ${quoteLit(fdwUser)})`;
-    await adapter.exec(
+    await adapter.execute(
       `CREATE USER MAPPING FOR CURRENT_USER SERVER foreign_server ${userMappingOpts}`,
     );
-    await adapter.exec(
+    await adapter.execute(
       `CREATE FOREIGN TABLE foreign_professors (
         id    int,
         name  character varying NOT NULL
@@ -60,8 +60,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   afterEach(async () => {
-    await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors").catch(() => {});
-    await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE").catch(() => {});
+    await adapter.execute("DROP FOREIGN TABLE IF EXISTS foreign_professors").catch(() => {});
+    await adapter.execute("DROP SERVER IF EXISTS foreign_server CASCADE").catch(() => {});
     await adapter.disableExtension("postgres_fdw", { force: "cascade" }).catch(() => {});
   });
 
