@@ -1,16 +1,9 @@
-import { onLoad, type Deprecators } from "@blazetrails/activesupport";
-import {
-  HelperMethodBuilder,
-  Parameters,
-  optimizeRoutesGeneration,
-  polymorphicPath,
-  polymorphicUrl,
-  urlFor,
-  urlOptions,
-} from "@blazetrails/actionpack";
+import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
+import { HelperMethodBuilder, Parameters, UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
   deprecator,
+  RoutingUrlFor,
   _setUrlFor,
   type UrlForImplementation,
   setApplyStylesheetMediaDefault,
@@ -68,15 +61,12 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.setup_action_pack", () => {
       onLoad("action_controller", () => {
+        include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
         _setUrlFor({
-          urlFor,
-          urlOptions,
-          optimizeRoutesGeneration,
-          polymorphicPath,
-          polymorphicUrl,
-          isParameters: (value) => value instanceof Parameters,
+          ...UrlFor,
+          isParameters: (value: unknown) => value instanceof Parameters,
           helperMethodBuilder: HelperMethodBuilder,
-        } as UrlForImplementation);
+        } as unknown as UrlForImplementation);
       });
     });
 

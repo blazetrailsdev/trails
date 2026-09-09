@@ -1,3 +1,4 @@
+import { Notifications } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
@@ -58,7 +59,10 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall instrument — PERMANENT
+   */
   private async *delayedRender(
     context: ViewContext,
     template: RenderableTemplate,
@@ -71,25 +75,36 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
       _layoutFor: (name?: string) => (name ? (context._layoutFor?.(name) ?? "") : sentinel),
     };
 
-    const layoutBody = await layout.render(streamingContext, locals);
-    const sentinelIdx = layoutBody.indexOf(sentinel);
+    const handle = Notifications.buildHandle("render_template.action_view", {
+      identifier: template.identifier,
+      layout: layout && layout.virtualPath,
+      locals,
+    });
+    handle.start();
 
-    if (sentinelIdx === -1) {
+    try {
+      const layoutBody = await layout.render(streamingContext, locals);
+      const sentinelIdx = layoutBody.indexOf(sentinel);
+
+      if (sentinelIdx === -1) {
+        const templateBody = await template.render(context, locals);
+        const fullBody = layoutBody + templateBody;
+        yield fullBody;
+        return;
+      }
+
+      const layoutPrefix = layoutBody.slice(0, sentinelIdx);
+      const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
+
+      yield layoutPrefix;
+
       const templateBody = await template.render(context, locals);
-      const fullBody = layoutBody + templateBody;
-      yield fullBody;
-      return;
+      yield templateBody;
+
+      yield layoutSuffix;
+    } finally {
+      handle.finish();
     }
-
-    const layoutPrefix = layoutBody.slice(0, sentinelIdx);
-    const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
-
-    yield layoutPrefix;
-
-    const templateBody = await template.render(context, locals);
-    yield templateBody;
-
-    yield layoutSuffix;
   }
 
   /** @internal */

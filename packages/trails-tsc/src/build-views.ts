@@ -37,6 +37,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
     );
   }
   fs.rmSync(outViews, { recursive: true, force: true });
+  fs.rmSync(path.join(outDir, "views-manifest.ts"), { force: true });
   fs.mkdirSync(outViews, { recursive: true });
   const registryMap = new Map<string, string[]>();
   const shimPaths: string[] = [];

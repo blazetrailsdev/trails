@@ -34,6 +34,7 @@ export {
   polymorphicPath,
   polymorphicUrl,
   HelperMethodBuilder,
+  UrlFor,
 } from "./routing/index.js";
 
 export { Request, MissingController, controllerConstants } from "./http/request.js";

@@ -354,6 +354,10 @@ export class Template {
     );
   }
 
+  private identifierMethodName(): string {
+    return this.shortIdentifier.replace(/[^a-z_]/g, "_");
+  }
+
   private instrument<T>(action: string, block: () => T): T {
     return Notifications.instrument<T>(
       `${action}.action_view`,
@@ -372,10 +376,6 @@ export class Template {
 
   private instrumentPayload(): Record<string, unknown> {
     return { virtual_path: this.virtualPath, identifier: this.identifier };
-  }
-
-  private identifierMethodName(): string {
-    return this.shortIdentifier.replace(/[^a-z_]/g, "_");
   }
 
   /** @internal */

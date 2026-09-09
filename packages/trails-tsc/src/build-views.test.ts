@@ -63,6 +63,18 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(false);
   });
 
+  it("deletes a views-manifest.ts left behind by an older build", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/users/show.html.tse", "first");
+    buildViews({ cwd });
+    const manifest = path.join(cwd, ".trails/views-manifest.ts");
+    fs.writeFileSync(manifest, "export const views = {} as const;\n");
+
+    buildViews({ cwd });
+
+    expect(fs.existsSync(manifest)).toBe(false);
+  });
+
   it("refuses to build when outDir is a symlink escaping cwd", () => {
     const cwd = mkScratch();
     const elsewhere = mkScratch();
