@@ -155,6 +155,28 @@ describe("FileSystemResolver view-directory spelling", () => {
     expect(ctx.findTemplate("show", ["story_pages"], ["html"])?.source).toBe("<h1>Underscore</h1>");
   });
 
+  it("prefers the kebab-cased directory when both spellings hold the template", async () => {
+    const fs = getFs();
+    const path = getPath();
+    await fs.mkdir!(path.join(dir, "both-ways"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "both-ways", "show.html.tse"), "<h1>Kebab</h1>");
+    await fs.mkdir!(path.join(dir, "both_ways"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "both_ways", "show.html.tse"), "<h1>Underscore</h1>");
+
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("show", ["both_ways"], ["html"])?.source).toBe("<h1>Kebab</h1>");
+  });
+
+  it("enumerates one identity per template, matching the built virtual path", () => {
+    const resolver = new FileSystemResolver(dir);
+    const enumerated = resolver.allTemplatePaths().map((p) => p.virtual);
+
+    expect(enumerated).toContain("rfc_pages/show");
+    expect(enumerated).not.toContain("rfc-pages/show");
+  });
+
   it("does not invent a template for a directory that exists in neither spelling", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(new FileSystemResolver(dir));

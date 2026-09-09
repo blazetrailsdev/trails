@@ -108,22 +108,6 @@ function compareSortKeys(
   return 0;
 }
 
-/** @internal */
-function mapPrefix(virtual: string, map: (prefix: string) => string): string {
-  const at = virtual.lastIndexOf("/");
-  return at < 0 ? virtual : map(virtual.slice(0, at)) + virtual.slice(at);
-}
-
-/** @internal */
-function dasherizePrefix(virtual: string): string {
-  return mapPrefix(virtual, (prefix) => prefix.replace(/_/g, "-"));
-}
-
-/** @internal */
-function underscorePrefix(entry: string): string {
-  return mapPrefix(entry, (prefix) => prefix.replace(/-/g, "_"));
-}
-
 export class FileSystemResolver extends Resolver {
   private templatesCache = new Map<string, TemplateWithDetails[]>();
   private pathParser = new PathParser();
@@ -172,7 +156,12 @@ export class FileSystemResolver extends Resolver {
     const paths = this.templateGlob("**/*");
     const seen = new Set<string>();
     for (const filename of paths) {
-      seen.add(filename.slice(this._path.length + 1).replace(/\.[^/]*$/, ""));
+      seen.add(
+        filename
+          .slice(this._path.length + 1)
+          .replace(/\.[^/]*$/, "")
+          .replace(/[^/]*\//g, (segment) => segment.replace(/-/g, "_")),
+      );
     }
     return Array.from(seen, (filename) => TemplatePath.parse(filename));
   }
@@ -209,7 +198,11 @@ export class FileSystemResolver extends Resolver {
 
   /** @internal */
   protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(underscorePrefix(template.slice(this._path.length + 1)));
+    const parsed = this.pathParser.parse(
+      template
+        .slice(this._path.length + 1)
+        .replace(/[^/]*\//g, (segment) => segment.replace(/-/g, "_")),
+    );
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
 
@@ -231,22 +224,22 @@ export class FileSystemResolver extends Resolver {
   protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
     if (path.name.includes(".")) return [];
 
+    const dashed = path.virtual.replace(/[^/]*\//g, (segment) => segment.replace(/_/g, "-"));
+    const paths =
+      dashed === path.virtual
+        ? this.templateGlob(`${this.escapeEntry(path.virtual)}*`)
+        : [
+            ...this.templateGlob(`${this.escapeEntry(dashed)}*`),
+            ...this.templateGlob(`${this.escapeEntry(path.virtual)}*`),
+          ];
     const templates: TemplateWithDetails[] = [];
 
-    for (const template of this.templateEntries(path.virtual)) {
+    for (const template of paths) {
       const built = this.buildUnboundTemplate(template);
       if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
     }
 
     return templates;
-  }
-
-  /** @internal */
-  protected templateEntries(virtual: string): string[] {
-    const found = this.templateGlob(`${this.escapeEntry(virtual)}*`);
-    const dashed = dasherizePrefix(virtual);
-    if (dashed === virtual) return found;
-    return [...found, ...this.templateGlob(`${this.escapeEntry(dashed)}*`)];
   }
 
   /** @internal */
