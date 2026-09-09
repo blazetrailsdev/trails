@@ -732,12 +732,15 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    const connection = leaseFixtureConnection();
-    await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
-    const firstRow = await connection.selectOne("SELECT * FROM topics WHERE author_name = 'David'");
+    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+    const firstRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
     expect(firstRow?.["title"]).toBe("The First Topic");
 
-    const secondRow = await connection.selectOne("SELECT * FROM topics WHERE author_name = 'Mary'");
+    const secondRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'Mary'");
     expect(secondRow?.["author_email_address"]).toBeNull();
   });
 
