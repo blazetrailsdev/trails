@@ -7,6 +7,7 @@ import {
 } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 import { Base } from "../../base.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -27,8 +28,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action :ignore on warning", async () => {
       await withDbWarningsAction("ignore", async () => {
-        const rows = await adapter.execute(`SELECT 1 + 'foo' AS v`);
-        expect(rows[0]?.v).toBe(1);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
+        expect(result.rows?.[0]).toEqual([1]);
       });
     });
 
@@ -72,15 +73,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action allows a list of warnings to ignore", async () => {
       await withDbWarningsAction("raise", [/Truncated incorrect DOUBLE value/], async () => {
-        const rows = await adapter.execute(`SELECT 1 + 'foo' AS v`);
-        expect(rows[0]?.v).toBe(1);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
+        expect(result.rows?.[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action allows a list of codes to ignore", async () => {
       await withDbWarningsAction("raise", ["1292"], async () => {
-        const rows = await adapter.execute(`SELECT 1 + 'foo' AS v`);
-        expect(rows[0]?.v).toBe(1);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
+        expect(result.rows?.[0]).toEqual([1]);
       });
     });
 

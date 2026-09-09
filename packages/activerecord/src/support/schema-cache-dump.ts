@@ -50,7 +50,11 @@ export function dumpedTables(marshalled: unknown[]): ReadonlySet<string> {
 export async function schemaShapes(adapter: DatabaseAdapter): Promise<Map<string, string>> {
   const shapes = new Map<string, string>();
   for (const sql of await shapeQueriesFor(adapter)) {
-    for (const row of (await adapter.execute(sql)) as { name: string; col: string | null }[]) {
+    const rows = (await adapter.selectAll(sql, "SCHEMA")).toArray() as {
+      name: string;
+      col: string | null;
+    }[];
+    for (const row of rows) {
       const name = String(row.name);
       shapes.set(name, `${shapes.get(name) ?? ""}\n${row.col ?? ""}`);
     }

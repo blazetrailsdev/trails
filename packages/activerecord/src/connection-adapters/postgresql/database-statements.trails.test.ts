@@ -20,6 +20,10 @@ describe("PostgreSQL::DatabaseStatements#buildTruncateStatements", () => {
 });
 
 describe("PostgreSQL::DatabaseStatements#isWriteQuery", () => {
+  it("answers true for a null sql, as Regexp#match?(nil) does in Ruby", () => {
+    expect(isWriteQuery(null)).toBe(true);
+  });
+
   it("retries the match against the bytes when the first match raises ArgumentError", () => {
     let matches = 0;
     const sql = {

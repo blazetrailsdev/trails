@@ -107,14 +107,14 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 describe("resetTestTables", () => {
   it("truncates canonical tables (keeps shape) instead of dropping them", async () => {
     await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4242)`);
-    expect(
-      ((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length,
-    ).toBeGreaterThan(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBeGreaterThan(
+      0,
+    );
 
     await resetTestTables(adapter);
 
     expect(await listTables(adapter)).toContain("articles");
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
   });
 
   it("drops bespoke (non-canonical) tables so their shape can't leak", async () => {
@@ -254,10 +254,10 @@ describe("purge-only pre-snapshot path", () => {
   it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
     const { dropAllTablesModule } = await freshModules();
     await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4243)`);
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(1);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(1);
 
     await dropAllTablesModule.purgeToCanonicalTables(adapter);
 
-    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
   });
 });

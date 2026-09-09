@@ -3,6 +3,7 @@ import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -52,13 +53,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 });
 
 async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<void>): Promise<void> {
-  const rows = (await adapter.execute(
+  const result = (await adapter.execute(
     "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
       "FROM information_schema.schemata WHERE schema_name = DATABASE()",
-  )) as Array<Record<string, string>>;
-  if (!rows[0]) throw new Error("Could not read database charset from information_schema.schemata");
-  const originalCharset = rows[0].DEFAULT_CHARACTER_SET_NAME;
-  const originalCollation = rows[0].DEFAULT_COLLATION_NAME;
+  )) as Mysql2RawResult;
+  const row = result.rows?.[0];
+  if (!row) throw new Error("Could not read database charset from information_schema.schemata");
+  const originalCharset = row[0] as string;
+  const originalCollation = row[1] as string;
 
   await adapter.executeMutation("ALTER DATABASE DEFAULT CHARACTER SET utf8mb4");
   try {

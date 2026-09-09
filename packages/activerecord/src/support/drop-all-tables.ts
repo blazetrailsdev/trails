@@ -98,7 +98,10 @@ async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]):
           `SELECT '${t.replace(/'/g, "''")}' AS t WHERE EXISTS (SELECT 1 FROM ${adapter.quoteTableName(t)})`,
       )
       .join(" UNION ALL ");
-    const rows = (await adapter.execute(probe)) as Array<{ t?: string; T?: string }>;
+    const rows = (await adapter.selectAll(probe, "SCHEMA")).toArray() as Array<{
+      t?: string;
+      T?: string;
+    }>;
     toTruncate = rows.map((r) => r.t ?? r.T).filter((t): t is string => Boolean(t));
     const dependents = await canonicalForeignKeyDependents();
     const wanted = new Set(toTruncate);

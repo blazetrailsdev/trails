@@ -572,8 +572,7 @@ export class SchemaReflection {
   }
 
   async isColumnsHash(pool: unknown, tableName: string): Promise<boolean> {
-    await this.ensureSyncCache();
-    return this._cache?.isColumnsHash(pool, tableName) ?? false;
+    return (await this.cache(pool)).isColumnsHash(pool, tableName);
   }
 
   async indexes(pool: unknown, tableName: string): Promise<IndexDefinition[]> {
@@ -585,8 +584,7 @@ export class SchemaReflection {
   }
 
   async size(pool: unknown): Promise<number> {
-    await this.ensureSyncCache();
-    return this._cache?.size ?? 0;
+    return (await this.cache(pool)).size;
   }
 
   async clearDataSourceCacheBang(pool: unknown, name: string): Promise<void> {
@@ -594,9 +592,13 @@ export class SchemaReflection {
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
-  /** @missingRailsCall load_cache — PERMANENT */
   async isCached(tableName: string): Promise<boolean> {
-    await this.ensureSyncCache();
+    if (this._cache == null) {
+      if (!SchemaReflection.checkSchemaCacheDumpVersion) {
+        this._cache = await this.loadCache(null);
+      }
+    }
+
     return this._cache?.isCached(tableName) ?? false;
   }
 
@@ -624,13 +626,6 @@ export class SchemaReflection {
     return this._cachePromise;
   }
 
-  private async ensureSyncCache(): Promise<void> {
-    if (this._cache) return;
-    if (!SchemaReflection.checkSchemaCacheDumpVersion) {
-      this._cache = await this.loadCacheFromDisk();
-    }
-  }
-
   private possibleCacheAvailable(): boolean {
     if (!SchemaReflection.useSchemaCacheDump) return false;
     if (!this._cachePath) return false;
@@ -639,11 +634,6 @@ export class SchemaReflection {
     } catch {
       return false;
     }
-  }
-
-  private async loadCacheFromDisk(): Promise<SchemaCache | null> {
-    if (!this.possibleCacheAvailable()) return null;
-    return SchemaCache._loadFrom(this._cachePath!);
   }
 
   private async loadCache(pool: unknown): Promise<SchemaCache | null> {

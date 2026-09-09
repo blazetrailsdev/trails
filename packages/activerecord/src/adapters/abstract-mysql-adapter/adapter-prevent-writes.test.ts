@@ -3,6 +3,7 @@ import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
 import { fixtures } from "../../test-fixtures.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures([]);
@@ -103,16 +104,18 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("doesnt error when a use query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const dbRows = await conn.execute("SELECT DATABASE() AS db");
-        const dbName = dbRows[0].db as string;
+        const dbResult = (await conn.execute("SELECT DATABASE() AS db")) as Mysql2RawResult;
+        const dbName = dbResult.rows![0][0] as string;
         await expect(conn.execute(`USE \`${dbName}\``)).resolves.toBeDefined();
       });
     });
 
     it("doesnt error when a kill query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("SELECT CONNECTION_ID() as connection_id");
-        const connId = rows[0].connection_id;
+        const result = (await conn.execute(
+          "SELECT CONNECTION_ID() as connection_id",
+        )) as Mysql2RawResult;
+        const connId = result.rows![0][0];
         await expect(conn.execute(`KILL QUERY ${connId}`)).rejects.toBeInstanceOf(QueryCanceled);
       });
     });

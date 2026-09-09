@@ -8,6 +8,7 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { StatementTimeout, QueryAborted, ConnectionFailed } from "../../errors.js";
+import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -28,8 +29,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it.skipIf(isMariaDb)("raises StatementTimeout when statement timeout exceeded", async () => {
       await adapter.execute("INSERT INTO `samples` (value) VALUES (1)");
-      const rows = await adapter.execute("SELECT id FROM `samples` LIMIT 1");
-      const id = Number(rows[0]["id"]);
+      const result = (await adapter.execute("SELECT id FROM `samples` LIMIT 1")) as Mysql2RawResult;
+      const id = Number(result.rows![0][0]);
 
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       let error: unknown;
@@ -73,8 +74,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("reconnect preserves isolation level", async () => {
       const sampleCount = async (): Promise<number> => {
-        const rows = await adapter.execute("SELECT COUNT(*) AS n FROM `samples`");
-        return Number(rows[0]["n"]);
+        const result = (await adapter.execute(
+          "SELECT COUNT(*) AS n FROM `samples`",
+        )) as Mysql2RawResult;
+        return Number(result.rows![0][0]);
       };
 
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);

@@ -28,12 +28,12 @@ export interface DatabaseStatements {
   lastInsertedId(result: unknown): number;
 }
 
-export function isWriteQuery(sql: string): boolean {
+export function isWriteQuery(sql: string | null): boolean {
   try {
-    return !READ_QUERY.test(sql);
+    return !READ_QUERY.test(sql as string);
   } catch (error) {
     if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql));
+    return !READ_QUERY.test(b(sql as string));
   }
 }
 

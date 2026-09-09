@@ -1,4 +1,3 @@
-import type { Column } from "../column.js";
 import type { Column as MysqlColumn } from "./column.js";
 import type { Result } from "../../result.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
@@ -13,14 +12,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   connection?: MysqlAdapterLike;
   tableCollationCache: Record<string, string | undefined> = Object.create(null);
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
-
-  /** @internal */
-  protected override resolvePrimaryKeyColumns(tableName: string, columns: Column[]): Column[] {
-    const order = this.primaryKeyOrderCache[tableName];
-    if (order === undefined) return super.resolvePrimaryKeyColumns(tableName, columns);
-    const byName = new Map(columns.map((c) => [c.name, c]));
-    return order.map((name) => byName.get(name)).filter((c): c is Column => c !== undefined);
-  }
 
   /** @internal */
   protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {

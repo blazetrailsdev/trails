@@ -628,7 +628,7 @@ describe("preprocessQuery", () => {
   });
 
   it("calls checkIfWriteQuery on the host", () => {
-    let checked: string | undefined;
+    let checked: string | null | undefined;
     const host: DatabaseStatementsHost = {
       ...hostDefaults,
       log,
@@ -687,7 +687,7 @@ describe("preprocessQuery", () => {
             call(sql) {
               if (depth === 0) {
                 depth++;
-                nested = preprocessQuery.call(host, "SELECT inner");
+                nested = preprocessQuery.call(host, "SELECT inner") as string;
               }
               return `${sql} /*outer*/`;
             },

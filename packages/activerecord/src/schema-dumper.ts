@@ -196,9 +196,6 @@ export abstract class SchemaDumper {
   static exclIgnorePattern: RegExp = /^excl_rails_[0-9a-f]{10}$/;
   static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
-  /** @internal */
-  protected primaryKeyOrderCache: Record<string, string[] | undefined> = Object.create(null);
-
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
   private _language: SchemaDumpLanguage;
@@ -448,7 +445,6 @@ export abstract class SchemaDumper {
     if (adapter && typeof adapter.primaryKey === "function") {
       try {
         pk = await adapter.primaryKey(table);
-        this.primaryKeyOrderCache[table] = pk == null ? [] : Array.isArray(pk) ? pk : [pk];
       } catch {}
     }
 
@@ -457,13 +453,11 @@ export abstract class SchemaDumper {
 
       const tbl: string[] = [];
 
-      const pkColumns = this.resolvePrimaryKeyColumns(table, columns);
-
       const stripped = this.removePrefixAndSuffix(table);
       const opts: string[] = [];
       if (typeof pk === "string") {
         if (pk !== "id") opts.push(`primaryKey: ${JSON.stringify(pk)}`);
-        const pkcol = pkColumns[0];
+        const pkcol = columns.find((c) => c.name === pk);
         let pkcolspec = pkcol ? this.columnSpecForPrimaryKey(pkcol) : {};
         if (Object.keys(pkcolspec).length > 0) {
           if (!Object.keys(pkcolspec).every((k) => k === "id" || k === "default")) {
@@ -584,32 +578,6 @@ export abstract class SchemaDumper {
   protected _adapter(): any {
     const src = (this as any)._source;
     return src?.adapter ?? src;
-  }
-
-  /** @internal */
-  protected resolvePrimaryKeyColumns(tableName: string, columns: Column[]): Column[] {
-    const pkNames = new Set(this.primaryKeyOrderCache[tableName] ?? []);
-    return this.orderPrimaryKeyColumns(
-      tableName,
-      columns.filter((c) => pkNames.has(c.name)),
-    );
-  }
-
-  /** @internal */
-  protected orderPrimaryKeyColumns(tableName: string, pkColumns: Column[]): Column[] {
-    const order = this.primaryKeyOrderCache[tableName];
-    if (!order || order.length === 0) return pkColumns;
-    const byName = new Map(pkColumns.map((c) => [c.name, c]));
-    const reordered: Column[] = [];
-    for (const name of order) {
-      const col = byName.get(name);
-      if (col) {
-        reordered.push(col);
-        byName.delete(name);
-      }
-    }
-    for (const col of byName.values()) reordered.push(col);
-    return reordered;
   }
 
   /** @internal */
