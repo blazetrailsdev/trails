@@ -5,7 +5,12 @@ import {
 } from "@blazetrails/trailties/generators";
 import type { AppDatabase } from "@blazetrails/trailties/generators";
 import { ActiveSupport } from "@blazetrails/activesupport";
-import { registerFsAdapter, type FsAdapter, type PathAdapter } from "@blazetrails/ruby-compat";
+import {
+  registerFsAdapter,
+  type Bytes,
+  type FsAdapter,
+  type PathAdapter,
+} from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
 
 const posixPath: PathAdapter = {
@@ -29,11 +34,44 @@ const posixPath: PathAdapter = {
   },
 };
 
+/**
+ * `Bytes` is a `Uint8Array` whose `toString(encoding)` decodes, the way Node's
+ * `Buffer` does; a bare `Uint8Array` would stringify to comma-separated byte
+ * numbers instead. There is no `Buffer` in the browser, so the decode is
+ * attached here.
+ */
+function toBytes(content: string): Bytes {
+  const bytes = new TextEncoder().encode(content);
+  return Object.assign(bytes, {
+    toString(encoding = "utf-8"): string {
+      return new TextDecoder(encoding).decode(bytes);
+    },
+  });
+}
+
 function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
+  // Required on FsAdapter, like its sync twin. Both overloads are carried: an
+  // encoding yields the string, its absence the bytes, and a missing path
+  // rejects the way the Node adapter's does rather than reading as empty.
+  function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
+  function readFile(path: string): Promise<Bytes>;
+  function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
+    const entry = vfs.read(path);
+    if (entry === null) {
+      return Promise.reject(
+        Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+          code: "ENOENT",
+        }),
+      );
+    }
+    return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
+  }
+
   return {
     readFileSync(path: string): string {
       return vfs.read(path)?.content ?? "";
     },
+    readFile,
     writeFileSync(path: string, content: string): void {
       vfs.write(path, content);
     },

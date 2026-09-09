@@ -95,8 +95,8 @@ export interface FsAdapter {
   stat?(path: string): Promise<FsStatResult>;
   lstat?(path: string): Promise<FsStatResult>;
   mkdtempSync?(prefix: string): string;
-  readFile?(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
-  readFile?(path: string): Promise<Bytes>;
+  readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
+  readFile(path: string): Promise<Bytes>;
   writeFile?(
     path: string,
     content: string | Uint8Array,
