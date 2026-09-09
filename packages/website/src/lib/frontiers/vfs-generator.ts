@@ -34,7 +34,22 @@ const posixPath: PathAdapter = {
   },
 };
 
-export function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
+/**
+ * `Bytes` is a `Uint8Array` whose `toString(encoding)` decodes, the way Node's
+ * `Buffer` does; a bare `Uint8Array` would stringify to comma-separated byte
+ * numbers instead. There is no `Buffer` in the browser, so the decode is
+ * attached here.
+ */
+function toBytes(content: string): Bytes {
+  const bytes = new TextEncoder().encode(content);
+  return Object.assign(bytes, {
+    toString(encoding = "utf-8"): string {
+      return new TextDecoder(encoding).decode(bytes);
+    },
+  });
+}
+
+function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   // Required on FsAdapter, like its sync twin. Both overloads are carried: an
   // encoding yields the string, its absence the bytes, and a missing path
   // rejects the way the Node adapter's does rather than reading as empty.
@@ -49,9 +64,7 @@ export function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
         }),
       );
     }
-    return Promise.resolve(
-      encoding === undefined ? new TextEncoder().encode(entry.content) : entry.content,
-    );
+    return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
   }
 
   return {

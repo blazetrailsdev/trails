@@ -30,7 +30,7 @@ describe("FsAdapter#readFile", () => {
     const fs = getFs();
     const bytes = await fs.readFile(fsAdapterPath);
     expect(bytes).toBeInstanceOf(Uint8Array);
-    expect(new TextDecoder().decode(bytes)).toContain("export interface FsAdapter");
+    expect(bytes.toString("utf8")).toContain("export interface FsAdapter");
   });
 
   test("rejects for a path that does not exist", async () => {
