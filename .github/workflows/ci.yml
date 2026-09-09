@@ -653,16 +653,42 @@ jobs:
       # starts; branch protection reads a cancelled required check as
       # not-success, exactly like a red one.
       #
-      # continue-on-error so a 403 or 5xx here degrades to "the run keeps
-      # going" — the pre-change behaviour — rather than replacing a legible
-      # prettier failure with a confusing red on a step about cancellation.
+      # SCOPE: same-repository PRs only, and not Dependabot's. This repo is
+      # public, and on a public repo GitHub hands a `pull_request` run from a
+      # fork — and every Dependabot `pull_request` run — a read-only
+      # GITHUB_TOKEN whose permissions are capped BELOW what the job declares.
+      # The `actions: write` above cannot raise it, so the POST 403s and those
+      # runs keep every expensive lane, exactly as before this change.
+      # (Workflow syntax > "Changing the permissions in a forked repository".)
+      #
+      # Lifting that was considered and rejected. A fork `pull_request` run
+      # cannot read secrets at all, so no PAT or App token reaches it; the only
+      # mechanism that works is a second, `workflow_run`-triggered workflow
+      # running in the base-repo context to cancel its trigger. That is a whole
+      # parallel workflow, with its own token and its own failure modes, for a
+      # repo with zero forks and no Dependabot config — disproportionate to the
+      # runner minutes it would recover. If forks or Dependabot ever become a
+      # real source of PRs here, that is the design to reach for.
+      #
+      # So the 403 is DOCUMENTED, not silent: continue-on-error keeps a 403 or
+      # a 5xx from replacing a legible prettier failure with a confusing red on
+      # a step about cancellation, but the failure branch below says which of
+      # the two it was, so nobody debugs "why did my fork PR not stop" from an
+      # empty log.
       - name: Cancel the rest of the run
         if: ${{ failure() && github.event_name == 'pull_request' }}
         continue-on-error: true
         run: |
           set -euo pipefail
           echo "Preflight failed — cancelling run $GITHUB_RUN_ID so the DB matrix and parity pipelines don't burn 20+ minutes on a run that is already lost."
-          gh api -X POST "repos/$REPO/actions/runs/$GITHUB_RUN_ID/cancel"
+          if ! err=$(gh api -X POST "repos/$REPO/actions/runs/$GITHUB_RUN_ID/cancel" 2>&1); then
+            printf '%s\n' "$err" >&2
+            if grep -qiE 'HTTP 40[13]|Resource not accessible' <<<"$err"; then
+              echo "::warning::Could not cancel this run: the GITHUB_TOKEN is read-only, which is what a fork PR or a Dependabot PR gets on a public repo regardless of this job's declared \`actions: write\`. The remaining lanes will run to completion; the preflight failure above is still the only thing wrong."
+            else
+              echo "::warning::Could not cancel this run (see the error above). The remaining lanes will run to completion; the preflight failure above is still the only thing wrong."
+            fi
+          fi
 
   # Off on PRs entirely. This is a documentation-drift gate — guide snippets vs.
   # the public type surface — not review signal, and GUIDES_PKGS_RE spans every

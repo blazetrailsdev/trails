@@ -1202,6 +1202,24 @@ describe("CI runs every tooling test suite", () => {
     expect(wf.jobs.preflight.permissions.actions).toBe("write");
   });
 
+  // The declared `actions: write` is a ceiling, not a floor: on a public repo
+  // a fork PR and a Dependabot PR both run with a read-only GITHUB_TOKEN, so
+  // the cancel 403s and those runs keep every expensive lane. That limit is
+  // accepted (the alternative is a second `workflow_run` workflow), so what is
+  // pinned is that it stays SAID — a `continue-on-error` step that swallowed
+  // the 403 in silence would send someone hunting a phantom bug.
+  it("says out loud when a read-only token blocks the preflight cancel", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8")) as {
+      jobs: { preflight: { steps: { name?: string; run?: string }[] } };
+    };
+    const run =
+      wf.jobs.preflight.steps.find((s) => s.name === "Cancel the rest of the run")?.run ?? "";
+
+    expect(run).toMatch(/::warning::/);
+    expect(run).toMatch(/read-only/);
+    expect(run).toMatch(/fork PR or a Dependabot PR/);
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
