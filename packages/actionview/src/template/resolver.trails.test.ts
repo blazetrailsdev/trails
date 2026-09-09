@@ -141,11 +141,11 @@ describe("FileSystemResolver view-directory spelling", () => {
     expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.source).toBe("<h1>Kebab</h1>");
   });
 
-  it("reports the underscored virtual path for a kebab-cased directory", () => {
+  it("identifies a template found through the alias by its real path", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(new FileSystemResolver(dir));
 
-    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath).toBe("rfc_pages/show");
+    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath).toBe("rfc-pages/show");
   });
 
   it("still finds a template in an underscored directory", () => {
@@ -169,12 +169,27 @@ describe("FileSystemResolver view-directory spelling", () => {
     expect(ctx.findTemplate("show", ["both_ways"], ["html"])?.source).toBe("<h1>Kebab</h1>");
   });
 
-  it("enumerates one identity per template, matching the built virtual path", () => {
+  it("enumerates the same identity the built template reports", () => {
+    const ctx = new LookupContext(null, {}, []);
     const resolver = new FileSystemResolver(dir);
+    ctx.addResolver(resolver);
     const enumerated = resolver.allTemplatePaths().map((p) => p.virtual);
 
-    expect(enumerated).toContain("rfc_pages/show");
-    expect(enumerated).not.toContain("rfc-pages/show");
+    expect(enumerated).toContain("rfc-pages/show");
+    expect(enumerated).not.toContain("rfc_pages/show");
+    expect(enumerated).toContain(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath);
+  });
+
+  it("finds a template in a directory whose name is genuinely hyphenated", async () => {
+    const fs = getFs();
+    const path = getPath();
+    await fs.mkdir!(path.join(dir, "admin-panel"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "admin-panel", "show.html.tse"), "<h1>Panel</h1>");
+
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("show", ["admin-panel"], ["html"])?.source).toBe("<h1>Panel</h1>");
   });
 
   it("does not invent a template for a directory that exists in neither spelling", () => {

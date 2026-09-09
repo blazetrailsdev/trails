@@ -156,12 +156,7 @@ export class FileSystemResolver extends Resolver {
     const paths = this.templateGlob("**/*");
     const seen = new Set<string>();
     for (const filename of paths) {
-      seen.add(
-        filename
-          .slice(this._path.length + 1)
-          .replace(/\.[^/]*$/, "")
-          .replace(/[^/]*\//g, (segment) => segment.replace(/-/g, "_")),
-      );
+      seen.add(filename.slice(this._path.length + 1).replace(/\.[^/]*$/, ""));
     }
     return Array.from(seen, (filename) => TemplatePath.parse(filename));
   }
@@ -198,11 +193,7 @@ export class FileSystemResolver extends Resolver {
 
   /** @internal */
   protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(
-      template
-        .slice(this._path.length + 1)
-        .replace(/[^/]*\//g, (segment) => segment.replace(/-/g, "_")),
-    );
+    const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
 
@@ -225,18 +216,14 @@ export class FileSystemResolver extends Resolver {
     if (path.name.includes(".")) return [];
 
     const dashed = path.virtual.replace(/[^/]*\//g, (segment) => segment.replace(/_/g, "-"));
-    const paths =
-      dashed === path.virtual
-        ? this.templateGlob(`${this.escapeEntry(path.virtual)}*`)
-        : [
-            ...this.templateGlob(`${this.escapeEntry(dashed)}*`),
-            ...this.templateGlob(`${this.escapeEntry(path.virtual)}*`),
-          ];
+    const spellings = dashed === path.virtual ? [path.virtual] : [dashed, path.virtual];
     const templates: TemplateWithDetails[] = [];
 
-    for (const template of paths) {
-      const built = this.buildUnboundTemplate(template);
-      if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
+    for (const spelling of spellings) {
+      for (const template of this.templateGlob(`${this.escapeEntry(spelling)}*`)) {
+        const built = this.buildUnboundTemplate(template);
+        if (built !== null && built.template.virtualPath === spelling) templates.push(built);
+      }
     }
 
     return templates;
