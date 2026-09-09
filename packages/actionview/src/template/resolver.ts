@@ -192,8 +192,8 @@ export class FileSystemResolver extends Resolver {
   }
 
   /** @internal */
-  protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
+  protected buildUnboundTemplate(template: string, logical?: string): TemplateWithDetails | null {
+    const parsed = this.pathParser.parse(logical ?? template.slice(this._path.length + 1));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
 
@@ -221,8 +221,12 @@ export class FileSystemResolver extends Resolver {
 
     for (const spelling of spellings) {
       for (const template of this.templateGlob(`${this.escapeEntry(spelling)}*`)) {
-        const built = this.buildUnboundTemplate(template);
-        if (built !== null && built.template.virtualPath === spelling) templates.push(built);
+        const suffix = template.slice(this._path.length + 1 + spelling.length);
+        const built = this.buildUnboundTemplate(
+          template,
+          spelling === path.virtual ? undefined : `${path.virtual}${suffix}`,
+        );
+        if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
       }
     }
 

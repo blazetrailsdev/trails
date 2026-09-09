@@ -141,11 +141,11 @@ describe("FileSystemResolver view-directory spelling", () => {
     expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.source).toBe("<h1>Kebab</h1>");
   });
 
-  it("identifies a template found through the alias by its real path", () => {
+  it("identifies a template found through the alias by the path that was requested", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(new FileSystemResolver(dir));
 
-    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath).toBe("rfc-pages/show");
+    expect(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath).toBe("rfc_pages/show");
   });
 
   it("still finds a template in an underscored directory", () => {
@@ -169,15 +169,19 @@ describe("FileSystemResolver view-directory spelling", () => {
     expect(ctx.findTemplate("show", ["both_ways"], ["html"])?.source).toBe("<h1>Kebab</h1>");
   });
 
-  it("enumerates the same identity the built template reports", () => {
-    const ctx = new LookupContext(null, {}, []);
+  it("enumerates each template once, by the path it actually occupies", () => {
     const resolver = new FileSystemResolver(dir);
-    ctx.addResolver(resolver);
     const enumerated = resolver.allTemplatePaths().map((p) => p.virtual);
 
     expect(enumerated).toContain("rfc-pages/show");
     expect(enumerated).not.toContain("rfc_pages/show");
-    expect(enumerated).toContain(ctx.findTemplate("show", ["rfc_pages"], ["html"])?.virtualPath);
+  });
+
+  it("round-trips an enumerated path back to the same identity", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("show", ["rfc-pages"], ["html"])?.virtualPath).toBe("rfc-pages/show");
   });
 
   it("finds a template in a directory whose name is genuinely hyphenated", async () => {
