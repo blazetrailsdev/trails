@@ -16,7 +16,7 @@ function makeLookupContext(): LookupContext {
   return new LookupContext();
 }
 
-const ctx: ViewContext = {};
+const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 describe("TemplateRenderer", () => {
   let lc: LookupContext;

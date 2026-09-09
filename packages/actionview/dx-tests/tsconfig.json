@@ -11,6 +11,7 @@
       "@blazetrails/i18n": ["../../i18n/src/index.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/activesupport/digest": ["../../activesupport/src/digest.ts"],
+      "@blazetrails/activesupport/cache": ["../../activesupport/src/cache.ts"],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/src/include.ts"],
       "@blazetrails/ruby-compat/method-missing-proxy": [
         "../../ruby-compat/src/method-missing-proxy.ts"

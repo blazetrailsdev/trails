@@ -9,7 +9,7 @@ import type { ViewContext } from "./abstract-renderer.js";
 
 const makeLookupContext = () => new LookupContext();
 
-const ctx: ViewContext = {};
+const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 describe("Renderer dispatch", () => {
   let renderer: Renderer;

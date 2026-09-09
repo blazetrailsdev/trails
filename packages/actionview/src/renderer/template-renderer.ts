@@ -1,3 +1,5 @@
+import { Notifications } from "@blazetrails/activesupport";
+
 import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
@@ -46,10 +48,10 @@ export class TemplateRenderer extends AbstractRenderer {
     }
     if (Object.prototype.hasOwnProperty.call(options, "template") && options.template != null) {
       const tmpl = options.template;
-      if (typeof tmpl === "object" && typeof (tmpl as RenderableTemplate).render === "function") {
-        return tmpl as RenderableTemplate;
+      if (typeof tmpl === "object" && typeof tmpl.render === "function") {
+        return tmpl;
       }
-      return this.findTemplateForName(tmpl, options.prefixes ?? [], keys);
+      return this.findTemplateForName(tmpl as string, options.prefixes ?? [], keys);
     }
     throw new Error(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
@@ -63,7 +65,17 @@ export class TemplateRenderer extends AbstractRenderer {
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
   ): Promise<RenderedTemplate> {
-    return this.renderWithLayout(view, template, layoutName, locals);
+    return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
+      Notifications.instrument<Promise<string>>(
+        "render_template.action_view",
+        {
+          identifier: template.identifier,
+          layout: layout && layout.virtualPath,
+          locals,
+        },
+        async () => template.render(view, locals),
+      ),
+    );
   }
 
   /** @internal */
@@ -72,6 +84,7 @@ export class TemplateRenderer extends AbstractRenderer {
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
+    block: (layout: RenderableTemplate | null) => Promise<string>,
   ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
@@ -80,13 +93,16 @@ export class TemplateRenderer extends AbstractRenderer {
 
     let body: string;
     if (layout) {
-      const templateBody = await template.render(view, locals);
-      if (view.viewFlow) {
-        view.viewFlow.set("layout", templateBody);
-      }
-      body = await layout.render(view, locals);
+      body = await Notifications.instrument<Promise<string>>(
+        "render_layout.action_view",
+        { identifier: layout.identifier },
+        async () => {
+          view.viewFlow?.set("layout", await block(layout));
+          return layout.render(view, locals);
+        },
+      );
     } else {
-      body = await template.render(view, locals);
+      body = await block(null);
     }
     return this.buildRenderedTemplate(body, template);
   }

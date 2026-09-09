@@ -1,10 +1,42 @@
+import { Notifications } from "@blazetrails/activesupport";
+
 import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
+import {
+  cacheCollectionRender,
+  collectionByCacheKeys,
+  collectionCache,
+  expandedCacheKey,
+  fetchOrCachePartial,
+  isCallableCacheKey,
+  isWillCache,
+  setCollectionCache,
+} from "./partial-renderer/collection-caching.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
 export class PartialRenderer extends AbstractRenderer {
+  /** @internal */
+  static collectionCache = collectionCache;
+  /** @internal */
+  static setCollectionCache = setCollectionCache;
+
+  /** @internal */
+  collectionCache = collectionCache;
+  /** @internal */
+  isWillCache = isWillCache;
+  /** @internal */
+  cacheCollectionRender = cacheCollectionRender;
+  /** @internal */
+  isCallableCacheKey = isCallableCacheKey;
+  /** @internal */
+  collectionByCacheKeys = collectionByCacheKeys;
+  /** @internal */
+  expandedCacheKey = expandedCacheKey;
+  /** @internal */
+  fetchOrCachePartial = fetchOrCachePartial;
+
   /** @internal */
   readonly options: RenderOptions;
   /** @internal */
@@ -43,14 +75,26 @@ export class PartialRenderer extends AbstractRenderer {
     locals: Record<string, unknown>,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
-    _block: unknown,
+    block: unknown,
   ): Promise<RenderedTemplate> {
-    let content = await template.render(view, locals);
-    if (layout) {
-      view.viewFlow?.set("layout", content);
-      content = await layout.render(view, locals);
-    }
-    return this.buildRenderedTemplate(content, template);
+    return Notifications.instrument<Promise<RenderedTemplate>>(
+      "render_partial.action_view",
+      {
+        identifier: template.identifier,
+        layout: layout && layout.virtualPath,
+        locals,
+      },
+      async (payload) => {
+        let content = await template.render(view, locals, null, { addToStack: block == null });
+
+        if (layout) {
+          view.viewFlow?.set("layout", content);
+          content = await layout.render(view, locals);
+        }
+        payload["cache_hit"] = view.viewRenderer.cacheHits[template.virtualPath as string];
+        return this.buildRenderedTemplate(content, template);
+      },
+    );
   }
 
   /** @internal */

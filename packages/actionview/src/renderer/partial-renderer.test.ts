@@ -13,7 +13,7 @@ function makeFakeTemplate(body = "body"): RenderableTemplate {
   };
 }
 
-const ctx: ViewContext = {};
+const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 describe("PartialRenderer", () => {
   let lc: LookupContext;
@@ -38,7 +38,7 @@ describe("PartialRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" });
+    expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" }, null, { addToStack: true });
   });
 
   it("looks up partial with underscore prefix", async () => {
@@ -71,7 +71,9 @@ describe("ObjectRenderer", () => {
     vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const user = { name: "Alice" };
     await new ObjectRenderer(lc).renderObjectWithPartial(user, "users/user", ctx, undefined);
-    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }));
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }), null, {
+      addToStack: true,
+    });
   });
 
   it("binds object under the as: option name", async () => {
@@ -84,7 +86,9 @@ describe("ObjectRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ person: user }));
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ person: user }), null, {
+      addToStack: true,
+    });
   });
 
   it("derives partial path from toPartialPath()", async () => {
@@ -129,13 +133,14 @@ describe("CollectionRenderer", () => {
   });
 
   it("returns empty body for an empty collection", async () => {
+    vi.spyOn(lc, "findAll").mockReturnValue([makeFakeTemplate()]);
     const result = await new CollectionRenderer(lc).renderCollectionWithPartial(
       [],
       "users/user",
       ctx,
       undefined,
     );
-    expect(result.body).toBe("");
+    expect(result.body).toBeNull();
   });
 
   it("exposes ${as}_counter and ${as}_iteration locals", async () => {
@@ -187,7 +192,7 @@ describe("CollectionRenderer", () => {
       .mockResolvedValueOnce("B");
     const spacerTmpl = makeFakeTemplate("|");
     vi.spyOn(lc, "findAll").mockImplementation((name) => [
-      name === "users/spacer" ? spacerTmpl : itemTmpl,
+      name === "spacer" ? spacerTmpl : itemTmpl,
     ]);
     const result = await new CollectionRenderer(lc, {
       spacerTemplate: "spacer",
@@ -214,11 +219,11 @@ describe("CollectionRenderer", () => {
 describe("PartialIteration", () => {
   it("tracks index, first, and last", () => {
     const iter = new PartialIteration(3);
-    expect(iter.first).toBe(true);
-    expect(iter.last).toBe(false);
-    iter.iterate();
+    expect(iter.isFirst()).toBe(true);
+    expect(iter.isLast()).toBe(false);
+    iter.iterateBang();
     expect(iter.index).toBe(1);
-    iter.iterate();
-    expect(iter.last).toBe(true);
+    iter.iterateBang();
+    expect(iter.isLast()).toBe(true);
   });
 });

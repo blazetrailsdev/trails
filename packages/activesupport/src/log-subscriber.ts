@@ -143,7 +143,7 @@ export class LogSubscriber extends Subscriber {
   }
 
   /** @missingRailsCall call — PERMANENT */
-  silenced(event: Event | string): boolean {
+  isSilenced(event: Event | string): boolean {
     const l = this.logger;
     if (!l) return true;
     const name = typeof event === "string" ? event : event.name;
@@ -153,7 +153,7 @@ export class LogSubscriber extends Subscriber {
 
   override call(event: Event): void {
     if (!this.logger) return;
-    if (this.silenced(event)) return;
+    if (this.isSilenced(event)) return;
     try {
       super.call(event);
     } catch (e: any) {
@@ -163,7 +163,7 @@ export class LogSubscriber extends Subscriber {
 
   override publishEvent(event: Event): void {
     if (!this.logger) return;
-    if (this.silenced(event)) return;
+    if (this.isSilenced(event)) return;
     try {
       super.publishEvent(event);
     } catch (e: any) {

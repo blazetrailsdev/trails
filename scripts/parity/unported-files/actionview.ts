@@ -83,9 +83,4 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
     package: "actionview",
     reason: "Layout resolution for rendered templates; no trails template renderer.",
   },
-  {
-    pattern: "renderer/collection_renderer.rb",
-    package: "actionview",
-    reason: "Renders a partial per collection element; no trails template renderer.",
-  },
 ];

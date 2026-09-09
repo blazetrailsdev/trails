@@ -9,7 +9,12 @@ export interface RenderableTemplate {
   readonly format: string | null;
   readonly variable?: string | null;
   readonly virtualPath?: string | null;
-  render(view: ViewContext, locals: Record<string, unknown>): string | Promise<string>;
+  render(
+    view: ViewContext,
+    locals: Record<string, unknown>,
+    buffer?: unknown,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+  ): string | Promise<string>;
 }
 
 export interface ViewContext {
@@ -17,11 +22,11 @@ export interface ViewContext {
   _layoutFor?(name?: string): string;
   viewFlow?: { set(key: string, content: string): void };
   prefixPartialPathWithControllerNamespace?: boolean;
-  viewRenderer?: { cacheHits: Record<string, unknown> };
+  viewRenderer: { cacheHits: Record<string, unknown> };
 }
 
 export interface RenderOptions {
-  template?: string;
+  template?: string | RenderableTemplate;
   partial?: string | object;
   inline?: string;
   body?: string;
@@ -43,7 +48,7 @@ export interface RenderOptions {
   type?: string;
   formats?: string[];
   variants?: string[];
-  cached?: boolean;
+  cached?: boolean | ((item: unknown) => unknown);
   stream?: boolean;
   [key: string]: unknown;
 }
@@ -246,10 +251,7 @@ export abstract class AbstractRenderer {
   }
 
   /** @internal */
-  protected buildRenderedTemplate(
-    content: string,
-    template: RenderableTemplate | null,
-  ): RenderedTemplate {
+  buildRenderedTemplate(content: string, template: RenderableTemplate | null): RenderedTemplate {
     return new RenderedTemplate(content, template);
   }
 

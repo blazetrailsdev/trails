@@ -1,6 +1,6 @@
 import type { LookupContext } from "../lookup-context.js";
 import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
-import { RenderedTemplate } from "./abstract-renderer.js";
+import { EmptyCollection, RenderedCollection, RenderedTemplate } from "./abstract-renderer.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import { PartialRenderer } from "./partial-renderer.js";
 import { ObjectRenderer } from "./object-renderer.js";
@@ -17,19 +17,22 @@ export class Renderer {
     this.lookupContext = lookupContext;
   }
 
-  async render(context: ViewContext, options: RenderOptions): Promise<string> {
+  async render(context: ViewContext, options: RenderOptions): Promise<string | null> {
     return (await this.renderToObject(context, options)).body;
   }
 
   /** @internal */
-  async renderToObject(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
+  async renderToObject(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
     return this.renderTemplateToObject(context, options);
   }
 
-  async renderBody(context: ViewContext, options: RenderOptions): Promise<string[]> {
+  async renderBody(context: ViewContext, options: RenderOptions): Promise<(string | null)[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
@@ -44,7 +47,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: unknown,
-  ): Promise<string> {
+  ): Promise<string | null> {
     return (await this.renderPartialToObject(context, options, block)).body;
   }
 
@@ -61,7 +64,11 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: unknown,
-  ): RenderedTemplate | Promise<RenderedTemplate> {
+  ):
+    | RenderedTemplate
+    | RenderedCollection
+    | EmptyCollection
+    | Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
     const partial = options.partial;
 
     if (typeof partial === "string") {

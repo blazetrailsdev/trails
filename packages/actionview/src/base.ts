@@ -11,6 +11,7 @@ import {
   type SafeBuffer,
 } from "@blazetrails/activesupport";
 
+import "./log-subscriber.js";
 import { _setBase } from "./base-slot.js";
 import { OutputBuffer } from "./buffers.js";
 import { Context } from "./context.js";

@@ -3,7 +3,7 @@ import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import type { CallableListener } from "./notifications/fanout.js";
+import type { CallableListener, EventedListener } from "./notifications/fanout.js";
 
 type FanoutSubscriber = ReturnType<Fanout["subscribe"]>;
 
@@ -47,7 +47,7 @@ export class Notifications {
 
   static subscribe(
     pattern: string | RegExp | null | undefined,
-    callback: ((event: Event) => void) | CallableListener,
+    callback: ((event: Event) => void) | CallableListener | EventedListener,
   ): NotificationSubscriber {
     const sub =
       typeof callback === "function"
