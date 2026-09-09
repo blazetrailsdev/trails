@@ -43,7 +43,7 @@ export interface RenderOptions {
   type?: string;
   formats?: string[];
   variants?: string[];
-  cached?: boolean;
+  cached?: boolean | ((item: unknown) => unknown);
   stream?: boolean;
   [key: string]: unknown;
 }
@@ -246,10 +246,7 @@ export abstract class AbstractRenderer {
   }
 
   /** @internal */
-  protected buildRenderedTemplate(
-    content: string,
-    template: RenderableTemplate | null,
-  ): RenderedTemplate {
+  buildRenderedTemplate(content: string, template: RenderableTemplate | null): RenderedTemplate {
     return new RenderedTemplate(content, template);
   }
 

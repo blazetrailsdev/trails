@@ -1,10 +1,40 @@
 import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
+import {
+  cacheCollectionRender,
+  collectionByCacheKeys,
+  collectionCache,
+  expandedCacheKey,
+  fetchOrCachePartial,
+  isCallableCacheKey,
+  isWillCache,
+  setCollectionCache,
+} from "./partial-renderer/collection-caching.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
 export class PartialRenderer extends AbstractRenderer {
+  /** @internal */
+  static collectionCache = collectionCache;
+  /** @internal */
+  static setCollectionCache = setCollectionCache;
+
+  /** @internal */
+  collectionCache = collectionCache;
+  /** @internal */
+  isWillCache = isWillCache;
+  /** @internal */
+  cacheCollectionRender = cacheCollectionRender;
+  /** @internal */
+  isCallableCacheKey = isCallableCacheKey;
+  /** @internal */
+  collectionByCacheKeys = collectionByCacheKeys;
+  /** @internal */
+  expandedCacheKey = expandedCacheKey;
+  /** @internal */
+  fetchOrCachePartial = fetchOrCachePartial;
+
   /** @internal */
   readonly options: RenderOptions;
   /** @internal */

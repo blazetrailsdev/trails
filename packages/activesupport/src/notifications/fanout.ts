@@ -42,7 +42,7 @@ export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => v
   return collection;
 }
 
-type EventedListener = {
+export type EventedListener = {
   start(name: string, id: unknown, payload: Record<string, unknown>): void;
   finish(name: string, id: unknown, payload: Record<string, unknown>): void;
 };
