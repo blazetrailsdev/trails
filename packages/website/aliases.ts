@@ -40,6 +40,7 @@ export const packageEntries: Array<[string, string]> = [
  */
 export const subpathPrefixes: Array<[string, string]> = [
   ["@blazetrails/activesupport/", "../activesupport/src/"],
+  ["@blazetrails/ruby-compat/", "../ruby-compat/src/"],
   ["@blazetrails/arel/src", "../arel/src"],
 ];
 

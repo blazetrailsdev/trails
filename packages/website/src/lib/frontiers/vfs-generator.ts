@@ -5,7 +5,12 @@ import {
 } from "@blazetrails/trailties/generators";
 import type { AppDatabase } from "@blazetrails/trailties/generators";
 import { ActiveSupport } from "@blazetrails/activesupport";
-import { registerFsAdapter, type FsAdapter, type PathAdapter } from "@blazetrails/ruby-compat";
+import {
+  registerFsAdapter,
+  type Bytes,
+  type FsAdapter,
+  type PathAdapter,
+} from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
 
 const posixPath: PathAdapter = {
@@ -29,18 +34,31 @@ const posixPath: PathAdapter = {
   },
 };
 
-function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
+export function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
+  // Required on FsAdapter, like its sync twin. Both overloads are carried: an
+  // encoding yields the string, its absence the bytes, and a missing path
+  // rejects the way the Node adapter's does rather than reading as empty.
+  function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
+  function readFile(path: string): Promise<Bytes>;
+  function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
+    const entry = vfs.read(path);
+    if (entry === null) {
+      return Promise.reject(
+        Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+          code: "ENOENT",
+        }),
+      );
+    }
+    return Promise.resolve(
+      encoding === undefined ? new TextEncoder().encode(entry.content) : entry.content,
+    );
+  }
+
   return {
     readFileSync(path: string): string {
       return vfs.read(path)?.content ?? "";
     },
-    // Required on FsAdapter, like its sync twin: a filesystem that cannot be
-    // read asynchronously made every async consumer guard a branch no
-    // registered adapter takes. The VFS is in memory, so this is the sync
-    // read with a promise around it.
-    readFile(path: string): Promise<string> {
-      return Promise.resolve(vfs.read(path)?.content ?? "");
-    },
+    readFile,
     writeFileSync(path: string, content: string): void {
       vfs.write(path, content);
     },

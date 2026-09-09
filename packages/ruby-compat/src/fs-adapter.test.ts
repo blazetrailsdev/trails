@@ -25,4 +25,16 @@ describe("FsAdapter#readFile", () => {
     const source = await fs.readFile(fsAdapterPath, "utf8");
     expect(source).toContain("export interface FsAdapter");
   });
+
+  test("returns bytes when no encoding is given", async () => {
+    const fs = getFs();
+    const bytes = await fs.readFile(fsAdapterPath);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(bytes)).toContain("export interface FsAdapter");
+  });
+
+  test("rejects for a path that does not exist", async () => {
+    const fs = getFs();
+    await expect(fs.readFile(`${fsAdapterPath}.missing`, "utf8")).rejects.toThrow(/ENOENT/);
+  });
 });
