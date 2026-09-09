@@ -1,0 +1,22 @@
+david:
+  id: 1
+  name: David
+  salary: 80000
+  shared_computers: laptop
+
+jamis:
+  id: 2
+  name: Jamis
+  salary: 150000
+
+<% for (const digit of [3, 4, 5, 6, 7, 8, 9, 10]) { %>
+dev_<%= digit %>:
+  id: <%= digit %>
+  name: fixture_<%= digit %>
+  salary: 100000
+<% } %>
+
+poor_jamis:
+  id: 11
+  name: Jamis
+  salary: 9000

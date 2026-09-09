@@ -922,6 +922,12 @@ export class FixtureSet {
     return out;
   }
 
+  static get contextClass(): new () => object {
+    return (FixtureSet.#contextClass ??= class {});
+  }
+
+  static #contextClass?: new () => object;
+
   static async createFixtures<T extends BaseClass, K extends string>(
     adapter: DatabaseAdapter,
     ModelClass: T,
@@ -953,6 +959,13 @@ export class FixtureError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ActiveRecord::Fixture::FixtureError";
+  }
+}
+
+export class FormatError extends FixtureError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActiveRecord::Fixture::FormatError";
   }
 }
 

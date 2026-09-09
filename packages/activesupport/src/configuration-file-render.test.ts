@@ -72,7 +72,9 @@ describe("ConfigurationFile loader options", () => {
   it("forwards loader options through the rendered branch", () => {
     const path = writeYaml(`<% /* nothing */ %>${merged}`);
 
-    expect(ConfigurationFile.parse(path, { merge: true }).development).toEqual({
+    expect(
+      (ConfigurationFile.parse(path, { merge: true }) as Record<string, unknown>).development,
+    ).toEqual({
       adapter: "sqlite3",
       database: "dev",
     });
@@ -81,7 +83,7 @@ describe("ConfigurationFile loader options", () => {
   it("without the option the merge key is an ordinary key", () => {
     const path = writeYaml(merged);
 
-    expect(ConfigurationFile.parse(path).development).toEqual({
+    expect((ConfigurationFile.parse(path) as Record<string, unknown>).development).toEqual({
       "<<": { adapter: "sqlite3" },
       database: "dev",
     });

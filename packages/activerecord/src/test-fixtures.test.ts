@@ -1,4 +1,6 @@
-import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
+import { onLoad } from "@blazetrails/activesupport";
 import { resolveFixtureNames } from "./test-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { registerModel } from "./associations.js";
@@ -6,7 +8,7 @@ import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js";
 import { defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures, TestFixtures } from "./test-fixtures.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
 import { College } from "./test-helpers/models/college.js";
@@ -809,5 +811,37 @@ describe("fixtures() pins every pool its sets seed through", () => {
     const secondary = await College.leaseConnection();
     expect(secondary).not.toBe(await Base.leaseConnection());
     expect(secondary.openTransactions()).toBeGreaterThan(0);
+  });
+});
+
+describe("TestFixturesTest", () => {
+  let klass: new () => object;
+
+  beforeEach(() => {
+    klass = class {};
+    include(klass, TestFixtures);
+  });
+
+  it("use transactional tests defaults to true", () => {
+    expect(true).toEqual((klass as { useTransactionalTests?: unknown }).useTransactionalTests);
+  });
+
+  it("use transactional tests can be overridden", () => {
+    (klass as { useTransactionalTests?: unknown }).useTransactionalTests = "foobar";
+
+    expect("foobar").toEqual((klass as { useTransactionalTests?: unknown }).useTransactionalTests);
+  });
+
+  it("inclusion runs active record fixtures load hook", () => {
+    onLoad("active_record_fixtures", function (base: { fixturePaths: string[] }) {
+      base.fixturePaths.push("test/fixtures");
+    });
+    const klass = class {};
+
+    include(klass, TestFixtures);
+
+    expect((klass as unknown as { fixturePaths: string[] }).fixturePaths).toContain(
+      "test/fixtures",
+    );
   });
 });

@@ -26,3 +26,9 @@ scripts/api-compare/call-mismatches-exclude/
 # TransitionTable#visualizer (transition_table.rb:128-131). fsm.js and fsm.css are
 # byte-for-byte copies of vendor/rails'.
 packages/actionpack/src/action-dispatch/journey/visualizer/
+
+# Copies of vendor/rails/activerecord/test/fixtures/{accounts,developers,other_posts}.yml,
+# read by fixture-set/file.test.ts. developers.yml is a TSE template, not YAML —
+# prettier cannot parse it — and reformatting the others would drift them away
+# from Rails'.
+packages/activerecord/src/fixture-set/test-data/

@@ -22,7 +22,7 @@ export class ConfigurationFile {
   static parse(
     contentPath: string,
     options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
-  ): Record<string, unknown> {
+  ): unknown {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
@@ -30,17 +30,11 @@ export class ConfigurationFile {
   parse({
     context,
     ...options
-  }: { context?: Record<string, unknown>; [option: string]: unknown } = {}): Record<
-    string,
-    unknown
-  > {
+  }: { context?: Record<string, unknown>; [option: string]: unknown } = {}): unknown {
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
-      const parsed = yamlParse(source, options);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-      return {};
+      const parsed: unknown = yamlParse(source, options);
+      return parsed != null && parsed !== false ? parsed : {};
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new FormatError(

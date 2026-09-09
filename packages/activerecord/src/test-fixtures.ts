@@ -1,4 +1,6 @@
 import { afterEach, beforeEach } from "vitest";
+import { included } from "@blazetrails/ruby-compat";
+import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
 import {
   prepareModelFixtures,
   prepareJoinTableFixtures,
@@ -27,6 +29,21 @@ import {
   leaseFixtureConnection,
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
+
+export const TestFixtures = {
+  [included](base: unknown): void {
+    classAttribute.call(base, "fixturePaths", { instanceWriter: false, default: [] });
+    classAttribute.call(base, "fixtureTableNames", { default: [] });
+    classAttribute.call(base, "fixtureClassNames", { default: {} });
+    classAttribute.call(base, "useTransactionalTests", { default: true });
+    classAttribute.call(base, "useInstantiatedFixtures", { default: false });
+    classAttribute.call(base, "preLoadedFixtures", { default: false });
+    classAttribute.call(base, "lockThreads", { default: true });
+    classAttribute.call(base, "fixtureSets", { default: {} });
+
+    runLoadHooks("active_record_fixtures", base);
+  },
+};
 
 export type TablelessFixtureEntry = {
   table: string;

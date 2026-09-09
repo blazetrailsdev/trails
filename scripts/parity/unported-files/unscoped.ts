@@ -325,19 +325,59 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "the group is split into per-case rows there.",
   },
   {
-    pattern: "fixture_set",
-    testFile: "fixture_set/",
+    pattern: "fixture_set/model_metadata.rb",
     reason:
-      "Supporting machinery for YAML fixtures (FixtureSet file/table-row/render-context/" +
-      "model-metadata/identify). Excluded along with fixtures.rb.",
+      "Supporting machinery for YAML fixtures: the per-model column/timestamp metadata " +
+      "FixtureSet::TableRows consults. Excluded along with fixtures.rb; file.rb and " +
+      "render_context.rb are ported (fixture-set/file.ts, fixture-set/render-context.ts) " +
+      "since story port-fixture-set-file-and-test-fixtures-cases.",
+  },
+  {
+    pattern: "fixture_set/table_row.rb",
+    reason:
+      "Supporting machinery for YAML fixtures: one row's association/enum/timestamp " +
+      "resolution. trails resolves those inline in fixtures.ts (prepareModelFixtures, " +
+      "resolveRefs) rather than as a row object. Excluded along with fixtures.rb.",
+  },
+  {
+    pattern: "fixture_set/table_rows.rb",
+    reason:
+      "Supporting machinery for YAML fixtures: the per-table row collection built from " +
+      "a FixtureSet. trails builds the same rows inline in fixtures.ts. Excluded along " +
+      "with fixtures.rb.",
+  },
+  {
+    testFile: "fixture_set/file_test.rb",
+    tests: ["render context lookup scope"],
+    reason:
+      "Asserts Ruby constant-lookup scope inside the rendering context — " +
+      "`defined? ActiveRecord`, `defined? ActiveRecord::FixtureSet::File`, `File.name` " +
+      "(file_test.rb:97-116). Constants are resolved lexically against the enclosing " +
+      "Ruby module nesting; an ESM module has no nesting to resolve against and no " +
+      "`defined?`, so there is nothing to assert. The other 13 cases are ported in " +
+      "fixture-set/file.test.ts.",
   },
   {
     pattern: "test_fixtures.rb",
-    testFile: "test_fixtures_test.rb",
     reason:
       "Rails test concern that wires fixtures into ActiveSupport::TestCase " +
       "(setup_fixtures, transactional rollback per test). Tied to YAML fixtures " +
-      "and the Minitest lifecycle; Vitest tests use per-test factories instead.",
+      "and the Minitest lifecycle; Vitest tests use per-test factories instead. " +
+      "Source-only since story port-fixture-set-file-and-test-fixtures-cases: the " +
+      "`included do` block is ported (TestFixtures in test-fixtures.ts) and " +
+      "test_fixtures_test.rb is enrolled per case by the row below.",
+  },
+  {
+    testFile: "test_fixtures_test.rb",
+    className: "TestFixturesTest",
+    tests: ["doesnt rely on active support test case specific methods"],
+    reason:
+      "Builds a `Class.new(Minitest::Test)` at run time, points its fixture_paths at a " +
+      "tmpdir holding a zines.yml, and runs it through Minitest's own runner, asserting " +
+      "the result passed? (test_fixtures_test.rb:33-72). Vitest has no runnable-per-" +
+      "instance test object to construct and run from inside another test, and trails' " +
+      "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
+      "setup has a counterpart. The other 3 cases are ported in test-fixtures.test.ts.",
   },
   {
     pattern: "encryption/encrypted_fixtures.rb",
