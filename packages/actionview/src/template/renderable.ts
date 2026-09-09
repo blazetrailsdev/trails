@@ -1,3 +1,4 @@
+import { tryCall } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
 export class Renderable {
@@ -7,8 +8,8 @@ export class Renderable {
     this.renderable = renderable;
   }
 
-  identifier(): string | undefined {
-    return (this.renderable as object | null)?.constructor?.name;
+  identifier(): string {
+    return this.renderable == null ? "NilClass" : (this.renderable as object).constructor.name;
   }
 
   render(context: unknown, ..._args: unknown[]): unknown {
@@ -28,9 +29,6 @@ export class Renderable {
   }
 
   format(): unknown {
-    const format = (this.renderable as { format?: unknown } | null)?.format;
-    return typeof format === "function"
-      ? (format as () => unknown).call(this.renderable)
-      : undefined;
+    return tryCall(this.renderable as object, "format");
   }
 }

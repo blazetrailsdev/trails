@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
 import { domClass, domId } from "./record-identifier.js";
 
 class Comment {
@@ -68,5 +70,72 @@ describe("RecordIdentifierTest", () => {
 
   it("test_dom_class_with_prefix", () => {
     expect(domClass(record, "custom_prefix")).toBe(`custom_prefix_${singular}`);
+  });
+});
+
+class Plane {
+  static readonly modelName = { paramKey: "airplane" };
+
+  readonly modelName = Plane.modelName;
+
+  private _toKey: unknown[] | null = null;
+
+  toKey(): unknown[] | null {
+    return this._toKey;
+  }
+
+  save(): void {
+    this._toKey = [1];
+  }
+}
+
+describe("RecordIdentifierWithoutActiveModelTest", () => {
+  let record: Plane;
+
+  beforeEach(() => {
+    record = new Plane();
+  });
+
+  it("test_dom_id_with_new_class", () => {
+    expect(domId(Plane)).toBe("new_airplane");
+  });
+
+  it("test_dom_id_with_new_record", () => {
+    expect(domId(record)).toBe("new_airplane");
+  });
+
+  it("test_dom_id_with_new_record_and_prefix", () => {
+    expect(domId(record, "custom_prefix")).toBe("custom_prefix_airplane");
+  });
+
+  it("test_dom_id_with_saved_record", () => {
+    record.save();
+    expect(domId(record)).toBe("airplane_1");
+  });
+
+  it("test_dom_id_with_prefix", () => {
+    record.save();
+    expect(domId(record, "edit")).toBe("edit_airplane_1");
+  });
+
+  it("test_dom_id_raises_useful_error_when_passed_nil", () => {
+    expect(() => domId(null)).toThrow(ArgumentError);
+  });
+
+  it("test_dom_class", () => {
+    expect(domClass(record)).toBe("airplane");
+  });
+
+  it("test_dom_class_with_prefix", () => {
+    expect(domClass(record, "custom_prefix")).toBe("custom_prefix_airplane");
+  });
+
+  it("test_dom_id_as_singleton_method", () => {
+    record.save();
+    expect(domId(record)).toBe("airplane_1");
+  });
+
+  it("test_dom_class_as_singleton_method", () => {
+    expect(domClass(record)).toBe("airplane");
   });
 });
