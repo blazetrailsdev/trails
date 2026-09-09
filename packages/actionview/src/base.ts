@@ -13,12 +13,12 @@ import {
 
 import { _setBase } from "./base-slot.js";
 import { OutputBuffer } from "./buffers.js";
-import { OutputFlow } from "./flows.js";
+import { Context } from "./context.js";
 import * as Helpers from "./helpers/index.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, include } from "@blazetrails/ruby-compat";
 
 export type CompiledMethod = (
   this: Base,
@@ -146,10 +146,6 @@ export class Base {
 
   _assigns: Record<string, unknown> = {};
 
-  outputBuffer: OutputBuffer | null = null;
-
-  viewFlow: OutputFlow = new OutputFlow();
-
   virtualPath: string | null = null;
 
   /** @noRailsEquivalent PERMANENT */
@@ -200,16 +196,6 @@ export class Base {
     for (const [key, value] of Object.entries(newAssigns)) {
       (this as unknown as Record<string, unknown>)[key] = value;
     }
-  }
-
-  _prepareContext(): void {
-    this.viewFlow = new OutputFlow();
-    this.outputBuffer = new OutputBuffer();
-    this.virtualPath = null;
-  }
-
-  _layoutFor(name?: string): SafeBuffer {
-    return htmlSafe(this.viewFlow.get(name ?? "layout").toString());
   }
 
   compiledMethodContainer(): CompiledMethodContainer {
@@ -378,12 +364,14 @@ Object.defineProperty(Base.prototype, "yield", {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface Base extends HelperMethods, TseUtilMethods {
+export interface Base extends Context, HelperMethods, TseUtilMethods {
   controller: Parameters<typeof Helpers.assignController>[0];
   request: unknown;
   /** @noRailsEquivalent PERMANENT */
   readonly yield: SafeBuffer;
 }
+
+include(Base, Context);
 
 runLoadHooks("action_view", Base);
 

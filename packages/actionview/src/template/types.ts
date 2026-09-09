@@ -1,3 +1,5 @@
+import { isBlank } from "@blazetrails/activesupport";
+
 const SYMBOLS: readonly string[] = [
   "html",
   "text",
@@ -41,8 +43,40 @@ export class Types {
     return SYMBOLS;
   }
 
+  static get(type: string | Types): Types {
+    if (type instanceof Types) {
+      return type;
+    } else {
+      return new Types(type);
+    }
+  }
+
   /** @internal */
   static isValidSymbols(symbols: ReadonlyArray<string | symbol>): boolean {
     return symbols.every((s) => typeof s === "string" && SYMBOLS.includes(s));
+  }
+
+  readonly symbol: string;
+
+  constructor(symbol: string) {
+    this.symbol = symbol;
+  }
+
+  toString(): string {
+    return this.symbol;
+  }
+
+  ref(): string {
+    return this.symbol;
+  }
+
+  toSym(): string {
+    return this.ref();
+  }
+
+  equals(type: unknown): boolean | undefined {
+    if (!isBlank(type)) {
+      return this.symbol === (type instanceof Types ? type.toSym() : String(type));
+    }
   }
 }

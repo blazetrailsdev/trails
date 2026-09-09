@@ -4,6 +4,7 @@ import { OutputBuffer } from "./buffers.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
 import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
+import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 import {
@@ -87,6 +88,7 @@ export class Template {
   static {
     TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("html", new Html());
   }
 
   static Error = TemplateError;
@@ -294,19 +296,32 @@ export class Template {
    * @internal
    * @missingRailsCall to_sentence — PERMANENT
    */
-  private compile(mod: CompiledMethodContainer): void {
+  protected compile(mod: CompiledMethodContainer): void {
     const compiledSource = this.compiledSource();
-    let factory: (mismatch: typeof StrictLocalsMismatch, safe: typeof htmlSafe) => CompiledMethod;
+    let factory: (
+      mismatch: typeof StrictLocalsMismatch,
+      safe: typeof htmlSafe,
+      outputBuffer: typeof OutputBuffer,
+    ) => CompiledMethod;
     try {
-      factory = new Function("StrictLocalsMismatch", "htmlSafe", `return ${compiledSource};`) as (
+      factory = new Function(
+        "StrictLocalsMismatch",
+        "htmlSafe",
+        "OutputBuffer",
+        `return ${compiledSource};`,
+      ) as (
         mismatch: typeof StrictLocalsMismatch,
         safe: typeof htmlSafe,
+        outputBuffer: typeof OutputBuffer,
       ) => CompiledMethod;
     } catch (error) {
       throw new SyntaxErrorInTemplate(this, this.source, error as Error);
     }
 
-    mod._compiledMethods.set(this.methodName(), factory(StrictLocalsMismatch, htmlSafe));
+    mod._compiledMethods.set(
+      this.methodName(),
+      factory(StrictLocalsMismatch, htmlSafe, OutputBuffer),
+    );
   }
 
   private handleRenderError(view: Base, e: unknown): never {
