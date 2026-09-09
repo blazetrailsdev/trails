@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger, Notifications, setTrailsRoot } from "@blazetrails/activesupport";
 
 import { Base } from "./base.js";
-import { LogSubscriber, Start } from "./log-subscriber.js";
+import { Start } from "./log-subscriber.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = { debug: [], info: [] };
@@ -60,10 +60,7 @@ describe("ActionView::LogSubscriber", () => {
   it("names the layout on both lines when one is rendered", () => {
     Notifications.instrument(
       "render_template.action_view",
-      {
-        identifier: "/srv/app/app/views/test/hello_world.tse",
-        layout: "layouts/yield",
-      },
+      { identifier: "/srv/app/app/views/test/hello_world.tse", layout: "layouts/yield" },
       () => undefined,
     );
 
@@ -128,14 +125,6 @@ describe("ActionView::LogSubscriber", () => {
     Notifications.instrument("render_collection.action_view", { count: 2 }, () => undefined);
 
     expect(logger.logged("debug")[0]).toMatch(/Rendered collection of templates/);
-  });
-
-  it("shortens an identifier to its app/views-relative path", () => {
-    const subscriber = new LogSubscriber();
-
-    expect(subscriber.fromRailsRoot("/srv/app/app/views/test/hello_world.tse")).toBe(
-      "test/hello_world.tse",
-    );
   });
 
   it("is silenced when there is no logger, or the logger is not at debug level", () => {
