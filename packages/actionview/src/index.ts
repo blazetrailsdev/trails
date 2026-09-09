@@ -59,7 +59,7 @@ export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } fr
 export { OutputFlow } from "./flows.js";
 export { Context } from "./context.js";
 export { convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
-export { JOIN, NEW, domClass, domId, recordKeyForDomId } from "./record-identifier.js";
+export { JOIN, NEW, domClass, domId } from "./record-identifier.js";
 export { Text } from "./template/text.js";
 export { HTML } from "./template/html.js";
 export { RawFile } from "./template/raw-file.js";

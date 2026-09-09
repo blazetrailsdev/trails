@@ -1,5 +1,5 @@
 import { tryCall } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 
 export class Renderable {
   private readonly renderable: unknown;
@@ -20,7 +20,7 @@ export class Renderable {
       if (!(error instanceof TypeError)) throw error;
       if (typeof renderable?.renderIn !== "function") {
         throw new ArgumentError(
-          `'${String(this.renderable)}' is not a renderable object. It must implement #render_in.`,
+          `'${rbInspect(this.renderable)}' is not a renderable object. It must implement #render_in.`,
         );
       } else {
         throw error;

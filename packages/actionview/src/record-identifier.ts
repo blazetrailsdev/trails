@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 
 import { convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
 
@@ -15,7 +15,7 @@ export function domClass(recordOrClass: unknown, prefix: string | null = null): 
 export function domId(recordOrClass: unknown, prefix: string | null = null): string {
   if (recordOrClass == null || recordOrClass === false) {
     throw new ArgumentError(
-      `dom_id must be passed a record_or_class as the first argument, you passed ${String(recordOrClass)}`,
+      `dom_id must be passed a record_or_class as the first argument, you passed ${rbInspect(recordOrClass)}`,
     );
   }
 
