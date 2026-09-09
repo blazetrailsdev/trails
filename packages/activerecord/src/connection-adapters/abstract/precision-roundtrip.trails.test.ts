@@ -131,12 +131,12 @@ describe("typeCast of Temporal bind values", () => {
 });
 
 describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
-  it("formatPlainTimeForSql drops nanoseconds", () => {
+  it("formatPlainTimeForSqlMysql drops nanoseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000000001");
     expect(formatPlainTimeForSql(v)).toBe("14:23:55");
   });
 
-  it("formatPlainTimeForSql preserves microseconds", () => {
+  it("formatPlainTimeForSqlMysql preserves microseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000001");
     expect(formatPlainTimeForSql(v)).toBe("14:23:55.000001");
   });

@@ -61,6 +61,10 @@ describe("Savepoints", () => {
       await execRollbackToSavepoint.call(nullHost);
       await releaseSavepoint.call(nullHost);
       expect(executedSql).toEqual(["SAVEPOINT ", "ROLLBACK TO SAVEPOINT ", "RELEASE SAVEPOINT "]);
+
+      executedSql.length = 0;
+      await createSavepoint.call(host, null);
+      expect(executedSql).toEqual(["SAVEPOINT "]);
     });
   });
 });

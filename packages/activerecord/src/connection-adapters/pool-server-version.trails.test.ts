@@ -58,7 +58,7 @@ describe("ConnectionPool#server_version", () => {
     expect(connection.databaseVersion).not.toBeInstanceOf(Promise);
   });
 
-  it("re-entrant read from inside the fetch raises, as Mutex#lock does", async () => {
+  it("re-entrant read from inside the fetch resolves rather than awaiting itself", async () => {
     const pool = new NullPool();
     const connected = Promise.resolve();
     let fetches = 0;
