@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import {
   ref,
   isFixtureRef,
@@ -18,6 +18,7 @@ import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { fixtures } from "./test-fixtures.js";
+import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -26,10 +27,16 @@ import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/pa
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
+import { Reply } from "./test-helpers/models/reply.js";
+import { registerModel } from "./associations.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { taskFixtureData } from "./test-helpers/fixtures/tasks.js";
 import { aircraftFixtureData } from "./test-helpers/fixtures/aircrafts.js";
 import "./relation.js";
+
+for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
+  registerModel(model);
+}
 
 const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
   accounts: ["name"],
@@ -607,7 +614,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     }
   }
 
-  it("test_raises_fk_violations", async () => {
+  it("raises fk violations", async () => {
     await withVerifyForeignKeysForFixtures(async () => {
       const load = (): Promise<unknown> =>
         defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
@@ -623,7 +630,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     });
   });
 
-  it("test_does_not_raise_if_no_fk_violations", async () => {
+  it("does not raise if no fk violations", async () => {
     await defineJoinTableFixtures(
       Base.connection,
       "fk_object_to_point_tos",
@@ -699,7 +706,7 @@ describe("FixturesTest", () => {
   );
 
   it("attributes", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
     expect(topics["first"].title).toBe("The First Topic");
     expect(topics["second"].author_email_address).toBeNull();
@@ -724,7 +731,7 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
     const firstRow = await connection.selectOne("SELECT * FROM topics WHERE author_name = 'David'");
     expect(firstRow?.["title"]).toBe("The First Topic");
@@ -734,34 +741,34 @@ describe("FixturesTest", () => {
   });
 
   it("insert with datetime", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     await FixtureSet.createFixtures(connection, Task, taskFixtureData);
     const first = await Task.find(1);
     expect(first).toBeTruthy();
   });
 
   it("insert with default value", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
     expect(aircraft?.wheels_count).toBe(0);
   });
 
   it("instantiation", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
     expect(topics["first"]).toBeInstanceOf(Topic);
   });
 
   it("yaml file with invalid column", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     await expect(
       FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData),
     ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
   });
 
   it("yaml file with symbol columns", async () => {
-    const connection = await leaseFixtureConnection();
+    const connection = leaseFixtureConnection();
     await FixtureSet.createFixtures(connection, Tree, nakedYmlTreesFixtureData);
     const root = await Tree.find(1);
     expect(root).toBeTruthy();
@@ -787,51 +794,48 @@ describe("FixturesWithoutInstantiationTest", () => {
 });
 
 describe("TransactionalFixturesTest", () => {
-  const { topics } = fixtures(["topics"]);
+  withTransactionalFixtures(leaseFixtureConnection);
+
+  let first: Topic;
+
+  beforeAll(async () => {
+    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+  });
+
+  beforeEach(async () => {
+    first = await Topic.find(1);
+  });
 
   it("destroy", async () => {
-    const first = topics("first");
     expect(first).not.toBeNull();
     await first.destroy();
   });
 
   it("destroy just kidding", () => {
-    expect(topics("first")).not.toBeNull();
+    expect(first).not.toBeNull();
   });
 });
 
-interface SetupTestState {
-  first?: boolean;
-  second?: boolean;
-}
-
-function setupTestSetup(state: SetupTestState): void {
-  state.first = true;
-}
-
 describe("SetupTest", () => {
-  const state: SetupTestState = {};
+  const state: { first?: boolean; second?: boolean } = {};
 
   beforeEach(() => {
-    setupTestSetup(state);
+    state.first = true;
   });
 
   it("nothing", () => {
     expect(state.first).toBe(true);
   });
-});
 
-describe("SetupSubclassTest", () => {
-  const state: SetupTestState = {};
+  describe("SetupSubclassTest", () => {
+    beforeEach(() => {
+      state.second = true;
+    });
 
-  beforeEach(() => {
-    setupTestSetup(state);
-    state.second = true;
-  });
-
-  it("subclassing should preserve setups", () => {
-    expect(state.first).toBe(true);
-    expect(state.second).toBe(true);
+    it("subclassing should preserve setups", () => {
+      expect(state.first).toBe(true);
+      expect(state.second).toBe(true);
+    });
   });
 });
 
