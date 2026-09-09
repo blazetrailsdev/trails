@@ -23,15 +23,15 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
+  protected columnSpecForPrimaryKey(column: Column | undefined): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
-    if (!this.isDefaultPrimaryKey(column)) {
-      spec["id"] = JSON.stringify(this.schemaType(column));
+    if (!this.isDefaultPrimaryKey(column!)) {
+      spec["id"] = JSON.stringify(this.schemaType(column!).replace(/^:/, ""));
     }
-    const colOpts = this.prepareColumnOptions(column);
+    const colOpts = this.prepareColumnOptions(column!);
     delete colOpts["null"];
     Object.assign(spec, colOpts);
-    if (this.isExplicitPrimaryKeyDefault(column)) {
+    if (this.isExplicitPrimaryKeyDefault(column!)) {
       spec["default"] ??= "null";
     }
     return spec;
@@ -57,7 +57,7 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === "bigint";
+    return this.schemaType(column) === ":bigint";
   }
 
   /** @internal */
@@ -67,14 +67,14 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaTypeWithVirtual(column: Column): string {
-    if (this.supportsVirtualColumns && column.isVirtual()) return "virtual";
+    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
     return this.schemaType(column);
   }
 
   /** @internal */
   protected schemaType(column: Column): string {
-    if (this.isBigint(column)) return "bigint";
-    return column.type ?? "";
+    if (this.isBigint(column)) return ":bigint";
+    return `:${column.type ?? ""}`;
   }
 
   /** @internal */

@@ -554,7 +554,7 @@ describe("ConnectionPool schema cache", () => {
         await pool.leaseConnection();
         pool.releaseConnection();
         expect(pool._lazyLoadPromise).toBeNull();
-        expect(await pool.schemaCache.isCached("widgets")).toBe(false);
+        expect(await pool.schemaCache.isCached("widgets")).toBeUndefined();
       } finally {
         await closePoolConnections(pool);
       }
@@ -615,7 +615,7 @@ describe("ConnectionPool schema cache", () => {
       await pool.leaseConnection();
       pool.releaseConnection();
       expect(pool._eagerWarmPromise).toBeNull();
-      expect(await pool.schemaCache.isCached("posts")).toBe(false);
+      expect(await pool.schemaCache.isCached("posts")).toBeUndefined();
     } finally {
       await closePoolConnections(pool);
     }

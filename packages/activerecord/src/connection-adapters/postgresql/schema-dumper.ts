@@ -15,7 +15,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
       if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
-      return { type: JSON.stringify(this.schemaType(column)), ...spec };
+      return { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")), ...spec };
     }
 
     if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
@@ -25,7 +25,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === "bigserial";
+    return this.schemaType(column) === ":bigserial";
   }
 
   /** @internal */
@@ -71,17 +71,17 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaType(column: Column): string {
     const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
-    if (column.isSerial()) return isBigSql ? "bigserial" : "serial";
-    if (isBigSql || column.type === "bigint") return "bigint";
+    if (column.isSerial()) return isBigSql ? ":bigserial" : ":serial";
+    if (isBigSql || column.type === "bigint") return ":bigint";
     const semantic = column.type ?? undefined;
-    if (semantic === "big_integer") return "bigint";
-    if (semantic === "bit_varying") return "bitVarying";
-    return semantic ?? super.schemaType(column as any);
+    if (semantic === "big_integer") return ":bigint";
+    if (semantic === "bit_varying") return ":bitVarying";
+    return semantic != null ? `:${semantic}` : super.schemaType(column as any);
   }
 
   /** @internal */
   protected override schemaTypeWithVirtual(column: Column): string {
-    if (this.supportsVirtualColumns && column.isVirtual()) return "virtual";
+    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
     return this.schemaType(column);
   }
 

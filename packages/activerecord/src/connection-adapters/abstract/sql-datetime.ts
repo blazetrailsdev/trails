@@ -74,8 +74,6 @@ export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
   return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
-export const formatPlainTimeForSqlMysql = formatPlainTimeForSql;
-
 function microsecondFraction(usec: number): string {
   return usec > 0 ? `.${String(usec).padStart(6, "0")}` : "";
 }

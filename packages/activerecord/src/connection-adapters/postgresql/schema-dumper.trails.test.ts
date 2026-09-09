@@ -50,25 +50,25 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("returns bigserial for a serial bigint column", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
-      expect(dumper.schemaType(col)).toBe("bigserial");
+      expect(dumper.schemaType(col)).toBe(":bigserial");
     });
 
     it("returns serial for a serial non-bigint column", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.schemaType(col)).toBe("serial");
+      expect(dumper.schemaType(col)).toBe(":serial");
     });
 
     it("returns bigint for bigint array columns (strips [] before returning)", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "bigint[]", type: "integer", array: true });
-      expect(dumper.schemaType(col)).toBe("bigint");
+      expect(dumper.schemaType(col)).toBe(":bigint");
     });
 
     it("returns semantic type for non-serial non-bigint columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "character varying", type: "string" });
-      expect(dumper.schemaType(col)).toBe("string");
+      expect(dumper.schemaType(col)).toBe(":string");
     });
   });
 
@@ -228,13 +228,13 @@ describe("PostgreSQL::SchemaDumper", () => {
           generated: "s",
         },
       );
-      expect(dumper.schemaTypeWithVirtual(col)).toBe("virtual");
+      expect(dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
     });
 
     it("returns schemaType for non-virtual columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.schemaTypeWithVirtual(col)).toBe("serial");
+      expect(dumper.schemaTypeWithVirtual(col)).toBe(":serial");
     });
   });
 

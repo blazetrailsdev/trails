@@ -127,7 +127,7 @@ describe("SchemaDumper trails-only cases", () => {
     };
     const output = (await TopLevelDumper.dump(source)).join("\n");
     expect(output).toContain('t.timestamptz("ts"');
-    expect(output).toContain('t.column("guid", "uuid"');
+    expect(output).toContain('t.uuid("guid"');
     expect(output).toContain('t.interval("span"');
     expect(output).toContain('t.oid("obj_id"');
     expect(output).not.toContain("t.enum(");

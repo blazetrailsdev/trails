@@ -50,13 +50,13 @@ describe("MySQL::SchemaDumper", () => {
 
   describe("schemaType", () => {
     it("timestamp → 'timestamp'", () =>
-      expect((make() as any).schemaType(col({ sqlType: "timestamp" }))).toBe("timestamp"));
+      expect((make() as any).schemaType(col({ sqlType: "timestamp" }))).toBe(":timestamp"));
     it("enum → full sql_type", () =>
       expect((make() as any).schemaType(col({ sqlType: "enum('a','b')" }))).toBe("enum('a','b')"));
     it("set → full sql_type", () =>
       expect((make() as any).schemaType(col({ sqlType: "set('x')" }))).toBe("set('x')"));
     it("standard → delegates to super", () =>
-      expect((make() as any).schemaType(col({ type: "string" }))).toBe("string"));
+      expect((make() as any).schemaType(col({ type: "string" }))).toBe(":string"));
   });
 
   describe("schemaLimit", () => {

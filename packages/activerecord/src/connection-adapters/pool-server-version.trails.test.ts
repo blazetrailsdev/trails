@@ -58,7 +58,7 @@ describe("ConnectionPool#server_version", () => {
     expect(connection.databaseVersion).not.toBeInstanceOf(Promise);
   });
 
-  it("re-entrant read from inside the fetch resolves rather than awaiting itself", async () => {
+  it("re-entrant read from inside the fetch raises, as Mutex#lock does", async () => {
     const pool = new NullPool();
     const connected = Promise.resolve();
     let fetches = 0;
@@ -72,8 +72,8 @@ describe("ConnectionPool#server_version", () => {
       },
     } as unknown as AbstractAdapter;
 
-    expect(String(await pool.serverVersion(connection))).toBe("8.0.35");
-    expect(fetches).toBe(2);
+    await expect(pool.serverVersion(connection)).rejects.toThrow("deadlock; recursive locking");
+    expect(fetches).toBe(1);
   }, 5000);
 
   it("two concurrent first callers issue one get_database_version", async () => {

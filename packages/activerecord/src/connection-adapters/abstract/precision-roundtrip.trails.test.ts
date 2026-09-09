@@ -5,7 +5,6 @@ import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
-  formatPlainTimeForSqlMysql,
 } from "./sql-datetime.js";
 import { quote as quoteFn, quotedDate, typeCast as typeCastFn } from "./quoting.js";
 import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
@@ -132,14 +131,14 @@ describe("typeCast of Temporal bind values", () => {
 });
 
 describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
-  it("formatPlainTimeForSqlMysql drops nanoseconds", () => {
+  it("formatPlainTimeForSql drops nanoseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000000001");
-    expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55");
+    expect(formatPlainTimeForSql(v)).toBe("14:23:55");
   });
 
-  it("formatPlainTimeForSqlMysql preserves microseconds", () => {
+  it("formatPlainTimeForSql preserves microseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000001");
-    expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55.000001");
+    expect(formatPlainTimeForSql(v)).toBe("14:23:55.000001");
   });
 });
 
@@ -157,7 +156,6 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   it("omits the fractional part for a whole-second PlainTime (.000 → omitted)", () => {
     const v = Temporal.PlainTime.from("14:23:55.000");
     expect(formatPlainTimeForSql(v)).toBe("14:23:55");
-    expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55");
   });
 });
 
