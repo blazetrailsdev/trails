@@ -1,6 +1,6 @@
 import { extractOptionsBang, isPlainObject, symbolizeKeys } from "@blazetrails/activesupport";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { _UrlFor } from "./routing-url-for-slot.js";
+import { _UrlFor, type ParametersLike } from "./routing-url-for-slot.js";
 
 export interface RoutingUrlForHost {
   controller: unknown;
@@ -20,7 +20,7 @@ export function urlFor(this: RoutingUrlForHost, options: UrlForOptions = null): 
 
     return _UrlFor!.urlFor.call(this, hash);
   } else if (_UrlFor!.isParameters(options)) {
-    ensureOnlyPathOption.call(this, options as Record<string, unknown>);
+    ensureOnlyPathOption.call(this, options);
 
     return _UrlFor!.urlFor.call(this, options);
   } else if (options === ":back") {
@@ -76,9 +76,19 @@ export function _generatePathsByDefault(this: RoutingUrlForHost): boolean {
 /** @internal */
 export function ensureOnlyPathOption(
   this: RoutingUrlForHost,
-  options: Record<string, unknown>,
+  options: Record<string, unknown> | ParametersLike,
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(options, "only_path")) {
-    if (!options["host"]) options["only_path"] = _generatePathsByDefault.call(this);
+  const params = _UrlFor!.isParameters(options) ? options : null;
+  const hash = params ? null : (options as Record<string, unknown>);
+  if (
+    !(params
+      ? params.hasKey("only_path")
+      : Object.prototype.hasOwnProperty.call(hash!, "only_path"))
+  ) {
+    if (!(params ? params.get("host") : hash!["host"])) {
+      const onlyPath = _generatePathsByDefault.call(this);
+      if (params) params.set("only_path", onlyPath);
+      else hash!["only_path"] = onlyPath;
+    }
   }
 }

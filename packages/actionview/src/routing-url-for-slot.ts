@@ -4,13 +4,19 @@ export interface PolymorphicBuilder {
   handleModelCall(target: unknown, record: unknown): string;
 }
 
+export interface ParametersLike {
+  hasKey(key: string): boolean;
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+}
+
 export interface UrlForImplementation {
   urlFor(this: unknown, options?: unknown): string;
   urlOptions(this: unknown): Record<string, unknown>;
   optimizeRoutesGeneration(this: unknown): boolean;
   polymorphicPath(this: unknown, record: unknown, options: Record<string, unknown>): string;
   polymorphicUrl(this: unknown, record: unknown, options: Record<string, unknown>): string;
-  isParameters(value: unknown): boolean;
+  isParameters(value: unknown): value is ParametersLike;
   helperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
 }
 

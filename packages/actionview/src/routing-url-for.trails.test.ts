@@ -10,7 +10,19 @@ import {
 import { _setUrlFor, type UrlForImplementation } from "./routing-url-for-slot.js";
 
 class Parameters {
-  constructor(readonly attrs: Record<string, unknown>) {}
+  constructor(private readonly data: Record<string, unknown>) {}
+  hasKey(key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.data, key);
+  }
+  get(key: string): unknown {
+    return this.data[key];
+  }
+  set(key: string, value: unknown): void {
+    this.data[key] = value;
+  }
+  toH(): Record<string, unknown> {
+    return { ...this.data };
+  }
 }
 
 const builder = {
@@ -84,6 +96,21 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
   it("routes ActionController::Parameters through super", () => {
     const params = new Parameters({ action: "index" });
     expect(urlFor.call(host, params)).toBe("/super");
+    expect(host.seen[0]).toBe(params);
+  });
+
+  it("defaults :only_path through the Parameters writer, not a bare property", () => {
+    const params = new Parameters({ action: "index" });
+    urlFor.call(host, params);
+    expect(params.hasKey("only_path")).toBe(true);
+    expect(params.get("only_path")).toBe(true);
+    expect(params.toH()).toEqual({ action: "index", only_path: true });
+  });
+
+  it("leaves :only_path alone on Parameters carrying a :host", () => {
+    const params = new Parameters({ action: "index", host: "example.com" });
+    urlFor.call(host, params);
+    expect(params.hasKey("only_path")).toBe(false);
   });
 
   it("routes a Symbol through handle_string_call", () => {
