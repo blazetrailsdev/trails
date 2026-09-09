@@ -1,3 +1,5 @@
+import { TypeError } from "@blazetrails/ruby-compat";
+
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
   instanceReader?: boolean;
@@ -56,7 +58,6 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
 
   for (const name of attrs as string[]) {
     if (typeof name !== "string") {
-      // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`${inspect(name)} is not a symbol nor a string`);
     }
 

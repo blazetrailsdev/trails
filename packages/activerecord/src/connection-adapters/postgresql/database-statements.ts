@@ -89,14 +89,9 @@ export async function execute(
   { allowRetry = false }: { allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
   try {
-    const result = (await AbstractAdapter.prototype.execute.call(this, sql, name, {
+    return (await AbstractAdapter.prototype.execute.call(this, sql, name, {
       allowRetry,
-    })) as { fields?: Array<{ name: string }>; rows?: unknown[][] } | null | undefined;
-    if (result == null) return [];
-    return new Result(
-      (result.fields ?? []).map((f) => f.name),
-      result.rows ?? [],
-    ).toArray();
+    })) as Record<string, unknown>[];
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }

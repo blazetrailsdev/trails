@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 
 import { hours } from "../duration.js";
+import { TypeError as RubyTypeError } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { TimeWithZone } from "../time-with-zone.js";
@@ -86,6 +87,11 @@ describe("RangeTest", () => {
 
   it("overlap behaves like ruby", () => {
     expect(new Range(1, 3).overlap(new Range(5, 8))).toBe(false);
+
+    expect(() => new Range(0, null).overlap(1 as never)).toThrow(RubyTypeError);
+    expect(() => new Range(0, null).overlap(null as never)).toThrow(RubyTypeError);
+
+    expect(() => new Range(1, 3).overlap(1 as never)).toThrow(RubyTypeError);
   });
 
   it("should include identical inclusive", () => {

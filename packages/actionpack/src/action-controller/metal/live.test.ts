@@ -16,7 +16,7 @@ import {
   sendStream,
   responseBody,
 } from "./live.js";
-import { IOError } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError } from "@blazetrails/ruby-compat";
 
 function makeResponse() {
   return new Response();
@@ -79,6 +79,19 @@ describe("ActionController::Live::Buffer", () => {
     buf.abort();
     expect(buf.isConnected).toBe(false);
     expect([...buf.eachChunk()]).toEqual([]);
+  });
+
+  it("ClientDisconnected is a RuntimeError, not an IOError", () => {
+    const buf = new Buffer(makeResponse());
+    buf.abort();
+    let raised: unknown;
+    try {
+      buf.write("x");
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(RuntimeError);
+    expect(raised).not.toBeInstanceOf(IOError);
   });
 
   it("write after abort raises ClientDisconnected by default", () => {
