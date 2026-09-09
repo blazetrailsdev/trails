@@ -39,9 +39,7 @@ export function controllerPathHelpers(name: string): ControllerPaths {
       ? parts.map((p) => dasherize(underscore(p))).join("/") + "-controller"
       : dasherize(underscore(stripped)) + "-controller";
   const viewBase =
-    parts.length > 1
-      ? parts.map((p) => dasherize(underscore(p))).join("/")
-      : dasherize(underscore(stripped));
+    parts.length > 1 ? parts.map((p) => underscore(p)).join("/") : underscore(stripped);
   const leaf = parts[parts.length - 1];
   const helperName = classify(leaf) + "Helper";
   const helperFile = dasherize(underscore(leaf)) + "-helper";
