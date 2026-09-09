@@ -16,14 +16,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
+    await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
     await adapter.close();
   });
   withTransactionalFixtures(() => adapter);
 
   async function setupTimesTable() {
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_times`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_times`);
+    await adapter.execute(`
       CREATE TABLE postgresql_times (
         id serial primary key,
         time_interval interval,
@@ -46,8 +46,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   }
 
   async function setupOidsTable() {
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_oids`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_oids`);
+    await adapter.execute(`
       CREATE TABLE postgresql_oids (
         id serial primary key,
         obj_id oid
@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLDatatypeTest", () => {
     it("data type of time types", async () => {
       const M = await setupTimesTable();
-      await adapter.exec(
+      await adapter.execute(
         `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
       );
       const first = await (M as any).find(1);
@@ -80,7 +80,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("data type of oid types", async () => {
       const M = await setupOidsTable();
-      await adapter.exec(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
+      await adapter.execute(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
       expect((M as any).columnForAttribute("obj_id").type).toBe("oid");
       expect(first).toBeDefined();
@@ -88,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("time values", async () => {
       const M = await setupTimesTable();
-      await adapter.exec(
+      await adapter.execute(
         `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
       );
       const first = await (M as any).find(1);
@@ -99,7 +99,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("update large time in seconds", async () => {
       const M = await setupTimesTable();
-      await adapter.exec(
+      await adapter.execute(
         `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
       );
       const first = await (M as any).find(1);
@@ -113,14 +113,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("oid values", async () => {
       const M = await setupOidsTable();
-      await adapter.exec(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
+      await adapter.execute(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
       expect(first.obj_id).toBe(1234);
     });
 
     it("update oid", async () => {
       const M = await setupOidsTable();
-      await adapter.exec(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
+      await adapter.execute(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
       const newValue = 2147483648;
       first.obj_id = newValue;
@@ -137,7 +137,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLInternalDatatypeTest", () => {
     it("name column type", async () => {
-      await adapter.exec(`CREATE TABLE ex (data name)`);
+      await adapter.execute(`CREATE TABLE ex (data name)`);
       const cols = await adapter.columns("ex");
       const col = cols.find((c) => c.name === "data");
       expect(col).toBeDefined();
@@ -145,7 +145,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("char column type", async () => {
-      await adapter.exec(`CREATE TABLE ex (data "char")`);
+      await adapter.execute(`CREATE TABLE ex (data "char")`);
       const cols = await adapter.columns("ex");
       const col = cols.find((c) => c.name === "data");
       expect(col).toBeDefined();

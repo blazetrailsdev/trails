@@ -6,11 +6,11 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`DROP TABLE IF EXISTS tsvectors`);
-    await adapter.exec(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
+    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
+    await adapter.execute(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
   });
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS tsvectors`);
+    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
     await adapter.close();
   });
 
@@ -26,7 +26,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("full text search", async () => {
-      await adapter.exec(`INSERT INTO tsvectors (text_vector) VALUES ('cat'::tsvector)`);
+      await adapter.execute(`INSERT INTO tsvectors (text_vector) VALUES ('cat'::tsvector)`);
       const rows = await adapter.execute(
         `SELECT text_vector FROM tsvectors WHERE text_vector @@ to_tsquery('cat')`,
       );
@@ -39,13 +39,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("update tsvector", async () => {
-      await adapter.exec(
+      await adapter.execute(
         `INSERT INTO tsvectors (text_vector) VALUES ($$'text' 'vector'$$::tsvector)`,
       );
       const rows = await adapter.execute(`SELECT text_vector FROM tsvectors`);
       expect(String(rows[0].text_vector)).toBe("'text' 'vector'");
 
-      await adapter.exec(`UPDATE tsvectors SET text_vector = $$'new' 'text' 'vector'$$::tsvector`);
+      await adapter.execute(
+        `UPDATE tsvectors SET text_vector = $$'new' 'text' 'vector'$$::tsvector`,
+      );
       const updated = await adapter.execute(`SELECT text_vector FROM tsvectors`);
       expect(String(updated[0].text_vector)).toBe("'new' 'text' 'vector'");
     });

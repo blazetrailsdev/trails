@@ -1,6 +1,7 @@
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "better-sqlite3";
 import { File } from "@blazetrails/ruby-compat";
+import { ConfigurationError } from "../errors.js";
 import {
   type ColumnInfo,
   type RunResult,
@@ -9,6 +10,7 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
+  SQLite3Constants,
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
@@ -145,7 +147,17 @@ function resolveDatabasePath(database: string): string | null {
 }
 
 /** @internal */
+function rejectSharedCache(config: SqliteOpenConfig): void {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+    throw new ConfigurationError(
+      "SQLITE_OPEN_SHAREDCACHE is not supported by the better-sqlite3 driver",
+    );
+  }
+}
+
+/** @internal */
 function openDatabase(config: SqliteOpenConfig): Database.Database {
+  rejectSharedCache(config);
   const opts: Database.Options = {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,

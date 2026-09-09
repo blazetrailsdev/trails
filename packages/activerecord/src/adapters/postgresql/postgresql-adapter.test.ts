@@ -26,11 +26,11 @@ async function withExampleTable(
   fn: () => Promise<void>,
   definition: string = EX_DEFAULT,
 ): Promise<void> {
-  await adapter.exec(`CREATE TABLE ex (${definition})`);
+  await adapter.execute(`CREATE TABLE ex (${definition})`);
   try {
     await fn();
   } finally {
-    await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
+    await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
   }
 }
 
@@ -85,7 +85,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     vi.restoreAllMocks();
     if (adapter.isConnected()) {
       try {
-        await adapter.exec(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);
+        await adapter.execute(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);
       } catch {}
     }
     await adapter.close();
@@ -349,8 +349,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for with collision pg class oid", async () => {
-      await adapter.exec(`create table ex(id serial primary key)`);
-      await adapter.exec(`create table ex2(id serial primary key)`);
+      await adapter.execute(`create table ex(id serial primary key)`);
+      await adapter.execute(`create table ex2(id serial primary key)`);
       try {
         const correctDependRecord = [
           "'pg_class'::regclass",
@@ -371,22 +371,22 @@ describeIfPg("PostgreSQLAdapter", () => {
           "'a'",
         ];
 
-        await adapter.exec(
+        await adapter.execute(
           `DELETE FROM pg_depend WHERE objid = 'ex_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
         );
-        await adapter.exec(`INSERT INTO pg_depend VALUES(${collisionDependRecord.join(",")})`);
-        await adapter.exec(`INSERT INTO pg_depend VALUES(${correctDependRecord.join(",")})`);
+        await adapter.execute(`INSERT INTO pg_depend VALUES(${collisionDependRecord.join(",")})`);
+        await adapter.execute(`INSERT INTO pg_depend VALUES(${correctDependRecord.join(",")})`);
 
         const result = await adapter.pkAndSequenceFor("ex");
         expect(result).not.toBeNull();
         expect(result![1]).toEqual(new Name("public", "ex_id_seq"));
 
-        await adapter.exec(
+        await adapter.execute(
           `DELETE FROM pg_depend WHERE objid = 'ex2_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
         );
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
-        await adapter.exec(`DROP TABLE IF EXISTS ex2 CASCADE`);
+        await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
+        await adapter.execute(`DROP TABLE IF EXISTS ex2 CASCADE`);
       }
     });
 
@@ -699,7 +699,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const numberCol = cols.find((c) => c.name === "number")!;
           expect(numberCol.default).toBeNull();
           expect(numberCol.defaultFunction == null).toBe(true);
-          await adapter.exec(`INSERT INTO ex DEFAULT VALUES`);
+          await adapter.execute(`INSERT INTO ex DEFAULT VALUES`);
           const rows = await adapter.execute(`SELECT number FROM ex`);
           expect(Number(rows[0].number)).toBe(4);
         },
@@ -724,13 +724,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("extensions omits current schema name", async () => {
       await withExtensionDisabled(adapter, "hstore", async () => {
-        await adapter.exec(`CREATE SCHEMA IF NOT EXISTS customschema`);
+        await adapter.execute(`CREATE SCHEMA IF NOT EXISTS customschema`);
         try {
-          await adapter.exec(`CREATE EXTENSION hstore SCHEMA customschema`);
+          await adapter.execute(`CREATE EXTENSION hstore SCHEMA customschema`);
           const exts = await adapter.extensions();
           expect(exts).toContain("customschema.hstore");
         } finally {
-          await adapter.exec(`DROP SCHEMA IF EXISTS customschema CASCADE`);
+          await adapter.execute(`DROP SCHEMA IF EXISTS customschema CASCADE`);
         }
       });
     });
@@ -742,11 +742,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       const quotedCurrentSchema = currentSchemaRows[0].quoted_current_schema as string;
       await withExtensionDisabled(adapter, "hstore", async () => {
         try {
-          await adapter.exec(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
+          await adapter.execute(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
           const exts = await adapter.extensions();
           expect(exts).toContain("hstore");
         } finally {
-          await adapter.exec(`DROP EXTENSION IF EXISTS hstore`);
+          await adapter.execute(`DROP EXTENSION IF EXISTS hstore`);
         }
       });
     });
@@ -845,9 +845,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("date decoding enabled", async () => {
-      await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
+      await adapter.execute(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
       try {
-        await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
+        await adapter.execute(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
         const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
         const d = rows[0].d as Temporal.PlainDate;
         expect(d).toBeInstanceOf(Temporal.PlainDate);
@@ -855,7 +855,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(d.month).toBe(6);
         expect(d.day).toBe(15);
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS "ex_dates" CASCADE`);
+        await adapter.execute(`DROP TABLE IF EXISTS "ex_dates" CASCADE`);
       }
     });
 
@@ -864,12 +864,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       PostgreSQLAdapter.decodeDates = false;
       const localAdapter = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        await localAdapter.exec(`CREATE TABLE "ex_dates_off" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
-        await localAdapter.exec(`INSERT INTO "ex_dates_off" ("d") VALUES ('2024-01-01')`);
+        await localAdapter.execute(
+          `CREATE TABLE "ex_dates_off" ("id" SERIAL PRIMARY KEY, "d" DATE)`,
+        );
+        await localAdapter.execute(`INSERT INTO "ex_dates_off" ("d") VALUES ('2024-01-01')`);
         const rows = await localAdapter.execute(`SELECT "d" FROM "ex_dates_off"`);
         expect(rows[0].d).toBe("2024-01-01");
       } finally {
-        await localAdapter.exec(`DROP TABLE IF EXISTS "ex_dates_off"`);
+        await localAdapter.execute(`DROP TABLE IF EXISTS "ex_dates_off"`);
         await localAdapter.close();
         PostgreSQLAdapter.decodeDates = saved;
       }
@@ -877,14 +879,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("disable extension with schema", async () => {
       await withExtensionDisabled(adapter, "hstore", async () => {
-        await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "custom_schema"`);
+        await adapter.execute(`CREATE SCHEMA IF NOT EXISTS "custom_schema"`);
         try {
-          await adapter.exec(`CREATE EXTENSION "hstore" SCHEMA custom_schema`);
+          await adapter.execute(`CREATE EXTENSION "hstore" SCHEMA custom_schema`);
           expect(await adapter.extensions()).toContain("custom_schema.hstore");
           await adapter.disableExtension("custom_schema.hstore");
           expect(await adapter.extensions()).not.toContain("custom_schema.hstore");
         } finally {
-          await adapter.exec(`DROP SCHEMA IF EXISTS "custom_schema" CASCADE`);
+          await adapter.execute(`DROP SCHEMA IF EXISTS "custom_schema" CASCADE`);
         }
       });
     });

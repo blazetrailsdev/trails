@@ -21,8 +21,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
+    await adapter.execute(`
       CREATE TABLE "postgresql_timestamps" (
         "id" SERIAL PRIMARY KEY,
         "created_at" timestamp without time zone,
@@ -33,7 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
+    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
   });
 
   describe("PostgreSQLTimestampTest", () => {
@@ -293,8 +293,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
       }
-      await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
-      await adapter.exec(
+      await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
+      await adapter.execute(
         `CREATE TABLE ts_infinity_dev (id serial primary key, updated_at timestamp)`,
       );
       try {
@@ -310,7 +310,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(timestamps).toContain(DateInfinity);
         expect(timestamps).toContain(DateNegativeInfinity);
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
+        await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
       }
     });
     it("save infinity and beyond", async () => {
@@ -321,8 +321,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("name", "string");
         }
       }
-      await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
-      await adapter.exec(
+      await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
+      await adapter.execute(
         `CREATE TABLE ts_infinity_dev (id serial primary key, name varchar, updated_at timestamp)`,
       );
       try {
@@ -338,7 +338,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         })) as { updated_at: unknown };
         expect(neg.updated_at).toBe(DateNegativeInfinity);
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
+        await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
       }
     });
     it("bc timestamp", async () => {
@@ -400,7 +400,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("adds column as custom type", async () => {
-      await adapter.exec(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
+      await adapter.execute(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
       await withNativeDatabaseTypeOverrides(
         { datetimes_as_enum: { name: "custom_time_format" } },
         () =>

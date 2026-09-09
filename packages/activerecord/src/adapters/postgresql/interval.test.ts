@@ -37,8 +37,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS interval_data_types`);
+    await adapter.execute(`
       CREATE TABLE interval_data_types (
         id serial primary key,
         maximum_term interval,
@@ -60,7 +60,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
+    await adapter.execute(`DROP TABLE IF EXISTS interval_data_types`);
     void IntervalDataType.resetColumnInformation();
   });
 

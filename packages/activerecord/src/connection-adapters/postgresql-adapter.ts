@@ -1265,17 +1265,6 @@ export class PostgreSQLAdapter
     }
   }
 
-  async exec(sql: string): Promise<void> {
-    await this.withRawConnection({}, async (conn) => {
-      const client = conn as unknown as pg.Client;
-      try {
-        await client.query(sql);
-      } catch (e) {
-        throw this.translateExceptionClass(e, sql, []);
-      }
-    });
-  }
-
   async close(): Promise<void> {
     void this._statements.reset();
     this._client = null;

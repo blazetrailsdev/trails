@@ -15,12 +15,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTransactionTest", () => {
     beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}`);
-      await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${SAMPLES}`);
+      await adapter.execute(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
       await adapter.execute(`INSERT INTO ${SAMPLES} VALUES (1, 0), (2, 0)`);
     });
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${SAMPLES}`);
     });
 
     it("raises SerializationFailure when a serialization failure occurs", async () => {

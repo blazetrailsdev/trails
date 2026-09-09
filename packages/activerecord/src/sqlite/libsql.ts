@@ -10,6 +10,7 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
+  SQLite3Constants,
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
@@ -124,13 +125,25 @@ export interface SyncableSqliteConnection extends SqliteConnection {
 }
 
 /** @internal */
+function sharedCacheDatabase(config: SqliteOpenConfig): string {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
+  if (config.database.startsWith("file:")) {
+    const hash = config.database.indexOf("#");
+    const body = hash === -1 ? config.database : config.database.slice(0, hash);
+    const fragment = hash === -1 ? "" : config.database.slice(hash);
+    return `${body}${body.includes("?") ? "&" : "?"}cache=shared${fragment}`;
+  }
+  return `file:${config.database}?cache=shared`;
+}
+
+/** @internal */
 function openDatabase(config: SqliteOpenConfig): Database.Database {
   const opts: Database.Options = {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  return new Database(config.database, opts);
+  return new Database(sharedCacheDatabase(config), opts);
 }
 
 export function isRemoteLibsqlUrl(url: string): boolean {
@@ -145,6 +158,11 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+    throw new ConfigurationError(
+      "SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver",
+    );
+  }
   const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   return new Database(config.database, opts);

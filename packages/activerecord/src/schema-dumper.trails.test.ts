@@ -7,7 +7,10 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { ValueType } from "@blazetrails/activemodel";
 import { Column } from "./connection-adapters/column.js";
 import { SqlTypeMetadata } from "./connection-adapters/sql-type-metadata.js";
-import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import {
+  CheckConstraintDefinition,
+  ForeignKeyDefinition,
+} from "./connection-adapters/abstract/schema-definitions.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {
   return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }), true, {
@@ -236,7 +239,9 @@ describe("SchemaDumper trails-only cases", () => {
       tables: async () => ["products"],
       columns: async (_t: string) => [column("price", "decimal")],
       indexes: async () => [],
-      checkConstraints: async () => [{ expression: "price > 0", name: chkName }],
+      checkConstraints: async () => [
+        new CheckConstraintDefinition("products", "price > 0", { name: chkName }),
+      ],
     });
     const autoName = "chk_rails_abc123def4";
     const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");

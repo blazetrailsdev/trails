@@ -23,7 +23,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
+    await adapter.execute(`DROP TABLE IF EXISTS virtual_columns`);
     await adapter.createTable("virtual_columns", (t) => {
       t.string("name");
       t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });

@@ -23,8 +23,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("save infinity and beyond", async () => {
       const oidDate = new OidDate();
-      await adapter.exec("DROP TABLE IF EXISTS pg_dates_inf");
-      await adapter.exec("CREATE TABLE pg_dates_inf (id serial primary key, last_read date)");
+      await adapter.execute("DROP TABLE IF EXISTS pg_dates_inf");
+      await adapter.execute("CREATE TABLE pg_dates_inf (id serial primary key, last_read date)");
       try {
         const posStr = oidDate.serialize(DateInfinity)!;
         const negStr = oidDate.serialize(DateNegativeInfinity)!;
@@ -34,7 +34,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(rows[0].last_read).toBe(DateInfinity);
         expect(rows[1].last_read).toBe(DateNegativeInfinity);
       } finally {
-        await adapter.exec("DROP TABLE IF EXISTS pg_dates_inf");
+        await adapter.execute("DROP TABLE IF EXISTS pg_dates_inf");
       }
     });
 

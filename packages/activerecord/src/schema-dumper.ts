@@ -3,7 +3,10 @@ import type { Column } from "./connection-adapters/column.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
-import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import type {
+  CheckConstraintDefinition,
+  ForeignKeyDefinition,
+} from "./connection-adapters/abstract/schema-definitions.js";
 import type { ValueType } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
@@ -545,14 +548,11 @@ export abstract class SchemaDumper {
       | undefined;
     if (!host) return undefined;
     if (host.supportsCheckConstraints && !(await host.supportsCheckConstraints())) return undefined;
-    const checkConstraints = ((await host.checkConstraints(table)) ?? []) as {
-      expression: string;
-      name?: string;
-      validate?: boolean;
-    }[];
+    const checkConstraints = ((await host.checkConstraints(table)) ??
+      []) as CheckConstraintDefinition[];
     if (checkConstraints.length === 0) return undefined;
-    const checkValid = checkConstraints.filter((chk) => chk.validate !== false);
-    const checkInvalid = checkConstraints.filter((chk) => chk.validate === false);
+    const checkValid = checkConstraints.filter((chk) => chk.isValidate);
+    const checkInvalid = checkConstraints.filter((chk) => !chk.isValidate);
 
     if (checkValid.length > 0) {
       const checkConstraintStatements = checkValid.map((check) => {
@@ -763,16 +763,11 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
-    const parts: string[] = [JSON.stringify(check.expression)];
-    const chkIgnorePattern = (this.constructor as typeof SchemaDumper).chkIgnorePattern;
-    const exportName =
-      "isExportNameOnSchemaDump" in (check as object)
-        ? (check as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
-        : check.name != null && !statelessTest(chkIgnorePattern, check.name);
-    if (exportName && check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
-    if (check.validate === false) parts.push("validate: false");
-    return parts;
+  checkParts(check: CheckConstraintDefinition): string[] {
+    const checkParts: string[] = [JSON.stringify(check.expression)];
+    if (check.isExportNameOnSchemaDump) checkParts.push(`name: ${JSON.stringify(check.name)}`);
+    if (!check.isValidate) checkParts.push(`validate: ${JSON.stringify(check.isValidate)}`);
+    return checkParts;
   }
 
   /**

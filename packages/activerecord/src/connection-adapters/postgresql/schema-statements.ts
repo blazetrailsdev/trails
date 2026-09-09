@@ -62,7 +62,6 @@ export interface SchemaStatements
     Pick<
       PostgreSQLAdapter,
       | "clearCacheBang"
-      | "exec"
       | "extractDefaultFunction"
       | "extractValueFromDefault"
       | "databaseVersion"

@@ -43,7 +43,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("executeMutation caches the plan for INSERT (reuses on repeat)", async () => {
-      await adapter.exec(
+      await adapter.execute(
         `CREATE TABLE IF NOT EXISTS "sp_exec_mut" ("id" SERIAL PRIMARY KEY, "name" TEXT)`,
       );
       await adapter.beginDbTransaction();
@@ -68,7 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(pool.length).toBe(1);
       } finally {
         await adapter.rollbackDbTransaction();
-        await adapter.exec(`DROP TABLE IF EXISTS "sp_exec_mut"`);
+        await adapter.execute(`DROP TABLE IF EXISTS "sp_exec_mut"`);
       }
     });
 

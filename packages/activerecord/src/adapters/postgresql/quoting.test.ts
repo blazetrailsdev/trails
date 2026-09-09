@@ -15,8 +15,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     try {
-      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
-      await adapter.exec(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
+      await adapter.execute(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
+      await adapter.execute(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
     } catch {}
     await adapter.close();
   });
@@ -47,16 +47,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote column name", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test"`);
-      await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
+      await adapter.execute(`DROP TABLE IF EXISTS "quoting_test"`);
+      await adapter.execute(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
       const rows = await adapter.execute(`SELECT "select" FROM "quoting_test"`);
       expect(rows[0].select).toBe("works");
     });
 
     it("quote table name", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test"`);
-      await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      await adapter.execute(`DROP TABLE IF EXISTS "quoting_test"`);
+      await adapter.execute(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       const rows = await adapter.execute(`SELECT * FROM "quoting_test"`);
       expect(rows).toHaveLength(0);
     });
@@ -115,7 +115,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote table name with spaces", async () => {
-      await adapter.exec(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
       await adapter.executeMutation(`INSERT INTO "table with spaces" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
       expect(rows).toHaveLength(1);

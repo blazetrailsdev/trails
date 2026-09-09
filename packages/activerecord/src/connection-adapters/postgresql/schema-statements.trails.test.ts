@@ -20,19 +20,19 @@ function postgresUrl(): string {
 }
 
 async function setup(adapter: PostgreSQLAdapter) {
-  await adapter.exec(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA_NAME}`);
-  await adapter.exec(
+  await adapter.execute(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA_NAME}`);
+  await adapter.execute(
     `CREATE TABLE ${SCHEMA_NAME}.${TABLE_NAME} (
        id serial PRIMARY KEY,
        name character varying(50),
        email character varying(50)
      )`,
   );
-  await adapter.exec(`CREATE INDEX ${INDEX_A_NAME} ON ${SCHEMA_NAME}.${TABLE_NAME} (name)`);
+  await adapter.execute(`CREATE INDEX ${INDEX_A_NAME} ON ${SCHEMA_NAME}.${TABLE_NAME} (name)`);
 }
 
 async function teardown(adapter: PostgreSQLAdapter) {
-  await adapter.exec(`DROP SCHEMA IF EXISTS ${SCHEMA_NAME} CASCADE`);
+  await adapter.execute(`DROP SCHEMA IF EXISTS ${SCHEMA_NAME} CASCADE`);
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -125,10 +125,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("primary keys returns empty array for table without pk", async () => {
-      await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.no_pk (name text)`);
+      await adapter.execute(`CREATE TABLE ${SCHEMA_NAME}.no_pk (name text)`);
       const keys = await adapter.primaryKeys(`${SCHEMA_NAME}.no_pk`);
       expect(keys).toEqual([]);
-      await adapter.exec(`DROP TABLE ${SCHEMA_NAME}.no_pk`);
+      await adapter.execute(`DROP TABLE ${SCHEMA_NAME}.no_pk`);
     });
 
     it("serial sequence", async () => {
@@ -198,7 +198,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("table comment returns comment when set", async () => {
-      await adapter.exec(`COMMENT ON TABLE ${SCHEMA_NAME}.${TABLE_NAME} IS 'test comment'`);
+      await adapter.execute(`COMMENT ON TABLE ${SCHEMA_NAME}.${TABLE_NAME} IS 'test comment'`);
       const comment = await adapter.tableComment(`${SCHEMA_NAME}.${TABLE_NAME}`);
       expect(comment).toBe("test comment");
     });
@@ -219,13 +219,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("table options includes comment when set", async () => {
-      await adapter.exec(`COMMENT ON TABLE ${SCHEMA_NAME}.${TABLE_NAME} IS 'my table'`);
+      await adapter.execute(`COMMENT ON TABLE ${SCHEMA_NAME}.${TABLE_NAME} IS 'my table'`);
       const opts = await adapter.tableOptions(`${SCHEMA_NAME}.${TABLE_NAME}`);
       expect(opts.comment).toBe("my table");
     });
 
     it("drop table removes a table", async () => {
-      await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.tmp_drop_test (id int)`);
+      await adapter.execute(`CREATE TABLE ${SCHEMA_NAME}.tmp_drop_test (id int)`);
       await adapter.dropTable(`${SCHEMA_NAME}.tmp_drop_test`);
       const rows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.tables
@@ -243,8 +243,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("drop table with force cascade drops dependent constraints", async () => {
-      await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.parent_tbl (id int PRIMARY KEY)`);
-      await adapter.exec(
+      await adapter.execute(`CREATE TABLE ${SCHEMA_NAME}.parent_tbl (id int PRIMARY KEY)`);
+      await adapter.execute(
         `CREATE TABLE ${SCHEMA_NAME}.child_tbl (id int REFERENCES ${SCHEMA_NAME}.parent_tbl(id))`,
       );
       await expect(adapter.dropTable(`${SCHEMA_NAME}.parent_tbl`)).rejects.toThrow();
@@ -263,12 +263,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME],
       );
       expect(Number(fkRows.at(0)!.c)).toBe(0);
-      await adapter.exec(`DROP TABLE IF EXISTS ${SCHEMA_NAME}.child_tbl`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${SCHEMA_NAME}.child_tbl`);
     });
 
     it("drop table multiple tables", async () => {
-      await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.t1 (id int)`);
-      await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.t2 (id int)`);
+      await adapter.execute(`CREATE TABLE ${SCHEMA_NAME}.t1 (id int)`);
+      await adapter.execute(`CREATE TABLE ${SCHEMA_NAME}.t2 (id int)`);
       await adapter.dropTable(`${SCHEMA_NAME}.t1`, `${SCHEMA_NAME}.t2`);
       const rows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.tables
@@ -283,7 +283,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tmpDb = "trails_test_drop_db_tmp";
       const rootAdapter = new PostgreSQLAdapter(postgresUrl());
       try {
-        await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
+        await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
         const before = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
@@ -299,7 +299,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(after.length).toBe(0);
       } finally {
-        await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
+        await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.close();
       }
     });
@@ -308,7 +308,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tmpDb = "trails_test_recreate_tmp";
       const rootAdapter = new PostgreSQLAdapter(postgresUrl());
       try {
-        await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
+        await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
         const existsBefore = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
@@ -324,7 +324,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(existsAfter.length).toBe(1);
       } finally {
-        await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
+        await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.close();
       }
     });
@@ -339,7 +339,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME, TABLE_NAME],
       );
       expect(cols.toArray().map((r: Record<string, unknown>) => r.column_name)).toContain("score");
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS score`);
+      await adapter.execute(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS score`);
     });
 
     it("add column with comment", async () => {
@@ -356,7 +356,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         [TABLE_NAME, SCHEMA_NAME],
       );
       expect(rows.at(0)!.comment).toBe("user bio");
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS bio`);
+      await adapter.execute(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS bio`);
     });
 
     it("change column default", async () => {
@@ -369,7 +369,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME, TABLE_NAME],
       );
       expect(rows.at(0)!.column_default).toMatch(/5/);
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
+      await adapter.execute(
+        `ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`,
+      );
     });
 
     it("change column default with from/to object", async () => {
@@ -387,7 +389,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME, TABLE_NAME],
       );
       expect(rows.at(0)!.column_default).toMatch(/7/);
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
+      await adapter.execute(
+        `ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`,
+      );
     });
 
     it("change column default with a bare object treats it as a literal default", async () => {
@@ -400,7 +404,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME, TABLE_NAME],
       );
       expect(rows.at(0)!.column_default).toMatch(/"to":\s*1/);
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS config`);
+      await adapter.execute(
+        `ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS config`,
+      );
     });
 
     it("change column null", async () => {
@@ -413,7 +419,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         [SCHEMA_NAME, TABLE_NAME],
       );
       expect(rows.at(0)!.is_nullable).toBe("NO");
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS flag`);
+      await adapter.execute(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS flag`);
     });
 
     it("change column comment", async () => {

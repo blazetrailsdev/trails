@@ -25,9 +25,9 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
-    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.execute(`CREATE EXTENSION IF NOT EXISTS hstore`);
+    await adapter.execute(`
       CREATE TABLE pg_arrays (
         id serial primary key,
         tags character varying(255)[],
@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     ).internalSchemaCache.clearDataSourceCacheBang(null, "pg_arrays");
   });
   afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});
+    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});
   });
   describe("PostgresqlArrayTest", () => {
     it("column", async () => {
@@ -161,8 +161,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(decimalsLine).toMatch(/array: true/);
     });
     it("schema dump renders non-empty array defaults via the element type", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS pg_array_defaults`);
-      await adapter.exec(`
+      await adapter.execute(`DROP TABLE IF EXISTS pg_array_defaults`);
+      await adapter.execute(`
         CREATE TABLE pg_array_defaults (
           id serial primary key,
           ints integer[] DEFAULT '{4,4,2}',
@@ -178,7 +178,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(line("flags")).toMatch(/default: \[true, false\]/);
         expect(line("nums")).toMatch(/default: \["1\.5", "2\.5"\]/);
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS pg_array_defaults`).catch(() => {});
+        await adapter.execute(`DROP TABLE IF EXISTS pg_array_defaults`).catch(() => {});
       }
     });
     it("change column with array", async () => {

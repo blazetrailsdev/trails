@@ -16,8 +16,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
-    await adapter.exec(`
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
+    await adapter.execute(`
       CREATE TABLE postgresql_infinities (
         id serial primary key,
         "float" double precision,
@@ -27,7 +27,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     `);
   });
   afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
+    await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
     await adapter.close();
   });
   withTransactionalFixtures(() => adapter);
