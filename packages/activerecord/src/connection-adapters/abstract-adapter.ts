@@ -756,15 +756,13 @@ export class AbstractAdapter implements Quoting {
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
 
-  /**
-   * @missingRailsCall build_statement_pool — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
-   * @missingRailsCall fetch — PERMANENT
-   */
-  constructor(config?: unknown) {
+  /** @missingRailsCall fetch — PERMANENT */
+  constructor(configOrDeprecatedConnection?: unknown) {
     ensureAbstractAdapterMixinsApplied();
-    this._config = (config ?? {}) as Record<string, unknown>;
+    this._config = (configOrDeprecatedConnection ?? {}) as Record<string, unknown>;
     this.pool = new NullPool();
     this._visitor = this.arelVisitor();
+    this._statements = this.buildStatementPool() as StatementPool | null;
 
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&

@@ -193,7 +193,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  protected _statementLimit = 1000;
 
   tableAliasLength(): number {
     return mysqlTableAliasLength();
@@ -1429,7 +1428,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   buildStatementPool(): StatementPool {
     return new StatementPool(
-      AbstractMysqlAdapter.typeCastConfigToInteger(this._statementLimit) as number,
+      AbstractMysqlAdapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
   }
 }

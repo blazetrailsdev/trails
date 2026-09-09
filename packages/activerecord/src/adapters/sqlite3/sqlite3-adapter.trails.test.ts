@@ -149,24 +149,22 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(result[0]?.foreign_keys).toBe(0);
   });
 
-  it("warns and skips an invalid pragma name", async () => {
+  it("warns and skips a pragma SQLite does not define", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { "bad-name!": 1 } as Record<string, number>,
+      pragmas: { not_a_real_pragma: 1 } as Record<string, number>,
     });
     await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("invalid SQLite pragma name"),
-    );
+    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: not_a_real_pragma");
   });
 
-  it("warns and skips a string value with unsafe characters", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { synchronous: "FULL; DROP TABLE users" },
-    });
+  it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "cache_size",
+    ) as Array<{ cache_size: number }>;
+    expect(result[0]?.cache_size).toBe(2000);
   });
 });
 

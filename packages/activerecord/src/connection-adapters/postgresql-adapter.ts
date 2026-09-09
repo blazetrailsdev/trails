@@ -391,8 +391,6 @@ export class PostgreSQLAdapter
   private _discardedAcquireGenerations = new Set<number>();
   private _acquiring: Promise<pg.Client> | null = null;
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
-  /** @internal */
-  private _statementLimit = 1000;
 
   constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
   /** @deprecated */
@@ -448,7 +446,7 @@ export class PostgreSQLAdapter
       return;
     }
     const {
-      statementLimit,
+      statementLimit: _statementLimit,
       preparedStatements,
       insertReturning,
       advisoryLocks,
@@ -456,7 +454,6 @@ export class PostgreSQLAdapter
       variables,
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
-    if (statementLimit !== undefined) this._statementLimit = statementLimit;
     this._useInsertReturning =
       "insertReturning" in this._config
         ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
@@ -2254,7 +2251,7 @@ export class PostgreSQLAdapter
   buildStatementPool(): StatementPool {
     return new StatementPool(
       this,
-      PostgreSQLAdapter.typeCastConfigToInteger(this._statementLimit) as number,
+      PostgreSQLAdapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
   }
 

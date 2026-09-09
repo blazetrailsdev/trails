@@ -116,6 +116,18 @@ function isStructuredDefault(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
+function pragmaNames(result: unknown): ReadonlySet<string> | null {
+  const rows = (result ?? []) as Array<{ name?: unknown }>;
+  if (rows.length === 0) return null;
+  return new Set(rows.map((row) => String(row.name)));
+}
+
+function pragmaValue(value: string | number | boolean): string {
+  if (typeof value === "boolean") return value ? "1" : "0";
+  if (typeof value === "number") return String(value);
+  return value.startsWith(":") ? value.slice(1) : value;
+}
+
 function _isSqliteMissingDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: unknown; message?: unknown };
@@ -214,8 +226,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _memoryDatabase: boolean;
   private _filename: string;
   /** @internal */
-  private _statementLimit = 1000;
-  override _statements = this.buildStatementPool();
+  declare _statements: StatementPool;
 
   /** @internal */
   get _strictStrings(): boolean {
@@ -252,10 +263,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._filename = filename;
     this._readonly = options.readonly ?? false;
     this._strict = strict;
-    if (options.statementLimit !== undefined) {
-      this._statementLimit = options.statementLimit;
-      this._statements = this.buildStatementPool();
-    }
     this._asyncConnectPending = this.driverIsAsync();
   }
 
@@ -661,6 +668,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     json: { name: "json" },
   };
 
+  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
+    foreign_keys: true,
+    journal_mode: ":wal",
+    synchronous: ":normal",
+    mmap_size: 134217728,
+    journal_size_limit: 67108864,
+    cache_size: 2000,
+  };
+
   nativeDatabaseTypes(): NativeDatabaseTypes {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
@@ -703,15 +719,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       throw new Error(
         `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
-    }
-  }
-
-  static override async databaseExists(config: { database?: string }): Promise<boolean> {
-    if (!config.database || config.database === ":memory:") return true;
-    try {
-      return File.isExist(config.database);
-    } catch {
-      return false;
     }
   }
 
@@ -1469,7 +1476,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   override buildStatementPool(): StatementPool {
     return new StatementPool(
-      SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
+      SQLite3Adapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
   }
 
@@ -1634,17 +1641,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const checked = super.configureConnection();
 
     const stmts: [string, string][] = [];
-    if (!this._readonly) {
-      const defaults: [string, string][] = [
-        ["foreign_keys", "ON"],
-        ["journal_mode", "WAL"],
-        ["synchronous", "NORMAL"],
-        ["mmap_size", "134217728"],
-        ["journal_size_limit", "67108864"],
-        ["cache_size", "2000"],
-      ];
-      for (const [p, v] of defaults) stmts.push([`${p} = ${v}`, `SQLite default pragma '${p}'`]);
-    }
     const dqsValue = this._strict ? "OFF" : "ON";
     stmts.push(
       [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
@@ -1655,33 +1651,24 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       "pragmas",
       {},
     );
-    const SAFE = /^\w+$/;
-    for (const [pragma, value] of Object.entries(pragmas)) {
-      if (!SAFE.test(pragma)) {
-        console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
-        continue;
+    const applyPragmas = (known: ReadonlySet<string> | null): void => {
+      for (const [pragma, value] of Object.entries({
+        ...SQLite3Adapter.DEFAULT_PRAGMAS,
+        ...pragmas,
+      })) {
+        if (known !== null && !known.has(pragma)) {
+          console.warn(`Unknown SQLite pragma: ${pragma}`);
+          continue;
+        }
+        stmts.push([`${pragma} = ${pragmaValue(value)}`, `SQLite pragma '${pragma}'`]);
       }
-      const scalar =
-        typeof value === "boolean"
-          ? value
-            ? "1"
-            : "0"
-          : typeof value === "number"
-            ? String(value)
-            : SAFE.test(value)
-              ? value
-              : null;
-      if (scalar === null) {
-        console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
-        continue;
-      }
-      stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
-    }
+    };
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
     if (this.driverIsAsync()) {
       return (async () => {
         await checked;
+        applyPragmas(pragmaNames(await this._rawConnection.pragma("pragma_list")));
         for (const [sql, label] of stmts) {
           try {
             await this._rawConnection.pragma(sql);
@@ -1691,6 +1678,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         }
       })();
     }
+    applyPragmas(pragmaNames(this._rawConnection.pragma("pragma_list")));
     for (const [sql, label] of stmts) {
       try {
         this._rawConnection.pragma(sql);
