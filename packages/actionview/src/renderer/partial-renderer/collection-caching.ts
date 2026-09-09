@@ -4,20 +4,13 @@ import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
-import type { Template } from "../../template.js";
-import type { RenderedTemplate, RenderOptions } from "../abstract-renderer.js";
-
-/** @internal */
-export interface CollectionIterator {
-  [Symbol.iterator](): Iterator<unknown>;
-  preloadBang(): void;
-  fromCollection(collection: unknown[]): CollectionIterator;
-}
+import type { SameCollectionIterator } from "../collection-renderer.js";
+import type { RenderableTemplate, RenderedTemplate, RenderOptions } from "../abstract-renderer.js";
 
 /** @internal */
 export interface CollectionCachingView {
   controller: { performCaching?: boolean };
-  digestPathFromTemplate(template: Template): string;
+  digestPathFromTemplate(template: RenderableTemplate): string;
   cacheFragmentName(name: unknown, options: { digestPath?: string | null }): unknown;
   combinedFragmentCacheKey(key: unknown): unknown[];
 }
@@ -25,7 +18,7 @@ export interface CollectionCachingView {
 /** @internal */
 export interface CollectionCachingHost {
   readonly options: RenderOptions;
-  buildRenderedTemplate(content: string, template: Template | null): RenderedTemplate;
+  buildRenderedTemplate(content: string, template: RenderableTemplate | null): RenderedTemplate;
 }
 
 /** @internal */
@@ -61,9 +54,9 @@ export async function cacheCollectionRender(
   this: CollectionCachingHost,
   instrumentationPayload: Record<string, unknown>,
   view: CollectionCachingView,
-  template: Template,
-  collection: CollectionIterator,
-  block: (collection: CollectionIterator) => Promise<RenderedTemplate[]>,
+  template: RenderableTemplate,
+  collection: SameCollectionIterator,
+  block: (collection: SameCollectionIterator) => Promise<RenderedTemplate[]>,
 ): Promise<RenderedTemplate[]> {
   if (!isWillCache.call(this, this.options, view)) return block(collection);
 
@@ -107,8 +100,8 @@ export function isCallableCacheKey(this: CollectionCachingHost): boolean {
 export function collectionByCacheKeys(
   this: CollectionCachingHost,
   view: CollectionCachingView,
-  template: Template,
-  collection: CollectionIterator,
+  template: RenderableTemplate,
+  collection: SameCollectionIterator,
 ): [Map<string, unknown>, string[]] {
   const seed = isCallableCacheKey.call(this)
     ? (this.options.cached as (i: unknown) => unknown)
@@ -119,11 +112,11 @@ export function collectionByCacheKeys(
 
   const hash = new Map<string, unknown>();
   const orderedKeys: string[] = [];
-  for (const item of collection) {
+  collection.each((item) => {
     const key = expandedCacheKey.call(this, seed(item), view, template, digestPath);
     orderedKeys.push(key);
     hash.set(key, item);
-  }
+  });
   return [hash, orderedKeys];
 }
 
@@ -132,7 +125,7 @@ export function expandedCacheKey(
   this: CollectionCachingHost,
   key: unknown,
   view: CollectionCachingView,
-  template: Template,
+  template: RenderableTemplate,
   digestPath: string,
 ): string {
   return expandCacheKey(view.combinedFragmentCacheKey(view.cacheFragmentName(key, { digestPath })));
@@ -142,7 +135,7 @@ export function expandedCacheKey(
 export function fetchOrCachePartial(
   this: CollectionCachingHost,
   cachedPartials: Record<string, unknown>,
-  template: Template,
+  template: RenderableTemplate,
   { orderBy }: { orderBy: string[] },
   block: () => RenderedTemplate,
 ): Map<string, RenderedTemplate> {

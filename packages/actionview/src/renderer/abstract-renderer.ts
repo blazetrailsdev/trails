@@ -9,7 +9,12 @@ export interface RenderableTemplate {
   readonly format: string | null;
   readonly variable?: string | null;
   readonly virtualPath?: string | null;
-  render(view: ViewContext, locals: Record<string, unknown>): string | Promise<string>;
+  render(
+    view: ViewContext,
+    locals: Record<string, unknown>,
+    buffer?: unknown,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+  ): string | Promise<string>;
 }
 
 export interface ViewContext {

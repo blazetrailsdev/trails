@@ -129,13 +129,14 @@ describe("CollectionRenderer", () => {
   });
 
   it("returns empty body for an empty collection", async () => {
+    vi.spyOn(lc, "findAll").mockReturnValue([makeFakeTemplate()]);
     const result = await new CollectionRenderer(lc).renderCollectionWithPartial(
       [],
       "users/user",
       ctx,
       undefined,
     );
-    expect(result.body).toBe("");
+    expect(result.body).toBeNull();
   });
 
   it("exposes ${as}_counter and ${as}_iteration locals", async () => {
@@ -187,7 +188,7 @@ describe("CollectionRenderer", () => {
       .mockResolvedValueOnce("B");
     const spacerTmpl = makeFakeTemplate("|");
     vi.spyOn(lc, "findAll").mockImplementation((name) => [
-      name === "users/spacer" ? spacerTmpl : itemTmpl,
+      name === "spacer" ? spacerTmpl : itemTmpl,
     ]);
     const result = await new CollectionRenderer(lc, {
       spacerTemplate: "spacer",
@@ -214,11 +215,11 @@ describe("CollectionRenderer", () => {
 describe("PartialIteration", () => {
   it("tracks index, first, and last", () => {
     const iter = new PartialIteration(3);
-    expect(iter.first).toBe(true);
-    expect(iter.last).toBe(false);
-    iter.iterate();
+    expect(iter.isFirst()).toBe(true);
+    expect(iter.isLast()).toBe(false);
+    iter.iterateBang();
     expect(iter.index).toBe(1);
-    iter.iterate();
-    expect(iter.last).toBe(true);
+    iter.iterateBang();
+    expect(iter.isLast()).toBe(true);
   });
 });

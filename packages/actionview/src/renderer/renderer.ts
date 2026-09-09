@@ -1,6 +1,6 @@
 import type { LookupContext } from "../lookup-context.js";
 import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
-import { RenderedTemplate } from "./abstract-renderer.js";
+import { EmptyCollection, RenderedCollection, RenderedTemplate } from "./abstract-renderer.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import { PartialRenderer } from "./partial-renderer.js";
 import { ObjectRenderer } from "./object-renderer.js";
@@ -18,11 +18,14 @@ export class Renderer {
   }
 
   async render(context: ViewContext, options: RenderOptions): Promise<string> {
-    return (await this.renderToObject(context, options)).body;
+    return (await this.renderToObject(context, options)).body as string;
   }
 
   /** @internal */
-  async renderToObject(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
+  async renderToObject(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
@@ -45,7 +48,7 @@ export class Renderer {
     options: RenderOptions,
     block?: unknown,
   ): Promise<string> {
-    return (await this.renderPartialToObject(context, options, block)).body;
+    return (await this.renderPartialToObject(context, options, block)).body as string;
   }
 
   cacheHits: Record<string, unknown> = {};
@@ -61,7 +64,11 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: unknown,
-  ): RenderedTemplate | Promise<RenderedTemplate> {
+  ):
+    | RenderedTemplate
+    | RenderedCollection
+    | EmptyCollection
+    | Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
     const partial = options.partial;
 
     if (typeof partial === "string") {

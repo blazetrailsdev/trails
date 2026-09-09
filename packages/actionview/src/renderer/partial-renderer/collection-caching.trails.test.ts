@@ -1,16 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { MemoryStore } from "@blazetrails/activesupport";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { MemoryStore, Notifications } from "@blazetrails/activesupport";
 
-import { RenderedTemplate } from "../abstract-renderer.js";
-import type { RenderOptions } from "../abstract-renderer.js";
+import { LookupContext } from "../../lookup-context.js";
+import { CollectionRenderer } from "../collection-renderer.js";
 import { PartialRenderer } from "../partial-renderer.js";
-import type { Template } from "../../template.js";
-import {
-  cacheCollectionRender,
-  collectionCache,
-  setCollectionCache,
-} from "./collection-caching.js";
-import type { CollectionCachingHost, CollectionIterator } from "./collection-caching.js";
+import type { RenderableTemplate, ViewContext } from "../abstract-renderer.js";
+import { collectionCache, setCollectionCache } from "./collection-caching.js";
 
 class RecordingStore extends MemoryStore {
   readMultiCalls = 0;
@@ -27,45 +22,41 @@ class RecordingStore extends MemoryStore {
   }
 }
 
-class ArrayIterator implements CollectionIterator {
-  constructor(private readonly collection: unknown[]) {}
-  [Symbol.iterator](): Iterator<unknown> {
-    return this.collection[Symbol.iterator]();
-  }
-  preloadBang(): void {}
-  fromCollection(collection: unknown[]): CollectionIterator {
-    return new ArrayIterator(collection);
-  }
-}
-
-const template = { virtualPath: "customers/_customer", format: "html" } as unknown as Template;
-
-function buildView(digest: string) {
+function buildView(digest = "abc"): ViewContext {
   return {
     controller: { performCaching: true },
-    digestPathFromTemplate: (t: Template) => `${t.virtualPath}:${digest}`,
+    digestPathFromTemplate: (t: RenderableTemplate) => `${t.virtualPath}:${digest}`,
     cacheFragmentName: (name: unknown, { digestPath }: { digestPath?: string | null }) => [
       digestPath,
       name,
     ],
     combinedFragmentCacheKey: (key: unknown) => [":views", key],
-  };
+  } as unknown as ViewContext;
 }
 
-function buildHost(options: RenderOptions): CollectionCachingHost {
+function buildTemplate(bodies: string[]): RenderableTemplate {
+  const render = vi.fn();
+  for (const body of bodies) render.mockResolvedValueOnce(body);
   return {
-    options,
-    buildRenderedTemplate: (content, tmpl) =>
-      new RenderedTemplate(content, tmpl as unknown as null),
+    identifier: "customers/_customer.html.tse",
+    format: "html",
+    virtualPath: "customers/_customer",
+    render,
   };
 }
 
 describe("CollectionCaching", () => {
   let store: RecordingStore;
+  let lc: LookupContext;
 
   beforeEach(() => {
     store = new RecordingStore();
     setCollectionCache(store);
+    lc = new LookupContext();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("is mixed into PartialRenderer at Rails' site", () => {
@@ -74,87 +65,103 @@ describe("CollectionCaching", () => {
   });
 
   it("reads the whole collection in one multi-read and writes the misses in one multi-write", async () => {
-    const host = buildHost({ cached: true });
-    const collection = new ArrayIterator(["david", "mary"]);
-    const payload: Record<string, unknown> = {};
+    vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>", "<mary>"])] as never);
 
-    const rendered = await cacheCollectionRender.call(
-      host,
-      payload,
-      buildView("abc"),
-      template,
-      collection,
-      async (filtered) => [...filtered].map((o) => new RenderedTemplate(`<${o}>`, null)),
-    );
+    const rendered = await new CollectionRenderer(lc, {
+      cached: true,
+    }).renderCollectionWithPartial(["david", "mary"], "customers/customer", buildView(), undefined);
 
     expect(store.readMultiCalls).toBe(1);
     expect(store.writeMultiCalls).toBe(1);
-    expect(payload["cache_hits"]).toBe(0);
-    expect(rendered.map((r) => r.body)).toEqual(["<david>", "<mary>"]);
+    expect(rendered.body).toBe("<david><mary>");
   });
 
-  it("serves a second render from the cache, in the collection's order", async () => {
-    const host = buildHost({ cached: true });
-    const payload: Record<string, unknown> = {};
-    const render = (payloadOut: Record<string, unknown>) =>
-      cacheCollectionRender.call(
-        host,
-        payloadOut,
-        buildView("abc"),
+  it("serves a second render from the cache without re-rendering the partial", async () => {
+    const render = () => {
+      const template = buildTemplate(["<david>", "<mary>"]);
+      vi.spyOn(lc, "findAll").mockReturnValue([template] as never);
+      return {
         template,
-        new ArrayIterator(["david", "mary"]),
-        async (filtered) => [...filtered].map((o) => new RenderedTemplate(`<${o}>`, null)),
-      );
+        result: new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
+          ["david", "mary"],
+          "customers/customer",
+          buildView(),
+          undefined,
+        ),
+      };
+    };
 
-    await render({});
-    const rendered = await render(payload);
+    await render().result;
+    const second = render();
+    const rendered = await second.result;
 
-    expect(payload["cache_hits"]).toBe(2);
-    expect(store.writeMultiCalls).toBe(1);
-    expect(rendered.map((r) => r.body)).toEqual(["<david>", "<mary>"]);
+    expect(second.template.render).not.toHaveBeenCalled();
+    expect(rendered.body).toBe("<david><mary>");
   });
 
   it("keys on the template digest, so a changed partial misses the cache", async () => {
-    const host = buildHost({ cached: true });
-
-    const first = await cacheCollectionRender.call(
-      host,
-      {},
+    const first = buildTemplate(["<old>"]);
+    vi.spyOn(lc, "findAll").mockReturnValue([first] as never);
+    await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
+      ["david"],
+      "customers/customer",
       buildView("abc"),
-      template,
-      new ArrayIterator(["david"]),
-      async () => [new RenderedTemplate("<old>", null)],
-    );
-    const payload: Record<string, unknown> = {};
-    const second = await cacheCollectionRender.call(
-      host,
-      payload,
-      buildView("def"),
-      template,
-      new ArrayIterator(["david"]),
-      async () => [new RenderedTemplate("<new>", null)],
+      undefined,
     );
 
-    expect(first.map((r) => r.body)).toEqual(["<old>"]);
-    expect(payload["cache_hits"]).toBe(0);
-    expect(second.map((r) => r.body)).toEqual(["<new>"]);
+    const second = buildTemplate(["<new>"]);
+    vi.spyOn(lc, "findAll").mockReturnValue([second] as never);
+    const rendered = await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
+      ["david"],
+      "customers/customer",
+      buildView("def"),
+      undefined,
+    );
+
+    expect(second.render).toHaveBeenCalledTimes(1);
+    expect(rendered.body).toBe("<new>");
   });
 
   it("renders without touching the cache when the controller is not caching", async () => {
-    const host = buildHost({ cached: true });
-    const view = buildView("abc");
+    vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>"])] as never);
+    const view = buildView() as unknown as { controller: { performCaching: boolean } };
     view.controller.performCaching = false;
 
-    const rendered = await cacheCollectionRender.call(
-      host,
-      {},
-      view,
-      template,
-      new ArrayIterator(["david"]),
-      async () => [new RenderedTemplate("<david>", null)],
+    const rendered = await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
+      ["david"],
+      "customers/customer",
+      view as unknown as ViewContext,
+      undefined,
     );
 
     expect(store.readMultiCalls).toBe(0);
-    expect(rendered.map((r) => r.body)).toEqual(["<david>"]);
+    expect(rendered.body).toBe("<david>");
+  });
+
+  it("instruments render_collection.action_view with Rails' payload", async () => {
+    const events: Record<string, unknown>[] = [];
+    const subscription = Notifications.subscribe("render_collection.action_view", (event) => {
+      events.push(event.payload);
+    });
+
+    try {
+      vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>", "<mary>"])] as never);
+      await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
+        ["david", "mary"],
+        "customers/customer",
+        buildView(),
+        undefined,
+      );
+    } finally {
+      Notifications.unsubscribe(subscription);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      identifier: "customers/_customer.html.tse",
+      layout: null,
+      count: 2,
+      cache_hits: 0,
+    });
   });
 });
