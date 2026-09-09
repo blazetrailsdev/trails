@@ -498,7 +498,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(tableName);
+      binds.push(this.quoteTableName(tableName));
       tableCondition = `t.oid = to_regclass($1)`;
     }
 

@@ -72,8 +72,8 @@ describe("ConnectionPool#server_version", () => {
       },
     } as unknown as AbstractAdapter;
 
-    expect(String(await pool.serverVersion(connection))).toBe("8.0.35");
-    expect(fetches).toBe(2);
+    await expect(pool.serverVersion(connection)).rejects.toThrow("deadlock; recursive locking");
+    expect(fetches).toBe(1);
   }, 5000);
 
   it("two concurrent first callers issue one get_database_version", async () => {

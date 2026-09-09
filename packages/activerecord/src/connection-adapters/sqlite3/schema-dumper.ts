@@ -23,7 +23,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === "integer";
+    return this.schemaType(column) === ":integer";
   }
 
   /** @internal */
@@ -37,7 +37,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (column.isVirtual()) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = column.isVirtualStored();
-      return { type: JSON.stringify(this.schemaType(column)), ...spec };
+      return { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")), ...spec };
     }
     return spec;
   }

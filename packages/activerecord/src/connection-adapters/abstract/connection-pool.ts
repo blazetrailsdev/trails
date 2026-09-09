@@ -1,4 +1,4 @@
-import { Monitor } from "@blazetrails/activesupport";
+import { Mutex } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import {
@@ -62,7 +62,7 @@ export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 
-  private readonly _mutex = new Monitor();
+  private readonly _mutex = new Mutex();
   private _serverVersion: unknown = null;
   private _schemaReflection: SchemaReflection | null = null;
 

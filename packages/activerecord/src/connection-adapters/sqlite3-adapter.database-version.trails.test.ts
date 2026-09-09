@@ -25,6 +25,7 @@ describe("SQLite3Adapter database version", () => {
       }
     }
     adapter = new QueryValueVersionAdapter({ database: ":memory:" });
+    await adapter.verifyBang();
     const holder = adapter.lock.synchronize(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       return String(await adapter!.databaseVersion);

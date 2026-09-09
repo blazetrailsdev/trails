@@ -118,7 +118,7 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
         },
       ),
     );
-    expect(type).toBe("datetime");
+    expect(type).toBe(":datetime");
     const text = dumper.formatColspec(spec);
     expect(text).toContain("precision: null");
     expect(text).toContain("null: false");

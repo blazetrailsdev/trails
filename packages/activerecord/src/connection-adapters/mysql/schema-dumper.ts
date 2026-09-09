@@ -57,16 +57,22 @@ export class SchemaDumper extends AbstractSchemaDumper {
       if (/\b(?:STORED|PERSISTENT)\b/i.test(column.extra ?? "")) spec["stored"] = "true";
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(spec, { type: JSON.stringify(this.schemaType(column)) }, rest);
+      Object.assign(
+        spec,
+        { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")) },
+        rest,
+      );
     }
 
     return spec;
   }
 
   /** @internal */
-  protected override columnSpecForPrimaryKey(column: MysqlColumn): Record<string, unknown> {
+  protected override columnSpecForPrimaryKey(
+    column: MysqlColumn | undefined,
+  ): Record<string, unknown> {
     const spec = super.columnSpecForPrimaryKey(column);
-    if (column.type === "integer" && column.isAutoIncrement()) delete spec["autoIncrement"];
+    if (column!.type === "integer" && column!.isAutoIncrement()) delete spec["autoIncrement"];
     return spec;
   }
 
@@ -84,9 +90,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaType(column: MysqlColumn): string {
     const sqlType = (column.sqlType ?? "").toLowerCase();
-    if (/^timestamp\b/.test(sqlType)) return "timestamp";
+    if (/^timestamp\b/.test(sqlType)) return ":timestamp";
     if (/^(?:enum|set)\b/.test(sqlType)) return column.sqlType ?? sqlType;
-    if (/^bigint\b/.test(sqlType)) return "bigint";
+    if (/^bigint\b/.test(sqlType)) return ":bigint";
     return super.schemaType(column);
   }
 

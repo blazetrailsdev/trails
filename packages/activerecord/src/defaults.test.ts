@@ -6,9 +6,8 @@ import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
-import { isMariaDb, MYSQL_TEST_URL } from "./support/mysql-server-version.js";
+import { isMariaDb } from "./support/mysql-server-version.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
@@ -333,7 +332,14 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
     strict: boolean,
     fn: (klass: typeof Base) => Promise<void>,
   ): Promise<void> {
-    const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict });
+    class TestMysqlNotNullDefault extends Base {
+      static override tableName = "test_mysql_not_null_defaults";
+    }
+    await TestMysqlNotNullDefault.establishConnection({
+      ...Base.connectionDbConfig().configurationHash,
+      strict,
+    } as Parameters<typeof TestMysqlNotNullDefault.establishConnection>[0]);
+    const adapter = await TestMysqlNotNullDefault.leaseConnection();
     try {
       await adapter.createTable("test_mysql_not_null_defaults", { force: true }, (t: any) => {
         t.integer("non_null_integer", { null: false });
@@ -341,15 +347,11 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
         t.text("non_null_text", { null: false });
         t.blob("non_null_blob", { null: false });
       });
-      class TestMysqlNotNullDefault extends Base {
-        static override tableName = "test_mysql_not_null_defaults";
-      }
-      TestMysqlNotNullDefault.adapter = adapter;
       await TestMysqlNotNullDefault.loadSchema();
       await fn(TestMysqlNotNullDefault);
     } finally {
       await adapter.dropTable("test_mysql_not_null_defaults", { ifExists: true });
-      await adapter.close();
+      await TestMysqlNotNullDefault.removeConnection();
     }
   }
 

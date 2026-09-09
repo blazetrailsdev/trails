@@ -1,15 +1,3 @@
-export function createSavepointSql(name: string | null): string {
-  return `SAVEPOINT ${name ?? ""}`;
-}
-
-export function execRollbackToSavepointSql(name: string | null): string {
-  return `ROLLBACK TO SAVEPOINT ${name ?? ""}`;
-}
-
-export function releaseSavepointSql(name: string | null): string {
-  return `RELEASE SAVEPOINT ${name ?? ""}`;
-}
-
 export interface SavepointHost {
   internalExecute(
     sql: string,
@@ -28,19 +16,25 @@ export function currentSavepointName(this: CurrentSavepointNameHost): string | n
   return this.currentTransaction().savepointName;
 }
 
-export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(createSavepointSql(spName), "TRANSACTION");
+export async function createSavepoint(
+  this: SavepointHost,
+  name: string | null = this.currentSavepointName(),
+): Promise<void> {
+  await this.internalExecute(`SAVEPOINT ${name ?? ""}`, "TRANSACTION");
 }
 
-export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION");
+export async function execRollbackToSavepoint(
+  this: SavepointHost,
+  name: string | null = this.currentSavepointName(),
+): Promise<void> {
+  await this.internalExecute(`ROLLBACK TO SAVEPOINT ${name ?? ""}`, "TRANSACTION");
 }
 
-export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION");
+export async function releaseSavepoint(
+  this: SavepointHost,
+  name: string | null = this.currentSavepointName(),
+): Promise<void> {
+  await this.internalExecute(`RELEASE SAVEPOINT ${name ?? ""}`, "TRANSACTION");
 }
 
 export const Savepoints = {

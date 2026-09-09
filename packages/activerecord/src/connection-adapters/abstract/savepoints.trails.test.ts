@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   currentSavepointName,
-  createSavepointSql,
-  execRollbackToSavepointSql,
-  releaseSavepointSql,
   createSavepoint,
   execRollbackToSavepoint,
   releaseSavepoint,
@@ -17,28 +14,6 @@ describe("Savepoints", () => {
 
     const nullHost = { currentTransaction: () => ({ savepointName: null }) };
     expect(currentSavepointName.call(nullHost)).toBeNull();
-  });
-
-  describe("SQL generation", () => {
-    it("createSavepointSql", () => {
-      expect(createSavepointSql("active_record_1")).toBe("SAVEPOINT active_record_1");
-    });
-
-    it("execRollbackToSavepointSql", () => {
-      expect(execRollbackToSavepointSql("active_record_1")).toBe(
-        "ROLLBACK TO SAVEPOINT active_record_1",
-      );
-    });
-
-    it("releaseSavepointSql", () => {
-      expect(releaseSavepointSql("active_record_1")).toBe("RELEASE SAVEPOINT active_record_1");
-    });
-
-    it("interpolates a null name the way Ruby interpolates nil", () => {
-      expect(createSavepointSql(null)).toBe("SAVEPOINT ");
-      expect(execRollbackToSavepointSql(null)).toBe("ROLLBACK TO SAVEPOINT ");
-      expect(releaseSavepointSql(null)).toBe("RELEASE SAVEPOINT ");
-    });
   });
 
   describe("adapter methods", () => {
@@ -73,6 +48,23 @@ describe("Savepoints", () => {
     it("releaseSavepoint executes RELEASE SAVEPOINT SQL", async () => {
       await releaseSavepoint.call(host);
       expect(executedSql).toEqual(["RELEASE SAVEPOINT active_record_1"]);
+    });
+
+    it("interpolates a null name the way Ruby interpolates nil", async () => {
+      const nullHost: SavepointHost = {
+        currentSavepointName: () => null,
+        async internalExecute(sql: string, _name: string) {
+          executedSql.push(sql);
+        },
+      };
+      await createSavepoint.call(nullHost);
+      await execRollbackToSavepoint.call(nullHost);
+      await releaseSavepoint.call(nullHost);
+      expect(executedSql).toEqual(["SAVEPOINT ", "ROLLBACK TO SAVEPOINT ", "RELEASE SAVEPOINT "]);
+
+      executedSql.length = 0;
+      await createSavepoint.call(host, null);
+      expect(executedSql).toEqual(["SAVEPOINT "]);
     });
   });
 });

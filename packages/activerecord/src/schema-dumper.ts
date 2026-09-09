@@ -72,54 +72,6 @@ export interface SchemaDumperConfig extends SchemaDumperOptions {
   tableNameSuffix?: string;
 }
 
-const DSL_HELPER_METHODS = new Set([
-  "string",
-  "text",
-  "integer",
-  "bigint",
-  "serial",
-  "bigserial",
-  "float",
-  "decimal",
-  "boolean",
-  "date",
-  "datetime",
-  "timestamp",
-  "timestamptz",
-  "time",
-  "binary",
-  "json",
-  "jsonb",
-  "citext",
-  "hstore",
-  "ltree",
-  "tsvector",
-  "inet",
-  "cidr",
-  "macaddr",
-  "xml",
-  "bit",
-  "bitVarying",
-  "money",
-  "int4range",
-  "int8range",
-  "numrange",
-  "daterange",
-  "tsrange",
-  "tstzrange",
-  "interval",
-  "oid",
-  "point",
-  "line",
-  "lseg",
-  "box",
-  "path",
-  "polygon",
-  "circle",
-  "virtual",
-  "enum",
-]);
-
 class AdapterSchemaSource implements SchemaSource {
   private _adapter: DatabaseAdapter;
 
@@ -461,7 +413,7 @@ export abstract class SchemaDumper {
       if (typeof pk === "string") {
         if (pk !== "id") opts.push(`primaryKey: ${JSON.stringify(pk)}`);
         const pkcol = columns.find((c) => c.name === pk);
-        let pkcolspec = pkcol ? this.columnSpecForPrimaryKey(pkcol) : {};
+        let pkcolspec = this.columnSpecForPrimaryKey(pkcol);
         if (Object.keys(pkcolspec).length > 0) {
           if (!Object.keys(pkcolspec).every((k) => k === "id" || k === "default")) {
             const { id: type, ...rest } = pkcolspec;
@@ -493,8 +445,8 @@ export abstract class SchemaDumper {
         const [type, colspec] = this.columnSpec(column);
         const optStr =
           Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
-        if (this._isDslHelper(type)) {
-          tbl.push(`    t.${type}(${JSON.stringify(column.name)}${optStr});`);
+        if (type.startsWith(":")) {
+          tbl.push(`    t.${type.slice(1)}(${JSON.stringify(column.name)}${optStr});`);
         } else {
           tbl.push(
             `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(type)}${optStr});`,
@@ -593,7 +545,7 @@ export abstract class SchemaDumper {
   protected abstract columnSpec(column: Column): [string, Record<string, unknown>];
 
   /** @internal */
-  protected abstract columnSpecForPrimaryKey(column: Column): Record<string, unknown>;
+  protected abstract columnSpecForPrimaryKey(column: Column | undefined): Record<string, unknown>;
 
   /** @internal */
   protected abstract prepareColumnOptions(column: Column): Record<string, unknown>;
@@ -771,11 +723,6 @@ export abstract class SchemaDumper {
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
     stream.push(statements.sort().join("\n"));
-  }
-
-  /** @internal */
-  protected _isDslHelper(dslType: string): boolean {
-    return DSL_HELPER_METHODS.has(dslType);
   }
 
   /** @internal */
