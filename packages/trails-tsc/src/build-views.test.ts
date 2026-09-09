@@ -17,7 +17,7 @@ function write(root: string, rel: string, body: string): void {
 }
 
 describe("buildViews", () => {
-  it("mirrors .tse files to .trails/views/ with .ts shim + .js runtime", () => {
+  it("mirrors .tse files to .trails/views/ as typecheck shims", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
     write(cwd, "app/views/users/edit.html.tse", "<%# locals: (name:) %>edit");
@@ -31,35 +31,23 @@ describe("buildViews", () => {
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.ts"), "utf8");
     expect(shim).toContain("export default function render(");
     expect(shim).toContain("_ob.append(name)");
-
-    const js = fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.js"), "utf8");
-    expect(js).toContain("export default function render(context, locals)");
-    expect(js).toContain("_ob.append(name)");
-    expect(js).not.toContain("RenderContext");
   });
 
-  it("emits a lazy-thunk manifest keyed by `<name>.<format>`", () => {
+  it("emits no runtime module — templates render from .tse source at request time", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "ok");
-    write(cwd, "app/views/users/show.json.tse", "{}");
 
     buildViews({ cwd });
 
-    const manifest = fs.readFileSync(path.join(cwd, ".trails/views-manifest.ts"), "utf8");
-    expect(manifest).toContain('"users/show.html": () => import("./views/users/show.html.tse.js")');
-    expect(manifest).toContain('"users/show.json": () => import("./views/users/show.json.tse.js")');
-    expect(manifest).toContain("export type ViewKey = keyof typeof views;");
-    expect(manifest).toContain("export type ViewsManifest = ");
-    expect(manifest).toContain("AUTO-GENERATED");
+    expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js.map"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
   });
 
-  it("is a no-op (empty manifest) when the views dir is absent", () => {
+  it("is a no-op when the views dir is absent", () => {
     const cwd = mkScratch();
     const { count } = buildViews({ cwd });
     expect(count).toBe(0);
-    const manifest = fs.readFileSync(path.join(cwd, ".trails/views-manifest.ts"), "utf8");
-    expect(manifest).toContain("export const views = {");
-    expect(manifest).toContain("} as const;");
   });
 
   it("clears stale outputs from a prior build", () => {
@@ -67,15 +55,12 @@ describe("buildViews", () => {
     write(cwd, "app/views/users/show.html.tse", "first");
     write(cwd, "app/views/users/gone.html.tse", "doomed");
     buildViews({ cwd });
-    expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.js"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(true);
 
     fs.rmSync(path.join(cwd, "app/views/users/gone.html.tse"));
     const { count } = buildViews({ cwd });
     expect(count).toBe(1);
-    expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.js"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(false);
-    const manifest = fs.readFileSync(path.join(cwd, ".trails/views-manifest.ts"), "utf8");
-    expect(manifest).not.toContain("gone.html");
   });
 
   it("refuses to build when outDir is a symlink escaping cwd", () => {
@@ -91,8 +76,7 @@ describe("buildViews", () => {
     const cwd = mkScratch();
     write(cwd, "src/templates/home.html.tse", "hi");
     buildViews({ cwd, viewsDir: "src/templates", outDir: "build/.gen" });
-    expect(fs.existsSync(path.join(cwd, "build/.gen/views/home.html.tse.js"))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, "build/.gen/views-manifest.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "build/.gen/views/home.html.tse.ts"))).toBe(true);
   });
 
   it("emits template-registry-augmentation.d.ts keyed by Rails partial name", () => {
@@ -198,7 +182,7 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
-  it("emits all 6 artifacts with correct source map references", () => {
+  it("emits all 4 artifacts with correct source map references", () => {
     const cwd = mkScratch();
     const src = "<h1><%= name %></h1>";
     write(cwd, "app/views/users/show.html.tse", src);
@@ -206,13 +190,9 @@ describe("buildViews", () => {
     const base = path.join(cwd, ".trails/views/users/show.html.tse");
     const mapDir = path.dirname(base);
     const srcPath = path.join(cwd, "app/views/users/show.html.tse");
-    for (const ext of [".ts", ".ts.map", ".js", ".js.map", ".d.ts", ".d.ts.map"]) {
+    for (const ext of [".ts", ".ts.map", ".d.ts", ".d.ts.map"]) {
       expect(fs.existsSync(base + ext), `missing ${ext}`).toBe(true);
     }
-    const jsMap = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
-    expect(jsMap.version).toBe(3);
-    expect(path.resolve(mapDir, jsMap.sources[0])).toBe(srcPath);
-    expect(jsMap.sourcesContent).toEqual([src]);
     const tsMap = JSON.parse(fs.readFileSync(base + ".ts.map", "utf8"));
     expect(path.resolve(mapDir, tsMap.sources[0])).toBe(srcPath);
     expect(tsMap.sourcesContent).toEqual([src]);
@@ -220,8 +200,6 @@ describe("buildViews", () => {
     expect(dtsMap.sources).toEqual(["show.html.tse.ts"]);
     const shim = fs.readFileSync(base + ".ts", "utf8");
     expect(shim).toContain("//# sourceMappingURL=show.html.tse.ts.map");
-    const js = fs.readFileSync(base + ".js", "utf8");
-    expect(js).toContain("//# sourceMappingURL=show.html.tse.js.map");
   });
 
   it("tse virtual shim includes TemplateRegistry import and render overloads", () => {
@@ -248,7 +226,7 @@ describe("runCli", () => {
     write(cwd, "app/views/home.html.tse", "x");
     const rc = runCli(["build", "--cwd", cwd]);
     expect(rc).toBe(0);
-    expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.js"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
   });
 
   it("rejects unknown commands with a non-zero exit", () => {
@@ -276,7 +254,7 @@ describe("runCli", () => {
     write(cwd, "app/views/home.html.tse", "hi");
     const rc = runCli(["dev", "--cwd", cwd]);
     expect(rc).toBe(0);
-    expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.js"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
     process.emit("SIGINT");
   });
 });
