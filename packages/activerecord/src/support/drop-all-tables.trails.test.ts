@@ -11,21 +11,27 @@ let adapter: DatabaseAdapter;
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (typeRegistryKeyFor(a) === "sqlite3") {
     return (
-      (await a.execute(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-      )) as Array<{ name: string }>
+      (
+        await a.selectAll(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+        )
+      ).toArray() as Array<{ name: string }>
     ).map((r) => r.name);
   } else if (typeRegistryKeyFor(a) === "postgresql") {
     return (
-      (await a.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
-      )) as Array<{ tablename: string }>
+      (
+        await a.selectAll(
+          `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
+        )
+      ).toArray() as Array<{ tablename: string }>
     ).map((r) => r.tablename);
   } else {
     return (
-      (await a.execute(
-        `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-      )) as Array<{ name?: string; TABLE_NAME?: string }>
+      (
+        await a.selectAll(
+          `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+        )
+      ).toArray() as Array<{ name?: string; TABLE_NAME?: string }>
     ).map((r) => (r.name ?? r.TABLE_NAME)!);
   }
 }

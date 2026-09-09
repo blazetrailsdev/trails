@@ -197,12 +197,18 @@ async function resetMysqlTables(
 ): Promise<void> {
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
-    const tableRows = await adapter.execute(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-    );
-    const viewRows = await adapter.execute(
-      `SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()`,
-    );
+    const tableRows = (
+      await adapter.selectAll(
+        `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+        "SCHEMA",
+      )
+    ).toArray();
+    const viewRows = (
+      await adapter.selectAll(
+        `SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()`,
+        "SCHEMA",
+      )
+    ).toArray();
     for (const r of viewRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
       if (name)

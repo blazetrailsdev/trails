@@ -55,17 +55,17 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await conn.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
 
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute(
+        const result = (await conn.execute(
           "SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594'",
-        );
-        expect(rows).toHaveLength(1);
+        )) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(1);
       });
     });
 
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("SHOW FULL FIELDS FROM `engines`");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
@@ -79,15 +79,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("doesnt error when a describe query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("DESCRIBE engines");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("DESCRIBE engines")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
     it("doesnt error when a desc query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute("DESC engines");
-        expect(rows).toHaveLength(2);
+        const result = (await conn.execute("DESC engines")) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(2);
       });
     });
 
@@ -95,10 +95,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await conn.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
 
       await Base.whilePreventingWrites(async () => {
-        const rows = await conn.execute(
+        const result = (await conn.execute(
           "/*action:index*/(\n( SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594' ) )",
-        );
-        expect(rows).toHaveLength(1);
+        )) as Mysql2RawResult;
+        expect(result.rows).toHaveLength(1);
       });
     });
 
