@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { TypeError } from "@blazetrails/ruby-compat";
 import { classAttribute } from "./class-attribute.js";
 
 describe("classAttribute", () => {

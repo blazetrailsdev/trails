@@ -1,3 +1,4 @@
+import { TypeError } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 /**
@@ -27,7 +28,6 @@ function is_emptyRange<T extends number | Date>(b: T | null, e: T | null, excl: 
 }
 
 export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>): boolean {
-  // eslint-disable-next-line blazetrails/rails-error-parity
   if (!(other instanceof Range)) throw new TypeError();
 
   const selfBegin = this.begin;

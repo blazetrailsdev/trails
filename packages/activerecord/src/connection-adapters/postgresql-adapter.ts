@@ -1144,7 +1144,14 @@ export class PostgreSQLAdapter
           });
           const count = runResult.rowCount ?? runResult.rows.length;
           payload.row_count = count;
-          return runResult;
+          const pgResult = new Result(
+            (runResult.fields ?? []).map((f) => f.name),
+            (runResult.rows ?? []) as unknown[][],
+          ).toArray() as unknown as pg.QueryResult;
+          for (const [key, value] of Object.entries(runResult)) {
+            Object.defineProperty(pgResult, key, { value, writable: true, configurable: true });
+          }
+          return pgResult;
         }),
       );
       return result;

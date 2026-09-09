@@ -3,14 +3,9 @@ import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
 import type { Headers } from "@blazetrails/rack";
-import { IOError, merge } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError, merge } from "@blazetrails/ruby-compat";
 
-export class ClientDisconnected extends Error {
-  constructor(message?: string) {
-    super(message ?? "client disconnected");
-    this.name = "ClientDisconnected";
-  }
-}
+export class ClientDisconnected extends RuntimeError {}
 
 interface LiveResponseLike {
   committed: boolean;
