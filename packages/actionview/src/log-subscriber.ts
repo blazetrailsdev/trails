@@ -106,6 +106,10 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     });
   }
 
+  static {
+    this.subscribeLogLevel("render_template", "debug");
+  }
+
   /** @missingRailsArgs round — PERMANENT */
   renderPartial(event: Event): void {
     this._debug(() => {
@@ -121,6 +125,10 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     });
   }
 
+  static {
+    this.subscribeLogLevel("render_partial", "debug");
+  }
+
   /** @missingRailsArgs round — PERMANENT */
   renderLayout(event: Event): void {
     this._info(() => {
@@ -128,6 +136,10 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;
     });
+  }
+
+  static {
+    this.subscribeLogLevel("render_layout", "info");
   }
 
   /** @missingRailsArgs round — PERMANENT */
@@ -145,6 +157,10 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
       message += ` ${this.renderCount(event.payload)} (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;
     });
+  }
+
+  static {
+    this.subscribeLogLevel("render_collection", "debug");
   }
 
   static override attachTo(...args: Parameters<typeof BaseLogSubscriber.attachTo>): Subscriber {
@@ -174,10 +190,5 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     return undefined;
   }
 }
-
-LogSubscriber.subscribeLogLevel("render_template", "debug");
-LogSubscriber.subscribeLogLevel("render_partial", "debug");
-LogSubscriber.subscribeLogLevel("render_layout", "info");
-LogSubscriber.subscribeLogLevel("render_collection", "debug");
 
 LogSubscriber.attachTo("action_view");

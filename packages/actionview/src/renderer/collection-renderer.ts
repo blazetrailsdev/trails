@@ -1,3 +1,5 @@
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+
 import { RenderedTemplate, localVariable, partialPath } from "./abstract-renderer.js";
 import type {
   ObjectRenderingHost,
@@ -114,6 +116,12 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     const firstPath = paths[0];
     if (paths.every((p) => p === firstPath)) {
       return this.renderCollectionWithPartial(collection, firstPath, context, block);
+    }
+    if (this.options.cached != null && this.options.cached !== false) {
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "render caching requires a template. Please specify a partial when rendering",
+      );
     }
     const baseLocals = { ...this.locals };
     const iteration = new PartialIteration(collection.length);
