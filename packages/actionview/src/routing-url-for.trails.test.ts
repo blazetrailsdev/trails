@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { HelperMethodBuilder, Parameters } from "@blazetrails/actionpack";
 import {
   _generatePathsByDefault,
   _routesContext,
@@ -9,6 +8,17 @@ import {
   type RoutingUrlForHost,
 } from "./routing-url-for.js";
 import { _setUrlFor, type UrlForImplementation } from "./routing-url-for-slot.js";
+
+class Parameters {
+  constructor(readonly attrs: Record<string, unknown>) {}
+}
+
+const builder = {
+  handleStringCall: (_target: unknown, name: string) => `string:${name}`,
+  handleClassCall: (_target: unknown, klass: unknown) =>
+    `class:${(klass as { name: string }).name}`,
+  handleModelCall: (_target: unknown, record: unknown) => `model:${(record as { id: number }).id}`,
+};
 
 interface Host extends RoutingUrlForHost {
   seen: unknown[];
@@ -24,10 +34,12 @@ function stubUrlFor(): void {
     },
     urlOptions: () => ({ host: "example.com" }),
     optimizeRoutesGeneration: () => true,
-    polymorphicPath: (record, options) => `path:${JSON.stringify([record, options])}`,
-    polymorphicUrl: (record, options) => `url:${JSON.stringify([record, options])}`,
-    isParameters: (value) => value instanceof Parameters,
-    helperMethodBuilder: HelperMethodBuilder,
+    polymorphicPath: (record: unknown, options: unknown) =>
+      `path:${JSON.stringify([record, options])}`,
+    polymorphicUrl: (record: unknown, options: unknown) =>
+      `url:${JSON.stringify([record, options])}`,
+    isParameters: (value: unknown) => value instanceof Parameters,
+    helperMethodBuilder: { path: () => builder, url: () => builder },
   } as unknown as UrlForImplementation);
 }
 
@@ -72,6 +84,18 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
   it("routes ActionController::Parameters through super", () => {
     const params = new Parameters({ action: "index" });
     expect(urlFor.call(host, params)).toBe("/super");
+  });
+
+  it("routes a Symbol through handle_string_call", () => {
+    expect(urlFor.call(host, ":root")).toBe("string:root");
+  });
+
+  it("routes a Class through handle_class_call", () => {
+    expect(urlFor.call(host, Workshop)).toBe("class:Workshop");
+  });
+
+  it("routes a record through handle_model_call", () => {
+    expect(urlFor.call(host, new Workshop(5))).toBe("model:5");
   });
 
   it("returns _back_url for :back", () => {

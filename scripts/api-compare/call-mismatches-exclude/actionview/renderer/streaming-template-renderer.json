@@ -26,5 +26,12 @@
     "rubyName": "each",
     "call": "log_error",
     "reason": "Pre-existing divergence in `StreamingBody`, a class nested inside a same-file parent (renderer/streaming_template_renderer.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
+    "call": "instrument",
+    "reason": "Rails wraps the whole streamed render in `ActiveSupport::Notifications.instrument(\"render_template.action_view\", ...)` (streaming_template_renderer.rb:64-69); the port's body is an async generator, so a synchronous instrument block cannot span it. Converge under actionview-instrument-streaming-template-renderer."
   }
 ]
