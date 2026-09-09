@@ -4,7 +4,6 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import { Base } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
 import { classifyCompareStep } from "./classify-compare-step.js";
@@ -139,6 +138,12 @@ function gh(args: string): string {
 function ghJson<T>(args: string): T {
   return JSON.parse(gh(args)) as T;
 }
+
+// ---------------------------------------------------------------------------
+// Connection
+// ---------------------------------------------------------------------------
+
+await Base.establishConnection({ adapter: "sqlite3", database: DB_PATH });
 
 // ---------------------------------------------------------------------------
 // Models
@@ -2541,8 +2546,7 @@ async function main() {
     console.log("Running full refresh sync.\n");
   }
 
-  const adapter = new BetterSQLite3Adapter(DB_PATH);
-  Base.adapter = adapter;
+  const adapter = Base.adapter as SQLite3Adapter;
 
   try {
     await migrateDb(adapter);
