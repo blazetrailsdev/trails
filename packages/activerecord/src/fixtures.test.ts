@@ -821,16 +821,18 @@ interface SetupTestState {
   second?: boolean;
 }
 
-const setupTestSetup = (state: SetupTestState): void => {
-  state.first = true;
-};
-
-describe("SetupTest", () => {
+function setupTest(): SetupTestState {
   const state: SetupTestState = {};
 
   beforeEach(() => {
-    setupTestSetup(state);
+    state.first = true;
   });
+
+  return state;
+}
+
+describe("SetupTest", () => {
+  const state = setupTest();
 
   it("nothing", () => {
     expect(state.first).toBe(true);
@@ -838,10 +840,9 @@ describe("SetupTest", () => {
 });
 
 describe("SetupSubclassTest", () => {
-  const state: SetupTestState = {};
+  const state = setupTest();
 
   beforeEach(() => {
-    setupTestSetup(state);
     state.second = true;
   });
 
