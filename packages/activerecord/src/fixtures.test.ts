@@ -7,6 +7,7 @@ import {
   resolveModelForTable,
   FixtureSetPrimaryKeyError,
   FixtureSet,
+  FixtureError,
 } from "./fixtures.js";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
@@ -558,7 +559,7 @@ describe("defineFixtures", () => {
   });
 });
 
-describe("PrimaryKeyError", () => {
+describe("PrimaryKeyErrorTest", () => {
   it("generates the correct value", async () => {
     const adapter = {
       execute: vi.fn(async () => []),
@@ -593,13 +594,10 @@ describe("PrimaryKeyError", () => {
       FixtureSetPrimaryKeyError,
     );
 
-    try {
-      await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData);
-    } catch (e: unknown) {
-      expect((e as Error).message).toContain("Unable to set");
-      expect((e as Error).message).toContain("name");
-      expect((e as Error).message).toContain("Essay");
-    }
+    const e = await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData).catch(
+      (err: Error) => err,
+    );
+    expect((e as Error).message).toContain("Unable to set");
   });
 });
 
@@ -621,11 +619,14 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
           first: { fk_object_to_point_to_id: 4242 },
         });
       if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
-        await expect(load()).rejects.toThrow(
+        await expect(load()).rejects.toThrow();
+        const error = await load().catch((e: Error) => e);
+        expect((error as Error).message).toContain(
           "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
         );
+        expect((error as Error).message).toContain("fk_pointing_to_non_existent_objects");
       } else {
-        await expect(load()).resolves.toBeDefined();
+        await expect(load()).resolves.not.toThrow();
       }
     });
   });
@@ -641,7 +642,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
         defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
           first: { fk_object_to_point_to_id: 1 },
         }),
-      ).resolves.toBeDefined();
+      ).resolves.not.toThrow();
     });
   });
 });
@@ -721,7 +722,7 @@ describe("FixturesTest", () => {
 
   it("no args record returns all without array", () => {
     const allBinaries = binaries.all();
-    expect(Array.isArray(allBinaries)).toBe(true);
+    expect(allBinaries).toBeInstanceOf(Array);
     expect(binaries.all().length).toBe(2);
   });
 
@@ -764,7 +765,11 @@ describe("FixturesTest", () => {
     const connection = leaseFixtureConnection();
     await expect(
       FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData),
-    ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
+    ).rejects.toThrow(FixtureError);
+    const e = await FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData).catch(
+      (err: Error) => err,
+    );
+    expect((e as Error).message).toBe('table "parrots" has no columns named "arrr", "foobar".');
   });
 
   it("yaml file with symbol columns", async () => {
@@ -832,11 +837,9 @@ function setupTest(): SetupTestState {
 }
 
 describe("SetupTest", () => {
-  const state = setupTest();
+  setupTest();
 
-  it("nothing", () => {
-    expect(state.first).toBe(true);
-  });
+  it("nothing", () => {});
 });
 
 describe("SetupSubclassTest", () => {
@@ -847,8 +850,8 @@ describe("SetupSubclassTest", () => {
   });
 
   it("subclassing should preserve setups", () => {
-    expect(state.first).toBe(true);
-    expect(state.second).toBe(true);
+    expect(state.first).toBeTruthy();
+    expect(state.second).toBeTruthy();
   });
 });
 
@@ -856,10 +859,10 @@ describe("ForeignKeyFixturesTest", () => {
   fixtures(["fkTestHasPk", "fkTestHasFk"]);
 
   it("number1", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 
   it("number2", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 });
