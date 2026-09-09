@@ -35,7 +35,7 @@ describe("FileSystemResolver", () => {
 
   it("resolves a template through the same paths as exists?", () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("index", ["posts"])).toBe(true);
     expect(ctx.isExists("missing", ["posts"])).toBe(false);
@@ -44,7 +44,7 @@ describe("FileSystemResolver", () => {
 
   it("finds a partial through the same paths as exists?", () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("form", ["posts"], true)).toBe(true);
     expect(ctx.findPartial("form", ["posts"], ["html"])?.source).toBe("<form></form>");
@@ -52,7 +52,7 @@ describe("FileSystemResolver", () => {
 
   it("prefers the requested variant", () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("index", ["posts"], false, [], { variants: ["phone"] })).toBe(true);
     expect(ctx.findAll("index", ["posts"], false, [], { variants: ["phone"] })).toHaveLength(2);
@@ -63,7 +63,7 @@ describe("FileSystemResolver", () => {
 
   it("escapes glob metacharacters in the looked-up path", () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.findTemplate("i*x", ["posts"], ["html"])?.source).toBe("<h1>Star</h1>");
     expect(ctx.isExists("i*dex", ["posts"])).toBe(false);
@@ -71,7 +71,7 @@ describe("FileSystemResolver", () => {
 
   it("finds a template under a prefix containing a glob metacharacter", () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("index", ["po?sts"])).toBe(true);
     expect(ctx.findTemplate("index", ["po?sts"], ["html"])?.source).toBe("<h1>Query</h1>");
@@ -79,7 +79,7 @@ describe("FileSystemResolver", () => {
 
   it("rescans the filesystem when the details cache is off", async () => {
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
     expect(ctx.isExists("index", ["posts"])).toBe(true);
 
     const fs = getFs();
@@ -93,7 +93,7 @@ describe("FileSystemResolver", () => {
 
   it("any? ignores the format and variant constraints", () => {
     const ctx = new LookupContext(null, { formats: ["json"] }, []);
-    ctx.addResolver(new FileSystemResolver(dir));
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("index", ["posts"])).toBe(false);
     expect(ctx.isAny("index", ["posts"])).toBe(true);

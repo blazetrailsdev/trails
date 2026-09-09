@@ -327,7 +327,7 @@ describe("ActionView::Base#render", () => {
       "test/hello_world.json.tse": '{"hello":"world"}',
     });
     const lookupContext = new LookupContext(null, {}, []);
-    lookupContext.addResolver(resolver);
+    lookupContext.appendViewPaths([resolver]);
     return new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
   };
 

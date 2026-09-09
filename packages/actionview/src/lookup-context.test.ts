@@ -93,7 +93,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
   it("passes resolver allTemplatePaths into MissingTemplate when render throws", async () => {
     const resolver = new PathsOnlyResolver(["posts/index", "posts/show", "posts/indx"]);
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(resolver);
+    ctx.appendViewPaths([resolver]);
 
     let caught: MissingTemplate | undefined;
     try {
@@ -110,7 +110,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
   it("passes resolver allTemplatePaths into MissingTemplate when renderPartial throws", async () => {
     const resolver = new PathsOnlyResolver(["posts/_form", "posts/_header"]);
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(resolver);
+    ctx.appendViewPaths([resolver]);
 
     let caught: MissingTemplate | undefined;
     try {
@@ -133,7 +133,7 @@ describe("LookupContext#renderPartialSync", () => {
       ),
     );
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(resolver);
+    ctx.appendViewPaths([resolver]);
     return ctx;
   }
 
@@ -205,7 +205,7 @@ describe("LookupContext#render with a layout", () => {
       ),
     );
     const ctx = new LookupContext(null, {}, []);
-    ctx.addResolver(resolver);
+    ctx.appendViewPaths([resolver]);
     return ctx;
   }
 

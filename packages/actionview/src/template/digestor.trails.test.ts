@@ -9,7 +9,7 @@ describe("Digestor.digest nested dependencies", () => {
   function digest(dependencies: ReadonlyArray<string | ReadonlyArray<string>>): string {
     DetailsKey.clear();
     const finder = new LookupContext();
-    finder.addResolver(new FixtureResolver({ "posts/show.html.tse": "hello" }));
+    finder.appendViewPaths([new FixtureResolver({ "posts/show.html.tse": "hello" })]);
     return Digestor.digest({ name: "posts/show", format: "html", finder, dependencies });
   }
 
