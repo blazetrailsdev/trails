@@ -3,10 +3,10 @@ import { Parser } from "../../parser.js";
 
 describe("ActionDispatch::Journey::Parser", () => {
   const parser = new Parser();
-  const assertRoundTrip = (str: string) => expect(parser.parse(str).toString()).toBe(str);
+  const assertRoundTrip = (str: string) => expect(parser.parse(str)!.toString()).toBe(str);
 
   it("slash", () => {
-    expect(parser.parse("/").type).toBe("SLASH");
+    expect(parser.parse("/")!.type).toBe("SLASH");
     assertRoundTrip("/");
   });
   it("segment", () => assertRoundTrip("/foo"));

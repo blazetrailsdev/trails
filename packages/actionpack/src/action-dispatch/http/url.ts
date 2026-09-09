@@ -1,5 +1,6 @@
 import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
-import { escapeFragment, rackEscape } from "../journey/router/utils.js";
+import { escapeFragment } from "../journey/router/utils.js";
+import { Utils as RackUtils } from "@blazetrails/rack";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -131,7 +132,7 @@ function buildHostUrl(
 
   let result = protocolStr;
   if (options.user && options.password) {
-    result += `${rackEscape(options.user)}:${rackEscape(options.password)}@`;
+    result += `${RackUtils.escape(options.user)}:${RackUtils.escape(options.password)}@`;
   }
   result += host;
   const normalized = normalizePort(port, protocolStr);

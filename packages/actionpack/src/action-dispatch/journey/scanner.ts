@@ -11,74 +11,98 @@ STATIC_TOKENS["*".charCodeAt(0)] = "STAR";
 
 const WORD = /\w+/y;
 const LITERAL_RUN = /(?:[\w%\-~!$&'*+,;=@]|\\[:()])+/y;
+const ANY = /./y;
 
 export class Scanner {
-  private _str = "";
-  private _pos = 0;
-  private _length = 0;
+  static Scanner = class Scanner {
+    /** @internal */
+    readonly string: string;
+    /** @internal */
+    pos = 0;
 
-  constructor() {}
+    constructor(string: string) {
+      this.string = string;
+    }
+
+    peekByte(): number {
+      return this.string.charCodeAt(this.pos);
+    }
+
+    /** @internal */
+    isEos(): boolean {
+      return this.pos >= this.string.length;
+    }
+
+    /** @internal */
+    skip(pattern: RegExp): number | null {
+      pattern.lastIndex = this.pos;
+      const m = pattern.exec(this.string);
+      if (m === null) return null;
+      this.pos += m[0].length;
+      return m[0].length;
+    }
+  };
+
+  private _scanner: InstanceType<typeof Scanner.Scanner> | null;
+  private _length: number | null;
+
+  constructor() {
+    this._scanner = null;
+    this._length = null;
+  }
 
   scanSetup(str: string): void {
-    this._str = str;
-    this._pos = 0;
-    this._length = 0;
+    this._scanner = new Scanner.Scanner(str);
   }
 
   nextToken(): Token | null {
-    if (this._pos >= this._str.length) return null;
-    let token: Token | null = null;
-    while (this._pos < this._str.length && (token = this.scan()) === null) {
-      /** @empty */
+    if (this._scanner!.isEos()) return null;
+
+    let token: Token | null;
+    for (;;) {
+      token = this.scan();
+      if (token !== null || this._scanner!.isEos()) break;
     }
     return token;
   }
 
   lastString(): string {
-    return this._str.slice(this._pos - this._length, this._pos);
+    return this._scanner!.string.slice(this._scanner!.pos - this._length!, this._scanner!.pos);
   }
 
   lastLiteral(): string {
-    return this.lastString().replace(/\\/g, "");
-  }
-
-  /** @internal */
-  peekByte(): number {
-    return this._str.charCodeAt(this._pos);
+    const lastStr = this._scanner!.string.slice(
+      this._scanner!.pos - this._length!,
+      this._scanner!.pos,
+    );
+    return lastStr.replace(/\\/g, "");
   }
 
   /** @internal */
   private scan(): Token | null {
-    const nextByte = this.peekByte();
-    const staticTok = STATIC_TOKENS[nextByte];
-
-    if (staticTok !== undefined && (staticTok !== "SYMBOL" || this.isNextByteIsNotAToken())) {
-      this._pos += 1;
-      if (staticTok === "SYMBOL" || staticTok === "STAR") {
-        WORD.lastIndex = this._pos;
-        const m = WORD.exec(this._str);
-        const skipped = m ? m[0].length : 0;
-        this._pos += skipped;
-        this._length = skipped + 1;
+    const nextByte = this._scanner!.peekByte();
+    let token: Token | undefined;
+    if (
+      (token = STATIC_TOKENS[nextByte]) !== undefined &&
+      (token !== "SYMBOL" || this.isNextByteIsNotAToken())
+    ) {
+      this._scanner!.pos += 1;
+      if (token === "SYMBOL" || token === "STAR") {
+        this._length = (this._scanner!.skip(WORD) ?? 0) + 1;
       }
-      return staticTok;
+      return token;
     }
-
-    LITERAL_RUN.lastIndex = this._pos;
-    const litMatch = LITERAL_RUN.exec(this._str);
-    if (litMatch) {
-      this._length = litMatch[0].length;
-      this._pos += this._length;
+    if ((this._length = this._scanner!.skip(LITERAL_RUN)) !== null) {
       return "LITERAL";
     }
-
-    this._length = 1;
-    this._pos += 1;
-    return "LITERAL";
+    if ((this._length = this._scanner!.skip(ANY)) !== null) {
+      return "LITERAL";
+    }
+    return null;
   }
 
   /** @internal */
   private isNextByteIsNotAToken(): boolean {
-    return STATIC_TOKENS[this._str.charCodeAt(this._pos + 1)] === undefined;
+    return STATIC_TOKENS[this._scanner!.string.charCodeAt(this._scanner!.pos + 1)] === undefined;
   }
 }

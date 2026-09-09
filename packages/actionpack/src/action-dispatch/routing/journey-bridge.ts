@@ -34,7 +34,7 @@ export function buildJourneyRouter(
   const journeyRoutes = new JourneyRoutes();
   for (let i = 0; i < routes.length; i++) {
     const r = routes[i];
-    const tree = new Parser().parse(r.path);
+    const tree = new Parser().parse(r.path)!;
     const ast = new Ast(tree, true);
     const requirements = regexpRequirements(r.pathConstraints);
     const pattern = new Pattern(ast, requirements, SEPARATORS, r.anchor);

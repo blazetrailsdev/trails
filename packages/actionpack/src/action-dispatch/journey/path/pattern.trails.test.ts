@@ -12,7 +12,7 @@ function buildPath(
   separators: string = SEPARATORS,
   anchored = true,
 ): Pattern {
-  const tree = new Parser().parse(path);
+  const tree = new Parser().parse(path)!;
   const ast = new Ast(tree, true);
   return new Pattern(ast, requirements, separators, anchored);
 }
@@ -123,7 +123,7 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
   });
 
   it("Pattern pushes RegExp requirements into the SymbolNode for GTG widening", () => {
-    const tree = new Parser().parse("/posts/:filename");
+    const tree = new Parser().parse("/posts/:filename")!;
     const ast = new Ast(tree, true);
     new Pattern(ast, { filename: /(.+)/ }, "/.?", true);
     const symbol = ast.terminals.find(

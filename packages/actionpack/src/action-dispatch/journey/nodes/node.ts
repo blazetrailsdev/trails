@@ -19,7 +19,7 @@ export abstract class Node {
     }
   }
 
-  grep<T extends Node>(klass: new (...args: never[]) => T): T[] {
+  grep<T extends Node>(klass: abstract new (...args: never[]) => T): T[] {
     const out: T[] = [];
     for (const n of this) if (n instanceof klass) out.push(n);
     return out;
@@ -79,13 +79,9 @@ export abstract class Node {
   }
 }
 
-export class Terminal extends Node {
+export abstract class Terminal extends Node {
   get symbol(): Node | string {
     return this.left;
-  }
-
-  get type(): NodeType {
-    throw new Error("subclass must override type");
   }
 
   override isTerminal(): boolean {

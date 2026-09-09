@@ -21,11 +21,11 @@ export class Parser {
     this._nextToken = null;
   }
 
-  static parse(string: string): Node {
+  static parse(string: string): Node | null {
     return new Parser().parse(string);
   }
 
-  parse(string: string): Node {
+  parse(string: string): Node | null {
     this._scanner.scanSetup(string);
     this.advanceToken();
     return this.doParse();
@@ -37,33 +37,33 @@ export class Parser {
   }
 
   /** @internal */
-  private doParse(): Node {
+  private doParse(): Node | null {
     return this.parseExpressions();
   }
 
   /** @internal */
-  private parseExpressions(): Node {
+  private parseExpressions(): Node | null {
     let node = this.parseExpression();
     while (this._nextToken !== null) {
       if (this._nextToken === "RPAREN") break;
       if (this._nextToken === "OR") {
         node = this.parseOr(node);
       } else {
-        node = new Cat(node, this.parseExpressions());
+        node = new Cat(node!, this.parseExpressions()!);
       }
     }
     return node;
   }
 
   /** @internal */
-  private parseOr(lhs: Node): Node {
+  private parseOr(lhs: Node | null): Node {
     this.advanceToken();
     const rhs = this.parseExpression();
-    return new Or([lhs, rhs]);
+    return new Or([lhs!, rhs!]);
   }
 
   /** @internal */
-  private parseExpression(): Node {
+  private parseExpression(): Node | null {
     if (this._nextToken === "STAR") return this.parseStar();
     if (this._nextToken === "LPAREN") return this.parseGroup();
     return this.parseTerminal();
@@ -84,14 +84,14 @@ export class Parser {
     if (this._nextToken !== "RPAREN") {
       throw new ArgumentError("missing right parenthesis.");
     }
-    const node = new Group(inner);
+    const node = new Group(inner!);
     this.advanceToken();
     return node;
   }
 
   /** @internal */
-  private parseTerminal(): Node {
-    let node: Node;
+  private parseTerminal(): Node | null {
+    let node: Node | null = null;
     switch (this._nextToken) {
       case "SYMBOL":
         node = new SymbolNode(this._scanner.lastString());
@@ -105,8 +105,6 @@ export class Parser {
       case "DOT":
         node = new Dot(".");
         break;
-      default:
-        throw new Error(`unexpected token: ${this._nextToken}`);
     }
     this.advanceToken();
     return node;

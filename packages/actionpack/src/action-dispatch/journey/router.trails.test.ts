@@ -8,7 +8,7 @@ import { Routes } from "./routes.js";
 import { Router, type RouterRequest, type RackishResponse } from "./router.js";
 
 function pat(path: string, requirements: Record<string, RegExp> = {}, anchored = true): Pattern {
-  const tree = new Parser().parse(path);
+  const tree = new Parser().parse(path)!;
   const ast = new Ast(tree, true);
   return new Pattern(ast, requirements, "/.?", anchored);
 }

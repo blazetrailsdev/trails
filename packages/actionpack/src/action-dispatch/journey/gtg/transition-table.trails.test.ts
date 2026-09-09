@@ -9,7 +9,7 @@ import { TransitionTable } from "./transition-table.js";
 function asts(paths: string[]) {
   const parser = new Parser();
   return paths.map((x) => {
-    const ast = parser.parse(x);
+    const ast = parser.parse(x)!;
     for (const n of ast) n.memo = ast;
     return ast;
   });

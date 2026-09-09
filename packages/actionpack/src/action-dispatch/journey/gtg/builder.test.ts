@@ -8,7 +8,7 @@ function asts(strings: string[]) {
   const parser = new Parser();
   return strings.map((s) => {
     const memo = { id: s };
-    const tree = parser.parse(s);
+    const tree = parser.parse(s)!;
     for (const n of tree) n.memo = memo;
     return tree;
   });

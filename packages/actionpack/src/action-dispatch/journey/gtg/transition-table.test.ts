@@ -10,7 +10,7 @@ import { Simulator } from "./simulator.js";
 function asts(paths: string[]): Node[] {
   const parser = new Parser();
   return paths.map((x) => {
-    const ast = parser.parse(x);
+    const ast = parser.parse(x)!;
     for (const n of ast) n.memo = ast;
     return ast;
   });

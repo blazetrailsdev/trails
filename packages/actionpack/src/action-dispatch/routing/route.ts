@@ -192,7 +192,7 @@ export class Route {
 
   get requiredParts(): readonly string[] {
     if (this._requiredParts === null) {
-      this._requiredParts = topLevelSymbolNames(new Parser().parse(this.path));
+      this._requiredParts = topLevelSymbolNames(new Parser().parse(this.path)!);
     }
     return this._requiredParts;
   }
@@ -218,7 +218,7 @@ export class Route {
   score(knowledge: Record<string, boolean> = {}): number {
     let tree;
     try {
-      tree = new Parser().parse(this.path);
+      tree = new Parser().parse(this.path)!;
     } catch {
       return 0;
     }
@@ -298,7 +298,7 @@ export class Route {
 
   pathFor(params: Record<string, string | number> = {}): string {
     if (this._pathFormatter === null) {
-      const tree = new Parser().parse(this.path);
+      const tree = new Parser().parse(this.path)!;
       this._pathTree = tree;
       const ast = new Ast(tree, true);
       const reqs: Record<string, RegExp> = Object.create(null);
@@ -545,7 +545,7 @@ function topLevelSymbolNames(tree: unknown): readonly string[] {
 
 function collectParamNamesFromJourneyAst(path: string): string[] {
   try {
-    const tree = new Parser().parse(path);
+    const tree = new Parser().parse(path)!;
     const ast = new Ast(tree, true);
     return ast.names.slice();
   } catch {
