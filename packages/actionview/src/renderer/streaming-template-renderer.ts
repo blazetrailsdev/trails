@@ -1,3 +1,4 @@
+import { Notifications } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
@@ -39,17 +40,15 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     }
 
     const layoutName = options.layout;
-    const layout =
-      layoutName != null && layoutName !== false
-        ? this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? "html"])
-        : null;
 
     try {
-      if (!layout) {
+      if (layoutName == null || layoutName === false) {
         const body = await template.render(context, locals);
         yield body;
         return;
       }
+
+      const layout = this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? "html"]);
 
       yield* this.delayedRender(context, template, layout, locals);
     } catch (err) {
@@ -58,11 +57,14 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall instrument — PERMANENT
+   */
   private async *delayedRender(
     context: ViewContext,
     template: RenderableTemplate,
-    layout: RenderableTemplate,
+    layout: RenderableTemplate | null,
     locals: Record<string, unknown>,
   ): AsyncGenerator<string> {
     const sentinel = `\x00STREAM_YIELD_${Date.now()}_${Math.random()}\x00`;
@@ -71,25 +73,50 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
       _layoutFor: (name?: string) => (name ? (context._layoutFor?.(name) ?? "") : sentinel),
     };
 
-    const layoutBody = await layout.render(streamingContext, locals);
-    const sentinelIdx = layoutBody.indexOf(sentinel);
+    const payload: Record<string, unknown> = {
+      identifier: template.identifier,
+      layout: layout && layout.virtualPath,
+      locals,
+    };
+    const handle = Notifications.buildHandle("render_template.action_view", payload);
+    handle.start();
 
-    if (sentinelIdx === -1) {
+    try {
+      if (!layout) {
+        const templateBody = await template.render(context, locals);
+        yield templateBody;
+        return;
+      }
+
+      const layoutBody = await layout.render(streamingContext, locals);
+      const sentinelIdx = layoutBody.indexOf(sentinel);
+
+      if (sentinelIdx === -1) {
+        const templateBody = await template.render(context, locals);
+        const fullBody = layoutBody + templateBody;
+        yield fullBody;
+        return;
+      }
+
+      const layoutPrefix = layoutBody.slice(0, sentinelIdx);
+      const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
+
+      yield layoutPrefix;
+
       const templateBody = await template.render(context, locals);
-      const fullBody = layoutBody + templateBody;
-      yield fullBody;
-      return;
+      yield templateBody;
+
+      yield layoutSuffix;
+    } catch (e) {
+      payload.exception = [
+        e instanceof Error ? e.name : String(e),
+        e instanceof Error ? e.message : String(e),
+      ];
+      payload.exception_object = e;
+      throw e;
+    } finally {
+      handle.finish();
     }
-
-    const layoutPrefix = layoutBody.slice(0, sentinelIdx);
-    const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
-
-    yield layoutPrefix;
-
-    const templateBody = await template.render(context, locals);
-    yield templateBody;
-
-    yield layoutSuffix;
   }
 
   /** @internal */

@@ -30,7 +30,7 @@ describe("watchViews", () => {
       await waitFor(() => events.includes("initial"));
       fs.writeFileSync(path.join(cwd, "app/views/home.html.tse"), "<%= name %>");
       await waitFor(() => events.includes("change"));
-      expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.js"))).toBe(true);
+      expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
     } finally {
       handle.close();
     }

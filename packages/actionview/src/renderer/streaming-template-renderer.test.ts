@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import { StreamingTemplateRenderer, StreamingBody } from "./streaming-template-renderer.js";
 import { Renderer } from "./renderer.js";
 import { LookupContext } from "../lookup-context.js";
@@ -108,6 +109,98 @@ describe("StreamingTemplateRenderer", () => {
         renderer.renderStream(ctx, { template: "posts/show", layout: "application" }),
       );
       expect(chunks.join("")).toBe("<wrapper>no yield here</wrapper>template body");
+    });
+
+    it("instruments the whole streamed render as render_template.action_view", async () => {
+      const events: Array<Record<string, unknown>> = [];
+      const subscriber = Notifications.subscribe(
+        "render_template.action_view",
+        (event: { payload: Record<string, unknown> }) => events.push(event.payload),
+      );
+      try {
+        const templateFake = makeFakeTemplate("inner content");
+        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
+
+        const layoutFake: RenderableTemplate = {
+          identifier: "layout",
+          virtualPath: "layouts/application",
+          format: "html",
+          render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
+            const yieldContent = viewCtx?._layoutFor?.() ?? "";
+            return Promise.resolve(`<header>${yieldContent}</header>`);
+          }),
+        };
+        vi.spyOn(lc, "findLayout").mockReturnValue(layoutFake as never);
+
+        const renderer = new StreamingTemplateRenderer(lc);
+        await collectChunks(
+          renderer.renderStream(ctx, { template: "posts/show", layout: "application" }),
+        );
+
+        expect(events).toHaveLength(1);
+        expect(events[0].identifier).toBe("fake");
+        expect(events[0].layout).toBe("layouts/application");
+      } finally {
+        Notifications.unsubscribe(subscriber);
+      }
+    });
+
+    it("instruments the no-layout branch when the named layout does not resolve", async () => {
+      const events: Array<Record<string, unknown>> = [];
+      const subscriber = Notifications.subscribe(
+        "render_template.action_view",
+        (event: { payload: Record<string, unknown> }) => events.push(event.payload),
+      );
+      try {
+        const templateFake = makeFakeTemplate("bare body");
+        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
+        vi.spyOn(lc, "findAll").mockReturnValue([] as never);
+        vi.spyOn(lc, "findLayout").mockReturnValue(null as never);
+
+        const renderer = new StreamingTemplateRenderer(lc);
+        const chunks = await collectChunks(
+          renderer.renderStream(ctx, { template: "posts/show", layout: "application" }),
+        );
+
+        expect(chunks).toEqual(["bare body"]);
+        expect(events).toHaveLength(1);
+        expect(events[0].layout).toBe(null);
+        expect(events[0].identifier).toBe("fake");
+      } finally {
+        Notifications.unsubscribe(subscriber);
+      }
+    });
+
+    it("records exception and exception_object on the payload when the render raises", async () => {
+      const events: Array<Record<string, unknown>> = [];
+      const subscriber = Notifications.subscribe(
+        "render_template.action_view",
+        (event: { payload: Record<string, unknown> }) => events.push(event.payload),
+      );
+      try {
+        const boom = new Error("kaboom");
+        boom.name = "ActionView::Template::Error";
+        const templateFake: RenderableTemplate = {
+          identifier: "fake",
+          format: "html",
+          render: vi.fn().mockRejectedValue(boom),
+        };
+        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
+        vi.spyOn(lc, "findAll").mockReturnValue([] as never);
+        vi.spyOn(lc, "findLayout").mockReturnValue(null as never);
+        vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const renderer = new StreamingTemplateRenderer(lc);
+        await collectChunks(
+          renderer.renderStream(ctx, { template: "posts/show", layout: "application" }),
+        );
+
+        expect(events).toHaveLength(1);
+        expect(events[0].exception).toEqual(["ActionView::Template::Error", "kaboom"]);
+        expect(events[0].exception_object).toBe(boom);
+      } finally {
+        Notifications.unsubscribe(subscriber);
+      }
     });
 
     it("handles error mid-render — yields completion sentinel and does not throw", async () => {

@@ -62,7 +62,7 @@ describe("TemplateDigestorTest", () => {
     DetailsKey.clear();
     templates = { ...FIXTURES };
     _finder = new LookupContext();
-    _finder.addResolver(new FixtureResolver(templates));
+    _finder.appendViewPaths([new FixtureResolver(templates)]);
   });
 
   function finder(): LookupContext {

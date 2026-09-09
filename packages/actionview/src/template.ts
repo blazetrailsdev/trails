@@ -1,4 +1,4 @@
-import { htmlSafe } from "@blazetrails/activesupport";
+import { htmlSafe, Notifications } from "@blazetrails/activesupport";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
@@ -209,22 +209,24 @@ export class Template {
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
   ): string {
     try {
-      this.compileBang(view);
+      return this.instrumentRenderTemplate<string>(() => {
+        this.compileBang(view);
 
-      if (this.strictLocalsQ() && this._strictLocalKeys && implicitLocals.length > 0) {
-        const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
-        for (const key of localsToIgnore) delete locals[key];
-      }
+        if (this.strictLocalsQ() && this._strictLocalKeys && implicitLocals.length > 0) {
+          const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
+          for (const key of localsToIgnore) delete locals[key];
+        }
 
-      if (buffer) {
-        view._run(this.methodName(), this, locals, buffer, { addToStack });
-        return "";
-      } else {
-        const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
-          addToStack,
-        });
-        return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
-      }
+        if (buffer) {
+          view._run(this.methodName(), this, locals, buffer, { addToStack });
+          return "";
+        } else {
+          const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
+            addToStack,
+          });
+          return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
+        }
+      });
     } catch (e) {
       return this.handleRenderError(view, e);
     }
@@ -266,7 +268,9 @@ export class Template {
     const mod = view.compiledMethodContainer();
     if (this._compiled === mod) return;
 
-    this.compile(mod);
+    this.instrument<void>("!compile_template", () => {
+      this.compile(mod);
+    });
 
     this._compiled = mod;
   }
@@ -352,6 +356,26 @@ export class Template {
 
   private identifierMethodName(): string {
     return this.shortIdentifier.replace(/[^a-z_]/g, "_");
+  }
+
+  private instrument<T>(action: string, block: () => T): T {
+    return Notifications.instrument<T>(
+      `${action}.action_view`,
+      this.instrumentPayload(),
+      block,
+    ) as T;
+  }
+
+  private instrumentRenderTemplate<T>(block: () => T): T {
+    return Notifications.instrument<T>(
+      "!render_template.action_view",
+      this.instrumentPayload(),
+      block,
+    ) as T;
+  }
+
+  private instrumentPayload(): Record<string, unknown> {
+    return { virtual_path: this.virtualPath, identifier: this.identifier };
   }
 
   /** @internal */

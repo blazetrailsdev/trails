@@ -28,6 +28,8 @@ export {
   escapeSegment,
   escapeFragment,
   unescapeUri,
+  HelperMethodBuilder,
+  UrlFor,
 } from "./routing/index.js";
 
 export { Request, MissingController, controllerConstants } from "./http/request.js";

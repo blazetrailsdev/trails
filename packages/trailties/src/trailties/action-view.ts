@@ -1,7 +1,11 @@
-import { type Deprecators } from "@blazetrails/activesupport";
+import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
+import { HelperMethodBuilder, Parameters, UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
   deprecator,
+  RoutingUrlFor,
+  _setUrlFor,
+  type UrlForImplementation,
   setApplyStylesheetMediaDefault,
   setPreloadLinksHeader,
 } from "@blazetrails/actionview";
@@ -53,6 +57,17 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
+    });
+
+    this.initializer("action_view.setup_action_pack", () => {
+      onLoad("action_controller", () => {
+        include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+        _setUrlFor({
+          ...UrlFor,
+          isParameters: (value: unknown) => value instanceof Parameters,
+          helperMethodBuilder: HelperMethodBuilder,
+        } as unknown as UrlForImplementation);
+      });
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {

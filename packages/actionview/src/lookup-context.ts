@@ -424,11 +424,6 @@ export class LookupContext {
     return [base, pfxs];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE actionview-drop-add-resolver-for-append-view-paths */
-  addResolver(resolver: PathSetResolver): void {
-    this.appendViewPaths([resolver]);
-  }
-
   setLayout(name: string | false): void {
     this.layoutName = name;
   }

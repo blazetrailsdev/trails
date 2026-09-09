@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
+import { Deprecators, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
+import { ActionController } from "@blazetrails/actionpack";
+import { RoutingUrlFor } from "@blazetrails/actionview";
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
   applyStylesheetMediaDefault,
   computeAssetPath,
@@ -32,5 +35,37 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
 
     expect(applyStylesheetMediaDefault).toBe(true);
     expect(String(stylesheetLinkTag.call(host, "style"))).toContain('media="screen"');
+  });
+});
+
+describe("action_view.setup_action_pack", () => {
+  afterEach(() => {
+    resetLoadHooks();
+  });
+
+  it("includes ActionDispatch::Routing::UrlFor into ActionView::RoutingUrlFor", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Trailtie.config,
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    const proto = RoutingUrlFor.prototype as unknown as Record<string, unknown>;
+    for (const name of ["routeFor", "fullUrlFor", "polymorphicUrl", "polymorphicPath"]) {
+      expect(typeof proto[name], name).toBe("function");
+    }
+  });
+
+  it("leaves RoutingUrlFor's own overrides on top of the included module", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Trailtie.config,
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    const view = Object.create(RoutingUrlFor.prototype) as RoutingUrlFor;
+    expect(RoutingUrlFor.prototype.urlFor.call(view as never, "http://www.example.com")).toBe(
+      "http://www.example.com",
+    );
   });
 });

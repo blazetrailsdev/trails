@@ -17,6 +17,22 @@ pnpm tsx scripts/api-compare/compare.ts | awk '/actionview  —/,/^=/' | head -1
 
 ## Decisions (locked)
 
+0. **Superseded (2026-09-09): the AOT output is a typecheck-only artifact.**
+   Decisions 1, 4, 6 and 7 below describe a runtime that loads compiled
+   `.tse.js` modules through a generated `views-manifest.ts`. That runtime was
+   never built and is not going to be. Rendering goes through the Rails path
+   end to end — `FileSystemResolver` finds the `.tse` file,
+   `Template#compile!` compiles it, `Handlers::Tse` renders it — which is what
+   `Template.rb:178`'s `extend Template::Handlers` wires up, and Rails has no
+   AOT manifest to mirror. A resolver reading `.trails/views/**.tse.js` would
+   be invented surface with no Ruby counterpart.
+
+   So `trails-tsc-views build` now emits only what tsc and the editor read:
+   the `.tse.ts` shim, its `.ts.map`, the `.d.ts` and `.d.ts.map`, plus
+   `template-registry-augmentation.d.ts`. The `.tse.js` / `.tse.js.map`
+   runtime modules and `views-manifest.ts` are gone. Read the rest of this
+   document with that in mind.
+
 1. **Template extension is `.tse`** (Trails Server Embedded), where Rails uses
    `.erb`. Compiled output is `.tse.js` (+ `.tse.d.ts` for typing).
 2. **Tag syntax mirrors ERB 1:1** — `<% %>`, `<%= %>`, `<%- -%>`, `<%# %>`.
