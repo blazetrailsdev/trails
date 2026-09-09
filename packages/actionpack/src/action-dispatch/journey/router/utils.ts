@@ -49,19 +49,13 @@ export class UriEncoder {
   unescapeUri(uri: string): string {
     const bytes: number[] = [];
     const encoder = new TextEncoder();
-    let i = 0;
-    while (i < uri.length) {
-      UriEncoder.ESCAPED.lastIndex = i;
-      const match = UriEncoder.ESCAPED.exec(uri);
-      if (match && match.index === i) {
-        bytes.push(parseInt(/^[0-9a-fA-F]*/.exec(match[0].slice(1, 3))![0], 16) || 0);
-        i += 3;
-        continue;
-      }
-      const cp = uri.codePointAt(i)!;
-      for (const b of encoder.encode(String.fromCodePoint(cp))) bytes.push(b);
-      i += cp > 0xffff ? 2 : 1;
+    let last = 0;
+    for (const match of uri.matchAll(UriEncoder.ESCAPED)) {
+      for (const b of encoder.encode(uri.slice(last, match.index))) bytes.push(b);
+      bytes.push(parseInt(match[0].slice(1, 3), 16));
+      last = match.index + match[0].length;
     }
+    for (const b of encoder.encode(uri.slice(last))) bytes.push(b);
     return new TextDecoder().decode(new Uint8Array(bytes));
   }
 
