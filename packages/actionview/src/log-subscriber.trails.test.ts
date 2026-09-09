@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger, Notifications, setTrailsRoot } from "@blazetrails/activesupport";
 
 import { Base } from "./base.js";
+import { LookupContext } from "./lookup-context.js";
 import { Start } from "./log-subscriber.js";
+import { Renderer } from "./renderer/renderer.js";
+import type { RenderableTemplate } from "./renderer/abstract-renderer.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = { debug: [], info: [] };
@@ -40,6 +43,23 @@ describe("ActionView::LogSubscriber", () => {
   afterEach(() => {
     Base.logger = oldLogger;
     setTrailsRoot(null);
+  });
+
+  it("logs one Rendering line and one Rendered line for a template render", async () => {
+    const template: RenderableTemplate = {
+      identifier: "/srv/app/app/views/test/hello_world.tse",
+      format: "html",
+      virtualPath: "test/hello_world",
+      render: async () => "Hello world",
+    };
+
+    await new Renderer(new LookupContext()).render({}, { template });
+
+    expect(logger.logged("debug")).toEqual(["  Rendering test/hello_world.tse"]);
+    expect(logger.logged("info")).toHaveLength(1);
+    expect(logger.logged("info")[0]).toMatch(
+      /^ {2}Rendered test\/hello_world\.tse \(Duration: .*ms \| GC: .*ms\)$/,
+    );
   });
 
   it("logs one Rendering line and one Rendered line, in that order", () => {

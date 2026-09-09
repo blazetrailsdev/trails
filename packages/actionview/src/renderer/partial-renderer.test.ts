@@ -38,7 +38,7 @@ describe("PartialRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" });
+    expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" }, null, { addToStack: true });
   });
 
   it("looks up partial with underscore prefix", async () => {
@@ -71,7 +71,9 @@ describe("ObjectRenderer", () => {
     vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const user = { name: "Alice" };
     await new ObjectRenderer(lc).renderObjectWithPartial(user, "users/user", ctx, undefined);
-    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }));
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }), null, {
+      addToStack: true,
+    });
   });
 
   it("binds object under the as: option name", async () => {
@@ -84,7 +86,9 @@ describe("ObjectRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ person: user }));
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ person: user }), null, {
+      addToStack: true,
+    });
   });
 
   it("derives partial path from toPartialPath()", async () => {

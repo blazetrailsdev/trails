@@ -17,8 +17,8 @@ export class Renderer {
     this.lookupContext = lookupContext;
   }
 
-  async render(context: ViewContext, options: RenderOptions): Promise<string> {
-    return (await this.renderToObject(context, options)).body as string;
+  async render(context: ViewContext, options: RenderOptions): Promise<string | null> {
+    return (await this.renderToObject(context, options)).body;
   }
 
   /** @internal */
@@ -32,7 +32,7 @@ export class Renderer {
     return this.renderTemplateToObject(context, options);
   }
 
-  async renderBody(context: ViewContext, options: RenderOptions): Promise<string[]> {
+  async renderBody(context: ViewContext, options: RenderOptions): Promise<(string | null)[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
@@ -47,8 +47,8 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: unknown,
-  ): Promise<string> {
-    return (await this.renderPartialToObject(context, options, block)).body as string;
+  ): Promise<string | null> {
+    return (await this.renderPartialToObject(context, options, block)).body;
   }
 
   cacheHits: Record<string, unknown> = {};

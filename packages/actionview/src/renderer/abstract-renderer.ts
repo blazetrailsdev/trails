@@ -26,7 +26,7 @@ export interface ViewContext {
 }
 
 export interface RenderOptions {
-  template?: string;
+  template?: string | RenderableTemplate;
   partial?: string | object;
   inline?: string;
   body?: string;
