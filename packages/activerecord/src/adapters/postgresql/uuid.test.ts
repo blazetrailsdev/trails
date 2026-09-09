@@ -233,7 +233,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("uuid schema dump", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "uuid_data_type");
       expect(output).toContain("uuid_data_type");
-      expect(output).toMatch(/"guid".*"uuid"/);
+      expect(output).toMatch(/t\.uuid\("guid"/);
     });
     it("uuid gen random uuid", async () => {
       const rows = await adapter.execute(`SELECT gen_random_uuid() AS uuid`);
