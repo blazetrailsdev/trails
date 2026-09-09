@@ -1218,6 +1218,20 @@ describe("CI runs every tooling test suite", () => {
     expect(run).toMatch(/::warning::/);
     expect(run).toMatch(/read-only/);
     expect(run).toMatch(/fork PR or a Dependabot PR/);
+
+    // Pin the discriminator itself, not just the wording it guards: the
+    // read-only diagnosis is only honest for an AUTHENTICATED token missing
+    // the scope. A 401 is missing/invalid auth and a 5xx is the API being
+    // down; naming forks for either misdirects.
+    const [, pattern] = run.match(/grep -qiE '([^']+)' <<</) ?? [];
+    expect(pattern, "cancel step classifies its error with a grep -qiE").toBeDefined();
+    const discriminator = new RegExp(pattern, "i");
+
+    expect(discriminator.test("gh: Resource not accessible by integration (HTTP 403)")).toBe(true);
+    expect(discriminator.test("HTTP 403: Forbidden")).toBe(true);
+    expect(discriminator.test("HTTP 401: Bad credentials")).toBe(false);
+    expect(discriminator.test("HTTP 503: no server is currently available")).toBe(false);
+    expect(discriminator.test("HTTP 404: Not Found")).toBe(false);
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

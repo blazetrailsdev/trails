@@ -683,7 +683,11 @@ jobs:
           echo "Preflight failed — cancelling run $GITHUB_RUN_ID so the DB matrix and parity pipelines don't burn 20+ minutes on a run that is already lost."
           if ! err=$(gh api -X POST "repos/$REPO/actions/runs/$GITHUB_RUN_ID/cancel" 2>&1); then
             printf '%s\n' "$err" >&2
-            if grep -qiE 'HTTP 40[13]|Resource not accessible' <<<"$err"; then
+            # 403 / "Resource not accessible" only: those are an authenticated
+            # token that lacks the scope, which is exactly the read-only-token
+            # case. A 401 is missing or invalid authentication — a different
+            # fault, and claiming "fork PR" for it would misdirect.
+            if grep -qiE 'HTTP 403|Resource not accessible' <<<"$err"; then
               echo "::warning::Could not cancel this run: the GITHUB_TOKEN is read-only, which is what a fork PR or a Dependabot PR gets on a public repo regardless of this job's declared \`actions: write\`. The remaining lanes will run to completion; the preflight failure above is still the only thing wrong."
             else
               echo "::warning::Could not cancel this run (see the error above). The remaining lanes will run to completion; the preflight failure above is still the only thing wrong."
