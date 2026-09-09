@@ -22,7 +22,7 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import { format, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -279,7 +279,7 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
 export function quotedDate(value: TemporalDateLike): string {
   if (yearOf(value) <= 0) {
-    const bceYear = String(-yearOf(value) + 1).padStart(4, "0");
+    const bceYear = format("%04d", -yearOf(value) + 1);
     return `${abstractQuotedDate(value).replace(/^-?\d+/, bceYear)} BC`;
   }
   return abstractQuotedDate(value);

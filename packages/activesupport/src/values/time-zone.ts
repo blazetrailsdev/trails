@@ -13,7 +13,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, sprintf } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -626,10 +626,7 @@ export class TimeZone {
     const sign = seconds < 0 ? "-" : "+";
     const hours = Math.trunc(Math.abs(seconds) / 3600);
     const minutes = Math.trunc((Math.abs(seconds) % 3600) / 60);
-    return format
-      .replace("%s", sign)
-      .replace("%02d", String(hours).padStart(2, "0"))
-      .replace("%02d", String(minutes).padStart(2, "0"));
+    return sprintf(format, sign, hours, minutes);
   }
 
   static find(arg: unknown): TimeZone | null {
