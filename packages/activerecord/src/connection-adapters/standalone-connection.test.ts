@@ -24,7 +24,7 @@ describe("StandaloneConnectionTest", () => {
   it.skip("async fallback", () => {});
 
   it("can throw away", async () => {
-    connection.throwAwayBang();
+    await connection.throwAwayBang();
     assertNot(await connection.active());
   });
 

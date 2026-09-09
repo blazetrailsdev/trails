@@ -1339,17 +1339,18 @@ export class PostgreSQLAdapter
     return this._maybeConfigureConnection(conn);
   }
 
-  override disconnectBang(): void {
-    const conn = this._rawConnection;
-    this._rawConnection = null;
-    this._client = null;
-    this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
-    void this._statements.reset();
-    if (this._acquiring) this._acquireGeneration++;
-    this._closingDriver = conn?.end().catch(() => {}) ?? null;
-    this.resetTransaction();
-    super.disconnectBang();
+  override async disconnectBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await super.disconnectBang();
+      const conn = this._rawConnection;
+      this._client = null;
+      this._connectionConfigured = false;
+      this._typeMapEagerLoaded = false;
+      if (this._acquiring) this._acquireGeneration++;
+      this._closingDriver = conn?.end().catch(() => {}) ?? null;
+      await this._closingDriver;
+      this._rawConnection = null;
+    });
   }
 
   /** @noRailsEquivalent PERMANENT */

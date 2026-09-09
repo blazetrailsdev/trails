@@ -1079,11 +1079,12 @@ export class AbstractAdapter implements Quoting {
     this._unconfiguredConnection = rawConnection as AbstractAdapter | null;
   }
 
-  disconnectBang(): void {
-    void this.clearCacheBang({ newConnection: true });
-    this.resetTransaction();
-    this._rawConnectionDirty = false;
-    this._connection = null;
+  async disconnectBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await this.clearCacheBang({ newConnection: true });
+      this.resetTransaction();
+      this._rawConnectionDirty = false;
+    });
   }
 
   async verifyBang(): Promise<void> {
@@ -1312,8 +1313,8 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   reconnect(): void | Promise<void> {}
 
-  disconnect(): void {
-    this.disconnectBang();
+  disconnect(): void | Promise<void> {
+    return this.disconnectBang();
   }
 
   clearCache(): void | Promise<void> {
@@ -1549,7 +1550,7 @@ export class AbstractAdapter implements Quoting {
     try {
       return await adapter.databaseExists();
     } finally {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   }
 
@@ -1611,9 +1612,9 @@ export class AbstractAdapter implements Quoting {
 
   async checkAllForeignKeysValidBang(): Promise<void> {}
 
-  throwAwayBang(): void {
+  throwAwayBang(): void | Promise<void> {
     this.pool.remove(this);
-    this.disconnectBang();
+    return this.disconnectBang();
   }
 
   async connectBang(): Promise<this> {
@@ -2124,7 +2125,7 @@ export class AbstractAdapter implements Quoting {
     try {
       await this.configureConnection();
     } catch (e) {
-      this.disconnectBang();
+      await this.disconnectBang();
       throw e;
     }
   }

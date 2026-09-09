@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
   describe("on a dropped connection", () => {
     it("answers the real type from the type map already built", async () => {
       await connection.execute("SELECT 1");
-      connection.disconnectBang();
+      await connection.disconnectBang();
 
       expect(
         connection.lookupCastTypeFromColumn({ oid: UUID_OID, fmod: -1, sqlType: "uuid" }),

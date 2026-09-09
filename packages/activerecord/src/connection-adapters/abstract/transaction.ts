@@ -275,7 +275,7 @@ export type TransactionConnection = DatabaseAdapter & {
   lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
-  throwAwayBang?(): void;
+  throwAwayBang?(): void | Promise<void>;
 };
 
 export class Transaction {
@@ -1082,7 +1082,7 @@ export class TransactionManager {
       return result;
     } finally {
       if (!transaction || !transaction.state.isCompleted()) {
-        this._connection.throwAwayBang?.();
+        await this._connection.throwAwayBang?.();
         transaction?.incompleteBang();
       }
     }

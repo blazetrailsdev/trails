@@ -256,7 +256,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     try {
       expect(await a.active()).toBe(true);
       expect(a.isConnected()).toBe(true);
-      a.disconnectBang();
+      await a.disconnectBang();
       expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
     } finally {
@@ -297,7 +297,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("disconnectBang then reconnect restores query capability", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     try {
-      a.disconnectBang();
+      await a.disconnectBang();
       expect(await a.active()).toBe(false);
       await a.reconnect();
       expect(await a.active()).toBe(true);

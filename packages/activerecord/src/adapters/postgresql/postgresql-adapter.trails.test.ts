@@ -350,7 +350,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.execute("SELECT 1 AS n");
-        other.disconnectBang();
+        await other.disconnectBang();
         expect(other._rawConnection).toBeNull();
 
         const resetting = other.resetBang();
@@ -1226,7 +1226,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const firstAcquire = a.connect();
         await waitForNewClientCalls(spy, 1);
 
-        a.disconnectBang();
+        await a.disconnectBang();
 
         const reconnect = a.reconnect();
         await waitForNewClientCalls(spy, 2);
@@ -1261,7 +1261,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const firstAcquire = a.connect();
         await waitForNewClientCalls(spy, 1);
 
-        a.disconnectBang();
+        await a.disconnectBang();
 
         await a.reconnect();
         expect(a._rawConnectionForTest()).toBe(reconnected);

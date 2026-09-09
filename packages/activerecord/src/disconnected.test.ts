@@ -28,7 +28,7 @@ describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
     await connection.execute("SELECT count(*) from products");
     const firstConnection = rawConnection(connection);
 
-    connection.disconnectBang();
+    await connection.disconnectBang();
     expect(rawConnection(connection)).toBeNull();
 
     await connection.execute("SELECT count(*) from products");

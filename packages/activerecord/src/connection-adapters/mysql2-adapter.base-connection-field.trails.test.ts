@@ -38,7 +38,7 @@ describe("Mysql2Adapter base _connection field", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
     await adapter.connectBang();
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     expect(connectionOf(adapter)).toBeNull();
     expect(end).toHaveBeenCalledTimes(1);
 

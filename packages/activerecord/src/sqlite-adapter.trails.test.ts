@@ -37,10 +37,10 @@ const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
 const asyncOnlyDriver = asyncDriver(openVia);
 
 describe("SQLite adapter driver binding", () => {
-  it("BetterSQLite3Adapter binds its bundled driver and opens", () => {
+  it("BetterSQLite3Adapter binds its bundled driver and opens", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:");
     expect(adapter).toBeInstanceOf(SQLite3Adapter);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("leaves the raw connection unopened until connectBang", async () => {
@@ -50,17 +50,17 @@ describe("SQLite adapter driver binding", () => {
 
     await adapter.connectBang();
     expect(adapter.isConnected()).toBe(true);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("the abstract base has no bundled driver and cannot open directly", () => {
     expect(() => new SQLite3Adapter(":memory:")).toThrow(/No SQLite driver configured/);
   });
 
-  it("accepts an explicit SqliteDriver via config.driver", () => {
+  it("accepts an explicit SqliteDriver via config.driver", async () => {
     const adapter = new SQLite3Adapter(":memory:", { driver: betterSqlite3Driver });
     expect(adapter).toBeInstanceOf(SQLite3Adapter);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("rejects an invalid driver object", () => {
@@ -90,13 +90,13 @@ describe("SQLite adapter driver binding", () => {
     const rows = await adapter.execute("SELECT name FROM async_t");
     expect(rows).toEqual([{ name: "async" }]);
     await adapter.internalExecute("DROP TABLE IF EXISTS async_t", "SCHEMA");
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("openAsync also opens sync drivers (better-sqlite3)", async () => {
     const adapter = await BetterSQLite3Adapter.openAsync(":memory:");
     expect(await adapter.active()).toBe(true);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("forwards driver-specific open config (timeout, driverOptions) to open()", async () => {
@@ -112,7 +112,7 @@ describe("SQLite adapter driver binding", () => {
     } as never);
     expect(seen?.timeout).toBe(1234);
     expect(seen?.driverOptions).toEqual({ foo: "bar" });
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("stays pending after a failed async open so verifyBang can retry", async () => {
@@ -126,7 +126,7 @@ describe("SQLite adapter driver binding", () => {
     expect(await adapter.active()).toBe(false);
     await adapter.completeAsyncConnect();
     expect(await adapter.active()).toBe(true);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("dedupes concurrent completeAsyncConnect() calls onto one open", async () => {
@@ -139,7 +139,7 @@ describe("SQLite adapter driver binding", () => {
     await Promise.all([adapter.completeAsyncConnect(), adapter.completeAsyncConnect()]);
     expect(opens).toBe(1);
     expect(await adapter.active()).toBe(true);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("disconnectBang is safe before an async-only connection completes", () => {
@@ -170,7 +170,7 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync(":memory:", { driver });
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     expect(closed).toBe(false);
     resolveClose!();
     await adapter.close();
@@ -193,7 +193,7 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync(":memory:", { driver });
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     await expect(adapter.close()).resolves.toBeUndefined();
   });
 
@@ -209,7 +209,7 @@ describe("SQLite adapter driver binding", () => {
     const rows = await adapter.execute("SELECT name FROM sync_checkout");
     expect(rows).toEqual([{ name: "lazy" }]);
     await adapter.internalExecute("DROP TABLE IF EXISTS sync_checkout", "SCHEMA");
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("completes a deferred open when the first call is a schema introspection", async () => {
@@ -218,7 +218,7 @@ describe("SQLite adapter driver binding", () => {
     const cols = await adapter.columns("schema_first");
     expect(cols.map((c) => c.name)).toEqual(["id", "name"]);
     await adapter.execute("DROP TABLE IF EXISTS schema_first");
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("opens once when several queries race the deferred async-only open", async () => {
@@ -235,7 +235,7 @@ describe("SQLite adapter driver binding", () => {
       adapter.execute("PRAGMA foreign_keys"),
     ]);
     expect(opens).toBe(1);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("serves an async-only driver through the synchronous pool checkout", async () => {
@@ -420,7 +420,7 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
-    conn.disconnectBang();
+    await conn.disconnectBang();
 
     const draining = pool.discardBang();
     expect(isClosed()).toBe(false);
@@ -480,13 +480,13 @@ describe("SQLite adapter driver binding", () => {
 
   it("reconnects an async-only driver and reapplies pragmas", async () => {
     const adapter = await SQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     expect(await adapter.active()).toBe(false);
     await adapter.reconnectBang();
     expect(await adapter.active()).toBe(true);
     const rows = await adapter.execute("PRAGMA foreign_keys");
     expect(rows).toEqual([{ foreign_keys: 1 }]);
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   const asyncPragmaDriver = asyncDriver(async (config) => {
@@ -507,7 +507,7 @@ describe("SQLite adapter driver binding", () => {
       driver: asyncPragmaDriver,
     });
     expect(adapter.encoding).toBe("UTF-8");
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("encoding falls back to UTF-8 before a deferred async-only open completes", async () => {
@@ -516,10 +516,10 @@ describe("SQLite adapter driver binding", () => {
     expect(adapter.encoding).toBe("UTF-8");
   });
 
-  it("encoding returns the database encoding for a sync driver", () => {
+  it("encoding returns the database encoding for a sync driver", async () => {
     const adapter = new SQLite3Adapter(":memory:", { driver: betterSqlite3Driver });
     expect(adapter.encoding).toBe("UTF-8");
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   it("isOpen and raw degrade gracefully before a deferred async-only open", () => {

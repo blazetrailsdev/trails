@@ -9,10 +9,10 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     openAdapters.push(adapter);
     return adapter;
   };
-  afterEach(() => {
+  afterEach(async () => {
     while (openAdapters.length) {
       try {
-        openAdapters.pop()!.disconnectBang();
+        await openAdapters.pop()!.disconnectBang();
       } catch {}
     }
   });
