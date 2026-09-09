@@ -34,6 +34,13 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     readFileSync(path: string): string {
       return vfs.read(path)?.content ?? "";
     },
+    // Required on FsAdapter, like its sync twin: a filesystem that cannot be
+    // read asynchronously made every async consumer guard a branch no
+    // registered adapter takes. The VFS is in memory, so this is the sync
+    // read with a promise around it.
+    readFile(path: string): Promise<string> {
+      return Promise.resolve(vfs.read(path)?.content ?? "");
+    },
     writeFileSync(path: string, content: string): void {
       vfs.write(path, content);
     },
