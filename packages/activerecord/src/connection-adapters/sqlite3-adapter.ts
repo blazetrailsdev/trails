@@ -604,7 +604,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._rawConnection?.isOpen() ?? false;
   }
 
-  override disconnectBang(): void {
+  override async disconnectBang(): Promise<void> {
+    await super.disconnectBang();
+
     const ahead = this._statementLock;
     if (ahead) {
       this._chainClose(ahead.then(() => this._disconnect()));
@@ -616,11 +618,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private _disconnect(): void {
     const conn = this._rawConnection;
-    super.disconnectBang();
     if (conn?.isOpen()) {
       const closing = conn.close();
       if (closing) this._chainClose(closing);
     }
+    this._connection = null;
   }
 
   /** @internal */

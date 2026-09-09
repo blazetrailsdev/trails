@@ -12,12 +12,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
     originalPreparedStatements = adapter.preparedStatements;
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     adapter.preparedStatements = true;
   });
-  afterEach(() => {
+  afterEach(async () => {
     adapter.preparedStatements = originalPreparedStatements;
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
   });
 
   describe("StatementPoolTest", () => {

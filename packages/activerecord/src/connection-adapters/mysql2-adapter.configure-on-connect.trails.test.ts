@@ -49,7 +49,7 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     const checkVersionSpy = vi.spyOn(adapter, "checkVersion");
 
     await adapter.connectBang();
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     await adapter.connectBang();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(2);

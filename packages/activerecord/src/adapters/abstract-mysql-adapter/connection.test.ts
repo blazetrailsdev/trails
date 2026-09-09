@@ -89,20 +89,20 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     }, 10_000);
     it("execute after disconnect reconnects", async () => {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
       const rows = await adapter.execute("SELECT 1+2 AS v");
       expect(rows[0].v).toBe(3);
     });
 
-    it("quote after disconnect reconnects", () => {
-      adapter.disconnectBang();
+    it("quote after disconnect reconnects", async () => {
+      await adapter.disconnectBang();
       expect(adapter.quote("string")).toBe("'string'");
     });
 
     it("active after disconnect", async () => {
       await adapter.execute("SELECT 1");
       expect(await adapter.active()).toBe(true);
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
       expect(await adapter.active()).toBe(false);
     });
 

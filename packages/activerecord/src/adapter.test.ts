@@ -691,7 +691,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   }
 
   it("reconnect after a disconnect", async () => {
-    connection.disconnectBang();
+    await connection.disconnectBang();
     expect(await activePredicate(connection)).toBe(false);
     await connection.reconnectBang();
     expect(await connection.active()).toBe(true);
@@ -722,7 +722,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(connection.isTransactionOpen()).toBe(true);
     await connection.materializeTransactions();
     expect(await rawTransactionOpen(connection)).toBe(true);
-    connection.disconnectBang();
+    await connection.disconnectBang();
     expect(connection.isTransactionOpen()).toBe(false);
   });
 
@@ -752,7 +752,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     await connection.transactionManager.beginTransaction();
     expect(connection.isTransactionOpen()).toBe(true);
     expect(await rawTransactionOpen(connection)).toBe(false);
-    connection.disconnectBang();
+    await connection.disconnectBang();
     expect(connection.isTransactionOpen()).toBe(false);
   });
 
@@ -1012,7 +1012,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     const pool = (connection as unknown as { pool: { newConnection(): DatabaseAdapter } }).pool;
     const fresh = pool.newConnection();
     try {
-      fresh.disconnectBang();
+      await fresh.disconnectBang();
       const failures: Error[] = [new ConnectionFailed("Oops"), new ConnectionFailed("Oops 2")];
       const original = fresh.configureConnection.bind(fresh);
       (
@@ -1028,7 +1028,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       expect((await fresh.execQuery("SELECT 1")).rows).toEqual([[1]]);
       expect(failures).toEqual([]);
     } finally {
-      fresh.disconnectBang();
+      await fresh.disconnectBang();
     }
   });
 });

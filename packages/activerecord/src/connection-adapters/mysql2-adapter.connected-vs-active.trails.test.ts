@@ -47,7 +47,7 @@ describe("Mysql2Adapter connected? vs active?", () => {
 
     expect(adapter.isConnected()).toBe(false);
     await adapter.connectBang();
-    adapter.disconnectBang();
+    await adapter.disconnectBang();
     expect(adapter.isConnected()).toBe(false);
     expect(await adapter.active()).toBe(false);
   });

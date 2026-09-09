@@ -165,11 +165,12 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
     expect(closing._statementLock).not.toBe(held);
 
-    closing.disconnectBang();
+    const disconnecting = closing.disconnectBang();
     expect(closing.isOpen).toBe(true);
 
     release();
     await expect(queued).resolves.toBe(1);
+    await disconnecting;
 
     await closing.whenClosed();
     expect(closing.isOpen).toBe(false);
@@ -185,11 +186,12 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const queued = closing.executeMutation(`INSERT INTO "dc2" DEFAULT VALUES`);
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
 
-    closing.disconnectBang();
-    const answered = closing.active();
+    const disconnecting = closing.disconnectBang();
 
     release();
     await expect(queued).resolves.toBe(1);
+    await disconnecting;
+    const answered = closing.active();
 
     expect(await answered).toBe(false);
     expect(closing.isOpen).toBe(false);

@@ -356,7 +356,7 @@ describe("per-adapter visitor isolation", () => {
 });
 
 describe("AbstractAdapter#defaultTimezone", () => {
-  it("falls back to ActiveRecord.defaultTimezone when the config sets none", () => {
+  it("falls back to ActiveRecord.defaultTimezone when the config sets none", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     const previous = ActiveRecord.defaultTimezone;
     try {
@@ -366,11 +366,11 @@ describe("AbstractAdapter#defaultTimezone", () => {
       expect(adapter.defaultTimezone).toBe("utc");
     } finally {
       ActiveRecord.defaultTimezone = previous;
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 
-  it("prefers the configured default_timezone over the global one", () => {
+  it("prefers the configured default_timezone over the global one", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:", defaultTimezone: "local" });
     const previous = ActiveRecord.defaultTimezone;
     try {
@@ -378,7 +378,7 @@ describe("AbstractAdapter#defaultTimezone", () => {
       expect(adapter.defaultTimezone).toBe("local");
     } finally {
       ActiveRecord.defaultTimezone = previous;
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 
@@ -392,23 +392,23 @@ describe("AbstractAdapter#defaultTimezone", () => {
     ).toThrow("default_timezone must be either 'utc' or 'local'");
   });
 
-  it("contributes no extended type map key when the config sets no default_timezone", () => {
+  it("contributes no extended type map key when the config sets no default_timezone", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.extendedTypeMapKey()).toBeNull();
     } finally {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 });
 
 describe("AbstractAdapter#adapterName", () => {
-  it("returns the class's ADAPTER_NAME rather than the type-registry key", () => {
+  it("returns the class's ADAPTER_NAME rather than the type-registry key", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.adapterName).toBe("SQLite");
     } finally {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 

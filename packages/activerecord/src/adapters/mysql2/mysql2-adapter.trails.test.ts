@@ -135,7 +135,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
         await fresh.execQuery("SELECT 1");
         expect(await fresh.active()).toBe(true);
         expect(fresh.isConnected()).toBe(true);
-        fresh.disconnectBang();
+        await fresh.disconnectBang();
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);
       } finally {

@@ -446,7 +446,7 @@ it("isConnected probes each pooled connection's connected state", async () => {
   await conn.verifyBang();
   expect(pool.isConnected()).toBe(true);
   pool.checkin(conn);
-  conn.disconnectBang();
+  await conn.disconnectBang();
   expect(pool.connections.length).toBe(1);
   expect(pool.isConnected()).toBe(false);
 });

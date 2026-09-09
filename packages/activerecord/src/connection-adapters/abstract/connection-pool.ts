@@ -666,7 +666,10 @@ export class ConnectionPool implements ReapablePool {
           conn.stealBang();
           this.checkin(conn);
         }
-        (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+        const closed = (
+          conn as unknown as { disconnectBang?: () => void | Promise<void> }
+        ).disconnectBang?.();
+        if (closed) draining.push(closed);
         const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         if (drain) draining.push(drain);
       }
@@ -729,7 +732,10 @@ export class ConnectionPool implements ReapablePool {
           this.checkin(conn);
         }
         if (reloadable.has(conn)) {
-          (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+          const closed = (
+            conn as unknown as { disconnectBang?: () => void | Promise<void> }
+          ).disconnectBang?.();
+          if (closed) draining.push(closed);
           const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
           if (drain) draining.push(drain);
         }
@@ -777,7 +783,10 @@ export class ConnectionPool implements ReapablePool {
 
     const draining: Array<Promise<void>> = [];
     for (const conn of idleConnections) {
-      (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+      const closed = (
+        conn as unknown as { disconnectBang?: () => void | Promise<void> }
+      ).disconnectBang?.();
+      if (closed) draining.push(closed);
       const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
       if (drain) draining.push(drain);
     }
@@ -959,7 +968,7 @@ export class ConnectionPool implements ReapablePool {
       return c;
     } catch (err) {
       this.remove(c);
-      c.disconnectBang();
+      this._trackCloseDrain(c.disconnectBang());
       this._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
       throw err;
     }

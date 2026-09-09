@@ -145,9 +145,9 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
   override clearCacheBang(): void {
     this.clearCacheCalls++;
   }
-  override disconnectBang(): void {
+  override async disconnectBang(): Promise<void> {
     this.disconnectCalls++;
-    super.disconnectBang();
+    await super.disconnectBang();
   }
   attachRawConnection(): void {
     this._connection = this;

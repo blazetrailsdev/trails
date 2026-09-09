@@ -49,7 +49,7 @@ export class SQLiteDatabaseTasks {
   async purge(): Promise<void> {
     try {
       const connection = (await this.connection()) as SQLite3Adapter;
-      connection.disconnectBang();
+      await connection.disconnectBang();
       await connection.whenClosed();
       await this.drop();
     } catch (error) {

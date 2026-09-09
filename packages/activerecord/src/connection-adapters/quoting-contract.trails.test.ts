@@ -11,7 +11,7 @@ const _abstractAdapterIsQuoting: _AbstractAdapterIsQuoting = true;
 void _abstractAdapterIsQuoting;
 
 describe("Quoting interface", () => {
-  it("AbstractAdapter implements every Quoting method", () => {
+  it("AbstractAdapter implements every Quoting method", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:");
     try {
       const q: Quoting = adapter;
@@ -32,11 +32,11 @@ describe("Quoting interface", () => {
       expect(typeof q.castBoundValue).toBe("function");
       expect(typeof q.sanitizeAsSqlComment).toBe("function");
     } finally {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 
-  it("SQLite3Adapter dispatches quote/quotedTrue to its own dialect", () => {
+  it("SQLite3Adapter dispatches quote/quotedTrue to its own dialect", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:");
     try {
       expect(adapter.quotedTrue()).toBe("1");
@@ -44,7 +44,7 @@ describe("Quoting interface", () => {
       expect(adapter.quote(true)).toBe("1");
       expect(adapter.quoteColumnName("foo")).toBe('"foo"');
     } finally {
-      adapter.disconnectBang();
+      await adapter.disconnectBang();
     }
   });
 });

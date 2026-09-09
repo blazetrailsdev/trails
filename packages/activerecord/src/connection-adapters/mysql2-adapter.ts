@@ -692,10 +692,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  override disconnectBang(): void {
-    this._connectGeneration++;
-    this._closeRawHandle();
-    super.disconnectBang();
+  override async disconnectBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await super.disconnectBang();
+      this._connectGeneration++;
+      this._closeRawHandle();
+    });
   }
 
   /** @internal */
