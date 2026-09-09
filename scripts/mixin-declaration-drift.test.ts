@@ -76,7 +76,7 @@ describe("mixin declaration drift", () => {
       // AbstractAdapter defers its own `include()` to the first construction (see
       // ensureAbstractAdapterMixinsApplied), so a prototype read before any
       // adapter exists sees none of the mixed-in methods.
-      new BetterSQLite3Adapter(":memory:").disconnectBang();
+      await new BetterSQLite3Adapter(":memory:").disconnectBang();
 
       const source = await fs.readFile(pair.adapterFile, "utf8");
       const names = requiredInterfaceMethodNames(pair.adapterFile, source, pair.adapterInterface);
