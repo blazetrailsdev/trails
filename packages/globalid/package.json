@@ -19,6 +19,9 @@
       "default": "./dist/signed-global-id.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc"
   },

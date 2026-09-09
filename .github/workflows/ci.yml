@@ -800,6 +800,7 @@ jobs:
           scripts/stale-story-references.test.ts
           scripts/closing-story-references.test.ts
           scripts/non-transactional-row-writes.test.ts
+          scripts/package-files-field.test.ts
           scripts/ruby-compat-leaf.test.ts
           scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
