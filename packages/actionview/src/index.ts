@@ -87,3 +87,13 @@ export {
   type RenderOptions,
 } from "./render-context.js";
 export { type NoExtraKeys, StrictLocalsMismatch } from "./strict-locals.js";
+export {
+  urlFor,
+  urlOptions,
+  _routesContext,
+  optimizeRoutesGeneration,
+  _generatePathsByDefault,
+  ensureOnlyPathOption,
+  type RoutingUrlForHost,
+} from "./routing-url-for.js";
+export { _setUrlFor, type UrlForImplementation } from "./routing-url-for-slot.js";

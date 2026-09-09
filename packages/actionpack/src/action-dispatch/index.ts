@@ -28,6 +28,12 @@ export {
   escapeSegment,
   escapeFragment,
   unescapeUri,
+  urlFor,
+  urlOptions,
+  optimizeRoutesGeneration,
+  polymorphicPath,
+  polymorphicUrl,
+  HelperMethodBuilder,
 } from "./routing/index.js";
 
 export { Request, MissingController, controllerConstants } from "./http/request.js";

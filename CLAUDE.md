@@ -747,7 +747,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Ten instances exist and are the only ones:
+where Ruby resolves the constant. Eleven instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
@@ -791,6 +791,14 @@ where Ruby resolves the constant. Ten instances exist and are the only ones:
   declared at `fixtures.rb:809`). The cycle is closed by `fixtures.ts` needing
   `Base` at runtime (`fixtures.ts:720,940`), so `database-statements.ts` cannot
   import `fixtures.ts` back.
+- `actionview/src/routing-url-for-slot.ts` — the `ActionDispatch::Routing::UrlFor`
+  module, read by `routing-url-for.ts` for the `super` calls in
+  `ActionView::RoutingUrlFor#url_for` / `#url_options` /
+  `#optimize_routes_generation?` (`actionview/lib/action_view/routing_url_for.rb:80-136`),
+  plus the `HelperMethodBuilder` and `ActionController::Parameters` its body
+  names. Rails mixes the module in from an `on_load(:action_controller)` hook
+  (`actionview/lib/action_view/railtie.rb:97-101`); actionview does not depend
+  on actionpack, so a plain import is not available in either direction.
 - `activerecord/src/base-slot.ts` — `Base`, read by `dynamic-matchers.ts`,
   `connection-handling.ts` and `core.ts` for Rails' `self == Base`
   (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
