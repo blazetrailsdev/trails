@@ -72,7 +72,7 @@ describe("EncryptedFileTest", () => {
     await ef.write(CONTENT);
     const fs = getFs();
     await ef.change(async (tmp) => {
-      const current = await fs.readFile!(tmp, "utf8");
+      const current = await fs.readFile(tmp, "utf8");
       await fs.writeFile!(tmp, `${current} and went by the lake`);
     });
     expect(await ef.read()).toBe(`${CONTENT} and went by the lake`);
