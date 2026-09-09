@@ -250,13 +250,15 @@ export class Formatter {
   private possibles(
     cache: Record<string, unknown>,
     options: Record<string, unknown>,
+    depth = 0,
   ): [number, Route][] {
     return [
       ...((cache["___routes"] as [number, Route][]) ?? []),
       ...Object.entries(options)
-        .filter(([k, v]) => Object.hasOwn(cache, pairKey(k, v)))
-        .flatMap(([k, v]) =>
-          this.possibles(cache[pairKey(k, v)] as Record<string, unknown>, options),
+        .map(([k, v]) => pairKey(k, v))
+        .filter((pair) => Object.hasOwn(cache, pair))
+        .flatMap((pair) =>
+          this.possibles(cache[pair] as Record<string, unknown>, options, depth + 1),
         ),
     ];
   }
