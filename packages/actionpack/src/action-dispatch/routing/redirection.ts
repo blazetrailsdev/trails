@@ -5,10 +5,9 @@ import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
 import {
   escapeFragment as journeyEscapeFragment,
   escapePath as journeyEscapePath,
-  rackEscape,
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
-import type { RackEnv } from "@blazetrails/rack";
+import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -157,7 +156,7 @@ export class Redirect extends Endpoint {
 
   /** @internal */
   protected escape(params: Record<string, string>): Record<string, string> {
-    return transformValues(params, rackEscape);
+    return transformValues(params, RackUtils.escape);
   }
 
   /** @internal */

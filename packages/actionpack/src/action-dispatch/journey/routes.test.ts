@@ -12,7 +12,7 @@ function makePattern(
   requirements: Record<string, RegExp> = {},
   anchored = true,
 ): Pattern {
-  const tree = new Parser().parse(path);
+  const tree = new Parser().parse(path)!;
   const ast = new Ast(tree, true);
   return new Pattern(ast, requirements, "/.?", anchored);
 }

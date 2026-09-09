@@ -7,7 +7,7 @@ import { Routes } from "./routes.js";
 import { Formatter, MissingRoute, RouteWithParams, UrlGenerationError } from "./formatter.js";
 
 function makePattern(path: string, requirements: Record<string, RegExp> = {}): Pattern {
-  const tree = new Parser().parse(path);
+  const tree = new Parser().parse(path)!;
   const ast = new Ast(tree, true);
   return new Pattern(ast, requirements, "/.?", true);
 }

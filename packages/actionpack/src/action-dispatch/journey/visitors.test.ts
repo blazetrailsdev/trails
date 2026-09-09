@@ -12,7 +12,7 @@ import {
 
 describe("ActionDispatch::Journey::Visitors::String", () => {
   const roundTrip = (str: string) =>
-    expect(StringVisitor.INSTANCE.accept(new Parser().parse(str), "")).toBe(str);
+    expect(StringVisitor.INSTANCE.accept(new Parser().parse(str)!, "")).toBe(str);
 
   it("round-trips slash", () => roundTrip("/"));
   it("round-trips segment", () => roundTrip("/foo"));
@@ -33,7 +33,7 @@ describe("ActionDispatch::Journey::Visitors::String", () => {
 
 describe("ActionDispatch::Journey::Visitors::Each", () => {
   it("visits every node in pre-order", () => {
-    const tree = new Parser().parse("/:foo");
+    const tree = new Parser().parse("/:foo")!;
     const seen: string[] = [];
     Each.INSTANCE.accept(tree, (n) => seen.push(n.type));
     expect(seen).toEqual(["CAT", "SLASH", "SYMBOL"]);
@@ -42,57 +42,57 @@ describe("ActionDispatch::Journey::Visitors::Each", () => {
 
 describe("ActionDispatch::Journey::Visitors::FormatBuilder", () => {
   it("builds a Format whose evaluate substitutes values", () => {
-    const tree = new Parser().parse("/posts/:id");
+    const tree = new Parser().parse("/posts/:id")!;
     const format = new FormatBuilder().accept(tree);
     expect(format).toBeInstanceOf(Format);
     expect(format.evaluate({ id: "42" })).toBe("/posts/42");
   });
 
   it("returns empty string when a required value is missing", () => {
-    const tree = new Parser().parse("/posts/:id");
+    const tree = new Parser().parse("/posts/:id")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({})).toBe("");
   });
 
   it("uses required_path escaping for controller", () => {
-    const tree = new Parser().parse("/:controller");
+    const tree = new Parser().parse("/:controller")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({ controller: "admin/posts" })).toBe("/admin/posts");
   });
 
   it("escapes segment values (not paths) for non-controller symbols", () => {
-    const tree = new Parser().parse("/:slug");
+    const tree = new Parser().parse("/:slug")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({ slug: "a/b" })).toBe("/a%2Fb");
   });
 
   it("coerces non-string values via toString (matches Rails .to_s)", () => {
-    const tree = new Parser().parse("/posts/:id");
+    const tree = new Parser().parse("/posts/:id")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({ id: 42 })).toBe("/posts/42");
   });
 
   it("ignores Object.prototype keys when checking for parameter presence", () => {
-    const tree = new Parser().parse("/posts/:toString");
+    const tree = new Parser().parse("/posts/:toString")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({})).toBe("");
   });
 
   it("emits required_path for stars", () => {
-    const tree = new Parser().parse("/*path");
+    const tree = new Parser().parse("/*path")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({ path: "a/b/c" })).toBe("/a/b/c");
   });
 
   it("optional group drops to empty when its parameter is missing", () => {
-    const tree = new Parser().parse("/posts(.:format)");
+    const tree = new Parser().parse("/posts(.:format)")!;
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({})).toBe("/posts");
     expect(format.evaluate({ format: "json" })).toBe("/posts.json");
   });
 
   it("throws on OR (alternation) nodes — Rails routes don't use OR for path-building", () => {
-    const tree = new Parser().parse("a|b");
+    const tree = new Parser().parse("a|b")!;
     expect(() => new FormatBuilder().accept(tree)).toThrow(/OR/);
   });
 });

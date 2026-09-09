@@ -56,7 +56,7 @@ export class MissingRoute {
 export class Formatter {
   readonly routes: FormatterHost;
   /** @internal */
-  private _cache: CacheNode | null = null;
+  private _cache: Record<string, unknown> | null = null;
 
   constructor(routes: FormatterHost) {
     this.routes = routes;
@@ -202,16 +202,19 @@ export class Formatter {
   }
 
   /** @internal */
-  private nonRecursive(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
-    const routes: [number, Route][] = [];
-    const queue: CacheNode[] = [cache];
+  private nonRecursive(
+    cache: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ): [number, Route][] {
+    let routes: [number, Route][] = [];
+    const queue: Record<string, unknown>[] = [cache];
     while (queue.length > 0) {
       const c = queue.shift()!;
-      routes.push(...c.routes);
+      if (Object.hasOwn(c, "___routes"))
+        routes = routes.concat(c["___routes"] as [number, Route][]);
       for (const [k, v] of Object.entries(options)) {
-        const key = pairKey(k, v);
-        const child = c.children.get(key);
-        if (child) queue.push(child);
+        const pair = pairKey(k, v);
+        if (Object.hasOwn(c, pair)) queue.push(c[pair] as Record<string, unknown>);
       }
     }
     return routes;
@@ -244,46 +247,39 @@ export class Formatter {
   }
 
   /** @internal */
-  private possibles(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
-    const out: [number, Route][] = [...cache.routes];
-    for (const [k, v] of Object.entries(options)) {
-      const key = pairKey(k, v);
-      const child = cache.children.get(key);
-      if (child) out.push(...this.possibles(child, options));
-    }
-    return out;
+  private possibles(
+    cache: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ): [number, Route][] {
+    return [
+      ...((cache["___routes"] as [number, Route][]) ?? []),
+      ...Object.entries(options)
+        .filter(([k, v]) => Object.hasOwn(cache, pairKey(k, v)))
+        .flatMap(([k, v]) =>
+          this.possibles(cache[pairKey(k, v)] as Record<string, unknown>, options),
+        ),
+    ];
   }
 
   /** @internal */
-  private buildCache(): CacheNode {
-    const root: CacheNode = { children: new Map(), routes: [] };
+  private buildCache(): Record<string, unknown> {
+    const root: Record<string, unknown> = { ___routes: [] as [number, Route][] };
     const list = this.routes.routes.routes;
     for (let i = 0; i < list.length; i++) {
       const route = list[i];
-      let h = root;
-      for (const [k, v] of Object.entries(route.requiredDefaults)) {
-        const key = pairKey(k, v);
-        let child = h.children.get(key);
-        if (!child) {
-          child = { children: new Map(), routes: [] };
-          h.children.set(key, child);
-        }
-        h = child;
-      }
-      h.routes.push([i, route]);
+      const leaf = Object.entries(route.requiredDefaults).reduce<Record<string, unknown>>(
+        (h, [k, v]) => (h[pairKey(k, v)] ||= {}) as Record<string, unknown>,
+        root,
+      );
+      ((leaf["___routes"] ||= []) as [number, Route][]).push([i, route]);
     }
     return root;
   }
 
   /** @internal */
-  private get cache(): CacheNode {
+  private get cache(): Record<string, unknown> {
     return (this._cache ??= this.buildCache());
   }
-}
-
-interface CacheNode {
-  children: Map<string, CacheNode>;
-  routes: [number, Route][];
 }
 
 function pairKey(k: string, v: unknown): string {

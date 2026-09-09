@@ -6,7 +6,7 @@ import { Route } from "./route.js";
 import { Routes, type Mapping } from "./routes.js";
 
 function makePattern(path: string): Pattern {
-  const tree = new Parser().parse(path);
+  const tree = new Parser().parse(path)!;
   const ast = new Ast(tree, true);
   return new Pattern(ast, {}, "/.?", true);
 }
