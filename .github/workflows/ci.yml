@@ -395,6 +395,9 @@ jobs:
   # Deliberately NOT folded into
   # `changes` — that job is on the critical path of every downstream gate, and a
   # prettier/attribution failure there would block gate computation.
+  # A failure here is terminal for a PR run: the last two steps report which
+  # check(s) went red and then cancel the run, so the expensive lanes stop
+  # instead of finishing. See those steps for the scoping and the reasoning.
   preflight:
     name: Preflight
     needs: changes
@@ -410,6 +413,11 @@ jobs:
       # it is part of the default token.
       contents: read
       pull-requests: read
+      # actions: write is required by, and only by, the "Cancel the rest of the
+      # run" step below — POST /actions/runs/{id}/cancel is the only API that
+      # stops a run in flight, and it is gated on that scope. Nothing else in
+      # this job writes anything.
+      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -446,6 +454,7 @@ jobs:
       # `--ignore-unknown` skips paths Prettier has no parser for, and
       # `.prettierignore` is still honored.
       - name: Prettier
+        id: prettier
         env:
           PRETTIER_FILES: ${{ needs.changes.outputs.prettier_files }}
         run: |
@@ -460,6 +469,7 @@ jobs:
           fi
 
       - name: Raw control bytes
+        id: control-bytes
         if: ${{ !cancelled() }}
         run: |
           scripts/ci/check-control-bytes.sh --self-test
@@ -468,6 +478,7 @@ jobs:
       # RFC 0087 Verification: the synchronous association-writer machinery the
       # campaign deleted stays deleted.
       - name: Sync association writers
+        id: sync-association-writers
         if: ${{ !cancelled() }}
         run: |
           scripts/ci/check-sync-association-writers.sh --self-test
@@ -480,6 +491,7 @@ jobs:
       # base to diff against. Only `docs/activerecord/` is policed — other
       # docs/ trees stay live until their own cutover.
       - name: Docs ActiveRecord Freeze
+        id: docs-activerecord-freeze
         # !cancelled() defeats the implicit success() that GitHub ANDs onto a
         # step `if:`, so an earlier step's failure (e.g. prettier) can't skip
         # this guard — preserving the independent reporting the three replaced
@@ -516,10 +528,12 @@ jobs:
       # must carry no pending citation of `<id>`. Same scan, same extractor, so
       # a finding is a guaranteed red on main.
       - name: Set up pnpm (closing-story citations)
+        id: setup-pnpm
         # !cancelled() as above, so an earlier step's failure can't skip it.
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         uses: ./.github/actions/setup-pnpm
       - name: Closing-story citations
+        id: closing-story-citations
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: |
           set -euo pipefail
@@ -531,6 +545,7 @@ jobs:
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
       # contributors are unaffected; push/schedule have no PR body.
       - name: Forbid Claude attribution in PR body
+        id: pr-body-attribution
         # !cancelled() so a prior step's failure can't suppress this guard
         # (see Docs ActiveRecord Freeze above).
         if: >-
@@ -551,6 +566,7 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in PR body."
       - name: Forbid Claude attribution in commit messages
+        id: commit-attribution
         # !cancelled() so a prior step's failure can't suppress this guard
         # (see Docs ActiveRecord Freeze above).
         if: >-
@@ -583,6 +599,70 @@ jobs:
             exit 1
           fi
           echo "No forbidden Claude attribution found in commit messages."
+
+      # Everything above is an independent check with its own `if:` guard, so a
+      # run can arrive here with any combination of them red. Name the failing
+      # ones explicitly: the cancel below turns every other job in the run grey,
+      # and a wall of `cancelled` jobs beside a red Preflight is only legible if
+      # Preflight itself says which check produced it. The `steps` context
+      # carries one entry per `id:`-bearing step, which is the only reason the
+      # checks above have ids.
+      - name: Report which preflight checks failed
+        if: ${{ failure() }}
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          failed=$(jq -r 'to_entries[] | select(.value.outcome == "failure") | .key' <<<"$STEPS_JSON")
+          # An id-less step (checkout, setup-node) can fail too; say so rather
+          # than emitting an empty list that reads as "nothing failed".
+          [ -n "$failed" ] || failed='(an unnamed setup step — see the step log)'
+          echo "::error::Preflight failed: $(tr '\n' ' ' <<<"$failed")"
+          {
+            echo "### Preflight failed"
+            echo ""
+            printf '%s\n' "$failed" | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A preflight red is terminal for the run. Every check above is a
+      # seconds-long correctness gate, so nothing the DB matrix,
+      # rails-comparison or the parity pipelines go on to report can change the
+      # outcome — they just spend another 20+ minutes of runner time on a run
+      # that is already lost. The `concurrency` block at the top only cancels a
+      # run a NEWER push supersedes and has nothing to say about a
+      # self-inflicted failure, so stop the run here instead.
+      #
+      # Pull requests only, deliberately, mirroring `concurrency`'s own scoping:
+      # a push to `main`, the Monday sweep and `workflow_dispatch` are the runs
+      # whose whole point is the full-suite signal and the timing report, and
+      # none of them is re-triggered by pushing a fix. Those stay red the slow
+      # way, with every lane's result intact.
+      #
+      # The alternative — `needs: preflight` on the expensive lanes — was
+      # rejected: it serializes preflight (checkout + pnpm install +
+      # closing-story scan, minutes not seconds) onto the front of every lane on
+      # every GREEN run, to save time on the rare red one, and it would change
+      # when each of those jobs' `!cancelled()`/`always()` gates fire.
+      #
+      # Cancelling includes this job, so Preflight's own conclusion becomes
+      # `cancelled` rather than `failure` — which is why the annotation and job
+      # summary above are written first; both survive the cancel. Downstream
+      # jobs report `cancelled`, which the `ci` aggregator already treats as a
+      # hard failure (`result == "failure" or result == "cancelled"`), so no
+      # allow-list arm changes. `ci` itself is normally cancelled before it
+      # starts; branch protection reads a cancelled required check as
+      # not-success, exactly like a red one.
+      #
+      # continue-on-error so a 403 or 5xx here degrades to "the run keeps
+      # going" — the pre-change behaviour — rather than replacing a legible
+      # prettier failure with a confusing red on a step about cancellation.
+      - name: Cancel the rest of the run
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          echo "Preflight failed — cancelling run $GITHUB_RUN_ID so the DB matrix and parity pipelines don't burn 20+ minutes on a run that is already lost."
+          gh api -X POST "repos/$REPO/actions/runs/$GITHUB_RUN_ID/cancel"
 
   # Off on PRs entirely. This is a documentation-drift gate — guide snippets vs.
   # the public type surface — not review signal, and GUIDES_PKGS_RE spans every
