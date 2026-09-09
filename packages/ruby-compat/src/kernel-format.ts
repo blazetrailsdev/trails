@@ -172,7 +172,7 @@ export function format(fmt: string, ...argv: unknown[]): string {
         case "7":
         case "8":
         case "9": {
-          const [n, after] = getNum(fmt, p, "width");
+          const [n, after] = getNum(fmt, p, 0, "width");
           p = after;
           if (fmt[p] === "$") {
             if (nextvalue !== UNDEF) throw new ArgumentError(`value given twice - ${n}$`);
@@ -222,6 +222,7 @@ export function format(fmt: string, ...argv: unknown[]): string {
         case ".": {
           if (flags & FPREC0) throw new ArgumentError("precision given twice");
           flags |= FPREC | FPREC0;
+          prec = 0;
           p++;
           if (fmt[p] === "*") {
             const [n, after] = getAster(fmt, p, getPosArg, getNextArg);
@@ -231,12 +232,13 @@ export function format(fmt: string, ...argv: unknown[]): string {
             p++;
             continue retry;
           }
-          const [n, after] = getNum(fmt, p, "precision");
+          const [n, after] = getNum(fmt, p, prec, "precision");
           prec = n;
           p = after;
           continue retry;
         }
         case "\n":
+        case "\0":
         case undefined:
         case "%":
           if (c !== "%") p--;
@@ -270,7 +272,8 @@ export function format(fmt: string, ...argv: unknown[]): string {
           buf += formatFloat(getArg(), c, flags, width, prec);
           break retry;
         default:
-          throw new ArgumentError(`malformed format string - %${c}`);
+          if (/[ -~]/.test(c)) throw new ArgumentError(`malformed format string - %${c}`);
+          throw new ArgumentError("malformed format string");
       }
     }
     flags = FNONE;
@@ -289,14 +292,14 @@ export const sprintf = format;
 
 const UNDEF = Symbol("Qundef");
 
-/** `get_num` (`vendor/ruby/sprintf.c:130` `GETNUM`). */
-function getNum(fmt: string, p: number, val: string): [number, number] {
-  let n = 0;
+/** `get_num` (`vendor/ruby/sprintf.c:138`), under the `GETNUM` (`:130`) that raises for it. */
+function getNum(fmt: string, p: number, nextN: number, val: string): [number, number] {
   for (; p < fmt.length && fmt[p] >= "0" && fmt[p] <= "9"; p++) {
-    n = n * 10 + (fmt.charCodeAt(p) - 48);
-    if (n > 0x7fffffff) throw new ArgumentError(`${val} too big`);
+    nextN = nextN * 10 + (fmt.charCodeAt(p) - 48);
+    if (nextN > 0x7fffffff) throw new ArgumentError(`${val} too big`);
   }
-  return [n, p];
+  if (p >= fmt.length) throw new ArgumentError("malformed format string - %*[0-9]");
+  return [nextN, p];
 }
 
 /** `GETASTER` (`vendor/ruby/sprintf.c:135`). */
@@ -306,22 +309,24 @@ function getAster(
   getPosArg: (n: number) => unknown,
   getNextArg: () => unknown,
 ): [number, number] {
-  const [n, after] = getNum(fmt, p + 1, "width");
+  const [n, after] = getNum(fmt, p + 1, 0, "width");
   if (fmt[after] === "$") return [num2int(getPosArg(n)), after];
   return [num2int(getNextArg()), p];
 }
 
+/**
+ * The `%<name>` / `%{name}` lookup — `rb_hash_lookup2(hash, sym, Qundef)`
+ * (`vendor/ruby/sprintf.c:403`). The key is the Symbol `:name`, never the
+ * String `"name"`, so a String-keyed hash raises `KeyError` here exactly as it
+ * does in Ruby.
+ */
 function hashLookup(hash: Record<string, unknown> | Map<unknown, unknown>, name: string): unknown {
-  if (hash instanceof Map) {
-    if (hash.has(`:${name}`)) return hash.get(`:${name}`);
-    if (hash.has(name)) return hash.get(name);
-    return UNDEF;
-  }
-  if (Object.hasOwn(hash, name)) return hash[name];
-  if (Object.hasOwn(hash, `:${name}`)) return hash[`:${name}`];
-  return UNDEF;
+  const sym = `:${name}`;
+  if (hash instanceof Map) return hash.has(sym) ? hash.get(sym) : UNDEF;
+  return Object.hasOwn(hash, sym) ? hash[sym] : UNDEF;
 }
 
+/** `NUM2INT` — `rb_num2int` (`vendor/ruby/numeric.c:3241`). */
 function num2int(val: unknown): number {
   if (typeof val === "bigint") return Number(val);
   if (typeof val === "number") {
@@ -544,15 +549,11 @@ function formatFloat(
   else if (flags & FSPACE) sc = " ";
 
   if (!Number.isFinite(fval)) {
-    /* `vendor/ruby/sprintf.c:886` — `Inf`, never `Infinity`, and space-filled
-       whatever the `0` flag says. */
     return pad(Number.isNaN(fval) ? "NaN" : "Inf", flags & ~FZERO, width, sc);
   }
   if (!(flags & FPREC)) prec = DEFAULT_FLOAT_PRECISION;
 
   if (conv === "a" || conv === "A") {
-    /* The `0x` prefix stands where an integer conversion's does, so a `0`
-       flag fills BETWEEN it and the digits (`vendor/ruby/vsnprintf.c:1183`). */
     const hex = hexFloat(Math.abs(fval), flags, prec);
     const body = conv === "A" ? hex.toUpperCase() : hex;
     return pad(body.slice(2), flags, width, sc + body.slice(0, 2));
