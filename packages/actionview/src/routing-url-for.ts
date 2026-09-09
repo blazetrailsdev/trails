@@ -26,13 +26,14 @@ export function urlFor(this: RoutingUrlForHost, options: UrlForOptions = null): 
   } else if (options === ":back") {
     return this._backUrl();
   } else if (Array.isArray(options)) {
-    const [components, opts] = extractOptionsBang([...options]);
-    ensureOnlyPathOption.call(this, opts as Record<string, unknown>);
+    const [components, extracted] = extractOptionsBang([...options]);
+    const opts = extracted as Record<string, unknown>;
+    ensureOnlyPathOption.call(this, opts);
 
-    if ((opts as Record<string, unknown>)["only_path"]) {
-      return _UrlFor!.polymorphicPath.call(this, components, opts as Record<string, unknown>);
+    if (opts["only_path"]) {
+      return _UrlFor!.polymorphicPath.call(this, components, opts);
     } else {
-      return _UrlFor!.polymorphicUrl.call(this, components, opts as Record<string, unknown>);
+      return _UrlFor!.polymorphicUrl.call(this, components, opts);
     }
   } else {
     const method = _generatePathsByDefault.call(this) ? "path" : "url";
