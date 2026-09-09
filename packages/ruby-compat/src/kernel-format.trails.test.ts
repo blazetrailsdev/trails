@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { KeyError } from "./key-error.js";
+import { Hash } from "./hash.js";
 import { format, sprintf } from "./kernel-format.js";
 import { TypeError } from "./type-error.js";
 
@@ -196,6 +197,25 @@ describe("format", () => {
   it.each(ERRORS)("format(%s, ...) raises", (args, expected) => {
     expect(() => format(...args)).toThrow(
       expect.objectContaining({ name: expected.name, message: expected.message }),
+    );
+  });
+
+  it("takes a named key's value from the hash's default when the key is absent", () => {
+    const withValue = new Hash<string, unknown>();
+    withValue.setDefault(0);
+    expect(format("%<x>d", withValue)).toBe("0");
+
+    const withProc = new Hash<string, unknown>();
+    withProc.setDefaultProc((_hash, key) => `gen-${String(key).slice(1)}`);
+    expect(format("%<x>s", withProc)).toBe("gen-x");
+    expect(format("%{x}", withProc)).toBe("gen-x");
+
+    const withFalse = new Hash<string, unknown>();
+    withFalse.setDefault(false);
+    expect(format("%<x>s", withFalse)).toBe("false");
+
+    expect(() => format("%<x>s", new Hash<string, unknown>())).toThrow(
+      expect.objectContaining({ name: "KeyError", message: "key<x> not found" }),
     );
   });
 

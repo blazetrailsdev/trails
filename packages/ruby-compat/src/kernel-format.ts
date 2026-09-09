@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { Hash } from "./hash.js";
 import { KeyError } from "./key-error.js";
 import { kernelFloat } from "./kernel-float.js";
 import { kernelInteger } from "./kernel-integer.js";
@@ -197,8 +198,12 @@ export function format(fmt: string, ...argv: unknown[]): string {
           checkNameArg(posarg, name);
           posarg = -2;
           sym = fmt.slice(start + 1, p);
-          nextvalue = hashLookup(getHash(), sym);
-          if (nextvalue === UNDEF) throw new KeyError(`key${name} not found`);
+          const namedHash = getHash();
+          nextvalue = hashLookup(namedHash, sym);
+          if (nextvalue === UNDEF) {
+            nextvalue = hashDefaultValue(namedHash, sym);
+            if (nextvalue == null) throw new KeyError(`key${name} not found`);
+          }
           if (term === "}") {
             buf += formatS(getArg(), "s", flags, width, prec);
             break retry;
@@ -324,6 +329,20 @@ function hashLookup(hash: Record<string, unknown> | Map<unknown, unknown>, name:
   const sym = `:${name}`;
   if (hash instanceof Map) return hash.has(sym) ? hash.get(sym) : UNDEF;
   return Object.hasOwn(hash, sym) ? hash[sym] : UNDEF;
+}
+
+/**
+ * `rb_hash_default_value(hash, sym)` (`vendor/ruby/hash.c:2068`), the arm
+ * `%<name>` takes before it raises (`vendor/ruby/sprintf.c:388`): a
+ * `Hash.new(0)` answers `0` for a missing key and a `Hash.new { … }` runs its
+ * block, so only a `nil` default reaches the `KeyError`. A plain object and a
+ * bare `Map` have nowhere to store a default, so they have none.
+ */
+function hashDefaultValue(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  name: string,
+): unknown {
+  return hash instanceof Hash ? hash.default(`:${name}`) : undefined;
 }
 
 /** `NUM2INT` — `rb_num2int` (`vendor/ruby/numeric.c:3241`). */
