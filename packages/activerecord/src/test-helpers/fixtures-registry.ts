@@ -256,6 +256,14 @@ export const fixtureRegistry = {
     model: () => import("./models/face.js").then((m) => m.Face),
     data: FixtureData.faceFixtureData,
   },
+  fkTestHasPk: {
+    joinTable: "fk_test_has_pk",
+    data: FixtureData.fkTestHasPkFixtureData,
+  },
+  fkTestHasFk: {
+    joinTable: "fk_test_has_fk",
+    data: FixtureData.fkTestHasFkFixtureData,
+  },
   friendships: {
     model: () => import("./models/friendship.js").then((m) => m.Friendship),
     data: FixtureData.friendshipFixtureData,

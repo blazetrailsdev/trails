@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   ref,
   isFixtureRef,
@@ -17,6 +17,16 @@ import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
+import { fixtures } from "./test-fixtures.js";
+import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
+import { Task } from "./test-helpers/models/task.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Tree } from "./test-helpers/models/tree.js";
+import { nakedYmlAccountsFixtureData } from "./test-helpers/fixtures/naked/yml/accounts.js";
+import { nakedYmlCompaniesFixtureData } from "./test-helpers/fixtures/naked/yml/companies.js";
+import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
+import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
 import "./relation.js";
 
 const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
@@ -667,5 +677,168 @@ describe("FixtureSet (trails)", () => {
     const seen: unknown[] = [];
     onLoad("active_record_fixture_set", (base: unknown) => seen.push(base));
     expect(seen).toEqual([FixtureSet]);
+  });
+});
+
+describe("FixturesTest", () => {
+  const { topics, developers, binaries, trafficLights } = fixtures([
+    "topics",
+    "developers",
+    "accounts",
+    "tasks",
+    "categories",
+    "funnyJokes",
+    "binaries",
+    "trafficLights",
+    "trees",
+    "aircrafts",
+  ]);
+
+  it("attributes", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect(topics("second").author_email_address).toBeNull();
+  });
+
+  it("no args returns all", () => {
+    const allTopics = topics.all();
+    expect(allTopics.length).toBe(5);
+    expect(allTopics[0].title).toBe("The First Topic");
+    expect(allTopics[allTopics.length - 1].id).toBe(5);
+  });
+
+  it("no args record returns all without array", () => {
+    const allBinaries = binaries.all();
+    expect(Array.isArray(allBinaries)).toBe(true);
+    expect(binaries.all().length).toBe(2);
+  });
+
+  it("nil raises", () => {
+    expect(() => topics(null as never)).toThrow();
+    expect(() => topics([null] as never)).toThrow();
+  });
+
+  it("inserts", async () => {
+    const connection = await leaseFixtureConnection();
+    const firstRow = await connection.selectOne("SELECT * FROM topics WHERE author_name = 'David'");
+    expect(firstRow?.["title"]).toBe("The First Topic");
+
+    const secondRow = await connection.selectOne("SELECT * FROM topics WHERE author_name = 'Mary'");
+    expect(secondRow?.["author_email_address"]).toBeNull();
+  });
+
+  it("insert with datetime", async () => {
+    const first = await Task.find(1);
+    expect(first).toBeTruthy();
+  });
+
+  it("insert with default value", async () => {
+    const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
+    expect(aircraft?.wheels_count).toBe(0);
+  });
+
+  it("instantiation", () => {
+    expect(topics("first")).toBeInstanceOf(Topic);
+  });
+
+  it("empty yaml fixture", async () => {
+    const connection = await leaseFixtureConnection();
+    await expect(
+      defineJoinTableFixtures(connection, "accounts", nakedYmlAccountsFixtureData),
+    ).resolves.not.toBeNull();
+  });
+
+  it("empty yaml fixture with a comment in it", async () => {
+    const connection = await leaseFixtureConnection();
+    await expect(
+      defineJoinTableFixtures(connection, "companies", nakedYmlCompaniesFixtureData),
+    ).resolves.not.toBeNull();
+  });
+
+  it("yaml file with invalid column", async () => {
+    const connection = await leaseFixtureConnection();
+    await expect(
+      defineJoinTableFixtures(connection, "parrots", nakedYmlParrotsFixtureData),
+    ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
+  });
+
+  it("yaml file with symbol columns", async () => {
+    const connection = await leaseFixtureConnection();
+    await defineJoinTableFixtures(connection, "trees", nakedYmlTreesFixtureData);
+    const root = await Tree.find(1);
+    expect(root).toBeTruthy();
+  });
+
+  it("erb in fixtures", () => {
+    expect(developers("dev_5").name).toBe("fixture_5");
+  });
+
+  it("serialized fixtures", () => {
+    expect(trafficLights("uk").state).toEqual(["Green", "Red", "Orange"]);
+  });
+});
+
+describe("FixturesWithoutInstantiationTest", () => {
+  const { topics, developers, accounts } = fixtures(["topics", "developers", "accounts"]);
+
+  it("accessor methods", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect(developers("jamis").name).toBe("Jamis");
+    expect(accounts("signals37").credit_limit).toBe(50);
+  });
+});
+
+describe("TransactionalFixturesTest", () => {
+  const { topics } = fixtures(["topics"]);
+
+  it("destroy", async () => {
+    const first = topics("first");
+    expect(first).not.toBeNull();
+    await first.destroy();
+  });
+
+  it("destroy just kidding", () => {
+    expect(topics("first")).not.toBeNull();
+  });
+});
+
+describe("SetupTest", () => {
+  let first: boolean;
+
+  beforeEach(() => {
+    first = true;
+  });
+
+  it("nothing", () => {
+    expect(first).toBe(true);
+  });
+});
+
+describe("SetupSubclassTest", () => {
+  let first: boolean;
+  let second: boolean;
+
+  beforeEach(() => {
+    first = true;
+  });
+
+  beforeEach(() => {
+    second = true;
+  });
+
+  it("subclassing should preserve setups", () => {
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+  });
+});
+
+describe("ForeignKeyFixturesTest", () => {
+  fixtures(["fkTestHasPk", "fkTestHasFk"]);
+
+  it("number1", () => {
+    expect(true).toBe(true);
+  });
+
+  it("number2", () => {
+    expect(true).toBe(true);
   });
 });
