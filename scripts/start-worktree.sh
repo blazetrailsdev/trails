@@ -2,6 +2,7 @@
 # start-worktree.sh — spin up a fresh trails worktree ready to develop in.
 #
 # Usage: scripts/start-worktree.sh <name>
+#        scripts/start-worktree.sh --branch <existing-branch> [<name>]
 #
 #   1. Fast-forwards the main worktree's `main` branch.
 #   2. Creates ~/github/blazetrailsdev/worktrees/<name> on a new branch <name>
@@ -9,16 +10,42 @@
 #   3. Runs `pnpm install` inside the new worktree.
 #   4. Symlinks the fetched Rails and Rack source directories from the main
 #      worktree so parity:api / parity:test don't have to refetch.
+#
+# --branch checks out an EXISTING branch instead of cutting a new one. It is
+# for re-attaching an agent to a PR whose worktree was reaped while the PR was
+# still open: the commits already exist, so branching off origin/main would
+# silently diverge from the PR. Everything after the checkout — pnpm install,
+# the vendor and .claude links, the tasks checkout — is identical, which is the
+# whole reason to come through this script rather than a bare `worktree add`.
 set -euo pipefail
 
-if [[ $# -ne 1 || -z "${1:-}" ]]; then
-  echo "Usage: $0 <name>" >&2
-  exit 2
+BRANCH=""
+if [[ "${1:-}" == "--branch" ]]; then
+  BRANCH="${2:-}"
+  if [[ -z "$BRANCH" ]]; then
+    echo "Usage: $0 --branch <existing-branch> [<name>]" >&2
+    exit 2
+  fi
+  # A branch name may contain "/" (fix/foo), which a worktree directory name
+  # may not; derive a flat default and let an explicit name win.
+  NAME="${3:-$(printf '%s' "$BRANCH" | tr '/' '-')}"
+  shift $(( $# > 2 ? 3 : 2 ))
+else
+  if [[ $# -ne 1 || -z "${1:-}" ]]; then
+    echo "Usage: $0 <name>" >&2
+    echo "       $0 --branch <existing-branch> [<name>]" >&2
+    exit 2
+  fi
+  NAME="$1"
 fi
 
-NAME="$1"
 case "$NAME" in
   */*|*..*|"") echo "Invalid worktree name: $NAME" >&2; exit 2 ;;
+esac
+# Guard the branch separately: it may hold "/", but a leading dash would be
+# read as a git flag and ".." would let a caller escape into another ref.
+case "$BRANCH" in
+  -*|*..*) echo "Invalid branch name: $BRANCH" >&2; exit 2 ;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -70,8 +97,25 @@ git -C "$MAIN_REPO" fetch origin --prune
 
 mkdir -p "$WORKTREES_ROOT"
 
-echo "==> Creating worktree at $TARGET on new branch '$NAME' from origin/main"
-git -C "$MAIN_REPO" worktree add -b "$NAME" "$TARGET" origin/main
+if [[ -n "$BRANCH" ]]; then
+  echo "==> Creating worktree at $TARGET on existing branch '$BRANCH'"
+  # Prefer the local branch; fall back to the remote one, tracking it. Neither
+  # existing is fatal: the point of --branch is to check out work that is
+  # already committed, so inventing the branch here would produce the very
+  # divergence this mode exists to avoid.
+  if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    git -C "$MAIN_REPO" worktree add "$TARGET" "$BRANCH"
+  elif git -C "$MAIN_REPO" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+    git -C "$MAIN_REPO" worktree add --track -b "$BRANCH" "$TARGET" "origin/$BRANCH"
+  else
+    echo "Branch $BRANCH exists neither locally nor on origin." >&2
+    echo "Nothing to check out — re-run without --branch to start fresh work." >&2
+    exit 1
+  fi
+else
+  echo "==> Creating worktree at $TARGET on new branch '$NAME' from origin/main"
+  git -C "$MAIN_REPO" worktree add -b "$NAME" "$TARGET" origin/main
+fi
 flock -u 9
 exec 9>&-
 
@@ -92,7 +136,12 @@ cleanup_partial_worktree() {
     rm -rf "$TARGET"
     git -C "$MAIN_REPO" worktree prune 2>/dev/null || true
   fi
-  if ! git -C "$MAIN_REPO" branch -D "$NAME" 2>/dev/null; then
+  # Only ever delete a branch this run created. Under --branch the branch
+  # carries an open PR's commits and predates us: deleting it on a failed
+  # pnpm install would destroy the work the re-attach was meant to recover.
+  if [[ -n "$BRANCH" ]]; then
+    echo "    keeping existing branch $BRANCH (not created by this run)" >&2
+  elif ! git -C "$MAIN_REPO" branch -D "$NAME" 2>/dev/null; then
     # Branch may not exist (worktree add failed before branch creation) or be
     # already gone — log and continue rather than masking the EXIT status.
     echo "    note: branch $NAME was not deletable (already gone or never created)" >&2
