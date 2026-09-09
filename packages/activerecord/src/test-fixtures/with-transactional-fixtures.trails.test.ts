@@ -17,7 +17,8 @@ async function primaryAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 interface AdapterWithExec {
-  execute(sql: string): Promise<unknown[]>;
+  execute(sql: string): Promise<unknown>;
+  selectAll(sql: string): Promise<{ toArray(): unknown[] }>;
 }
 
 interface TmHandle {
@@ -43,12 +44,12 @@ describe("withTransactionalFixtures", () => {
 
   it("inserts a row (first run)", async () => {
     await a().execute(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
-    const rows = await a().execute(`SELECT * FROM fixture_users`);
+    const rows = (await a().selectAll(`SELECT * FROM fixture_users`)).toArray();
     expect(rows).toHaveLength(1);
   });
 
   it("sees zero rows because the previous insert rolled back", async () => {
-    const rows = await a().execute(`SELECT * FROM fixture_users`);
+    const rows = (await a().selectAll(`SELECT * FROM fixture_users`)).toArray();
     expect(rows).toHaveLength(0);
   });
 
@@ -68,12 +69,12 @@ describe("withTransactionalFixtures", () => {
     await tm.beginTransaction({});
     await a().execute(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
     await tm.commitTransaction();
-    const rows = await a().execute(`SELECT * FROM fixture_users`);
+    const rows = (await a().selectAll(`SELECT * FROM fixture_users`)).toArray();
     expect(rows).toHaveLength(1);
   });
 
   it("nested transaction commit was a savepoint release, outer still rolls back", async () => {
-    const rows = await a().execute(`SELECT * FROM fixture_users`);
+    const rows = (await a().selectAll(`SELECT * FROM fixture_users`)).toArray();
     expect(rows).toHaveLength(0);
   });
 });
@@ -81,7 +82,7 @@ describe("withTransactionalFixtures", () => {
 describe("withTransactionalFixtures (raw adapter)", () => {
   let adapter: SQLite3Adapter;
   const exec = (sql: string) => adapter.execute(sql);
-  const query = (sql: string) => adapter.execute(sql);
+  const query = async (sql: string) => (await adapter.selectAll(sql)).toArray();
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
@@ -111,7 +112,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 describe("withTransactionalFixtures (pooled adapter)", () => {
   let adapter: LeasedTestAdapter;
   const exec = (sql: string) => adapter.execute(sql);
-  const query = (sql: string) => adapter.execute(sql);
+  const query = async (sql: string) => (await adapter.selectAll(sql)).toArray();
 
   beforeAll(async () => {
     const handle = await createPooledTestAdapter();
