@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { beginDeferredTransaction } from "./abstract/database-statements.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
@@ -11,7 +12,9 @@ describe.each([
       beginIsolatedDbTransaction: vi.fn(async () => {}),
       beginDbTransaction: vi.fn(async () => {}),
     };
-    await klass.prototype.beginDeferredTransaction.call(host as never, ":read_committed");
+    await (
+      klass.prototype as unknown as { beginDeferredTransaction: typeof beginDeferredTransaction }
+    ).beginDeferredTransaction.call(host as never, ":read_committed");
     expect(host.beginIsolatedDbTransaction).toHaveBeenCalledWith(":read_committed");
     expect(host.beginDbTransaction).not.toHaveBeenCalled();
   });
@@ -21,7 +24,9 @@ describe.each([
       beginIsolatedDbTransaction: vi.fn(async () => {}),
       beginDbTransaction: vi.fn(async () => {}),
     };
-    await klass.prototype.beginDeferredTransaction.call(host as never);
+    await (
+      klass.prototype as unknown as { beginDeferredTransaction: typeof beginDeferredTransaction }
+    ).beginDeferredTransaction.call(host as never);
     expect(host.beginDbTransaction).toHaveBeenCalled();
     expect(host.beginIsolatedDbTransaction).not.toHaveBeenCalled();
   });
