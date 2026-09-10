@@ -74,7 +74,9 @@ describe("DJAS — composite key support", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("ck_line_items", "ck_orders", "ck_shops", { ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).dropTable("ck_line_items", "ck_orders", "ck_shops", { ifExists: true });
   });
 
   afterEach(() => {

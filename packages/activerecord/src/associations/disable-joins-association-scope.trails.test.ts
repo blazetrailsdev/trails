@@ -75,7 +75,9 @@ describe("DisableJoinsAssociationScope", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("djs_comments", "djs_posts", "djs_authors", {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("djs_comments", "djs_posts", "djs_authors", {
       ifExists: true,
     });
   });

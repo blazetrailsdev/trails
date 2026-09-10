@@ -95,7 +95,9 @@ describe("DJAS composite-key + nested-through", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops", {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops", {
       ifExists: true,
     });
   });

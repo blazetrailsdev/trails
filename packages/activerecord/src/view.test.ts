@@ -6,16 +6,18 @@ import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
-function conn(): AbstractAdapter {
-  return Base.connection as unknown as AbstractAdapter;
+async function conn(): Promise<AbstractAdapter> {
+  return (await Base.leaseConnection()) as unknown as AbstractAdapter;
 }
 
 async function createView(name: string, sql: string): Promise<void> {
-  await conn().executeMutation(`CREATE VIEW ${conn().quoteTableName(name)} AS ${sql}`);
+  await (
+    await conn()
+  ).executeMutation(`CREATE VIEW ${(await conn()).quoteTableName(name)} AS ${sql}`);
 }
 async function dropView(name: string): Promise<void> {
-  if (await conn().viewExists(name)) {
-    await conn().executeMutation(`DROP VIEW ${conn().quoteTableName(name)}`);
+  if (await (await conn()).viewExists(name)) {
+    await (await conn()).executeMutation(`DROP VIEW ${(await conn()).quoteTableName(name)}`);
   }
 }
 
@@ -44,19 +46,19 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "views", async () => {
-    expect(await conn().views()).toEqual([Ebook._tableName]);
+    expect(await (await conn()).views()).toEqual([Ebook._tableName]);
   });
 
   itIfSupports("views", "view exists", async () => {
-    expect(await conn().viewExists(Ebook._tableName)).toBe(true);
+    expect(await (await conn()).viewExists(Ebook._tableName)).toBe(true);
   });
 
   itIfSupports("views", "table exists", async () => {
-    expect(await conn().tableExists(Ebook._tableName)).toBe(false);
+    expect(await (await conn()).tableExists(Ebook._tableName)).toBe(false);
   });
 
   itIfSupports("views", "views ara valid data sources", async () => {
-    expect(await conn().dataSourceExists(Ebook._tableName)).toBe(true);
+    expect(await (await conn()).dataSourceExists(Ebook._tableName)).toBe(true);
   });
 
   itIfSupports("views", "column definitions", async () => {
@@ -88,7 +90,7 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema(conn() as any, "ebooks'");
+    const schema = await dumpTableSchema((await conn()) as any, "ebooks'");
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
   });
 });
@@ -118,15 +120,15 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "views", async () => {
-    expect(await conn().views()).toEqual([Paperback._tableName]);
+    expect(await (await conn()).views()).toEqual([Paperback._tableName]);
   });
 
   itIfSupports("views", "view exists", async () => {
-    expect(await conn().viewExists(Paperback._tableName)).toBe(true);
+    expect(await (await conn()).viewExists(Paperback._tableName)).toBe(true);
   });
 
   itIfSupports("views", "table exists", async () => {
-    expect(await conn().tableExists(Paperback._tableName)).toBe(false);
+    expect(await (await conn()).tableExists(Paperback._tableName)).toBe(false);
   });
 
   itIfSupports("views", "column definitions", async () => {
@@ -149,7 +151,7 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema(conn() as any, "paperbacks");
+    const schema = await dumpTableSchema((await conn()) as any, "paperbacks");
     expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);
   });
 });

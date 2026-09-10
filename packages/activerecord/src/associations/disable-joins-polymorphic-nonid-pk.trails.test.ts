@@ -98,13 +98,11 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable(
-      "dp_non_id_articles",
-      "dp_non_id_photos",
-      "dp_galleries",
-      "dp_authors",
-      { ifExists: true },
-    );
+    await (
+      await Base.leaseConnection()
+    ).dropTable("dp_non_id_articles", "dp_non_id_photos", "dp_galleries", "dp_authors", {
+      ifExists: true,
+    });
   });
 
   afterEach(() => Notifications.unsubscribeAll());

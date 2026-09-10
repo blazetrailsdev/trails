@@ -51,7 +51,9 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoProfile);
   });
   afterAll(async () => {
-    await Base.connection.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });

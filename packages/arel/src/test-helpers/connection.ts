@@ -81,5 +81,5 @@ export const fakeRecordConnection: ArelConnection = {
 
 /** @internal */
 export const fakeRecordEngine: ArelEngine = {
-  connection: { visitor: new ToSql(fakeRecordConnection) },
+  withConnection: (block) => block({ visitor: new ToSql(fakeRecordConnection) }),
 };

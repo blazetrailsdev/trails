@@ -47,7 +47,9 @@ describe("EagerSingularizationTest", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable(
+    await (
+      await Base.leaseConnection()
+    ).dropTable(
       "viri",
       "octopi",
       "passes",

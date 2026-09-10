@@ -12,7 +12,7 @@ describe("RequiredAssociationsTest", () => {
     });
   });
   afterAll(async () => {
-    await Base.connection.dropTable("children", "parents", { ifExists: true });
+    await (await Base.leaseConnection()).dropTable("children", "parents", { ifExists: true });
   });
 
   it("belongs_to associations can be optional by default", async () => {

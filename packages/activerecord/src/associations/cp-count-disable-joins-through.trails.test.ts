@@ -68,7 +68,9 @@ describe("CollectionProxy#count — disable_joins through", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("cd_ratings", "cd_comments", "cd_posts", "cd_authors", {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("cd_ratings", "cd_comments", "cd_posts", "cd_authors", {
       ifExists: true,
     });
   });

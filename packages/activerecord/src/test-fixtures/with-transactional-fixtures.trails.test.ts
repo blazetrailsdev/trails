@@ -208,18 +208,19 @@ describe("the DDL recording window leaves no own property behind", () => {
   const spied: string[] = [];
 
   beforeAll(async () => {
-    const conn = Base.connection as unknown as Record<string, unknown>;
+    const leased = await Base.leaseConnection();
+    const conn = leased as unknown as Record<string, unknown>;
     ownAddIndex = Object.prototype.hasOwnProperty.call(conn, "addIndex");
 
-    const proto = Object.getPrototypeOf(Base.connection) as Record<string, unknown>;
+    const proto = Object.getPrototypeOf(leased) as Record<string, unknown>;
     const original = proto.addIndex;
     proto.addIndex = function (this: unknown, ...args: unknown[]) {
       spied.push(String(args[0]));
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
     try {
-      await Base.connection.addIndex("computers", "system", { name: "idx_proto_spy" });
-      await Base.connection.removeIndex("computers", { name: "idx_proto_spy" });
+      await leased.addIndex("computers", "system", { name: "idx_proto_spy" });
+      await leased.removeIndex("computers", { name: "idx_proto_spy" });
     } finally {
       proto.addIndex = original;
     }

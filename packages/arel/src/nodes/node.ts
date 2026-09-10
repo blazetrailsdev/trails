@@ -3,7 +3,9 @@ import { SQLString } from "../collectors/sql-string.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface ArelEngine {
-  connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
+  withConnection<T>(
+    block: (connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } }) => T,
+  ): T;
 }
 
 export const _engine: { current: ArelEngine | null } = { current: null };
@@ -35,7 +37,7 @@ export class Node {
       );
     }
     const collector = new SQLString();
-    return engine.connection.visitor.accept(this, collector).value;
+    return engine.withConnection((connection) => connection.visitor.accept(this, collector).value);
   }
 
   fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {

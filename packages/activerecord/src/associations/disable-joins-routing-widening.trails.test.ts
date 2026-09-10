@@ -86,7 +86,9 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("rw_other_origins", "rw_members", "rw_comments", "rw_authors", {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("rw_other_origins", "rw_members", "rw_comments", "rw_authors", {
       ifExists: true,
     });
   });
