@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { FloatDomainError, NoMethodError } from "@blazetrails/ruby-compat";
 
 class SQLite3Exception extends Error {
   constructor(message: string) {
@@ -114,7 +114,10 @@ function toS(value: unknown): string {
 }
 
 function toI(value: unknown): number {
-  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new FloatDomainError(String(value));
+    return Math.trunc(value);
+  }
   if (value == null) return 0;
   if (typeof value === "string") return parseInt(value, 10) || 0;
   throw new NoMethodError(`undefined method 'to_i' for ${JSON.stringify(value)}`);
@@ -163,7 +166,7 @@ function setEnumPragma(name: string, mode: unknown, enums: (string | number)[][]
   return `${name}='${toS(match[0]).toUpperCase()}'`;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE gem-ports-score-as-extra-surface */
 export function setPragma(name: string, value: unknown): string {
   const enums = ENUM_PRAGMAS[name];
   if (enums) return setEnumPragma(name, value, enums);
