@@ -10,7 +10,7 @@ describe("FakeActiveRecordAdapter", () => {
   });
 
   it("primary_key falls back to id", () => {
-    const adapter = new FakeActiveRecordAdapter();
+    const adapter = new FakeActiveRecordAdapter({});
     expect(adapter.primaryKey("fake_widgets")).toBe("id");
 
     adapter.primaryKeys = { fake_widgets: "widget_id" };
@@ -18,7 +18,7 @@ describe("FakeActiveRecordAdapter", () => {
   });
 
   it("merge_column appends synthetic columns readable through columns", () => {
-    const adapter = new FakeActiveRecordAdapter();
+    const adapter = new FakeActiveRecordAdapter({});
     adapter.mergeColumn("fake_contacts", "name", "string");
     adapter.mergeColumn("fake_contacts", "age", "integer", { null: false, default: 0 });
 
@@ -32,19 +32,19 @@ describe("FakeActiveRecordAdapter", () => {
   });
 
   it("columns is empty for an unknown table", () => {
-    const adapter = new FakeActiveRecordAdapter();
+    const adapter = new FakeActiveRecordAdapter({});
     expect(adapter.columns("fake_nothing")).toEqual([]);
   });
 
   it("data_source_exists? and active? are always true", async () => {
-    const adapter = new FakeActiveRecordAdapter();
+    const adapter = new FakeActiveRecordAdapter({});
     expect(await adapter.dataSourceExists()).toBe(true);
     expect(await adapter.active()).toBe(true);
   });
 
   it("shares the synthetic column list across instances", () => {
-    new FakeActiveRecordAdapter().mergeColumn("fake_shared", "id", "integer");
-    const other = new FakeActiveRecordAdapter();
+    new FakeActiveRecordAdapter({}).mergeColumn("fake_shared", "id", "integer");
+    const other = new FakeActiveRecordAdapter({});
     expect(other.columns("fake_shared").map((c) => c.name)).toEqual(["id"]);
   });
 });

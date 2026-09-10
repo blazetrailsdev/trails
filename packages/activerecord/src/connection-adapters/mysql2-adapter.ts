@@ -102,7 +102,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _isFakeConnection = false;
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _connectionConfigured = false;
-  override _statements: MysqlStatementPool | null = null;
+  declare _statements: MysqlStatementPool | null;
 
   _databaseTimezone: "utc" | "local" = "utc";
 
@@ -128,7 +128,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   private _getStmtPool(): MysqlStatementPool {
     if (!this._statements) {
-      this._statements = new MysqlStatementPool(this._statementLimit);
+      this._statements = this.buildStatementPool();
     }
     return this._statements;
   }
@@ -216,7 +216,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       return;
     }
     const {
-      statementLimit,
+      statementLimit: _statementLimit,
       preparedStatements,
       advisoryLocks,
       strict,
@@ -225,7 +225,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       _fakeConnection: fake,
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
-    if (statementLimit !== undefined) this._statementLimit = statementLimit;
     this._database =
       mysqlConfig.database ??
       (() => {

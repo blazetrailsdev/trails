@@ -155,18 +155,45 @@ describe("SQLite3Adapter pragmas option", () => {
       pragmas: { "bad-name!": 1 } as Record<string, number>,
     });
     await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("invalid SQLite pragma name"),
-    );
+    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
   });
 
   it("warns and skips a string value with unsafe characters", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { synchronous: "FULL; DROP TABLE users" },
-    });
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-pragma-injection-${Date.now()}.db`);
+    const seed = new BetterSQLite3Adapter(dbPath);
+    await seed.connectBang();
+    await seed.execute("CREATE TABLE sentinel (id integer)");
+    await seed.close();
+    try {
+      adapter = new BetterSQLite3Adapter(dbPath, {
+        pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
+      });
+      await expect(adapter.connectBang()).rejects.toThrow(
+        'unrecognized synchronous "FULL; DROP TABLE sentinel"',
+      );
+      const check = new BetterSQLite3Adapter(dbPath);
+      await check.connectBang();
+      const rows = (check.raw as import("better-sqlite3").Database)
+        .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
+        .get();
+      expect(rows).toEqual({ c: 1 });
+      await check.dropTable("sentinel", { ifExists: true });
+      await check.close();
+    } finally {
+      fs.rmSync(dbPath, { force: true });
+    }
+  });
+
+  it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "cache_size",
+    ) as Array<{ cache_size: number }>;
+    expect(result[0]?.cache_size).toBe(2000);
   });
 });
 

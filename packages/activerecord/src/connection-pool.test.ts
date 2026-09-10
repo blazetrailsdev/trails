@@ -49,7 +49,7 @@ function makePool(size: number = 5): ConnectionPool {
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
   constructor() {
-    super();
+    super({});
     this._connection = this;
   }
   activeFlag = true;

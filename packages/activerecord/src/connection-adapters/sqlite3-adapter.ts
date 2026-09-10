@@ -7,6 +7,7 @@ import type {
   SqliteStatement,
 } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
+import { PRAGMA_SETTERS, setPragma } from "../sqlite/pragmas.js";
 import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -214,13 +215,36 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _memoryDatabase: boolean;
   private _filename: string;
   /** @internal */
-  private _statementLimit = 1000;
-  override _statements = this.buildStatementPool();
+  declare _statements: StatementPool;
 
   /** @internal */
   get _strictStrings(): boolean {
     return this._strict;
   }
+
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
+    string: { name: "varchar" },
+    text: { name: "text" },
+    integer: { name: "integer" },
+    float: { name: "float" },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    boolean: { name: "boolean" },
+    json: { name: "json" },
+  };
+
+  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
+    foreign_keys: true,
+    journal_mode: ":wal",
+    synchronous: ":normal",
+    mmap_size: 134217728,
+    journal_size_limit: 67108864,
+    cache_size: 2000,
+  };
 
   /** @missingRailsCall merge — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
   constructor(config: SQLite3Config);
@@ -252,10 +276,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._filename = filename;
     this._readonly = options.readonly ?? false;
     this._strict = strict;
-    if (options.statementLimit !== undefined) {
-      this._statementLimit = options.statementLimit;
-      this._statements = this.buildStatementPool();
-    }
     this._asyncConnectPending = this.driverIsAsync();
   }
 
@@ -646,21 +666,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
-    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
-    string: { name: "varchar" },
-    text: { name: "text" },
-    integer: { name: "integer" },
-    float: { name: "float" },
-    decimal: { name: "decimal" },
-    datetime: { name: "datetime" },
-    time: { name: "time" },
-    date: { name: "date" },
-    binary: { name: "blob" },
-    boolean: { name: "boolean" },
-    json: { name: "json" },
-  };
-
   nativeDatabaseTypes(): NativeDatabaseTypes {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
@@ -703,15 +708,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       throw new Error(
         `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
-    }
-  }
-
-  static override async databaseExists(config: { database?: string }): Promise<boolean> {
-    if (!config.database || config.database === ":memory:") return true;
-    try {
-      return File.isExist(config.database);
-    } catch {
-      return false;
     }
   }
 
@@ -1469,7 +1465,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   override buildStatementPool(): StatementPool {
     return new StatementPool(
-      SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
+      SQLite3Adapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
   }
 
@@ -1634,17 +1630,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const checked = super.configureConnection();
 
     const stmts: [string, string][] = [];
-    if (!this._readonly) {
-      const defaults: [string, string][] = [
-        ["foreign_keys", "ON"],
-        ["journal_mode", "WAL"],
-        ["synchronous", "NORMAL"],
-        ["mmap_size", "134217728"],
-        ["journal_size_limit", "67108864"],
-        ["cache_size", "2000"],
-      ];
-      for (const [p, v] of defaults) stmts.push([`${p} = ${v}`, `SQLite default pragma '${p}'`]);
-    }
     const dqsValue = this._strict ? "OFF" : "ON";
     stmts.push(
       [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
@@ -1655,27 +1640,15 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       "pragmas",
       {},
     );
-    const SAFE = /^\w+$/;
-    for (const [pragma, value] of Object.entries(pragmas)) {
-      if (!SAFE.test(pragma)) {
-        console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
-        continue;
+    for (const [pragma, value] of Object.entries({
+      ...SQLite3Adapter.DEFAULT_PRAGMAS,
+      ...pragmas,
+    })) {
+      if (PRAGMA_SETTERS.has(pragma)) {
+        stmts.push([setPragma(pragma, value), `SQLite pragma '${pragma}'`]);
+      } else {
+        console.warn(`Unknown SQLite pragma: ${pragma}`);
       }
-      const scalar =
-        typeof value === "boolean"
-          ? value
-            ? "1"
-            : "0"
-          : typeof value === "number"
-            ? String(value)
-            : SAFE.test(value)
-              ? value
-              : null;
-      if (scalar === null) {
-        console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
-        continue;
-      }
-      stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
     }
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);

@@ -1,4 +1,5 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
@@ -725,6 +726,12 @@ interface ConnectionCallback {
   method: (this: AbstractAdapter) => void;
 }
 
+function isPlainConfigHash(value: unknown): value is Record<string, unknown> {
+  if (value == null || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 export const RAW_CONNECTION_DEPRECATION_MESSAGE =
   "Initializing a connection adapter with a pre-opened raw connection is " +
   "deprecated and will be removed. Pass a configuration hash (or connection " +
@@ -756,15 +763,43 @@ export class AbstractAdapter implements Quoting {
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
 
-  /**
-   * @missingRailsCall build_statement_pool — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
-   * @missingRailsCall fetch — PERMANENT
-   */
-  constructor(config?: unknown) {
+  /** @missingRailsCall fetch — PERMANENT */
+  constructor(
+    configOrDeprecatedConnection: unknown,
+    deprecatedLogger: unknown = null,
+    deprecatedConnectionOptions: unknown = null,
+    deprecatedConfig: unknown = null,
+  ) {
     ensureAbstractAdapterMixinsApplied();
-    this._config = (config ?? {}) as Record<string, unknown>;
+    this._connection = null;
+    this._unconfiguredConnection = null;
+
+    if (isPlainConfigHash(configOrDeprecatedConnection)) {
+      this._config = configOrDeprecatedConnection;
+      if (
+        isRubyTruthy(deprecatedLogger) ||
+        isRubyTruthy(deprecatedConnectionOptions) ||
+        isRubyTruthy(deprecatedConfig)
+      ) {
+        throw new ArgumentError(
+          "when initializing an Active Record adapter with a config hash, that should be the only argument",
+        );
+      }
+    } else {
+      this._unconfiguredConnection = (configOrDeprecatedConnection ??
+        null) as AbstractAdapter | null;
+      if (isRubyTruthy(deprecatedConfig)) {
+        this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
+        this._connectionParameters = deprecatedConnectionOptions;
+      } else {
+        this._config = (deprecatedConnectionOptions ?? {}) as Record<string, unknown>;
+        this._connectionParameters = null;
+      }
+    }
+
     this.pool = new NullPool();
     this._visitor = this.arelVisitor();
+    this._statements = this.buildStatementPool() as StatementPool | null;
 
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
@@ -793,6 +828,8 @@ export class AbstractAdapter implements Quoting {
   protected _lastActivity = 0;
   protected _verified = false;
   protected _unconfiguredConnection: AbstractAdapter | null = null;
+  /** @internal */
+  protected _connectionParameters: unknown = null;
   protected _rawConnectionDirty = false;
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;

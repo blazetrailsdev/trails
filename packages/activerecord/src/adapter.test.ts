@@ -352,7 +352,7 @@ describe("AdapterTest", () => {
         return 10;
       }
     }
-    const conn = new TableAliasAdapter();
+    const conn = new TableAliasAdapter({});
     expect(conn.tableAliasFor("posts")).toBe("posts");
     expect(conn.tableAliasFor("posts_comments")).toBe("posts_comm");
     expect(conn.tableAliasFor("dbo.posts")).toBe("dbo_posts");
