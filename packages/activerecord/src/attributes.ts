@@ -81,15 +81,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       }
       return attributesHash;
     };
-    let pool: { withConnectionSync<T>(fn: (conn: unknown) => T): T } | null;
-    try {
-      pool = connectionPool.call(cacheHost);
-    } catch {
-      pool = null;
-    }
-    const attributesHash = pool
-      ? pool.withConnectionSync(buildAttributesHash)
-      : buildAttributesHash(undefined);
+    const attributesHash = connectionPool.call(cacheHost).withConnectionSync(buildAttributesHash);
 
     const attributeSet = new AttributeSet(attributesHash);
     AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
