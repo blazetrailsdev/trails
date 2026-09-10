@@ -20,7 +20,7 @@ describe("TestUnconnectedAdapter", () => {
 
   it("connection no longer established", async () => {
     await expect(TestRecord.find(1)).rejects.toThrow(ConnectionNotDefined);
-    await expect(new TestRecord().save()).rejects.toThrow(ConnectionNotDefined);
+    await expect(async () => new TestRecord().save()).rejects.toThrow(ConnectionNotDefined);
   });
 
   it("error message when connection not established", async () => {

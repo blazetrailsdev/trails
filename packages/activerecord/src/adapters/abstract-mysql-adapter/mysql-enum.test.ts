@@ -4,8 +4,10 @@ import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test
 import { Base } from "../../base.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

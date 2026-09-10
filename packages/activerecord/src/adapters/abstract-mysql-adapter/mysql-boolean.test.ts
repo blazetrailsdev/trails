@@ -1,12 +1,14 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
+import { fixtures } from "../../test-fixtures.js";
 
 class BooleanType extends Base {
   static tableName = "mysql_booleans";
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   let savedEmulateBooleans: boolean;
 
