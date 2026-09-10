@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
-import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -14,7 +13,7 @@ afterAll(() => {
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as PostgreSQLAdapter;
+    adapter = await leasePgAdapter();
   });
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);

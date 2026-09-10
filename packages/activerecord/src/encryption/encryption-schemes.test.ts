@@ -84,7 +84,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.supportUnencryptedData = false;
     const prevKeyProvider = makeKeyProvider("prev-key-for-schemes-test-32bytes!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider }] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Author();
     const author = await Author.create({ name: "david" });
     const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
@@ -104,7 +105,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.previous = [
       { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
     ] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Author();
     const author = await withoutEncryption(() => Author.create({ name: "unencrypted author" }));
     const reloaded = await Author.find(author.id);

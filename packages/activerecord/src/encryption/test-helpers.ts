@@ -100,7 +100,7 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   return adapter;
 }
 
-export function makePlainPost(adapter: DatabaseAdapter) {
+export function makePlainPost() {
   return class PlainPost extends Base {
     static {
       this._tableName = "posts";
@@ -111,10 +111,7 @@ export function makePlainPost(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedAuthorWithPreviousSchemes(
-  adapter: DatabaseAdapter,
-  previousSchemes: Scheme[],
-) {
+export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]) {
   return class EncryptedAuthor extends Base {
     static {
       this._tableName = "authors";
@@ -125,7 +122,7 @@ export function makeEncryptedAuthorWithPreviousSchemes(
   } as any;
 }
 
-export function makeEncryptedPost(adapter: DatabaseAdapter) {
+export function makeEncryptedPost() {
   return class EncryptedPost extends Base {
     static {
       this._tableName = "posts";
@@ -138,7 +135,7 @@ export function makeEncryptedPost(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedBook(adapter: DatabaseAdapter) {
+export function makeEncryptedBook() {
   return class EncryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -151,7 +148,7 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithDowncaseName() {
   return class EncryptedBookWithDowncaseName extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -164,7 +161,7 @@ export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
+export function makeEncryptedBookThatIgnoresCase() {
   return class EncryptedBookThatIgnoresCase extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -178,7 +175,7 @@ export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
+export function makeEncryptedAuthor() {
   return class EncryptedAuthor extends Base {
     static {
       this._tableName = "authors";
@@ -189,7 +186,7 @@ export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithCustomCompressor() {
   const customCompressor: Compressor = {
     deflate(data: string): Buffer | Uint8Array {
       return Configurable.config.compressor.deflate(data);
@@ -222,7 +219,7 @@ const _failingEncryptor: Encryptor = {
   },
 };
 
-export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
+export function makeBookThatWillFailToEncryptName() {
   return class BookThatWillFailToEncryptName extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -235,7 +232,7 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
+export function makeEncryptedTrafficLight() {
   return class EncryptedTrafficLight extends Base {
     static {
       this._tableName = "traffic_lights";
@@ -251,7 +248,7 @@ export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter) {
+export function makeEncryptedTrafficLightWithStoreState() {
   return class EncryptedTrafficLightWithStoreState extends Base {
     static {
       this._tableName = "traffic_lights";
@@ -267,7 +264,7 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
   } as any;
 }
 
-export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithBinaryMessagePackSerialized() {
   return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -276,7 +273,7 @@ export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: Databa
   } as any;
 }
 
-export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
+export function makeMsgPackTextBook() {
   return class MsgPackTextBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -289,7 +286,7 @@ export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeUnencryptedBook(adapter: DatabaseAdapter) {
+export function makeUnencryptedBook() {
   return class UnencryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -301,7 +298,7 @@ export function makeUnencryptedBook(adapter: DatabaseAdapter) {
   } as any;
 }
 
-export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithUniquenessValidation() {
   return class EncryptedBookWithUniquenessValidation extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -315,7 +312,7 @@ export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapt
   } as any;
 }
 
-export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
+export function makeEncryptedBookAttribute() {
   return class EncryptedBookAttribute extends Base {
     static {
       this._tableName = "encrypted_books";

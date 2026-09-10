@@ -27,11 +27,6 @@ import {
 } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
-async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-  const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
-  if (typeof maybeClose === "function") await maybeClose.call(adapter);
-}
-
 function normalizeRawConfig(raw: RawConfig): RawConfig {
   const normalized: Record<string, unknown> = { ...raw };
   if (!normalized.adapter) {

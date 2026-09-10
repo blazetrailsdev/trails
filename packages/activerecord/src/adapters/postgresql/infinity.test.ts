@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
-import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -16,7 +15,7 @@ afterAll(() => {
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as PostgreSQLAdapter;
+    adapter = await leasePgAdapter();
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
     await adapter.execute(`
       CREATE TABLE postgresql_infinities (
