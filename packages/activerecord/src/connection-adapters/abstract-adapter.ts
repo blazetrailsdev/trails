@@ -2094,7 +2094,7 @@ export class AbstractAdapter implements Quoting {
       )) as T;
     } catch (ex) {
       if (ex instanceof StatementInvalid) {
-        throw ex.setQuery(sql, binds);
+        throw await ex.setQuery(sql, binds);
       }
       throw ex;
     }

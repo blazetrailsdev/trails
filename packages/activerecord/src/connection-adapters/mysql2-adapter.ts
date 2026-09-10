@@ -34,13 +34,11 @@ import {
   performQuery as mysql2PerformQuery,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
-import { fetch } from "@blazetrails/ruby-compat";
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -293,20 +291,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
-    try {
-      return await this.log(driverSql, name, binds ?? [], typeCastedBinds, false, (payload) =>
-        this.withRawConnection({ allowRetry: options?.allowRetry ?? false }, async (conn) => {
-          const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], typeCastedBinds, {
-            prepare: options?.prepare ?? false,
-            notificationPayload: payload,
-          });
-          return this.castResult(raw);
-        }),
-      );
-    } catch (e) {
-      throw await this._enrichMismatchedForeignKey(e);
-    }
+    return await this.log(driverSql, name, binds ?? [], typeCastedBinds, false, (payload) =>
+      this.withRawConnection({ allowRetry: options?.allowRetry ?? false }, async (conn) => {
+        const mysqlConn = conn as unknown as mysql.Connection;
+        const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], typeCastedBinds, {
+          prepare: options?.prepare ?? false,
+          notificationPayload: payload,
+        });
+        return this.castResult(raw);
+      }),
+    );
   }
 
   async supportsJson(): Promise<boolean> {
@@ -445,48 +439,29 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-    try {
-      return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
-        this.withRawConnection({}, async (conn) => {
-          const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, driverSql, binds, typeCastedBinds, {
-            prepare: false,
-            notificationPayload: payload,
-          });
-          const affected = this.affectedRows(raw);
+    return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
+      this.withRawConnection({}, async (conn) => {
+        const mysqlConn = conn as unknown as mysql.Connection;
+        const raw = await this.performQuery(mysqlConn, driverSql, binds, typeCastedBinds, {
+          prepare: false,
+          notificationPayload: payload,
+        });
+        const affected = this.affectedRows(raw);
 
-          if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-            if (affected > 1) {
-              return affected;
-            }
-            return raw.insertId ?? 0;
+        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+          if (affected > 1) {
+            return affected;
           }
+          return raw.insertId ?? 0;
+        }
 
-          return affected;
-        }),
-      );
-    } catch (e) {
-      throw await this._enrichMismatchedForeignKey(e);
-    }
+        return affected;
+      }),
+    );
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
     return true;
-  }
-
-  override async beginIsolatedDbTransaction(isolation: string): Promise<unknown> {
-    const level = fetch<string>(transactionIsolationLevels(), isolation);
-    return this.withRawConnection(
-      { allowRetry: true, materializeTransactions: false },
-      async () => {
-        await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
-          materializeTransactions: false,
-        });
-        return this.internalExecute("BEGIN", "TRANSACTION", [], {
-          materializeTransactions: false,
-        });
-      },
-    );
   }
 
   override async internalExecute(
@@ -510,23 +485,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       const driverSql = this.mysqlQuote(sql);
       const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-      try {
-        return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
-          this.withRawConnection(
-            { materializeTransactions: false, allowRetry },
-            async (rawConn) => {
-              const conn = rawConn as unknown as mysql.Connection;
-              const rawResult = await this.performQuery(conn, driverSql, binds, typeCastedBinds, {
-                prepare: prepareOption,
-              });
-              payload.row_count = rawResult.affectedRows;
-              return rawResult;
-            },
-          ),
-        );
-      } catch (e) {
-        throw await this._enrichMismatchedForeignKey(e);
-      }
+      return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
+        this.withRawConnection({ materializeTransactions: false, allowRetry }, async (rawConn) => {
+          const conn = rawConn as unknown as mysql.Connection;
+          const rawResult = await this.performQuery(conn, driverSql, binds, typeCastedBinds, {
+            prepare: prepareOption,
+          });
+          payload.row_count = rawResult.affectedRows;
+          return rawResult;
+        }),
+      );
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }

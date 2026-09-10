@@ -9,7 +9,27 @@ import {
 } from "./errors.js";
 import { TooManyRecords } from "./nested-attributes.js";
 
+const bigintColumn = { sqlType: "bigint", type: "integer", isBigint: () => true };
+
 describe("MismatchedForeignKey setQuery (trails-only)", () => {
+  it("awaits an async queryParser before rebuilding", async () => {
+    const original = new MismatchedForeignKey({
+      message: "boom",
+      queryParser: async () => ({
+        table: "engines",
+        foreignKey: "car_id",
+        targetTable: "cars",
+        primaryKey: "id",
+        primaryKeyColumn: bigintColumn,
+      }),
+    });
+
+    const rebuilt = (await original.setQuery("ALTER TABLE `engines`", [])) as MismatchedForeignKey;
+
+    expect(rebuilt.fkDetails.primaryKeyColumn).toBe(bigintColumn);
+    expect(rebuilt.stack).toBe(original.stack);
+  });
+
   it("rebuilds the exception with parsed details when built with a queryParser and no sql", () => {
     const original = new MismatchedForeignKey({
       message: "Cannot add foreign key constraint",
@@ -22,33 +42,34 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
           foreignKey: "car_id",
           targetTable: "cars",
           primaryKey: "id",
-          primaryKeySqlType: "bigint",
-          primaryKeyType: "bigint",
+          primaryKeyColumn: bigintColumn,
         };
       },
     });
 
-    const rebuilt = original.setQuery("ALTER TABLE `engines` ADD CONSTRAINT fk", ["b"]);
+    const rebuilt = original.setQuery("ALTER TABLE `engines` ADD CONSTRAINT fk", [
+      "b",
+    ]) as MismatchedForeignKey;
 
     expect(rebuilt).not.toBe(original);
     expect(rebuilt).toBeInstanceOf(MismatchedForeignKey);
     expect(rebuilt.sql).toBe("ALTER TABLE `engines` ADD CONSTRAINT fk");
     expect(rebuilt.binds).toEqual(["b"]);
-    expect((rebuilt as MismatchedForeignKey).connectionPool).toBe("pool-sentinel");
+    expect(rebuilt.connectionPool).toBe("pool-sentinel");
     expect(rebuilt.message).toContain(
       "Column `car_id` on table `engines` does not match column `id` on `cars`",
     );
     expect(rebuilt.message).toContain("which has type `bigint`");
     expect(rebuilt.message).toContain("\nOriginal message: Cannot add foreign key constraint");
     expect(rebuilt.stack).toBe(original.stack);
-    expect((rebuilt as MismatchedForeignKey).fkDetails).toEqual({
+    expect(rebuilt.fkDetails).toEqual({
       table: "engines",
       foreignKey: "car_id",
       targetTable: "cars",
       primaryKey: "id",
-      primaryKeySqlType: "bigint",
-      primaryKeyType: "bigint",
+      primaryKeyColumn: bigintColumn,
     });
+    expect(rebuilt.message).toContain("`t.bigint :car_id`");
   });
 
   it("falls back to the plain setQuery assign when sql was supplied at construction", () => {
@@ -59,7 +80,7 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
       queryParser: () => ({ table: "t" }),
     });
 
-    const result = original.setQuery("OTHER SQL", ["x"]);
+    const result = original.setQuery("OTHER SQL", ["x"]) as StatementInvalid;
 
     expect(result).toBe(original);
     expect(result.sql).toBe("CREATE TABLE t");
@@ -68,7 +89,7 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
   it("falls back to the plain setQuery assign when no queryParser was given", () => {
     const original = new MismatchedForeignKey({ message: "boom" });
 
-    const result = original.setQuery("ALTER TABLE `x`", ["y"]);
+    const result = original.setQuery("ALTER TABLE `x`", ["y"]) as StatementInvalid;
 
     expect(result).toBe(original);
     expect(result).toBeInstanceOf(StatementInvalid);
