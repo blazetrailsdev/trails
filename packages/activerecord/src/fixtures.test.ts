@@ -35,7 +35,6 @@ import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { taskFixtureData } from "./test-helpers/fixtures/tasks.js";
 import { aircraftFixtureData } from "./test-helpers/fixtures/aircrafts.js";
 import { Post } from "./test-helpers/models/post.js";
-import { Comment } from "./test-helpers/models/comment.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
@@ -46,8 +45,6 @@ import {
   courseFixtureData,
   funnyJokeFixtureData,
   itemFixtureData,
-  otherCommentFixtureData,
-  otherPostFixtureData,
 } from "./test-helpers/fixtures/index.js";
 import "./relation.js";
 
@@ -903,13 +900,9 @@ describe("OverRideFixtureMethodTest", () => {
 });
 
 describe("FixtureWithSetModelClassTest", () => {
-  const { otherPosts, otherComments } = fixtures(
-    {
-      otherPosts: [Post, otherPostFixtureData],
-      otherComments: [Comment, otherCommentFixtureData],
-    },
-    { useTransactionalTests: false },
-  );
+  const { otherPosts, otherComments } = fixtures(["otherPosts", "otherComments"], {
+    useTransactionalTests: false,
+  });
 
   it("uses fixture class defined in yaml", () => {
     expect(otherPosts("second_welcome")).toBeInstanceOf(Post);
@@ -1006,15 +999,16 @@ describe("CheckEscapedYamlFixturesTest", () => {
   );
 
   it("proper escaped fixture", () => {
-    expect((funnyJokes("another_joke") as any).name).toBe("The \\n Aristocrats\nAte the candy\n");
+    expect(funnyJokes("another_joke").name).toBe("The \\n Aristocrats\nAte the candy\n");
   });
 });
 
+class DevelopersProject {}
 describe("ManyToManyFixturesWithClassDefined", () => {
   fixtures(["developersProjects"]);
 
   it("this should run cleanly", () => {
-    expect(true).toBe(true);
+    expect(DevelopersProject).toBeDefined();
   });
 });
 
@@ -1099,10 +1093,10 @@ describe("FoxyFixturesTest", () => {
   });
 
   it("preserves existing fixture data", () => {
-    expect(String(pirates("redbeard").created_on.toDate())).toBe(
+    expect(String((pirates("redbeard").created_on as Time).toDate())).toBe(
       String(Duration.weeks(2).ago(Time.now()).toDate()),
     );
-    expect(String(pirates("redbeard").updated_on.toDate())).toBe(
+    expect(String((pirates("redbeard").updated_on as Time).toDate())).toBe(
       String(Duration.weeks(2).ago(Time.now()).toDate()),
     );
   });
@@ -1135,7 +1129,7 @@ describe("FoxyFixturesTest", () => {
   });
 
   it("supports timestamps in join tables", async () => {
-    expect((developers("david") as any).created_at).not.toBeNull();
+    expect(developers("david").created_at).not.toBeNull();
     expect(computers("laptop").created_at).not.toBeNull();
 
     const klass = class extends Base {
@@ -1149,6 +1143,31 @@ describe("FoxyFixturesTest", () => {
       computer_id: computers("laptop").id,
     });
     expect(computersDevelopers?.readAttribute("created_at")).not.toBeNull();
+  });
+
+  it("supports inline habtm", async () => {
+    expect(await parrots("george").treasures.isInclude(treasures("diamond"))).toBe(true);
+    expect(await parrots("george").treasures.isInclude(treasures("sapphire"))).toBe(true);
+    expect(await parrots("george").treasures.isInclude(treasures("ruby"))).toBe(false);
+  });
+
+  it("supports inline habtm with specified id", async () => {
+    expect(await parrots("polly").treasures.isInclude(treasures("ruby"))).toBe(true);
+    expect(await parrots("polly").treasures.isInclude(treasures("sapphire"))).toBe(true);
+    expect(await parrots("polly").treasures.isInclude(treasures("diamond"))).toBe(false);
+  });
+
+  it("supports yaml arrays", async () => {
+    expect(await parrots("louis").treasures.isInclude(treasures("diamond"))).toBe(true);
+    expect(await parrots("louis").treasures.isInclude(treasures("sapphire"))).toBe(true);
+  });
+
+  it("strips DEFAULTS key", async () => {
+    expect(() => parrots("DEFAULTS" as never)).toThrow();
+
+    for (const t of ["sapphire", "ruby"] as const) {
+      expect(await parrots("davey").treasures.isInclude(treasures(t))).toBe(true);
+    }
   });
 
   it("supports label interpolation", () => {
@@ -1178,26 +1197,24 @@ describe("FoxyFixturesTest", () => {
 
   it("supports sti", async () => {
     expect(parrots("polly")).toBeInstanceOf(DeadParrot);
-    expect((await (parrots("polly") as any).killer)?.id).toBe(pirates("blackbeard").id);
+    expect((await (parrots("polly") as DeadParrot).killer)?.id).toBe(pirates("blackbeard").id);
   });
 
   it("supports sti with respective files", async () => {
     expect(liveParrots("dusty")).toBeInstanceOf(LiveParrot);
     expect(deadParrots("deadbird")).toBeInstanceOf(DeadParrot);
-    expect((await (deadParrots("deadbird") as any).killer)?.id).toBe(pirates("blackbeard").id);
+    expect((await deadParrots("deadbird").killer)?.id).toBe(pirates("blackbeard").id);
   });
 
   it("resolves enums in sti subclasses", () => {
-    expect((parrots("george") as any).isAustralian()).toBe(true);
-    expect((parrots("louis") as any).isAfrican()).toBe(true);
-    expect((parrots("frederick") as any).isAfrican()).toBe(true);
+    expect((parrots("george") as LiveParrot).isAustralian()).toBe(true);
+    expect((parrots("louis") as LiveParrot).isAfrican()).toBe(true);
+    expect((parrots("frederick") as LiveParrot).isAfrican()).toBe(true);
   });
 
   it("namespaced models", async () => {
-    expect(await (adminAccounts("signals37") as any).users.isInclude(adminUsers("david"))).toBe(
-      true,
-    );
-    expect(await (adminAccounts("signals37") as any).users.size()).toBe(2);
+    expect(await adminAccounts("signals37").users.isInclude(adminUsers("david"))).toBe(true);
+    expect(await adminAccounts("signals37").users.size()).toBe(2);
   });
 
   it("resolves enums", () => {

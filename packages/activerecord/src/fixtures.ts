@@ -246,6 +246,12 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
       throughReflection?: { foreignKey?: string | string[]; klass?: BaseClass; tableName?: string };
     };
     if (!r.isThroughReflection?.()) continue;
+    let targetTable: string | undefined;
+    try {
+      targetTable = r.klass?.tableName;
+    } catch {
+      targetTable = undefined;
+    }
     try {
       const throughModel = r.throughReflection?.klass;
       const joinTable = r.throughReflection?.tableName;
@@ -262,7 +268,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
         joinTable,
         lhsKey,
         rhsKey,
-        targetTable: r.klass?.tableName,
+        targetTable,
         throughModel,
         isHabtm: r.parentReflection?.macro === "hasAndBelongsToMany",
       });
@@ -517,7 +523,7 @@ export async function prepareModelFixtures(
     { rows: FixtureAttrs[]; throughModel: BaseClass | undefined; isHabtm: boolean }
   >();
 
-  const labels = Object.keys(fixtures);
+  const labels = Object.keys(fixtures).filter((label) => label !== "DEFAULTS");
 
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {

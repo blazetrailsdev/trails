@@ -277,20 +277,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "(fixtures_test.rb:1276-1297). trails' fixtures() reloads every set per test and " +
       "keeps no connection-keyed fixture cache, so there is nothing cached to assert.",
   },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FoxyFixturesTest",
-    tests: [
-      "strips DEFAULTS key",
-      "supports inline habtm",
-      "supports inline habtm with specified id",
-      "supports yaml arrays",
-    ],
-    reason:
-      "CONVERGEABLE fixtures-inline-habtm-and-defaults-label: the TS parrots corpus drops " +
-      "parrots.yml's inline treasures lists, and the loader does not ignore the DEFAULTS " +
-      "label as fixtures.rb:773 does.",
-  },
+
   {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
