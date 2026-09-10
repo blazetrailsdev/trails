@@ -85,9 +85,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   override isConnected(): boolean {
     const conn = this._rawConnection as
-      | (mysql.Connection & { _closing?: boolean; stream?: { destroyed?: boolean } })
+      | (mysql.Connection & {
+          connection: { _closing?: boolean; stream?: { destroyed?: boolean } };
+        })
       | null;
-    return !(conn == null || conn._closing === true || conn.stream?.destroyed === true);
+    return !(
+      conn == null ||
+      conn.connection._closing === true ||
+      conn.connection.stream?.destroyed === true
+    );
   }
 
   private get _rawConnection(): mysql.Connection | null {
