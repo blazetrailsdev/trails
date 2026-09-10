@@ -490,13 +490,14 @@ export class ConnectionPool implements ReapablePool {
     }
 
     return this._pinnedConnection.lock.synchronize(async () => {
-      const pinned = this._pinnedConnection;
-      if (pinned) {
-        await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
-        if (this._connections && !this._connections.includes(pinned)) {
-          this._connections.push(pinned);
+      if (this._pinnedConnection) {
+        await (
+          this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
+        ).verifyBang();
+        if (this._connections && !this._connections.includes(this._pinnedConnection)) {
+          this._connections.push(this._pinnedConnection);
         }
-        return pinned;
+        return this._pinnedConnection;
       }
       return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     });
