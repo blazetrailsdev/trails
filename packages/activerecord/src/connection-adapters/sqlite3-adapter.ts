@@ -675,11 +675,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   get encoding(): string {
-    if (this._encoding !== null) return this._encoding;
     return SQLite3Adapter.parseEncoding(this._rawConnection?.pragma("encoding"));
   }
-
-  private _encoding: string | null = null;
 
   /** @internal */
   private static parseEncoding(result: unknown): string {
@@ -723,11 +720,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     config: SQLite3ConnectionParameters,
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
-      if (
-        error instanceof Error &&
-        (error.message.includes("No such file or directory") ||
-          error.message.includes("unable to open database file"))
-      ) {
+      if (error instanceof Error && error.message.includes("No such file or directory")) {
         throw new NoDatabaseError();
       } else {
         throw error;
@@ -1544,11 +1537,14 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   private async connectAsync(): Promise<void> {
-    const conn = await (this.constructor as typeof SQLite3Adapter).newClient(
-      this._connectionParameters,
-    );
-    this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
-    this._rawConnection = conn;
+    try {
+      this._rawConnection = await (this.constructor as typeof SQLite3Adapter).newClient(
+        this._connectionParameters,
+      );
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
   }
 
   /**
