@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
@@ -25,6 +25,10 @@ describe("directly bound adapter", () => {
 });
 
 describe("Arel toSql through Table.engine", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("borrows a connection for the visit and returns it to the pool", () => {
     Base.releaseConnection();
     const pool = Base.connectionPool();
@@ -50,15 +54,10 @@ describe("Arel toSql through Table.engine", () => {
   it("restores the lease when the checkout itself raises", () => {
     Base.releaseConnection();
     const pool = Base.connectionPool();
-    const acquire = pool.acquireConnectionSync;
-    pool.acquireConnectionSync = () => {
+    vi.spyOn(pool, "acquireConnectionSync").mockImplementation(() => {
       throw new Error("checkout failed");
-    };
-    try {
-      expect(() => pool.withConnectionSync((conn) => conn)).toThrow("checkout failed");
-    } finally {
-      pool.acquireConnectionSync = acquire;
-    }
+    });
+    expect(() => pool.withConnectionSync((conn) => conn)).toThrow("checkout failed");
     expect(pool.activeConnection).toBeNull();
     expect(pool.isPermanentLease()).toBe(true);
   });
