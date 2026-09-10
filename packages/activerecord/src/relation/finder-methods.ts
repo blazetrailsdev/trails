@@ -7,6 +7,7 @@ import {
   RangeError as ActiveModelRangeError,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
@@ -412,7 +413,10 @@ function whereCompositePrimaryKeyIn(relation: any, pk: string[], ids: unknown[])
   return rel;
 }
 
-/** @missingRailsCall size — PERMANENT */
+/**
+ * @missingRailsCall size — PERMANENT
+ * @missingRailsArgs where_sql — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+ */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,
@@ -421,9 +425,17 @@ export function raiseRecordNotFoundExceptionBang(
   key?: string | string[],
   notFoundIds?: unknown[],
 ): never {
+  const model = this.model;
   const conditions = this.whereClause.isEmpty()
     ? ""
-    : ` [${this.arel().whereSql(this.model)?.value ?? ""}]`;
+    : ` [${
+        this.arel().whereSql({
+          withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
+            (model as any)._adapter
+              ? block((model as any)._adapter)
+              : (model as any).connectionPool().withConnectionSync(block),
+        })?.value ?? ""
+      }]`;
 
   const name = this.model.name;
   key ??= this.model.primaryKey;
