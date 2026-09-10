@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, onTestFinished } from "vitest";
 import {
   createPooledTestAdapter,
   _resetPooledTestAdapterForTests,
@@ -58,10 +58,12 @@ describe("withTransactionalFixtures", () => {
       { adapter: "sqlite3", database: ":memory:" },
       { ownerName: "MidTestPool" },
     );
+    onTestFinished(() => {
+      Base.connectionHandler.removeConnectionPool("MidTestPool");
+    });
     await Promise.resolve();
     await Promise.resolve();
     expect((pool as unknown as { _pinnedConnection: unknown })._pinnedConnection).not.toBeNull();
-    Base.connectionHandler.removeConnectionPool("MidTestPool");
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {

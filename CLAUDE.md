@@ -835,6 +835,35 @@ deep-imported the module is invented surface: it is a guard Rails does not have,
 in a body that is otherwise line-for-line. This is the one place the decision is
 recorded; do not re-derive it per slot or per call site.
 
+## The pool monitor guards only sections that span an `await` (`ConnectionPool`'s `MonitorMixin`)
+
+Rails' `ConnectionPool` is a monitor (`include MonitorMixin`,
+`activerecord/lib/active_record/connection_adapters/abstract/connection_pool.rb:217`),
+and trails' takes that monitor through ruby-compat's `synchronize`, which keys
+it on the receiver — `synchronize.call(this, block)` is Ruby's bare
+`synchronize do` self-call, with no extra member on the class. A monitor
+excludes other callers only while its holder is
+suspended, and a JS body with no `await` cannot be suspended: nothing else runs
+until it returns. So a `synchronize do` whose body is synchronous in trails is
+already atomic, and wrapping it would change nothing but its return type.
+
+That is the whole constraint, and it splits Rails' sections in two:
+
+- **Ported onto the monitor**: `checkout`'s pinned branch (`:550-567`), whose body
+  awaits `verify!`. It nests inside the pinned connection's `lock` exactly as
+  Rails nests it, and keeps the `:553` re-check.
+- **Not wrapped**: `connections` (`:443`), `disconnect` (`:454`), `discard!`
+  (`:485`), `clear_reloadable_connections` (`:507`), and the queue's
+  `synchronize` (`connection_pool/queue.rb:80-81`, a bare `block()` in
+  `queue.ts`). Their trails bodies contain no `await`. `connections` is also a
+  synchronous reader in Rails, so it could not await the monitor even if it
+  needed to, and the other three run inside the synchronous
+  `with_exclusively_acquired_all_connections` block, where an async
+  `synchronize` cannot nest.
+
+This is a genuine language shortcoming, ratified repo-wide here. If one of those
+bodies ever gains an `await`, it gains the monitor in the same change.
+
 ## Method visibility is not a runtime fact in JS (`basic_obj_respond_to`'s `pub`)
 
 Ruby's `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864-2879`) takes a

@@ -1,4 +1,4 @@
-import { Mutex } from "@blazetrails/ruby-compat";
+import { Mutex, synchronize } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import {
@@ -477,13 +477,8 @@ export class ConnectionPool implements ReapablePool {
     if (lockThread) this._pinnedConnection.setLockThread(executionContextId());
     const pinned = this._pinnedConnection;
     if (isTransactionAware(pinned)) {
-      await pinned.lock.synchronize(async () => {
-        await pinned.verifyBang();
-        await pinned.transactionManager.beginTransaction({
-          joinable: false,
-          _lazy: false,
-        });
-      });
+      await pinned.verifyBang();
+      await pinned.transactionManager.beginTransaction({ joinable: false, _lazy: false });
     }
   }
 
@@ -528,18 +523,20 @@ export class ConnectionPool implements ReapablePool {
       return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     }
 
-    return this._pinnedConnection.lock.synchronize(async () => {
-      if (this._pinnedConnection) {
-        await (
-          this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
-        ).verifyBang();
-        if (this._connections && !this._connections.includes(this._pinnedConnection)) {
-          this._connections.push(this._pinnedConnection);
+    return this._pinnedConnection.lock.synchronize(() =>
+      (synchronize<DatabaseAdapter>).call(this, async () => {
+        if (this._pinnedConnection) {
+          await (
+            this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
+          ).verifyBang();
+          if (this._connections && !this._connections.includes(this._pinnedConnection)) {
+            this._connections.push(this._pinnedConnection);
+          }
+          return this._pinnedConnection;
         }
-        return this._pinnedConnection;
-      }
-      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
-    });
+        return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
+      }),
+    );
   }
 
   /**

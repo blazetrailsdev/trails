@@ -105,7 +105,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     const ship = await Ship.create({ name: "Cached Ship", developer_id: developers("david").id });
     ship.strictLoadingBang();
     const developer = new Developer({ id: developers("david").id });
-    (ship as any).association("developer").writer(developer);
+    await (ship as any).association("developer").writer(developer);
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
   });

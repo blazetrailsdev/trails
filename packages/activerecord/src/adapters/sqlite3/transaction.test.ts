@@ -1,4 +1,5 @@
 import { it, expect, afterEach } from "vitest";
+import { assertNotEmpty } from "@blazetrails/activesupport";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SQLite3Constants } from "../../sqlite-adapter.js";
@@ -80,7 +81,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     const conn2 = await withConn({ flags: sharedCacheFlags() });
     await conn2.beginIsolatedDbTransaction(":read_uncommitted");
     const rows = (await conn2.execute(`SELECT * FROM "zines" WHERE title = 'foo'`))!;
-    expect(rows.length).toBeGreaterThan(0);
+    assertNotEmpty(rows);
     await conn2.rollbackDbTransaction();
 
     await conn1.rollbackDbTransaction();
