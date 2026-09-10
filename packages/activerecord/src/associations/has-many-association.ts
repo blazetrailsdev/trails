@@ -1,3 +1,4 @@
+import { _setHasManyAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -525,3 +526,5 @@ Object.assign(HasManyAssociation.prototype, {
 });
 
 Object.assign(HasManyAssociation.prototype, { foreignKeyPresent });
+
+_setHasManyAssociation(HasManyAssociation);

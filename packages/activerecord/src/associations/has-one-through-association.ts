@@ -1,3 +1,4 @@
+import { _setHasOneThroughAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
@@ -241,3 +242,5 @@ Object.assign(HasOneThroughAssociation.prototype, {
   createThroughRecord,
   ...ThroughAssociation,
 });
+
+_setHasOneThroughAssociation(HasOneThroughAssociation);
