@@ -17,6 +17,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
+import { _Base } from "../base-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
@@ -129,13 +130,8 @@ export function uncacheableMethods(): Set<string> {
 /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string): void {
   if (DelegateCache.delegateBaseMethods) return;
-  let base: unknown = modelClass;
-  while (typeof base === "function" && (base as { name?: string }).name !== "Base") {
-    base = Object.getPrototypeOf(base);
-  }
-  if (typeof base !== "function") return;
   for (
-    let ctor: unknown = base;
+    let ctor: unknown = _Base;
     typeof ctor === "function" && ctor !== Function.prototype;
     ctor = Object.getPrototypeOf(ctor)
   ) {

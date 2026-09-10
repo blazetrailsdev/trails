@@ -1952,7 +1952,6 @@ export function arelColumn(
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
-  if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
   const isSymbol = isRubySymbol(field);
   field = isSymbol ? symbolToName(field as string) : field == null ? "" : String(field);
   field = (modelClass?.attributeAliases?.[field] as string | undefined) ?? field;

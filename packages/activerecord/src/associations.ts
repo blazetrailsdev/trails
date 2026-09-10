@@ -385,10 +385,10 @@ export class Associations {
     if (!ownWrappedNames.has(name)) {
       ownWrappedNames.add(name);
       self.prototype.destroyAssociations = async function (this: {
-        association(n: string): { handleDependency(): Promise<void>; reset(): void };
+        association(n: string): { deleteAll(dependent?: string): Promise<unknown>; reset(): void };
         _collectionProxies?: { delete(n: string): void };
       }): Promise<void> {
-        await this.association(middleName).handleDependency();
+        await this.association(middleName).deleteAll("delete_all");
         this.association(name).reset();
         this._collectionProxies?.delete(name);
         if (typeof prevDestroyAssociations === "function") {

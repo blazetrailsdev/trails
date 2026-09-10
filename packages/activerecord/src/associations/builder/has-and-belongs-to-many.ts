@@ -141,11 +141,8 @@ export class HasAndBelongsToMany {
     middleOptions.className = `${this.lhsModel.name}::${joinModel.name}`;
     if (hasKey(this.options, "foreignKey")) {
       middleOptions.foreignKey = this.options.foreignKey;
-    } else {
-      middleOptions.foreignKey = joinModel.leftReflection.foreignKey;
     }
     middleOptions.anonymousClass = joinModel;
-    middleOptions.dependent = "delete";
     return middleOptions;
   }
 

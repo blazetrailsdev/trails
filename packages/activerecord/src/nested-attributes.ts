@@ -371,22 +371,6 @@ export function assignNestedAttributesForCollectionAssociation(
 
   checkRecordLimitBang(resolveNestedLimit(config?.limit, record), attrs);
 
-  if (config?.allowDestroy) {
-    const loaded = loadedCollectionTarget(record, associationName);
-    if (loaded.length > 0) {
-      const targetModel = resolveCollectionTargetModel(record, associationName);
-      if (targetModel) {
-        for (const a of attrs) {
-          const id = a.id;
-          if (id != null && id !== "" && hasDestroyFlag(a)) {
-            const existing = findRecordById(targetModel, loaded, id);
-            if (existing) existing.markForDestruction();
-          }
-        }
-      }
-    }
-  }
-
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const association = record.association(associationName) as CollectionAssociation;
 
@@ -464,14 +448,6 @@ export function assignNestedAttributesForCollectionAssociation(
   return existingRecordsScope
     .toArray()
     .then((existingRecords: Base[]) => assignRecords(existingRecords));
-}
-
-/** @internal */
-function loadedCollectionTarget(record: Base, associationName: string): Base[] {
-  const proxy = (record as any)._collectionProxies?.get?.(associationName) as
-    | { target?: unknown[] }
-    | undefined;
-  return Array.isArray(proxy?.target) ? (proxy.target as Base[]) : [];
 }
 
 /** @internal */

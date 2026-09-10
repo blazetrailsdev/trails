@@ -105,14 +105,12 @@ describe("Relation private build-arel helpers", () => {
       expect((node as any).name).toBe("title");
     });
 
-    it("passes through an Arel node unchanged", () => {
+    it("stringifies a SqlLiteral before dispatch, as Ruby's String#to_s does", () => {
       const lit = new Nodes.SqlLiteral("COUNT(*)");
-      expect(relation().arelColumn(lit)).toBe(lit);
-    });
-
-    it("passes through a non-string Arel node without calling .match", () => {
-      const grouping = new Nodes.Grouping(new Nodes.SqlLiteral("id"));
-      expect(relation().arelColumn(grouping)).toBe(grouping);
+      const node = relation().arelColumn(lit);
+      expect(node).not.toBe(lit);
+      expect(node).toBeInstanceOf(Nodes.SqlLiteral);
+      expect(String(node)).toBe("COUNT(*)");
     });
 
     it("resolves table.column form via arelColumnWithTable", () => {

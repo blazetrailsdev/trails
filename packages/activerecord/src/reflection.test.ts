@@ -890,7 +890,7 @@ describe("ReflectionTest", () => {
       Object.getPrototypeOf(reflection),
       Object.getOwnPropertyDescriptors(reflection),
     ) as typeof reflection;
-    expect(dup!.hasInverse()).toBe(false);
+    expect(dup!.hasInverse()).toBeFalsy();
   });
   it.skip("automatic inverse does not suppress name error from incidental code", () => {});
 

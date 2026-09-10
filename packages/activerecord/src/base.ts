@@ -2059,9 +2059,8 @@ export class Base extends Model {
     const saveOk = await runCallbacks(this, "save", async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
-        const createOk = await this._createRecord(undefined, block);
-        if (createOk) saved = true;
-        else saved = false;
+        const result = await this._createRecord(undefined, block);
+        saved = result !== false;
       } else {
         const result = await this._updateRecord(undefined, block);
         saved = result !== false;
@@ -2769,7 +2768,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   hasTransactionalCallbacks(): boolean;
   /** @internal */
-  _createRecord(attributeNames?: string[], block?: (record: this) => void): Promise<boolean>;
+  _createRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   /** @internal */
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;

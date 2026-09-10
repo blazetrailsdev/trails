@@ -62,16 +62,14 @@ export async function _createRecord(
   this: any,
   attributeNames?: string[],
   block?: (record: any) => void,
-): Promise<boolean> {
+): Promise<unknown> {
   const ctor = this.constructor;
-  return (
-    (await runCallbacks(this, "create", () =>
-      dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
-        counterCacheCreateRecord.call(this, names, (names2: string[]) =>
-          persistenceCreateRecord.call(this, names2, block),
-        ),
+  return await runCallbacks(this, "create", () =>
+    dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
+      counterCacheCreateRecord.call(this, names, (names2: string[]) =>
+        persistenceCreateRecord.call(this, names2, block),
       ),
-    )) !== false
+    ),
   );
 }
 

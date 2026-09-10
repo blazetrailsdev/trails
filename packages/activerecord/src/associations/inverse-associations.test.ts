@@ -117,17 +117,17 @@ describe("AutomaticInverseFindingTests", () => {
     const monkeyReflection = (MixedCaseMonkey as any).reflectOnAssociation("human");
     const humanReflection = (Human as any).reflectOnAssociation("mixedCaseMonkey");
 
-    expect(monkeyReflection.hasInverse()).toBe(true);
+    expect(monkeyReflection.hasInverse()).toBeTruthy();
     expect(monkeyReflection.inverseOf()).toBe(humanReflection);
 
-    expect(humanReflection.hasInverse()).toBe(true);
+    expect(humanReflection.hasInverse()).toBeTruthy();
     expect(humanReflection.inverseOf()).toBe(monkeyReflection);
   });
 
   it("has many and belongs to should find inverse automatically for model in module", () => {
     const accountReflection = (AdminAccount as any).reflectOnAssociation("users");
     const userReflection = (AdminUser as any).reflectOnAssociation("account");
-    expect(accountReflection.hasInverse()).toBe(true);
+    expect(accountReflection.hasInverse()).toBeTruthy();
     expect(accountReflection.inverseOf()).toBe(userReflection);
   });
 
@@ -135,10 +135,10 @@ describe("AutomaticInverseFindingTests", () => {
     const carReflection = (Car as any).reflectOnAssociation("bulb");
     const bulbReflection = (Bulb as any).reflectOnAssociation("car");
 
-    expect(carReflection.hasInverse()).toBe(true);
+    expect(carReflection.hasInverse()).toBeTruthy();
     expect(carReflection.inverseOf()).toBe(bulbReflection);
 
-    expect(bulbReflection.hasInverse()).toBe(true);
+    expect(bulbReflection.hasInverse()).toBeTruthy();
     expect(bulbReflection.inverseOf()).toBe(carReflection);
   });
 
@@ -146,7 +146,7 @@ describe("AutomaticInverseFindingTests", () => {
     const commentReflection = (Comment as any).reflectOnAssociation("ratings");
     const ratingReflection = (Rating as any).reflectOnAssociation("comment");
 
-    expect(commentReflection.hasInverse()).toBe(true);
+    expect(commentReflection.hasInverse()).toBeTruthy();
     expect(commentReflection.inverseOf()).toBe(ratingReflection);
   });
 
@@ -154,7 +154,7 @@ describe("AutomaticInverseFindingTests", () => {
     const commentReflection = (Comment as any).reflectOnAssociation("post");
     const postReflection = (Post as any).reflectOnAssociation("comments");
 
-    expect(postReflection.hasInverse()).toBe(true);
+    expect(postReflection.hasInverse()).toBeTruthy();
     expect(postReflection.inverseOf()).toBe(commentReflection);
   });
 
@@ -163,10 +163,10 @@ describe("AutomaticInverseFindingTests", () => {
     const authorChildReflection = (Author as any).reflectOnAssociation("specialPosts");
     const postReflection = (Post as any).reflectOnAssociation("author");
 
-    expect(authorReflection.hasInverse()).toBe(true);
+    expect(authorReflection.hasInverse()).toBeTruthy();
     expect(authorReflection.inverseOf()).toBe(postReflection);
 
-    expect(authorChildReflection.hasInverse()).toBe(true);
+    expect(authorChildReflection.hasInverse()).toBeTruthy();
     expect(authorChildReflection.inverseOf()).toBe(postReflection);
   });
 
@@ -183,9 +183,9 @@ describe("AutomaticInverseFindingTests", () => {
     const userReflection = (Room as any).reflectOnAssociation("user");
     const ownerReflection = (Room as any).reflectOnAssociation("owner");
     const roomReflection = (User as any).reflectOnAssociation("room");
-    expect(userReflection.hasInverse()).toBe(true);
+    expect(userReflection.hasInverse()).toBeTruthy();
     expect(userReflection.inverseOf()).toBe(roomReflection);
-    expect(ownerReflection.hasInverse()).toBe(false);
+    expect(ownerReflection.hasInverse()).toBeFalsy();
     expect(ownerReflection.inverseOf()).not.toBe(roomReflection);
   });
 
@@ -195,7 +195,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(contactsReflection.scope).toBeTruthy();
     expect(companyReflection.scope).toBeFalsy();
     await withAutomaticScopeInversing([contactsReflection, companyReflection], () => {
-      expect(contactsReflection.hasInverse()).toBe(true);
+      expect(contactsReflection.hasInverse()).toBeTruthy();
       expect(contactsReflection.inverseOf()).toBe(companyReflection);
       expect(companyReflection.inverseOf()).not.toBe(contactsReflection);
     });
@@ -207,7 +207,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(postReflection.scope).toBeTruthy();
     expect(authorReflection.scope).toBeFalsy();
     await withAutomaticScopeInversing([postReflection, authorReflection], () => {
-      expect(postReflection.hasInverse()).toBe(true);
+      expect(postReflection.hasInverse()).toBeTruthy();
       expect(postReflection.inverseOf()).toBe(authorReflection);
       expect(authorReflection.inverseOf()).not.toBe(postReflection);
     });
@@ -280,26 +280,26 @@ describe("AutomaticInverseFindingTests", () => {
 
   it("polymorphic and has many through relationships should not have inverses", () => {
     const sponsorReflection = (Sponsor as any).reflectOnAssociation("sponsorable");
-    expect(sponsorReflection.hasInverse()).toBe(false);
+    expect(sponsorReflection.hasInverse()).toBeFalsy();
 
     const clubReflection = (Club as any).reflectOnAssociation("members");
-    expect(clubReflection.hasInverse()).toBe(false);
+    expect(clubReflection.hasInverse()).toBeFalsy();
   });
 
   it("polymorphic has one should find inverse automatically", () => {
     const humanReflection = (Human as any).reflectOnAssociation("polymorphicFaceWithoutInverse");
-    expect(humanReflection.hasInverse()).toBe(true);
+    expect(humanReflection.hasInverse()).toBeTruthy();
   });
 
   it("has many inverse of derived automatically despite of composite foreign key", () => {
     const carReviewReflection = (CpkCar as any).reflectOnAssociation("carReviews");
-    expect(carReviewReflection.hasInverse()).toBe(true);
+    expect(carReviewReflection.hasInverse()).toBeTruthy();
     expect(carReviewReflection.inverseOf()).toBe((CpkCarReview as any).reflectOnAssociation("car"));
   });
 
   it("belongs to inverse of derived automatically despite of composite foreign key", () => {
     const carReflection = (CpkCarReview as any).reflectOnAssociation("car");
-    expect(carReflection.hasInverse()).toBe(true);
+    expect(carReflection.hasInverse()).toBeTruthy();
     expect(carReflection.inverseOf()).toBe((CpkCar as any).reflectOnAssociation("carReviews"));
   });
 });
@@ -335,13 +335,13 @@ describe("InverseAssociationTests", () => {
   });
 
   it("should be able to ask a reflection if it has an inverse", () => {
-    expect((Human as any).reflectOnAssociation("face").hasInverse()).toBe(true);
-    expect((Human as any).reflectOnAssociation("interests").hasInverse()).toBe(true);
-    expect((Face as any).reflectOnAssociation("human").hasInverse()).toBe(true);
+    expect((Human as any).reflectOnAssociation("face").hasInverse()).toBeTruthy();
+    expect((Human as any).reflectOnAssociation("interests").hasInverse()).toBeTruthy();
+    expect((Face as any).reflectOnAssociation("human").hasInverse()).toBeTruthy();
 
-    expect((Club as any).reflectOnAssociation("sponsor").hasInverse()).toBe(false);
-    expect((Club as any).reflectOnAssociation("memberships").hasInverse()).toBe(false);
-    expect((Sponsor as any).reflectOnAssociation("sponsorClub").hasInverse()).toBe(false);
+    expect((Club as any).reflectOnAssociation("sponsor").hasInverse()).toBeFalsy();
+    expect((Club as any).reflectOnAssociation("memberships").hasInverse()).toBeFalsy();
+    expect((Sponsor as any).reflectOnAssociation("sponsorClub").hasInverse()).toBeFalsy();
   });
 
   it("inverse of method should supply the actual reflection instance it is the inverse of", () => {
