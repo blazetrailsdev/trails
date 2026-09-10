@@ -1043,7 +1043,7 @@ describe("NullPool member parity", () => {
   });
 
   it("raises NoMethodError on a pool-less adapter's role, shard and inspect", () => {
-    const adapter = new AbstractAdapter();
+    const adapter = new AbstractAdapter({});
     expect(adapter.pool).toBeInstanceOf(NullPool);
     expect(() => adapter.role).toThrow(/undefined method 'role'/);
     expect(() => adapter.shard).toThrow(/undefined method 'shard'/);
@@ -1068,7 +1068,7 @@ describe("NullPool member parity", () => {
   });
 
   it("lets a failing assertion whose subject holds a NullPool report its own failure", () => {
-    const adapter = new AbstractAdapter();
+    const adapter = new AbstractAdapter({});
     expect(() =>
       expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),
     ).toThrow(/expected/i);

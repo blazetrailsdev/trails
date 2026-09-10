@@ -35,7 +35,7 @@ describe("AbstractAdapter#databaseVersion", () => {
   }
 
   it("is readable from a standalone adapter that has never connected", async () => {
-    const adapter = new AsyncVersionAdapter();
+    const adapter = new AsyncVersionAdapter({});
 
     expect(String(await adapter.databaseVersion)).toBe("8.0.31");
   });
@@ -47,7 +47,7 @@ describe("AbstractAdapter#databaseVersion", () => {
         seen.push(String(await this.databaseVersion));
       }
     }
-    const adapter = new CheckingAdapter();
+    const adapter = new CheckingAdapter({});
     await adapter.configureConnection();
     await adapter.configureConnection();
     expect(seen).toEqual(["8.0.31", "8.0.31"]);

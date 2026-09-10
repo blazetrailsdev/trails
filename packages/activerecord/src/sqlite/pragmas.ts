@@ -1,24 +1,29 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+class SQLite3Exception extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SQLite3::Exception";
+  }
+}
 
-export const SYNCHRONOUS_MODES: string[][] = [
-  ["full", "2"],
-  ["normal", "1"],
-  ["off", "0"],
+export const SYNCHRONOUS_MODES: (string | number)[][] = [
+  ["full", 2],
+  ["normal", 1],
+  ["off", 0],
 ];
 
-export const TEMP_STORE_MODES: string[][] = [
-  ["default", "0"],
-  ["file", "1"],
-  ["memory", "2"],
+export const TEMP_STORE_MODES: (string | number)[][] = [
+  ["default", 0],
+  ["file", 1],
+  ["memory", 2],
 ];
 
-export const AUTO_VACUUM_MODES: string[][] = [
-  ["none", "0"],
-  ["full", "1"],
-  ["incremental", "2"],
+export const AUTO_VACUUM_MODES: (string | number)[][] = [
+  ["none", 0],
+  ["full", 1],
+  ["incremental", 2],
 ];
 
-export const JOURNAL_MODES: string[][] = [
+export const JOURNAL_MODES: (string | number)[][] = [
   ["delete"],
   ["truncate"],
   ["persist"],
@@ -27,11 +32,16 @@ export const JOURNAL_MODES: string[][] = [
   ["off"],
 ];
 
-export const LOCKING_MODES: string[][] = [["normal"], ["exclusive"]];
+export const LOCKING_MODES: (string | number)[][] = [["normal"], ["exclusive"]];
 
-export const ENCODINGS: string[][] = [["utf-8"], ["utf-16"], ["utf-16le"], ["utf-16be"]];
+export const ENCODINGS: (string | number)[][] = [["utf-8"], ["utf-16"], ["utf-16le"], ["utf-16be"]];
 
-export const WAL_CHECKPOINTS: string[][] = [["passive"], ["full"], ["restart"], ["truncate"]];
+export const WAL_CHECKPOINTS: (string | number)[][] = [
+  ["passive"],
+  ["full"],
+  ["restart"],
+  ["truncate"],
+];
 
 const BOOLEAN_PRAGMAS = [
   "automatic_index",
@@ -78,7 +88,7 @@ const INT_PRAGMAS = [
   "wal_autocheckpoint",
 ];
 
-const ENUM_PRAGMAS: Record<string, string[][]> = {
+const ENUM_PRAGMAS: Record<string, (string | number)[][]> = {
   auto_vacuum: AUTO_VACUUM_MODES,
   default_synchronous: SYNCHRONOUS_MODES,
   default_temp_store: TEMP_STORE_MODES,
@@ -120,14 +130,14 @@ function setBooleanPragma(name: string, mode: unknown): string {
         value = "'OFF'";
         break;
       default:
-        throw new ArgumentError(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+        throw new SQLite3Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
     }
   } else if (mode === true || mode === 1) {
     value = "ON";
   } else if (mode === false || mode === 0 || mode == null) {
     value = "OFF";
   } else {
-    throw new ArgumentError(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+    throw new SQLite3Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
   }
   return `${name}=${value}`;
 }
@@ -136,12 +146,12 @@ function setIntPragma(name: string, value: unknown): string {
   return `${name}=${parseInt(String(value), 10) || 0}`;
 }
 
-function setEnumPragma(name: string, mode: unknown, enums: string[][]): string {
-  const match = enums.find((p) => p.find((i) => i.toLowerCase() === toS(mode).toLowerCase()));
+function setEnumPragma(name: string, mode: unknown, enums: (string | number)[][]): string {
+  const match = enums.find((p) => p.find((i) => toS(i).toLowerCase() === toS(mode).toLowerCase()));
   if (!match) {
-    throw new ArgumentError(`unrecognized ${name} ${JSON.stringify(mode)}`);
+    throw new SQLite3Exception(`unrecognized ${name} ${JSON.stringify(mode)}`);
   }
-  return `${name}='${match[0].toUpperCase()}'`;
+  return `${name}='${toS(match[0]).toUpperCase()}'`;
 }
 
 /** @noRailsEquivalent PERMANENT */

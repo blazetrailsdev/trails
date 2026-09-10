@@ -79,7 +79,7 @@ class PostForRetryTest extends Base {
 
 describe("AdapterConnection retryable classification (trails-only)", () => {
   it("a from(Arel node) clause does not reset the SELECT's retryable classification", async () => {
-    const adapter = new QueryTestAdapter();
+    const adapter = new QueryTestAdapter({});
     adapter.simulateConnect();
     PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
 
@@ -100,7 +100,7 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   });
 
   it("findBySql tolerates a null opts argument without throwing", async () => {
-    const adapter = new QueryTestAdapter();
+    const adapter = new QueryTestAdapter({});
     adapter.simulateConnect();
     PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
 
@@ -108,7 +108,7 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   });
 
   it("withRawConnection is reentrant", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     let innerRan = false;
     const result = await a.withRawConnection({}, async () => {
       await a.withRawConnection({}, async () => {
@@ -156,7 +156,7 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
 
 describe("AbstractAdapter reconnect/verify lifecycle", () => {
   it("reconnectBang re-enables lazy transactions, clears the cache, and reconfigures", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     await a.transactionManager.disableLazyTransactionsBang();
     expect(a.transactionManager.isLazyTransactionsEnabled()).toBe(false);
@@ -171,7 +171,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnectBang with restoreTransactions keeps an open transaction open", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     await a.transactionManager.beginTransaction();
     expect(a.isTransactionOpen()).toBe(true);
@@ -181,7 +181,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnectBang without restoreTransactions discards open transactions", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     await a.transactionManager.beginTransaction();
     expect(a.isTransactionOpen()).toBe(true);
@@ -191,7 +191,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnectBang clears verified/last-activity state when reconfigure fails", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     a.failConfigure = true;
 
@@ -201,7 +201,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnect! retries a transient connection failure and succeeds", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     (a as unknown as { _config: { connectionRetries: number } })._config.connectionRetries = 2;
     (a as unknown as { backoff: () => Promise<void> }).backoff = () => Promise.resolve();
@@ -215,7 +215,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnect! gives up after exhausting connection retries", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     (a as unknown as { _config: { connectionRetries: number } })._config.connectionRetries = 2;
     (a as unknown as { backoff: () => Promise<void> }).backoff = () => Promise.resolve();
@@ -228,7 +228,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("reconnect! does not retry a non-retryable error", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
     (a as unknown as { _config: { connectionRetries: number } })._config.connectionRetries = 3;
     (a as unknown as { backoff: () => Promise<void> }).backoff = () => Promise.resolve();
@@ -241,7 +241,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("verifyBang promotes an unconfigured connection instead of reconnecting", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     const raw = {} as unknown as AbstractAdapter;
     (a as unknown as { _unconfiguredConnection: AbstractAdapter | null })._unconfiguredConnection =
       raw;
@@ -257,7 +257,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
   });
 
   it("verifyBang disconnects and raises when configuring an unconfigured connection fails", async () => {
-    const a = new ReconnectLifecycleAdapter();
+    const a = new ReconnectLifecycleAdapter({});
     (a as unknown as { _unconfiguredConnection: AbstractAdapter | null })._unconfiguredConnection =
       {} as unknown as AbstractAdapter;
     a.failConfigure = true;

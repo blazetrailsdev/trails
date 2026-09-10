@@ -26,7 +26,7 @@ class DummyCreation extends SchemaCreation {
 }
 
 describe("ColumnDefinitionTest", () => {
-  const viz = new DummyCreation(new DummyAdapter());
+  const viz = new DummyCreation(new DummyAdapter({}));
 
   it("should not include default clause when default is null", async () => {
     const columnDef = new ColumnDefinition("title", "string", { limit: 20 });

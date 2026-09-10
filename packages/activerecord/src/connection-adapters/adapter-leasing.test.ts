@@ -15,7 +15,7 @@ describe("AdapterLeasingTest", () => {
   let adapter: AbstractAdapter;
 
   beforeEach(() => {
-    adapter = new AbstractAdapter();
+    adapter = new AbstractAdapter({});
   });
 
   it("in use?", () => {

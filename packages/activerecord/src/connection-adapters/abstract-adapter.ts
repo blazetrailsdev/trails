@@ -765,7 +765,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @missingRailsCall fetch — PERMANENT */
   constructor(
-    configOrDeprecatedConnection?: unknown,
+    configOrDeprecatedConnection: unknown,
     deprecatedLogger: unknown = null,
     deprecatedConnectionOptions: unknown = null,
     deprecatedConfig: unknown = null,

@@ -15,7 +15,7 @@ class DisconnectAdapter extends AbstractAdapter {
 
 describe("AbstractAdapter#disconnect!", () => {
   it("waits for the adapter lock before touching connection state", async () => {
-    const adapter = new DisconnectAdapter();
+    const adapter = new DisconnectAdapter({});
     adapter.attachRawConnection();
 
     const observed: Array<AbstractAdapter | null> = [];
@@ -34,7 +34,7 @@ describe("AbstractAdapter#disconnect!", () => {
   });
 
   it("does not nil the raw connection in the abstract body", async () => {
-    const adapter = new DisconnectAdapter();
+    const adapter = new DisconnectAdapter({});
     adapter.attachRawConnection();
 
     await adapter.disconnectBang();

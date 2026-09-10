@@ -12,14 +12,14 @@ import {
 
 describe("AbstractAdapter connection lifecycle privates", () => {
   it("verifiedBang sets _verified and _lastActivity", () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     a.verifiedBang();
     expect((a as any)._verified).toBe(true);
     expect((a as any)._lastActivity).toBeGreaterThan(0);
   });
 
   it("retryable error predicates match Rails semantics", () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     expect(a.isRetryableConnectionError(new ConnectionNotEstablished("x"))).toBe(true);
     expect(a.isRetryableConnectionError(new ConnectionNotDefined("x"))).toBe(false);
     expect(a.isRetryableConnectionError(new ConnectionFailed("x"))).toBe(true);
@@ -31,7 +31,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   it("backoff sleeps proportionally to counter", async () => {
     vi.useFakeTimers();
     try {
-      const a = new AbstractAdapter();
+      const a = new AbstractAdapter({});
       let resolved = false;
       void a.backoff(2).then(() => (resolved = true));
       await vi.advanceTimersByTimeAsync(150);
@@ -44,7 +44,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   });
 
   it("extendedTypeMapKey + typeMap default behavior", () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     expect(a.extendedTypeMapKey()).toBeNull();
     (a as any)._defaultTimezone = "utc";
     expect(a.extendedTypeMapKey()).toEqual({ defaultTimezone: "utc" });
@@ -52,7 +52,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   });
 
   it("withRawConnection serializes concurrent calls and yields the connection", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -72,7 +72,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   });
 
   it("configureConnection invokes checkVersion", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     let called = 0;
     a.checkVersion = async () => void (called += 1);
     await a.configureConnection();
@@ -82,13 +82,13 @@ describe("AbstractAdapter connection lifecycle privates", () => {
 
 describe("AbstractAdapter#databaseExists", () => {
   it("proves the database by connecting, not by a cached handle", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     expect((a as any)._connection).toBe(null);
     expect(await a.databaseExists()).toBe(true);
   });
 
   it("returns false when connect! raises NoDatabaseError", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     a.connectBang = async () => {
       throw new NoDatabaseError("no such database");
     };
@@ -97,7 +97,7 @@ describe("AbstractAdapter#databaseExists", () => {
   });
 
   it("re-raises errors other than NoDatabaseError", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     a.connectBang = async () => {
       throw new ConnectionFailed("boom");
     };
@@ -107,7 +107,7 @@ describe("AbstractAdapter#databaseExists", () => {
 
 describe("AbstractAdapter connection lifecycle critical sections", () => {
   it("reconnectBang serializes concurrent callers", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     const events: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -132,7 +132,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
   });
 
   it("verifyBang serializes concurrent callers and promotes the unconfigured connection once", async () => {
-    const a = new AbstractAdapter();
+    const a = new AbstractAdapter({});
     const events: string[] = [];
     (a as any).active = async () => false;
     (a as any)._unconfiguredConnection = { handle: 1 };

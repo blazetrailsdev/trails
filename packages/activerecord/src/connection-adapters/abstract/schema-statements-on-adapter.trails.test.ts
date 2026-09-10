@@ -34,7 +34,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return `"${name.replace(/"/g, '""')}"`;
   }
   constructor(private readonly firstRows: Record<string, unknown>[] = []) {
-    super();
+    super({});
   }
   get lastSql() {
     return this.allSql.at(-1) ?? "";
@@ -61,7 +61,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   fixtures([], { useTransactionalTests: false });
 
   it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
-    const stub = new StubAdapter();
+    const stub = new StubAdapter({});
     expect(stub.tableAliasLength()).toBe(64);
     expect(stub.tableAliasFor("a.very.long.schema.qualified.table.name")).toBe(
       "a_very_long_schema_qualified_table_name",
@@ -78,7 +78,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("indexes() raises NotImplementedError on an adapter that does not override it", async () => {
-    const stub = new StubAdapter();
+    const stub = new StubAdapter({});
     await expect(stub.indexes("things")).rejects.toThrow(NotImplementedError);
   });
 
@@ -176,7 +176,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         return true;
       }
     }
-    const stub = new FkStub();
+    const stub = new FkStub({});
     await expect(stub.foreignKeys("any_table")).rejects.toThrow(
       new NotImplementedError("foreign_keys is not implemented"),
     );
@@ -245,7 +245,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         ]);
       }
     }
-    const stub = new FkStub();
+    const stub = new FkStub({});
     await expect(
       stub.removeForeignKey("products", { name: "wrong_name", toTable: "other", ifExists: true }),
     ).rejects.toThrow(/no foreign key/i);
@@ -259,7 +259,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         return Promise.resolve(0);
       }
     }
-    const stub = new NoFkAdapter();
+    const stub = new NoFkAdapter({});
     expect((stub as any).useForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     expect(executed).toBe(false);
@@ -273,7 +273,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         return Promise.resolve(0);
       }
     }
-    const stub = new NoFkAdapter();
+    const stub = new NoFkAdapter({});
     expect((stub as any).useForeignKeys()).toBe(false);
     await expect(
       stub.removeForeignKey("articles", { name: "fk_whatever" }),
@@ -285,7 +285,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     let executed = false;
     class DisabledFkAdapter extends StubAdapter {
       constructor() {
-        super();
+        super({});
         (this as any)._config = { foreignKeys: false };
       }
       supportsForeignKeys() {
@@ -308,14 +308,14 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("isForeignKeysEnabled defaults to true when config omits foreign_keys (Rails fetch default)", () => {
-    const stub = new StubAdapter();
+    const stub = new StubAdapter({});
     expect((stub as any).isForeignKeysEnabled()).toBe(true);
   });
 
   it("isForeignKeysEnabled is false when config stores foreign_keys: nil (Rails fetch semantics)", () => {
     class NullFkAdapter extends StubAdapter {
       constructor() {
-        super();
+        super({});
         (this as any)._config = { foreignKeys: null };
       }
       supportsForeignKeys() {
@@ -328,7 +328,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {
-    const stub = new StubAdapter();
+    const stub = new StubAdapter({});
     const opts = (stub as any).validColumnDefinitionOptions() as string[];
     expect(opts).toContain("ifExists");
     expect(opts).toContain("ifNotExists");

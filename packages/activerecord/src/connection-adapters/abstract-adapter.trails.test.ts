@@ -31,7 +31,7 @@ class TestAdapter extends AbstractAdapter {
 
 describe("AbstractAdapter#returnValueAfterInsert", () => {
   it("returns true when column isAutoPopulated (has default function)", async () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     const col = new Column("id", null, new SqlTypeMetadata({ sqlType: "uuid" }), false, {
       defaultFunction: "gen_random_uuid()",
     });
@@ -39,7 +39,7 @@ describe("AbstractAdapter#returnValueAfterInsert", () => {
   });
 
   it("returns false when column is not auto-populated", async () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     const col = new Column("name", null, new SqlTypeMetadata({ sqlType: "varchar" }));
     expect(await adapter.returnValueAfterInsert(col)).toBe(false);
   });
@@ -47,7 +47,7 @@ describe("AbstractAdapter#returnValueAfterInsert", () => {
 
 describe("AbstractAdapter#_columnMethodNames", () => {
   it("mirrors the abstract ColumnMethods list (define_column_methods + blob/numeric aliases)", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter._columnMethodNames()).toEqual([
       "bigint",
       "binary",
@@ -69,7 +69,7 @@ describe("AbstractAdapter#_columnMethodNames", () => {
   });
 
   it("does not surface native-types-only `primary_key`", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter._columnMethodNames()).not.toContain("primary_key");
   });
 });
@@ -204,13 +204,13 @@ describe("AbstractAdapter.extendedTypeMap", () => {
   });
 
   it("backs the typeMap of an adapter configured with a default timezone", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     (adapter as any)._defaultTimezone = "utc";
     expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
   });
 
   it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     (adapter as any)._defaultTimezone = "utc";
     expect(adapter.typeMap).toBe(adapter.typeMap);
     expect(AbstractAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
@@ -221,23 +221,23 @@ describe("AbstractAdapter.extendedTypeMap", () => {
 
 describe("AbstractAdapter#lookupCastType", () => {
   it("looks the sql type up in TYPE_MAP", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter.lookupCastType("integer")).toBeInstanceOf(IntegerType);
     expect(adapter.lookupCastType("boolean")).toBeInstanceOf(BooleanType);
   });
 
   it("carries the sql type's limit through to the cast type", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter.lookupCastType("varchar(64)")).toMatchObject({ limit: 64 });
   });
 
   it("is the type source for lookupCastTypeFromColumn", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter.lookupCastTypeFromColumn({ sqlType: "datetime" })).toBeInstanceOf(DateTimeType);
   });
 
   it("falls back to the default value type for an unmapped sql type", () => {
-    const adapter = new TestAdapter();
+    const adapter = new TestAdapter({});
     expect(adapter.lookupCastTypeFromColumn({ sqlType: null })).toBeInstanceOf(ValueType);
   });
 
@@ -252,19 +252,19 @@ describe("DatabaseStatements#insert id extraction", () => {
   }
 
   it("respects idValue override when provided, regardless of execInsert return type", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     adapter.execInsert = async () => new Result(["id"], [[42]]);
     expect(await adapter.insert("INSERT INTO t VALUES (1)", null, null, 99)).toBe(99);
   });
 
   it("extracts id from Result via lastInsertedId when execInsert returns a Result", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     adapter.execInsert = async () => new Result(["id"], [[99]]);
     expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(99);
   });
 
   it("calls adapter lastInsertedId when present and execInsert returns a Result", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     adapter.execInsert = async () => new Result(["id"], [[99]]);
     const customLastInserted = vi.fn().mockReturnValue(77);
     adapter.lastInsertedId = customLastInserted;
@@ -273,7 +273,7 @@ describe("DatabaseStatements#insert id extraction", () => {
   });
 
   it("forwards opts.returning to execInsert", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     const execInsert = vi.fn(async () => new Result(["id"], [[5]]));
     adapter.execInsert = execInsert;
     await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
@@ -285,7 +285,7 @@ describe("DatabaseStatements#insert id extraction", () => {
   });
 
   it("returns returningColumnValues row when returning requested and result is a Result", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     adapter.execInsert = async () => new Result(["id", "uuid"], [[7, "abc"]]);
     const rcv = vi.fn((result: Result) => result.rows[0]);
     adapter.returningColumnValues = rcv;
@@ -305,7 +305,7 @@ describe("DatabaseStatements#insert id extraction", () => {
   });
 
   it("preserves a legitimate null RETURNING value rather than falling back to the insert id", async () => {
-    const adapter = new InsertTestAdapter() as any;
+    const adapter = new InsertTestAdapter({}) as any;
     adapter.execInsert = async () => new Result(["created_by"], [[null]]);
     adapter.returningColumnValues = (result: Result) => result.rows[0];
     const out = await adapter.insert(
@@ -339,17 +339,17 @@ describe("per-adapter visitor isolation", () => {
   }
 
   it("each adapter caches its own dialect-specific visitor", () => {
-    const sqlite = new SqliteAdapter();
-    const mysql = new MysqlAdapter();
+    const sqlite = new SqliteAdapter({});
+    const mysql = new MysqlAdapter({});
 
     expect(sqlite.visitor).toBeInstanceOf(Visitors.SQLite);
     expect(mysql.visitor).toBeInstanceOf(Visitors.MySQL);
   });
 
   it("constructing a second adapter does not overwrite the first adapter's visitor", () => {
-    const sqlite = new SqliteAdapter();
+    const sqlite = new SqliteAdapter({});
     const visitorBefore = sqlite.visitor;
-    new MysqlAdapter();
+    new MysqlAdapter({});
     expect(sqlite.visitor).toBe(visitorBefore);
     expect(sqlite.visitor).toBeInstanceOf(Visitors.SQLite);
   });
