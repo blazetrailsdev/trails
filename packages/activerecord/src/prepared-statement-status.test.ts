@@ -29,7 +29,7 @@ describe("PreparedStatementStatusTest", () => {
 
     expect(courseConn).not.toBe(entrantConn);
 
-    // eslint-disable-next-line vitest/no-conditional-in-test
+    // eslint-disable-next-line blazetrails/no-conditional-in-test
     if ((await Base.leaseConnection()).preparedStatements) {
       const t1 = IsolatedExecutionState.run(async () => {
         await courseConn.unpreparedStatement(async () => {

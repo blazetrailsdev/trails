@@ -20,14 +20,6 @@ import { adapterSupports } from "../support/supports.js";
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
 
-function indexesSurvivingColumnDrop(actual: string[]): void {
-  if (adapterType === "postgres") {
-    expect(actual).toEqual([]);
-  } else {
-    expect(actual).toEqual(["index_test_models_on_hat_style_and_hat_size"]);
-  }
-}
-
 const expectedAlterQueryCount = adapterType === "sqlite" ? 14 : 1;
 
 async function indexNames(conn: AbstractAdapter, table: string): Promise<string[]> {
@@ -200,7 +192,13 @@ describe("Migration", () => {
       expect((await connection.indexes("test_models")).length).toBe(1);
       await connection.removeColumn("test_models", "hat_size");
 
-      indexesSurvivingColumnDrop(await indexNames(connection, "test_models"));
+      if (adapterType === "postgres") {
+        expect(await indexNames(connection, "test_models")).toEqual([]);
+      } else {
+        expect(await indexNames(connection, "test_models")).toEqual([
+          "index_test_models_on_hat_style_and_hat_size",
+        ]);
+      }
     });
 
     it("removing and renaming column preserves custom primary key", async () => {

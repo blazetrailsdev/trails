@@ -6,6 +6,7 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { Base } from "../../base.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -14,6 +15,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("SchemaTest", () => {
+    fixtures(["posts"], { usesTransaction: ["float limits", "drop temporary table"] });
+
     it("float limits", async () => {
       await adapter.createTable("mysql_doubles", { force: true }, (t: any) => {
         t.float("float_no_limit");
@@ -57,18 +60,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("schema", async () => {
       await withOmgPost(async (OmgPost) => {
-        await adapter.executeMutation(
-          "INSERT INTO `posts` (`title`, `body`, `type`) " +
-            "VALUES ('Welcome to the weblog', 'Such a lovely day', 'Post')",
-        );
-        try {
-          const first = await (OmgPost as any).first();
-          expect(first).toBeTruthy();
-        } finally {
-          await adapter.executeMutation(
-            "DELETE FROM `posts` WHERE `title` = 'Welcome to the weblog'",
-          );
-        }
+        expect(await (OmgPost as any).first()).toBeTruthy();
       });
     });
 

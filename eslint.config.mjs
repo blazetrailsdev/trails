@@ -15,6 +15,7 @@ import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
+import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
 import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
@@ -292,6 +293,7 @@ export default defineConfig(
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
+          "no-conditional-in-test": noConditionalInTest,
           "no-getter-called-as-method": noGetterCalledAsMethod,
           "async-querying-empty": asyncQueryingEmpty,
           "sqlite-driver-await": sqliteDriverAwait,
@@ -966,7 +968,9 @@ export default defineConfig(
 
   // ── activerecord: no-conditional-tests and no-conditional-in-test are
   // clean. no-conditional-expect still has outstanding violations; enable
-  // it in a follow-up PR as the sites are driven to zero.
+  // it in a follow-up PR as the sites are driven to zero. The in-test rule is
+  // blazetrails' narrowing of vitest's, which admits Rails' inline
+  // `if current_adapter?(...)` branch (`adapterType` / `currentAdapter()`).
   {
     files: [
       "packages/activerecord/src/**/*.test.ts",
@@ -976,7 +980,7 @@ export default defineConfig(
     plugins: { vitest },
     rules: {
       "vitest/no-conditional-tests": "error",
-      "vitest/no-conditional-in-test": "error",
+      "blazetrails/no-conditional-in-test": "error",
     },
   },
 

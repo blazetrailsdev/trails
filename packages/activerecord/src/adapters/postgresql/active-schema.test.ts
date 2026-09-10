@@ -157,7 +157,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX IF NOT EXISTS "index_people_on_last_name" ON "people" ("last_name")`,
       );
 
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
       if (supportsNullsNotDistinct) {
         expect(
           await sql(() => adapter.addIndex("people", "last_name", { nullsNotDistinct: true })),

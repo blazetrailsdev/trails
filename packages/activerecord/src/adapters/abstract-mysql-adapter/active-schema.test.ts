@@ -184,7 +184,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("create mysql database with encoding", async () => {
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if ActiveRecord::Base.lease_connection.send(:row_format_dynamic_by_default?)` (active_schema_test.rb:126-134)
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' inline `if ActiveRecord::Base.lease_connection.send(:row_format_dynamic_by_default?)` (active_schema_test.rb:126-134)
       if (await isRowFormatDynamicByDefault.call(adapter)) {
         const sqls = await captureSql(() => adapter.createDatabase("matt"), { stub: adapter });
         expect(sqls[0]).toBe("CREATE DATABASE `matt` DEFAULT CHARACTER SET `utf8mb4`");

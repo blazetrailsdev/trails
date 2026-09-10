@@ -1,30 +1,22 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
-import { createTestUniqueConstraintsTable } from "../support/load-schema-helper.js";
-import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
+import { fixtures } from "../test-fixtures.js";
 
-class Section extends Base {}
+class Section extends Base {
+  static name = "ActiveRecord::Migration::UniqueConstraintTest::Section";
+}
 
 describeIfSupports("unique_constraints", "Migration", () => {
-  let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
-  beforeAll(async () => {
-    scratch = await openScratchDatabase("unique_constraints");
-    connection = scratch.connection;
-    await createTestUniqueConstraintsTable(connection);
-    (Section as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
-  }, 30000);
-
-  afterAll(async () => {
-    await scratch.drop();
-  }, 30000);
+  fixtures([]);
 
   beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.createTable("sections", { force: true }, (t) => {
       t.integer("position", { null: false });
     });
@@ -74,7 +66,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
       }
 
       await connection.getDatabaseVersion();
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
       if (await connection.supportsNullsNotDistinct()) {
         const constraint = uniqueConstraints.find((c) => c.name === expectedNullsNotDistinct.name)!;
         expect(constraint.tableName).toBe("test_unique_constraints");
@@ -164,7 +156,9 @@ describeIfSupports("unique_constraints", "Migration", () => {
       await expect(
         Section.transaction(
           async () => {
-            await connection.execQuery("SET CONSTRAINTS unique_section_position DEFERRED");
+            await (
+              await Section.leaseConnection()
+            ).execQuery("SET CONSTRAINTS unique_section_position DEFERRED");
             await Section.createBang({ position: 1 });
             await section.updateBang({ position: 2 });
 

@@ -93,7 +93,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       expect(fk.toTable).toBe("fk_test_has_pk");
       expect(fk.column).toBe("fk_id");
       expect(fk.primaryKey).toBe("pk_id");
-      // eslint-disable-next-line vitest/no-conditional-in-test
+      // eslint-disable-next-line blazetrails/no-conditional-in-test
       if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_name");
     });
   });
@@ -111,7 +111,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       expect(fk.toTable).toBe("fk_test_has_pk");
       expect(fk.column).toBe("fk_id");
       expect(fk.primaryKey).toBe("pk_id");
-      // eslint-disable-next-line vitest/no-conditional-in-test
+      // eslint-disable-next-line blazetrails/no-conditional-in-test
       if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_name");
     });
 

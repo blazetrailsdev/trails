@@ -89,14 +89,12 @@ describe("Migration", () => {
       expect(constraint.tableName).toBe("products");
       expect(constraint.name).toBe("products_price_check");
 
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:50-54)
       if (adapterType === "mysql") {
         expect(constraint.expression).toBe("`price` > `discounted_price`");
       } else {
         expect(constraint.expression).toBe("price > discounted_price");
       }
 
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:57-70); see supportsJsonSchemaValid
       if (adapterType === "mysql" && supportsJsonSchemaValid) {
         try {
           await connection.addCheckConstraint(
@@ -120,7 +118,6 @@ describe("Migration", () => {
         }
       }
 
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:PostgreSQLAdapter)` (check_constraint_test.rb:72-83)
       if (adapterType === "postgres") {
         try {
           await connection.addCheckConstraint(
@@ -172,7 +169,6 @@ describe("Migration", () => {
       expect(constraint.tableName).toBe("trades");
       expect(constraint.name).toBe("chk_rails_2189e9f96c");
 
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:112-116)
       if (adapterType === "mysql") {
         expect(constraint.expression).toBe("`quantity` > 0");
       } else {
