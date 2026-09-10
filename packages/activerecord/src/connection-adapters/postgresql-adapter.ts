@@ -571,7 +571,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @missingRailsCall load_additional_types — CONVERGEABLE pg-get-oid-type-drops-the-on-demand-load-additional-types
+   * @missingRailsCall load_additional_types — PERMANENT
    */
   getOidType(oid: number, fmod: number, columnName: string, sqlType: string = ""): ValueType {
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
