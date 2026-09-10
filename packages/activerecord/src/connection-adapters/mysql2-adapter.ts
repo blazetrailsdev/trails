@@ -472,10 +472,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       materializeTransactions = true,
       allowRetry = false,
       prepare: prepareOption = false,
+      async = false,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
     } = {},
   ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
@@ -485,7 +487,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       const driverSql = this.mysqlQuote(sql);
       const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-      return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
+      return await this.log(driverSql, name, binds, typeCastedBinds, async, (payload) =>
         this.withRawConnection({ materializeTransactions: false, allowRetry }, async (rawConn) => {
           const conn = rawConn as unknown as mysql.Connection;
           const rawResult = await this.performQuery(conn, driverSql, binds, typeCastedBinds, {

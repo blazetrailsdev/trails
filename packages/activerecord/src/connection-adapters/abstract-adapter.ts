@@ -655,6 +655,7 @@ export interface AbstractAdapter {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
     },
   ): Promise<unknown>;
   /** @internal */

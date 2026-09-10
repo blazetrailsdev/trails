@@ -96,9 +96,10 @@ export interface DatabaseStatementsHost {
     name?: string | null,
     binds?: unknown[],
     opts?: {
-      materializeTransactions?: boolean;
-      allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
     },
   ): Promise<unknown>;
   /** @internal */
@@ -756,6 +757,7 @@ interface DatabaseStatementsDefaultsHost {
     binds?: unknown[],
     options?: {
       prepare?: boolean;
+      async?: boolean;
       allowRetry?: boolean;
       materializeTransactions?: boolean;
     },
@@ -1095,10 +1097,12 @@ export function internalExecute(
   binds: unknown[] = [],
   {
     prepare = false,
+    async = false,
     allowRetry = false,
     materializeTransactions = true,
   }: {
     prepare?: boolean;
+    async?: boolean;
     allowRetry?: boolean;
     materializeTransactions?: boolean;
   } = {},
@@ -1109,7 +1113,7 @@ export function internalExecute(
     name,
     binds,
     prepare,
-    false,
+    async,
     allowRetry,
     materializeTransactions,
   );
