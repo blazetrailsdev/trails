@@ -720,7 +720,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     config: SQLite3ConnectionParameters,
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
-      if (error instanceof Error && error.message.includes("No such file or directory")) {
+      if (
+        error instanceof Error &&
+        (error as { code?: unknown }).code === "SQLITE_CANTOPEN" &&
+        (error.message.includes("No such file or directory") ||
+          !File.isExist(String(config.database)))
+      ) {
         throw new NoDatabaseError();
       } else {
         throw error;
