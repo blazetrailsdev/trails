@@ -4757,12 +4757,17 @@ function collectCalls(
       // `constructor` here so an instantiation counts toward the call set. Args
       // are walked FIRST (see the call branch below), so calls nested in
       // constructor arguments (`new Foo(typeCast(x))`) are credited regardless
-      // of body shape.
-      ts.forEachChild(n, visit);
+      // of body shape. A function-expression argument is a Ruby block
+      // (`BodyProxy.new(body) { … }`) and is deferred past the call, exactly as
+      // the call branch below defers it.
+      visit(n.expression);
+      const blocks = (n.arguments ?? []).filter(isFunctionArgument);
+      for (const arg of n.arguments ?? []) if (!isFunctionArgument(arg)) visit(arg);
       if (!(skipHoistedClosures && isThrownConstruction(n))) {
         names.add("constructor");
         tally(occurrences, "constructor");
       }
+      for (const block of blocks) visit(block);
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION

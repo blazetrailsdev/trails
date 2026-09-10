@@ -33,19 +33,27 @@ export class MockCookie {
 export class MockResponse extends Response {
   originalHeaders: Record<string, any>;
   cookies: Record<string, MockCookie>;
-  errors: string;
+  private _errors: any;
   private _bufferedBody: string | undefined;
 
   constructor(status: number, headers: Record<string, any>, body: any, errors?: any) {
     super(body, status, headers);
     this.originalHeaders = { ...headers };
-    this.errors = "";
-    if (errors) {
-      if (typeof errors.string === "function") this.errors = errors.string();
-      else if (typeof errors === "string") this.errors = errors;
-    }
+    this._errors = errors;
     this.cookies = this.parseCookiesFromHeader();
     this.bufferedBodyBang();
+  }
+
+  get errors(): string {
+    if (this._errors) {
+      if (typeof this._errors.string === "function") return this._errors.string();
+      if (typeof this._errors === "string") return this._errors;
+    }
+    return "";
+  }
+
+  set errors(value: string) {
+    this._errors = value;
   }
 
   override get body(): string {
