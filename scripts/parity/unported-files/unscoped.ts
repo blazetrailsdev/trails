@@ -260,6 +260,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
+    className: "MultipleFixtureConnectionsTest",
     tests: [
       "resolves associations using composite primary keys",
       "resolves associations using composite primary keys with partially filled values",

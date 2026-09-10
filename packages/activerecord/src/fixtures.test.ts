@@ -1343,6 +1343,7 @@ describe("CompositePkFixturesTest", () => {
     "cpkOrders",
     "cpkBooks",
     "cpkAuthors",
+    "cpkReviews",
     "cpkOrderAgreements",
   ]);
 
