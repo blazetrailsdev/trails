@@ -7,6 +7,7 @@ import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
 import {
   ActiveRecordError,
+  NoDatabaseError,
   StatementInvalid,
   StatementTimeout,
   ValueTooLong,
@@ -138,6 +139,13 @@ describe("SQLite3Adapter pragmas option", () => {
       "foreign_keys",
     ) as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(1);
+  });
+
+  it("raises NoDatabaseError opening a missing database file readonly", async () => {
+    const missing = new BetterSQLite3Adapter("tmp/missing-readonly-database.sqlite3", {
+      readonly: true,
+    });
+    await expect(missing.connectBang()).rejects.toThrow(NoDatabaseError);
   });
 
   it("converts boolean false to 0 for pragma", async () => {
