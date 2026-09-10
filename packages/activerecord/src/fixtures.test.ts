@@ -11,7 +11,13 @@ import {
   FixtureError,
 } from "./fixtures.js";
 import { Time } from "@blazetrails/date";
-import { Duration, OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
+import {
+  assertNotEmpty,
+  Duration,
+  OID_NAMESPACE,
+  onLoad,
+  uuidV5,
+} from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
@@ -1338,88 +1344,88 @@ describe("FixtureClassNamesTest", () => {
   });
 });
 
-describe("CompositePkFixturesTest", () => {
-  const { cpkOrders, cpkBooks, cpkAuthors, cpkOrderAgreements } = fixtures([
-    "cpkOrders",
-    "cpkBooks",
-    "cpkAuthors",
-    "cpkReviews",
-    "cpkOrderAgreements",
-  ]);
-
-  it("generates composite primary key for partially filled fixtures", () => {
-    const alice = cpkAuthors("cpk_great_author");
-    const aliceCpkBook = cpkBooks("cpk_great_author_first_book");
-    const aliceCpkBookId = aliceCpkBook.id as unknown[];
-
-    expect(aliceCpkBookId.filter((v) => v != null)).not.toHaveLength(0);
-    expect(aliceCpkBookId[0]).toBe(alice.id);
-    expect(aliceCpkBookId[aliceCpkBookId.length - 1]).not.toBeNull();
-  });
-
-  it("generates composite primary key ids", () => {
-    expect(
-      (cpkOrders("cpk_groceries_order_1").id as unknown[]).filter((v) => v != null),
-    ).not.toHaveLength(0);
-
-    for (const idColumn of cpkBooks("cpk_great_author_first_book").id as unknown[]) {
-      expect(idColumn).not.toBeNull();
-    }
-  });
-
-  it("generates composite primary key with unique components", () => {
-    expect(new Set(cpkOrders("cpk_groceries_order_1").id as unknown[]).size).toBe(2);
-  });
-
-  it("association with custom primary key", async () => {
-    const order = cpkOrders("cpk_groceries_order_2");
-    const orderAgreement = cpkOrderAgreements("order_agreement_three");
-
-    const [, orderId] = order.id as unknown[];
-
-    expect(orderAgreement.order_id).toBe(orderId);
-    expect((await orderAgreement.order)?.id).toEqual(order.id);
-  });
-
-  it("composite identify resolves to same values", () => {
-    const identifyOne = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
-    const identifyTwo = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
-
-    expect(identifyOne).toEqual(identifyTwo);
-  });
-
-  it("composite identify returns hash with key names", () => {
-    const id = FixtureSet.compositeIdentify("order", CpkOrder.primaryKey as string[]);
-
-    expect(Object.keys(id)).toEqual(["shop_id", "id"]);
-  });
-
-  it("composite identify uses same hashing algorithm as identify for first attribute", () => {
-    const idHash = FixtureSet.compositeIdentify("order", ["first_attribute", "second_attribute"]);
-    const id = FixtureSet.identify("order");
-
-    expect(idHash["first_attribute"]).toBe(id);
-    expect(idHash["second_attribute"]).not.toBe(id);
-  });
-
-  it("composite identify hashes one label to same values irrespective of column names", () => {
-    const idHashOne = FixtureSet.compositeIdentify("order", [
-      "first_attribute",
-      "second_attribute",
+describe("MultipleFixtureConnectionsTest", () => {
+  describe("CompositePkFixturesTest", () => {
+    const { cpkOrders, cpkBooks, cpkAuthors, cpkOrderAgreements } = fixtures([
+      "cpkOrders",
+      "cpkBooks",
+      "cpkAuthors",
+      "cpkReviews",
+      "cpkOrderAgreements",
     ]);
-    const idHashTwo = FixtureSet.compositeIdentify("order", ["shop_id", "id"]);
 
-    expect(Object.values(idHashOne)).toEqual(Object.values(idHashTwo));
-    expect(Object.keys(idHashOne)).not.toEqual(Object.keys(idHashTwo));
-  });
+    it("generates composite primary key for partially filled fixtures", () => {
+      const alice = cpkAuthors("cpk_great_author");
+      const aliceCpkBook = cpkBooks("cpk_great_author_first_book");
+      const aliceCpkBookId = aliceCpkBook.id as unknown[];
 
-  it("composite identify hashes to same values based on position in key", () => {
-    const id = FixtureSet.identify("order");
-    const idHashTwo = FixtureSet.compositeIdentify("order", ["one", "two"]);
-    const idHashThree = FixtureSet.compositeIdentify("order", ["one", "two", "three"]);
+      assertNotEmpty(aliceCpkBookId.filter((v) => v != null));
+      expect(aliceCpkBookId[0]).toBe(alice.id);
+      expect(aliceCpkBookId[aliceCpkBookId.length - 1]).not.toBeNull();
+    });
 
-    expect(Object.values(idHashTwo)[0]).toBe(id);
-    expect(Object.values(idHashThree)[0]).toBe(id);
-    expect(Object.values(idHashThree).slice(0, 2)).toEqual(Object.values(idHashTwo));
+    it("generates composite primary key ids", () => {
+      assertNotEmpty((cpkOrders("cpk_groceries_order_1").id as unknown[]).filter((v) => v != null));
+
+      for (const idColumn of cpkBooks("cpk_great_author_first_book").id as unknown[]) {
+        expect(idColumn).not.toBeNull();
+      }
+    });
+
+    it("generates composite primary key with unique components", () => {
+      expect(new Set(cpkOrders("cpk_groceries_order_1").id as unknown[]).size).toBe(2);
+    });
+
+    it("association with custom primary key", async () => {
+      const order = cpkOrders("cpk_groceries_order_2");
+      const orderAgreement = cpkOrderAgreements("order_agreement_three");
+
+      const [, orderId] = order.id as unknown[];
+
+      expect(orderAgreement.order_id).toBe(orderId);
+      expect((await orderAgreement.order)?.id).toEqual(order.id);
+    });
+
+    it("composite identify resolves to same values", () => {
+      const identifyOne = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+      const identifyTwo = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+
+      expect(identifyOne).toEqual(identifyTwo);
+    });
+
+    it("composite identify returns hash with key names", () => {
+      const id = FixtureSet.compositeIdentify("order", CpkOrder.primaryKey as string[]);
+
+      expect(Object.keys(id)).toEqual(["shop_id", "id"]);
+    });
+
+    it("composite identify uses same hashing algorithm as identify for first attribute", () => {
+      const idHash = FixtureSet.compositeIdentify("order", ["first_attribute", "second_attribute"]);
+      const id = FixtureSet.identify("order");
+
+      expect(idHash["first_attribute"]).toBe(id);
+      expect(idHash["second_attribute"]).not.toBe(id);
+    });
+
+    it("composite identify hashes one label to same values irrespective of column names", () => {
+      const idHashOne = FixtureSet.compositeIdentify("order", [
+        "first_attribute",
+        "second_attribute",
+      ]);
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["shop_id", "id"]);
+
+      expect(Object.values(idHashOne)).toEqual(Object.values(idHashTwo));
+      expect(Object.keys(idHashOne)).not.toEqual(Object.keys(idHashTwo));
+    });
+
+    it("composite identify hashes to same values based on position in key", () => {
+      const id = FixtureSet.identify("order");
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["one", "two"]);
+      const idHashThree = FixtureSet.compositeIdentify("order", ["one", "two", "three"]);
+
+      expect(Object.values(idHashTwo)[0]).toBe(id);
+      expect(Object.values(idHashThree)[0]).toBe(id);
+      expect(Object.values(idHashThree).slice(0, 2)).toEqual(Object.values(idHashTwo));
+    });
   });
 });
