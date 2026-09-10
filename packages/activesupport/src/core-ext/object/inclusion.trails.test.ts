@@ -8,6 +8,6 @@ describe("InTest (trails)", () => {
   });
 
   it("checks Map keys like Hash#include?", () => {
-    expect(isIn("a", new Map([["a", 1]]) as never)).toBe(true);
+    expect(isIn("a", new Map([["a", 1]]))).toBe(true);
   });
 });
