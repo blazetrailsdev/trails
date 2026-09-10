@@ -78,6 +78,8 @@ export interface SqliteOpenConfig {
   noMutex?: boolean;
   timeout?: number;
   strict?: boolean;
+  authToken?: string;
+  syncUrl?: string;
   driverOptions?: Record<string, unknown>;
 }
 

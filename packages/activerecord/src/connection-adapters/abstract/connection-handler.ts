@@ -15,13 +15,9 @@ import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { resolve as resolveConnectionAdapter } from "../../connection-adapters.js";
-import { buildAdapterArg } from "../adapter-args.js";
 import { isPreventingWrites } from "../../core.js";
 
-_setAdapterClassResolver(
-  (adapterName) => resolveConnectionAdapter(adapterName),
-  (adapterName, configuration) => buildAdapterArg(adapterName, configuration),
-);
+_setAdapterClassResolver((adapterName) => resolveConnectionAdapter(adapterName));
 
 export interface ConnectionOwner {
   name: string;

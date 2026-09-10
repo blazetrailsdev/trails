@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdapterArg } from "./adapter-args.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 function clientOptions(config: Record<string, unknown>): Record<string, unknown> {
@@ -101,7 +100,7 @@ describe("PostgreSQLAdapter conn_params", () => {
 
   describe("through buildAdapterArg (the connection-handling path)", () => {
     it("slices the residual database.yml hash the arg builder forwards", () => {
-      const [config] = buildAdapterArg("postgresql", {
+      const options = clientOptions({
         adapter: "postgresql",
         database: "trails_test",
         username: "alice",
@@ -109,11 +108,10 @@ describe("PostgreSQLAdapter conn_params", () => {
         checkoutTimeout: 5,
         migrationsPaths: "db/migrate",
       });
-      const options = clientOptions(config as Record<string, unknown>);
 
       expect(options.user).toBe("alice");
       expect(options.database).toBe("trails_test");
-      expect(options.host).toBe("localhost");
+      expect(options).not.toHaveProperty("adapter");
       expect(options).not.toHaveProperty("username");
       expect(options).not.toHaveProperty("pool");
       expect(options).not.toHaveProperty("checkoutTimeout");

@@ -521,19 +521,38 @@ describe("SQLite adapter driver binding", () => {
       database: ":memory:",
       driver: asyncPragmaDriver,
     });
-    expect(adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
   it("encoding falls back to UTF-8 before a deferred async-only open completes", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncPragmaDriver });
     expect(await adapter.active()).toBe(false);
-    expect(adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding).toBe("UTF-8");
   });
 
   it("encoding returns the database encoding for a sync driver", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
-    expect(adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding).toBe("UTF-8");
+    await adapter.disconnectBang();
+  });
+
+  it("encoding reads a non-UTF-8 database's encoding through an async-only driver", async () => {
+    const utf16Driver = asyncDriver(async (config) => {
+      const conn = await openVia(config);
+      conn.pragma('encoding = "UTF-16le"');
+      return new Proxy(conn, {
+        get(target, prop, receiver) {
+          if (prop === "pragma") {
+            return (source: string, opts?: { simple?: boolean }) =>
+              Promise.resolve(target.pragma(source, opts));
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as unknown as SqliteConnection;
+    });
+    const adapter = new SQLite3Adapter({ database: ":memory:", driver: utf16Driver });
+    expect(await adapter.encoding).toBe("UTF-16le");
     await adapter.disconnectBang();
   });
 
