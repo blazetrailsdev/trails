@@ -1,10 +1,3 @@
-// `vitest/no-conditional-in-test`, narrowed for activerecord: an `if` whose
-// test names `adapterType` or calls `currentAdapter()` is the port of Rails'
-// inline `if current_adapter?(...)` branch and is allowed where Rails puts it.
-// Hoisting it into a helper instead invents surface, and a helper named
-// `assert*`/`expect*` also hides its arms from the assertion comparer
-// (`isAssertionCallee`, scripts/test-compare/extract-ts-core.ts).
-
 const TEST_FNS = new Set(["it", "test"]);
 
 function calleeRoot(callee) {

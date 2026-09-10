@@ -968,9 +968,7 @@ export default defineConfig(
 
   // ── activerecord: no-conditional-tests and no-conditional-in-test are
   // clean. no-conditional-expect still has outstanding violations; enable
-  // it in a follow-up PR as the sites are driven to zero. The in-test rule is
-  // blazetrails' narrowing of vitest's, which admits Rails' inline
-  // `if current_adapter?(...)` branch (`adapterType` / `currentAdapter()`).
+  // it in a follow-up PR as the sites are driven to zero.
   {
     files: [
       "packages/activerecord/src/**/*.test.ts",
