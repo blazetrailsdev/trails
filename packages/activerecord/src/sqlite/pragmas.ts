@@ -1,3 +1,5 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
+
 class SQLite3Exception extends Error {
   constructor(message: string) {
     super(message);
@@ -111,10 +113,17 @@ function toS(value: unknown): string {
   return str.startsWith(":") ? str.slice(1) : str;
 }
 
+function toI(value: unknown): number {
+  if (typeof value === "number") return Math.trunc(value);
+  if (value == null) return 0;
+  if (typeof value === "string") return parseInt(value, 10) || 0;
+  throw new NoMethodError(`undefined method 'to_i' for ${JSON.stringify(value)}`);
+}
+
 function setBooleanPragma(name: string, mode: unknown): string {
   let value: string;
   if (typeof mode === "string") {
-    switch (toS(mode).toLowerCase()) {
+    switch (mode.toLowerCase()) {
       case "on":
       case "yes":
       case "true":
@@ -143,7 +152,7 @@ function setBooleanPragma(name: string, mode: unknown): string {
 }
 
 function setIntPragma(name: string, value: unknown): string {
-  return `${name}=${parseInt(String(value), 10) || 0}`;
+  return `${name}=${toI(value)}`;
 }
 
 function setEnumPragma(name: string, mode: unknown, enums: (string | number)[][]): string {
