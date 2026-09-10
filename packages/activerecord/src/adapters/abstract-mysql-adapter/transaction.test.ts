@@ -97,13 +97,17 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         });
 
         let firstBeginFailed = false;
-        const origInternalExecute = (adapter as any).internalExecute.bind(adapter);
-        (adapter as any).internalExecute = async (sql: string, ...args: any[]) => {
-          if (sql === "BEGIN" && !firstBeginFailed) {
+        const origPerformQuery = (adapter as any).performQuery.bind(adapter);
+        (adapter as any).performQuery = async (
+          rawConnection: unknown,
+          sql: string,
+          ...args: any[]
+        ) => {
+          if (sql.includes("BEGIN") && !firstBeginFailed) {
             firstBeginFailed = true;
             throw new ConnectionFailed("Simulated failure");
           }
-          return origInternalExecute(sql, ...args);
+          return origPerformQuery(rawConnection, sql, ...args);
         };
         try {
           await adapter.transaction({ isolation: ":read_committed" }, async () => {
@@ -113,7 +117,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             );
           });
         } finally {
-          delete (adapter as any).internalExecute;
+          delete (adapter as any).performQuery;
         }
         expect(firstBeginFailed).toBeTruthy();
       } finally {

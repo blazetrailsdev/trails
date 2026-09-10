@@ -1,4 +1,5 @@
 export { NotImplementedError } from "@blazetrails/ruby-compat";
+import type { Column } from "./connection-adapters/column.js";
 
 export class ActiveRecordError extends Error {
   constructor(message?: string, options?: ErrorOptions) {
@@ -224,7 +225,7 @@ export class StatementInvalid extends AdapterError {
     this._querySet = options?.sql != null;
   }
 
-  setQuery(sql: string, binds: unknown[]): StatementInvalid {
+  setQuery(sql: string, binds: unknown[]): StatementInvalid | Promise<StatementInvalid> {
     if (!this._querySet) {
       this.sql = sql;
       this.binds = binds;
@@ -362,23 +363,6 @@ export class InvalidForeignKey extends WrappedDatabaseException {
   }
 }
 
-export function sqlTypeToMigrationKeyword(sqlType: string): string {
-  const normalized = sqlType.trim().toLowerCase();
-
-  if (/^tinyint\s*\(\s*1\s*\)$/.test(normalized)) return "boolean";
-
-  const base = normalized.split("(")[0].trim().split(/\s+/)[0];
-
-  if (base === "bigint") return "bigint";
-  if (base.endsWith("int")) return "integer";
-  if (base === "varchar" || base === "char") return "string";
-  if (base === "text" || base === "tinytext" || base === "mediumtext" || base === "longtext") {
-    return "text";
-  }
-
-  return base;
-}
-
 export interface MismatchedForeignKeyOptions {
   message?: string;
   sql?: string;
@@ -389,19 +373,20 @@ export interface MismatchedForeignKeyOptions {
   foreignKey?: string;
   targetTable?: string;
   primaryKey?: string;
-  primaryKeySqlType?: string;
-  primaryKeyType?: string;
-  queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
+  primaryKeyColumn?: Pick<Column, "sqlType" | "type" | "isBigint">;
+  queryParser?: (
+    sql: string,
+  ) => Partial<MismatchedForeignKeyOptions> | Promise<Partial<MismatchedForeignKeyOptions>>;
 }
 
 export class MismatchedForeignKey extends StatementInvalid {
-  readonly fkDetails: Omit<
+  readonly fkDetails: Pick<
     MismatchedForeignKeyOptions,
-    "message" | "sql" | "binds" | "connectionPool" | "cause"
+    "table" | "foreignKey" | "targetTable" | "primaryKey" | "primaryKeyColumn"
   >;
 
   private readonly _originalMessage?: string;
-  private readonly _queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
+  private readonly _queryParser?: MismatchedForeignKeyOptions["queryParser"];
 
   constructor(options: MismatchedForeignKeyOptions = {}) {
     const {
@@ -411,17 +396,16 @@ export class MismatchedForeignKey extends StatementInvalid {
       foreignKey,
       targetTable,
       primaryKey,
-      primaryKeySqlType,
-      primaryKeyType,
+      primaryKeyColumn,
       ...rest
     } = options;
 
     let msg: string;
-    if (table && foreignKey && targetTable && primaryKey && primaryKeySqlType) {
-      const type = primaryKeyType ?? sqlTypeToMigrationKeyword(primaryKeySqlType);
+    if (table) {
+      const type = primaryKeyColumn!.isBigint() ? "bigint" : primaryKeyColumn!.type;
       msg = [
         `Column \`${foreignKey}\` on table \`${table}\` does not match column \`${primaryKey}\` on \`${targetTable}\`,`,
-        `which has type \`${primaryKeySqlType}\`.`,
+        `which has type \`${primaryKeyColumn!.sqlType}\`.`,
         `To resolve this issue, change the type of the \`${foreignKey}\` column on \`${table}\` to be :${type}.`,
         `(For example \`t.${type} :${foreignKey}\`).`,
       ].join(" ");
@@ -438,28 +422,25 @@ export class MismatchedForeignKey extends StatementInvalid {
     this.name = "ActiveRecord::MismatchedForeignKey";
     this._originalMessage = originalMessage;
     this._queryParser = queryParser;
-    this.fkDetails = {
-      table,
-      foreignKey,
-      targetTable,
-      primaryKey,
-      primaryKeySqlType,
-      primaryKeyType,
-    };
+    this.fkDetails = { table, foreignKey, targetTable, primaryKey, primaryKeyColumn };
   }
 
-  override setQuery(sql: string, binds: unknown[]): StatementInvalid {
+  override setQuery(sql: string, binds: unknown[]): StatementInvalid | Promise<StatementInvalid> {
     if (this._queryParser && !this._querySet) {
-      const exception = new MismatchedForeignKey({
-        message: this._originalMessage,
-        sql,
-        binds,
-        connectionPool: this.connectionPool,
-        cause: this.cause,
-        ...this._queryParser(sql),
-      });
-      exception.stack = this.stack;
-      return exception;
+      const build = (details: Partial<MismatchedForeignKeyOptions>) => {
+        const exception = new MismatchedForeignKey({
+          message: this._originalMessage,
+          sql,
+          binds,
+          connectionPool: this.connectionPool,
+          cause: this.cause,
+          ...details,
+        });
+        exception.stack = this.stack;
+        return exception;
+      };
+      const details = this._queryParser(sql);
+      return details instanceof Promise ? details.then(build) : build(details);
     }
     return super.setQuery(sql, binds);
   }

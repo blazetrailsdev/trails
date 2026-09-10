@@ -37,7 +37,6 @@ import {
   SQLWarning,
   StatementTimeout,
   ValueTooLong,
-  sqlTypeToMigrationKeyword,
 } from "../errors.js";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
@@ -1012,10 +1011,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       binds,
       connectionPool,
     }: { sql: string | null; binds: unknown[]; connectionPool: AbstractAdapter["pool"] },
-  ): MismatchedForeignKey {
+  ): MismatchedForeignKey | Promise<MismatchedForeignKey> {
     if (sql) {
-      const details = this.mismatchedForeignKeyDetails({ message, sql });
-      return new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details });
+      return this.mismatchedForeignKeyDetails({ message, sql }).then(
+        (details) => new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details }),
+      );
     }
     return new MismatchedForeignKey({
       message,
@@ -1025,17 +1025,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall column_for — CONVERGEABLE mysql-mismatched-fk-details-omits-primary-key-column
-   */
-  protected mismatchedForeignKeyDetails({
+  /** @internal */
+  protected async mismatchedForeignKeyDetails({
     message,
     sql,
   }: {
     message: string;
     sql: string;
-  }): Partial<MismatchedForeignKeyOptions> {
+  }): Promise<Partial<MismatchedForeignKeyOptions>> {
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
     const fkPat = fkFromMsg ?? "\\w+";
 
@@ -1058,33 +1055,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       primary_key: primaryKey,
     } = match.groups;
 
-    return { table, foreignKey, targetTable, primaryKey };
-  }
-
-  protected async _enrichMismatchedForeignKey(err: unknown): Promise<unknown> {
-    if (!(err instanceof MismatchedForeignKey)) return err;
-    const { table, foreignKey, targetTable, primaryKey } = err.fkDetails;
-    if (!targetTable || !primaryKey || err.fkDetails.primaryKeySqlType) return err;
-
     const primaryKeyColumn = await this.columnFor(targetTable, primaryKey);
-    const sqlType = primaryKeyColumn.sqlTypeMetadata?.sqlType ?? "";
-    const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
-
-    const exception = new MismatchedForeignKey({
-      message: (err as unknown as { _originalMessage?: string })._originalMessage,
-      sql: err.sql ?? undefined,
-      binds: err.binds ?? undefined,
-      connectionPool: err.connectionPool,
-      cause: err.cause,
-      table,
-      foreignKey,
-      targetTable,
-      primaryKey,
-      primaryKeySqlType: sqlType,
-      primaryKeyType,
-    });
-    exception.stack = err.stack;
-    return exception;
+    return { table, foreignKey, targetTable, primaryKey, primaryKeyColumn };
   }
 
   /** @internal */
