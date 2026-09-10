@@ -185,7 +185,7 @@ export class ConnectionPoolConfiguration {
   declare _threadQueryCaches: QueryCacheRegistry;
   declare _queryCacheMaxSize: number | null;
   declare _queryCacheVersion: { value: number };
-  declare _resolvePinnedConnection: () => unknown;
+  declare _pinnedConnection: unknown;
 
   /**
    * @internal
@@ -273,7 +273,7 @@ export class ConnectionPoolConfiguration {
   }
 
   clearQueryCache(): void {
-    if (this._resolvePinnedConnection()) {
+    if (this._pinnedConnection) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();

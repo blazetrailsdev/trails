@@ -14,21 +14,20 @@ function fkDriverError(): Error {
 
 function makeAdapter(): Mysql2Adapter {
   const adapter = new Mysql2Adapter({ host: "localhost" });
-  (adapter as unknown as { columns: unknown }).columns = async () => [
-    { name: "id", sqlTypeMetadata: { sqlType: "bigint", type: "integer" } },
-  ];
+  (adapter as unknown as { columnFor: unknown }).columnFor = async () => ({
+    name: "id",
+    sqlTypeMetadata: { sqlType: "bigint", type: "integer" },
+  });
   return adapter;
 }
 
-function translateAndEnrich(adapter: Mysql2Adapter, e: unknown, sql: string): Promise<Error> {
+function enrich(adapter: Mysql2Adapter, err: unknown): Promise<unknown> {
   return (
-    adapter as unknown as {
-      _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error>;
-    }
-  )._translateAndEnrich(e, sql, []);
+    adapter as unknown as { _enrichMismatchedForeignKey(err: unknown): Promise<unknown> }
+  )._enrichMismatchedForeignKey(err);
 }
 
-describe("Mysql2Adapter#_translateAndEnrich (queryParser rebuild ordering)", () => {
+describe("Mysql2Adapter mismatched foreign key translation", () => {
   it("sql-less translation yields a MismatchedForeignKey with the generic fallback message", async () => {
     const adapter = makeAdapter();
     const translated = adapter.translateExceptionClass(fkDriverError(), null, null);
@@ -40,34 +39,43 @@ describe("Mysql2Adapter#_translateAndEnrich (queryParser rebuild ordering)", () 
     await adapter.close();
   });
 
-  it("re-enriches a sql-less MismatchedForeignKey after the setQuery rebuild", async () => {
+  it("a sql-less MismatchedForeignKey picks up its details from the queryParser lambda", async () => {
     const adapter = makeAdapter();
     const sqlLess = adapter.translateExceptionClass(
       fkDriverError(),
       null,
       null,
     ) as MismatchedForeignKey;
-    const enriched = await translateAndEnrich(adapter, sqlLess, FK_SQL);
+    const rebuilt = sqlLess.setQuery(FK_SQL, []) as MismatchedForeignKey;
+    expect(rebuilt).toBeInstanceOf(MismatchedForeignKey);
+    expect(rebuilt.fkDetails).toMatchObject({
+      table: "wheels",
+      foreignKey: "wheelable_id",
+      targetTable: "vehicles",
+      primaryKey: "id",
+    });
+    expect(rebuilt.sql).toBe(FK_SQL);
+    await adapter.close();
+  });
+
+  it("translating with the sql present carries the primary key column type into the message", async () => {
+    const adapter = makeAdapter();
+    const translated = adapter.translateExceptionClass(fkDriverError(), FK_SQL, []);
+    const enriched = (await enrich(adapter, translated)) as MismatchedForeignKey;
+
     expect(enriched).toBeInstanceOf(MismatchedForeignKey);
     expect(enriched.message).toContain(
       "Column `wheelable_id` on table `wheels` does not match column `id` on `vehicles`, " +
         "which has type `bigint`.",
     );
     expect(enriched.message).toContain("`t.bigint :wheelable_id`");
-    expect((enriched as MismatchedForeignKey).sql).toBe(FK_SQL);
     await adapter.close();
   });
 
-  it("re-translates from the driver cause when the catch site unwraps it", async () => {
+  it("passes a non-MismatchedForeignKey error through untouched", async () => {
     const adapter = makeAdapter();
-    const sqlLess = adapter.translateExceptionClass(
-      fkDriverError(),
-      null,
-      null,
-    ) as MismatchedForeignKey;
-    const enriched = await translateAndEnrich(adapter, sqlLess.cause ?? sqlLess, FK_SQL);
-    expect(enriched).toBeInstanceOf(MismatchedForeignKey);
-    expect(enriched.message).toContain("which has type `bigint`");
+    const err = new Error("boom");
+    expect(await enrich(adapter, err)).toBe(err);
     await adapter.close();
   });
 });

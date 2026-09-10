@@ -1,9 +1,17 @@
-import { kernelFloat } from "@blazetrails/ruby-compat";
+import { kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType {
   override type(): string {
     return "point";
+  }
+
+  override isMutable(): boolean {
+    return true;
+  }
+
+  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+    return !rbEqual(rawOldValue, this.serialize(newValue));
   }
 
   cast(value: unknown): unknown {

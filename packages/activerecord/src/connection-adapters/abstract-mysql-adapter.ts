@@ -406,9 +406,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @missingRailsArgs fetch — PERMANENT */
-  async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+  async beginIsolatedDbTransaction(isolation: string): Promise<unknown> {
     const level = fetch<string>(transactionIsolationLevels(), isolation);
-    await this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
+    return this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
       allowRetry: true,
       materializeTransactions: false,
     });
@@ -421,8 +421,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  async execRollbackDbTransaction(): Promise<void> {
-    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+  async execRollbackDbTransaction(): Promise<unknown> {
+    return this.internalExecute("ROLLBACK", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });
@@ -1062,35 +1062,30 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return { table, foreignKey, targetTable, primaryKey };
   }
 
-  protected async _enrichMismatchedForeignKey(
-    err: MismatchedForeignKey,
-  ): Promise<MismatchedForeignKey> {
+  protected async _enrichMismatchedForeignKey(err: unknown): Promise<unknown> {
+    if (!(err instanceof MismatchedForeignKey)) return err;
     const { table, foreignKey, targetTable, primaryKey } = err.fkDetails;
     if (!targetTable || !primaryKey || err.fkDetails.primaryKeySqlType) return err;
 
-    try {
-      const cols = await this.columns(targetTable);
-      const col = cols.find((c) => c.name === primaryKey);
-      if (!col) return err;
+    const primaryKeyColumn = await this.columnFor(targetTable, primaryKey);
+    const sqlType = primaryKeyColumn.sqlTypeMetadata?.sqlType ?? "";
+    const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
 
-      const sqlType = col.sqlTypeMetadata?.sqlType ?? col.sqlTypeMetadata?.type ?? "";
-      const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
-
-      return new MismatchedForeignKey({
-        message: err.cause instanceof Error ? err.cause.message : undefined,
-        sql: err.sql ?? undefined,
-        binds: err.binds ?? undefined,
-        cause: err.cause,
-        table,
-        foreignKey,
-        targetTable,
-        primaryKey,
-        primaryKeySqlType: sqlType,
-        primaryKeyType,
-      });
-    } catch {
-      return err;
-    }
+    const exception = new MismatchedForeignKey({
+      message: (err as unknown as { _originalMessage?: string })._originalMessage,
+      sql: err.sql ?? undefined,
+      binds: err.binds ?? undefined,
+      connectionPool: err.connectionPool,
+      cause: err.cause,
+      table,
+      foreignKey,
+      targetTable,
+      primaryKey,
+      primaryKeySqlType: sqlType,
+      primaryKeyType,
+    });
+    exception.stack = err.stack;
+    return exception;
   }
 
   /** @internal */

@@ -93,7 +93,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   beforeEach(async () => {
     member = members("groucho");
     const organization = organizations("discordians");
-    (member.association("organization") as any).writer(organization);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
     await member.reload();
   });

@@ -251,9 +251,8 @@ export class ConnectionPool implements ReapablePool {
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
   private _pendingCloseDrains = new Set<Promise<void>>();
-  private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
-  /** @internal */
-  private _fixturePin: { connection: DatabaseAdapter; depth: number } | null = null;
+  private _pinnedConnection: DatabaseAdapter | null = null;
+  private _pinnedConnectionsDepth = 0;
 
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
@@ -405,7 +404,7 @@ export class ConnectionPool implements ReapablePool {
     const lease = this.connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
-      const pinned = this._resolvePinnedConnection();
+      const pinned = this._pinnedConnection;
       if (pinned) {
         if (this._connections && !this._connections.includes(pinned)) {
           this._connections.push(pinned);
@@ -431,79 +430,34 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  async pinConnectionBang(lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
-    const fixture =
-      typeof lockThread === "object" && lockThread !== null ? Boolean(lockThread.fixture) : false;
-    const slot = fixture ? "fixture" : "ctx";
-    const ctxId = executionContextId();
-    let pin: { connection: DatabaseAdapter; depth: number } | undefined =
-      slot === "fixture" ? (this._fixturePin ?? undefined) : this._pinnedConnections.get(ctxId);
+  async pinConnectionBang(lockThread = false): Promise<void> {
+    this._pinnedConnection ??= this.connectionLease().connection ?? (await this.checkout());
+    this._pinnedConnectionsDepth += 1;
 
-    const leasedConnection = this.connectionLease().connection;
-    const connection = pin?.connection ?? leasedConnection ?? (await this.checkout());
-    const newlyCheckedOut = !pin && leasedConnection == null;
-
-    if (!pin) {
-      pin = { connection, depth: 0 };
-      if (slot === "fixture") {
-        this._fixturePin = pin;
-      } else {
-        this._pinnedConnections.set(ctxId, pin);
-      }
+    if (this._connections && !this._connections.includes(this._pinnedConnection)) {
+      this._connections.push(this._pinnedConnection);
     }
-    pin.depth++;
 
-    try {
-      if (this._connections && !this._connections.includes(connection)) {
-        this._connections.push(connection);
-      }
-
-      if (lockThread) connection.setLockThread(executionContextId());
-
-      if (isTransactionAware(connection)) {
-        await connection.verifyBang();
-        await connection.transactionManager.beginTransaction({
-          joinable: false,
-          _lazy: false,
-        });
-      }
-    } catch (error) {
-      pin.depth--;
-      if (pin.depth === 0) {
-        if (slot === "fixture") {
-          this._fixturePin = null;
-        } else {
-          this._pinnedConnections.delete(ctxId);
-        }
-        if (newlyCheckedOut) {
-          this.checkin(connection);
-        }
-      }
-      throw error;
+    if (lockThread) this._pinnedConnection.setLockThread(executionContextId());
+    if (isTransactionAware(this._pinnedConnection)) {
+      await this._pinnedConnection.verifyBang();
+      await this._pinnedConnection.transactionManager.beginTransaction({
+        joinable: false,
+        _lazy: false,
+      });
     }
   }
 
   async unpinConnectionBang(): Promise<boolean> {
-    const ctxId = executionContextId();
-    const contextPin = this._pinnedConnections.get(ctxId);
-    const fromFixture = contextPin ? null : this._fixturePin;
-    const pin = contextPin ?? fromFixture;
-    if (!pin) {
+    if (!this._pinnedConnection) {
       throw new Error(`There isn't a pinned connection ${this.inspect()}`);
     }
 
-    const connection = pin.connection;
     let clean = true;
-
     const block = async () => {
-      pin.depth--;
-      if (pin.depth === 0) {
-        if (fromFixture) {
-          this._fixturePin = null;
-        } else {
-          this._pinnedConnections.delete(ctxId);
-        }
-      }
+      this._pinnedConnectionsDepth -= 1;
+      const connection = this._pinnedConnection!;
+      if (this._pinnedConnectionsDepth === 0) this._pinnedConnection = null;
 
       if (isTransactionAware(connection)) {
         if (connection.transactionManager.currentTransaction.open) {
@@ -514,15 +468,15 @@ export class ConnectionPool implements ReapablePool {
         }
       }
 
-      if (pin.depth === 0) {
+      if (this._pinnedConnection === null) {
         connection.stealBang();
         connection.setLockThread(null);
         this.checkin(connection);
       }
     };
 
-    if (isTransactionAware(connection)) {
-      await connection.lock.synchronize(block);
+    if (isTransactionAware(this._pinnedConnection)) {
+      await this._pinnedConnection.lock.synchronize(block);
     } else {
       await block();
     }
@@ -530,19 +484,23 @@ export class ConnectionPool implements ReapablePool {
     return clean;
   }
 
-  /** @missingRailsCall lock — PERMANENT */
-  async checkout(checkoutTimeout?: number): Promise<DatabaseAdapter> {
-    checkoutTimeout ??= this.checkoutTimeout;
-    const pinned = this._resolvePinnedConnection();
-    if (!pinned) {
+  async checkout(checkoutTimeout: number = this.checkoutTimeout): Promise<DatabaseAdapter> {
+    if (!this._pinnedConnection) {
       return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     }
 
-    await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
-    if (this._connections && !this._connections.includes(pinned)) {
-      this._connections.push(pinned);
-    }
-    return pinned;
+    return this._pinnedConnection.lock.synchronize(async () => {
+      if (this._pinnedConnection) {
+        await (
+          this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
+        ).verifyBang();
+        if (this._connections && !this._connections.includes(this._pinnedConnection)) {
+          this._connections.push(this._pinnedConnection);
+        }
+        return this._pinnedConnection;
+      }
+      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
+    });
   }
 
   /**
@@ -550,7 +508,7 @@ export class ConnectionPool implements ReapablePool {
    * @noRailsEquivalent PERMANENT
    */
   acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
-    const pinned = this._resolvePinnedConnection();
+    const pinned = this._pinnedConnection;
     if (pinned) return pinned;
     if (this.isDiscarded()) {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
@@ -886,15 +844,6 @@ export class ConnectionPool implements ReapablePool {
     this._checkedOut.delete(conn);
     this._available?.delete(conn);
 
-    for (const [ctxId, pin] of this._pinnedConnections) {
-      if (pin.connection === conn) {
-        this._pinnedConnections.delete(ctxId);
-      }
-    }
-    if (this._fixturePin?.connection === conn) {
-      this._fixturePin = null;
-    }
-
     if (this._connections) {
       const connIdx = this._connections.indexOf(conn);
       if (connIdx >= 0) this._connections.splice(connIdx, 1);
@@ -930,18 +879,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   private _isConnectionPinned(conn: DatabaseAdapter): boolean {
-    if (this._fixturePin?.connection === conn) return true;
-    for (const pin of this._pinnedConnections.values()) {
-      if (pin.connection === conn) return true;
-    }
-    return false;
-  }
-
-  /** @internal */
-  private _resolvePinnedConnection(): DatabaseAdapter | undefined {
-    if (this._fixturePin) return this._fixturePin.connection;
-    if (this._pinnedConnections.size === 0) return undefined;
-    return this._pinnedConnections.get(executionContextId())?.connection;
+    return this._pinnedConnection === conn;
   }
 
   private connectionLease(): Lease {
@@ -978,7 +916,7 @@ export class ConnectionPool implements ReapablePool {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
 export interface ConnectionPool extends Omit<
   Included<ConnectionPoolConfiguration>,
-  "_resolvePinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
+  "_pinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
 > {
   readonly queryCache: Store;
   readonly queryCacheEnabled: boolean;

@@ -1175,7 +1175,7 @@ describe("HasOneAssociationsTest", () => {
     const author = await DbaReplAuthor.create({ name: "Test" });
     const book = await (DbaReplBook as any).create({ author });
     await (author.association("book") as any).loadTarget();
-    (author.association("book") as any).writer(await (DbaReplBook as any).create({}));
+    await (author.association("book") as any).writer(await (DbaReplBook as any).create({}));
     await author.save();
     expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
   });

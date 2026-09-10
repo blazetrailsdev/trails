@@ -60,7 +60,7 @@ describe("withTransactionalFixtures", () => {
     );
     await Promise.resolve();
     await Promise.resolve();
-    expect((pool as unknown as { _fixturePin: unknown })._fixturePin).not.toBeNull();
+    expect((pool as unknown as { _pinnedConnection: unknown })._pinnedConnection).not.toBeNull();
     Base.connectionHandler.removeConnectionPool("MidTestPool");
   });
 

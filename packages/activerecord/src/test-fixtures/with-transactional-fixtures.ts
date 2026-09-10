@@ -107,7 +107,7 @@ let connectionSubscriber: NotificationSubscriber | null = null;
 let pendingPins: Promise<void>[] = [];
 
 async function pinConnectionPool(pool: ConnectionPool): Promise<void> {
-  await pool.pinConnectionBang({ fixture: true });
+  await pool.pinConnectionBang();
   pinnedPools.push(pool);
   await pool.leaseConnection();
 }
