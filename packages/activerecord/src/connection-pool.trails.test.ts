@@ -107,6 +107,13 @@ it("with connection prevent permanent checkout on fresh lease releases", async (
   expect(pool.activeConnection).toBeNull();
 });
 
+it("with connection prevent permanent checkout on fresh lease keeps the lease permanent", async () => {
+  const pool = makePool();
+  expect(pool.isPermanentLease()).toBe(true);
+  await pool.withConnection(() => undefined, { preventPermanentCheckout: true });
+  expect(pool.isPermanentLease()).toBe(true);
+});
+
 it("withConnection waits for a released connection when pool is saturated", async () => {
   const pool = makePool(1);
   const held = await pool.checkout();

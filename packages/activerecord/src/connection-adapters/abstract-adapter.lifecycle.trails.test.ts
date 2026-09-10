@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { TypeMap } from "../type/type-map.js";
+import { ConnectionPool } from "./abstract/connection-pool.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
+import { PoolConfig } from "./pool-config.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+
 import {
   ConnectionNotEstablished,
   ConnectionNotDefined,
@@ -9,6 +14,16 @@ import {
   LockWaitTimeout,
   NoDatabaseError,
 } from "../errors.js";
+
+async function pinnedPool(a: AbstractAdapter): Promise<ConnectionPool> {
+  const dbConfig = new HashConfig("test", "primary", { adapter: "abstract" });
+  const pool = new ConnectionPool(new PoolConfig(new ConnectionDescriptor("primary"), dbConfig));
+  (pool as unknown as { _connections: AbstractAdapter[] })._connections.push(a);
+  (pool as unknown as { _available: { add: (c: AbstractAdapter) => void } })._available.add(a);
+  a.pool = pool;
+  await pool.pinConnectionBang(true);
+  return pool;
+}
 
 describe("AbstractAdapter connection lifecycle privates", () => {
   it("verifiedBang sets _verified and _lastActivity", () => {
@@ -53,19 +68,25 @@ describe("AbstractAdapter connection lifecycle privates", () => {
 
   it("withRawConnection serializes concurrent calls and yields the connection", async () => {
     const a = new AbstractAdapter({});
+    const pool = await pinnedPool(a);
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const p1 = a.withRawConnection({}, async () => {
-      order.push(1);
-      await gate;
-      order.push(2);
-      return "a";
-    });
-    const p2 = a.withRawConnection({}, async () => {
-      order.push(3);
-      return "b";
-    });
+    const p1 = pool.withConnection((conn) =>
+      conn.withRawConnection({}, async () => {
+        order.push(1);
+        await gate;
+        order.push(2);
+        return "a";
+      }),
+    );
+    const p2 = pool.withConnection((conn) =>
+      conn.withRawConnection({}, async () => {
+        order.push(3);
+        return "b";
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
     release();
     expect(await Promise.all([p1, p2])).toEqual(["a", "b"]);
     expect(order).toEqual([1, 2, 3]);
@@ -108,6 +129,7 @@ describe("AbstractAdapter#databaseExists", () => {
 describe("AbstractAdapter connection lifecycle critical sections", () => {
   it("reconnectBang serializes concurrent callers", async () => {
     const a = new AbstractAdapter({});
+    const pool = await pinnedPool(a);
     const events: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -121,9 +143,10 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
       events.push("exit");
     };
     (a as any).attemptConfigureConnection = async () => {};
+    (a as any).active = async () => true;
 
-    const p1 = a.reconnectBang();
-    const p2 = a.reconnectBang();
+    const p1 = pool.withConnection((conn) => conn.reconnectBang());
+    const p2 = pool.withConnection((conn) => conn.reconnectBang());
     await Promise.resolve();
     release();
     await Promise.all([p1, p2]);
@@ -133,6 +156,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
 
   it("verifyBang serializes concurrent callers and promotes the unconfigured connection once", async () => {
     const a = new AbstractAdapter({});
+    const pool = await pinnedPool(a);
     const events: string[] = [];
     (a as any).active = async () => false;
     (a as any)._unconfiguredConnection = { handle: 1 };
@@ -145,7 +169,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
       events.push("reconnect");
     };
 
-    await Promise.all([a.verifyBang(), a.verifyBang()]);
+    await Promise.all([pool.withConnection(() => undefined), pool.withConnection(() => undefined)]);
 
     expect(events).toEqual([
       "configure:enter",
