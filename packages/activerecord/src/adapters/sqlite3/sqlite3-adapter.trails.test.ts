@@ -142,7 +142,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("raises NoDatabaseError opening a missing database file readonly", async () => {
-    const missing = new BetterSQLite3Adapter(`tmp/missing-${Date.now()}.sqlite3`, {
+    const missing = new BetterSQLite3Adapter("tmp/missing-readonly-database.sqlite3", {
       readonly: true,
     });
     await expect(missing.connectBang()).rejects.toThrow(NoDatabaseError);
