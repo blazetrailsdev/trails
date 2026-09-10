@@ -52,6 +52,10 @@ export class MockResponse extends Response {
     return "";
   }
 
+  set errors(value: string) {
+    this._errors = value;
+  }
+
   override get body(): string {
     if (this._bufferedBody !== undefined) return this._bufferedBody;
 
