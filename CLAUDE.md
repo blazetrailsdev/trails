@@ -749,7 +749,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Twelve instances exist and are the only ones:
+where Ruby resolves the constant. Fourteen instances exist and are the only ones:
 
 - `activerecord/src/associations/association-class-slots.ts` — the six
   concrete association ctors `AssociationReflection#association_class` returns,
@@ -814,6 +814,19 @@ extends Association`, whose modules reach `reflection.ts` back through
   (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
   The cycle is closed by `base.ts` importing all three, so none of them can
   import `base.ts` back.
+- `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
+  `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
+  (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle
+  is `schema-statements.ts -> join-table.ts -> model-schema.ts ->
+connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts`,
+  whose module-scope `include(AbstractAdapter, SchemaStatements)`
+  (`abstract_adapter.rb:50-56`) would read `SchemaStatements` in TDZ.
+- `activerecord/src/connection-handling-slot.ts` — `DEFAULT_ENV`, read by
+  `migration.ts`, `database-configurations.ts` and
+  `database-configurations/database-config.ts` (`migration.rb:676,773,1341`
+  name `ConnectionHandling::DEFAULT_ENV`, defined at `connection_handling.rb:7`).
+  Same cycle as above, entered through `schema-statements.ts ->
+migration/command-recorder.ts -> migration.ts`.
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do

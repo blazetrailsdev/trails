@@ -1313,11 +1313,8 @@ export function extractFromProgram(
   // of the host's effective surface (see arel #814).
   //
   // We walk the whole file (not just top-level expression statements):
-  // some hosts apply their `include`s from inside a module-level helper
-  // (e.g. `ensureAbstractAdapterMixinsApplied()` in abstract-adapter.ts,
-  // added in PR #4458 to break a module-eval TDZ cycle). Those calls are
-  // nested inside a function body but still describe the host's static
-  // mixin surface, so they must be attributed too.
+  // an `include` nested inside a function body still describes the host's
+  // static mixin surface, so it must be attributed too.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;

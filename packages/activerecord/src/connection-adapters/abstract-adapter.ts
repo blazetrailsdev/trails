@@ -770,7 +770,6 @@ export class AbstractAdapter implements Quoting {
     deprecatedConnectionOptions: unknown = null,
     deprecatedConfig: unknown = null,
   ) {
-    ensureAbstractAdapterMixinsApplied();
     this._connection = null;
     this._unconfiguredConnection = null;
 
@@ -2206,57 +2205,49 @@ export class AbstractAdapter implements Quoting {
   }
 }
 
-let abstractAdapterMixinsApplied = false;
-
 let abstractTypeMap: TypeMap | undefined;
 
-/** @internal */
-function ensureAbstractAdapterMixinsApplied(): void {
-  if (abstractAdapterMixinsApplied) return;
-  abstractAdapterMixinsApplied = true;
+include(AbstractAdapter, DatabaseStatements);
+include(AbstractAdapter, SchemaStatements);
+include(AbstractAdapter, QuotingMixin);
+include(AbstractAdapter, QueryCacheMixin);
+AbstractAdapter.setCallback("checkin", "after", function () {
+  (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
+});
+AbstractAdapter.setCallback("checkin", "after", function () {
+  this.enableLazyTransactionsBang();
+});
+include(AbstractAdapter, SavepointsMixin);
+include(AbstractAdapter, {
+  maxIdentifierLength,
+  tableNameLength,
+  tableAliasLength,
+  indexNameLength,
+  bindParamsLength,
+});
 
-  include(AbstractAdapter, DatabaseStatements);
-  include(AbstractAdapter, SchemaStatements);
-  include(AbstractAdapter, QuotingMixin);
-  include(AbstractAdapter, QueryCacheMixin);
-  AbstractAdapter.setCallback("checkin", "after", function () {
-    (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
+{
+  const baseSelectAll = AbstractAdapter.prototype.selectAll;
+  Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
+    value: makeCachedSelectAll(baseSelectAll as never),
+    writable: true,
+    configurable: true,
+    enumerable: false,
   });
-  AbstractAdapter.setCallback("checkin", "after", function () {
-    this.enableLazyTransactionsBang();
-  });
-  include(AbstractAdapter, SavepointsMixin);
-  include(AbstractAdapter, {
-    maxIdentifierLength,
-    tableNameLength,
-    tableAliasLength,
-    indexNameLength,
-    bindParamsLength,
-  });
-
-  {
-    const baseSelectAll = AbstractAdapter.prototype.selectAll;
-    Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
-      value: makeCachedSelectAll(baseSelectAll as never),
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
-  }
-
-  dirtiesQueryCache(
-    AbstractAdapter,
-    "execQuery",
-    "execute",
-    "create",
-    "insert",
-    "update",
-    "delete",
-    "truncate",
-    "truncateTables",
-    "rollbackToSavepoint",
-    "rollbackDbTransaction",
-    "restartDbTransaction",
-    "execInsertAll",
-  );
 }
+
+dirtiesQueryCache(
+  AbstractAdapter,
+  "execQuery",
+  "execute",
+  "create",
+  "insert",
+  "update",
+  "delete",
+  "truncate",
+  "truncateTables",
+  "rollbackToSavepoint",
+  "rollbackDbTransaction",
+  "restartDbTransaction",
+  "execInsertAll",
+);
