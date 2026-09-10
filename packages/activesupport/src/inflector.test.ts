@@ -22,6 +22,7 @@ import {
 } from "./index.js";
 import { Inflections, Uncountables, inflections } from "./inflector/inflections.js";
 import { I18n } from "./i18n.js";
+import { assertEmpty, assertNotEmpty } from "./testing/assertions.js";
 import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
@@ -600,12 +601,12 @@ describe("InflectorTest", () => {
 
     inflections("es", (inflect) => inflect.clear());
 
-    expect(inflections("es").plurals).toHaveLength(0);
-    expect(inflections("es").singulars).toHaveLength(0);
-    expect([...inflections("es").uncountables]).toHaveLength(0);
-    expect(inflections().plurals).not.toHaveLength(0);
-    expect(inflections().singulars).not.toHaveLength(0);
-    expect([...inflections().uncountables]).not.toHaveLength(0);
+    assertEmpty(inflections("es").plurals);
+    assertEmpty(inflections("es").singulars);
+    assertEmpty(inflections("es").uncountables);
+    assertNotEmpty(inflections().plurals);
+    assertNotEmpty(inflections().singulars);
+    assertNotEmpty(inflections().uncountables);
   });
 
   it("clear all", () => {

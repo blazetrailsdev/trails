@@ -22,8 +22,8 @@ describe("InTest", () => {
   });
 
   it("in range", () => {
-    expect(isIn(25, new Range(1, 50))).toBe(true);
-    expect(isIn(75, new Range(1, 50))).toBe(false);
+    expect(isIn(25, new Range(1, 50))).toBeTruthy();
+    expect(isIn(75, new Range(1, 50))).toBeFalsy();
   });
 
   it("in set", () => {
@@ -33,8 +33,8 @@ describe("InTest", () => {
   });
 
   it("in date range", () => {
-    expect(isIn(Temporal.Now.plainDateISO(), new Range(null, tomorrow()))).toBe(true);
-    expect(isIn(Temporal.Now.plainDateISO(), new Range(tomorrow(), null))).toBe(false);
+    expect(isIn(Temporal.Now.plainDateISO(), new Range(null, tomorrow()))).toBeTruthy();
+    expect(isIn(Temporal.Now.plainDateISO(), new Range(tomorrow(), null))).toBeFalsy();
   });
 
   it("no method catching", () => {

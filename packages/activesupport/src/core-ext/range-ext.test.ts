@@ -230,7 +230,7 @@ describe("RangeTest", () => {
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
       TimeZone.find("Eastern Time (US & Canada)")!,
     );
-    expect(new Range(twz.minus(hours(1)), twz).cover(twz)).toBe(true);
+    expect(new Range(twz.minus(hours(1)), twz).cover(twz)).toBeTruthy();
   });
 
   it("case equals on time with zone", () => {
@@ -238,7 +238,7 @@ describe("RangeTest", () => {
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
       TimeZone.find("Eastern Time (US & Canada)")!,
     );
-    expect(new Range(twz.minus(hours(1)), twz).caseEquals(twz)).toBe(true);
+    expect(new Range(twz.minus(hours(1)), twz).caseEquals(twz)).toBeTruthy();
   });
 
   it("date time with each", () => {
