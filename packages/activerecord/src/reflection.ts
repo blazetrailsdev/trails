@@ -326,7 +326,7 @@ export class AbstractReflection {
   }
 
   checkValidityOfInverseBang(): void {
-    if (!this.isPolymorphic() && this.hasInverse()) {
+    if (!this.isPolymorphic() && this.hasInverse() != null && this.hasInverse() !== false) {
       const inverse = this.inverseOf();
       if (inverse == null) {
         throw new InverseOfAssociationNotFoundError(this._concrete());
@@ -413,7 +413,7 @@ export class AbstractReflection {
     return message;
   }
 
-  hasInverse(): boolean {
+  hasInverse(): string | false | null {
     return false;
   }
 
@@ -748,8 +748,8 @@ export class AssociationReflection extends MacroReflection {
     return !!(this.options.autosave === true || this.isCollection());
   }
 
-  hasInverse(): boolean {
-    return !!this.inverseName();
+  hasInverse(): string | false | null {
+    return this.inverseName();
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
@@ -993,7 +993,7 @@ export class AssociationReflection extends MacroReflection {
   polymorphicInverseOf(
     associatedClass: typeof Base,
   ): AssociationReflection | ThroughReflection | null {
-    if (this.hasInverse()) {
+    if (this.hasInverse() != null && this.hasInverse() !== false) {
       const inverseRelationship = associatedClass._reflectOnAssociation(
         this.options.inverseOf as string,
       );
@@ -1430,7 +1430,7 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.associationForeignKey ?? this._delegate.associationForeignKey;
   }
 
-  hasInverse(): boolean {
+  hasInverse(): string | false | null {
     return this._delegate.hasInverse();
   }
 

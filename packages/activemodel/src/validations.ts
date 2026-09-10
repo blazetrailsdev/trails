@@ -175,7 +175,7 @@ export const ClassMethods = {
     const [filters, extracted] = extractOptionsBang(args as unknown[]);
     let options = extracted as ConditionalOptions;
 
-    if (filters.every((arg) => typeof arg === "string")) {
+    if (filters.every((arg) => typeof arg === "string" && arg.startsWith(":"))) {
       for (const k of Object.keys(options)) {
         if (!(VALID_OPTIONS_FOR_VALIDATE as readonly string[]).includes(k)) {
           throw new ArgumentError(
