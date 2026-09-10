@@ -181,6 +181,10 @@ export const fixtureRegistry = {
     model: () => import("./models/cpk.js").then((m) => m.CpkOrderTag),
     data: FixtureData.cpkOrderTagFixtureData,
   },
+  cpkReviews: {
+    model: () => import("./models/cpk.js").then((m) => m.CpkReview),
+    data: FixtureData.cpkReviewFixtureData,
+  },
   cpkTags: {
     model: () => import("./models/cpk.js").then((m) => m.CpkTag),
     data: FixtureData.cpkTagFixtureData,
@@ -347,6 +351,15 @@ export const fixtureRegistry = {
   organizations: {
     model: () => import("./models/organization.js").then((m) => m.Organization),
     data: FixtureData.organizationFixtureData,
+  },
+  otherBooks: {
+    model: () => import("./models/book.js").then((m) => m.Book),
+    data: FixtureData.otherBookFixtureData,
+  },
+  randomlyNamedA9: {
+    model: () =>
+      import("./models/randomly-named-c1.js").then((m) => m.ClassNameThatDoesNotFollowCONVENTIONS),
+    data: FixtureData.randomlyNamedA9FixtureData,
   },
   otherDogs: {
     model: () => import("./models/other-dog.js").then((m) => m.OtherDog),
