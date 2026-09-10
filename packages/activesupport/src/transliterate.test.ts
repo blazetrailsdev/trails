@@ -65,8 +65,10 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate handles unknown object", () => {
-    expect(() => transliterate({} as unknown as string)).toThrow(ArgumentError);
-    expect(() => transliterate({} as unknown as string)).toThrow(
+    expect(() => transliterate(new (class Object {})() as unknown as string)).toThrow(
+      ArgumentError,
+    );
+    expect(() => transliterate(new (class Object {})() as unknown as string)).toThrow(
       "Can only transliterate strings. Received Object",
     );
   });

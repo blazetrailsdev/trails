@@ -63,7 +63,7 @@ describe("kernelFloat", () => {
     expect(() => kernelFloat(null)).toThrow(TypeError);
     expect(() => kernelFloat(null)).toThrow("can't convert nil into Float");
     expect(() => kernelFloat([])).toThrow("can't convert Array into Float");
-    expect(() => kernelFloat({})).toThrow("can't convert Object into Float");
+    expect(() => kernelFloat({})).toThrow("can't convert Hash into Float");
   });
 
   it("honors to_f on an object that defines one", () => {

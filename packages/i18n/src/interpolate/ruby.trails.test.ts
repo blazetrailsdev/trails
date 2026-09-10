@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { interpolate } from "./ruby.js";
 import { resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { ArgumentError, ReservedInterpolationKey } from "../exceptions.js";
+import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat";
+import { ReservedInterpolationKey } from "../exceptions.js";
 
 describe("I18n.interpolate", () => {
   beforeEach(() => {
@@ -143,7 +144,7 @@ describe("sprintf conformance", () => {
   });
 
   it("raises ArgumentError given a value no numeric conversion accepts", () => {
-    expect(() => interpolate("%<v>d", { v: "abc" })).toThrow(ArgumentError);
+    expect(() => interpolate("%<v>d", { v: "abc" })).toThrow(RubyArgumentError);
     expect(() => interpolate("%<v>x", { v: "abc" })).toThrow('invalid value for Integer(): "abc"');
     expect(() => interpolate("%<v>f", { v: "abc" })).toThrow('invalid value for Float(): "abc"');
     expect(() => interpolate("%<v>d", { v: null })).toThrow("can't convert nil into Integer");
@@ -154,6 +155,6 @@ describe("sprintf conformance", () => {
   });
 
   it("raises ArgumentError given a spec outside the grammar", () => {
-    expect(() => interpolate("%<v>,d", { v: 1 })).toThrow(ArgumentError);
+    expect(() => interpolate("%<v>,d", { v: 1 })).toThrow(RubyArgumentError);
   });
 });

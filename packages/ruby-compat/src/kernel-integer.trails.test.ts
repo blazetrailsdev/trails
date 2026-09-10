@@ -4,6 +4,9 @@ import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { kernelInteger } from "./kernel-integer.js";
 
+class Foo {}
+const foo = <T extends object>(methods: T): Foo & T => Object.assign(new Foo(), methods);
+
 describe("kernelInteger", () => {
   it("truncates a Numeric toward zero", () => {
     expect(kernelInteger(10)).toBe(10);
@@ -103,10 +106,10 @@ describe("kernelInteger", () => {
     expect(() => kernelInteger("10", null)).toThrow("no implicit conversion from nil to integer");
     expect(() => kernelInteger("10", "2")).toThrow("no implicit conversion of String into Integer");
     expect(() => kernelInteger("10", true)).toThrow("no implicit conversion of true into Integer");
-    expect(() => kernelInteger("10", {})).toThrow("no implicit conversion of Object into Integer");
+    expect(() => kernelInteger("10", {})).toThrow("no implicit conversion of Hash into Integer");
     expect(kernelInteger("1f", { toInt: () => 16 })).toBe(31);
-    expect(() => kernelInteger("10", { toInt: () => "x" })).toThrow(
-      "can't convert Object to Integer (Object#to_int gives String)",
+    expect(() => kernelInteger("10", foo({ toInt: () => "x" }))).toThrow(
+      "can't convert Foo to Integer (Foo#to_int gives String)",
     );
   });
 
@@ -141,22 +144,22 @@ describe("kernelInteger", () => {
   });
 
   it("raises the conversion mismatch when to_str answers a non-String", () => {
-    expect(() => kernelInteger({ toStr: () => 1 })).toThrow(
-      "can't convert Object to String (Object#to_str gives Integer)",
+    expect(() => kernelInteger(foo({ toStr: () => 1 }))).toThrow(
+      "can't convert Foo to String (Foo#to_str gives Integer)",
     );
-    expect(() => kernelInteger({ toStr: () => 1, toI: () => 5 })).toThrow(
-      "can't convert Object to String (Object#to_str gives Integer)",
+    expect(() => kernelInteger(foo({ toStr: () => 1, toI: () => 5 }))).toThrow(
+      "can't convert Foo to String (Foo#to_str gives Integer)",
     );
-    expect(() => kernelInteger({ toStr: () => 1 }, 10)).toThrow(
-      "can't convert Object to String (Object#to_str gives Integer)",
+    expect(() => kernelInteger(foo({ toStr: () => 1 }), 10)).toThrow(
+      "can't convert Foo to String (Foo#to_str gives Integer)",
     );
     expect(kernelInteger({ toStr: () => null, toI: () => 5 })).toBe(5);
     expect(kernelInteger({ toInt: () => 1, toStr: () => 2 })).toBe(1);
   });
 
   it("raises TypeError naming the conversion when to_i answers a non-Integer", () => {
-    expect(() => kernelInteger({ toI: () => "q" })).toThrow(
-      "can't convert Object to Integer (Object#to_i gives String)",
+    expect(() => kernelInteger(foo({ toI: () => "q" }))).toThrow(
+      "can't convert Foo to Integer (Foo#to_i gives String)",
     );
   });
 });

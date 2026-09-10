@@ -22,6 +22,7 @@ export function rbObjClass(x: unknown): string {
   const branded = (x as Comparable)[rubyClass];
   if (branded != null) return branded;
   if (hasEpochNanoseconds(x)) return "Time";
+  if (isPlainHash(x)) return "Hash";
   return (x as object).constructor?.name ?? typeof x;
 }
 
