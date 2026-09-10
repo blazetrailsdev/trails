@@ -439,11 +439,14 @@ export class ConnectionPool implements ReapablePool {
     }
 
     if (lockThread) this._pinnedConnection.setLockThread(executionContextId());
-    if (isTransactionAware(this._pinnedConnection)) {
-      await this._pinnedConnection.verifyBang();
-      await this._pinnedConnection.transactionManager.beginTransaction({
-        joinable: false,
-        _lazy: false,
+    const pinned = this._pinnedConnection;
+    if (isTransactionAware(pinned)) {
+      await pinned.lock.synchronize(async () => {
+        await pinned.verifyBang();
+        await pinned.transactionManager.beginTransaction({
+          joinable: false,
+          _lazy: false,
+        });
       });
     }
   }
