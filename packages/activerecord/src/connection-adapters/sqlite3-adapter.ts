@@ -244,7 +244,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     cache_size: 2000,
   };
 
-  /** @missingRailsCall merge — CONVERGEABLE converge-sqlite3-adapter-construction-call-set-rows */
+  /** @missingRailsCall merge — CONVERGEABLE converge-sqlite3-connection-parameters-merge */
   constructor(config: SQLite3Config) {
     const { database, ...options } = config;
     if (database === undefined || database === "") {
