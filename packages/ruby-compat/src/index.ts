@@ -4,6 +4,7 @@ export { Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
 export { EOFError } from "./eof-error.js";
 export { File } from "./file.js";
+export { Base64 } from "./base64.js";
 export { IO } from "./io.js";
 export { IOError } from "./io-error.js";
 export {

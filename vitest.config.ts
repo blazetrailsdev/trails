@@ -166,6 +166,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/cache.ts",
   ),
+  "@blazetrails/activesupport/configuration-file": path.resolve(
+    __dirname,
+    "packages/activesupport/src/configuration-file.ts",
+  ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,

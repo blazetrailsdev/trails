@@ -32,16 +32,6 @@
     "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."
   },
   {
-    "pattern": "fixture_set",
-    "testFile": "fixture_set/",
-    "reason": "Supporting machinery for YAML fixtures (FixtureSet file/table-row/render-context/model-metadata/identify). Excluded along with fixtures.rb."
-  },
-  {
-    "pattern": "test_fixtures.rb",
-    "testFile": "test_fixtures_test.rb",
-    "reason": "Rails test concern that wires fixtures into ActiveSupport::TestCase (setup_fixtures, transactional rollback per test). Tied to YAML fixtures and the Minitest lifecycle; Vitest tests use per-test factories instead."
-  },
-  {
     "pattern": "encryption/encrypted_fixtures.rb",
     "reason": "Encrypts YAML fixture rows on load. Behavior ported inline into defineFixtures() (define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts."
   },

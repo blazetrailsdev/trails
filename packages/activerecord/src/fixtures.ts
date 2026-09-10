@@ -893,6 +893,8 @@ export async function prepareJoinTableFixtures(
   };
 }
 
+const contextClasses = new WeakMap<object, new () => object>();
+
 export class FixtureSet {
   static readonly MAX_ID = 2 ** 30 - 1;
 
@@ -920,6 +922,15 @@ export class FixtureSet {
       );
     });
     return out;
+  }
+
+  static get contextClass(): new () => object {
+    let contextClass = contextClasses.get(this);
+    if (contextClass === undefined) {
+      contextClass = class {};
+      contextClasses.set(this, contextClass);
+    }
+    return contextClass;
   }
 
   static async createFixtures<T extends BaseClass, K extends string>(
@@ -953,6 +964,13 @@ export class FixtureError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ActiveRecord::Fixture::FixtureError";
+  }
+}
+
+export class FormatError extends FixtureError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActiveRecord::Fixture::FormatError";
   }
 }
 
