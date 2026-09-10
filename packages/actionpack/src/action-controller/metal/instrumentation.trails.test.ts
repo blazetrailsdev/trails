@@ -5,7 +5,7 @@ import { Base } from "../base.js";
 import { logProcessAction } from "./instrumentation.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { ParamError } from "../../action-dispatch/http/param-error.js";
+import { ParseError } from "../../action-dispatch/http/parameters.js";
 import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
 
 function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
@@ -93,12 +93,12 @@ describe("ActionController::Instrumentation#process_action", () => {
     class WidgetsController extends Base {
       static actions = ["index"];
       index(): void {
-        throw new ParamError("bad param");
+        throw new ParseError("bad param");
       }
     }
     await expect(
       new WidgetsController().dispatch("index", newRequest(), new Response()),
-    ).rejects.toThrow(ParamError);
+    ).rejects.toThrow(ParseError);
 
     expect(events).toHaveLength(1);
     expect(events[0].status).toBe(400);

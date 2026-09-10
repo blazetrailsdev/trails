@@ -14,7 +14,7 @@ const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
 };
 
 class RoutingError extends Error {
-  name = "RoutingError";
+  name = "ActionController::RoutingError";
 }
 
 const routingErrorApp = async (_env: RackEnv): Promise<RackResponse> => {

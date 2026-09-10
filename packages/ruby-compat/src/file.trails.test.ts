@@ -250,3 +250,15 @@ describe("File.fnmatch", () => {
     expect(File.read(path, { encoding: "ASCII-8BIT" })).toBe("h\u00e9l");
   });
 });
+
+describe("File.foreach", () => {
+  it("yields each line with its separator, streaming past a chunk boundary", () => {
+    const root = fixture();
+    const path = join(root, "lines.txt");
+    const long = "é".repeat(5000);
+    writeFileSync(path, `a\n${long}\nlast`);
+    const lines: string[] = [];
+    expect(File.foreach(path, (line) => lines.push(line))).toBeNull();
+    expect(lines).toEqual(["a\n", `${long}\n`, "last"]);
+  });
+});

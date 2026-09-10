@@ -8,12 +8,12 @@ class Boomer {
     const path = env["PATH_INFO"] as string;
     if (path === "/not_found") {
       const err = new Error("ActionNotFound");
-      err.name = "RoutingError";
+      err.name = "ActionController::RoutingError";
       throw err;
     }
     if (path === "/bad_params") {
       const err = new Error("bad params");
-      err.name = "ParameterMissing";
+      err.name = "ActionController::ParameterMissing";
       throw err;
     }
     throw new Error("puke!");

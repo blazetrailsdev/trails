@@ -12,7 +12,7 @@ export class ActionControllerError extends Error {
 export class BadRequest extends ActionControllerError {
   constructor(msg?: string) {
     super(msg);
-    this.name = "BadRequest";
+    this.name = "ActionController::BadRequest";
   }
 }
 
@@ -28,7 +28,7 @@ export class RoutingError extends ActionControllerError {
 
   constructor(message: string, failures: unknown[] = []) {
     super(message);
-    this.name = "RoutingError";
+    this.name = "ActionController::RoutingError";
     this.failures = failures;
   }
 }
@@ -70,14 +70,14 @@ export class UrlGenerationError extends ActionControllerError {
 export class MethodNotAllowed extends ActionControllerError {
   constructor(...allowedMethods: string[]) {
     super(`Only ${allowedMethods.join(", ")} requests are allowed.`);
-    this.name = "MethodNotAllowed";
+    this.name = "ActionController::MethodNotAllowed";
   }
 }
 
 export class NotImplemented extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "Not Implemented");
-    this.name = "NotImplemented";
+    this.name = "ActionController::NotImplemented";
   }
 }
 
@@ -101,14 +101,14 @@ export class SessionOverflowError extends ActionControllerError {
 export class UnknownHttpMethod extends ActionControllerError {
   constructor(message?: string) {
     super(message);
-    this.name = "UnknownHttpMethod";
+    this.name = "ActionController::UnknownHttpMethod";
   }
 }
 
 export class UnknownFormat extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "Unknown format");
-    this.name = "UnknownFormat";
+    this.name = "ActionController::UnknownFormat";
   }
 }
 
@@ -128,7 +128,7 @@ export class MissingExactTemplate extends UnknownFormat {
 
   constructor(message: string, controller: { name: string }, actionName: string) {
     super(message);
-    this.name = "MissingExactTemplate";
+    this.name = "ActionController::MissingExactTemplate";
     this.controller = controller;
     this.actionName = actionName;
   }

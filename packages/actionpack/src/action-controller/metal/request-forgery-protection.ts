@@ -21,14 +21,14 @@ import { ActionControllerError } from "./exceptions.js";
 export class InvalidAuthenticityToken extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "Invalid authenticity token");
-    this.name = "InvalidAuthenticityToken";
+    this.name = "ActionController::InvalidAuthenticityToken";
   }
 }
 
 export class InvalidCrossOriginRequest extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "Invalid cross-origin request");
-    this.name = "InvalidCrossOriginRequest";
+    this.name = "ActionController::InvalidCrossOriginRequest";
   }
 }
 

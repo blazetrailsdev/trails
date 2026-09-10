@@ -187,12 +187,12 @@ export class PostgreSQLDatabaseTasks {
     let removingComments = true;
     const tempfile = Tempfile.open("uncommented_structure.sql");
     try {
-      for (const line of File.read(filename).split(/(?<=\n)/)) {
+      File.foreach(filename, (line) => {
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
           tempfile.write(line);
           removingComments = false;
         }
-      }
+      });
     } finally {
       tempfile.close();
     }

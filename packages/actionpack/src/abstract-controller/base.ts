@@ -52,7 +52,7 @@ export class ActionNotFound extends Error {
     action: string | null = null,
   ) {
     super(message);
-    this.name = "ActionNotFound";
+    this.name = "AbstractController::ActionNotFound";
     this.controller = controller;
     this.action = action;
   }

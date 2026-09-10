@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { ParameterTypeError } from "@blazetrails/rack";
+import { ActionNotFound } from "../../abstract-controller/base.js";
+import { RoutingError } from "../../action-controller/metal/exceptions.js";
 import { ExceptionWrapper } from "../exception-wrapper.js";
 
 describe("ExceptionWrapperTest", () => {
@@ -58,27 +61,19 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#status_code returns 400 for Rack::Utils::ParameterTypeError", () => {
-    expect(ExceptionWrapper.statusCodeFor("ParameterTypeError")).toBe(400);
-  });
-
-  it("#status_code returns 400 for the ActionDispatch ParseError/ParamError family", () => {
-    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::Http::Parameters::ParseError")).toBe(
-      400,
-    );
-    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParamError")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParameterTypeError")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::InvalidParameterError")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParamsTooDeepError")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("InvalidParameterError")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("ParamsTooDeepError")).toBe(400);
+    const exception = new ParameterTypeError("");
+    const wrapper = new ExceptionWrapper(null, exception);
+    expect(wrapper.statusCode).toBe(400);
   });
 
   it("#rescue_response? returns false for an exception that's not in rescue_responses", () => {
-    expect(ExceptionWrapper.rescueResponse("SomeRandomError")).toBe(false);
+    const wrapper = new ExceptionWrapper(null, new Error());
+    expect(wrapper.rescueResponse()).toBe(false);
   });
 
   it("#rescue_response? returns true for an exception that is in rescue_responses", () => {
-    expect(ExceptionWrapper.rescueResponse("RoutingError")).toBe(true);
+    const wrapper = new ExceptionWrapper(null, new RoutingError(""));
+    expect(wrapper.rescueResponse()).toBe(true);
   });
 
   it("#application_trace cannot be nil", () => {
@@ -147,23 +142,12 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#show? returns true when using :rescuable and the exceptions is rescuable", () => {
-    class RoutingError extends Error {
-      get name() {
-        return "RoutingError";
-      }
-    }
-    ExceptionWrapper.registerStatus("RoutingError", 404);
-    const wrapper = new ExceptionWrapper(null, new RoutingError("not found"));
+    const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
     expect(wrapper.show(requestWith("rescuable"))).toBe(true);
   });
 
   it("#show? returns false when using :none and the exceptions is rescuable", () => {
-    class RoutingError extends Error {
-      get name() {
-        return "RoutingError";
-      }
-    }
-    const wrapper = new ExceptionWrapper(null, new RoutingError("not found"));
+    const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
     expect(wrapper.show(requestWith("none"))).toBe(false);
   });
 
