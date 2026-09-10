@@ -2060,11 +2060,18 @@ export class AbstractAdapter implements Quoting {
       sql: sql as string,
       binds: binds as unknown[],
     });
-    if (arError !== nativeError && arError instanceof Error && nativeError instanceof Error) {
-      arError.stack = nativeError.stack;
-      if (arError.cause === undefined) arError.cause = nativeError;
-    }
-    return arError;
+    const setBacktrace = (translated: unknown) => {
+      if (
+        translated !== nativeError &&
+        translated instanceof Error &&
+        nativeError instanceof Error
+      ) {
+        translated.stack = nativeError.stack;
+        if (translated.cause === undefined) translated.cause = nativeError;
+      }
+      return translated;
+    };
+    return arError instanceof Promise ? arError.then(setBacktrace) : setBacktrace(arError);
   }
 
   async log<T>(

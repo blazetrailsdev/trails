@@ -55,8 +55,9 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
 
   it("translating with the sql present carries the primary key column type into the message", async () => {
     const adapter = makeAdapter();
+    const driverError = fkDriverError();
     const translated = (await adapter.translateExceptionClass(
-      fkDriverError(),
+      driverError,
       FK_SQL,
       [],
     )) as MismatchedForeignKey;
@@ -67,6 +68,8 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
         "which has type `bigint`.",
     );
     expect(translated.message).toContain("`t.bigint :wheelable_id`");
+    expect(translated.stack).toBe(driverError.stack);
+    expect(translated.cause).toBe(driverError);
     await adapter.close();
   });
 
