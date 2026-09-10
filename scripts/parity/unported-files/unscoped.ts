@@ -206,6 +206,93 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
+    className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
+    tests: ["model class in fixture file is respected"],
+    reason:
+      'Calls create_fixtures("other_posts") by set name and #find on the returned ' +
+      "Fixture (fixtures_test.rb:1002-1008). trails' FixtureSet.createFixtures " +
+      "(fixtures.ts:936) takes a model and a data hash, not a name resolved against " +
+      "fixture_paths, and Fixture (fixtures.ts:945) has no #find.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "TransactionalFixturesOnConnectionNotification",
+    tests: [
+      "notification established transactions are rolled back",
+      "transaction created on connection notification",
+      "transaction created on connection notification for shard",
+    ],
+    reason:
+      "Each drives setup_fixtures/teardown_fixtures as instance methods against a " +
+      "mock pool and asserts pin_connection!(true) (fixtures_test.rb:1085-1177). " +
+      "trails' transactional fixtures are vitest hooks (with-transactional-fixtures.ts), " +
+      "so there is no teardown_fixtures to call mid-test, and pinConnectionPool calls " +
+      "pinConnectionBang() without Rails' lock_threads argument.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "InvalidTableNameFixturesTest",
+    tests: ["raises error"],
+    reason:
+      "Asserts ActiveRecord::FixtureClassNotFound when a set has no resolvable class " +
+      "(fixtures_test.rb:1180-1184). trails has no FixtureClassNotFound: the registry " +
+      "binds every set name to a model, so there is no unresolved class to raise on.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FixturesBrokenRollbackTest",
+    tests: ["no rollback in teardown unless transaction active"],
+    reason:
+      "Aliases setup_fixtures/teardown_fixtures and overrides load_fixtures to raise " +
+      "(fixtures_test.rb:1206-1234). trails' fixture lifecycle is vitest hooks registered " +
+      "by fixtures(), with no overridable load_fixtures or callable setup_fixtures.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "LoadAllFixturesTest",
+    tests: ["all there"],
+    reason:
+      "fixtures :all scans fixture_paths on disk and asserts the .yml layout under " +
+      "test/fixtures/all (fixtures_test.rb:1237-1247). trails has no fixture_paths and no " +
+      "fixtures :all; the corpus is TS modules, as in the YAML-path row above.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "LoadAllFixturesWithArrayTest",
+    tests: ["all there"],
+    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1250-1260), with two fixture_paths.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "LoadAllFixturesWithPathnameTest",
+    tests: ["all there"],
+    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1263-1273), with a Pathname.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FasterFixturesTest",
+    tests: ["cache"],
+    reason:
+      "Asserts FixtureSet.fixture_is_cached? and setup_fixture_accessors " +
+      "(fixtures_test.rb:1276-1297). trails' fixtures() reloads every set per test and " +
+      "keeps no connection-keyed fixture cache, so there is nothing cached to assert.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FoxyFixturesTest",
+    tests: [
+      "strips DEFAULTS key",
+      "supports inline habtm",
+      "supports inline habtm with specified id",
+      "supports yaml arrays",
+    ],
+    reason:
+      "CONVERGEABLE fixtures-inline-habtm-and-defaults-label: the TS parrots corpus drops " +
+      "parrots.yml's inline treasures lists, and the loader does not ignore the DEFAULTS " +
+      "label as fixtures.rb:773 does.",
+  },
+  {
+    testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["complete instantiation", "fixtures from root yml with instantiation"],
     reason:
