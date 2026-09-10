@@ -76,7 +76,17 @@ export class Validations {
     classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
   }
 
-  declare errors: Errors;
+  /** @internal */
+  declare _errors?: Errors<this>;
+
+  get errors(): Errors<this> {
+    return (this._errors ??= new Errors(this));
+  }
+
+  set errors(value: Errors<this>) {
+    this._errors = value;
+  }
+
   /** @internal */
   declare contextForValidation: () => ValidationContext;
   /** @internal */

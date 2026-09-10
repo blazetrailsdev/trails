@@ -42,6 +42,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+import { Logger } from "@blazetrails/activesupport";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -780,11 +781,46 @@ describe("FixturesTest", () => {
     expect(first).toBeTruthy();
   });
 
+  it("auto value on primary key", async () => {
+    const fixtures = [
+      { name: "first", wheels_count: 2 },
+      { name: "second", wheels_count: 3 },
+    ];
+    const conn = await Base.leaseConnection();
+    await expect(
+      conn.insertFixturesSet({ aircraft: fixtures }, ["aircraft"]),
+    ).resolves.not.toThrow();
+    const result = await conn.selectAll("SELECT name, wheels_count FROM aircraft ORDER BY id");
+    expect(result.toArray()).toEqual(fixtures);
+  });
+
+  it("insert with default function", async () => {
+    const connection = leaseFixtureConnection();
+    await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
+    const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
+    expect(
+      Math.abs(Time.now().toF() - (aircraft!.manufactured_at as Time).toF()),
+    ).toBeLessThanOrEqual(1.1);
+  });
+
   it("insert with default value", async () => {
     const connection = leaseFixtureConnection();
     await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
     expect(aircraft?.wheels_count).toBe(0);
+  });
+
+  it("logger level invariant", async () => {
+    const previousLogger = Base.logger;
+    try {
+      Base.logger = new Logger(null);
+
+      const level = (Base.logger as Logger).level;
+      await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+      expect((Base.logger as Logger).level).toBe(level);
+    } finally {
+      Base.logger = previousLogger;
+    }
   });
 
   it("instantiation", async () => {

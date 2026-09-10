@@ -24,6 +24,8 @@ import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapte
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
+import { registerModel } from "../associations.js";
+import type { CollectionProxy } from "../associations/collection-proxy.js";
 import { Migration } from "../migration.js";
 import { SchemaDumper } from "../schema-dumper.js";
 
@@ -63,6 +65,23 @@ class CreateSchoolsAndClassesMigration extends SilentMigration {
     await this.addForeignKey("classes", "schools", { validate: true });
   }
 }
+
+class Rocket extends Base {
+  declare name: string;
+  declare astronauts: CollectionProxy<Astronaut>;
+
+  static {
+    this.hasMany("astronauts");
+  }
+}
+
+class Astronaut extends Base {
+  static {
+    this.belongsTo("rocket");
+  }
+}
+
+registerModel([Rocket, Astronaut]);
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {
@@ -1010,342 +1029,325 @@ describeIfSupports("foreign_keys", "Migration", () => {
     );
   });
 
-  function changeColumnTables(prefix: string, suffix: string) {
-    const rockets = `${prefix}rockets${suffix}`;
-    const astronauts = `${prefix}astronauts${suffix}`;
-
-    return {
-      rockets,
-      astronauts,
-      withChangeColumnTables: async (body: (conn: AbstractAdapter) => Promise<void>) => {
-        const conn = await ambientConnection();
-        await conn.dropTable(astronauts, rockets, { ifExists: true });
-        const migration = new CreateRocketsMigration();
-        await migration.migrate("up");
-        try {
-          await body(conn);
-        } finally {
-          await migration.migrate("down");
-          await conn.dropTable(astronauts, rockets, { ifExists: true });
-        }
-      },
-      createRocketWithAstronaut: async (conn: AbstractAdapter) => {
-        await conn.executeMutation(
-          `INSERT INTO ${conn.quoteTableName(rockets)} (name) VALUES ('myrocket')`,
-        );
-        const rows = (
-          await conn.selectAll(`SELECT id FROM ${conn.quoteTableName(rockets)}`)
-        ).toArray() as Array<{ id: number }>;
-        await conn.executeMutation(
-          `INSERT INTO ${conn.quoteTableName(astronauts)} (rocket_id) VALUES (${rows[0].id})`,
-        );
-      },
-      rocketName: async (conn: AbstractAdapter): Promise<string> => {
-        const rows = (
-          await conn.selectAll(`SELECT name FROM ${conn.quoteTableName(rockets)} ORDER BY id`)
-        ).toArray() as Array<{ name: string }>;
-        return rows[0].name;
-      },
-    };
-  }
-
   describe("ForeignKeyChangeColumnTest", () => {
     fixtures([], { useTransactionalTests: false });
 
-    const { rockets, astronauts, withChangeColumnTables, createRocketWithAstronaut, rocketName } =
-      changeColumnTables("", "");
+    let connection: AbstractAdapter;
+    let migration: CreateRocketsMigration;
 
-    beforeEach(() => {
-      Base.tableNamePrefix = "";
-      Base.tableNameSuffix = "";
+    beforeEach(async () => {
+      connection = await Base.leaseConnection();
+      migration = new CreateRocketsMigration();
+      await migration.migrate("up");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
     });
 
-    afterEach(() => {
-      Base.tableNamePrefix = "";
-      Base.tableNameSuffix = "";
+    afterEach(async () => {
+      await migration.migrate("down");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
     });
 
     it("change column of parent table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeColumnNull(rockets, "name", false);
+      await connection.changeColumnNull(Rocket.tableName, "name", false);
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it("rename column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it.skipIf(
       currentAdapter("Mysql2Adapter", "TrilogyAdapter") && !adapterSupports("rename_index"),
     )("rename reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-        expect(fk.column).toBe("new_rocket_id");
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
+      expect(fk.column).toBe("new_rocket_id");
     });
 
     it("remove reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeColumn(astronauts, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName, "rocket_id");
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeForeignKey(astronauts, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column in change table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeTable(astronauts, async (t) => {
-          await t.removeForeignKey({ column: "rocket_id" });
-        });
-
-        assertEmpty(await conn.foreignKeys(astronauts));
+      await connection.changeTable(Astronaut.tableName, async (t) => {
+        await t.removeForeignKey({ column: "rocket_id" });
       });
+
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
   });
 
   describe("ForeignKeyChangeColumnWithPrefixTest", () => {
     fixtures([], { useTransactionalTests: false });
 
-    const { rockets, astronauts, withChangeColumnTables, createRocketWithAstronaut, rocketName } =
-      changeColumnTables("p_", "");
-
     beforeEach(() => {
       Base.tableNamePrefix = "p_";
-      Base.tableNameSuffix = "";
     });
 
     afterEach(() => {
       Base.tableNamePrefix = "";
-      Base.tableNameSuffix = "";
+    });
+
+    let connection: AbstractAdapter;
+    let migration: CreateRocketsMigration;
+
+    beforeEach(async () => {
+      connection = await Base.leaseConnection();
+      migration = new CreateRocketsMigration();
+      await migration.migrate("up");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
+    });
+
+    afterEach(async () => {
+      await migration.migrate("down");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
     });
 
     it("change column of parent table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeColumnNull(rockets, "name", false);
+      await connection.changeColumnNull(Rocket.tableName, "name", false);
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it("rename column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it.skipIf(
       currentAdapter("Mysql2Adapter", "TrilogyAdapter") && !adapterSupports("rename_index"),
     )("rename reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-        expect(fk.column).toBe("new_rocket_id");
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
+      expect(fk.column).toBe("new_rocket_id");
     });
 
     it("remove reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeColumn(astronauts, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName, "rocket_id");
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeForeignKey(astronauts, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column in change table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeTable(astronauts, async (t) => {
-          await t.removeForeignKey({ column: "rocket_id" });
-        });
-
-        assertEmpty(await conn.foreignKeys(astronauts));
+      await connection.changeTable(Astronaut.tableName, async (t) => {
+        await t.removeForeignKey({ column: "rocket_id" });
       });
+
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
   });
 
   describe("ForeignKeyChangeColumnWithSuffixTest", () => {
     fixtures([], { useTransactionalTests: false });
 
-    const { rockets, astronauts, withChangeColumnTables, createRocketWithAstronaut, rocketName } =
-      changeColumnTables("", "_s");
-
     beforeEach(() => {
-      Base.tableNamePrefix = "";
       Base.tableNameSuffix = "_s";
     });
 
     afterEach(() => {
-      Base.tableNamePrefix = "";
       Base.tableNameSuffix = "";
     });
 
+    let connection: AbstractAdapter;
+    let migration: CreateRocketsMigration;
+
+    beforeEach(async () => {
+      connection = await Base.leaseConnection();
+      migration = new CreateRocketsMigration();
+      await migration.migrate("up");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
+    });
+
+    afterEach(async () => {
+      await migration.migrate("down");
+      Rocket.resetTableName();
+      await Rocket.resetColumnInformation();
+      Astronaut.resetTableName();
+      await Astronaut.resetColumnInformation();
+    });
+
     it("change column of parent table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeColumnNull(rockets, "name", false);
+      await connection.changeColumnNull(Rocket.tableName, "name", false);
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it("rename column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
     });
 
     it.skipIf(
       currentAdapter("Mysql2Adapter", "TrilogyAdapter") && !adapterSupports("rename_index"),
     )("rename reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
 
-        const foreignKeys = await conn.foreignKeys(astronauts);
-        expect(foreignKeys.length).toBe(1);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      expect(foreignKeys.length).toBe(1);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe(astronauts);
-        expect(fk.toTable).toBe(rockets);
-        expect(fk.column).toBe("new_rocket_id");
-      });
+      const fk = foreignKeys[0];
+      expect((await Rocket.first())!.name).toBe("myrocket");
+      expect(fk.fromTable).toBe(Astronaut.tableName);
+      expect(fk.toTable).toBe(Rocket.tableName);
+      expect(fk.column).toBe("new_rocket_id");
     });
 
     it("remove reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeColumn(astronauts, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName, "rocket_id");
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.removeForeignKey(astronauts, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
 
-        assertEmpty(await conn.foreignKeys(astronauts));
-      });
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
 
     it("remove foreign key by column in change table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocket = await Rocket.createBang({ name: "myrocket" });
+      await rocket.astronauts.push(await Astronaut.createBang());
 
-        await conn.changeTable(astronauts, async (t) => {
-          await t.removeForeignKey({ column: "rocket_id" });
-        });
-
-        assertEmpty(await conn.foreignKeys(astronauts));
+      await connection.changeTable(Astronaut.tableName, async (t) => {
+        await t.removeForeignKey({ column: "rocket_id" });
       });
+
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
     });
   });
 

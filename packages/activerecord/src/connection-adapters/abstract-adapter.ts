@@ -599,6 +599,10 @@ export interface AbstractAdapter {
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string | null): boolean;
+  insertFixturesSet(
+    fixtureSet: Record<string, Record<string, unknown>[]>,
+    tablesToDelete?: string[],
+  ): Promise<void>;
   emptyInsertStatementValue(pk?: string | null): string;
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
   cacheableQuery(
