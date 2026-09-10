@@ -14,6 +14,7 @@ import { Time } from "@blazetrails/date";
 import {
   assertNotEmpty,
   Duration,
+  Logger,
   OID_NAMESPACE,
   onLoad,
   uuidV5,
@@ -42,7 +43,6 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
-import { Logger } from "@blazetrails/activesupport";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -736,6 +736,19 @@ describe("FixturesTest", () => {
     { useTransactionalTests: false },
   );
 
+  it("auto value on primary key", async () => {
+    const fixtures = [
+      { name: "first", wheels_count: 2 },
+      { name: "second", wheels_count: 3 },
+    ];
+    const conn = await Base.leaseConnection();
+    await expect(
+      conn.insertFixturesSet({ aircraft: fixtures }, ["aircraft"]),
+    ).resolves.not.toThrow();
+    const result = await conn.selectAll("SELECT name, wheels_count FROM aircraft ORDER BY id");
+    expect(result.toArray()).toEqual(fixtures);
+  });
+
   it("attributes", async () => {
     const connection = leaseFixtureConnection();
     const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
@@ -779,19 +792,6 @@ describe("FixturesTest", () => {
     await FixtureSet.createFixtures(connection, Task, taskFixtureData);
     const first = await Task.find(1);
     expect(first).toBeTruthy();
-  });
-
-  it("auto value on primary key", async () => {
-    const fixtures = [
-      { name: "first", wheels_count: 2 },
-      { name: "second", wheels_count: 3 },
-    ];
-    const conn = await Base.leaseConnection();
-    await expect(
-      conn.insertFixturesSet({ aircraft: fixtures }, ["aircraft"]),
-    ).resolves.not.toThrow();
-    const result = await conn.selectAll("SELECT name, wheels_count FROM aircraft ORDER BY id");
-    expect(result.toArray()).toEqual(fixtures);
   });
 
   it("insert with default function", async () => {

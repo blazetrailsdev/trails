@@ -3,6 +3,7 @@ import { InstanceVariablesObject, exceptBang, extend, include } from "@blazetrai
 import { Conversion, ClassMethods as ConversionClassMethods } from "../../conversion.js";
 import { Naming } from "../../naming.js";
 import type { ModelName } from "../../naming.js";
+import { NoMethodError } from "../../attribute-assignment.js";
 import { Validations } from "../../validations.js";
 import { JSON as SerializersJSON } from "../../serializers/json.js";
 
@@ -114,6 +115,9 @@ export class Contact {
 
   constructor(options: Record<string, unknown> = {}) {
     for (const [name, value] of Object.entries(options)) {
+      if (!(name in this)) {
+        throw new NoMethodError(`undefined method '${name}=' for an instance of Contact`);
+      }
       (this as unknown as Record<string, unknown>)[name] = value;
     }
   }
