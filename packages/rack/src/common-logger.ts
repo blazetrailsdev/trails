@@ -9,6 +9,7 @@ import {
 import { Process, sprintf } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { forwardedValues } from "./utils.js";
+import { BodyProxy } from "./body-proxy.js";
 
 function clockTime(): number {
   return Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -28,8 +29,11 @@ export class CommonLogger {
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const beganAt = clockTime();
     const response = await this.app(env);
-    const [status, headers, _body] = response;
-    this.log(env, status, headers, beganAt);
+    const [status, headers, body] = response;
+
+    response[2] = new BodyProxy(body, () => {
+      this.log(env, status, headers, beganAt);
+    });
     return response;
   }
 
