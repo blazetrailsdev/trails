@@ -1,3 +1,4 @@
+import { _setBelongsToAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
@@ -348,3 +349,5 @@ export function inferCompositePrimaryKey(pk: string | string[]): string[] {
   if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;
   return [pk];
 }
+
+_setBelongsToAssociation(BelongsToAssociation);

@@ -747,7 +747,15 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Eleven instances exist and are the only ones:
+where Ruby resolves the constant. Twelve instances exist and are the only ones:
+
+- `activerecord/src/associations/association-class-slots.ts` — the six
+  concrete association ctors `AssociationReflection#association_class` returns,
+  read by `reflection.ts` (`reflection.rb:889-923`). The cycle is closed by
+  `class SingularAssociation extends Association` / `class CollectionAssociation
+extends Association`, whose modules reach `reflection.ts` back through
+  `association-scope.ts` and `through-association.ts`; `base.ts` still loads the
+  ctors through `associations/instance-methods.ts`.
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,

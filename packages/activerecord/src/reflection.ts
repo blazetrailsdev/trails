@@ -26,12 +26,20 @@ import {
   queryConstraintsList,
   compositeQueryConstraintsList,
 } from "./persistence.js";
-import { BelongsToAssociation } from "./associations/belongs-to-association.js";
-import { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
-import { HasManyAssociation } from "./associations/has-many-association.js";
-import { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
-import { HasOneAssociation } from "./associations/has-one-association.js";
-import { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
+import type { BelongsToAssociation } from "./associations/belongs-to-association.js";
+import type { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
+import type { HasManyAssociation } from "./associations/has-many-association.js";
+import type { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
+import type { HasOneAssociation } from "./associations/has-one-association.js";
+import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
+import {
+  _BelongsToAssociation,
+  _BelongsToPolymorphicAssociation,
+  _HasManyAssociation,
+  _HasManyThroughAssociation,
+  _HasOneAssociation,
+  _HasOneThroughAssociation,
+} from "./associations/association-class-slots.js";
 import {
   AmbiguousSourceReflectionForThroughAssociation,
   HasManyThroughAssociationNotFoundError,
@@ -1114,7 +1122,7 @@ export class HasManyReflection extends AssociationReflection {
   }
 
   associationClass(): typeof HasManyAssociation | typeof HasManyThroughAssociation {
-    return this.options.through ? HasManyThroughAssociation : HasManyAssociation;
+    return this.options.through ? _HasManyThroughAssociation! : _HasManyAssociation!;
   }
 }
 
@@ -1128,7 +1136,7 @@ export class HasOneReflection extends AssociationReflection {
   }
 
   associationClass(): typeof HasOneAssociation | typeof HasOneThroughAssociation {
-    return this.options.through ? HasOneThroughAssociation : HasOneAssociation;
+    return this.options.through ? _HasOneThroughAssociation! : _HasOneAssociation!;
   }
 }
 
@@ -1146,7 +1154,7 @@ export class BelongsToReflection extends AssociationReflection {
   }
 
   associationClass(): typeof BelongsToAssociation | typeof BelongsToPolymorphicAssociation {
-    return this.isPolymorphic() ? BelongsToPolymorphicAssociation : BelongsToAssociation;
+    return this.isPolymorphic() ? _BelongsToPolymorphicAssociation! : _BelongsToAssociation!;
   }
 
   protected override canFindInverseOfAutomatically(

@@ -1,3 +1,4 @@
+import { _setHasOneAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
@@ -435,3 +436,5 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
 }
 
 Object.assign(HasOneAssociation.prototype, { foreignKeyPresent });
+
+_setHasOneAssociation(HasOneAssociation);

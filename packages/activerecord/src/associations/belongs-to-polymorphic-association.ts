@@ -1,3 +1,4 @@
+import { _setBelongsToPolymorphicAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { modelRegistry } from "../associations.js";
@@ -122,3 +123,5 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     return (value as string) ?? null;
   }
 }
+
+_setBelongsToPolymorphicAssociation(BelongsToPolymorphicAssociation);

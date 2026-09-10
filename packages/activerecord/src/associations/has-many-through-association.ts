@@ -1,3 +1,4 @@
+import { _setHasManyThroughAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
@@ -560,3 +561,5 @@ const throughAssociationMethods = {
 };
 
 Object.assign(HasManyThroughAssociation.prototype, throughAssociationMethods);
+
+_setHasManyThroughAssociation(HasManyThroughAssociation);
