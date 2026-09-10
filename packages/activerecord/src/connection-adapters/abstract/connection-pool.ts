@@ -484,10 +484,9 @@ export class ConnectionPool implements ReapablePool {
     return clean;
   }
 
-  async checkout(checkoutTimeout?: number): Promise<DatabaseAdapter> {
-    const timeout = checkoutTimeout ?? this.checkoutTimeout;
+  async checkout(checkoutTimeout: number = this.checkoutTimeout): Promise<DatabaseAdapter> {
     if (!this._pinnedConnection) {
-      return this.checkoutAndVerify(await this.acquireConnection(timeout));
+      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     }
 
     return this._pinnedConnection.lock.synchronize(async () => {
@@ -499,7 +498,7 @@ export class ConnectionPool implements ReapablePool {
         }
         return pinned;
       }
-      return this.checkoutAndVerify(await this.acquireConnection(timeout));
+      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
     });
   }
 
