@@ -1,4 +1,5 @@
-import { valuesAt } from "./hash-utils.js";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { ArgumentError, isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
 export function sum<T>(collection: T[], fn?: (item: T) => number): number;
@@ -204,20 +205,22 @@ export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
 
 export function isIn<T>(
   value: T,
-  collection: T[] | Set<T> | string | Record<string, unknown>,
+  collection: Range<T> | T[] | Set<T> | Map<T, unknown> | string | Record<string, unknown>,
 ): boolean {
+  if (collection instanceof Range) return collection.cover(value);
   if (Array.isArray(collection)) return collection.includes(value);
   if (collection instanceof Set) return collection.has(value);
   if (typeof collection === "string") return collection.includes(value as unknown as string);
-  if (typeof collection === "object" && collection !== null) {
+  if (collection instanceof Map) return collection.has(value);
+  if (isPlainObject(collection)) {
     return Object.prototype.hasOwnProperty.call(collection, value as string);
   }
-  return false;
+  throw new ArgumentError("The parameter passed to #in? must respond to #include?");
 }
 
 export function presenceIn<T>(
   value: T,
-  collection: T[] | Set<T> | string | Record<string, unknown>,
+  collection: Range<T> | T[] | Set<T> | Map<T, unknown> | string | Record<string, unknown>,
 ): T | null {
   return isIn(value, collection) ? value : null;
 }

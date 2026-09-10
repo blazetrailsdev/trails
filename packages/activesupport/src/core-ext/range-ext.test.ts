@@ -224,8 +224,22 @@ describe("RangeTest", () => {
     );
     expect(() => [...new Range(twz.minus(hours(1)), twz).step(1)]).toThrow(TypeError);
   });
-  it.skip("cover on time with zone");
-  it.skip("case equals on time with zone");
+
+  it("cover on time with zone", () => {
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
+      TimeZone.find("Eastern Time (US & Canada)")!,
+    );
+    expect(new Range(twz.minus(hours(1)), twz).cover(twz)).toBeTruthy();
+  });
+
+  it("case equals on time with zone", () => {
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
+      TimeZone.find("Eastern Time (US & Canada)")!,
+    );
+    expect(new Range(twz.minus(hours(1)), twz).caseEquals(twz)).toBeTruthy();
+  });
 
   it("date time with each", () => {
     const r = new Range(0, 4);

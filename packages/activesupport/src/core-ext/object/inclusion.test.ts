@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isIn, presenceIn } from "../../index.js";
+import { ArgumentError } from "../../hash-utils.js";
+import { Temporal } from "@blazetrails/date";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { tomorrow } from "../date/calculations.js";
 
 describe("InTest", () => {
   it("in array", () => {
@@ -18,9 +22,8 @@ describe("InTest", () => {
   });
 
   it("in range", () => {
-    const range = [1, 2, 3, 4, 5];
-    expect(isIn(3, range)).toBe(true);
-    expect(isIn(6, range)).toBe(false);
+    expect(isIn(25, new Range(1, 50))).toBeTruthy();
+    expect(isIn(75, new Range(1, 50))).toBeFalsy();
   });
 
   it("in set", () => {
@@ -30,15 +33,13 @@ describe("InTest", () => {
   });
 
   it("in date range", () => {
-    const start = new Date("2023-01-01");
-    const end = new Date("2023-12-31");
-    const inside = new Date("2023-06-15");
-    const outside = new Date("2024-01-01");
-    expect(inside >= start && inside <= end).toBe(true);
-    expect(outside >= start && outside <= end).toBe(false);
+    expect(isIn(Temporal.Now.plainDateISO(), new Range(null, tomorrow()))).toBeTruthy();
+    expect(isIn(Temporal.Now.plainDateISO(), new Range(tomorrow(), null))).toBeFalsy();
   });
 
-  it.skip("no method catching");
+  it("no method catching", () => {
+    expect(() => isIn(1, 1 as never)).toThrow(ArgumentError);
+  });
 
   it("presence in", () => {
     expect(presenceIn(2, [1, 2, 3])).toBe(2);
