@@ -40,7 +40,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
 
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
       await adapter.executeMutation(
         // eslint-disable-next-line blazetrails/require-table-teardown
@@ -132,7 +132,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
 
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
       await adapter.executeMutation(
         // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach

@@ -12,7 +12,7 @@ void _abstractAdapterIsQuoting;
 
 describe("Quoting interface", () => {
   it("AbstractAdapter implements every Quoting method", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:");
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     try {
       const q: Quoting = adapter;
 
@@ -37,7 +37,7 @@ describe("Quoting interface", () => {
   });
 
   it("SQLite3Adapter dispatches quote/quotedTrue to its own dialect", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:");
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.quotedTrue()).toBe("1");
       expect(adapter.quotedFalse()).toBe("0");

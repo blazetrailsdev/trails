@@ -1,7 +1,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import type { SQLite3AdapterOptions, SQLite3Config } from "./connection-adapters/pool-config.js";
+import type { SQLite3Config } from "./connection-adapters/pool-config.js";
 import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
 import { Base } from "./base.js";
 import { activeLane, testConfigurationHashes } from "./support/connection.js";
@@ -133,8 +133,7 @@ if (adapterType === "postgres") {
     }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
-  const config: SQLite3Config = { ...options, database: filename };
+  const [config] = adapterArgs as [SQLite3Config];
   newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
 }
 

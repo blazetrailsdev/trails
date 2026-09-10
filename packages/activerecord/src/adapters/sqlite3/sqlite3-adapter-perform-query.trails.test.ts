@@ -10,7 +10,7 @@ import { acquireStatementLock } from "../../connection-adapters/sqlite3/database
 let adapter: SQLite3Adapter;
 
 beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter({ database: ":memory:" });
   await adapter.execute(`CREATE TABLE "pq" ("id" INTEGER PRIMARY KEY, "nick" TEXT)`);
 });
 
@@ -155,7 +155,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("does not close the handle out from under a statement holding the lock", async () => {
-    const closing = new BetterSQLite3Adapter(":memory:");
+    const closing = new BetterSQLite3Adapter({ database: ":memory:" });
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.execute(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     const release = await acquireStatementLock(closing);
@@ -177,7 +177,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
-    const closing = new BetterSQLite3Adapter(":memory:");
+    const closing = new BetterSQLite3Adapter({ database: ":memory:" });
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.execute(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
     const release = await acquireStatementLock(closing);

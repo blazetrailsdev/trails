@@ -51,7 +51,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
       const { BetterSQLite3Adapter } =
         await import("../connection-adapters/better-sqlite3-adapter.js");
-      const adapter = new BetterSQLite3Adapter(dbFile);
+      const adapter = new BetterSQLite3Adapter({ database: dbFile });
       try {
         await adapter.executeMutation(
           "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
@@ -77,7 +77,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         );
       } finally {
         Base.protectedEnvironments = protectedEnvironments;
-        const cleanup = new BetterSQLite3Adapter(dbFile);
+        const cleanup = new BetterSQLite3Adapter({ database: dbFile });
 
         await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
 
@@ -108,7 +108,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     );
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
       await adapter.executeMutation(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
@@ -124,7 +124,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         NoEnvironmentInSchemaError,
       );
     } finally {
-      const cleanup = new BetterSQLite3Adapter(dbFile);
+      const cleanup = new BetterSQLite3Adapter({ database: dbFile });
       await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.close();
       DatabaseTasks.databaseConfiguration = originalConfigurations;
@@ -157,7 +157,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
     const protectedEnvironments = Base.protectedEnvironments;
 
     for (const dbFile of [primaryDb, secondaryDb]) {
-      const adapter = new BetterSQLite3Adapter(dbFile);
+      const adapter = new BetterSQLite3Adapter({ database: dbFile });
       try {
         await adapter.executeMutation(
           "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
@@ -174,7 +174,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
       expect(protectedEnvironments).not.toContain(env);
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
 
-      const secondary = new BetterSQLite3Adapter(secondaryDb);
+      const secondary = new BetterSQLite3Adapter({ database: secondaryDb });
       try {
         await secondary.executeMutation(
           "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
@@ -1187,7 +1187,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     const dbPath = path.join(tmp, "truncate-all.sqlite3");
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
-    const seed = new BetterSQLite3Adapter(dbPath);
+    const seed = new BetterSQLite3Adapter({ database: dbPath });
     await seed.executeMutation("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
     await seed.executeMutation("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
     await seed.executeMutation("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
@@ -1213,7 +1213,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
       await Base.removeConnection();
     }
 
-    const reader = new BetterSQLite3Adapter(dbPath);
+    const reader = new BetterSQLite3Adapter({ database: dbPath });
     try {
       expect(await reader.execute("SELECT * FROM schema_migrations")).toHaveLength(1);
       expect(await reader.execute("SELECT * FROM ar_internal_metadata")).toHaveLength(1);

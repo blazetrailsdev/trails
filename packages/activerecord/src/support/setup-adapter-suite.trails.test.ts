@@ -13,7 +13,7 @@ describe("setupAdapterSuite — schema + transactional rollback", () => {
   });
 
   const suite = setupAdapterSuite({
-    factory: () => new BetterSQLite3Adapter(":memory:"),
+    factory: () => new BetterSQLite3Adapter({ database: ":memory:" }),
     setup,
   });
 
@@ -46,7 +46,7 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
   describe("closeOnTeardown defaults to true", () => {
     setupAdapterSuite({
       factory: () => {
-        const adapter = new BetterSQLite3Adapter(":memory:");
+        const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
         const realClose = adapter.close.bind(adapter);
         adapter.close = async () => {
           await defaultCloseSpy();
@@ -66,7 +66,7 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
   describe("closeOnTeardown:false skips close()", () => {
     setupAdapterSuite({
       factory: () => {
-        const adapter = new BetterSQLite3Adapter(":memory:");
+        const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
         optOutRealClose = adapter.close.bind(adapter);
         adapter.close = async () => {
           await optOutCloseSpy();

@@ -23,7 +23,7 @@ function sharedCacheFlags(): number {
 }
 
 async function withConn(options: { flags?: number } = {}): Promise<SQLite3Adapter> {
-  const adapter = new NodeSQLiteAdapter(":memory:", options);
+  const adapter = new NodeSQLiteAdapter({ ...options, database: ":memory:" });
   openAdapters.push(adapter);
   await adapter.connectBang();
   return adapter;

@@ -36,7 +36,7 @@
  * not touch, because a wrap is not what they were missing:
  *
  * - **Throwaway per-test adapters** — the `adapters/*` cluster constructs its
- *   own adapter in `beforeEach` (`new BetterSQLite3Adapter(":memory:")`,
+ *   own adapter in `beforeEach` (`new BetterSQLite3Adapter({ database: ":memory:" })`,
  *   `new PostgreSQLAdapter(PG_TEST_URL)` + per-test DDL) and closes it in
  *   `afterEach`. Rows cannot survive a database that is discarded, and a
  *   BEGIN/ROLLBACK around it would protect nothing.

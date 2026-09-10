@@ -67,7 +67,7 @@ function isPrivateFieldBrandCheck(error: unknown): boolean {
 }
 
 async function recordLayPath(): Promise<Set<string>> {
-  const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+  const real = new BetterSQLite3Adapter({ database: ":memory:" }) as unknown as AbstractAdapter;
   const touched = new Set<string>();
   const recorder = (inner: AbstractAdapter): AbstractAdapter => {
     const self: AbstractAdapter = new Proxy(real, {

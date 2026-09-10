@@ -7,7 +7,7 @@ let adapter: BetterSQLite3Adapter;
 
 describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descriptor", () => {
   beforeEach(() => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
   });
 
   afterEach(async () => {

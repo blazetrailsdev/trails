@@ -5,7 +5,7 @@ import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js
 import { loadSchema } from "./load-schema-helper.js";
 
 async function withAdapter(fn: (adapter: BetterSQLite3Adapter) => Promise<void>): Promise<void> {
-  const adapter = new BetterSQLite3Adapter(":memory:");
+  const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
   try {
     await fn(adapter);
   } finally {
@@ -86,7 +86,7 @@ describe("load_schema arm-probe guard", () => {
       override async createTable(): Promise<void> {}
     }
 
-    const probe = new Probe(":memory:");
+    const probe = new Probe({ database: ":memory:" });
     try {
       const err = await loadSchema(probe as unknown as AbstractAdapter).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(Error);

@@ -16,7 +16,9 @@ async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
 
 describe("loadCanonicalSchema", () => {
   test("lays down real canonical DDL for hundreds of tables", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+    }) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       const dump = await dumpSchema(adapter);

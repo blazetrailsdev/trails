@@ -11,7 +11,7 @@ describe("SQLite3Adapter type-map limit threading", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-typemap-"));
-    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
   });
 
   afterEach(async () => {

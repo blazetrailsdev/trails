@@ -228,7 +228,7 @@ describe("non-transactional row writes", () => {
 
   it("clears a file wired by setupAdapterSuite", () => {
     const src = `describe("x", () => {
-  const suite = setupAdapterSuite({ factory: () => new BetterSQLite3Adapter(":memory:") });
+  const suite = setupAdapterSuite({ factory: () => new BetterSQLite3Adapter({ database: ":memory:" }) });
 
   it("inserts", async () => {
     await Base.connection.execute(\`INSERT INTO widgets (id) VALUES (1)\`);

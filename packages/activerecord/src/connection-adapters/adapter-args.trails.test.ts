@@ -5,7 +5,7 @@ describe("buildAdapterArg", () => {
   describe("sqlite", () => {
     it("returns [filename] when no adapter options are set", () => {
       expect(buildAdapterArg("sqlite3", { adapter: "sqlite3", database: "x.db" })).toEqual([
-        "x.db",
+        { database: "x.db" },
       ]);
     });
 
@@ -19,12 +19,12 @@ describe("buildAdapterArg", () => {
         statementLimit: 64,
       });
       expect(args).toEqual([
-        "x.db",
         {
           readonly: true,
           strict: true,
           pragmas: { journal_mode: "WAL", synchronous: "NORMAL" },
           statementLimit: 64,
+          database: "x.db",
         },
       ]);
     });
@@ -36,7 +36,7 @@ describe("buildAdapterArg", () => {
         timeout: 5000,
         strict: true,
       });
-      expect(args).toEqual(["x.db", { strict: true, timeout: 5000 }]);
+      expect(args).toEqual([{ strict: true, timeout: 5000, database: "x.db" }]);
     });
 
     it("preserves the SQLite retries option", () => {
@@ -45,7 +45,7 @@ describe("buildAdapterArg", () => {
         database: "x.db",
         retries: 3,
       });
-      expect(args).toEqual(["x.db", { retries: 3 }]);
+      expect(args).toEqual([{ retries: 3, database: "x.db" }]);
     });
 
     it("forwards every configuration key to the adapter, as new_connection does", () => {
@@ -58,19 +58,26 @@ describe("buildAdapterArg", () => {
         someKeyTheAdapterLearnsLater: "kept",
       });
       expect(args).toEqual([
-        "x.db",
-        { pool: 5, host: "ignored", strict: true, someKeyTheAdapterLearnsLater: "kept" },
+        {
+          pool: 5,
+          host: "ignored",
+          strict: true,
+          someKeyTheAdapterLearnsLater: "kept",
+          database: "x.db",
+        },
       ]);
     });
 
     it("parses sqlite3:// URLs", () => {
       expect(
         buildAdapterArg("sqlite3", { adapter: "sqlite3", url: "sqlite3://memory.db" }),
-      ).toEqual(["memory.db"]);
+      ).toEqual([{ database: "memory.db" }]);
     });
 
     it("defaults to :memory: when neither url nor database is set", () => {
-      expect(buildAdapterArg("sqlite3", { adapter: "sqlite3" })).toEqual([":memory:"]);
+      expect(buildAdapterArg("sqlite3", { adapter: "sqlite3" })).toEqual([
+        { database: ":memory:" },
+      ]);
     });
 
     it("prefers explicit database over url (matches non-sqlite precedence)", () => {
@@ -80,13 +87,13 @@ describe("buildAdapterArg", () => {
           url: "sqlite3://old.db",
           database: "mutated.db",
         }),
-      ).toEqual(["mutated.db"]);
+      ).toEqual([{ database: "mutated.db" }]);
     });
 
     it("uses the sqlite (filename, options) shape for node-sqlite", () => {
       expect(
         buildAdapterArg("node-sqlite", { adapter: "node-sqlite", database: "x.db", strict: true }),
-      ).toEqual(["x.db", { strict: true }]);
+      ).toEqual([{ strict: true, database: "x.db" }]);
     });
   });
 
@@ -197,36 +204,46 @@ describe("buildAdapterArg", () => {
 
 describe("normalizeAdapterName", () => {
   it("maps aliases to canonical names", () => {
-    expect(buildAdapterArg("sqlite3", { database: "file.db" })).toEqual(["file.db"]);
+    expect(buildAdapterArg("sqlite3", { database: "file.db" })).toEqual([{ database: "file.db" }]);
     expect(buildAdapterArg("custom", { database: "db" })).toEqual([
       { database: "db", host: "localhost" },
     ]);
   });
 
   it("normalizes the node-sqlite adapter to the sqlite arg shape", () => {
-    expect(buildAdapterArg("node-sqlite", { database: "file.db" })).toEqual(["file.db"]);
+    expect(buildAdapterArg("node-sqlite", { database: "file.db" })).toEqual([
+      { database: "file.db" },
+    ]);
   });
 });
 
 describe("parseSqliteUrl", () => {
   it("strips sqlite3:// and sqlite:// prefixes", () => {
-    expect(buildAdapterArg("sqlite3", { url: "sqlite3://file.db" })).toEqual(["file.db"]);
-    expect(buildAdapterArg("sqlite3", { url: "sqlite://memory.db" })).toEqual(["memory.db"]);
+    expect(buildAdapterArg("sqlite3", { url: "sqlite3://file.db" })).toEqual([
+      { database: "file.db" },
+    ]);
+    expect(buildAdapterArg("sqlite3", { url: "sqlite://memory.db" })).toEqual([
+      { database: "memory.db" },
+    ]);
   });
 
   it("treats an empty path as :memory:", () => {
-    expect(buildAdapterArg("sqlite3", { url: "sqlite3://" })).toEqual([":memory:"]);
+    expect(buildAdapterArg("sqlite3", { url: "sqlite3://" })).toEqual([{ database: ":memory:" }]);
   });
 
   it("passes bare paths through unchanged", () => {
-    expect(buildAdapterArg("sqlite3", { database: "/tmp/x.db" })).toEqual(["/tmp/x.db"]);
-    expect(buildAdapterArg("sqlite3", { database: ":memory:" })).toEqual([":memory:"]);
+    expect(buildAdapterArg("sqlite3", { database: "/tmp/x.db" })).toEqual([
+      { database: "/tmp/x.db" },
+    ]);
+    expect(buildAdapterArg("sqlite3", { database: ":memory:" })).toEqual([
+      { database: ":memory:" },
+    ]);
   });
 });
 
 function argFamilyOf(name: string): string {
-  const [byDatabase] = buildAdapterArg(name, { database: "db" });
-  if (typeof byDatabase === "string") return "sqlite";
+  const [byDatabase] = buildAdapterArg(name, { database: "db" }) as [Record<string, unknown>];
+  if (!("host" in byDatabase)) return "sqlite";
   const [byUrl] = buildAdapterArg(name, { url: "u", pool: 5 }) as [Record<string, unknown>];
   if ("connectionString" in byUrl) return "postgresql";
   const [bySocket] = buildAdapterArg(name, { database: "db", socket: "/s" }) as [
