@@ -28,7 +28,11 @@ import {
   type QueryCacheHost,
   type Store,
 } from "./query-cache.js";
-import { executionContextId, withExecutionContext } from "./connection-pool/execution-context.js";
+import {
+  executionContext,
+  executionContextId,
+  withExecutionContext,
+} from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -164,9 +168,9 @@ export class Lease {
 }
 
 export class LeaseRegistry {
-  private _map = new Map<string, Lease>();
+  private _map = new WeakMap<object, Lease>();
 
-  get(context: string): Lease {
+  get(context: object): Lease {
     let lease = this._map.get(context);
     if (!lease) {
       lease = new Lease();
@@ -175,12 +179,12 @@ export class LeaseRegistry {
     return lease;
   }
 
-  _peek(context: string): Lease | undefined {
+  _peek(context: object): Lease | undefined {
     return this._map.get(context);
   }
 
   clear(): void {
-    this._map.clear();
+    this._map = new WeakMap();
   }
 }
 
@@ -922,7 +926,7 @@ export class ConnectionPool implements ReapablePool {
     if (!this._leases) {
       this._leases = new LeaseRegistry();
     }
-    return this._leases.get(String(executionContextId()));
+    return this._leases.get(executionContext());
   }
 
   private bulkMakeNewConnections = bulkMakeNewConnections;
@@ -1147,14 +1151,14 @@ function acquireConnection(
 function removeConnectionFromThreadCache(
   pool: Pool,
   conn: DatabaseAdapter,
-  ownerThread?: string | number,
+  ownerThread?: object,
 ): void {
-  const owner = ownerThread ?? executionContextId();
-  pool._leases?._peek(String(owner))?.clear(conn);
+  const owner = ownerThread ?? executionContext();
+  pool._leases?._peek(owner)?.clear(conn);
 }
 
 /** @internal */
-function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | number): void {
+function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: object): void {
   removeConnectionFromThreadCache(pool, conn, ownerThread);
 }
 
