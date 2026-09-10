@@ -6,7 +6,7 @@ import type {
   SqliteOpenConfig,
   SqliteStatement,
 } from "../sqlite-adapter.js";
-import { SQLite3Constants } from "../sqlite-adapter.js";
+import { PRAGMA_SETTERS, SQLite3Constants } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -114,12 +114,6 @@ function isStructuredDefault(value: unknown): boolean {
   if (value === null || typeof value !== "object" || isSqlLiteral(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
-}
-
-function pragmaNames(result: unknown): ReadonlySet<string> | null {
-  const rows = (result ?? []) as Array<{ name?: unknown }>;
-  if (rows.length === 0) return null;
-  return new Set(rows.map((row) => String(row.name)));
 }
 
 function pragmaValue(value: string | number | boolean): string {
@@ -1651,24 +1645,21 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       "pragmas",
       {},
     );
-    const applyPragmas = (known: ReadonlySet<string> | null): void => {
-      for (const [pragma, value] of Object.entries({
-        ...SQLite3Adapter.DEFAULT_PRAGMAS,
-        ...pragmas,
-      })) {
-        if (known !== null && !known.has(pragma)) {
-          console.warn(`Unknown SQLite pragma: ${pragma}`);
-          continue;
-        }
+    for (const [pragma, value] of Object.entries({
+      ...SQLite3Adapter.DEFAULT_PRAGMAS,
+      ...pragmas,
+    })) {
+      if (PRAGMA_SETTERS.has(pragma)) {
         stmts.push([`${pragma} = ${pragmaValue(value)}`, `SQLite pragma '${pragma}'`]);
+      } else {
+        console.warn(`Unknown SQLite pragma: ${pragma}`);
       }
-    };
+    }
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
     if (this.driverIsAsync()) {
       return (async () => {
         await checked;
-        applyPragmas(pragmaNames(await this._rawConnection.pragma("pragma_list")));
         for (const [sql, label] of stmts) {
           try {
             await this._rawConnection.pragma(sql);
@@ -1678,7 +1669,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         }
       })();
     }
-    applyPragmas(pragmaNames(this._rawConnection.pragma("pragma_list")));
     for (const [sql, label] of stmts) {
       try {
         this._rawConnection.pragma(sql);

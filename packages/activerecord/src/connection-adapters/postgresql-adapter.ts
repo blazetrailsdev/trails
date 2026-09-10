@@ -415,7 +415,6 @@ export class PostgreSQLAdapter
     if (deprecatedRawConnection) {
       deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
       this._acceptDeprecatedRawConnection(config);
-      this._statements = this.buildStatementPool();
       return;
     }
     if (typeof config === "string") {
@@ -442,7 +441,6 @@ export class PostgreSQLAdapter
           },
         },
       };
-      this._statements = this.buildStatementPool();
       return;
     }
     const {
@@ -506,7 +504,6 @@ export class PostgreSQLAdapter
         },
       },
     };
-    this._statements = this.buildStatementPool();
   }
 
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {

@@ -149,24 +149,38 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(result[0]?.foreign_keys).toBe(0);
   });
 
-  it("warns and skips a pragma SQLite does not define", async () => {
+  it("warns and skips an invalid pragma name", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { not_a_real_pragma: 1 } as Record<string, number>,
+      pragmas: { "bad-name!": 1 } as Record<string, number>,
     });
     await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: not_a_real_pragma");
+    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
   });
 
   it("cannot run a second statement smuggled through a pragma value", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { synchronous: "FULL; DROP TABLE sqlite_master" },
-    });
-    await adapter.connectBang();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("SQLite pragma 'synchronous' failed"),
-    );
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-pragma-injection-${Date.now()}.db`);
+    const seed = new BetterSQLite3Adapter(dbPath);
+    await seed.connectBang();
+    await seed.execute("CREATE TABLE sentinel (id integer)");
+    await seed.close();
+    try {
+      adapter = new BetterSQLite3Adapter(dbPath, {
+        pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
+      });
+      await adapter.connectBang();
+      const rows = (adapter.raw as import("better-sqlite3").Database)
+        .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
+        .get();
+      expect(rows).toEqual({ c: 1 });
+    } finally {
+      await adapter?.dropTable("sentinel", { ifExists: true });
+      fs.rmSync(dbPath, { force: true });
+    }
   });
 
   it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {

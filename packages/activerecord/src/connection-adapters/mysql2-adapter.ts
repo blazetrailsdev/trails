@@ -104,7 +104,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _isFakeConnection = false;
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _connectionConfigured = false;
-  override _statements: MysqlStatementPool | null = null;
+  declare _statements: MysqlStatementPool | null;
 
   _databaseTimezone: "utc" | "local" = "utc";
 
