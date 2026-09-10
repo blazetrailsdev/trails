@@ -1,6 +1,7 @@
 import { Base } from "../../base.js";
 
 export class Joke extends Base {
+  declare name: string;
   static _tableName = "funny_jokes";
 }
 

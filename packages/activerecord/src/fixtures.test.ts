@@ -9,7 +9,8 @@ import {
   FixtureSet,
   FixtureError,
 } from "./fixtures.js";
-import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { Duration, OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
@@ -33,6 +34,18 @@ import { registerModel } from "./associations.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { taskFixtureData } from "./test-helpers/fixtures/tasks.js";
 import { aircraftFixtureData } from "./test-helpers/fixtures/aircrafts.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Joke } from "./test-helpers/models/joke.js";
+import { Book } from "./test-helpers/models/book.js";
+import { Course } from "./test-helpers/models/course.js";
+import { Matey } from "./test-helpers/models/matey.js";
+import { DeadParrot, LiveParrot } from "./test-helpers/models/parrot.js";
+import {
+  badPostFixtureData,
+  courseFixtureData,
+  funnyJokeFixtureData,
+  itemFixtureData,
+} from "./test-helpers/fixtures/index.js";
 import "./relation.js";
 
 for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
@@ -868,5 +881,348 @@ describe("ForeignKeyFixturesTest", () => {
 
   it("number2", () => {
     expect(true).toBeTruthy();
+  });
+});
+
+describe("OverRideFixtureMethodTest", () => {
+  const { topics: superTopics } = fixtures(["topics"]);
+
+  function topics(name: "first") {
+    const topic = superTopics(name);
+    topic.title = "omg";
+    return topic;
+  }
+
+  it("fixture methods can be overridden", () => {
+    const x = topics("first");
+    expect(x.title).toBe("omg");
+  });
+});
+
+describe("FixtureWithSetModelClassTest", () => {
+  const { otherPosts, otherComments } = fixtures(["otherPosts", "otherComments"], {
+    useTransactionalTests: false,
+  });
+
+  it("uses fixture class defined in yaml", () => {
+    expect(otherPosts("second_welcome")).toBeInstanceOf(Post);
+  });
+
+  it("loads the associations to fixtures with set model class", async () => {
+    const post = otherPosts("second_welcome");
+    const comment = otherComments("second_greetings");
+    expect((await post.comments).map((c) => c.id)).toEqual([comment.id]);
+    expect((await comment.post)?.id).toBe(post.id);
+  });
+});
+
+describe("SetFixtureClassPrevailsTest", () => {
+  const { badPosts } = fixtures(
+    { badPosts: [Post, badPostFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("uses set fixture class", () => {
+    expect(badPosts("bad_welcome")).toBeInstanceOf(Post);
+  });
+});
+
+describe("CheckSetTableNameFixturesTest", () => {
+  const { funnyJokes } = fixtures(
+    { funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("table method", () => {
+    expect(funnyJokes("a_joke")).toBeInstanceOf(Joke);
+  });
+});
+
+describe("FixtureNameIsNotTableNameFixturesTest", () => {
+  const { items } = fixtures({ items: [Book, itemFixtureData] }, { useTransactionalTests: false });
+
+  it("named accessor", () => {
+    expect(items("dvd")).toBeInstanceOf(Book);
+  });
+});
+
+describe("FixtureNameIsNotTableNameMultipleFixturesTest", () => {
+  const { items, funnyJokes } = fixtures(
+    { items: [Book, itemFixtureData], funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("named accessor of differently named fixture", () => {
+    expect(items("dvd")).toBeInstanceOf(Book);
+  });
+
+  it("named accessor of same named fixture", () => {
+    expect(funnyJokes("a_joke")).toBeInstanceOf(Joke);
+  });
+});
+
+describe("CustomConnectionFixturesTest", () => {
+  const { courses } = fixtures(
+    { courses: [Course, courseFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("leaky destroy", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+
+  it("it twice in whatever order to check for fixture leakage", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+});
+
+describe("TransactionalFixturesOnCustomConnectionTest", () => {
+  const { courses } = fixtures({ courses: [Course, courseFixtureData] });
+
+  it("leaky destroy", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+
+  it("it twice in whatever order to check for fixture leakage", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+});
+
+describe("CheckEscapedYamlFixturesTest", () => {
+  const { funnyJokes } = fixtures(
+    { funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("proper escaped fixture", () => {
+    expect(funnyJokes("another_joke").name).toBe("The \\n Aristocrats\nAte the candy\n");
+  });
+});
+
+class DevelopersProject {}
+describe("ManyToManyFixturesWithClassDefined", () => {
+  fixtures(["developersProjects"]);
+
+  it("this should run cleanly", () => {
+    expect(true).toBeTruthy();
+  });
+});
+
+const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
+
+describe("FoxyFixturesTest", () => {
+  const {
+    parrots,
+    pirates,
+    treasures,
+    ships,
+    computers,
+    developers,
+    "admin/accounts": adminAccounts,
+    "admin/users": adminUsers,
+    liveParrots,
+    deadParrots,
+    books,
+  } = fixtures(
+    [
+      "parrots",
+      "parrotsPirates",
+      "pirates",
+      "treasures",
+      "mateys",
+      "ships",
+      "computers",
+      "developers",
+      "admin/accounts",
+      "admin/users",
+      "liveParrots",
+      "deadParrots",
+      "books",
+    ],
+    { useTransactionalTests: false },
+  );
+
+  it("identifies strings", () => {
+    expect(FixtureSet.identify("foo")).toBe(FixtureSet.identify("foo"));
+    expect(FixtureSet.identify("foo")).not.toBe(FixtureSet.identify("FOO"));
+  });
+
+  it("identifies symbols", () => {
+    expect(FixtureSet.identify("foo")).toBe(FixtureSet.identify("foo"));
+  });
+
+  it("identifies consistently", () => {
+    expect(FixtureSet.identify("ruby")).toBe(207281424);
+    expect(FixtureSet.identify("sapphire_2")).toBe(1066363776);
+
+    expect(FixtureSet.identify("daddy", ":uuid")).toBe("f92b6bda-0d0d-5fe1-9124-502b18badded");
+    expect(FixtureSet.identify("sonny", ":uuid")).toBe("b4b10018-ad47-595d-b42f-d8bdaa6d01bf");
+  });
+
+  it("populates timestamp columns", () => {
+    for (const property of TIMESTAMP_COLUMNS) {
+      expect(parrots("george").readAttribute(property), `should set ${property}`).not.toBeNull();
+    }
+  });
+
+  it("does not populate timestamp columns if model has set record timestamps to false", () => {
+    for (const property of TIMESTAMP_COLUMNS) {
+      expect(ships("black_pearl").readAttribute(property), `should not set ${property}`).toBeNull();
+    }
+  });
+
+  it("populates all columns with the same time", () => {
+    let last: unknown = null;
+
+    for (const property of TIMESTAMP_COLUMNS) {
+      const current = parrots("george").readAttribute(property);
+      last ??= current;
+
+      expect(current).toEqual(last);
+      last = current;
+    }
+  });
+
+  it("only populates columns that exist", () => {
+    expect(pirates("blackbeard").created_on).not.toBeNull();
+    expect(pirates("blackbeard").updated_on).not.toBeNull();
+  });
+
+  it("preserves existing fixture data", () => {
+    expect(String((pirates("redbeard").created_on as Time).toDate())).toBe(
+      String(Duration.weeks(2).ago(Time.now()).toDate()),
+    );
+    expect(String((pirates("redbeard").updated_on as Time).toDate())).toBe(
+      String(Duration.weeks(2).ago(Time.now()).toDate()),
+    );
+  });
+
+  it("generates unique ids", () => {
+    expect(parrots("george").id).not.toBeNull();
+    expect(parrots("george").id).not.toBe(parrots("louis").id);
+  });
+
+  it("automatically sets primary key", () => {
+    expect(ships("black_pearl")).not.toBeNull();
+  });
+
+  it("preserves existing primary key", () => {
+    expect(ships("interceptor").id).toBe(2);
+  });
+
+  it("resolves belongs to symbols", async () => {
+    expect((await pirates("blackbeard").parrot)?.id).toBe(parrots("george").id);
+  });
+
+  it("ignores belongs to symbols if association and foreign key are named the same", async () => {
+    expect((await computers("workstation").developer)?.id).toBe(developers("david").id);
+  });
+
+  it("supports join tables", async () => {
+    expect(await pirates("blackbeard").parrots.isInclude(parrots("george"))).toBeTruthy();
+    expect(await pirates("blackbeard").parrots.isInclude(parrots("louis"))).toBeTruthy();
+    expect(await parrots("george").pirates.isInclude(pirates("blackbeard"))).toBeTruthy();
+  });
+
+  it("supports timestamps in join tables", async () => {
+    expect(developers("david").created_at).not.toBeNull();
+    expect(computers("laptop").created_at).not.toBeNull();
+
+    const klass = class extends Base {
+      static {
+        this.tableName = "computers_developers";
+      }
+    };
+
+    const computersDevelopers = await klass.findBy({
+      developer_id: developers("david").id,
+      computer_id: computers("laptop").id,
+    });
+    expect(computersDevelopers?.readAttribute("created_at")).not.toBeNull();
+  });
+
+  it("supports inline habtm", async () => {
+    expect(await parrots("george").treasures.isInclude(treasures("diamond"))).toBeTruthy();
+    expect(await parrots("george").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+    expect(await parrots("george").treasures.isInclude(treasures("ruby"))).toBeFalsy();
+  });
+
+  it("supports inline habtm with specified id", async () => {
+    expect(await parrots("polly").treasures.isInclude(treasures("ruby"))).toBeTruthy();
+    expect(await parrots("polly").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+    expect(await parrots("polly").treasures.isInclude(treasures("diamond"))).toBeFalsy();
+  });
+
+  it("supports yaml arrays", async () => {
+    expect(await parrots("louis").treasures.isInclude(treasures("diamond"))).toBeTruthy();
+    expect(await parrots("louis").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+  });
+
+  it("strips DEFAULTS key", async () => {
+    expect(() => parrots("DEFAULTS" as never)).toThrow();
+
+    for (const t of ["sapphire", "ruby"] as const) {
+      expect(await parrots("davey").treasures.isInclude(treasures(t))).toBeTruthy();
+    }
+  });
+
+  it("supports label interpolation", () => {
+    expect(parrots("frederick").name).toBe("frederick");
+  });
+
+  it("supports label string interpolation", () => {
+    expect(pirates("mark").catchphrase).toBe("X marks the spot!");
+  });
+
+  it("supports label interpolation for integer label", () => {
+    expect(pirates("1").catchphrase).toBe("#1 pirate!");
+  });
+
+  it("supports polymorphic belongs to", async () => {
+    expect((await treasures("sapphire").looter)?.id).toBe(pirates("redbeard").id);
+    expect((await treasures("ruby").looter)?.id).toBe(parrots("louis").id);
+  });
+
+  it("only generates a pk if necessary", async () => {
+    const m = (await Matey.first())!;
+    expect(() => {
+      m.pirate = pirates("blackbeard");
+      m.target = pirates("redbeard");
+    }).not.toThrow();
+  });
+
+  it("supports sti", async () => {
+    expect(parrots("polly")).toBeInstanceOf(DeadParrot);
+    expect((await (parrots("polly") as DeadParrot).killer)?.id).toBe(pirates("blackbeard").id);
+  });
+
+  it("supports sti with respective files", async () => {
+    expect(liveParrots("dusty")).toBeInstanceOf(LiveParrot);
+    expect(deadParrots("deadbird")).toBeInstanceOf(DeadParrot);
+    expect((await deadParrots("deadbird").killer)?.id).toBe(pirates("blackbeard").id);
+  });
+
+  it("resolves enums in sti subclasses", () => {
+    expect((parrots("george") as LiveParrot).isAustralian()).toBeTruthy();
+    expect((parrots("louis") as LiveParrot).isAfrican()).toBeTruthy();
+    expect((parrots("frederick") as LiveParrot).isAfrican()).toBeTruthy();
+  });
+
+  it("namespaced models", async () => {
+    expect((await adminAccounts("signals37").users).map((u) => u.id)).toContain(
+      adminUsers("david").id,
+    );
+    expect(await adminAccounts("signals37").users.size()).toBe(2);
+  });
+
+  it("resolves enums", () => {
+    expect(books("awdr").isPublished()).toBeTruthy();
+    expect(books("awdr").isRead()).toBeTruthy();
+    expect(books("rfr").isProposed()).toBeTruthy();
+    expect(books("ddd").isPublished()).toBeTruthy();
   });
 });

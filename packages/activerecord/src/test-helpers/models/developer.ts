@@ -55,6 +55,7 @@ export class Developer extends Base {
   declare firm_id: number;
   declare first_name: string;
   declare legacy_created_at: RubyTime | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare legacy_created_on: RubyTime | Temporal.PlainDateTime;
   declare legacy_updated_at: RubyTime | Temporal.PlainDateTime;
   declare legacy_updated_on: RubyTime | Temporal.PlainDateTime;

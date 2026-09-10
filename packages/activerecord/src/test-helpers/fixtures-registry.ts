@@ -394,6 +394,14 @@ export const fixtureRegistry = {
     model: () => import("./models/pirate.js").then((m) => m.Pirate),
     data: FixtureData.pirateFixtureData,
   },
+  otherComments: {
+    model: () => import("./models/comment.js").then((m) => m.Comment),
+    data: FixtureData.otherCommentFixtureData,
+  },
+  otherPosts: {
+    model: () => import("./models/post.js").then((m) => m.Post),
+    data: FixtureData.otherPostFixtureData,
+  },
   posts: {
     model: () => import("./models/post.js").then((m) => m.Post),
     data: FixtureData.postFixtureData,

@@ -3,11 +3,13 @@ import { ref } from "../../fixtures.js";
 export const parrotFixtureData = {
   george: {
     name: "Curious George",
+    treasures: "diamond, sapphire",
     parrot_sti_class: "LiveParrot",
     breed: "australian",
   },
   louis: {
     name: "King Louis",
+    treasures: ["diamond", "sapphire"],
     parrot_sti_class: "LiveParrot",
     breed: "african",
   },
@@ -20,13 +22,16 @@ export const parrotFixtureData = {
     id: 4,
     name: "polly",
     killer_id: ref("pirates", "blackbeard"),
+    treasures: "sapphire, ruby",
     parrot_sti_class: "DeadParrot",
   },
   DEFAULTS: {
+    treasures: "sapphire, ruby",
     parrot_sti_class: "LiveParrot",
     breed: "australian",
   },
   davey: {
+    treasures: "sapphire, ruby",
     parrot_sti_class: "LiveParrot",
     breed: "australian",
   },

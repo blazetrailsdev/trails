@@ -517,7 +517,7 @@ export async function prepareModelFixtures(
     { rows: FixtureAttrs[]; throughModel: BaseClass | undefined; isHabtm: boolean }
   >();
 
-  const labels = Object.keys(fixtures);
+  const labels = Object.keys(fixtures).filter((label) => label !== "DEFAULTS");
 
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
