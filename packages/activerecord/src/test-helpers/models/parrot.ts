@@ -6,6 +6,7 @@ import type { Pirate } from "./pirate.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+import "./treasure.js";
 
 export class Parrot extends Base {
   declare pirates: AssociationProxy<Pirate>;
