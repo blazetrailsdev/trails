@@ -110,6 +110,7 @@ export const SKIP_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
 // "non-column key" skip would also mask genuinely-unported columns.
 export const HABTM_LABEL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   developers: new Set<string>(["sharedComputers"]),
+  parrots: new Set<string>(["treasures"]),
 };
 
 // prettier-ignore
