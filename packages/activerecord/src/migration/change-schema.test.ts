@@ -12,30 +12,6 @@ import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 
-function bigintColumn(eight: Column): void {
-  if (adapterType === "sqlite") {
-    expect(eight.sqlType).toBe("bigint");
-    return;
-  }
-  expect(eight.type).toBe("integer");
-  expect(eight.limit).toBe(8);
-}
-
-function datetimeSqlType(
-  connection: AbstractAdapter,
-  column: Column,
-  postgresqlType: string,
-  mysqlType: string,
-): void {
-  if (adapterType === "postgres") {
-    expect(column.sqlType).toBe(postgresqlType);
-  } else if (adapterType === "mysql") {
-    expect(column.sqlType).toBe(mysqlType);
-  } else {
-    expect(column.sqlType).toBe(connection.typeToSql("datetime(6)"));
-  }
-}
-
 class SilentMigration extends Migration {
   write(): void {}
 }
@@ -130,7 +106,7 @@ describe("Migration", () => {
         false,
       );
       expect(four.default).toBe("1");
-      // eslint-disable-next-line vitest/no-conditional-in-test
+      // eslint-disable-next-line blazetrails/no-conditional-in-test
       if (!mysql) expect(five!.default).toBe("hello");
     });
 
@@ -178,7 +154,6 @@ describe("Migration", () => {
       const four = detect(columns, "four_int");
       const eight = detect(columns, "eight_int");
 
-      // eslint-disable-next-line vitest/no-conditional-in-test
       if (currentAdapter("PostgreSQLAdapter")) {
         expect(defaultInt.sqlType).toBe("integer");
         expect(one.sqlType).toBe("smallint");
@@ -432,7 +407,12 @@ describe("Migration", () => {
       const columns = await connection.columns("testings");
       const eight = detect(columns, "eight_int");
 
-      bigintColumn(eight);
+      if (adapterType === "sqlite") {
+        expect(eight.sqlType).toBe("bigint");
+      } else {
+        expect(eight.type).toBe("integer");
+        expect(eight.limit).toBe(8);
+      }
     });
 
     it("add column with timestamp type", async () => {
@@ -445,7 +425,13 @@ describe("Migration", () => {
 
       expect(column.type).toBe("datetime");
 
-      datetimeSqlType(connection, column, "timestamp without time zone", "timestamp");
+      if (adapterType === "postgres") {
+        expect(column.sqlType).toBe("timestamp without time zone");
+      } else if (adapterType === "mysql") {
+        expect(column.sqlType).toBe("timestamp");
+      } else {
+        expect(column.sqlType).toBe(connection.typeToSql("datetime(6)"));
+      }
     });
 
     it("add column with postgresql datetime type", async () => {
@@ -458,7 +444,13 @@ describe("Migration", () => {
 
       expect(column.type).toBe("datetime");
 
-      datetimeSqlType(connection, column, "timestamp(6) without time zone", "datetime(6)");
+      if (adapterType === "postgres") {
+        expect(column.sqlType).toBe("timestamp(6) without time zone");
+      } else if (adapterType === "mysql") {
+        expect(column.sqlType).toBe("datetime(6)");
+      } else {
+        expect(column.sqlType).toBe(connection.typeToSql("datetime(6)"));
+      }
     });
 
     it("change column with timestamp type", async () => {
@@ -473,7 +465,13 @@ describe("Migration", () => {
 
       expect(column.type).toBe("datetime");
 
-      datetimeSqlType(connection, column, "timestamp without time zone", "timestamp");
+      if (adapterType === "postgres") {
+        expect(column.sqlType).toBe("timestamp without time zone");
+      } else if (adapterType === "mysql") {
+        expect(column.sqlType).toBe("timestamp");
+      } else {
+        expect(column.sqlType).toBe(connection.typeToSql("datetime(6)"));
+      }
     });
 
     it("column exists", async () => {

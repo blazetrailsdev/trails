@@ -1,32 +1,24 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
-import { createTestExclusionConstraintsTable } from "../support/load-schema-helper.js";
-import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
+import { fixtures } from "../test-fixtures.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
-class Invoice extends Base {}
+class Invoice extends Base {
+  static name = "ActiveRecord::Migration::ExclusionConstraintTest::Invoice";
+}
 
 describeIfSupports("exclusion_constraints", "Migration", () => {
-  let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
-  beforeAll(async () => {
-    scratch = await openScratchDatabase("exclusion_constraints");
-    connection = scratch.connection;
-    await createTestExclusionConstraintsTable(connection);
-    (Invoice as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
-  }, 30000);
-
-  afterAll(async () => {
-    await scratch.drop();
-  }, 30000);
+  fixtures([]);
 
   beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.createTable("invoices", { force: true }, (t) => {
       t.date("start_date");
       t.date("end_date");
@@ -194,7 +186,10 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       await expect(
         Invoice.transaction(
           async () => {
-            await connection.setConstraints("deferred", "invoices_date_overlap");
+            await ((await Invoice.leaseConnection()) as PostgreSQLAdapter).setConstraints(
+              "deferred",
+              "invoices_date_overlap",
+            );
             await Invoice.createBang({ start_date: "2020-12-31", end_date: "2021-01-01" });
             await invoice.updateBang({ end_date: "2020-12-31" });
 
