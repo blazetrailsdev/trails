@@ -31,7 +31,7 @@ import {
 import {
   executionContext,
   executionContextId,
-  withExecutionContext,
+  withLeaseContext,
 } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
@@ -614,7 +614,7 @@ export class ConnectionPool implements ReapablePool {
     } else {
       let forkedLease!: Lease;
       try {
-        return await withExecutionContext(async () => {
+        return await withLeaseContext(async () => {
           const lease = (forkedLease = this.connectionLease());
           const stickyWas = lease.sticky;
           if (preventPermanent) lease.sticky = false;
@@ -626,8 +626,16 @@ export class ConnectionPool implements ReapablePool {
           }
         });
       } finally {
+        const sticky = forkedLease?.sticky ?? null;
         const conn = forkedLease?.release();
-        if (conn) this.checkin(conn);
+        if (conn) {
+          if (lease.connection) {
+            this.checkin(conn);
+          } else {
+            lease.connection = conn;
+            lease.sticky = sticky;
+          }
+        }
       }
     }
   }
