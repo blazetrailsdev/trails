@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import {
   ref,
   isFixtureRef,
@@ -10,7 +11,13 @@ import {
   FixtureError,
 } from "./fixtures.js";
 import { Time } from "@blazetrails/date";
-import { Duration, OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
+import {
+  assertNotEmpty,
+  Duration,
+  OID_NAMESPACE,
+  onLoad,
+  uuidV5,
+} from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
@@ -19,7 +26,15 @@ import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
-import { fixtures } from "./test-fixtures.js";
+import { fixtures, TestFixtures } from "./test-fixtures.js";
+import { Organization } from "./test-helpers/models/organization.js";
+import { ClassNameThatDoesNotFollowCONVENTIONS } from "./test-helpers/models/randomly-named-c1.js";
+import {
+  AdminClassNameThatDoesNotFollowCONVENTIONS1,
+  AdminClassNameThatDoesNotFollowCONVENTIONS2,
+} from "./test-helpers/models/admin/randomly-named-c1.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 import { Task } from "./test-helpers/models/task.js";
@@ -1224,5 +1239,193 @@ describe("FoxyFixturesTest", () => {
     expect(books("awdr").isRead()).toBeTruthy();
     expect(books("rfr").isProposed()).toBeTruthy();
     expect(books("ddd").isPublished()).toBeTruthy();
+  });
+});
+
+describe("ActiveSupportSubclassWithFixturesTest", () => {
+  const { organizations } = fixtures(["organizations"]);
+
+  it("foo", async () => {
+    expect((await Organization.findBy({ name: "No Such Agency" }))?.id).toBe(
+      organizations("nsa").id,
+    );
+  });
+});
+
+describe("CustomNameForFixtureOrModelTest", () => {
+  const {
+    randomlyNamedA9,
+    "admin/randomlyNamedA9": adminRandomlyNamedA9,
+    "admin/randomlyNamedB0": adminRandomlyNamedB0,
+  } = fixtures(["randomlyNamedA9", "admin/randomlyNamedA9", "admin/randomlyNamedB0"]);
+
+  it("named accessor for randomly named fixture and class", () => {
+    expect(randomlyNamedA9("first_instance")).toBeInstanceOf(ClassNameThatDoesNotFollowCONVENTIONS);
+  });
+
+  it("named accessor for randomly named namespaced fixture and class", () => {
+    expect(adminRandomlyNamedA9("first_instance")).toBeInstanceOf(
+      AdminClassNameThatDoesNotFollowCONVENTIONS1,
+    );
+    expect(adminRandomlyNamedB0("second_instance")).toBeInstanceOf(
+      AdminClassNameThatDoesNotFollowCONVENTIONS2,
+    );
+  });
+});
+
+describe("IgnoreFixturesTest", () => {
+  const { otherBooks, parrots } = fixtures(
+    ["otherBooks", "parrots", "parrotsPirates", "pirates", "treasures"],
+    { useTransactionalTests: false },
+  );
+
+  it("ignores books fixtures", async () => {
+    expect(() => otherBooks("published" as never)).toThrow();
+    expect(() => otherBooks("published_paperback" as never)).toThrow();
+    expect(() => otherBooks("published_ebook" as never)).toThrow();
+
+    expect(await Book.count()).toBe(2);
+    expect(otherBooks("awdr").name).toBe("Agile Web Development with Rails");
+    expect(otherBooks("awdr").status).toBe("published");
+    expect(otherBooks("awdr").format).toBe("paperback");
+    expect(otherBooks("awdr").language).toBe("english");
+
+    expect(otherBooks("rfr").name).toBe("Ruby for Rails");
+    expect(otherBooks("rfr").format).toBe("ebook");
+    expect(otherBooks("rfr").status).toBe("published");
+  });
+
+  it("ignores parrots fixtures", () => {
+    expect(() => parrots("DEFAULT" as never)).toThrow();
+    expect(() => parrots("DEAD_PARROT" as never)).toThrow();
+
+    expect(parrots("polly").parrot_sti_class).toBe("DeadParrot");
+  });
+});
+
+describe("FixturesWithDefaultScopeTest", () => {
+  const { bulbs } = fixtures(["bulbs"]);
+
+  it("inserts fixtures excluded by a default scope", async () => {
+    expect(await Bulb.count()).toBe(1);
+    expect(await Bulb.unscoped().count()).toBe(2);
+  });
+
+  it("allows access to fixtures excluded by a default scope", () => {
+    expect(bulbs("special").name).toBe("special");
+  });
+});
+
+describe("FixturesWithAbstractBelongsTo", () => {
+  const { pirates, doubloons } = fixtures(["pirates", "doubloons"]);
+
+  it("creates fixtures with belongs_to associations defined in abstract base classes", async () => {
+    expect(doubloons("blackbeards_doubloon")).not.toBeNull();
+    expect((await doubloons("blackbeards_doubloon").pirate)?.id).toBe(pirates("blackbeard").id);
+  });
+});
+
+describe("FixtureClassNamesTest", () => {
+  let klass: (new () => object) & { fixtureClassNames: Record<string, unknown> };
+  let savedCache: Record<string, unknown>;
+
+  beforeEach(() => {
+    klass = class {} as typeof klass;
+    include(klass, TestFixtures);
+    savedCache = { ...klass.fixtureClassNames };
+  });
+
+  afterEach(() => {
+    klass.fixtureClassNames = savedCache;
+  });
+
+  it("fixture_class_names returns nil for unregistered identifier", () => {
+    expect(klass.fixtureClassNames["unregistered_identifier"]).toBeUndefined();
+  });
+});
+
+describe("MultipleFixtureConnectionsTest", () => {
+  describe("CompositePkFixturesTest", () => {
+    const { cpkOrders, cpkBooks, cpkAuthors, cpkOrderAgreements } = fixtures([
+      "cpkOrders",
+      "cpkBooks",
+      "cpkAuthors",
+      "cpkReviews",
+      "cpkOrderAgreements",
+    ]);
+
+    it("generates composite primary key for partially filled fixtures", () => {
+      const alice = cpkAuthors("cpk_great_author");
+      const aliceCpkBook = cpkBooks("cpk_great_author_first_book");
+      const aliceCpkBookId = aliceCpkBook.id as unknown[];
+
+      assertNotEmpty(aliceCpkBookId.filter((v) => v != null));
+      expect(aliceCpkBookId[0]).toBe(alice.id);
+      expect(aliceCpkBookId[aliceCpkBookId.length - 1]).not.toBeNull();
+    });
+
+    it("generates composite primary key ids", () => {
+      assertNotEmpty((cpkOrders("cpk_groceries_order_1").id as unknown[]).filter((v) => v != null));
+
+      for (const idColumn of cpkBooks("cpk_great_author_first_book").id as unknown[]) {
+        expect(idColumn).not.toBeNull();
+      }
+    });
+
+    it("generates composite primary key with unique components", () => {
+      expect(new Set(cpkOrders("cpk_groceries_order_1").id as unknown[]).size).toBe(2);
+    });
+
+    it("association with custom primary key", async () => {
+      const order = cpkOrders("cpk_groceries_order_2");
+      const orderAgreement = cpkOrderAgreements("order_agreement_three");
+
+      const [, orderId] = order.id as unknown[];
+
+      expect(orderAgreement.order_id).toBe(orderId);
+      expect((await orderAgreement.order)?.id).toEqual(order.id);
+    });
+
+    it("composite identify resolves to same values", () => {
+      const identifyOne = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+      const identifyTwo = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+
+      expect(identifyOne).toEqual(identifyTwo);
+    });
+
+    it("composite identify returns hash with key names", () => {
+      const id = FixtureSet.compositeIdentify("order", CpkOrder.primaryKey as string[]);
+
+      expect(Object.keys(id)).toEqual(["shop_id", "id"]);
+    });
+
+    it("composite identify uses same hashing algorithm as identify for first attribute", () => {
+      const idHash = FixtureSet.compositeIdentify("order", ["first_attribute", "second_attribute"]);
+      const id = FixtureSet.identify("order");
+
+      expect(idHash["first_attribute"]).toBe(id);
+      expect(idHash["second_attribute"]).not.toBe(id);
+    });
+
+    it("composite identify hashes one label to same values irrespective of column names", () => {
+      const idHashOne = FixtureSet.compositeIdentify("order", [
+        "first_attribute",
+        "second_attribute",
+      ]);
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["shop_id", "id"]);
+
+      expect(Object.values(idHashOne)).toEqual(Object.values(idHashTwo));
+      expect(Object.keys(idHashOne)).not.toEqual(Object.keys(idHashTwo));
+    });
+
+    it("composite identify hashes to same values based on position in key", () => {
+      const id = FixtureSet.identify("order");
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["one", "two"]);
+      const idHashThree = FixtureSet.compositeIdentify("order", ["one", "two", "three"]);
+
+      expect(Object.values(idHashTwo)[0]).toBe(id);
+      expect(Object.values(idHashThree)[0]).toBe(id);
+      expect(Object.values(idHashThree).slice(0, 2)).toEqual(Object.values(idHashTwo));
+    });
   });
 });

@@ -206,6 +206,74 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
+    className: "CustomNameForFixtureOrModelTest",
+    tests: ["table name is defined in the model"],
+    reason:
+      'Reads ActiveRecord::FixtureSet.all_loaded_fixtures["admin/randomly_named_a9"].table_name ' +
+      "(fixtures_test.rb:1521). trails' FixtureSet (fixtures.ts:896) is static-only with no " +
+      "per-set instance and no all_loaded_fixtures registry of them, so there is no table_name " +
+      "to read off a loaded set.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "NilFixturePathTest",
+    tests: ["raises an error when all fixtures loaded"],
+    reason:
+      "Asserts `fixtures :all` with fixture_paths = nil raises 'No fixture path found.' " +
+      "(fixtures_test.rb:1607-1619). trails' fixtures() takes the set names or data up front " +
+      "and has no :all arm that globs fixture_paths, so there is no path lookup to fail.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "FileFixtureConflictTest",
+    tests: ["ignores file fixtures"],
+    reason:
+      "Points fixture_paths at FIXTURES_ROOT/all and calls `fixtures :all`, asserting the " +
+      ".yml files found on disk (fixtures_test.rb:1627-1632). The canonical corpus is TS " +
+      "modules, and fixtures() has no :all arm that scans a directory.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "MultipleFixtureConnectionsTest",
+    tests: [
+      "uses writing connection for fixtures",
+      "writing and reading connections are the same",
+      "writing and reading connections are the same for non default shards",
+      "only existing connections are replaced",
+      "only existing connections are restored",
+    ],
+    reason:
+      "Rails defines these only under current_adapter?(:SQLite3Adapter) && !in_memory_db? " +
+      "(fixtures_test.rb:1646) against test/fixtures/fixture_database.sqlite3, and drives " +
+      "TestFixtures#setup_shared_connection_pool / teardown_shared_connection_pool / " +
+      "clean_up_connection_handler, which trails' test-fixtures.ts does not port.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "SameNameDifferentDatabaseFixturesTest",
+    tests: ["fixtures are properly loaded"],
+    reason:
+      'Loads dogs and other_dogs, both table "dogs", where OtherDog < ARUnit2Model lives on ' +
+      "the arunit2 database (models/other_dog.rb). trails' fixtures() loads every set through " +
+      "one connection, so the two sets land in one dogs table and useFixtures rejects the " +
+      "colliding primary keys.",
+  },
+  {
+    testFile: "fixtures_test.rb",
+    className: "MultipleFixtureConnectionsTest",
+    tests: [
+      "resolves associations using composite primary keys",
+      "resolves associations using composite primary keys with partially filled values",
+    ],
+    reason:
+      "Rails' cpk_reviews.yml names the book by association label (book: " +
+      "cpk_book_with_generated_pk), which TableRow#resolve_sti_reflections expands through " +
+      "composite_identify over the [author_id, number] foreign key (fixture_set/table_row.rb:166-172). " +
+      "trails' cpk-reviews.ts spells it as per-column ref()s instead, and those resolve " +
+      "number to the book's author_id slot, so review.book misses.",
+  },
+  {
+    testFile: "fixtures_test.rb",
     className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
     tests: ["model class in fixture file is respected"],
     reason:
