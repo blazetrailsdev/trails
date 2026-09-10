@@ -56,6 +56,17 @@ describe("FixtureSet::RenderContext#binary (trails)", () => {
       blob.close(true);
     }
   });
+
+  it("encodes bytes 0x80..0xff as themselves, not UTF-8-expanded", () => {
+    const blob = Tempfile.new(["blob", "bin"]);
+    blob.close();
+    RubyFile.binwrite(blob.path!, String.fromCharCode(0x00, 0x7f, 0x80, 0xc3, 0xff));
+    try {
+      expect(new (RenderContext.createSubclass())().binary(blob.path!)).toBe('!!binary "AH+Aw/8="');
+    } finally {
+      blob.close(true);
+    }
+  });
 });
 
 describe("FixtureSet.contextClass (trails)", () => {

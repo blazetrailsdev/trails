@@ -1,4 +1,4 @@
-import { File, pack } from "@blazetrails/ruby-compat";
+import { Base64, File } from "@blazetrails/ruby-compat";
 
 import { FixtureSet } from "../fixtures.js";
 
@@ -26,7 +26,7 @@ export class RenderContext {
       }
 
       binary(path: string): string {
-        return `!!binary "${pack([File.binread(path)], "m0")}"`;
+        return `!!binary "${Base64.strictEncode64(File.binread(path))}"`;
       }
     };
   }
