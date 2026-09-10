@@ -1320,11 +1320,11 @@ describe("FixturesWithAbstractBelongsTo", () => {
 });
 
 describe("FixtureClassNamesTest", () => {
-  let klass: { fixtureClassNames: Record<string, unknown> };
+  let klass: (new () => object) & { fixtureClassNames: Record<string, unknown> };
   let savedCache: Record<string, unknown>;
 
   beforeEach(() => {
-    klass = class {} as never;
+    klass = class {} as typeof klass;
     include(klass, TestFixtures);
     savedCache = { ...klass.fixtureClassNames };
   });
