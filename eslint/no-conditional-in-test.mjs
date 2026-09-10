@@ -11,25 +11,31 @@ function calleeRoot(callee) {
   return null;
 }
 
+function isAdapterTypeRef(node) {
+  return node.type === "Identifier" && node.name === "adapterType";
+}
+
+function isStringLiteral(node) {
+  return node.type === "Literal" && typeof node.value === "string";
+}
+
 function isAdapterCondition(node) {
-  if (!node || typeof node !== "object") return false;
-  if (node.type === "Identifier" && node.name === "adapterType") return true;
-  if (
-    node.type === "CallExpression" &&
-    node.callee.type === "Identifier" &&
-    node.callee.name === "currentAdapter"
-  )
-    return true;
-  for (const key of Object.keys(node)) {
-    if (key === "parent") continue;
-    const child = node[key];
-    if (Array.isArray(child)) {
-      if (child.some(isAdapterCondition)) return true;
-    } else if (child && typeof child.type === "string" && isAdapterCondition(child)) {
-      return true;
-    }
+  switch (node.type) {
+    case "CallExpression":
+      return node.callee.type === "Identifier" && node.callee.name === "currentAdapter";
+    case "BinaryExpression":
+      return (
+        ["===", "!==", "==", "!="].includes(node.operator) &&
+        ((isAdapterTypeRef(node.left) && isStringLiteral(node.right)) ||
+          (isStringLiteral(node.left) && isAdapterTypeRef(node.right)))
+      );
+    case "LogicalExpression":
+      return isAdapterCondition(node.left) && isAdapterCondition(node.right);
+    case "UnaryExpression":
+      return node.operator === "!" && isAdapterCondition(node.argument);
+    default:
+      return false;
   }
-  return false;
 }
 
 export default {

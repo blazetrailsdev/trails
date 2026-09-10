@@ -95,6 +95,7 @@ describe("Migration", () => {
         expect(constraint.expression).toBe("price > discounted_price");
       }
 
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:57-70); see supportsJsonSchemaValid
       if (adapterType === "mysql" && supportsJsonSchemaValid) {
         try {
           await connection.addCheckConstraint(
