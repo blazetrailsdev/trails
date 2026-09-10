@@ -18,7 +18,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
 
   readonly #columns: Map<string, Column[]>;
 
-  constructor(...args: [config?: unknown]) {
+  constructor(...args: ConstructorParameters<typeof AbstractAdapter>) {
     super(...args);
     this.dataSources = [];
     this.primaryKeys = {};

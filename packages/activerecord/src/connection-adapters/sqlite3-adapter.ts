@@ -6,7 +6,8 @@ import type {
   SqliteOpenConfig,
   SqliteStatement,
 } from "../sqlite-adapter.js";
-import { PRAGMA_SETTERS, SQLite3Constants } from "../sqlite-adapter.js";
+import { SQLite3Constants } from "../sqlite-adapter.js";
+import { PRAGMA_SETTERS, setPragma } from "../sqlite/pragmas.js";
 import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -116,12 +117,6 @@ function isStructuredDefault(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-function pragmaValue(value: string | number | boolean): string {
-  if (typeof value === "boolean") return value ? "1" : "0";
-  if (typeof value === "number") return String(value);
-  return value.startsWith(":") ? value.slice(1) : value;
-}
-
 function _isSqliteMissingDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: unknown; message?: unknown };
@@ -226,6 +221,30 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   get _strictStrings(): boolean {
     return this._strict;
   }
+
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
+    string: { name: "varchar" },
+    text: { name: "text" },
+    integer: { name: "integer" },
+    float: { name: "float" },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    boolean: { name: "boolean" },
+    json: { name: "json" },
+  };
+
+  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
+    foreign_keys: true,
+    journal_mode: ":wal",
+    synchronous: ":normal",
+    mmap_size: 134217728,
+    journal_size_limit: 67108864,
+    cache_size: 2000,
+  };
 
   /** @missingRailsCall merge — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
   constructor(config: SQLite3Config);
@@ -646,30 +665,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       }
     }
   }
-
-  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
-    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
-    string: { name: "varchar" },
-    text: { name: "text" },
-    integer: { name: "integer" },
-    float: { name: "float" },
-    decimal: { name: "decimal" },
-    datetime: { name: "datetime" },
-    time: { name: "time" },
-    date: { name: "date" },
-    binary: { name: "blob" },
-    boolean: { name: "boolean" },
-    json: { name: "json" },
-  };
-
-  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
-    foreign_keys: true,
-    journal_mode: ":wal",
-    synchronous: ":normal",
-    mmap_size: 134217728,
-    journal_size_limit: 67108864,
-    cache_size: 2000,
-  };
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
@@ -1650,7 +1645,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       ...pragmas,
     })) {
       if (PRAGMA_SETTERS.has(pragma)) {
-        stmts.push([`${pragma} = ${pragmaValue(value)}`, `SQLite pragma '${pragma}'`]);
+        stmts.push([setPragma(pragma, value), `SQLite pragma '${pragma}'`]);
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);
       }

@@ -158,8 +158,7 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
   });
 
-  it("cannot run a second statement smuggled through a pragma value", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("warns and skips a string value with unsafe characters", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const os = await import("os");
@@ -172,13 +171,18 @@ describe("SQLite3Adapter pragmas option", () => {
       adapter = new BetterSQLite3Adapter(dbPath, {
         pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
       });
-      await adapter.connectBang();
-      const rows = (adapter.raw as import("better-sqlite3").Database)
+      await expect(adapter.connectBang()).rejects.toThrow(
+        'unrecognized synchronous "FULL; DROP TABLE sentinel"',
+      );
+      const check = new BetterSQLite3Adapter(dbPath);
+      await check.connectBang();
+      const rows = (check.raw as import("better-sqlite3").Database)
         .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
         .get();
       expect(rows).toEqual({ c: 1 });
+      await check.dropTable("sentinel", { ifExists: true });
+      await check.close();
     } finally {
-      await adapter?.dropTable("sentinel", { ifExists: true });
       fs.rmSync(dbPath, { force: true });
     }
   });
