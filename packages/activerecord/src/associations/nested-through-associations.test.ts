@@ -742,7 +742,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through should not be autosaved", async () => {
     const david = authors("david");
     const c = new Categorization();
-    (c as any).association("author").writer(david);
+    await (c as any).association("author").writer(david);
     expect(await (c as any).postTaggings.toArray()).not.toHaveLength(0);
     await c.save();
     expect(await (c as any).postTaggings.toArray()).not.toHaveLength(0);

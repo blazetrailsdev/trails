@@ -484,19 +484,23 @@ export class ConnectionPool implements ReapablePool {
     return clean;
   }
 
-  /** @missingRailsCall lock — PERMANENT */
   async checkout(checkoutTimeout?: number): Promise<DatabaseAdapter> {
-    checkoutTimeout ??= this.checkoutTimeout;
-    const pinned = this._pinnedConnection;
-    if (!pinned) {
-      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
+    const timeout = checkoutTimeout ?? this.checkoutTimeout;
+    if (!this._pinnedConnection) {
+      return this.checkoutAndVerify(await this.acquireConnection(timeout));
     }
 
-    await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
-    if (this._connections && !this._connections.includes(pinned)) {
-      this._connections.push(pinned);
-    }
-    return pinned;
+    return this._pinnedConnection.lock.synchronize(async () => {
+      const pinned = this._pinnedConnection;
+      if (pinned) {
+        await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
+        if (this._connections && !this._connections.includes(pinned)) {
+          this._connections.push(pinned);
+        }
+        return pinned;
+      }
+      return this.checkoutAndVerify(await this.acquireConnection(timeout));
+    });
   }
 
   /**

@@ -1067,29 +1067,25 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const { table, foreignKey, targetTable, primaryKey } = err.fkDetails;
     if (!targetTable || !primaryKey || err.fkDetails.primaryKeySqlType) return err;
 
-    try {
-      const col = await this.columnFor(targetTable, primaryKey);
-      if (!col) return err;
+    const primaryKeyColumn = await this.columnFor(targetTable, primaryKey);
+    const sqlType = primaryKeyColumn.sqlTypeMetadata?.sqlType ?? "";
+    const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
 
-      const sqlType = col.sqlTypeMetadata?.sqlType ?? col.sqlTypeMetadata?.type ?? "";
-      const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
-
-      return new MismatchedForeignKey({
-        message: err.cause instanceof Error ? err.cause.message : undefined,
-        sql: err.sql ?? undefined,
-        binds: err.binds ?? undefined,
-        connectionPool: err.connectionPool,
-        cause: err.cause,
-        table,
-        foreignKey,
-        targetTable,
-        primaryKey,
-        primaryKeySqlType: sqlType,
-        primaryKeyType,
-      });
-    } catch {
-      return err;
-    }
+    const exception = new MismatchedForeignKey({
+      message: (err as unknown as { _originalMessage?: string })._originalMessage,
+      sql: err.sql ?? undefined,
+      binds: err.binds ?? undefined,
+      connectionPool: err.connectionPool,
+      cause: err.cause,
+      table,
+      foreignKey,
+      targetTable,
+      primaryKey,
+      primaryKeySqlType: sqlType,
+      primaryKeyType,
+    });
+    exception.stack = err.stack;
+    return exception;
   }
 
   /** @internal */
