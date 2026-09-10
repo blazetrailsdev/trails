@@ -42,7 +42,6 @@ import {
   NotNullViolation,
   NoDatabaseError,
   ConnectionNotEstablished,
-  DatabaseConnectionError,
   StatementTimeout,
 } from "../errors.js";
 import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
@@ -117,14 +116,12 @@ function isStructuredDefault(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-function _isSqliteMissingDbError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const e = error as { code?: unknown; message?: unknown };
-  return (
-    e.code === "SQLITE_CANTOPEN" ||
-    (typeof e.message === "string" && /unable to open database file/i.test(e.message))
-  );
-}
+type SQLite3ConnectionParameters = SQLite3AdapterOptions & {
+  driver: SqliteDriver;
+  database: string;
+  resultsAsHash: true;
+  defaultTransactionMode: "immediate";
+};
 
 let sqlite3TypeMap: TypeMap | undefined;
 
@@ -205,7 +202,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._rawConnection!;
   }
 
-  private _readonly: boolean;
+  /** @internal */
+  _connectionParameters: SQLite3ConnectionParameters;
   private _strict: boolean;
   /** @internal */
   _statementLock: Promise<void> | null = null;
@@ -274,9 +272,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       filename = this.prepareDatabasePath(filename);
     }
     this._filename = filename;
-    this._readonly = options.readonly ?? false;
     this._strict = strict;
     this._asyncConnectPending = this.driverIsAsync();
+    this._connectionParameters = {
+      ...(this._config as SQLite3AdapterOptions),
+      driver: this.resolveDriverFactory(),
+      database: filename,
+      resultsAsHash: true,
+      defaultTransactionMode: "immediate",
+    };
   }
 
   /** @internal */
@@ -715,12 +719,33 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._memoryDatabase || File.isExist(this._filename);
   }
 
-  /** @missingRailsCall include? — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
   static newClient(
-    this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
-    config: { database?: string; readonly?: boolean },
-  ): SQLite3Adapter {
-    return new this(config.database ?? ":memory:", { readonly: config.readonly });
+    config: SQLite3ConnectionParameters,
+  ): SqliteConnection | Promise<SqliteConnection> {
+    const rescue = (error: unknown): never => {
+      if (error instanceof Error && error.message.includes("unable to open database file")) {
+        throw new NoDatabaseError();
+      } else {
+        throw error;
+      }
+    };
+    const timeout = SQLite3Adapter.typeCastConfigToInteger(config.timeout);
+    const openConfig: SqliteOpenConfig = {
+      database: String(config.database),
+      readOnly: config.readonly ?? false,
+      strict: config.strict,
+      timeout: typeof timeout === "number" && Number.isInteger(timeout) ? timeout : undefined,
+      flags: config.flags,
+      noMutex: (config as { noMutex?: boolean }).noMutex,
+      driverOptions: config.driverOptions,
+    };
+    try {
+      const driver = config.driver;
+      if (!driver.openSync) return driver.open(openConfig).catch(rescue);
+      return driver.openSync(openConfig) as SqliteConnection;
+    } catch (error) {
+      return rescue(error);
+    }
   }
 
   static override dbconsole(
@@ -1496,66 +1521,22 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return def;
   }
 
-  /**
-   * @missingRailsCall new_client — CONVERGEABLE sqlite3-connection-parameters-never-built
-   * @internal
-   */
+  /** @internal */
   private connect(): void {
-    const openConfig = this.openConfig();
-    try {
-      const factory = this.resolveDriverFactory();
-      if (!factory.openSync) {
-        this._asyncConnectPending = true;
-        return;
-      }
-      const syncConn = factory.openSync(openConfig);
-      this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
-      this._rawConnection = syncConn as SqliteConnection;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (_isSqliteMissingDbError(e)) {
-        throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
-          cause: e,
-        });
-      }
-      throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
-        cause: e,
-      });
+    if (!this._connectionParameters.driver.openSync) {
+      this._asyncConnectPending = true;
+      return;
     }
-  }
-
-  private openConfig(): SqliteOpenConfig {
-    const cfg = this._config as SQLite3AdapterOptions & Partial<SqliteOpenConfig>;
-    return {
-      database: this._filename,
-      readOnly: this._readonly,
-      strict: this._strict,
-      timeout: this.castTimeout(),
-      flags: cfg.flags,
-      noMutex: cfg.noMutex,
-      driverOptions: cfg.driverOptions,
-    };
+    const syncConn = SQLite3Adapter.newClient(this._connectionParameters) as SqliteConnection;
+    this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
+    this._rawConnection = syncConn;
   }
 
   /** @internal */
   private async connectAsync(): Promise<void> {
-    const openConfig = this.openConfig();
-    try {
-      const factory = this.resolveDriverFactory();
-      const conn = await factory.open(openConfig);
-      this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
-      this._rawConnection = conn;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (_isSqliteMissingDbError(e)) {
-        throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
-          cause: e,
-        });
-      }
-      throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
-        cause: e,
-      });
-    }
+    const conn = await SQLite3Adapter.newClient(this._connectionParameters);
+    this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
+    this._rawConnection = conn;
   }
 
   /**
@@ -1619,7 +1600,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * @missingRailsArgs fetch — PERMANENT
    * @internal
    */
-  override configureConnection(): void | Promise<void> {
+  override async configureConnection(): Promise<void> {
     this.castTimeout();
     const cfg = this._config as SQLite3AdapterOptions;
     if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
@@ -1627,7 +1608,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
-    const checked = super.configureConnection();
+    await super.configureConnection();
 
     const stmts: [string, string][] = [];
     const dqsValue = this._strict ? "OFF" : "ON";
@@ -1652,26 +1633,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
-    if (this.driverIsAsync()) {
-      return (async () => {
-        await checked;
-        for (const [sql, label] of stmts) {
-          try {
-            await this._rawConnection!.pragma(sql);
-          } catch (e) {
-            warn(label, e);
-          }
-        }
-      })();
-    }
     for (const [sql, label] of stmts) {
       try {
-        this._rawConnection!.pragma(sql);
+        await this._rawConnection!.pragma(sql);
       } catch (e) {
         warn(label, e);
       }
     }
-    return checked;
   }
 
   /** @internal */
