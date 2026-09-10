@@ -907,7 +907,7 @@ export class Relation<T extends Base> {
   ): Promise<Result> {
     return InsertAll.execute(this, attributes, {
       uniqueBy: options?.uniqueBy,
-      onDuplicate: "skip",
+      onDuplicate: ":skip",
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
@@ -918,7 +918,7 @@ export class Relation<T extends Base> {
     options?: {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
-      onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
+      onDuplicate?: ":skip" | ":update" | Nodes.SqlLiteral;
       returning?: InsertAllOptions["returning"];
       recordTimestamps?: boolean;
     },
@@ -926,7 +926,7 @@ export class Relation<T extends Base> {
     return InsertAll.execute(this, attributes, {
       uniqueBy: options?.uniqueBy,
       updateOnly: options?.updateOnly,
-      onDuplicate: options?.onDuplicate ?? "update",
+      onDuplicate: options?.onDuplicate ?? ":update",
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
@@ -1324,7 +1324,7 @@ export class Relation<T extends Base> {
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
   ): Promise<Result> {
     return InsertAll.execute(this, attributes, {
-      onDuplicate: "raise",
+      onDuplicate: ":raise",
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });

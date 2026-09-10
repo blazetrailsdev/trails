@@ -1,3 +1,5 @@
+import { StandardError } from "./standard-error.js";
+
 /**
  * Ruby's core `NameError` (`vendor/ruby/error.c:3348`), its constructor
  * (`vendor/ruby/error.c:3349` `name_err_initialize`) and its `name` reader
@@ -7,10 +9,8 @@
  * and are mixed onto this prototype there. `@blazetrails/activesupport`'s index
  * re-exports the class, so that package's public surface is unchanged.
  *
- * JS has no NameError, and trails uses `ReferenceError` as its analogue
- * throughout, so this extends it: `catch (e) { e instanceof ReferenceError }`
- * keeps working for hosts that spell the analogue directly, while
- * `rescue NameError` sites can name the class Rails names.
+ * It extends `StandardError`, mirroring Ruby's `NameError < StandardError`, so
+ * a bare `rescue` (`e instanceof StandardError`) catches it as in Ruby.
  *
  * `name` is not Ruby's `NameError#name`. In Ruby that attribute holds the
  * missing constant segment — `safe_constantize`'s
@@ -23,7 +23,7 @@
  * @noRailsEquivalent PERMANENT — Ruby core `NameError`, which Rails reopens
  * rather than defines.
  */
-export class NameError extends ReferenceError {
+export class NameError extends StandardError {
   /**
    * Ruby's `NameError#name` (`vendor/ruby/error.c:3350`): the missing constant
    * *segment*, not the path.

@@ -113,11 +113,27 @@ describe("InsertAll disallow_raw_sql!", () => {
   it("raises ArgumentError with the Rails message for a raw SQL on_duplicate", async () => {
     await expect(
       Book.upsertAll([{ name: "Rework", author_id: 1 }], {
-        onDuplicate: "name = name || ';'" as "update",
+        onDuplicate: "name = name || ';'" as ":update",
       }),
     ).rejects.toThrow(
       "Dangerous query method (method whose arguments are used as raw SQL) called: " +
         "name = name || ';'. Known-safe values can be passed by wrapping them in Arel.sql().",
     );
+  });
+
+  it("raises for a plain-string on_duplicate or returning, since only a Symbol is safe", async () => {
+    await expect(
+      Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: "skip" as ":skip" }),
+    ).rejects.toThrow(
+      "Dangerous query method (method whose arguments are used as raw SQL) called: skip.",
+    );
+    await expect(
+      Book.insertAll([{ name: "Rework", author_id: 1 }], { returning: "id" }),
+    ).rejects.toThrow(
+      "Dangerous query method (method whose arguments are used as raw SQL) called: id.",
+    );
+    await expect(
+      Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: ":skip" }),
+    ).resolves.toBeDefined();
   });
 });

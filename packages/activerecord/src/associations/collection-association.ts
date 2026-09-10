@@ -15,7 +15,7 @@ import { ownerForeignKeyColumns } from "./foreign-association.js";
 import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 
-export class CollectionAssociation extends Association {
+export abstract class CollectionAssociation extends Association {
   nestedAttributesTarget: (Base | null)[] | null = null;
   protected _proxy?: AssociationProxy;
   protected _associationIds: unknown[] | null = null;
@@ -223,14 +223,10 @@ export class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  protected difference(_a: Base[], _b: Base[]): Base[] {
-    throw new Error("difference is implemented by CollectionAssociation subclasses");
-  }
+  protected abstract difference(a: Base[], b: Base[]): Base[];
 
   /** @internal */
-  protected intersection(_a: Base[], _b: Base[]): Base[] {
-    throw new Error("intersection is implemented by CollectionAssociation subclasses");
-  }
+  protected abstract intersection(a: Base[], b: Base[]): Base[];
 
   /** @internal */
   async insertRecord(

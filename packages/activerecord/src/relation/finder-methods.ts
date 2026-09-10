@@ -37,7 +37,7 @@ export function normalizeFindArgs(
   const composite = Array.isArray(pk);
 
   if (args.length === 0) {
-    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, String(pk));
+    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, pk);
   }
 
   const [first, ...rest] = args;
@@ -69,21 +69,10 @@ export function normalizeFindArgs(
   }
 
   if (ids.length === 0) {
-    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, String(pk));
+    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, pk);
   }
 
   if (composite) {
-    const pkArity = pk.length;
-    for (const id of ids) {
-      if (!Array.isArray(id) || id.length !== pkArity) {
-        throw new RecordNotFound(
-          `${modelName}: composite primary key requires a ${pkArity}-element array, got ${String(id)}`,
-          modelName,
-          String(pk),
-          id,
-        );
-      }
-    }
     return { ids, wantArray, tuples: ids as unknown[][] };
   }
 

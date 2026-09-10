@@ -1,3 +1,5 @@
+import { StandardError } from "./standard-error.js";
+
 /**
  * Ruby's core `IOError` (`vendor/ruby/io.c:15342`), a `StandardError`
  * subclass — what `rb_io_check_closed` raises with `"closed stream"` when a
@@ -7,7 +9,7 @@
  * @noRailsEquivalent PERMANENT — Ruby core `IOError`, which Rails inherits
  * rather than defines.
  */
-export class IOError extends Error {
+export class IOError extends StandardError {
   constructor(message?: string) {
     super(message ?? new.target.name);
     this.name = new.target.name;

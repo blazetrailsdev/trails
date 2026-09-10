@@ -208,48 +208,26 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
-  it("find(1) on composite PK → RecordNotFound with arity message", () => {
-    try {
-      normalizeFindArgs("Order", pk, [1]);
-      expect.fail("should have thrown");
-    } catch (e) {
-      expect(e).toBeInstanceOf(RecordNotFound);
-      const err = e as RecordNotFound;
-      expect(err.message).toBe("Order: composite primary key requires a 2-element array, got 1");
-      expect(err.model).toBe("Order");
-      expect(err.primaryKey).toBe("shop_id,id");
-      expect(err.id).toBe(1);
-    }
-  });
-
-  it("find(1, 2, 3) on 2-arity PK → arity error with the whole tuple", () => {
-    try {
-      normalizeFindArgs("Order", pk, [1, 2, 3]);
-      expect.fail("should have thrown");
-    } catch (e) {
-      const err = e as RecordNotFound;
-      expect(err.message).toBe(
-        "Order: composite primary key requires a 2-element array, got 1,2,3",
-      );
-      expect(err.id).toEqual([1, 2, 3]);
-    }
-  });
-
-  it("find([1, 2, 3]) on 2-arity PK → arity error with the whole tuple", () => {
-    try {
-      normalizeFindArgs("Order", pk, [[1, 2, 3]]);
-      expect.fail("should have thrown");
-    } catch (e) {
-      const err = e as RecordNotFound;
-      expect(err.message).toBe(
-        "Order: composite primary key requires a 2-element array, got 1,2,3",
-      );
-      expect(err.id).toEqual([1, 2, 3]);
-    }
+  it("find([1, 2, 3]) on 2-arity PK → no arity pre-check, the tuple reaches find_one", () => {
+    expect(normalizeFindArgs("Order", pk, [[1, 2, 3]])).toEqual({
+      ids: [[1, 2, 3]],
+      wantArray: false,
+      tuples: [[1, 2, 3]],
+    });
   });
 
   it("find() → without-an-ID shape, same as simple PK", () => {
     expect(() => normalizeFindArgs("Order", pk, [])).toThrow(/without an ID/);
+  });
+
+  it("find() → RecordNotFound carries the raw composite primary_key", () => {
+    try {
+      normalizeFindArgs("Order", pk, []);
+      expect.fail("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect((e as RecordNotFound).primaryKey).toEqual(["shop_id", "id"]);
+    }
   });
 });
 
