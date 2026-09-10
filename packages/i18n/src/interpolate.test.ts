@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as I18n from "./index.js";
-import { ArgumentError, MissingInterpolationArgument, config } from "./index.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { MissingInterpolationArgument, config } from "./index.js";
 import type { MissingInterpolationArgumentHandler } from "./index.js";
 import { inspect } from "./exceptions.js";
 import { resetConfig } from "./i18n.js";
