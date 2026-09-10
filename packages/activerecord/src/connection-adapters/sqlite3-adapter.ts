@@ -723,7 +723,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     config: SQLite3ConnectionParameters,
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
-      if (error instanceof Error && error.message.includes("unable to open database file")) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("No such file or directory") ||
+          error.message.includes("unable to open database file"))
+      ) {
         throw new NoDatabaseError();
       } else {
         throw error;
@@ -731,6 +735,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     };
     const timeout = SQLite3Adapter.typeCastConfigToInteger(config.timeout);
     const openConfig: SqliteOpenConfig = {
+      ...config,
       database: String(config.database),
       readOnly: config.readonly ?? false,
       strict: config.strict,
@@ -1527,14 +1532,21 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       this._asyncConnectPending = true;
       return;
     }
-    const syncConn = SQLite3Adapter.newClient(this._connectionParameters) as SqliteConnection;
-    this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
-    this._rawConnection = syncConn;
+    try {
+      this._rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
+        this._connectionParameters,
+      ) as SqliteConnection;
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
   }
 
   /** @internal */
   private async connectAsync(): Promise<void> {
-    const conn = await SQLite3Adapter.newClient(this._connectionParameters);
+    const conn = await (this.constructor as typeof SQLite3Adapter).newClient(
+      this._connectionParameters,
+    );
     this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
     this._rawConnection = conn;
   }
@@ -1631,14 +1643,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         console.warn(`Unknown SQLite pragma: ${pragma}`);
       }
     }
-    const warn = (label: string, e: unknown) =>
-      console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
-    for (const [sql, label] of stmts) {
-      try {
-        await this._rawConnection!.pragma(sql);
-      } catch (e) {
-        warn(label, e);
-      }
+    for (const [sql] of stmts) {
+      await this._rawConnection!.pragma(sql);
     }
   }
 
