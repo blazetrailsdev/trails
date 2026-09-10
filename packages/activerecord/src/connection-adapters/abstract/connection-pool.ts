@@ -616,16 +616,23 @@ export class ConnectionPool implements ReapablePool {
         restoreSticky();
       }
     } else {
-      restoreSticky();
-      return withExecutionContext(async () => {
-        const lease = this.connectionLease();
-        if (preventPermanent) lease.sticky = false;
-        try {
-          return await fn((lease.connection = await this.checkout()));
-        } finally {
-          this.releaseConnection(lease);
-        }
-      });
+      let forkedLease!: Lease;
+      try {
+        return await withExecutionContext(async () => {
+          const lease = (forkedLease = this.connectionLease());
+          const stickyWas = lease.sticky;
+          if (preventPermanent) lease.sticky = false;
+          try {
+            return await fn((lease.connection = await this.checkout()));
+          } finally {
+            if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
+            if (!lease.sticky) this.releaseConnection(lease);
+          }
+        });
+      } finally {
+        const conn = forkedLease?.release();
+        if (conn) this.checkin(conn);
+      }
     }
   }
 
