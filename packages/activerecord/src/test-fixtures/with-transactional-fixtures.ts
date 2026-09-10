@@ -160,7 +160,8 @@ export function withTransactionalFixtures(
         if (newPool) {
           if (fixtureConnectionPools !== null && !fixtureConnectionPools.includes(newPool)) {
             fixtureConnectionPools.push(newPool);
-            pendingPins.push(pinConnectionPool(newPool));
+            const connection = newPool.leaseConnectionSync();
+            pendingPins.push(connection.lock.synchronize(() => pinConnectionPool(newPool)));
           }
         }
       }

@@ -1799,11 +1799,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     return { Customer: CanonicalCustomer, Order: CanonicalOrder };
   }
 
-  function setBilling(order: Base, customer: Base) {
-    (order.association("billing") as any).writer(customer);
+  async function setBilling(order: Base, customer: Base) {
+    await (order.association("billing") as any).writer(customer);
   }
-  function setShipping(order: Base, customer: Base) {
-    (order.association("shipping") as any).writer(customer);
+  async function setShipping(order: Base, customer: Base) {
+    await (order.association("shipping") as any).writer(customer);
   }
 
   it("should save parent but not invalid child", async () => {
@@ -1892,8 +1892,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const numCustomers = (await Customer.count()) as number;
     const order = new Order({});
     const customer = new Customer({ name: "C" });
-    setBilling(order, customer);
-    setShipping(order, customer);
+    await setBilling(order, customer);
+    await setShipping(order, customer);
     expect(await order.save()).toBe(true);
     expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
     expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
@@ -1909,8 +1909,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const numCustomers = (await Customer.count()) as number;
     const order = await Order.create({});
     const customer = new Customer({ name: "C" });
-    setBilling(order, customer);
-    setShipping(order, customer);
+    await setBilling(order, customer);
+    await setShipping(order, customer);
     expect(await order.save()).toBe(true);
     expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
     expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
@@ -1926,15 +1926,15 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const numCustomers = (await Customer.count()) as number;
     const order = await Order.create({});
     let customer = new Customer({ name: "C" });
-    setBilling(order, customer);
-    setShipping(order, customer);
+    await setBilling(order, customer);
+    await setShipping(order, customer);
     expect(await order.save()).toBe(true);
     expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
     expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     await order.reload();
     customer = new Customer({ name: "C2" });
-    setBilling(order, customer);
-    setShipping(order, customer);
+    await setBilling(order, customer);
+    await setShipping(order, customer);
     expect(await order.save()).toBe(true);
     await order.reload();
     expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);

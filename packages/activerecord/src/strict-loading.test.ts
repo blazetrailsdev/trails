@@ -371,9 +371,9 @@ describe("StrictLoadingTest", () => {
     const computer = new Computer({ extendedWarranty: 1 });
     computer.strictLoadingBang();
 
-    (computer.association("firm") as any).writer(firm);
+    await (computer.association("firm") as any).writer(firm);
     ((computer as any).developer as Developer).name = "Joe";
-    (firm.association("leadDeveloper") as any).writer((computer as any).developer);
+    await (firm.association("leadDeveloper") as any).writer((computer as any).developer);
 
     await computer.save();
     expect(computer.isNewRecord()).toBe(false);

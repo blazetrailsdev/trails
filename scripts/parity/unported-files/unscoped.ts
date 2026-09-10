@@ -622,13 +622,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: single-process SQLite driver limits ---
   {
-    testFile: "adapters/sqlite3/transaction_test.rb",
-    tests: ["opens a `read_uncommitted` transaction"],
-    reason:
-      "Cross-connection read_uncommitted visibility requires SQLITE_OPEN_SHAREDCACHE. " +
-      "better-sqlite3 does not expose this flag, so two connections cannot share a cache.",
-  },
-  {
     testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",
     tests: ["supports extensions", "respond to enable extension", "respond to disable extension"],
     reason:
