@@ -41,7 +41,7 @@ async function assertInsertAllReturningAlias(): Promise<void> {
   if (!supportsInsertReturning) return;
   const before = (await Book.count()) as number;
   const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
-    returning: "title",
+    returning: ":title",
   });
   expect(result.columns).toContain("title");
   expect(await Book.count()).toBe(before + 1);
@@ -112,7 +112,7 @@ describe("InsertAllTest", () => {
     async () => {
       const bookName = ["Array"];
       const createdBookId = ((await Book.createBang({ name: bookName })) as any).id;
-      const insertResult = await Book.insertBang({ name: bookName }, { returning: "id" });
+      const insertResult = await Book.insertBang({ name: bookName }, { returning: ":id" });
       const insertedBookId = insertResult.toArray()[0]["id"];
       const createdBook = (await Book.findByBang({ id: createdBookId })) as any;
       const insertedBook = (await Book.findByBang({ id: insertedBookId })) as any;
@@ -183,7 +183,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_returning", "insert all returns requested fields", async () => {
     const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
-      returning: ["id", "name"],
+      returning: [":id", ":name"],
     });
     expect(result.pluck("name")).toEqual(["Rework"]);
   });

@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { _RequestCtor } from "./request-slot.js";
@@ -228,21 +228,23 @@ export class ContentSecurityPolicy {
   private applyMappings(sources: CSPSource[]): CSPSource[] {
     return sources.map((source) => {
       if (typeof source === "string" && source.startsWith(":")) {
-        return this.applyMapping(source.slice(1));
+        return this.applyMapping(source);
       }
       if (typeof source === "string" || typeof source === "function") {
         return source;
       }
-      throw new ArgumentError(`Invalid content security policy source: ${String(source)}`);
+      throw new ArgumentError(`Invalid content security policy source: ${rbInspect(source)}`);
     });
   }
 
   /** @internal */
   private applyMapping(source: string): string {
-    if (!Object.hasOwn(MAPPINGS, source)) {
-      throw new ArgumentError(`Unknown content security policy source mapping: ${source}`);
+    if (!Object.hasOwn(MAPPINGS, source.slice(1))) {
+      throw new ArgumentError(
+        `Unknown content security policy source mapping: ${rbInspect(source)}`,
+      );
     }
-    return MAPPINGS[source as keyof typeof MAPPINGS];
+    return MAPPINGS[source.slice(1) as keyof typeof MAPPINGS];
   }
 
   /** @internal */

@@ -307,7 +307,9 @@ describe("ContentSecurityPolicyTest", () => {
 
   it("invalid directive source", () => {
     const policy = new ContentSecurityPolicy();
-    expect(() => policy.defaultSrc(123 as unknown as string)).toThrow(/Invalid/);
+    expect(() => policy.scriptSrc([":self"] as unknown as string)).toThrow(
+      "Invalid content security policy source: [:self]",
+    );
   });
 
   it("raises runtime error when unexpected source", () => {

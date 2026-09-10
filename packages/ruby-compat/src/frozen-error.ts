@@ -6,6 +6,8 @@ import { RuntimeError } from "./runtime-error.js";
  * `"can't modify frozen %s: %s"` message over the receiver's class and its
  * `inspect`.
  *
+ * Ruby's chain is `FrozenError < RuntimeError < StandardError`.
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `FrozenError`, which Rails inherits
  * rather than defines.
  */

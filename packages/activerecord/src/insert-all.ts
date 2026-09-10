@@ -9,7 +9,7 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
@@ -18,14 +18,11 @@ import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } fr
 
 type ModelClass = typeof Base;
 
-const COLUMN_NAME_WITH_ORDER =
-  /^\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*\s*$/i;
-
 export interface InsertAllOptions {
-  onDuplicate?: "raise" | "skip" | "update" | Nodes.SqlLiteral;
+  onDuplicate?: ":raise" | ":skip" | ":update" | Nodes.SqlLiteral;
   updateOnly?: string | string[];
   uniqueBy?: string | string[];
-  returning?: string | string[] | Nodes.SqlLiteral | false;
+  returning?: `:${string}` | `:${string}`[] | Nodes.SqlLiteral | false;
   recordTimestamps?: boolean;
 }
 
@@ -91,7 +88,7 @@ export class InsertAll {
   uniqueBy: string | string[] | IndexDefinition | undefined;
   returning: string | string[] | Nodes.SqlLiteral | false | undefined;
 
-  onDuplicate: "raise" | "skip" | "update" | Nodes.SqlLiteral | undefined;
+  onDuplicate: ":raise" | ":skip" | ":update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
   updateSql: Nodes.SqlLiteral | undefined;
 
@@ -178,7 +175,7 @@ export class InsertAll {
     if (isEmpty(this.inserts)) return Result.empty();
     let message = `${this.model.name} `;
     if (many(this.inserts)) message += "Bulk ";
-    message += this.onDuplicate === "update" ? "Upsert" : "Insert";
+    message += this.onDuplicate === ":update" ? "Upsert" : "Insert";
     return this.connection.execInsertAll(await this.toSql(), message);
   }
 
@@ -198,11 +195,11 @@ export class InsertAll {
   }
 
   skipDuplicates(): boolean {
-    return this.onDuplicate === "skip";
+    return this.onDuplicate === ":skip";
   }
 
   updateDuplicates(): boolean {
-    return this.onDuplicate === "update";
+    return this.onDuplicate === ":update";
   }
 
   mapKeyWithValue<T>(fn: (key: string, value: unknown) => T): T[][] {
@@ -257,7 +254,7 @@ export class InsertAll {
     }
     if (
       onDuplicate !== undefined &&
-      onDuplicate !== "update" &&
+      onDuplicate !== ":update" &&
       !this.isCustomUpdateSqlProvided() &&
       isPresent(this.updateOnly)
     ) {
@@ -268,12 +265,12 @@ export class InsertAll {
       this._updatableColumns = Array.isArray(this.updateOnly)
         ? this.updateOnly
         : [this.updateOnly as string];
-      this.onDuplicate = "update";
+      this.onDuplicate = ":update";
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
-      this.onDuplicate = "update";
-    } else if (onDuplicate === "update" && isEmpty(this.updatableColumns())) {
-      this.onDuplicate = "skip";
+      this.onDuplicate = ":update";
+    } else if (onDuplicate === ":update" && isEmpty(this.updatableColumns())) {
+      this.onDuplicate = ":skip";
     }
   }
 
@@ -411,9 +408,8 @@ export class InsertAll {
   }
 
   /** @internal */
-  private disallowRawSqlBang(value: unknown, permit: RegExp = COLUMN_NAME_WITH_ORDER): void {
-    if (typeof value !== "string" || Arel.arelNode(value)) return;
-    if (permit.test(value)) return;
+  private disallowRawSqlBang(value: unknown): void {
+    if (typeof value !== "string" || isSymbol(value) || Arel.arelNode(value)) return;
 
     throw new ArgumentError(
       "Dangerous query method (method whose arguments are used as raw " +
@@ -503,7 +499,8 @@ export class Builder implements InsertBuilder {
     const cols = Array.isArray(ret) ? ret : [ret];
     const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     return cols
-      .map((attr: string) => {
+      .map((attribute: string) => {
+        const attr = isSymbol(attribute) ? symbolToS(attribute) : attribute;
         const physical = aliases?.[attr];
         if (physical) {
           return `${this.quoteColumn(physical)} AS ${this.quoteColumn(attr)}`;

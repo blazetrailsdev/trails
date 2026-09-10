@@ -1,4 +1,5 @@
 import { expect } from "vitest";
+import { NameError } from "@blazetrails/ruby-compat";
 import { registerConstant } from "./inflector.js";
 
 class AceBaseCase {}
@@ -25,18 +26,18 @@ export function runConstantizeTestsOn(yieldFn: (name: string) => unknown): void 
   expect(yieldFn("ConstantizeTestCases")).toBe(ConstantizeTestCases);
   expect(yieldFn("::ConstantizeTestCases")).toBe(ConstantizeTestCases);
 
-  expect(() => yieldFn("UnknownClass")).toThrow(ReferenceError);
-  expect(() => yieldFn("UnknownClass::Ace")).toThrow(ReferenceError);
-  expect(() => yieldFn("UnknownClass::Ace::Base")).toThrow(ReferenceError);
-  expect(() => yieldFn("An invalid string")).toThrow(ReferenceError);
-  expect(() => yieldFn("InvalidClass\n")).toThrow(ReferenceError);
-  expect(() => yieldFn("Ace::ConstantizeTestCases")).toThrow(ReferenceError);
-  expect(() => yieldFn("Ace::Base::ConstantizeTestCases")).toThrow(ReferenceError);
-  expect(() => yieldFn("Ace::Gas::Base")).toThrow(ReferenceError);
-  expect(() => yieldFn("Ace::Gas::ConstantizeTestCases")).toThrow(ReferenceError);
-  expect(() => yieldFn("")).toThrow(ReferenceError);
-  expect(() => yieldFn("::")).toThrow(ReferenceError);
-  expect(() => yieldFn("Ace::gas")).toThrow(ReferenceError);
+  expect(() => yieldFn("UnknownClass")).toThrow(NameError);
+  expect(() => yieldFn("UnknownClass::Ace")).toThrow(NameError);
+  expect(() => yieldFn("UnknownClass::Ace::Base")).toThrow(NameError);
+  expect(() => yieldFn("An invalid string")).toThrow(NameError);
+  expect(() => yieldFn("InvalidClass\n")).toThrow(NameError);
+  expect(() => yieldFn("Ace::ConstantizeTestCases")).toThrow(NameError);
+  expect(() => yieldFn("Ace::Base::ConstantizeTestCases")).toThrow(NameError);
+  expect(() => yieldFn("Ace::Gas::Base")).toThrow(NameError);
+  expect(() => yieldFn("Ace::Gas::ConstantizeTestCases")).toThrow(NameError);
+  expect(() => yieldFn("")).toThrow(NameError);
+  expect(() => yieldFn("::")).toThrow(NameError);
+  expect(() => yieldFn("Ace::gas")).toThrow(NameError);
 }
 
 export function runSafeConstantizeTestsOn(yieldFn: (name: string) => unknown): void {
