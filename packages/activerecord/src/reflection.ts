@@ -326,7 +326,8 @@ export class AbstractReflection {
   }
 
   checkValidityOfInverseBang(): void {
-    if (!this.isPolymorphic() && this.hasInverse() != null && this.hasInverse() !== false) {
+    const hasInverse = this.hasInverse();
+    if (!this.isPolymorphic() && hasInverse != null && hasInverse !== false) {
       const inverse = this.inverseOf();
       if (inverse == null) {
         throw new InverseOfAssociationNotFoundError(this._concrete());
@@ -993,7 +994,8 @@ export class AssociationReflection extends MacroReflection {
   polymorphicInverseOf(
     associatedClass: typeof Base,
   ): AssociationReflection | ThroughReflection | null {
-    if (this.hasInverse() != null && this.hasInverse() !== false) {
+    const hasInverse = this.hasInverse();
+    if (hasInverse != null && hasInverse !== false) {
       const inverseRelationship = associatedClass._reflectOnAssociation(
         this.options.inverseOf as string,
       );
