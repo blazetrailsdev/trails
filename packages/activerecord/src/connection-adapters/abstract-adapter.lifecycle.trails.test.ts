@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { NullLock } from "@blazetrails/activesupport";
 import { TypeMap } from "../type/type-map.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
@@ -26,6 +27,10 @@ async function pinnedPool(a: AbstractAdapter): Promise<ConnectionPool> {
 }
 
 describe("AbstractAdapter connection lifecycle privates", () => {
+  it("installs NullLock on an unpinned connection", () => {
+    expect(new AbstractAdapter({}).lock).toBe(NullLock);
+  });
+
   it("verifiedBang sets _verified and _lastActivity", () => {
     const a = new AbstractAdapter({});
     a.verifiedBang();

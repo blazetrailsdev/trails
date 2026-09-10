@@ -799,6 +799,7 @@ export class AbstractAdapter implements Quoting {
     this.pool = new NullPool();
     this._visitor = this.arelVisitor();
     this._statements = this.buildStatementPool() as StatementPool | null;
+    this.setLockThread(null);
 
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
@@ -839,7 +840,7 @@ export class AbstractAdapter implements Quoting {
 
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
+  lock!: LoadInterlockAwareMonitor | NullLock;
 
   setLockThread(lockThread: unknown): void {
     this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : NullLock;
