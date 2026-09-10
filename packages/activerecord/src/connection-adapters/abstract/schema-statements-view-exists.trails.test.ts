@@ -7,32 +7,34 @@ import { assertNoQueries } from "../../testing/query-assertions.js";
 describe("SchemaStatements#viewExists", () => {
   fixtures({});
 
-  function conn(): AbstractAdapter {
-    return Base.connection as unknown as AbstractAdapter;
+  async function conn(): Promise<AbstractAdapter> {
+    return (await Base.leaseConnection()) as unknown as AbstractAdapter;
   }
 
   const viewName = "view_exists_probe_books";
 
   beforeAll(async () => {
-    await conn().executeMutation(
-      `CREATE VIEW ${conn().quoteTableName(viewName)} AS SELECT * FROM books`,
+    await (
+      await conn()
+    ).executeMutation(
+      `CREATE VIEW ${(await conn()).quoteTableName(viewName)} AS SELECT * FROM books`,
     );
   });
 
   afterAll(async () => {
-    await conn().executeMutation(`DROP VIEW ${conn().quoteTableName(viewName)}`);
+    await (await conn()).executeMutation(`DROP VIEW ${(await conn()).quoteTableName(viewName)}`);
   });
 
   it("issues its probe as a SCHEMA query", async () => {
     await assertNoQueries(false, async () => {
-      expect(await conn().viewExists(viewName)).toBe(true);
-      expect(await conn().viewExists("no_such_view_anywhere")).toBe(false);
+      expect(await (await conn()).viewExists(viewName)).toBe(true);
+      expect(await (await conn()).viewExists("no_such_view_anywhere")).toBe(false);
     });
   });
 
   it("treats a blank name as absent, like Rails' present? guard", async () => {
-    expect(await conn().viewExists("")).toBeNull();
-    expect(await conn().viewExists("   ")).toBeNull();
-    expect(await conn().viewExists(null as unknown as string)).toBeNull();
+    expect(await (await conn()).viewExists("")).toBeNull();
+    expect(await (await conn()).viewExists("   ")).toBeNull();
+    expect(await (await conn()).viewExists(null as unknown as string)).toBeNull();
   });
 });

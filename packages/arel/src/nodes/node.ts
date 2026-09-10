@@ -3,7 +3,9 @@ import { SQLString } from "../collectors/sql-string.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface ArelEngine {
-  connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
+  withConnection<T>(
+    block: (connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } }) => T,
+  ): T;
 }
 
 export const _engine: { current: ArelEngine | null } = { current: null };
@@ -30,12 +32,12 @@ export class Node {
     if (!engine) {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(
-        "undefined method `connection' for nil — Arel::Table.engine is unset. " +
+        "undefined method `with_connection' for nil — Arel::Table.engine is unset. " +
           "Set it to your ActiveRecord base class, or pass an engine to toSql().",
       );
     }
     const collector = new SQLString();
-    return engine.connection.visitor.accept(this, collector).value;
+    return engine.withConnection((connection) => connection.visitor.accept(this, collector).value);
   }
 
   fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {

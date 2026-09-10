@@ -29,7 +29,11 @@ describe("tableless useFixtures (naked/yml)", () => {
   describe("test_yaml_file_with_invalid_column", () => {
     it("raises with Rails-mirrored message listing all unknown columns", async () => {
       await expect(
-        defineJoinTableFixtures(Base.connection, "parrots", nakedYmlParrotsFixtureData),
+        defineJoinTableFixtures(
+          await Base.leaseConnection(),
+          "parrots",
+          nakedYmlParrotsFixtureData,
+        ),
       ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
     });
   });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  type ArelEngine,
   Table,
   sql,
   star,
@@ -1137,8 +1138,9 @@ describe("SelectManagerTest", () => {
     });
 
     it("handles database-specific statements", () => {
-      const pgEngine = {
-        connection: { visitor: new Visitors.PostgreSQL(fakeRecordConnection) },
+      const pgEngine: ArelEngine = {
+        withConnection: (block) =>
+          block({ visitor: new Visitors.PostgreSQL(fakeRecordConnection) }),
       };
       const mgr = new SelectManager();
       mgr.from(users);

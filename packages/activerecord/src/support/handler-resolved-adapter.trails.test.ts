@@ -26,7 +26,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("handler_resolved_comments", { ifExists: true });
+    await (await Base.leaseConnection()).dropTable("handler_resolved_comments", { ifExists: true });
   });
 
   it("connectedQ() is true after setupHandlerSuite()", () => {

@@ -40,7 +40,7 @@ import {
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<void> {
-  const qm = new Nodes.BindParam(null).toSql({ connection: conn });
+  const qm = new Nodes.BindParam(null).toSql({ withConnection: (block) => block(conn) });
   const id = await conn.insert(
     `INSERT INTO events(id) VALUES (${qm})`,
     null,

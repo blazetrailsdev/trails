@@ -1048,7 +1048,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("highPrecisionCurrentTimestamp returns CURRENT_TIMESTAMP literal", () => {
       const ts = adapter.highPrecisionCurrentTimestamp();
 
-      expect(ts.toSql({ connection: adapter })).toBe("CURRENT_TIMESTAMP");
+      expect(ts.toSql({ withConnection: (block) => block(adapter) })).toBe("CURRENT_TIMESTAMP");
     });
 
     it("setConstraints ALL DEFERRED executes without error", async () => {

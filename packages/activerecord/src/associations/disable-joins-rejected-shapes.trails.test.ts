@@ -70,7 +70,9 @@ describe("disable_joins shapes the deleted routing gate rejected", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("rj_members", "rj_comments", "rj_authors", { ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).dropTable("rj_members", "rj_comments", "rj_authors", { ifExists: true });
   });
 
   it("a polymorphic source without source_type raises rather than routing anywhere", async () => {

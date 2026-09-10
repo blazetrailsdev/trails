@@ -12,7 +12,7 @@ beforeAll(async () => {
   });
 });
 afterAll(async () => {
-  await Base.connection.dropTable("metrics", { ifExists: true });
+  await (await Base.leaseConnection()).dropTable("metrics", { ifExists: true });
 });
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {

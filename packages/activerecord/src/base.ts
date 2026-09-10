@@ -3254,9 +3254,8 @@ DatabaseTasks._registerBase(Base);
 runLoadHooks("active_record", Base);
 
 Table.engine = {
-  get connection(): DatabaseAdapter {
-    const pool = Base.connectionPool();
-    return pool.activeConnection ?? pool.leaseConnectionSync();
+  withConnection<T>(block: (connection: DatabaseAdapter) => T): T {
+    return Base.connectionPool().withConnectionSync(block);
   },
 };
 

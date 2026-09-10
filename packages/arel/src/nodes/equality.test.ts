@@ -26,7 +26,9 @@ describe("Arel", () => {
               return fakeRecordConnection.quoteTableName(name);
             },
           };
-          const engine: ArelEngine = { connection: { visitor: new Visitors.ToSql(connection) } };
+          const engine: ArelEngine = {
+            withConnection: (block) => block({ visitor: new Visitors.ToSql(connection) }),
+          };
 
           const attr = new Table("users").get("id");
           const test = attr.eq(10);

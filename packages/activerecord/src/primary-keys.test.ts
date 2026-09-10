@@ -478,7 +478,7 @@ describe("CompositePrimaryKeyTest", () => {
   const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"]);
 
   beforeAll(async () => {
-    const conn = Base.connection as any;
+    const conn = (await Base.leaseConnection()) as any;
     await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
     await conn.createTable(
       "uber_barcodes",
@@ -503,7 +503,7 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   afterAll(async () => {
-    const conn = Base.connection as any;
+    const conn = (await Base.leaseConnection()) as any;
     await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
   });
 

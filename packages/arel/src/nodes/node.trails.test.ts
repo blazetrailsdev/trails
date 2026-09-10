@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { Table, Nodes, Visitors, type ArelEngine } from "../index.js";
 
 describe("TestNode", () => {
   const users = new Table("users");
@@ -170,7 +170,9 @@ describe("Node base polymorphic defaults", () => {
 });
 
 describe("Table.engine", () => {
-  const sqliteEngine = { connection: { visitor: new Visitors.SQLite(fakeRecordConnection) } };
+  const sqliteEngine: ArelEngine = {
+    withConnection: (block) => block({ visitor: new Visitors.SQLite(fakeRecordConnection) }),
+  };
 
   it("Node#toSql() compiles through the engine connection's visitor", () => {
     const users = new Table("users");

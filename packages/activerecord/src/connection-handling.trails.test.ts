@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
 
@@ -20,5 +21,44 @@ describe("directly bound adapter", () => {
     } finally {
       pool.checkin(bound);
     }
+  });
+});
+
+describe("Arel toSql through Table.engine", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("borrows a connection for the visit and returns it to the pool", () => {
+    Base.releaseConnection();
+    const pool = Base.connectionPool();
+    expect(pool.activeConnection).toBeNull();
+
+    expect(new Nodes.SqlLiteral("1").eq(1).toSql()).toBe("1 = 1");
+
+    expect(pool.activeConnection).toBeNull();
+    expect(pool.isPermanentLease()).toBe(true);
+  });
+
+  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", () => {
+    Base.releaseConnection();
+    const pool = Base.connectionPool();
+    const leased = pool.withConnectionSync(() => pool.leaseConnectionSync());
+    try {
+      expect(pool.activeConnection).toBe(leased);
+    } finally {
+      Base.releaseConnection();
+    }
+  });
+
+  it("restores the lease when the checkout itself raises", () => {
+    Base.releaseConnection();
+    const pool = Base.connectionPool();
+    vi.spyOn(pool, "acquireConnectionSync").mockImplementation(() => {
+      throw new Error("checkout failed");
+    });
+    expect(() => pool.withConnectionSync((conn) => conn)).toThrow("checkout failed");
+    expect(pool.activeConnection).toBeNull();
+    expect(pool.isPermanentLease()).toBe(true);
   });
 });

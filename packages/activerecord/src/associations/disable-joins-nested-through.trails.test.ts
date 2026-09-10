@@ -85,7 +85,9 @@ describe("DJAS routing widening — nested-through", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.dropTable("nt_ratings", "nt_comments", "nt_posts", "nt_authors", {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("nt_ratings", "nt_comments", "nt_posts", "nt_authors", {
       ifExists: true,
     });
   });
