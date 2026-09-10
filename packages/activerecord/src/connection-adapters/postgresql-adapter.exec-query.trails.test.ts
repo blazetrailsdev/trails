@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Result } from "../result.js";
 import { Store } from "./abstract/query-cache.js";
+import { ConnectionPool } from "./abstract/connection-pool.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
+import { PoolConfig } from "./pool-config.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
 
@@ -334,27 +338,56 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
 
   it("reads currval on the session that ran its own INSERT", async () => {
     let sequence = 0;
-    let currval = 0;
-    adapter = await makeAdapter(async (sql: unknown) => {
-      const text = typeof sql === "string" ? sql : String((sql as { text: string }).text);
-      if (text.includes("INSERT INTO")) {
-        await Promise.resolve();
-        currval = ++sequence;
-        return { rows: [], fields: [] };
-      }
-      return { rows: [[currval]], fields: [{ name: "currval", dataTypeID: 23 }] };
-    });
-    (adapter as unknown as { _useInsertReturning: boolean })._useInsertReturning = false;
+    let entered!: () => void;
+    const inFirstInsert = new Promise<void>((r) => (entered = r));
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const session = () => {
+      let currval = 0;
+      return async (sql: unknown) => {
+        const text = typeof sql === "string" ? sql : String((sql as { text: string }).text);
+        if (text.includes("INSERT INTO")) {
+          if (sequence === 0) {
+            entered();
+            await gate;
+          }
+          currval = ++sequence;
+          return { rows: [], fields: [] };
+        }
+        return { rows: [[currval]], fields: [{ name: "currval", dataTypeID: 23 }] };
+      };
+    };
+    adapter = await makeAdapter(session());
+    const other = await makeAdapter(session());
+    for (const conn of [adapter, other]) {
+      (conn as unknown as { _useInsertReturning: boolean })._useInsertReturning = false;
+    }
+    const dbConfig = new HashConfig("test", "primary", { adapter: "postgresql" });
+    const pool = new ConnectionPool(new PoolConfig(new ConnectionDescriptor("primary"), dbConfig));
+    for (const conn of [adapter, other]) {
+      (pool as unknown as { _connections: PostgreSQLAdapter[] })._connections.push(conn);
+      (pool as unknown as { _available: { add: (c: PostgreSQLAdapter) => void } })._available.add(
+        conn,
+      );
+      conn.pool = pool;
+    }
 
     const insert = (title: string) =>
-      adapter.execInsert(
-        `INSERT INTO posts (title) VALUES ('${title}')`,
-        "SQL",
-        [],
-        "id",
-        "posts_id_seq",
+      pool.withConnection((conn) =>
+        conn.execInsert(
+          `INSERT INTO posts (title) VALUES ('${title}')`,
+          "SQL",
+          [],
+          "id",
+          "posts_id_seq",
+        ),
       );
-    const [first, second] = await Promise.all([insert("a"), insert("b")]);
+    const p1 = insert("a");
+    await inFirstInsert;
+    const p2 = insert("b");
+    release();
+    const [first, second] = await Promise.all([p1, p2]);
+    await other.close().catch(() => undefined);
 
     expect(first.rows[0][0]).toBe(1);
     expect(second.rows[0][0]).toBe(2);

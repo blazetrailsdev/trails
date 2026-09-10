@@ -28,7 +28,7 @@ import {
   type QueryCacheHost,
   type Store,
 } from "./query-cache.js";
-import { executionContextId } from "./connection-pool/execution-context.js";
+import { executionContextId, withExecutionContext } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -605,26 +605,23 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
-    const needsCheckout = !lease.connection;
-    if (needsCheckout) {
+    if (lease.connection) {
       try {
-        lease.connection = await this.checkout();
-      } catch (err) {
+        return await fn(lease.connection);
+      } finally {
         restoreSticky();
-        throw err;
       }
-    }
-
-    const releaseOnDone = () => {
+    } else {
       restoreSticky();
-      if (!lease.sticky) this.releaseConnection(lease);
-    };
-
-    try {
-      return await fn(lease.connection!);
-    } finally {
-      if (needsCheckout) releaseOnDone();
-      else restoreSticky();
+      return withExecutionContext(async () => {
+        const lease = this.connectionLease();
+        if (preventPermanent) lease.sticky = false;
+        try {
+          return await fn((lease.connection = await this.checkout()));
+        } finally {
+          this.releaseConnection(lease);
+        }
+      });
     }
   }
 
