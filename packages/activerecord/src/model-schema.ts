@@ -1,3 +1,4 @@
+import { _setDeriveJoinTableName } from "./model-schema-slot.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
@@ -892,3 +893,5 @@ function typeForColumn(this: SchemaHost, connection: any, column: any): any {
   }
   return null;
 }
+
+_setDeriveJoinTableName(deriveJoinTableName);

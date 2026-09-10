@@ -1,4 +1,4 @@
-import { deriveJoinTableName } from "../model-schema.js";
+import { _deriveJoinTableName } from "../model-schema-slot.js";
 
 export interface JoinTableHost {
   joinTableName(table1: string, table2: string): string;
@@ -18,5 +18,5 @@ export function findJoinTableName(
 
 /** @internal */
 export function joinTableName(table1: string, table2: string): string {
-  return deriveJoinTableName(table1, table2);
+  return _deriveJoinTableName!(table1, table2);
 }

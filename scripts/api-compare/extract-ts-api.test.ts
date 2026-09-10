@@ -1988,11 +1988,8 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("detects include() calls nested inside a module-level helper function", () => {
-    // Mirrors connection-adapters/abstract-adapter.ts after PR #4458, which
-    // moved the `include(AbstractAdapter, ...)` calls into a guarded
-    // `ensureAbstractAdapterMixinsApplied()` helper to break a module-eval
-    // TDZ cycle. The calls are no longer top-level expression statements but
-    // still describe the host's mixin surface, so they must be attributed.
+    // An include() call nested in a function body is not a top-level
+    // expression statement but still describes the host's mixin surface.
     const info = extractFromFiles("/p", {
       "math.ts": `export const Math = { add() {}, mul() {} };`,
       "node.ts": `export class Node {}`,
