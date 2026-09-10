@@ -327,6 +327,26 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("defers a callback passed to `new` past the construction", () => {
+    // Ruby walks the block of `BodyProxy.new(body) { log(...) }` AFTER the
+    // `new` it hangs off (rack/common_logger.rb:44), the same as any send's
+    // block, so the constructor's callback argument must not lead.
+    const constructed = extractFromSource(
+      `class Foo {
+        call(body) {
+          return new BodyProxy(this.wrap(body), () => {
+            this.log();
+          });
+        }
+      }`,
+    );
+    expect(constructed.instanceMethods.find((m) => m.name === "call")!.callSeq).toEqual([
+      "wrap",
+      "constructor",
+      "log",
+    ]);
+  });
+
   it("defers a `block(...)`-branded callback the way it defers a bare one", () => {
     // `Hash#fetch`'s block arm has to be handed the ruby-compat `block(...)`
     // brand, so the callback reaches the call wrapped in one more
