@@ -603,7 +603,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "a" });
-    const results = await Topic.findBySql("SELECT * FROM topics");
+    const results = await Topic.findBySql('SELECT * FROM "topics"');
     expect(results.length).toBe(1);
   });
 
@@ -652,7 +652,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.findBySql("SELECT * FROM topics");
+    const results = await Topic.findBySql('SELECT * FROM "topics"');
     expect(results.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -664,7 +664,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.findBySql("SELECT * FROM topics");
+    const results = await Topic.findBySql('SELECT * FROM "topics"');
     expect(Array.isArray(results)).toBe(true);
   });
 
@@ -760,7 +760,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.findBySql("SELECT * FROM topics");
+    const results = await Topic.findBySql('SELECT * FROM "topics"');
     expect(Array.isArray(results)).toBe(true);
   });
 

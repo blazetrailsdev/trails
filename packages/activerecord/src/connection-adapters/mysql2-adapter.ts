@@ -291,12 +291,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
+    const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
     try {
-      return await this.log(sql, name, binds ?? [], typeCastedBinds, false, (payload) =>
+      return await this.log(driverSql, name, binds ?? [], typeCastedBinds, false, (payload) =>
         this.withRawConnection({ allowRetry: options?.allowRetry ?? false }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, sql, binds ?? [], typeCastedBinds, {
+          const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], typeCastedBinds, {
             prepare: options?.prepare ?? false,
             notificationPayload: payload,
           });
@@ -400,6 +401,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  private mysqlQuote(sql: string): string {
+    const parts = sql.split(/('(?:[^'\\]|\\.)*')/);
+    for (let i = 0; i < parts.length; i += 2) {
+      parts[i] = parts[i].replace(/"/g, "`");
+    }
+    let result = parts.join("");
+
+    if (/\bOFFSET\b/i.test(result) && !/\bLIMIT\b/i.test(result)) {
+      result = result.replace(/\bOFFSET\b/i, "LIMIT 18446744073709551615 OFFSET");
+    }
+
+    return result;
+  }
+
   /** @internal */
   executeBatch = mysql2ExecuteBatch;
 
@@ -428,12 +443,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string | null = "SQL",
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
+    const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
     try {
-      return await this.log(sql, name, binds, typeCastedBinds, false, (payload) =>
+      return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
         this.withRawConnection({}, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, sql, binds, typeCastedBinds, {
+          const raw = await this.performQuery(mysqlConn, driverSql, binds, typeCastedBinds, {
             prepare: false,
             notificationPayload: payload,
           });
@@ -492,14 +508,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       if (materializeTransactions) {
         await this.materializeTransactions();
       }
+      const driverSql = this.mysqlQuote(sql);
       const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
       try {
-        return await this.log(sql, name, binds, typeCastedBinds, false, (payload) =>
+        return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
           this.withRawConnection(
             { materializeTransactions: false, allowRetry },
             async (rawConn) => {
               const conn = rawConn as unknown as mysql.Connection;
-              const rawResult = await this.performQuery(conn, sql, binds, typeCastedBinds, {
+              const rawResult = await this.performQuery(conn, driverSql, binds, typeCastedBinds, {
                 prepare: prepareOption,
               });
               payload.row_count = rawResult.affectedRows;
