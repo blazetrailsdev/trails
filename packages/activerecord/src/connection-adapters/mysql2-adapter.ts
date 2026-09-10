@@ -16,13 +16,11 @@ import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import {
-  ActiveRecordError,
   AdapterError,
   AdapterTimeout,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseConnectionError,
-  MismatchedForeignKey,
   NoDatabaseError,
 } from "../errors.js";
 import { Result } from "../result.js";
@@ -287,35 +285,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
-    return this.log(driverSql, name, binds ?? [], typeCastedBinds, false, async (payload) => {
-      try {
-        return await this.withRawConnection(
-          { allowRetry: options?.allowRetry ?? false },
-          async (conn) => {
-            const mysqlConn = conn as unknown as mysql.Connection;
-            const raw = await this.performQuery(
-              mysqlConn,
-              driverSql,
-              binds ?? [],
-              typeCastedBinds,
-              {
-                prepare: options?.prepare ?? false,
-                notificationPayload: payload,
-              },
-            );
-            return this.castResult(raw);
-          },
-        );
-      } catch (e: any) {
-        const translated =
-          e instanceof MismatchedForeignKey
-            ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
-            : e instanceof ActiveRecordError
-              ? e
-              : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
-        throw translated;
-      }
-    });
+    try {
+      return await this.log(driverSql, name, binds ?? [], typeCastedBinds, false, (payload) =>
+        this.withRawConnection({ allowRetry: options?.allowRetry ?? false }, async (conn) => {
+          const mysqlConn = conn as unknown as mysql.Connection;
+          const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], typeCastedBinds, {
+            prepare: options?.prepare ?? false,
+            notificationPayload: payload,
+          });
+          return this.castResult(raw);
+        }),
+      );
+    } catch (e) {
+      throw await this._enrichMismatchedForeignKey(e);
+    }
   }
 
   async supportsJson(): Promise<boolean> {
@@ -424,18 +407,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return result;
   }
 
-  private async _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error> {
-    let translated = this.translateExceptionClass(e, sql, binds) as Error;
-    if (translated instanceof MismatchedForeignKey) {
-      translated = translated.setQuery(sql, binds);
-    }
-    if (translated instanceof MismatchedForeignKey) {
-      translated = await this._enrichMismatchedForeignKey(translated);
-    }
-    if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
-    return translated;
-  }
-
   /** @internal */
   executeBatch = mysql2ExecuteBatch;
 
@@ -466,9 +437,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
-      try {
-        return await this.withRawConnection({}, async (conn) => {
+    try {
+      return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
+        this.withRawConnection({}, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
           const raw = await this.performQuery(mysqlConn, driverSql, binds, typeCastedBinds, {
             prepare: false,
@@ -484,31 +455,30 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           }
 
           return affected;
-        });
-      } catch (e: any) {
-        const translated =
-          e instanceof MismatchedForeignKey
-            ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
-            : e instanceof ActiveRecordError
-              ? e
-              : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
-        throw translated;
-      }
-    });
+        }),
+      );
+    } catch (e) {
+      throw await this._enrichMismatchedForeignKey(e);
+    }
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
     return true;
   }
 
-  override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+  override async beginIsolatedDbTransaction(isolation: string): Promise<unknown> {
     const level = fetch<string>(transactionIsolationLevels(), isolation);
-    await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
-      await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
-        materializeTransactions: false,
-      });
-      await this.internalExecute("BEGIN", "TRANSACTION", [], { materializeTransactions: false });
-    });
+    return this.withRawConnection(
+      { allowRetry: true, materializeTransactions: false },
+      async () => {
+        await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
+          materializeTransactions: false,
+        });
+        return this.internalExecute("BEGIN", "TRANSACTION", [], {
+          materializeTransactions: false,
+        });
+      },
+    );
   }
 
   async beginDeferredTransaction(): Promise<unknown> {
@@ -536,9 +506,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       const driverSql = this.mysqlQuote(sql);
       const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-      return await this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
-        try {
-          return await this.withRawConnection(
+      try {
+        return await this.log(driverSql, name, binds, typeCastedBinds, false, (payload) =>
+          this.withRawConnection(
             { materializeTransactions: false, allowRetry },
             async (rawConn) => {
               const conn = rawConn as unknown as mysql.Connection;
@@ -548,17 +518,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               payload.row_count = rawResult.affectedRows;
               return rawResult;
             },
-          );
-        } catch (e: any) {
-          const translated =
-            e instanceof MismatchedForeignKey
-              ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
-              : e instanceof ActiveRecordError
-                ? e
-                : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
-          throw translated;
-        }
-      });
+          ),
+        );
+      } catch (e) {
+        throw await this._enrichMismatchedForeignKey(e);
+      }
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }

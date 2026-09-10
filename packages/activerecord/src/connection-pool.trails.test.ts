@@ -255,10 +255,9 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
   }
 });
 
-it("pin connection isolation across execution contexts", async () => {
+it("a nested execution context shares the pool's single pinned connection", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   let ctx1Conn: DatabaseAdapter | null = null;
-  let ctx2Conn: DatabaseAdapter | null = null;
 
   try {
     await withExecutionContext(async () => {
@@ -267,12 +266,7 @@ it("pin connection isolation across execution contexts", async () => {
 
       await withExecutionContext(async () => {
         await pool.pinConnectionBang();
-        ctx2Conn = await pool.checkout();
-        expect(ctx2Conn).not.toBe(ctx1Conn);
-
-        pool.checkin(ctx2Conn);
-        expect(await pool.checkout()).toBe(ctx2Conn);
-
+        expect(await pool.checkout()).toBe(ctx1Conn);
         await pool.unpinConnectionBang();
       });
 
@@ -281,42 +275,17 @@ it("pin connection isolation across execution contexts", async () => {
     });
 
     expect(ctx1Conn).toBeTruthy();
-    expect(ctx2Conn).toBeTruthy();
-    expect(ctx1Conn).not.toBe(ctx2Conn);
   } finally {
     await closePoolConnections(pool);
   }
 });
 
-it("concurrent checkouts within a pinned context all return the pinned connection", async () => {
-  const pool = makeAmbientPool({ pool: 5 });
-  try {
-    await pool.pinConnectionBang();
-    const pinned = await pool.checkout();
-
-    const results = await Promise.all(
-      Array.from({ length: 11 }, async () => {
-        const first = await pool.checkout();
-        const second = await pool.checkout();
-        return { first, second };
-      }),
-    );
-    for (const { first, second } of results) {
-      expect(first).toBe(pinned);
-      expect(second).toBe(pinned);
-    }
-    await pool.unpinConnectionBang();
-  } finally {
-    await closePoolConnections(pool);
-  }
-});
-
-it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)", async () => {
+it("the pinned connection survives across execution contexts (vitest beforeEach/afterEach)", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   let pinned: DatabaseAdapter | null = null;
   try {
     await withExecutionContext(async () => {
-      await pool.pinConnectionBang({ fixture: true });
+      await pool.pinConnectionBang();
       pinned = await pool.checkout();
     });
     await withExecutionContext(async () => {
@@ -329,7 +298,7 @@ it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)
   }
 });
 
-it("fixture pin holds a leased connection", async () => {
+it("the pinned connection holds a leased connection", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {
     const established = await pool.checkout();
@@ -337,7 +306,7 @@ it("fixture pin holds a leased connection", async () => {
     expect(established.inUse).toBe(false);
 
     await withExecutionContext(async () => {
-      await pool.pinConnectionBang({ fixture: true });
+      await pool.pinConnectionBang();
       expect((await pool.checkout()).inUse).toBe(true);
       await pool.unpinConnectionBang();
     });
@@ -346,10 +315,10 @@ it("fixture pin holds a leased connection", async () => {
   }
 });
 
-it("context pin takes priority over fixture pin in unpin", async () => {
+it("nested pinConnectionBang bumps the depth; the connection is released at depth zero", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {
-    await pool.pinConnectionBang({ fixture: true });
+    await pool.pinConnectionBang();
     await withExecutionContext(async () => {
       await pool.pinConnectionBang();
       const before = await pool.checkout();
@@ -768,9 +737,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const pool = makeAmbientPool({ pool: 1 });
 
       const pinnedCount = (): number =>
-        (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
-          ? 1
-          : 0;
+        (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
       try {
         expect(pinnedCount()).toBe(0);
@@ -786,12 +753,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
       }
     });
 
-    it("two concurrent contexts each pin a connection independently", async () => {
+    it("two concurrent contexts share the pool's single pinned connection", async () => {
       const pool = makeAmbientPool({ pool: 2 });
       const pinnedCount = (): number =>
-        (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
-          ? 1
-          : 0;
+        (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
       try {
         await Promise.all([
@@ -813,7 +778,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       }
     });
 
-    it("unpins when beginTransaction throws", async () => {
+    it("leaves the connection pinned when beginTransaction throws", async () => {
       const pool = makeAmbientPool({ pool: 1 });
       try {
         const seed = await pool.checkout();
@@ -830,13 +795,11 @@ describe("ConnectionPoolConfiguration query cache", () => {
         };
 
         const pinnedCount = (): number =>
-          (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
-            ? 1
-            : 0;
+          (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
         await withExecutionContext(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
-          expect(pinnedCount()).toBe(0);
+          expect(pinnedCount()).toBe(1);
         });
       } finally {
         await closePoolConnections(pool);
@@ -851,13 +814,11 @@ describe("ConnectionPoolConfiguration query cache", () => {
         vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
 
         const pinnedCount = (): number =>
-          (pool as unknown as { _resolvePinnedConnection(): unknown })._resolvePinnedConnection()
-            ? 1
-            : 0;
+          (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
         await withExecutionContext(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");
-          expect(pinnedCount()).toBe(0);
+          expect(pinnedCount()).toBe(1);
         });
       } finally {
         await closePoolConnections(pool);
