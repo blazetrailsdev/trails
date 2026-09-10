@@ -21,10 +21,10 @@ export class File {
     this.#file = file;
   }
 
-  each(): [string, unknown][];
+  each(): IterableIterator<[string, unknown]>;
   each(block: (row: [string, unknown]) => void): void;
-  each(block?: (row: [string, unknown]) => void): [string, unknown][] | void {
-    if (block === undefined) return this.rows();
+  each(block?: (row: [string, unknown]) => void): IterableIterator<[string, unknown]> | void {
+    if (block === undefined) return this.rows()[Symbol.iterator]();
     this.rows().forEach(block);
   }
 
@@ -59,7 +59,7 @@ export class File {
         if (!(error instanceof ConfigurationFile.FormatError)) throw error;
         throw new FormatError(error.message);
       }
-      this.#rawRows = data != null && data !== false ? Object.entries(this.validate(data)) : [];
+      this.#rawRows = data != null && data !== false ? toA(this.validate(data)) : [];
     }
     return this.#rawRows;
   }
@@ -82,12 +82,12 @@ export class File {
     return data;
   }
 
-  private validate(data: unknown): Record<string, unknown> {
-    if (!isPlainObject(data)) {
+  private validate(data: unknown): Record<string, unknown> | Map<unknown, unknown> {
+    if (!isPlainObject(data) && !(data instanceof Map)) {
       throw new FormatError(`fixture is not a hash: ${this.#file}`);
     }
 
-    const invalid = Object.entries(data).filter(([, row]) => !isPlainObject(row));
+    const invalid = toA(data).filter(([, row]) => !isPlainObject(row));
     if (invalid.length > 0) {
       throw new FormatError(
         `fixture key is not a hash: ${this.#file}, keys: ` +
@@ -96,4 +96,10 @@ export class File {
     }
     return data;
   }
+}
+
+function toA(hash: Record<string, unknown> | Map<unknown, unknown>): [string, unknown][] {
+  return hash instanceof Map
+    ? [...hash].map(([key, value]) => [String(key), value])
+    : Object.entries(hash);
 }

@@ -1,7 +1,12 @@
+import { File, pack } from "@blazetrails/ruby-compat";
+
 import { FixtureSet } from "../fixtures.js";
 
 export class RenderContext {
-  static createSubclass(): new () => { getBinding(): Record<string, unknown> } {
+  static createSubclass(): new () => {
+    getBinding(): Record<string, unknown>;
+    binary(path: string): string;
+  } {
     return class extends FixtureSet.contextClass {
       getBinding(): Record<string, unknown> {
         const binding: Record<string, unknown> = {};
@@ -18,6 +23,10 @@ export class RenderContext {
           }
         }
         return binding;
+      }
+
+      binary(path: string): string {
+        return `!!binary "${pack([File.binread(path)], "m0")}"`;
       }
     };
   }

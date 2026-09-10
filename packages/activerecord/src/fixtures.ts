@@ -893,6 +893,8 @@ export async function prepareJoinTableFixtures(
   };
 }
 
+const contextClasses = new WeakMap<object, new () => object>();
+
 export class FixtureSet {
   static readonly MAX_ID = 2 ** 30 - 1;
 
@@ -922,10 +924,13 @@ export class FixtureSet {
     return out;
   }
 
-  static #contextClass?: new () => object;
-
   static get contextClass(): new () => object {
-    return (FixtureSet.#contextClass ??= class {});
+    let contextClass = contextClasses.get(this);
+    if (contextClass === undefined) {
+      contextClass = class {};
+      contextClasses.set(this, contextClass);
+    }
+    return contextClass;
   }
 
   static async createFixtures<T extends BaseClass, K extends string>(
