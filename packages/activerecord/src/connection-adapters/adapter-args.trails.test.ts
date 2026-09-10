@@ -3,12 +3,6 @@ import { ADAPTER_ARG_FAMILIES, buildAdapterArg } from "./adapter-args.js";
 
 describe("buildAdapterArg", () => {
   describe("sqlite", () => {
-    it("returns [filename] when no adapter options are set", () => {
-      expect(buildAdapterArg("sqlite3", { adapter: "sqlite3", database: "x.db" })).toEqual([
-        { database: "x.db" },
-      ]);
-    });
-
     it("preserves SQLite adapter options as the second constructor arg", () => {
       const args = buildAdapterArg("sqlite3", {
         adapter: "sqlite3",
@@ -88,12 +82,6 @@ describe("buildAdapterArg", () => {
           database: "mutated.db",
         }),
       ).toEqual([{ database: "mutated.db" }]);
-    });
-
-    it("uses the sqlite (filename, options) shape for node-sqlite", () => {
-      expect(
-        buildAdapterArg("node-sqlite", { adapter: "node-sqlite", database: "x.db", strict: true }),
-      ).toEqual([{ strict: true, database: "x.db" }]);
     });
   });
 

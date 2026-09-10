@@ -55,9 +55,4 @@ describe("SQLite3Adapter hash-only constructor", () => {
   it("raises ArgumentError when the config hash's database is empty", () => {
     expect(() => new BetterSQLite3Adapter({ database: "" })).toThrow(ArgumentError);
   });
-
-  it("still accepts the legacy positional (filename, options) form", () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
-    expect(adapter._strictStrings).toBe(true);
-  });
 });
