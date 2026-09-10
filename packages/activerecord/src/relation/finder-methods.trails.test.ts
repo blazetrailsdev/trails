@@ -9,6 +9,7 @@ import {
   raiseRecordNotFoundExceptionBang,
   _orderColumns,
 } from "./finder-methods.js";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { RecordNotFound } from "../errors.js";
 
 describe("normalizeFindArgs — simple primary key", () => {
@@ -88,12 +89,15 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
-  it("find(1, 2) on 2-arity PK → single tuple via variadic", () => {
-    expect(normalizeFindArgs("Order", pk, [1, 2])).toEqual({
-      ids: [[1, 2]],
-      wantArray: false,
-      tuples: [[1, 2]],
-    });
+  it("find(1) / find(1, 2) on 2-arity PK → NoMethodError from find_with_ids' ids.first.first", () => {
+    for (const args of [[1], [1, 2]]) {
+      expect(() => normalizeFindArgs("Order", pk, args)).toThrow(
+        new NoMethodError("undefined method 'first' for an instance of Integer"),
+      );
+    }
+    expect(() => normalizeFindArgs("Order", pk, [null])).toThrow(
+      new NoMethodError("undefined method 'first' for nil"),
+    );
   });
 
   it("find([[1, 2], [3, 4]]) → list of tuples", () => {

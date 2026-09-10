@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
 import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
@@ -50,12 +50,15 @@ export function normalizeFindArgs(
   let wantArray: boolean;
 
   if (composite) {
-    const expectsArray = Array.isArray(first) && Array.isArray(first[0]);
-    if (rest.length > 0 && args.every((x) => !Array.isArray(x))) {
-      ids = [args];
-    } else {
-      ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
+    if (!Array.isArray(first)) {
+      throw new NoMethodError(
+        first == null
+          ? "undefined method 'first' for nil"
+          : `undefined method 'first' for an instance of ${rbObjClass(first)}`,
+      );
     }
+    const expectsArray = Array.isArray(first[0]);
+    ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
     wantArray = expectsArray || ids.length !== 1;
   } else if (rest.length > 0) {
     ids = compactUniqIds(args.flat(Infinity));
