@@ -922,11 +922,11 @@ export class FixtureSet {
     return out;
   }
 
+  static #contextClass?: new () => object;
+
   static get contextClass(): new () => object {
     return (FixtureSet.#contextClass ??= class {});
   }
-
-  static #contextClass?: new () => object;
 
   static async createFixtures<T extends BaseClass, K extends string>(
     adapter: DatabaseAdapter,

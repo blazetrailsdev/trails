@@ -43,9 +43,7 @@ export class File {
   private configRow(): Record<string, unknown> {
     if (this.#configRow === undefined) {
       const row = this.rawRows().find(([fixtureName]) => fixtureName === "_fixture");
-      this.#configRow = row
-        ? this.validateConfigRow(row[row.length - 1])
-        : { model_class: null, ignore: null };
+      this.#configRow = row ? this.validateConfigRow(row[1]) : { model_class: null, ignore: null };
     }
     return this.#configRow;
   }

@@ -37,6 +37,11 @@ describe("FixtureSet", () => {
     it("names", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
         expect(
+          fh
+            .each()
+            .map(([name]) => name)
+            .sort(),
+        ).toEqual(
           [
             "signals37",
             "unknown",
@@ -45,23 +50,18 @@ describe("FixtureSet", () => {
             "rails_core_account_2",
             "odegy_account",
           ].sort(),
-        ).toEqual(
-          fh
-            .each()
-            .map(([name]) => name)
-            .sort(),
         );
       });
     });
 
     it("values", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
-        expect([1, 2, 3, 4, 5, 6]).toEqual(
+        expect(
           fh
             .each()
             .map(([, row]) => (row as Record<string, unknown>)["id"])
             .sort(),
-        );
+        ).toEqual([1, 2, 3, 4, 5, 6]);
       });
     });
 
@@ -69,13 +69,13 @@ describe("FixtureSet", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "developers.yml"), (fh) => {
         const devs = Array.from({ length: 8 }, (_, i) => `dev_${i + 3}`);
         const names = fh.each().map(([name]) => name);
-        expect([]).toEqual(devs.filter((dev) => !names.includes(dev)));
+        expect(devs.filter((dev) => !names.includes(dev))).toEqual([]);
       });
     });
 
     it("empty file", () => {
       tmpYaml(["empty", "yml"], "", (t) => {
-        expect([]).toEqual(File.open(t.path!, (fh) => fh.each()));
+        expect(File.open(t.path!, (fh) => fh.each())).toEqual([]);
       });
     });
 
@@ -93,16 +93,18 @@ describe("FixtureSet", () => {
 
     it("wrong config row", () => {
       tmpYaml(["empty", "yml"], "---\n_fixture:\n  class_name: Foo\n", (t) => {
-        let error: unknown;
-        expect(() => {
-          try {
-            File.open(t.path!, (fh) => fh.modelClass);
-          } catch (raised) {
-            error = raised;
-            throw raised;
-          }
-        }).toThrow(FormatError);
-        expect((error as Error).message).toContain("Invalid `_fixture` section");
+        let error!: Error;
+        expect(() =>
+          File.open(t.path!, (fh) => {
+            try {
+              return fh.modelClass;
+            } catch (raised) {
+              error = raised as Error;
+              throw raised;
+            }
+          }),
+        ).toThrow(FormatError);
+        expect(error.message).toContain("Invalid `_fixture` section");
       });
     });
 
@@ -114,7 +116,7 @@ describe("FixtureSet", () => {
       const yaml = "one:\n  name: <%= fixtureHelper() %>\n";
       tmpYaml(["curious", "yml"], yaml, (t) => {
         const golden = [["one", { name: "Fixture helper" }]];
-        expect(golden).toEqual(File.open(t.path!, (fh) => fh.each()));
+        expect(File.open(t.path!, (fh) => fh.each())).toEqual(golden);
       });
       delete (FixtureSet.contextClass.prototype as Record<string, unknown>)["fixtureHelper"];
     });
@@ -132,13 +134,13 @@ describe("FixtureSet", () => {
 
     it("removes fixture config row", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
-        expect(["second_welcome"]).toEqual(fh.each().map(([name]) => name));
+        expect(fh.each().map(([name]) => name)).toEqual(["second_welcome"]);
       });
     });
 
     it("extracts model class from config row", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
-        expect("Post").toEqual(fh.modelClass);
+        expect(fh.modelClass).toEqual("Post");
       });
     });
   });
