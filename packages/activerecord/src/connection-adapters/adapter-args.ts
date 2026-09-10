@@ -52,7 +52,7 @@ export function buildAdapterArg(
       if (syncUrl !== undefined) merged.syncUrl = syncUrl;
       options.driverOptions = merged;
     }
-    return Object.keys(options).length > 0 ? [filename, options] : [filename];
+    return [{ ...options, database: filename }];
   }
   if (url && database === undefined) {
     const { adapter: _ua, url: _uu, ...urlRest } = configuration;

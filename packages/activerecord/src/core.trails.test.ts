@@ -71,7 +71,7 @@ describe("connection checkout for directly-assigned adapters", () => {
   let DirectTopic: typeof Base;
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.execute(
       "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
     );

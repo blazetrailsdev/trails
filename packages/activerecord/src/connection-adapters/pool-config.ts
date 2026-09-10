@@ -219,7 +219,8 @@ export interface TrailsAdapterOptions {
   foreignKeys?: boolean;
 }
 
-export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
+export interface SQLite3Config extends TrailsAdapterOptions {
+  database?: string;
   readonly?: boolean;
   flags?: number;
   driver?: import("../sqlite-adapter.js").SqliteDriver;
@@ -228,10 +229,6 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   timeout?: number | string | false;
   retries?: number | string | false;
   driverOptions?: Record<string, unknown>;
-}
-
-export interface SQLite3Config extends SQLite3AdapterOptions {
-  database?: string;
 }
 
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {

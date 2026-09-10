@@ -186,7 +186,7 @@ new Mysql2Adapter({
 // SQLite3 defaults preparedStatements to true (matches Rails' abstract default).
 // BetterSQLite3Adapter is the concrete `sqlite3` adapter (subclass of
 // SQLite3Adapter, bound to the better-sqlite3 client library).
-new BetterSQLite3Adapter("db/app.sqlite3", { statementLimit: 200 });
+new BetterSQLite3Adapter({ database: "db/app.sqlite3", statementLimit: 200 });
 ```
 
 Adapter-level keys are stripped from the config hash before it's

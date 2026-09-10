@@ -109,7 +109,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("createTable runs the block when options is passed explicitly as undefined", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createTable("things", undefined, (t) => {
       t.string("name");
     });
@@ -117,7 +117,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("changeTable runs the block when options is passed explicitly as undefined", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createTable("things", (t) => {
       t.string("name");
     });
@@ -128,7 +128,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("createJoinTable runs the block when options is passed explicitly as undefined", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createJoinTable("artists", "musics", undefined, (t) => {
       t.column("nickname", "string");
     });
@@ -136,7 +136,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("createTable is callable directly on the adapter", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createTable("things", (t) => {
       t.string("name");
       t.integer("quantity");
@@ -150,7 +150,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("dropTable removes the table", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createTable("temp_table", (t) => {
       t.string("value");
     });
@@ -160,7 +160,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addColumn and columnExists work on adapter", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.createTable("widgets", { id: false }, (t) => {
       t.string("title");
     });

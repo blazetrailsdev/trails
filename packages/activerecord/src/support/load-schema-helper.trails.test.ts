@@ -42,7 +42,9 @@ describe("boot-laid table snapshot", () => {
 
 describe("LoadSchemaHelper", () => {
   test("load_schema", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+    }) as unknown as AbstractAdapter;
     try {
       await loadSchema(adapter);
 

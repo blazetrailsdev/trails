@@ -12,7 +12,7 @@ describe("SQLite3Adapter transaction control", () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-tx-"));
-    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
     await adapter.executeMutation(
       "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -137,7 +137,10 @@ describe("SQLite3Adapter transaction control", () => {
 
   describe("cross-connection isolation", () => {
     it("writer changes are not visible to reader until committed", async () => {
-      const reader = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"), { readonly: true });
+      const reader = new BetterSQLite3Adapter({
+        database: path.join(tmpDir, "db.sqlite3"),
+        readonly: true,
+      });
       try {
         await expect(
           reader.executeMutation("INSERT INTO items (name) VALUES ('x')"),

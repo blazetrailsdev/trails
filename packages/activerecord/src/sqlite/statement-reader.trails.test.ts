@@ -71,9 +71,9 @@ describe.each(drivers)("SqliteStatement#close — %s", (_name, driver, available
 });
 
 const adapters: [string, () => SQLite3Adapter, boolean][] = [
-  ["better-sqlite3", () => new BetterSQLite3Adapter(":memory:"), true],
-  ["libsql", () => new LibSQLAdapter(":memory:"), true],
-  ["node-sqlite", () => new NodeSQLiteAdapter(":memory:"), isNodeSqliteAvailable],
+  ["better-sqlite3", () => new BetterSQLite3Adapter({ database: ":memory:" }), true],
+  ["libsql", () => new LibSQLAdapter({ database: ":memory:" }), true],
+  ["node-sqlite", () => new NodeSQLiteAdapter({ database: ":memory:" }), isNodeSqliteAvailable],
 ];
 
 describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, available) => {

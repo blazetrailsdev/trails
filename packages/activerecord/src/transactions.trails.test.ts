@@ -38,7 +38,7 @@ for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
 const openAdapters: SQLite3Adapter[] = [];
 
 async function makeSQLiteTopic() {
-  const adp = new BetterSQLite3Adapter(":memory:");
+  const adp = new BetterSQLite3Adapter({ database: ":memory:" });
   openAdapters.push(adp);
   await adp.execute(
     "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",

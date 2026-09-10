@@ -12,7 +12,7 @@ import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
-import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
+import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -116,7 +116,7 @@ function isStructuredDefault(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-type SQLite3ConnectionParameters = SQLite3AdapterOptions & {
+type SQLite3ConnectionParameters = SQLite3Config & {
   driver: SqliteDriver;
   database: string;
   resultsAsHash: true;
@@ -244,25 +244,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     cache_size: 2000,
   };
 
-  /** @missingRailsCall merge — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
-  constructor(config: SQLite3Config);
-  /** @deprecated */
-  constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
-  constructor(
-    filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
-    options: SQLite3AdapterOptions = {},
-  ) {
-    let filename: string;
-    if (typeof filenameOrConfig === "object") {
-      const { database, ...rest } = filenameOrConfig;
-      if (database === undefined || database === "") {
-        throw new ArgumentError("No database file specified. Missing argument: database");
-      }
-      filename = database;
-      options = rest;
-    } else {
-      filename = filenameOrConfig;
+  /** @missingRailsCall merge — CONVERGEABLE converge-sqlite3-connection-parameters-merge */
+  constructor(config: SQLite3Config) {
+    const { database, ...options } = config;
+    if (database === undefined || database === "") {
+      throw new ArgumentError("No database file specified. Missing argument: database");
     }
+    let filename = database;
     const strict = hasKey(options, "strict")
       ? options.strict!
       : SQLite3Adapter.strictStringsByDefault;
@@ -275,7 +263,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._strict = strict;
     this._asyncConnectPending = this.driverIsAsync();
     this._connectionParameters = {
-      ...(this._config as SQLite3AdapterOptions),
+      ...(this._config as SQLite3Config),
       driver: this.resolveDriverFactory(),
       database: filename,
       resultsAsHash: true,
@@ -1504,7 +1492,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   private resolveDriverFactory(): SqliteDriver {
-    const driverOpt = (this._config as SQLite3AdapterOptions).driver;
+    const driverOpt = (this._config as SQLite3Config).driver;
     if (driverOpt != null) {
       if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
         throw new TypeError(
@@ -1581,11 +1569,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @noRailsEquivalent PERMANENT */
   static async openAsync(
-    this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
-    filename: string | ":memory:" = ":memory:",
-    options: SQLite3AdapterOptions = {},
+    this: new (config: SQLite3Config) => SQLite3Adapter,
+    config: SQLite3Config,
   ): Promise<SQLite3Adapter> {
-    const adapter = new this(filename, options);
+    const adapter = new this(config);
     await adapter.connectBang();
     return adapter;
   }
@@ -1597,7 +1584,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   private castTimeout(): number | undefined {
-    const cfg = this._config as SQLite3AdapterOptions;
+    const cfg = this._config as SQLite3Config;
     if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
     }
@@ -1615,7 +1602,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    */
   override async configureConnection(): Promise<void> {
     this.castTimeout();
-    const cfg = this._config as SQLite3AdapterOptions;
+    const cfg = this._config as SQLite3Config;
     if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",

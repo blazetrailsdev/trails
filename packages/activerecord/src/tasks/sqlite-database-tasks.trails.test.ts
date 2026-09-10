@@ -82,7 +82,7 @@ describe("SQLiteDatabaseTasks", () => {
 
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
-    const seedAdapter = new BetterSQLite3Adapter(dbPath);
+    const seedAdapter = new BetterSQLite3Adapter({ database: dbPath });
     try {
       await seedAdapter.executeMutation(
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
@@ -114,7 +114,7 @@ describe("SQLiteDatabaseTasks", () => {
         await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
       });
 
-      const loadedAdapter = new BetterSQLite3Adapter(loadDbPath);
+      const loadedAdapter = new BetterSQLite3Adapter({ database: loadDbPath });
       try {
         const tables = (await loadedAdapter.execute(
           "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
@@ -132,7 +132,7 @@ describe("SQLiteDatabaseTasks", () => {
         await (loadedAdapter as unknown as { close(): Promise<void> }).close();
       }
     } finally {
-      const cleanupAdapter = new BetterSQLite3Adapter(dbPath);
+      const cleanupAdapter = new BetterSQLite3Adapter({ database: dbPath });
       await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
       await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
     }

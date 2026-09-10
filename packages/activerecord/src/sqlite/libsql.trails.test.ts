@@ -170,7 +170,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
 
   beforeAll(async () => {
     removeFiles();
-    adapter = new LibSQLAdapter(dbPath);
+    adapter = new LibSQLAdapter({ database: dbPath });
     await adapter.executeMutation(
       "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -301,64 +301,64 @@ describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
 describe("parseSqliteUrl — remote URL pass-through", () => {
   it("passes libsql:// through unchanged", () => {
     expect(buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" })).toEqual([
-      "libsql://mydb.turso.io",
+      { database: "libsql://mydb.turso.io" },
     ]);
   });
 
   it("passes https:// through unchanged", () => {
     expect(buildAdapterArg("libsql-remote", { url: "https://mydb.turso.io" })).toEqual([
-      "https://mydb.turso.io",
+      { database: "https://mydb.turso.io" },
     ]);
   });
 
   it("still strips sqlite3:// prefix for local adapters", () => {
     expect(buildAdapterArg("sqlite3", { url: "sqlite3:///tmp/local.db" })).toEqual([
-      "/tmp/local.db",
+      { database: "/tmp/local.db" },
     ]);
   });
 });
 
 describe("buildAdapterArg — authToken threading", () => {
   it("threads authToken into driverOptions", () => {
-    const [filename, options] = buildAdapterArg("libsql-remote", {
+    const [options] = buildAdapterArg("libsql-remote", {
       url: "libsql://mydb.turso.io",
       authToken: "tok_secret",
-    }) as [string, Record<string, unknown>];
-    expect(filename).toBe("libsql://mydb.turso.io");
+    }) as [Record<string, unknown>];
+    expect(options.database).toBe("libsql://mydb.turso.io");
     expect((options.driverOptions as Record<string, unknown>).authToken).toBe("tok_secret");
   });
 
   it("prefers remote url over database for libsql:// URLs", () => {
-    const [filename] = buildAdapterArg("libsql-remote", {
+    const [options] = buildAdapterArg("libsql-remote", {
       url: "libsql://mydb.turso.io",
       database: "local.db",
       authToken: "tok",
-    }) as [string];
-    expect(filename).toBe("libsql://mydb.turso.io");
+    }) as [Record<string, unknown>];
+    expect(options.database).toBe("libsql://mydb.turso.io");
   });
 
   it("produces no options object when only url and no extras supplied", () => {
     const args = buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" });
     expect(args).toHaveLength(1);
-    expect(args[0]).toBe("libsql://mydb.turso.io");
+    expect(args[0]).toEqual({ database: "libsql://mydb.turso.io" });
   });
 
   it("merges authToken into a pre-existing driverOptions object", () => {
-    const [, options] = buildAdapterArg("libsql-remote", {
+    const [options] = buildAdapterArg("libsql-remote", {
       url: "libsql://mydb.turso.io",
       authToken: "tok",
       driverOptions: { tls: true },
-    }) as [string, Record<string, unknown>];
+    }) as [Record<string, unknown>];
     const driverOpts = options.driverOptions as Record<string, unknown>;
     expect(driverOpts.authToken).toBe("tok");
     expect(driverOpts.tls).toBe(true);
   });
 
   it("forwards a raw driverOptions object when authToken is absent", () => {
-    const [, options] = buildAdapterArg("libsql-remote", {
+    const [options] = buildAdapterArg("libsql-remote", {
       url: "libsql://mydb.turso.io",
       driverOptions: { tls: false },
-    }) as [string, Record<string, unknown>];
+    }) as [Record<string, unknown>];
     expect((options.driverOptions as Record<string, unknown>).tls).toBe(false);
   });
 });
@@ -410,23 +410,23 @@ describe("libsqlReplicaDriver — capabilities and async-open dispatch", () => {
 
 describe("buildAdapterArg — syncUrl threading (replica mode)", () => {
   it("threads syncUrl and authToken into driverOptions", () => {
-    const [filename, options] = buildAdapterArg("libsql-replica", {
+    const [options] = buildAdapterArg("libsql-replica", {
       database: "/tmp/replica.db",
       syncUrl: "libsql://primary.turso.io",
       authToken: "tok_secret",
-    }) as [string, Record<string, unknown>];
-    expect(filename).toBe("/tmp/replica.db");
+    }) as [Record<string, unknown>];
+    expect(options.database).toBe("/tmp/replica.db");
     const driverOpts = options.driverOptions as Record<string, unknown>;
     expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
     expect(driverOpts.authToken).toBe("tok_secret");
   });
 
   it("merges syncUrl into a pre-existing driverOptions object", () => {
-    const [, options] = buildAdapterArg("libsql-replica", {
+    const [options] = buildAdapterArg("libsql-replica", {
       database: "/tmp/replica.db",
       syncUrl: "libsql://primary.turso.io",
       driverOptions: { tls: true },
-    }) as [string, Record<string, unknown>];
+    }) as [Record<string, unknown>];
     const driverOpts = options.driverOptions as Record<string, unknown>;
     expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
     expect(driverOpts.tls).toBe(true);
@@ -501,7 +501,8 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
   let adapter: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
 
   beforeAll(async () => {
-    adapter = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
+    adapter = await LibSQLRemoteAdapter.openAsync({
+      database: tursoUrl,
       driverOptions: { authToken: tursoToken },
     });
   });
@@ -540,14 +541,16 @@ describe.skipIf(!hasCredentials)(
 
     beforeAll(async () => {
       removeFiles();
-      primary = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
+      primary = await LibSQLRemoteAdapter.openAsync({
+        database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       });
       await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
       await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
       await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
 
-      replica = (await LibSQLReplicaAdapter.openAsync(replicaPath, {
+      replica = (await LibSQLReplicaAdapter.openAsync({
+        database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken },
       })) as LibSQLReplicaAdapter;
     });
@@ -597,13 +600,15 @@ describe.skipIf(!hasCredentials)(
 
     beforeAll(async () => {
       removeFiles();
-      primary = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
+      primary = await LibSQLRemoteAdapter.openAsync({
+        database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       });
       await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
       await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
 
-      replica = (await LibSQLReplicaAdapter.openAsync(replicaPath, {
+      replica = (await LibSQLReplicaAdapter.openAsync({
+        database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken, syncPeriod: 1 },
       })) as LibSQLReplicaAdapter;
     });

@@ -46,18 +46,13 @@ describe("SQLite3Adapter hash-only constructor", () => {
   });
 
   it("raises ArgumentError when the config hash has no database", () => {
-    expect(() => new BetterSQLite3Adapter({} as { database?: string })).toThrow(ArgumentError);
-    expect(() => new BetterSQLite3Adapter({} as { database?: string })).toThrow(
+    expect(() => new BetterSQLite3Adapter({})).toThrow(ArgumentError);
+    expect(() => new BetterSQLite3Adapter({})).toThrow(
       "No database file specified. Missing argument: database",
     );
   });
 
   it("raises ArgumentError when the config hash's database is empty", () => {
     expect(() => new BetterSQLite3Adapter({ database: "" })).toThrow(ArgumentError);
-  });
-
-  it("still accepts the legacy positional (filename, options) form", () => {
-    adapter = new BetterSQLite3Adapter(":memory:", { strict: true });
-    expect(adapter._strictStrings).toBe(true);
   });
 });
