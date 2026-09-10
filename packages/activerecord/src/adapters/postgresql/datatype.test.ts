@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -13,11 +13,10 @@ afterAll(() => {
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await leasePgAdapter();
   });
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
-    await adapter.close();
   });
   withTransactionalFixtures(() => adapter);
 
@@ -31,11 +30,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     const { Base } = await import("../../index.js");
-    const a = adapter;
     class PostgresqlTime extends Base {
       static tableName = "postgresql_times";
       static {
-        this.adapter = a;
         this.attribute("id", "integer");
         this.attribute("time_interval", "string");
         this.attribute("scaled_time_interval", "interval");
@@ -54,11 +51,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     const { Base } = await import("../../index.js");
-    const a = adapter;
     class PostgresqlOid extends Base {
       static tableName = "postgresql_oids";
       static {
-        this.adapter = a;
         this.attribute("id", "integer");
       }
     }

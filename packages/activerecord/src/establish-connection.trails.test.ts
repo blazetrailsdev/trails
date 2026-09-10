@@ -8,7 +8,6 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 async function resetConnection() {
-  Base._adapter = null;
   await Base._connectionHandler.clearAllConnections();
   Base._connectionHandler = new ConnectionHandler();
 }

@@ -100,48 +100,42 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   return adapter;
 }
 
-export function makePlainPost(adapter: DatabaseAdapter) {
+export function makePlainPost() {
   return class PlainPost extends Base {
     static {
       this._tableName = "posts";
       this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("body", "string");
-      this.adapter = adapter;
     }
   } as any;
 }
 
-export function makeEncryptedAuthorWithPreviousSchemes(
-  adapter: DatabaseAdapter,
-  previousSchemes: Scheme[],
-) {
+export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]) {
   return class EncryptedAuthor extends Base {
     static {
       this._tableName = "authors";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { previousSchemes });
     }
   } as any;
 }
 
-export function makeEncryptedPost(adapter: DatabaseAdapter) {
+export function makeEncryptedPost() {
   return class EncryptedPost extends Base {
     static {
       this._tableName = "posts";
       this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("body", "text");
-      this.adapter = adapter;
       this.encrypts("title");
       this.encrypts("body");
     }
   } as any;
 }
 
-export function makeEncryptedBook(adapter: DatabaseAdapter) {
+export function makeEncryptedBook() {
   return class EncryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -149,13 +143,12 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true });
     }
   } as any;
 }
 
-export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithDowncaseName() {
   return class EncryptedBookWithDowncaseName extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -163,13 +156,12 @@ export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, downcase: true });
     }
   } as any;
 }
 
-export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
+export function makeEncryptedBookThatIgnoresCase() {
   return class EncryptedBookThatIgnoresCase extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -178,25 +170,23 @@ export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.attribute("original_name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, ignoreCase: true });
     }
   } as any;
 }
 
-export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
+export function makeEncryptedAuthor() {
   return class EncryptedAuthor extends Base {
     static {
       this._tableName = "authors";
       this.attribute("id", "integer");
       this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
-      this.adapter = adapter;
       this.encrypts("name");
     }
   } as any;
 }
 
-export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithCustomCompressor() {
   const customCompressor: Compressor = {
     deflate(data: string): Buffer | Uint8Array {
       return Configurable.config.compressor.deflate(data);
@@ -212,7 +202,6 @@ export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) 
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { compressor: customCompressor });
     }
   } as any;
@@ -230,7 +219,7 @@ const _failingEncryptor: Encryptor = {
   },
 };
 
-export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
+export function makeBookThatWillFailToEncryptName() {
   return class BookThatWillFailToEncryptName extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -238,13 +227,12 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { encryptor: _failingEncryptor });
     }
   } as any;
 }
 
-export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
+export function makeEncryptedTrafficLight() {
   return class EncryptedTrafficLight extends Base {
     static {
       this._tableName = "traffic_lights";
@@ -255,13 +243,12 @@ export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.serialize("state", { type: Array });
       this.serialize("long_state", { type: Array });
-      this.adapter = adapter;
       this.encrypts("state");
     }
   } as any;
 }
 
-export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter) {
+export function makeEncryptedTrafficLightWithStoreState() {
   return class EncryptedTrafficLightWithStoreState extends Base {
     static {
       this._tableName = "traffic_lights";
@@ -271,24 +258,22 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
       this.attribute("updated_at", "datetime");
       this.attribute("long_state", "string");
       this.serialize("long_state", { type: Array });
-      this.adapter = adapter;
       this.encrypts("state");
       this.storeAccessor("state", "color");
     }
   } as any;
 }
 
-export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithBinaryMessagePackSerialized() {
   return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
     static {
       this._tableName = "encrypted_books";
-      this.adapter = adapter;
       this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
     }
   } as any;
 }
 
-export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
+export function makeMsgPackTextBook() {
   return class MsgPackTextBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -296,13 +281,12 @@ export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
-      this.adapter = adapter;
       this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
     }
   } as any;
 }
 
-export function makeUnencryptedBook(adapter: DatabaseAdapter) {
+export function makeUnencryptedBook() {
   return class UnencryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -310,12 +294,11 @@ export function makeUnencryptedBook(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
-      this.adapter = adapter;
     }
   } as any;
 }
 
-export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapter) {
+export function makeEncryptedBookWithUniquenessValidation() {
   return class EncryptedBookWithUniquenessValidation extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -323,14 +306,13 @@ export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapt
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
-      this.adapter = adapter;
       this.validatesUniquenessOf("name");
       this.encrypts("name", { deterministic: true });
     }
   } as any;
 }
 
-export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
+export function makeEncryptedBookAttribute() {
   return class EncryptedBookAttribute extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -338,7 +320,6 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "date");
-      this.adapter = adapter;
       this.encrypts("name");
     }
   } as any;

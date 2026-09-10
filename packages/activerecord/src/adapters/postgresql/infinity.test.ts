@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
@@ -15,7 +15,7 @@ afterAll(() => {
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await leasePgAdapter();
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
     await adapter.execute(`
       CREATE TABLE postgresql_infinities (
@@ -28,17 +28,14 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
-    await adapter.close();
   });
   withTransactionalFixtures(() => adapter);
 
   async function modelClass() {
     const { Base } = await import("../../index.js");
-    const a = adapter;
     class PostgresqlInfinity extends Base {
       static tableName = "postgresql_infinities";
       static {
-        this.adapter = a;
         this.attribute("id", "integer");
       }
     }
@@ -114,12 +111,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         setZone("Pacific Time (US & Canada)");
         const { Base } = await import("../../index.js");
-        const a = adapter;
         class PostgresqlInfinity extends Base {
           static tableName = "postgresql_infinities";
           static timeZoneAwareAttributes = true;
           static {
-            this.adapter = a;
             this.attribute("id", "integer");
           }
         }

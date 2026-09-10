@@ -84,7 +84,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.supportUnencryptedData = false;
     const prevKeyProvider = makeKeyProvider("prev-key-for-schemes-test-32bytes!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider }] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Author();
     const author = await Author.create({ name: "david" });
     const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
@@ -104,7 +105,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.previous = [
       { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
     ] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Author();
     const author = await withoutEncryption(() => Author.create({ name: "unencrypted author" }));
     const reloaded = await Author.find(author.id);
@@ -118,7 +120,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
       }
     } as any;
@@ -138,7 +139,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.encrypts("name", {
           encryptor: new TestEncryptor({ "2": "3" }),
           previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
@@ -157,7 +157,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     } as any;
     new RawModel();
@@ -284,7 +283,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
-        this.adapter = adp;
         this.encrypts("name", { deterministic: true, downcase: false });
       }
     } as any;
@@ -340,7 +338,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
           this._tableName = "authors";
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adp;
           this.encrypts("name", {
             encryptor: currentEncryptor,
             deterministic: { fixed: false },
@@ -354,7 +351,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
           this._tableName = "authors";
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adp;
         }
       } as any;
       new Raw();
@@ -403,7 +399,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
           this._tableName = "authors";
           this.attribute("id", "integer");
           this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
-          this.adapter = adp;
           this.encrypts("name", { deterministic: true, downcase: false });
         }
       } as any;
@@ -454,7 +449,6 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
         this.attribute("name", "string");
       }
     } as any;
-    modelClass.adapter = await freshAdapter();
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
@@ -485,7 +479,6 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
         this.attribute("name", "string");
       }
     } as any;
-    modelClass.adapter = await freshAdapter();
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });

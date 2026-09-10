@@ -3,8 +3,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { NullPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 
 export function leaseFixtureConnection(): DatabaseAdapter {
-  const direct = (Base as unknown as { _adapter?: DatabaseAdapter })._adapter;
-  if (direct) return direct;
   const pool = Base.connectionPool();
   if (pool.isPermanentLease()) return pool.leaseConnectionSync();
   return pool.activeConnection!;

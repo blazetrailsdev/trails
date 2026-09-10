@@ -54,7 +54,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         static name = "Post";
       }
       OmgPost.inheritanceColumn = "disabled";
-      OmgPost.adapter = adapter;
       await fn(OmgPost, db);
     }
 

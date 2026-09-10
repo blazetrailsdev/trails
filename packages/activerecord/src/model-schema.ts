@@ -31,7 +31,6 @@ import {
 function reflectionAdapter(klass: any): any {
   const threaded = threadedConnectionFor(klass);
   if (threaded) return threaded;
-  if (klass._adapter) return klass._adapter;
   const pool = connectionPool.call(klass);
   return pool.activeConnection ?? pool.leaseConnectionSync();
 }
@@ -259,7 +258,6 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   try {
     const hash =
       cachedFrom(threadedConnectionFor(klass)) ??
-      cachedFrom((klass as { _adapter?: { internalSchemaCache?: unknown } })._adapter) ??
       cachedFrom(
         connectionPool.call(klass).activeConnection as { internalSchemaCache?: unknown } | null,
       );
@@ -457,17 +455,12 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   let table: string | undefined;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
-    const direct = (host as unknown as { _adapter?: { internalSchemaCache?: Cache } })._adapter;
-    if (direct?.internalSchemaCache) {
-      cache = direct.internalSchemaCache;
-    } else {
-      const pool = (
-        host as unknown as {
-          connectionPool?: () => { poolConfig?: { schemaCache?: Cache | null } };
-        }
-      ).connectionPool?.();
-      cache = pool?.poolConfig?.schemaCache;
-    }
+    const pool = (
+      host as unknown as {
+        connectionPool?: () => { poolConfig?: { schemaCache?: Cache | null } };
+      }
+    ).connectionPool?.();
+    cache = pool?.poolConfig?.schemaCache;
   } catch {
     return;
   }
@@ -652,8 +645,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
   const startingAdapter: SchemaHost["connection"] | undefined =
-    threadedConnectionFor(this as unknown as typeof Base) ??
-    (this as unknown as { _adapter?: SchemaHost["connection"] })._adapter;
+    threadedConnectionFor(this as unknown as typeof Base) ?? undefined;
   if (!startingAdapter) {
     try {
       return await withConnection.call<typeof Base, [() => Promise<void>], Promise<void>>(

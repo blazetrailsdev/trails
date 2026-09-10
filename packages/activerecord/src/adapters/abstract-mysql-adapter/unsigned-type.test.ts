@@ -7,8 +7,10 @@ import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { deprecator } from "../../deprecator.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -28,7 +30,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     class UnsignedType extends Base {
       static _tableName = "unsigned_types";
     }
-    UnsignedType.adapter = adapter;
     await UnsignedType.loadSchema();
     return UnsignedType;
   }

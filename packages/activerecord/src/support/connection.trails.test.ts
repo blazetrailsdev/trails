@@ -13,7 +13,6 @@ describe("connect", () => {
     DatabaseTasks.clearRegisteredTasks();
     Base.configurations(originalConfigurations);
     await Base.removeConnection();
-    Base._adapter = null;
     vi.unstubAllEnvs();
     await restoreWorkerConnection();
   });

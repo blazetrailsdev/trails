@@ -12,11 +12,11 @@ export function consoleCommand(): Command {
 
     let dbAdapter: any;
     try {
-      const { loadDatabaseConfig, connectAdapter } = await import("../database.js");
+      const { loadDatabaseConfig } = await import("../database.js");
       const config = await loadDatabaseConfig();
-      dbAdapter = await connectAdapter(config);
       const { Base } = await import("@blazetrails/activerecord");
-      Base.adapter = dbAdapter;
+      await Base.establishConnection(config);
+      dbAdapter = await Base.leaseConnection();
       console.log(
         `Connected to ${config.adapter ?? "sqlite3"} (${config.database ?? "in-memory"})`,
       );

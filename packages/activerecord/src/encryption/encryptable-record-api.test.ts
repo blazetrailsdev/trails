@@ -38,7 +38,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt encrypts all the encryptable attributes", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const title = "The Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
 
@@ -56,13 +57,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt won't fail for classes without attributes to encrypt", async () => {
-    const PlainPost = makePlainPost(await freshAdapter());
+    await freshAdapter();
+    const PlainPost = makePlainPost();
     const post = await PlainPost.create({ title: "hello", body: "world" });
     await expect(post.encrypt()).resolves.toBeUndefined();
   });
 
   it("decrypt decrypts encrypted attributes", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const title = "the Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
     const post = await Post.create({ title, body });
@@ -76,7 +79,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("decrypt can be invoked multiple times", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post = await Post.create({
       title: "the Starfleet is here",
       body: "<p>the Starfleet is here, we are safe now!</p>",
@@ -89,7 +93,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt can be invoked multiple times", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post = await Post.create({
       title: "the Starfleet is here",
       body: "<p>the Starfleet is here, we are safe now!</p>",
@@ -103,26 +108,30 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypted_attribute? returns false for regular attributes", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     expect(book.encryptedAttribute("id")).toBe(false);
   });
 
   it("encrypted_attribute? returns true for encrypted attributes which content is encrypted", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     const reloaded = await Book.find(book.id);
     expect(reloaded.encryptedAttribute("name")).toBe(true);
   });
 
   it("encrypted_attribute? returns false for encrypted attributes which content is not encrypted", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     expect(book.encryptedAttribute("name")).toBe(false);
   });
 
   it("ciphertext_for returns the ciphertext for a given attribute", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     const ciphertext = book.ciphertextFor("name");
     expect(typeof ciphertext).toBe("string");
@@ -132,7 +141,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("ciphertext_for returns the persisted ciphertext for a non-deterministically encrypted attribute", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post = await Post.create({
       title: "Fear is the mind-killer",
       body: "Fear is the little-death...",
@@ -145,7 +155,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("ciphertext_for returns the ciphertext of a new value", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     book.name = "Arrakis";
     const ciphertext = book.ciphertextFor("name");
@@ -154,7 +165,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("ciphertext_for returns the ciphertext of a decrypted value", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     await book.decrypt();
     const ciphertext = book.ciphertextFor("name");
@@ -163,7 +175,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("ciphertext_for returns the ciphertext of a value when the record is new", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = new Book();
     book.name = "Dune";
     const ciphertext = book.ciphertextFor("name");
@@ -175,7 +188,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const prevKeyProvider = makeKeyProvider("prev-key-for-encryption-test-32b!!");
     const prevScheme = new Scheme({ keyProvider: prevKeyProvider });
 
-    const Author = makeEncryptedAuthorWithPreviousSchemes(await freshAdapter(), [prevScheme]);
+    await freshAdapter();
+    const Author = makeEncryptedAuthorWithPreviousSchemes([prevScheme]);
 
     const author = await Author.create({ name: "david" });
 
@@ -195,7 +209,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt won't change the encoding of strings even when compression is used", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const title = `The Starfleet is here! ${"OMG👌".repeat(30)}`;
     const post = await withoutEncryption(() => Post.create({ title, body: "some body" }));
     await post.encrypt();
@@ -205,7 +220,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("encrypt will honor forced encoding for deterministic attributes", async () => {
     Configurable.config.forcedEncodingForDeterministicEncryption = "UTF-8";
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
@@ -215,7 +231,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("encrypt won't force encoding for deterministic attributes when option is nil", async () => {
     Configurable.config.forcedEncodingForDeterministicEncryption = "";
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
@@ -225,7 +242,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("encrypt will preserve case when :ignore_case option is used", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
@@ -237,7 +255,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("re-encrypting will preserve case when :ignore_case option is used", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");

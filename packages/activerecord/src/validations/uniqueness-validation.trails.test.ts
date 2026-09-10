@@ -8,6 +8,7 @@ import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
+import { establishConnectionTo } from "../test-helpers/adapter-double.js";
 
 describe("UniquenessValidationContextTest", () => {
   fixtures(["topics"]);
@@ -64,6 +65,7 @@ describe("UniquenessValidationContextTest", () => {
 describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   let adapter: TestDatabaseAdapter;
   let pool: ConnectionPool;
+  let restoreDirectSubscriber: () => Promise<void>;
 
   class DirectSubscriber extends Subscriber {
     static _tableName = "direct_subscribers";
@@ -80,12 +82,14 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
       t.integer("update_count", { null: false, default: 0 });
       t.index("nick", { unique: true });
     });
-    (DirectSubscriber as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
+    pool.releaseConnection();
+    restoreDirectSubscriber = await establishConnectionTo(DirectSubscriber, adapter);
+    await DirectSubscriber.loadSchema();
   });
 
   afterAll(async () => {
+    await restoreDirectSubscriber();
     await adapter.dropTable("direct_subscribers", { ifExists: true });
-    pool.releaseConnection();
     await pool.disconnectBang();
   });
 

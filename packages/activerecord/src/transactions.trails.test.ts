@@ -9,6 +9,7 @@ import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 type StartTransactionState = { level: number; attributes: unknown } | null;
 interface TxRecordInternals {
@@ -48,9 +49,9 @@ async function makeSQLiteTopic() {
       this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("approved", "boolean");
-      this.adapter = adp;
     }
   }
+  await establishConnectionTo(Topic, adp);
   return { Topic, adapter: adp };
 }
 
@@ -318,7 +319,6 @@ describe("SchemaAdapter TM delegation", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = testAdapter;
       }
     }
     await transaction(Item, async () => {
@@ -336,7 +336,6 @@ describe("SchemaAdapter TM delegation", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = testAdapter;
       }
     }
 
@@ -369,7 +368,6 @@ describe("SchemaAdapter TM delegation", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = testAdapter;
       }
     }
     await Item.create({ name: "prime" });
@@ -413,7 +411,6 @@ describe("SchemaAdapter TM delegation", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = testAdapter;
       }
     }
     await Item.create({ name: "prime" });

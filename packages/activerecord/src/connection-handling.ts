@@ -39,24 +39,12 @@ export function currentQueryConnection(): DatabaseAdapter | null {
 }
 
 /**
- * The threaded {@link currentQueryConnection}, but only when it belongs to
- * `modelClass`'s *own* pool — otherwise `null`. Internal reads use this so a
- * statement for model B that runs while only an outer wrap for a *different-pool*
- * model A is active (cross-database eager-load, or `update_columns` issued inside
- * another model's `transaction` block) resolves against B's pool rather than
- * adopting A's connection. The pool-identity check mirrors the `connection`
- * getter's guard; it returns `null` (so callers fall back to `.connection`) for a
- * directly-assigned adapter or a model whose `connectionPool()` throws (e.g. a
- * HABTM join model with no registered pool), preserving those models' existing
- * resolution, so such a model still raises `ConnectionNotEstablished`.
- *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the same threaded connection narrowed to the model's own pool, which Ruby gets from per-pool lease state (connection_handling.rb:309).
  */
 export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter | null {
   const threaded = currentQueryConnection();
   if (!threaded) return null;
-  if ((modelClass as any)._adapter) return null;
   try {
     return connectionPool.call(modelClass).activeConnection === threaded ? threaded : null;
   } catch {
@@ -284,7 +272,6 @@ export function clearQueryCachesForCurrentThread(this: typeof Base): void {
 }
 
 export function leaseConnection(this: typeof Base): Promise<DatabaseAdapter> {
-  if ((this as any)._adapter) return Promise.resolve((this as any)._adapter);
   return connectionPool.call(this).leaseConnection();
 }
 
@@ -298,35 +285,20 @@ export function withConnection<T>(
   options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
 ): Promise<T> {
   try {
-    const pool = leasablePool(this);
-    if (!pool) return Promise.resolve(fn(connection.call(this))) as Promise<T>;
     return Promise.resolve(
-      pool.withConnection(
-        (conn) =>
-          IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, () => Promise.resolve(fn(conn))),
-        options,
-      ),
+      connectionPool
+        .call(this)
+        .withConnection(
+          (conn) =>
+            IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, () =>
+              Promise.resolve(fn(conn)),
+            ),
+          options,
+        ),
     ) as Promise<T>;
   } catch (err) {
     return Promise.reject(err);
   }
-}
-
-/** @internal */
-function leasablePool(modelClass: typeof Base): ConnectionPool | null {
-  const klass = modelClass as unknown as {
-    _adapter?: unknown;
-    connectionPool?(): ConnectionPool | null | undefined;
-  };
-  if (klass._adapter || typeof klass.connectionPool !== "function") return null;
-  let pool: ConnectionPool | null | undefined;
-  try {
-    pool = klass.connectionPool();
-  } catch {
-    return null;
-  }
-  if (!pool || typeof pool.withConnection !== "function") return null;
-  return pool;
 }
 
 export function connectionDbConfig(this: typeof Base) {
@@ -362,7 +334,6 @@ const CONNECTION_DEPRECATION_MSG =
 
 /** @deprecated */
 export function connection(this: typeof Base): DatabaseAdapter {
-  if ((this as any)._adapter) return (this as any)._adapter;
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = ActiveRecord.permanentConnectionCheckout;
@@ -389,10 +360,6 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
 export function adapterClassSync(
   this: typeof Base,
 ): (new (...args: any[]) => DatabaseAdapter) | null {
-  const directAdapter = (this as any)._adapter;
-  if (directAdapter) {
-    return directAdapter.constructor as new (...args: any[]) => DatabaseAdapter;
-  }
   const adapterClass = connectionPool.call(this).dbConfig.adapterClass();
   if (adapterClass instanceof Promise) {
     adapterClass.catch(() => {});
@@ -448,8 +415,6 @@ export function connectionSpecificationName(this: typeof Base): string {
 }
 
 export function schemaCache(this: typeof Base) {
-  const directAdapter = (this as any)._adapter;
-  if (directAdapter) return directAdapter.schemaCache;
   return connectionPool.call(this).schemaCache;
 }
 
@@ -595,17 +560,6 @@ export async function establishConnection(
       },
 ): Promise<void> {
   if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
-  let current: any = modelClass;
-  while (current && typeof current === "function") {
-    if ("_adapter" in current) {
-      current._adapter = null;
-    }
-    const proto = Object.getPrototypeOf(current.prototype);
-    if (!proto) break;
-    const parent = proto.constructor;
-    if (!parent || parent === current) break;
-    current = parent;
-  }
 
   configOrEnv ??= DEFAULT_ENV();
   const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);

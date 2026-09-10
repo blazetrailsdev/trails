@@ -4,8 +4,10 @@ import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test
 import { Base } from "../../base.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -49,7 +51,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           this.enum("state", { start: 0, middle: 1, finish: 2 });
         }
       }
-      EnumTest.adapter = adapter;
 
       const enumTest = await EnumTest.create({ state: "middle" });
       expect((enumTest as any).state).toBe("middle");

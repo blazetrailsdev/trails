@@ -1,20 +1,18 @@
-import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { describe, it, beforeEach, expect } from "vitest";
 import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { captureSql } from "../../testing/sql-capture.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({});
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
   });
 
   describe("CaseSensitivityTest", () => {
-    afterEach(async () => {
-      await adapter.execute("DELETE FROM collation_tests");
-    });
-
     function collationTestModel(): typeof Base {
       class CollationTest extends Base {
         static _tableName = "collation_tests";
@@ -22,7 +20,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.attribute("string_cs_column", "string");
       CollationTest.attribute("string_ci_column", "string");
       CollationTest.attribute("binary_column", "binary");
-      CollationTest.adapter = adapter;
       return CollationTest;
     }
 

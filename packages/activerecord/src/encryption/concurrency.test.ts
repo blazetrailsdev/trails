@@ -29,7 +29,7 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   });
 
   it.skip("models can be encrypted and decrypted in different threads concurrently", async () => {
-    const Book = makeEncryptedBook(adapter);
+    const Book = makeEncryptedBook();
     new Book();
 
     const names = Array.from({ length: 10 }, (_, i) => `Concurrent Book ${i}`);

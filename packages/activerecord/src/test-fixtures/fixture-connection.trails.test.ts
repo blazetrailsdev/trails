@@ -21,19 +21,6 @@ describe("fixture connection source", () => {
 
     expect(leased).toBe(Base.connectionPool().activeConnection);
   });
-
-  it("returns a directly-assigned adapter without consulting the pool", () => {
-    const sentinel = { marker: "direct-adapter" } as never;
-    const previous = Base._adapter;
-    Base._adapter = sentinel;
-    try {
-      ActiveRecord.permanentConnectionCheckout = "disallowed";
-
-      expect(leaseFixtureConnection()).toBe(sentinel);
-    } finally {
-      Base._adapter = previous;
-    }
-  });
 });
 
 describe("per-set fixture connection", () => {

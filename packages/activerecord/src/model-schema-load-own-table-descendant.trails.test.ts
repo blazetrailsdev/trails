@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { registerSubclass } from "./inheritance.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
@@ -34,7 +34,7 @@ const tables: Record<string, Cols> = {
   tickets: { id: col("id"), subject: col("subject") },
 };
 
-function buildHierarchy(asked: string[]) {
+async function buildHierarchy(asked: string[]) {
   class Shape extends Base {
     static override tableName = "shapes";
     static {
@@ -51,15 +51,15 @@ function buildHierarchy(asked: string[]) {
   registerSubclass(VipTicket);
 
   for (const klass of [Shape, Circle, Ticket, VipTicket]) {
-    (klass as unknown as { adapter: unknown }).adapter = makeAdapter(tables, asked);
+    await establishConnectionTo(klass, makeAdapter(tables, asked) as never);
   }
   return { Shape, Circle, Ticket, VipTicket };
 }
 
 describe("loadSchema — own-table descendant under an STI ancestor", () => {
-  it("reflects the descendant's own table, not the STI base's", () => {
+  it("reflects the descendant's own table, not the STI base's", async () => {
     const asked: string[] = [];
-    const { Ticket } = buildHierarchy(asked);
+    const { Ticket } = await buildHierarchy(asked);
 
     const hash = Ticket.columnsHash();
 
@@ -68,9 +68,9 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect(hash).not.toHaveProperty("sides");
   });
 
-  it("marks the descendant itself schema-loaded rather than the STI base", () => {
+  it("marks the descendant itself schema-loaded rather than the STI base", async () => {
     const asked: string[] = [];
-    const { Shape, Ticket } = buildHierarchy(asked);
+    const { Shape, Ticket } = await buildHierarchy(asked);
 
     loadSchema.call(Ticket as never);
 
@@ -78,9 +78,9 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
-  it("gives the descendant its own column set for attribute access", () => {
+  it("gives the descendant its own column set for attribute access", async () => {
     const asked: string[] = [];
-    const { Ticket } = buildHierarchy(asked);
+    const { Ticket } = await buildHierarchy(asked);
 
     expect([...Ticket.columnNames()].sort()).toEqual(["id", "subject"]);
     expect(
@@ -90,9 +90,9 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     ).toEqual(["id", "subject"]);
   });
 
-  it("gives a shared-table subclass of an own-table descendant that descendant's columns", () => {
+  it("gives a shared-table subclass of an own-table descendant that descendant's columns", async () => {
     const asked: string[] = [];
-    const { VipTicket } = buildHierarchy(asked);
+    const { VipTicket } = await buildHierarchy(asked);
 
     const hash = VipTicket.columnsHash();
 
@@ -101,9 +101,9 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect(Object.prototype.hasOwnProperty.call(VipTicket, "_columnsHash")).toBe(true);
   });
 
-  it("gives a genuine STI subclass the base's shared table", () => {
+  it("gives a genuine STI subclass the base's shared table", async () => {
     const asked: string[] = [];
-    const { Circle } = buildHierarchy(asked);
+    const { Circle } = await buildHierarchy(asked);
 
     const hash = Circle.columnsHash();
 

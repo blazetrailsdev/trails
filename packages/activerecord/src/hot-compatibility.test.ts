@@ -40,7 +40,6 @@ describe("HotCompatibilityTest", () => {
 
     class HotCompatibility extends Base {}
     HotCompatibility.tableName = "hot_compatibilities";
-    (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
     return { klass: HotCompatibility, adapter };
   }
 
@@ -94,7 +93,6 @@ describe("HotCompatibilityTest", () => {
     try {
       class HotCompatibility extends Base {}
       HotCompatibility.tableName = "hot_compatibilities";
-      (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
 
       const record = await HotCompatibility.create({ bar: "bar" });
 

@@ -70,7 +70,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts the attribute seamlessly when creating and updating records", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post = await Post.create({ title: "The Starfleet is here!", body: "take cover!" });
     await assertEncryptedAttribute(post, "title", "The Starfleet is here!");
 
@@ -84,7 +85,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("attribute is not accessible with the wrong key", async () => {
     Configurable.config.supportUnencryptedData = false;
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post = await Post.create({ title: "The Starfleet is here!", body: "take cover!" });
 
     await expect(
@@ -99,7 +101,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("swapping key_providers via with_encryption_context", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const keyProvider1 = makeKeyProvider("key-provider-one-for-testing-32b!!");
     const keyProvider2 = makeKeyProvider("key-provider-two-for-testing-32b!!");
 
@@ -131,13 +134,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("ignores nil values", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: null });
     expect(book.name).toBeNull();
   });
 
   it("ignores empty values", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "" });
     expect(book.name).toBe("");
     const dbValues = book._attributes.valuesForDatabase();
@@ -156,7 +161,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title");
         this.encrypts("body", { keyProvider });
       }
@@ -177,7 +181,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.encrypts("name", { key: customKey });
       }
     } as any;
@@ -190,7 +193,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts multiple attributes with different options at the same time", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const title = "The Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
     const post = await Post.create({ title, body });
@@ -199,8 +203,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypted_attributes returns the list of encrypted attributes in a model (each record class holds their own list)", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Post();
     new Author();
     expect(Post.encryptedAttributes).toEqual(new Set(["title", "body"]));
@@ -209,8 +215,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("deterministic_encrypted_attributes returns the list of deterministic encrypted attributes in a model (each record class holds their own list)", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Book();
     new Post();
     expect(deterministicEncryptedAttributes.call(Book)).toEqual(new Set(["name"]));
@@ -218,14 +226,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("by default, encryption is not deterministic", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     const post1 = await Post.create({ title: "the same title", body: "some body" });
     const post2 = await Post.create({ title: "the same title", body: "some body" });
     expect(ciphertextFor(post1, "title")).not.toBe(ciphertextFor(post2, "title"));
   });
 
   it("deterministic attributes can be searched with Active Record queries", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     await Book.create({ name: "Dune" });
     expect(await Book.findBy({ name: "Dune" })).not.toBeNull();
     expect(await Book.findBy({ name: "not Dune" })).toBeNull();
@@ -233,7 +243,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("deterministic attributes can be created by passing deterministic: true", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book1 = await Book.create({ name: "Dune" });
     const book2 = await Book.create({ name: "Dune" });
     expect(ciphertextFor(book1, "name")).toBe(ciphertextFor(book2, "name"));
@@ -241,21 +252,24 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("can work with pre-encryption nil values", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: null }));
     expect(book.name).toBeNull();
   });
 
   it("can work with pre-encryption empty values", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: "" }));
     expect(book.name).toBe("");
   });
 
   it("reading a not encrypted value won't raise a Decryption error when :support_unencrypted_data is true", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     const author = await withoutEncryption(() => Author.create({ name: "Stephen King" }));
     const reloaded = await Author.find(author.id);
     expect(reloaded.name).toBe("Stephen King");
@@ -263,7 +277,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("reading a not encrypted value will raise a Decryption error when :support_unencrypted_data is false", async () => {
     Configurable.config.supportUnencryptedData = false;
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     const author = await withoutEncryption(() => Author.create({ name: "Stephen King" }));
 
     await expect(
@@ -275,14 +290,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("by default, it's case sensitive", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     await Book.create({ name: "Dune" });
     expect(await Book.findBy({ name: "Dune" })).not.toBeNull();
     expect(await Book.findBy({ name: "dune" })).toBeNull();
   });
 
   it("when using downcase: true it ignores case since everything will be downcase", async () => {
-    const Book = makeEncryptedBookWithDowncaseName(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookWithDowncaseName();
     await Book.create({ name: "Dune" });
     expect(await Book.findBy({ name: "Dune" })).not.toBeNull();
     expect(await Book.findBy({ name: "dune" })).not.toBeNull();
@@ -290,7 +307,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when downcase: true it creates content downcased", async () => {
-    const Book = makeEncryptedBookWithDowncaseName(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookWithDowncaseName();
     await Book.create({ name: "Dune" });
     const found = await Book.findBy({ name: "dune" });
     expect(found).not.toBeNull();
@@ -298,7 +316,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when ignore_case: true, it ignores case in queries but keep it when reading the attribute", async () => {
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     await Book.create({ name: "Dune" });
     const book = await Book.findBy({ name: "dune" });
@@ -307,14 +326,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when ignore_case: true, it lets you update attributes normally", async () => {
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     const book = await Book.create({ name: "Dune" });
     await book.update({ name: "Dune II" });
     expect(book.name).toBe("Dune II");
   });
 
   it("won't change the encoding of strings", async () => {
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     const author = await Author.create({ name: "Jorge" });
     const reloaded = await Author.find(author.id);
     expect(typeof reloaded.name).toBe("string");
@@ -322,7 +343,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("track previous changes properly for encrypted attributes", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     await book.update({ name: "A new title!" });
     expect("name" in book.previousChanges).toBe(true);
@@ -335,7 +357,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     } as any;
     Post.encrypts("title");
@@ -352,7 +373,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("isEncryptedAttribute identifies encrypted vs plain attributes", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Post();
     expect(isEncryptedAttribute(Post, "title")).toBe(true);
     expect(isEncryptedAttribute(Post, "body")).toBe(true);
@@ -361,7 +383,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("encrypts serialized attributes", async () => {
     const states = ["green", "red"];
-    const TrafficLight = makeEncryptedTrafficLight(await freshAdapter());
+    await freshAdapter();
+    const TrafficLight = makeEncryptedTrafficLight();
     const trafficLight = await TrafficLight.create({ state: states, long_state: states });
 
     await assertEncryptedAttribute(trafficLight, "state", states);
@@ -372,7 +395,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const EncryptedFirstTrafficLight = class extends Base {
       static {
         this._tableName = "traffic_lights";
-        this.adapter = adp;
         this.attribute("id", "integer");
         this.attribute("state", "string");
         this.attribute("long_state", "string");
@@ -400,7 +422,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts store attributes with accessors", async () => {
-    const TrafficLight = makeEncryptedTrafficLightWithStoreState(await freshAdapter());
+    await freshAdapter();
+    const TrafficLight = makeEncryptedTrafficLightWithStoreState();
     const light = new TrafficLight();
     light.color = "red";
     light.long_state = ["green", "red"];
@@ -409,7 +432,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(light, "state", { color: "red" });
   });
   it("encryption errors when saving records will raise the error and don't save anything", async () => {
-    const Book = makeBookThatWillFailToEncryptName(await freshAdapter());
+    await freshAdapter();
+    const Book = makeBookThatWillFailToEncryptName();
     new Book();
     const countBefore = await Book.count();
     await expect(Book.create({ name: "Dune" })).rejects.toThrow(Encryption);
@@ -417,7 +441,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("can't modify encrypted attributes when frozen_encryption is true", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Post();
     const post = await Post.create({ title: "Original", body: "body" });
     post.title = "Some new title";
@@ -430,7 +455,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   const authorNameLimitPresent = currentAdapter("Mysql2Adapter", "TrilogyAdapter");
 
   it.skipIf(!authorNameLimitPresent)("validate column sizes", async () => {
-    const Author = makeEncryptedAuthor(await freshAdapter());
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
     new Author();
     await Author.loadSchema();
     const authorNameLimit = (Author.columnsHash()["name"] as { limit: number }).limit;
@@ -442,7 +468,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forces UTF-8 encoding for deterministic attributes by default", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
     const book = await Book.create({ name: "Dune" });
     const reloaded = await Book.find(book.id);
@@ -452,7 +479,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("forces encoding for deterministic attributes based on the configured option", async () => {
     Configurable.config.forcedEncodingForDeterministicEncryption = "ASCII";
     const adp = await freshAdapter();
-    const Book = makeEncryptedBook(adp);
+    const Book = makeEncryptedBook();
     new Book();
     const book = await Book.create({ name: "Helló" });
     const normalized = await Book.create({ name: "Hell?" });
@@ -463,7 +490,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("forced encoding for deterministic attributes will replace invalid characters", async () => {
     Configurable.config.forcedEncodingForDeterministicEncryption = "ASCII";
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
     const book = await Book.create({ name: "Hello üñ" });
     const reloaded = await Book.find(book.id);
@@ -473,7 +501,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("forced encoding for deterministic attributes can be disabled", async () => {
     Configurable.config.forcedEncodingForDeterministicEncryption = "";
     const adp = await freshAdapter();
-    const Book = makeEncryptedBook(adp);
+    const Book = makeEncryptedBook();
     new Book();
     const book = await Book.create({ name: "Helló" });
     const unrelated = await Book.create({ name: "Hell?" });
@@ -492,7 +520,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     "insert_on_duplicate_update",
     "loading records with encrypted attributes defined on columns with default values",
     async () => {
-      const Book = makeEncryptedBook(await freshAdapter());
+      await freshAdapter();
+      const Book = makeEncryptedBook();
       new Book();
       await Book.insert({ name: "<untitled>" });
       const book = await Book.last();
@@ -506,7 +535,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true });
       }
     } as any;
@@ -528,7 +556,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.attribute("name", "string", { default: "OVERRIDE" });
         this.encrypts("name", { deterministic: true });
       }
@@ -546,7 +573,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("can dump and load records that use encryption", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
 
     const book = await Book.create({ name: "Dune" });
@@ -582,7 +610,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title", { keyProvider: keyProviderSha1 });
       }
     } as any;
@@ -595,7 +622,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title", { keyProvider: keyProviderSha256 });
       }
     } as any;
@@ -605,7 +631,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(posts.map((p: any) => p.title)).toContain("Post 1");
   });
   it("when ignore_case: true, it keeps both the attribute and the _original counterpart encrypted", async () => {
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await Book.create({ name: "Dune" });
     await assertEncryptedAttribute(book, "name", "Dune");
@@ -618,14 +645,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("when ignore_case: true, it returns the actual value when not encrypted", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await withoutEncryption(async () => Book.create({ name: "Dune" }));
     expect(book.name).toBe("Dune");
   });
 
   it("when ignore_case: true, users can override accessors and call super", async () => {
-    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookThatIgnoresCase();
     const OverridingBook = class extends Book {
       get name() {
         return `${super.name}-overridden`;
@@ -644,7 +673,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = class extends Base {
       static {
         this._tableName = "encrypted_books";
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true, ignoreCase: true });
       }
     } as unknown as typeof Base & {
@@ -698,14 +726,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       deterministicKey: "test deterministic key",
       keyDerivationSalt: "testing key derivation salt",
     });
-    const Book = makeEncryptedBook(adapter);
+    const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: ciphertext }));
     const reloaded = await Book.find(book.id);
     expect(reloaded.name).toBe("Dune");
   });
 
   it("can compress data with custom compressor", async () => {
-    const Book = makeEncryptedBookWithCustomCompressor(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBookWithCustomCompressor();
     new Book();
     const name = "a".repeat(141);
     const book = await Book.create({ name });
@@ -714,9 +743,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(reloaded.name).toBe("[compressed] " + name);
   });
   it("type method returns cast type", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
+    await freshAdapter();
+    const Book = makeEncryptedBook();
     new Book();
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Post();
     expect(Book.typeForAttribute("name").type()).toBe("string");
     expect(Post.typeForAttribute("body").type()).toBe("text");
@@ -759,7 +790,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds errors for changed encrypted attrs", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Post();
     const post = new Post({ title: "hello" });
     post.title = "changed";
@@ -772,7 +804,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds no errors for unchanged attrs", async () => {
-    const Post = makeEncryptedPost(await freshAdapter());
+    await freshAdapter();
+    const Post = makeEncryptedPost();
     new Post();
     const post = new Post({});
     const errored: Array<[string, string]> = [];
@@ -785,7 +818,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("EncryptableRecord.encryptAttributes writes ciphertext to DB and keeps plaintext in memory", async () => {
     const adp = await freshAdapter();
-    const Post = makeEncryptedPost(adp);
+    const Post = makeEncryptedPost();
     new Post();
     const post = await Post.create({ title: "Hello", body: "World" });
     await assertEncryptedAttribute(post, "title", "Hello");
@@ -797,7 +830,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("EncryptableRecord.decryptAttributes stores plaintext in DB", async () => {
     Configurable.config.supportUnencryptedData = true;
     const adp = await freshAdapter();
-    const Post = makeEncryptedPost(adp);
+    const Post = makeEncryptedPost();
     new Post();
     const post = await Post.create({ title: "Hello", body: "World" });
     await assertEncryptedAttribute(post, "title", "Hello");
@@ -815,7 +848,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("updated_at", "datetime");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     } as any;
     await BookDate.create({ name: "bootstrap" });
@@ -976,9 +1008,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     const adapter = await freshAdapter();
     const Model = class extends Base {
       static _tableName = "authors";
-      static {
-        this.adapter = adapter;
-      }
     } as any;
     await Model.loadSchema();
     expect(() => {
@@ -994,7 +1023,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true, ignoreCase: true });
       }
     } as any;
@@ -1015,7 +1043,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
           this.encrypts("name", { deterministic: true, ignoreCase: true });
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       } as any;
       await Model.loadSchema();
@@ -1032,7 +1059,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
         this.attribute("name", "string");
         this.attribute("original_name", "string");
         this.encrypts("name", { deterministic: true, ignoreCase: true });
-        this.adapter = adapter;
       }
     } as any;
     await Model.loadSchema();

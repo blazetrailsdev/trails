@@ -2,25 +2,21 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 describe("directly bound adapter", () => {
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
-    const pool = Base.connectionPool();
-    const bound = await pool.checkout();
-    try {
-      class Boundish extends Base {}
-      Boundish.adapter = bound;
+    class Boundish extends Base {}
+    const bound = adapterDouble();
+    await establishConnectionTo(Boundish, bound);
 
-      const direct = connection.call(Boundish as unknown as typeof Base);
-      const leased = await leaseConnection.call(Boundish as unknown as typeof Base);
-      const scoped = await withConnection.call(Boundish as unknown as typeof Base, (conn) => conn);
+    const direct = connection.call(Boundish as unknown as typeof Base);
+    const leased = await leaseConnection.call(Boundish as unknown as typeof Base);
+    const scoped = await withConnection.call(Boundish as unknown as typeof Base, (conn) => conn);
 
-      expect(direct).toBe(bound);
-      expect(leased).toBe(bound);
-      expect(scoped).toBe(bound);
-    } finally {
-      pool.checkin(bound);
-    }
+    expect(direct).toBe(bound);
+    expect(leased).toBe(bound);
+    expect(scoped).toBe(bound);
   });
 });
 

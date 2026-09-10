@@ -12,7 +12,7 @@ import {
   isSchemaLoaded,
   reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
 } from "./model-schema.js";
-import { connectionPool, threadedConnectionFor } from "./connection-handling.js";
+import { connectionPool } from "./connection-handling.js";
 
 type AnyClass = any;
 
@@ -59,15 +59,6 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   ) {
     registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
 
-    let connection: unknown;
-    try {
-      connection =
-        threadedConnectionFor(cacheHost) ??
-        cacheHost._adapter ??
-        connectionPool.call(cacheHost).activeConnection;
-    } catch {
-      connection = undefined;
-    }
     const columns: Record<string, unknown> =
       (Object.prototype.hasOwnProperty.call(cacheHost, "_columnsHash")
         ? cacheHost._columnsHash
@@ -75,18 +66,22 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       cachedColumnsHash(cacheHost) ??
       {};
     const ignored = new Set<string>(cacheHost.ignoredColumns ?? []);
-    const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
-      string,
-      Attribute
-    >;
-    for (const [name, column] of Object.entries(columns)) {
-      if (ignored.has(name)) continue;
-      attributesHash[name] = Attribute.fromDatabase(
-        name,
-        (column as { default?: unknown }).default ?? null,
-        typeForColumn.call(cacheHost, connection, column),
-      );
-    }
+    const buildAttributesHash = (connection: unknown) => {
+      const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
+        string,
+        Attribute
+      >;
+      for (const [name, column] of Object.entries(columns)) {
+        if (ignored.has(name)) continue;
+        attributesHash[name] = Attribute.fromDatabase(
+          name,
+          (column as { default?: unknown }).default ?? null,
+          typeForColumn.call(cacheHost, connection, column),
+        );
+      }
+      return attributesHash;
+    };
+    const attributesHash = connectionPool.call(cacheHost).withConnectionSync(buildAttributesHash);
 
     const attributeSet = new AttributeSet(attributesHash);
     AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(

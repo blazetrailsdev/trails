@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
 import { registerSubclass } from "./inheritance.js";
 
@@ -48,7 +48,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
-      (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+      await establishConnectionTo(klass, makeAdapter(cols) as never);
     }
 
     await Ticket.loadSchema();
@@ -78,7 +78,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
-      (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+      await establishConnectionTo(klass, makeAdapter(cols) as never);
     }
 
     await Ticket.loadSchema();
