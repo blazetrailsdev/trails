@@ -26,12 +26,10 @@ export class CommonLogger {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const began = clockTime();
+    const beganAt = clockTime();
     const response = await this.app(env);
     const [status, headers, _body] = response;
-    const logger = this.logger || env["rack.errors"];
-    const now = clockTime();
-    this.log(env, status, headers, now - began, logger);
+    this.log(env, status, headers, beganAt);
     return response;
   }
 
@@ -39,9 +37,8 @@ export class CommonLogger {
   private log(
     env: Record<string, any>,
     status: number,
-    headers: Record<string, string | string[]>,
-    elapsed: number,
-    logger: any,
+    responseHeaders: Record<string, string | string[]>,
+    beganAt: number,
   ): void {
     let addr: string;
     if (env["HTTP_X_FORWARDED_FOR"]) {
@@ -53,7 +50,7 @@ export class CommonLogger {
       addr = env["REMOTE_ADDR"] || "-";
     }
 
-    const length = this.extractContentLength(headers);
+    const length = this.extractContentLength(responseHeaders);
 
     // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
     const now = new Date();
@@ -90,13 +87,15 @@ export class CommonLogger {
       env[SERVER_PROTOCOL],
       String(status).slice(0, 4),
       length,
-      elapsed,
+      clockTime() - beganAt,
     );
 
     msg = msg.replace(/[\p{Cc}\p{Cn}\p{Cs}\p{Zl}\p{Zp}]/gu, (c) =>
       sprintf("\\x%x", c.codePointAt(0)),
     );
     msg = msg.slice(0, -1) + "\n";
+
+    const logger = this.logger || env["rack.errors"];
 
     if (logger && typeof logger.write === "function") {
       logger.write(msg);
