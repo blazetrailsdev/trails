@@ -417,6 +417,42 @@ export class ConnectionPool implements ReapablePool {
     return lease.connection;
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   */
+  withConnectionSync<T>(
+    fn: (conn: DatabaseAdapter) => T,
+    options: { preventPermanentCheckout?: boolean } = {},
+  ): T {
+    const preventPermanentCheckout = options.preventPermanentCheckout ?? false;
+    const lease = this.connectionLease();
+    const stickyWas = lease.sticky;
+    if (preventPermanentCheckout) lease.sticky = false;
+
+    if (lease.connection) {
+      try {
+        return fn(lease.connection);
+      } finally {
+        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+      }
+    } else {
+      try {
+        const pinned = this._pinnedConnection;
+        if (pinned && this._connections && !this._connections.includes(pinned)) {
+          this._connections.push(pinned);
+        }
+        return fn(
+          (lease.connection =
+            pinned ?? this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout))),
+        );
+      } finally {
+        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+        if (!lease.sticky) this.releaseConnection(lease);
+      }
+    }
+  }
+
   isPermanentLease(): boolean {
     return this.connectionLease().sticky === null;
   }

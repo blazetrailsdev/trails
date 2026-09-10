@@ -3255,15 +3255,7 @@ runLoadHooks("active_record", Base);
 
 Table.engine = {
   withConnection<T>(block: (connection: DatabaseAdapter) => T): T {
-    const pool = Base.connectionPool();
-    const active = pool.activeConnection;
-    if (active) return block(active);
-    const connection = pool.leaseConnectionSync();
-    try {
-      return block(connection);
-    } finally {
-      pool.releaseConnection();
-    }
+    return Base.connectionPool().withConnectionSync(block);
   },
 };
 

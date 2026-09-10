@@ -32,7 +32,7 @@ export class Node {
     if (!engine) {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(
-        "undefined method `connection' for nil — Arel::Table.engine is unset. " +
+        "undefined method `with_connection' for nil — Arel::Table.engine is unset. " +
           "Set it to your ActiveRecord base class, or pass an engine to toSql().",
       );
     }
