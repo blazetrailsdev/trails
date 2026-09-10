@@ -2,7 +2,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import type { SQLite3Config } from "./connection-adapters/pool-config.js";
-import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
 import { Base } from "./base.js";
 import { activeLane, testConfigurationHashes } from "./support/connection.js";
 
@@ -54,8 +53,6 @@ export function rawTestAdapterConfiguration(): Record<string, unknown> {
 
 /** @internal */
 export let newRawTestAdapter: () => DatabaseAdapter;
-
-const adapterArgs = buildAdapterArg(_primaryConfiguration.adapter as string, _primaryConfiguration);
 
 const { HashConfig } = await import("./database-configurations/hash-config.js");
 const { PoolConfig } = await import("./connection-adapters/pool-config.js");
@@ -117,24 +114,22 @@ export async function checkoutRawTestAdapter(): Promise<{
 
 if (adapterType === "postgres") {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
-  const [config] = adapterArgs as [Record<string, unknown>];
   rawTestAdapterCaps = { max: 1 };
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
+    new PostgreSQLAdapter({ ..._primaryConfiguration, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
-  const [config] = adapterArgs as [Record<string, unknown>];
   rawTestAdapterCaps = { connectionLimit: 1, flags: ["FOUND_ROWS"] };
   newRawTestAdapter = () =>
     new Mysql2Adapter({
-      ...config,
+      ..._primaryConfiguration,
       connectionLimit: 1,
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  const [config] = adapterArgs as [SQLite3Config];
-  newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
+  newRawTestAdapter = () =>
+    new BetterSQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
 }
 
 let _inTestPool: ConnectionPool | null = null;

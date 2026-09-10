@@ -164,6 +164,9 @@ function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
     );
   }
   const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  if (config.authToken !== undefined) {
+    (opts as LibsqlReplicaOptions).authToken = config.authToken;
+  }
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   return new Database(config.database, opts);
 }
@@ -187,7 +190,8 @@ export const libsqlRemoteDriver: SqliteDriver = {
 };
 
 export function isReplicaConfig(config: SqliteOpenConfig): boolean {
-  const syncUrl = (config.driverOptions as { syncUrl?: unknown } | undefined)?.syncUrl;
+  const syncUrl =
+    config.syncUrl ?? (config.driverOptions as { syncUrl?: unknown } | undefined)?.syncUrl;
   return typeof syncUrl === "string" && syncUrl.length > 0;
 }
 
@@ -207,6 +211,8 @@ export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOpti
   const opts: LibsqlReplicaOptions = {
     ...(config.driverOptions as LibsqlReplicaOptions | undefined),
   };
+  if (config.syncUrl !== undefined) opts.syncUrl = config.syncUrl;
+  if (config.authToken !== undefined) opts.authToken = config.authToken;
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   if (opts.syncPeriod !== undefined) {
     if (

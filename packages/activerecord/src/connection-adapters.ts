@@ -1,5 +1,4 @@
 import { AdapterNotFound } from "./errors.js";
-import { ADAPTER_ARG_FAMILIES } from "./connection-adapters/adapter-args.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 export interface ConnectionAdapters {
@@ -87,7 +86,7 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const builtinLoaders: Record<keyof typeof ADAPTER_ARG_FAMILIES, [string, AdapterLoader]> = {
+const builtinLoaders: Record<string, [string, AdapterLoader]> = {
   sqlite3: ["./connection-adapters/better-sqlite3-adapter.js", sqlite3Loader],
   "node-sqlite": ["./connection-adapters/node-sqlite-adapter.js", nodeSqliteLoader],
   "expo-sqlite": ["./connection-adapters/expo-sqlite-adapter.js", expoSqliteLoader],

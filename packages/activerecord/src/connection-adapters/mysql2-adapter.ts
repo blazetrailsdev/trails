@@ -752,6 +752,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   ): Promise<mysql.Connection> {
     const {
       typeCast: userTypeCast,
+      adapter: _adapter,
       strict: _strict,
       waitTimeout: _wt,
       variables: _vars,
@@ -762,6 +763,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...connOptions
     } = config as mysql.PoolOptions &
       MysqlAdapterOptions & {
+        adapter?: string;
         connectionLimit?: number;
         queueLimit?: number;
         waitForConnections?: boolean;

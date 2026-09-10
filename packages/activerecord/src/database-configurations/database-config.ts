@@ -32,20 +32,11 @@ export interface DatabaseConfigOptions {
 type AdapterClassResolver = (
   adapterName: string | undefined,
 ) => (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown>;
-type AdapterArgBuilder = (
-  adapterName: string | undefined,
-  configuration: Record<string, unknown>,
-) => unknown[];
 let _adapterClassResolver: AdapterClassResolver | null = null;
-let _buildAdapterArg: AdapterArgBuilder = (_n, c) => [c];
 
 /** @internal */
-export function _setAdapterClassResolver(
-  fn: AdapterClassResolver,
-  argBuilder: AdapterArgBuilder,
-): void {
+export function _setAdapterClassResolver(fn: AdapterClassResolver): void {
   _adapterClassResolver = fn;
-  _buildAdapterArg = argBuilder;
 }
 
 export class DatabaseConfig {
@@ -94,8 +85,7 @@ export class DatabaseConfig {
     }
     const configurationHash = (this as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
-    const args = _buildAdapterArg(this.adapter, configurationHash as Record<string, unknown>);
-    return new (adapterClass as new (...args: unknown[]) => unknown)(...args);
+    return new (adapterClass as new (config: DatabaseConfigOptions) => unknown)(configurationHash);
   }
 
   validateBang(): true {

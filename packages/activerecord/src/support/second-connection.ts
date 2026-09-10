@@ -3,15 +3,14 @@ import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js"
 import { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../connection-adapters/pool-config.js";
-import { HashConfig } from "../database-configurations/hash-config.js";
+import { UrlConfig } from "../database-configurations/url-config.js";
 
 export async function withSecondAdapter<T>(
   url: string,
   fn: (adapter: PostgreSQLAdapter) => T | Promise<T>,
 ): Promise<T> {
-  const dbConfig = new HashConfig("arunit", "primary", {
+  const dbConfig = new UrlConfig("arunit", "primary", url, {
     adapter: "postgresql",
-    url,
     pool: 1,
   });
   await dbConfig.adapterClass();

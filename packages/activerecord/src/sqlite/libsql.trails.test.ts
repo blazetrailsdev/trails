@@ -12,7 +12,6 @@ import {
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
 import { LibSQLRemoteAdapter } from "../connection-adapters/libsql-remote-adapter.js";
 import { LibSQLReplicaAdapter } from "../connection-adapters/libsql-replica-adapter.js";
-import { buildAdapterArg } from "../connection-adapters/adapter-args.js";
 
 describe("SqliteDriver — libsql round-trip", () => {
   let driver: SqliteConnection;
@@ -298,71 +297,6 @@ describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
   });
 });
 
-describe("parseSqliteUrl — remote URL pass-through", () => {
-  it("passes libsql:// through unchanged", () => {
-    expect(buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" })).toEqual([
-      { database: "libsql://mydb.turso.io" },
-    ]);
-  });
-
-  it("passes https:// through unchanged", () => {
-    expect(buildAdapterArg("libsql-remote", { url: "https://mydb.turso.io" })).toEqual([
-      { database: "https://mydb.turso.io" },
-    ]);
-  });
-
-  it("still strips sqlite3:// prefix for local adapters", () => {
-    expect(buildAdapterArg("sqlite3", { url: "sqlite3:///tmp/local.db" })).toEqual([
-      { database: "/tmp/local.db" },
-    ]);
-  });
-});
-
-describe("buildAdapterArg — authToken threading", () => {
-  it("threads authToken into driverOptions", () => {
-    const [options] = buildAdapterArg("libsql-remote", {
-      url: "libsql://mydb.turso.io",
-      authToken: "tok_secret",
-    }) as [Record<string, unknown>];
-    expect(options.database).toBe("libsql://mydb.turso.io");
-    expect((options.driverOptions as Record<string, unknown>).authToken).toBe("tok_secret");
-  });
-
-  it("prefers remote url over database for libsql:// URLs", () => {
-    const [options] = buildAdapterArg("libsql-remote", {
-      url: "libsql://mydb.turso.io",
-      database: "local.db",
-      authToken: "tok",
-    }) as [Record<string, unknown>];
-    expect(options.database).toBe("libsql://mydb.turso.io");
-  });
-
-  it("produces no options object when only url and no extras supplied", () => {
-    const args = buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" });
-    expect(args).toHaveLength(1);
-    expect(args[0]).toEqual({ database: "libsql://mydb.turso.io" });
-  });
-
-  it("merges authToken into a pre-existing driverOptions object", () => {
-    const [options] = buildAdapterArg("libsql-remote", {
-      url: "libsql://mydb.turso.io",
-      authToken: "tok",
-      driverOptions: { tls: true },
-    }) as [Record<string, unknown>];
-    const driverOpts = options.driverOptions as Record<string, unknown>;
-    expect(driverOpts.authToken).toBe("tok");
-    expect(driverOpts.tls).toBe(true);
-  });
-
-  it("forwards a raw driverOptions object when authToken is absent", () => {
-    const [options] = buildAdapterArg("libsql-remote", {
-      url: "libsql://mydb.turso.io",
-      driverOptions: { tls: false },
-    }) as [Record<string, unknown>];
-    expect((options.driverOptions as Record<string, unknown>).tls).toBe(false);
-  });
-});
-
 describe("isReplicaConfig — embedded-replica mode selection", () => {
   it("selects replica mode when a non-empty syncUrl is present", () => {
     expect(
@@ -378,6 +312,12 @@ describe("isReplicaConfig — embedded-replica mode selection", () => {
     expect(
       isReplicaConfig({ database: "/tmp/replica.db", driverOptions: { authToken: "tok" } }),
     ).toBe(false);
+  });
+
+  it("selects replica mode from a top-level syncUrl in the configuration hash", () => {
+    expect(
+      isReplicaConfig({ database: "/tmp/replica.db", syncUrl: "libsql://primary.turso.io" }),
+    ).toBe(true);
   });
 
   it("does not select replica mode for an empty syncUrl", () => {
@@ -410,24 +350,21 @@ describe("libsqlReplicaDriver — capabilities and async-open dispatch", () => {
 
 describe("buildAdapterArg — syncUrl threading (replica mode)", () => {
   it("threads syncUrl and authToken into driverOptions", () => {
-    const [options] = buildAdapterArg("libsql-replica", {
+    const driverOpts = buildReplicaOptions({
       database: "/tmp/replica.db",
       syncUrl: "libsql://primary.turso.io",
       authToken: "tok_secret",
-    }) as [Record<string, unknown>];
-    expect(options.database).toBe("/tmp/replica.db");
-    const driverOpts = options.driverOptions as Record<string, unknown>;
+    }) as Record<string, unknown>;
     expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
     expect(driverOpts.authToken).toBe("tok_secret");
   });
 
   it("merges syncUrl into a pre-existing driverOptions object", () => {
-    const [options] = buildAdapterArg("libsql-replica", {
+    const driverOpts = buildReplicaOptions({
       database: "/tmp/replica.db",
       syncUrl: "libsql://primary.turso.io",
       driverOptions: { tls: true },
-    }) as [Record<string, unknown>];
-    const driverOpts = options.driverOptions as Record<string, unknown>;
+    }) as Record<string, unknown>;
     expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
     expect(driverOpts.tls).toBe(true);
   });

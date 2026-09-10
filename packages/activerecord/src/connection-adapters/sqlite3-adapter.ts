@@ -662,8 +662,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
 
-  get encoding(): string {
-    return SQLite3Adapter.parseEncoding(this._rawConnection?.pragma("encoding"));
+  get encoding(): string | Promise<string> {
+    const read = (rawConnection: SqliteConnection): string | Promise<string> => {
+      const result = rawConnection.pragma("encoding");
+      return result instanceof Promise
+        ? result.then(SQLite3Adapter.parseEncoding)
+        : SQLite3Adapter.parseEncoding(result);
+    };
+    const rawConnection = this.anyRawConnection() as unknown as
+      | SqliteConnection
+      | Promise<SqliteConnection>;
+    return rawConnection instanceof Promise ? rawConnection.then(read) : read(rawConnection);
   }
 
   /** @internal */
@@ -1611,11 +1620,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await super.configureConnection();
 
     const stmts: [string, string][] = [];
-    const dqsValue = this._strict ? "OFF" : "ON";
-    stmts.push(
-      [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
-      [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
-    );
     const pragmas = fetch<Record<string, string | number | boolean>>(
       cfg as unknown as Record<string, unknown>,
       "pragmas",
