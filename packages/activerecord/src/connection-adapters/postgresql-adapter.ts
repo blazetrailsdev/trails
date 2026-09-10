@@ -985,10 +985,6 @@ export class PostgreSQLAdapter
     });
   }
 
-  async beginDeferredTransaction(): Promise<void> {
-    return this.beginDbTransaction();
-  }
-
   private static _isConnectionError(err: unknown): boolean {
     const e = err as { code?: string; message?: string } | null | undefined;
     if (!e) return false;

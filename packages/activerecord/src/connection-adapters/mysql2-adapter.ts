@@ -84,13 +84,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override isConnected(): boolean {
-    return this._client !== null;
+    const conn = this._rawConnection as
+      | (mysql.Connection & {
+          connection: { _closing?: boolean; stream?: { destroyed?: boolean } };
+        })
+      | null;
+    return !(
+      conn == null ||
+      conn.connection._closing === true ||
+      conn.connection.stream?.destroyed === true
+    );
   }
 
-  private get _client(): mysql.Connection | null {
+  private get _rawConnection(): mysql.Connection | null {
     return this._connection as unknown as mysql.Connection | null;
   }
-  private set _client(value: mysql.Connection | null) {
+  private set _rawConnection(value: mysql.Connection | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
   private _connectingPromise: Promise<mysql.Connection> | null = null;
@@ -149,7 +158,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   _clientForTest(): mysql.Connection | null {
-    return this._client;
+    return this._rawConnection;
   }
 
   private _database: string | undefined;
@@ -330,7 +339,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private async _ensureClient(): Promise<mysql.Connection> {
-    if (this._client) return this._client;
+    if (this._rawConnection) return this._rawConnection;
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       return this._connectingPromise;
     }
@@ -362,7 +371,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           );
         }
         if (this._connectingPromiseGen === gen) this._connectingPromise = null;
-        this._client = conn;
+        this._rawConnection = conn;
         this._statements = null;
         return conn;
       },
@@ -387,7 +396,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   protected override async awaitRawConnectionReady(): Promise<void> {
-    if (this._client === null && !this._permanentlyClosed && !this._isFakeConnection) {
+    if (this._rawConnection === null && !this._permanentlyClosed && !this._isFakeConnection) {
       await this.connectBang();
     }
   }
@@ -478,10 +487,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         });
       },
     );
-  }
-
-  async beginDeferredTransaction(): Promise<unknown> {
-    return this.beginDbTransaction();
   }
 
   override async internalExecute(
@@ -617,8 +622,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    if (!this._client) return false;
-    const [rows] = await this._client.query("SELECT RELEASE_LOCK(?) AS unlocked", [String(lockId)]);
+    if (!this._rawConnection) return false;
+    const [rows] = await this._rawConnection.query("SELECT RELEASE_LOCK(?) AS unlocked", [
+      String(lockId),
+    ]);
     return (rows as Record<string, unknown>[])[0]?.unlocked === 1;
   }
 
@@ -632,7 +639,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
     return this.lock.synchronize(async () => {
       this._connectGeneration++;
-      this._closeRawHandle();
+      this._connectionConfigured = false;
+      this._statements = null;
+      this._endRawConnection();
+      this._rawConnection = null;
       await this._ensureClient();
     });
   }
@@ -641,19 +651,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
       this._connectGeneration++;
-      this._closeRawHandle();
+      this._connectionConfigured = false;
+      this._statements = null;
+      this._endRawConnection();
+      this._rawConnection = null;
     });
   }
 
   /** @internal */
-  private _closeRawHandle(): void {
-    this._connectionConfigured = false;
-    this._statements = null;
-    if (this._client) {
-      const ending = this._client.end().catch(() => {});
-      this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
-      this._client = null;
-    }
+  private _endRawConnection(): void {
+    const ending = this._rawConnection?.end().catch(() => {});
+    if (!ending) return;
+    this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
   }
 
   override discardBang(): void {
@@ -664,9 +673,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.discardBang();
     this._connectionConfigured = false;
     this._statements = null;
-    const conn = this._client;
-    this._client = null;
-    abandonRawSocket(conn);
+    abandonRawSocket(this._rawConnection);
+    this._rawConnection = null;
   }
 
   async close(): Promise<void> {
@@ -674,9 +682,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectGeneration++;
     this._connectionConfigured = false;
     this._statements = null;
-    if (this._client) {
-      await this._client.end();
-      this._client = null;
+    if (this._rawConnection) {
+      await this._rawConnection.end();
+      this._rawConnection = null;
     }
     if (this._endingClient) {
       await this._endingClient;
@@ -701,20 +709,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   get raw(): mysql.Connection {
-    if (!this._client) {
+    if (!this._rawConnection) {
       throw new Error(
         this._permanentlyClosed
           ? "Mysql2Adapter: connection is permanently closed"
           : "Mysql2Adapter: connection not yet established — call execute() or await active() first",
       );
     }
-    return this._client;
+    return this._rawConnection;
   }
 
   /** @internal */
   override async configureConnection(): Promise<void> {
     this._databaseTimezone = ActiveRecord.defaultTimezone;
-    if (this._connectionConfigured || !this._client) return;
+    if (this._connectionConfigured || !this._rawConnection) return;
     this._connectionConfigured = true;
     await super.configureConnection();
     await this.loadEscapeState();

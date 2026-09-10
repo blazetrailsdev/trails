@@ -185,11 +185,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  get _rawConnection(): SqliteConnection {
+  get _rawConnection(): SqliteConnection | null {
     return this._connection as unknown as SqliteConnection;
   }
   /** @internal */
-  set _rawConnection(value: SqliteConnection) {
+  set _rawConnection(value: SqliteConnection | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
   private _asyncConnectPending = false;
@@ -202,7 +202,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   protected async sqliteConnection(): Promise<SqliteConnection> {
     await this.ensureConnected();
-    return this._rawConnection;
+    return this._rawConnection!;
   }
 
   private _readonly: boolean;
@@ -642,7 +642,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const closing = conn.close();
       if (closing) this._chainClose(closing);
     }
-    this._connection = null;
+    this._rawConnection = null;
   }
 
   /** @internal */
@@ -655,7 +655,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await this._rawConnection.exec("ROLLBACK");
+        await this._rawConnection!.exec("ROLLBACK");
       } catch {}
     } else {
       this.connect();
@@ -690,7 +690,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
   override getDatabaseVersion(): Version | Promise<Version> {
     if (this._rawConnection == null && !this._asyncConnectPending) this.connect();
-    const driver = this._rawConnection as SqliteConnection | undefined;
+    const driver = this._rawConnection;
     if (!driver) return new Version("0.0.0");
     const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
     // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled below: an in-process driver answers directly, an async-only one with a Promise.
@@ -1657,7 +1657,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         await checked;
         for (const [sql, label] of stmts) {
           try {
-            await this._rawConnection.pragma(sql);
+            await this._rawConnection!.pragma(sql);
           } catch (e) {
             warn(label, e);
           }
@@ -1666,7 +1666,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
     for (const [sql, label] of stmts) {
       try {
-        this._rawConnection.pragma(sql);
+        this._rawConnection!.pragma(sql);
       } catch (e) {
         warn(label, e);
       }
