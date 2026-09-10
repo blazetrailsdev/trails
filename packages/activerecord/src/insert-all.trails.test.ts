@@ -128,7 +128,7 @@ describe("InsertAll disallow_raw_sql!", () => {
       "Dangerous query method (method whose arguments are used as raw SQL) called: skip.",
     );
     await expect(
-      Book.insertAll([{ name: "Rework", author_id: 1 }], { returning: "id" }),
+      Book.insertAll([{ name: "Rework", author_id: 1 }], { returning: "id" as ":id" }),
     ).rejects.toThrow(
       "Dangerous query method (method whose arguments are used as raw SQL) called: id.",
     );

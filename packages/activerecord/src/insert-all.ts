@@ -22,7 +22,7 @@ export interface InsertAllOptions {
   onDuplicate?: ":raise" | ":skip" | ":update" | Nodes.SqlLiteral;
   updateOnly?: string | string[];
   uniqueBy?: string | string[];
-  returning?: string | string[] | Nodes.SqlLiteral | false;
+  returning?: `:${string}` | `:${string}`[] | Nodes.SqlLiteral | false;
   recordTimestamps?: boolean;
 }
 
