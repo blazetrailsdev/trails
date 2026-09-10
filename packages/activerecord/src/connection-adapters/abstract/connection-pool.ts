@@ -602,18 +602,14 @@ export class ConnectionPool implements ReapablePool {
   ): Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
     const lease = this.connectionLease();
-    const stickyWas = lease.sticky;
-    if (preventPermanent) lease.sticky = false;
-
-    const restoreSticky = () => {
-      if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
-    };
 
     if (lease.connection) {
+      const stickyWas = lease.sticky;
+      if (preventPermanent) lease.sticky = false;
       try {
         return await fn(lease.connection);
       } finally {
-        restoreSticky();
+        if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
       }
     } else {
       let forkedLease!: Lease;
