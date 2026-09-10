@@ -1,15 +1,14 @@
-import { assertValidKeys, ConfigurationFile } from "@blazetrails/activesupport";
+import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
+import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { FormatError } from "../fixtures.js";
 import { RenderContext } from "./render-context.js";
 
-export type FixtureRow = [string, unknown];
-
 export class File {
-  private file: string;
-  private memoRows?: FixtureRow[];
-  private memoConfigRow?: Record<string, unknown>;
-  private memoRawRows?: FixtureRow[];
+  #file: string;
+  #rows?: [string, unknown][];
+  #configRow?: Record<string, unknown>;
+  #rawRows?: [string, unknown][];
 
   static open(file: string): File;
   static open<T>(file: string, block: (fh: File) => T): T;
@@ -19,12 +18,12 @@ export class File {
   }
 
   constructor(file: string) {
-    this.file = file;
+    this.#file = file;
   }
 
-  each(): FixtureRow[];
-  each(block: (row: FixtureRow) => void): void;
-  each(block?: (row: FixtureRow) => void): FixtureRow[] | void {
+  each(): [string, unknown][];
+  each(block: (row: [string, unknown]) => void): void;
+  each(block?: (row: [string, unknown]) => void): [string, unknown][] | void {
     if (block === undefined) return this.rows();
     this.rows().forEach(block);
   }
@@ -37,41 +36,40 @@ export class File {
     return this.configRow()["ignore"];
   }
 
-  private rows(): FixtureRow[] {
-    return (this.memoRows ??= this.rawRows().filter(([fixtureName]) => fixtureName !== "_fixture"));
+  private rows(): [string, unknown][] {
+    return (this.#rows ??= this.rawRows().filter(([fixtureName]) => fixtureName !== "_fixture"));
   }
 
   private configRow(): Record<string, unknown> {
-    if (this.memoConfigRow === undefined) {
+    if (this.#configRow === undefined) {
       const row = this.rawRows().find(([fixtureName]) => fixtureName === "_fixture");
-      this.memoConfigRow = row
+      this.#configRow = row
         ? this.validateConfigRow(row[row.length - 1])
-        : { ":model_class": null, ":ignore": null };
+        : { model_class: null, ignore: null };
     }
-    return this.memoConfigRow;
+    return this.#configRow;
   }
 
-  private rawRows(): FixtureRow[] {
-    if (this.memoRawRows === undefined) {
+  private rawRows(): [string, unknown][] {
+    if (this.#rawRows === undefined) {
       let data: unknown;
       try {
-        data = ConfigurationFile.parse(this.file, {
+        data = ConfigurationFile.parse(this.#file, {
           context: new (RenderContext.createSubclass())().getBinding(),
         });
       } catch (error: unknown) {
         if (!(error instanceof ConfigurationFile.FormatError)) throw error;
         throw new FormatError(error.message);
       }
-      this.memoRawRows =
-        data != null && data !== false ? (Object.entries(this.validate(data)) as FixtureRow[]) : [];
+      this.#rawRows = data != null && data !== false ? Object.entries(this.validate(data)) : [];
     }
-    return this.memoRawRows;
+    return this.#rawRows;
   }
 
   private validateConfigRow(data: unknown): Record<string, unknown> {
-    if (!isHash(data)) {
+    if (!isPlainObject(data)) {
       throw new FormatError(
-        `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.file}`,
+        `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.#file}`,
       );
     }
 
@@ -79,7 +77,7 @@ export class File {
       assertValidKeys(data, ["model_class", "ignore"]);
     } catch (error: unknown) {
       throw new FormatError(
-        `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.file}`,
+        `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.#file}`,
       );
     }
 
@@ -87,21 +85,17 @@ export class File {
   }
 
   private validate(data: unknown): Record<string, unknown> {
-    if (!isHash(data)) {
-      throw new FormatError(`fixture is not a hash: ${this.file}`);
+    if (!isPlainObject(data)) {
+      throw new FormatError(`fixture is not a hash: ${this.#file}`);
     }
 
-    const invalid = Object.entries(data).filter(([, row]) => !isHash(row));
+    const invalid = Object.entries(data).filter(([, row]) => !isPlainObject(row));
     if (invalid.length > 0) {
       throw new FormatError(
-        `fixture key is not a hash: ${this.file}, keys: ` +
+        `fixture key is not a hash: ${this.#file}, keys: ` +
           `[${invalid.map(([key]) => JSON.stringify(key)).join(", ")}]`,
       );
     }
     return data;
   }
-}
-
-function isHash(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
