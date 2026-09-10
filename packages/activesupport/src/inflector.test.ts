@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
   constRegexp,
   pluralize,
@@ -20,7 +20,8 @@ import {
   ordinal,
   ordinalize,
 } from "./index.js";
-import { Inflections, Uncountables } from "./inflector/inflections.js";
+import { Inflections, Uncountables, inflections } from "./inflector/inflections.js";
+import { I18n } from "./i18n.js";
 import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
@@ -102,6 +103,15 @@ const SingularToPlural: Record<string, string> = {
   taxi: "taxis",
 };
 
+const StringToParameterizedAndNormalized: Record<string, string> = {
+  Malmö: "malmo",
+  Garçons: "garcons",
+  OpsÙ: "opsu",
+  Ærøskøbing: "aeroskobing",
+  Aßlar: "asslar",
+  "Japanese: 日本語": "japanese",
+};
+
 function withInflections(fn: (inflect: Inflections) => void): void {
   const inflect = Inflections.instance("en");
   const savedPlurals = [...inflect.plurals];
@@ -127,6 +137,15 @@ function withInflections(fn: (inflect: Inflections) => void): void {
 }
 
 describe("InflectorTest", () => {
+  let enforceAvailableLocales: boolean;
+  beforeAll(() => {
+    enforceAvailableLocales = I18n.config().enforceAvailableLocales;
+    I18n.config().enforceAvailableLocales = false;
+  });
+  afterAll(() => {
+    I18n.config().enforceAvailableLocales = enforceAvailableLocales;
+  });
+
   beforeEach(() => {
     _resetConstants();
     registerConstantizeFixtures();
@@ -148,7 +167,15 @@ describe("InflectorTest", () => {
     expect(pluralize("")).toBe("");
   });
 
-  it.skip("pluralize with fallback");
+  it("pluralize with fallback", () => {
+    const defaultLocale = I18n.defaultLocale();
+    I18n.setDefaultLocale("en-GB");
+    try {
+      expect(pluralize("day")).toBe("days");
+    } finally {
+      I18n.setDefaultLocale(defaultLocale);
+    }
+  });
 
   it("uncountability of ascii word", () => {
     withInflections((inflect) => {
@@ -376,7 +403,13 @@ describe("InflectorTest", () => {
     expect(parameterize("Test with + sign")).toBe("test-with-sign");
   });
 
-  it.skip("parameterize and normalize");
+  it("parameterize and normalize", () => {
+    for (const [someString, parameterizedString] of Object.entries(
+      StringToParameterizedAndNormalized,
+    )) {
+      expect(parameterize(someString)).toBe(parameterizedString);
+    }
+  });
 
   it("parameterize with custom separator", () => {
     expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
@@ -398,7 +431,11 @@ describe("InflectorTest", () => {
     );
   });
 
-  it.skip("parameterize with locale");
+  it("parameterize with locale", () => {
+    const word = "Fünf autos";
+    I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
+    expect(parameterize(word, { locale: "de" })).toBe("fuenf-autos");
+  });
 
   it("classify", () => {
     expect(classify("primary_spokesmen")).toBe("PrimarySpokesman");
@@ -535,7 +572,41 @@ describe("InflectorTest", () => {
     });
   });
 
-  it.skip("inflector locality");
+  it("inflector locality", () => {
+    inflections("es", (inflect) => {
+      inflect.plural(/$/, "s");
+      inflect.plural(/z$/i, "ces");
+
+      inflect.singular(/s$/, "");
+      inflect.singular(/es$/, "");
+
+      inflect.irregular("el", "los");
+
+      inflect.uncountable("agua");
+    });
+
+    expect(pluralize("hijo", "es")).toBe("hijos");
+    expect(pluralize("luz", "es")).toBe("luces");
+    expect(pluralize("luz")).toBe("luzs");
+
+    expect(singularize("sociedades", "es")).toBe("sociedad");
+    expect(singularize("sociedades")).toBe("sociedade");
+
+    expect(pluralize("el", "es")).toBe("los");
+    expect(pluralize("el")).toBe("els");
+
+    expect(pluralize("agua", "es")).toBe("agua");
+    expect(pluralize("agua")).toBe("aguas");
+
+    inflections("es", (inflect) => inflect.clear());
+
+    expect(inflections("es").plurals).toHaveLength(0);
+    expect(inflections("es").singulars).toHaveLength(0);
+    expect([...inflections("es").uncountables]).toHaveLength(0);
+    expect(inflections().plurals).not.toHaveLength(0);
+    expect(inflections().singulars).not.toHaveLength(0);
+    expect([...inflections().uncountables]).not.toHaveLength(0);
+  });
 
   it("clear all", () => {
     withInflections((inflect) => {

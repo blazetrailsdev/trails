@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isIn, presenceIn } from "../../index.js";
+import { ArgumentError } from "../../hash-utils.js";
 
 describe("InTest", () => {
   it("in array", () => {
@@ -38,7 +39,9 @@ describe("InTest", () => {
     expect(outside >= start && outside <= end).toBe(false);
   });
 
-  it.skip("no method catching");
+  it("no method catching", () => {
+    expect(() => isIn(1, 1 as never)).toThrow(ArgumentError);
+  });
 
   it("presence in", () => {
     expect(presenceIn(2, [1, 2, 3])).toBe(2);

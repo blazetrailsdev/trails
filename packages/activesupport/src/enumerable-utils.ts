@@ -1,4 +1,4 @@
-import { valuesAt } from "./hash-utils.js";
+import { ArgumentError, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
 export function sum<T>(collection: T[], fn?: (item: T) => number): number;
@@ -212,7 +212,7 @@ export function isIn<T>(
   if (typeof collection === "object" && collection !== null) {
     return Object.prototype.hasOwnProperty.call(collection, value as string);
   }
-  return false;
+  throw new ArgumentError("The parameter passed to #in? must respond to #include?");
 }
 
 export function presenceIn<T>(
