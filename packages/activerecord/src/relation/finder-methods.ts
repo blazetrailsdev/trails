@@ -36,10 +36,6 @@ export function normalizeFindArgs(
 ): NormalizedFindIds {
   const composite = Array.isArray(pk);
 
-  if (args.length === 0) {
-    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, pk);
-  }
-
   const [first, ...rest] = args;
 
   if (!composite && Array.isArray(first) && first.length === 0) {
@@ -67,7 +63,7 @@ export function normalizeFindArgs(
     ids = compactUniqIds((first as unknown[]).flat(Infinity));
     wantArray = true;
   } else {
-    ids = [first];
+    ids = compactUniqIds([first]);
     wantArray = false;
   }
 

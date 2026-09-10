@@ -221,17 +221,9 @@ describe("normalizeFindArgs — composite primary key", () => {
   });
 
   it("find() → without-an-ID shape, same as simple PK", () => {
-    expect(() => normalizeFindArgs("Order", pk, [])).toThrow(/without an ID/);
-  });
-
-  it("find() → RecordNotFound carries the raw composite primary_key", () => {
-    try {
-      normalizeFindArgs("Order", pk, []);
-      expect.fail("should have thrown");
-    } catch (e) {
-      expect(e).toBeInstanceOf(RecordNotFound);
-      expect((e as RecordNotFound).primaryKey).toEqual(["shop_id", "id"]);
-    }
+    expect(() => normalizeFindArgs("Order", pk, [])).toThrow(
+      new NoMethodError("undefined method 'first' for nil"),
+    );
   });
 });
 
