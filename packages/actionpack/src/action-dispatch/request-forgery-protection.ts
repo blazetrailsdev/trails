@@ -21,7 +21,7 @@ export interface CsrfOptions {
 export class InvalidAuthenticityToken extends Error {
   constructor(message = "Can't verify CSRF token authenticity.") {
     super(message);
-    this.name = "InvalidAuthenticityToken";
+    this.name = "ActionController::InvalidAuthenticityToken";
   }
 }
 

@@ -376,6 +376,45 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/io.c:12063` `rb_io_s_foreach` in its block form: the stream
+   * opens through `open_key_args` (`io.c:12163`), `rb_io_each_line`
+   * (`io.c:4159`) yields each line with its separator retained, and
+   * `rb_ensure` (`io.c:12180`) closes it. The file is read in chunks, never
+   * whole; the decoder streams so a character straddling two chunks survives.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.foreach` (`IO.foreach`,
+   * `vendor/ruby/io.c:12063`).
+   */
+  static foreach(name: string, block: (line: string) => void): null {
+    const fs = getFs();
+    const fd = fs.openSync(name, "r");
+    try {
+      const decoder = new TextDecoder();
+      const buffer = new Uint8Array(8192);
+      let pos = 0;
+      let rest = "";
+      for (;;) {
+        const read = fs.readSync(fd, buffer, 0, buffer.length, pos);
+        rest +=
+          read === 0
+            ? decoder.decode()
+            : decoder.decode(buffer.subarray(0, read), { stream: true });
+        let at;
+        while ((at = rest.indexOf("\n")) !== -1) {
+          block(rest.slice(0, at + 1));
+          rest = rest.slice(at + 1);
+        }
+        if (read === 0) break;
+        pos += read;
+      }
+      if (rest !== "") block(rest);
+    } finally {
+      fs.closeSync(fd);
+    }
+    return null;
+  }
+
+  /**
    * `vendor/ruby/io.c:12377` `rb_io_s_write`, which answers the number of
    * BYTES written rather than the string itself.
    *

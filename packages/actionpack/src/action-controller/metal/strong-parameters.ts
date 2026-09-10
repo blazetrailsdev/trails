@@ -26,7 +26,7 @@ export class ParameterMissing extends Error {
 
   constructor(param: string, keys: string[] | null = null) {
     super(`param is missing or the value is empty or invalid: ${param}`);
-    this.name = "ParameterMissing";
+    this.name = "ActionController::ParameterMissing";
     this.param = param;
     this.keys = keys;
   }

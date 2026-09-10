@@ -3,7 +3,7 @@ import { BadRequest } from "./bad-request.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
     super(message);
-    this.name = "ParameterTypeError";
+    this.name = "Rack::QueryParser::ParameterTypeError";
   }
 }
 include(ParameterTypeError, BadRequest);
@@ -11,7 +11,7 @@ include(ParameterTypeError, BadRequest);
 export class InvalidParameterError extends ArgumentError {
   constructor(message: string) {
     super(message);
-    this.name = "InvalidParameterError";
+    this.name = "Rack::QueryParser::InvalidParameterError";
   }
 }
 include(InvalidParameterError, BadRequest);

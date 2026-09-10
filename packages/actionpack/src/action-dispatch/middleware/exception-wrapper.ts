@@ -2,6 +2,7 @@ import { hasKey } from "@blazetrails/ruby-compat";
 
 import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
+import { statusCode } from "@blazetrails/rack";
 import {
   PathRegistry,
   type BacktraceLocation,
@@ -53,51 +54,39 @@ export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
 }
 
-const STATUS_MAP: Record<string, number> = {
-  Error: 500,
-  TypeError: 500,
-  RangeError: 500,
-  ReferenceError: 500,
-  SyntaxError: 500,
-  NotFoundError: 404,
-  RoutingError: 404,
-  UnknownFormat: 406,
-  InvalidAuthenticityToken: 422,
-  ParameterMissing: 400,
-  ParameterTypeError: 400,
-  InvalidParameterError: 400,
-  ParamsTooDeepError: 400,
-  UnpermittedParameters: 400,
-  "ActionDispatch::Http::Parameters::ParseError": 400,
-  "ActionDispatch::ParamError": 400,
-  "ActionDispatch::ParameterTypeError": 400,
-  "ActionDispatch::InvalidParameterError": 400,
-  "ActionDispatch::ParamsTooDeepError": 400,
+const rescueResponses: Record<string, string> = {
+  "ActionController::RoutingError": ":not_found",
+  "AbstractController::ActionNotFound": ":not_found",
+  "ActionController::MethodNotAllowed": ":method_not_allowed",
+  "ActionController::UnknownHttpMethod": ":method_not_allowed",
+  "ActionController::NotImplemented": ":not_implemented",
+  "ActionController::UnknownFormat": ":not_acceptable",
+  "ActionDispatch::Http::MimeNegotiation::InvalidType": ":not_acceptable",
+  "ActionController::MissingExactTemplate": ":not_acceptable",
+  "ActionController::InvalidAuthenticityToken": ":unprocessable_entity",
+  "ActionController::InvalidCrossOriginRequest": ":unprocessable_entity",
+  "ActionDispatch::Http::Parameters::ParseError": ":bad_request",
+  "ActionController::BadRequest": ":bad_request",
+  "ActionController::ParameterMissing": ":bad_request",
+  "Rack::QueryParser::ParameterTypeError": ":bad_request",
+  "Rack::QueryParser::InvalidParameterError": ":bad_request",
 };
 
-/** @internal */
-const RESCUE_TEMPLATES: Record<string, string> = {
+const rescueTemplates: Record<string, string> = {
   "ActionView::MissingTemplate": "missing_template",
   "ActionController::RoutingError": "routing_error",
   "AbstractController::ActionNotFound": "unknown_action",
   "ActiveRecord::StatementInvalid": "invalid_statement",
   "ActionView::Template::Error": "template_error",
   "ActionController::MissingExactTemplate": "missing_exact_template",
-  MissingTemplate: "missing_template",
-  RoutingError: "routing_error",
-  ActionNotFound: "unknown_action",
-  StatementInvalid: "invalid_statement",
-  MissingExactTemplate: "missing_exact_template",
 };
 
-/** @internal */
-const WRAPPER_EXCEPTIONS = new Set<string>(["ActionView::Template::Error", "TemplateError"]);
+const wrapperExceptions: string[] = ["ActionView::Template::Error"];
 
-/** @internal */
-const SILENT_EXCEPTIONS = new Set<string>([
-  "RoutingError",
+const silentExceptions: string[] = [
+  "ActionController::RoutingError",
   "ActionDispatch::Http::MimeNegotiation::InvalidType",
-]);
+];
 
 /** @noRailsEquivalent PERMANENT */
 export function classNameOf(e: Error): string {
@@ -146,7 +135,10 @@ export class ExceptionWrapper {
   }
 
   get unwrappedException(): Error {
-    if (WRAPPER_EXCEPTIONS.has(this.exceptionClassName) && this.exception.cause instanceof Error) {
+    if (
+      wrapperExceptions.includes(this.exceptionClassName) &&
+      this.exception.cause instanceof Error
+    ) {
       return this.exception.cause;
     }
     return this.exception;
@@ -162,14 +154,11 @@ export class ExceptionWrapper {
   }
 
   isRoutingError(): boolean {
-    return this.exception instanceof RoutingError || this.exceptionClassName === "RoutingError";
+    return this.exception instanceof RoutingError;
   }
 
   isTemplateError(): boolean {
-    return (
-      this.exceptionClassName === "TemplateError" ||
-      this.exceptionClassName === "ActionView::Template::Error"
-    );
+    return this.exceptionClassName === "ActionView::Template::Error";
   }
 
   hasCause(): boolean {
@@ -215,7 +204,9 @@ export class ExceptionWrapper {
   }
 
   rescueTemplate(): string {
-    return RESCUE_TEMPLATES[this.exceptionClassName] ?? "diagnostics";
+    return hasKey(rescueTemplates, this.exceptionClassName)
+      ? rescueTemplates[this.exceptionClassName]
+      : "diagnostics";
   }
 
   get traces(): Record<string, TraceWithId[]> {
@@ -260,7 +251,7 @@ export class ExceptionWrapper {
 
   exceptionTrace(): BacktraceLine[] {
     const app = this.applicationTrace;
-    if (app.length === 0 && !SILENT_EXCEPTIONS.has(this.exceptionClassName)) {
+    if (app.length === 0 && !silentExceptions.includes(this.exceptionClassName)) {
       return this.frameworkTrace;
     }
     return app;
@@ -286,20 +277,11 @@ export class ExceptionWrapper {
     return this.extractFileAndLineNumber(firstTrace);
   }
 
-  static registerStatus(exceptionName: string, statusCode: number): void {
-    STATUS_MAP[exceptionName] = statusCode;
-  }
-
-  static statusCodeFor(exceptionName: string): number {
-    return STATUS_MAP[exceptionName] ?? 500;
-  }
-
   static statusCodeForException(className: string): number {
-    return ExceptionWrapper.statusCodeFor(className);
-  }
-
-  static rescueResponse(exceptionName: string): boolean {
-    return hasKey(STATUS_MAP, exceptionName) && STATUS_MAP[exceptionName] !== 500;
+    const status = hasKey(rescueResponses, className)
+      ? rescueResponses[className]
+      : ":internal_server_error";
+    return statusCode(status.slice(1));
   }
 
   show(request: ShowExceptionsRequest): boolean {
@@ -310,7 +292,7 @@ export class ExceptionWrapper {
   }
 
   rescueResponse(): boolean {
-    return ExceptionWrapper.rescueResponse(this.exceptionClassName);
+    return hasKey(rescueResponses, this.exceptionClassName);
   }
 
   exceptionInspect(): string {
@@ -465,9 +447,7 @@ export class ExceptionWrapper {
   }
 
   private computeStatusCode(): number {
-    return (
-      STATUS_MAP[classNameOf(this.unwrappedException)] ?? STATUS_MAP[this.exceptionName] ?? 500
-    );
+    return ExceptionWrapper.statusCodeForException(classNameOf(this.unwrappedException));
   }
 }
 

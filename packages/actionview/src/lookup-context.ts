@@ -57,7 +57,7 @@ export class MissingTemplate extends Error {
       `Missing template ${templatePath} with format "${format}". ` +
         `Searched in: ${searchedPaths.length > 0 ? searchedPaths.join(", ") : "(no resolvers)"}`,
     );
-    this.name = "MissingTemplate";
+    this.name = "ActionView::MissingTemplate";
     this.path = controller ? `${controller}/${action}` : action;
     this.paths = searchedPaths;
     this.prefixes = controller ? [controller] : [];
