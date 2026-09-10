@@ -221,7 +221,9 @@ Two rules of thumb cover every field, including ones this table forgets:
   commit, open a PR; ingest picks it up when the PR merges.
 - **Recording what HAPPENED to the work** — claimed, in progress, done, blocked,
   closed — is a verb: `tasks claim <id>` (`--assignee <name>` for `assignee`),
-  `tasks in-progress <id> --pr N`, `tasks done <id> --pr N`,
+  `tasks in-progress <id> --pr trails#N`, `tasks done <id> --pr trails#N`
+  (the PR is `repo#N` — `tasks#94`, `trailmap#22` for other repos; a bare
+  number is refused),
   `tasks block <id> <reason>`, `tasks close <id> <reason>`,
   `tasks status-set <id> <status>` for anything else. `updated` is stamped by
   whichever verb you ran.
