@@ -62,17 +62,10 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
   });
 }
 
-async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
-  const original = (Person as any)._adapter;
-  try {
-    (Person as any).adapter = adp;
-    void (Person as any).resetColumnInformation();
-    await loadSchemaFromAdapter.call(Person as any);
-    return Person.columnNames();
-  } finally {
-    (Person as any)._adapter = original;
-    void (Person as any).resetColumnInformation();
-  }
+async function personColumnNames(): Promise<string[]> {
+  void (Person as any).resetColumnInformation();
+  await loadSchemaFromAdapter.call(Person as any);
+  return Person.columnNames();
 }
 
 fixtures({}, { useTransactionalTests: false });
@@ -149,7 +142,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await expect(
       new Migrator(
@@ -267,7 +260,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await new Migrator(
       "up",
@@ -280,7 +273,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
   });
 
   it("add table with decimals", async () => {
@@ -311,7 +304,6 @@ describe("MigrationTest", () => {
         static {
           if (!isPgOrSqlite) this.attribute("value_of_e", "integer");
           this.attribute("my_house_population", "integer");
-          this.adapter = adapter;
         }
       }
       await BigNumber.loadSchema();
@@ -487,7 +479,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await new Migrator(
       "up",
@@ -496,7 +488,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames(adapter)).not.toContain("last_name");
+    expect(await personColumnNames()).not.toContain("last_name");
 
     const error: unknown = await new Migrator(
       "up",
@@ -702,7 +694,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await new Migrator(
       "up",
@@ -711,7 +703,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames(adapter)).not.toContain("last_name");
+    expect(await personColumnNames()).not.toContain("last_name");
 
     await new Migrator(
       "up",
@@ -720,7 +712,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       102,
     ).migrate();
-    expect(await personColumnNames(adapter)).not.toContain("last_name");
+    expect(await personColumnNames()).not.toContain("last_name");
   });
 
   it("add column with casted type if not exists set to true", async () => {
@@ -733,7 +725,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await new Migrator(
       "up",
@@ -742,7 +734,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
   });
 
   it("add column with if not exists set to true does not raise if type is different", async () => {
@@ -754,7 +746,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
 
     await new Migrator(
       "up",
@@ -767,7 +759,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames(adapter)).toContain("last_name");
+    expect(await personColumnNames()).toContain("last_name");
   });
 
   it("method missing delegates to connection", async () => {

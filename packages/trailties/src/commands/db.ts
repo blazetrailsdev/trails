@@ -11,7 +11,6 @@ import {
   loadDatabaseConfig,
   loadDatabaseConfigModule,
   loadAllDatabaseConfigs,
-  connectAdapter,
   resolveEnv,
   resolveSchemaFormat,
   type DatabaseConfig as RawConfig,
@@ -301,21 +300,6 @@ async function runMigrate(
   if (pending.length === 0) console.log("All migrations are up to date.");
 
   if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
-}
-
-async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>): Promise<void> {
-  const { Base } = await import("@blazetrails/activerecord");
-  const previous = Base._adapter;
-  Base.adapter = adapter;
-  try {
-    await fn();
-  } finally {
-    if (previous === null) {
-      Base._adapter = previous;
-    } else {
-      Base.adapter = previous;
-    }
-  }
 }
 
 async function runTestLoadSchema(options: {
@@ -714,8 +698,8 @@ export function dbCommand(): Command {
     .description("Run database seeds")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, prefix }) => {
-        await withSeedAdapter(adapter, () => runSeed(prefix));
+      await forEachDatabase(opts, async ({ prefix }) => {
+        await runSeed(prefix);
       });
     });
 
@@ -730,12 +714,7 @@ export function dbCommand(): Command {
         await DatabaseTasks.truncateAll(config.envName);
       });
 
-      const adapter = await connectAdapter(raw);
-      try {
-        await withSeedAdapter(adapter, runSeed);
-      } finally {
-        await closeAdapter(adapter);
-      }
+      await DatabaseTasks.withTemporaryPool(config, () => runSeed());
     });
 
   cmd
@@ -778,7 +757,7 @@ export function dbCommand(): Command {
       DatabaseTasks.seedLoader = {
         async loadSeed() {
           await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
-            await withSeedAdapter(await pool.leaseConnection(), runSeed);
+            await runSeed();
           });
         },
       };
@@ -870,7 +849,7 @@ export function dbCommand(): Command {
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
         await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
-        await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
+        await runSeed(ctx.prefix);
       });
     });
 
@@ -882,7 +861,7 @@ export function dbCommand(): Command {
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
         await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
-        await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
+        await runSeed(ctx.prefix);
       });
     });
 

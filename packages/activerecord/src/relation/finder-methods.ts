@@ -419,9 +419,7 @@ export function raiseRecordNotFoundExceptionBang(
     : ` [${
         this.arel().whereSql({
           withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
-            (model as any)._adapter
-              ? block((model as any)._adapter)
-              : (model as any).connectionPool().withConnectionSync(block),
+            (model as any).connectionPool().withConnectionSync(block),
         })?.value ?? ""
       }]`;
 

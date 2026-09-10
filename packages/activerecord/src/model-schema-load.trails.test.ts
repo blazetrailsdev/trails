@@ -3,7 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { defaultValue } from "./type.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -56,7 +56,7 @@ describe("loadSchemaFromAdapter", () => {
       },
       { uuid: new UuidType(), jsonb: new JsonbType() },
     );
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -67,7 +67,7 @@ describe("loadSchemaFromAdapter", () => {
   it("does not overwrite user-declared attributes", async () => {
     Model.attribute("guid", "string");
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -77,7 +77,7 @@ describe("loadSchemaFromAdapter", () => {
   it("is a no-op for abstract classes", async () => {
     (Model as unknown as { _abstractClass: boolean })._abstractClass = true;
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -93,7 +93,7 @@ describe("loadSchemaFromAdapter", () => {
     }
     expect(Object.prototype.hasOwnProperty.call(Post, "_abstractClass")).toBe(false);
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
 
     await loadSchemaFromAdapter.call(Post as typeof Base);
 
@@ -111,7 +111,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -130,7 +130,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -150,7 +150,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => defaultValue(),
     });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -162,7 +162,7 @@ describe("loadSchemaFromAdapter", () => {
       stale: true,
     };
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Model as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Model, adapter as never);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -178,7 +178,7 @@ describe("loadSchemaFromAdapter integration details", () => {
       static override tableName = "posts";
     }
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
     const rec = new Post();
@@ -202,7 +202,7 @@ describe("loadSchemaFromAdapter integration details", () => {
       { guid: { sqlType: "uuid" }, secret: { sqlType: "uuid" } },
       { uuid: new UuidType() },
     );
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
     expect(Object.keys(Post.columnsHash())).not.toContain("secret");
@@ -220,7 +220,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { _ignoredColumns: string[] })._ignoredColumns = ["age"];
 
     const adapter = makeAdapter({ age: { sqlType: "integer" } }, { integer: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
     expect(Post.typeForAttribute("age")!.type()).toBe("integer");
@@ -235,7 +235,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { _columns: unknown })._columns = ["stale"];
 
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
     const columnsHash = (Post as unknown as { _columnsHash: Record<string, unknown> })._columnsHash;
@@ -248,7 +248,7 @@ describe("loadSchemaFromAdapter integration details", () => {
       static override tableName = "posts";
     }
     const adapter = makeAdapter({ id: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "id")).toBeUndefined();
@@ -297,7 +297,7 @@ describe("set adapter auto-loads schema", () => {
       static override tableName = "posts";
     }
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Post, adapter as never);
 
     await Post.loadSchema();
 

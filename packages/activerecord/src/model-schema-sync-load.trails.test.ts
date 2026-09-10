@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
 import { defaultValue } from "./type.js";
@@ -27,19 +27,19 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 describe("sync loadSchema / columnsHash", () => {
-  it("columnsHash returns cached Column objects when schema cache is populated", () => {
+  it("columnsHash returns cached Column objects when schema cache is populated", async () => {
     class Post extends Base {
       static override tableName = "posts";
     }
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Post, makeAdapter(cols) as never);
 
     const hash = Post.columnsHash();
 
     expect(hash.guid).toBe(cols.guid);
   });
 
-  it("columnsHash filters ignoredColumns out of the cached hash", () => {
+  it("columnsHash filters ignoredColumns out of the cached hash", async () => {
     class Post extends Base {
       static override tableName = "posts";
     }
@@ -48,7 +48,7 @@ describe("sync loadSchema / columnsHash", () => {
       guid: { sqlType: "uuid", name: "guid", default: null },
       secret: { sqlType: "uuid", name: "secret", default: null },
     };
-    (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Post, makeAdapter(cols) as never);
 
     const hash = Post.columnsHash();
 
@@ -56,7 +56,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(hash.secret).toBeUndefined();
   });
 
-  it("returns an empty hash when no schema cache is available", () => {
+  it("returns an empty hash when no schema cache is available", async () => {
     class Widget extends Base {
       static override tableName = "widgets";
       static {
@@ -66,7 +66,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Widget.columnsHash()).toEqual({});
   });
 
-  it("STI subclass reflects its own table into its own defs", () => {
+  it("STI subclass reflects its own table into its own defs", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -77,8 +77,8 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
-    (Circle as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
+    await establishConnectionTo(Circle, makeAdapter(cols) as never);
 
     Circle.columnsHash();
 
@@ -87,7 +87,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
-  it.skip("STI reflection falls back to subclass adapter when base has none", () => {
+  it.skip("STI reflection falls back to subclass adapter when base has none", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -98,14 +98,14 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Circle as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Circle, makeAdapter(cols) as never);
 
     Circle.columnsHash();
 
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
-  it("columnsHash on STI subclass returns cached Column objects from base adapter", () => {
+  it("columnsHash on STI subclass returns cached Column objects from base adapter", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -115,13 +115,13 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     const hash = Circle.columnsHash();
     expect(hash.guid).toBe(cols.guid);
   });
 
-  it("marks the reflecting class as _schemaLoaded, not its STI base", () => {
+  it("marks the reflecting class as _schemaLoaded, not its STI base", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -131,7 +131,7 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     Circle.columnsHash();
 
@@ -139,7 +139,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
-  it("preserves subclass-declared attributes across the subclass's reflection", () => {
+  it("preserves subclass-declared attributes across the subclass's reflection", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -153,7 +153,7 @@ describe("sync loadSchema / columnsHash", () => {
     }
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     Circle.columnsHash();
 
@@ -162,7 +162,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
-  it("reflection replaces a stale own columnsHash on the reflecting class", () => {
+  it("reflection replaces a stale own columnsHash on the reflecting class", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -172,13 +172,13 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
     void Circle.resetColumnInformation();
 
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });
 
-  it("resetting the STI base propagates to subclasses", () => {
+  it("resetting the STI base propagates to subclasses", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -188,7 +188,7 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     Circle.columnsHash();
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
@@ -198,7 +198,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
-  it("reflection on an STI subclass rebuilds its own column caches", () => {
+  it("reflection on an STI subclass rebuilds its own column caches", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -208,7 +208,7 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     Circle.columnsHash();
 
@@ -218,7 +218,7 @@ describe("sync loadSchema / columnsHash", () => {
     ).toEqual(["guid"]);
   });
 
-  it("resetColumnInformation on the base deletes a tracked STI subclass's own schema memos", () => {
+  it("resetColumnInformation on the base deletes a tracked STI subclass's own schema memos", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -232,7 +232,7 @@ describe("sync loadSchema / columnsHash", () => {
     }
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
     Circle.columnsHash();
 
     const memoKeys = [
@@ -254,7 +254,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });
 
-  it("resetColumnInformation on the base reloads a tracked non-STI subclass's schema memos", () => {
+  it("resetColumnInformation on the base reloads a tracked non-STI subclass's schema memos", async () => {
     class Post extends Base {
       static override tableName = "posts";
     }
@@ -266,8 +266,8 @@ describe("sync loadSchema / columnsHash", () => {
     }
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
-    (SpecialPost as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Post, makeAdapter(cols) as never);
+    await establishConnectionTo(SpecialPost, makeAdapter(cols) as never);
     SpecialPost.columnsHash();
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
 
@@ -277,7 +277,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect((SpecialPost as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
   });
 
-  it("resetColumnInformation on an STI subclass leaves the STI base alone", () => {
+  it("resetColumnInformation on an STI subclass leaves the STI base alone", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -287,7 +287,7 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Shape, makeAdapter(cols) as never);
     Shape.columnsHash();
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
@@ -296,7 +296,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
-  it("resetColumnInformation drops schema-sourced defs but preserves user defs", () => {
+  it("resetColumnInformation drops schema-sourced defs but preserves user defs", async () => {
     class Post extends Base {
       static override tableName = "posts";
       static {
@@ -304,7 +304,7 @@ describe("sync loadSchema / columnsHash", () => {
       }
     }
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Post, makeAdapter(cols) as never);
     Post.columnsHash();
 
     expect(Object.keys(Post.columnsHash())).toContain("guid");
@@ -322,7 +322,7 @@ describe("sync loadSchema / columnsHash", () => {
     return {
       calls,
       isWarm: () => warm,
-      adapter: {
+      adapter: adapterDouble({
         internalSchemaCache: {
           isCached: () => warm,
           getCachedColumnsHash: () => (warm ? cols : undefined),
@@ -334,17 +334,18 @@ describe("sync loadSchema / columnsHash", () => {
           },
         },
         lookupCastTypeFromColumn: () => defaultValue(),
-      },
+      }),
     };
   }
 
-  it("resetColumnInformation clears the data source cache when eager warming is off (default)", () => {
+  it("resetColumnInformation clears the data source cache when eager warming is off (default)", async () => {
     class Post extends Base {
       static override tableName = "posts";
     }
     const cols = { id: { sqlType: "integer", name: "id", default: null } };
     const built = makeResettableAdapter(cols);
-    (Post as unknown as { adapter: unknown }).adapter = built.adapter;
+    await establishConnectionTo(Post, built.adapter as never);
+    Post.connectionPool().poolConfig.schemaCache = built.adapter.internalSchemaCache as never;
     Post.columnsHash();
 
     built.calls.clear = 0;

@@ -7,6 +7,7 @@ import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
+import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -83,9 +84,9 @@ describe("connection checkout for directly-assigned adapters", () => {
         this.attribute("id", new IntegerType());
         this.attribute("title", new StringType());
         this.attribute("approved", new BooleanType());
-        this.adapter = adp;
       }
     }
+    await establishConnectionTo(TopicWithDirectAdapter, adp);
     DirectTopic = TopicWithDirectAdapter;
   });
 

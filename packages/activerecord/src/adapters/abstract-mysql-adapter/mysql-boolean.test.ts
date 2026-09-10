@@ -30,7 +30,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       t.boolean("archived");
       t.string("published", { limit: 1 });
     });
-    BooleanType.adapter = adapter;
     await BooleanType.loadSchema();
     savedEmulateBooleans = adapter.emulateBooleans;
   });

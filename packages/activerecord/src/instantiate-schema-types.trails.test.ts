@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { defaultValue } from "./type.js";
 
 class DoublingType extends ValueType {
@@ -31,24 +31,24 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 describe("_instantiate routes row values through adapter-resolved types", () => {
-  it("applies the schema-reflected cast type's deserialize on hydration", () => {
+  it("applies the schema-reflected cast type's deserialize on hydration", async () => {
     class Widget extends Base {
       static override tableName = "widgets";
     }
     const cols = { payload: { sqlType: "doubling", name: "payload", default: null } };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
     const rec = Widget._instantiate({ payload: "ab" });
 
     expect((rec as unknown as { payload: string }).payload).toBe("abab");
   });
 
-  it("falls back to ValueType when adapter has no cast for the column", () => {
+  it("falls back to ValueType when adapter has no cast for the column", async () => {
     class Widget extends Base {
       static override tableName = "widgets";
     }
     const cols = { blob: { sqlType: "unknown", name: "blob", default: null } };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
     const rec = Widget._instantiate({ blob: "raw" });
 
@@ -60,13 +60,13 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
       static override tableName = "widgets";
     }
     const colsA = { payload: { sqlType: "unknown", name: "payload", default: null } };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsA);
+    await establishConnectionTo(Widget, makeAdapter(colsA) as never);
     await Widget.loadSchema();
 
     expect(Widget.typeForAttribute("payload")!.type()).toBeUndefined();
 
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
+    await establishConnectionTo(Widget, makeAdapter(colsB) as never);
     await Widget.loadSchema();
 
     expect(Widget.typeForAttribute("payload")!.type()).toBe("doubling");
@@ -80,12 +80,12 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
       payload: { sqlType: "doubling", name: "payload", default: null },
       removed: { sqlType: "doubling", name: "removed", default: null },
     };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsA);
+    await establishConnectionTo(Widget, makeAdapter(colsA) as never);
     await Widget.loadSchema();
     expect(Object.keys(Widget.columnsHash())).toContain("removed");
 
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
-    (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
+    await establishConnectionTo(Widget, makeAdapter(colsB) as never);
     await Widget.loadSchema();
 
     expect(Object.keys(Widget.columnsHash())).not.toContain("removed");

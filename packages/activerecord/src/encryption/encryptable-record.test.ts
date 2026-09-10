@@ -156,7 +156,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title");
         this.encrypts("body", { keyProvider });
       }
@@ -177,7 +176,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.encrypts("name", { key: customKey });
       }
     } as any;
@@ -335,7 +333,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     } as any;
     Post.encrypts("title");
@@ -372,7 +369,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const EncryptedFirstTrafficLight = class extends Base {
       static {
         this._tableName = "traffic_lights";
-        this.adapter = adp;
         this.attribute("id", "integer");
         this.attribute("state", "string");
         this.attribute("long_state", "string");
@@ -506,7 +502,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true });
       }
     } as any;
@@ -528,7 +523,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.attribute("name", "string", { default: "OVERRIDE" });
         this.encrypts("name", { deterministic: true });
       }
@@ -582,7 +576,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title", { keyProvider: keyProviderSha1 });
       }
     } as any;
@@ -595,7 +588,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.encrypts("title", { keyProvider: keyProviderSha256 });
       }
     } as any;
@@ -644,7 +636,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = class extends Base {
       static {
         this._tableName = "encrypted_books";
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true, ignoreCase: true });
       }
     } as unknown as typeof Base & {
@@ -815,7 +806,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("updated_at", "datetime");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     } as any;
     await BookDate.create({ name: "bootstrap" });
@@ -976,9 +966,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     const adapter = await freshAdapter();
     const Model = class extends Base {
       static _tableName = "authors";
-      static {
-        this.adapter = adapter;
-      }
     } as any;
     await Model.loadSchema();
     expect(() => {
@@ -994,7 +981,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.encrypts("name", { deterministic: true, ignoreCase: true });
       }
     } as any;
@@ -1015,7 +1001,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
           this.encrypts("name", { deterministic: true, ignoreCase: true });
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       } as any;
       await Model.loadSchema();
@@ -1032,7 +1017,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
         this.attribute("name", "string");
         this.attribute("original_name", "string");
         this.encrypts("name", { deterministic: true, ignoreCase: true });
-        this.adapter = adapter;
       }
     } as any;
     await Model.loadSchema();

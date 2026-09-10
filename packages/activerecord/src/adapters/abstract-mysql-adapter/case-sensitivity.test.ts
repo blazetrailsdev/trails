@@ -22,7 +22,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       CollationTest.attribute("string_cs_column", "string");
       CollationTest.attribute("string_ci_column", "string");
       CollationTest.attribute("binary_column", "binary");
-      CollationTest.adapter = adapter;
       return CollationTest;
     }
 

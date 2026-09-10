@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "../base.js";
-import { adapterDouble } from "../test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "../test-helpers/adapter-double.js";
 
 describe("per-instance @primary_key slot", () => {
-  it("seats the record's primary key from the class at init_internals", () => {
+  it("seats the record's primary key from the class at init_internals", async () => {
     class SeatedToy extends Base {
       static override tableName = "toys";
       static _primaryKey = "toy_id";
@@ -23,7 +23,7 @@ describe("per-instance @primary_key slot", () => {
     expect(spy).toHaveBeenCalledWith("toy_id");
   });
 
-  it("keeps the seat the class answered at construction", () => {
+  it("keeps the seat the class answered at construction", async () => {
     class ColdToy extends Base {
       static override tableName = "toys";
     }
@@ -32,9 +32,12 @@ describe("per-instance @primary_key slot", () => {
 
     expect((record as unknown as { _primaryKey?: string })._primaryKey).toBe("id");
 
-    (ColdToy as unknown as { adapter: unknown }).adapter = adapterDouble({
-      internalSchemaCache: { getCachedPrimaryKeys: () => "toy_id" },
-    });
+    await establishConnectionTo(
+      ColdToy,
+      adapterDouble({
+        internalSchemaCache: { getCachedPrimaryKeys: () => "toy_id" },
+      }) as never,
+    );
     const spy = vi.spyOn(
       record as unknown as { _readAttribute(n: string): unknown },
       "_readAttribute",

@@ -112,7 +112,6 @@ interface PrimaryKeyHost {
   _primaryKey?: string | string[];
   name: string;
   tableName?: string;
-  _adapter?: CachedSchemaSource | null;
   connectionPool?(): {
     activeConnection?: CachedSchemaSource | null;
     poolConfig?: { schemaCache?: CachedSchemaSource["internalSchemaCache"] | null };
@@ -122,7 +121,6 @@ interface PrimaryKeyHost {
 function cachedSchemaCacheFor(
   host: PrimaryKeyHost,
 ): CachedSchemaSource["internalSchemaCache"] | undefined {
-  if (host._adapter?.internalSchemaCache) return host._adapter.internalSchemaCache;
   const pool = host.connectionPool?.();
   return pool?.activeConnection?.internalSchemaCache ?? pool?.poolConfig?.schemaCache ?? undefined;
 }

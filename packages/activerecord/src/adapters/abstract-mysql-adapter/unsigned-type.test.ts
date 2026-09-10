@@ -28,7 +28,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     class UnsignedType extends Base {
       static _tableName = "unsigned_types";
     }
-    UnsignedType.adapter = adapter;
     await UnsignedType.loadSchema();
     return UnsignedType;
   }

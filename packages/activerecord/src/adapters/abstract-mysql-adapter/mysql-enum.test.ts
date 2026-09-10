@@ -49,7 +49,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           this.enum("state", { start: 0, middle: 1, finish: 2 });
         }
       }
-      EnumTest.adapter = adapter;
 
       const enumTest = await EnumTest.create({ state: "middle" });
       expect((enumTest as any).state).toBe("middle");

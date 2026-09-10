@@ -338,7 +338,6 @@ import {
   isAssociationCached as _isAssociationCached,
   associationInstanceGet as _associationInstanceGet,
   associationInstanceSet as _associationInstanceSet,
-  registerModelConstant,
   initInternals as _associationsInitInternals,
   initializeDup as _associationsInitializeDup,
 } from "./associations.js";
@@ -719,7 +718,6 @@ export class Base extends Model {
     return _Core.inspectionFilter.call(this);
   }
 
-  static _adapter: DatabaseAdapter | null = null;
   /** @internal */
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _abstractClass = false;
@@ -904,27 +902,6 @@ export class Base extends Model {
 
   static get predicateBuilder(): import("./relation/predicate-builder.js").PredicateBuilder {
     return _Core.predicateBuilder.call(this);
-  }
-
-  static set adapter(adapter: DatabaseAdapter) {
-    if (this._adapter === adapter) {
-      return;
-    }
-    if (this !== Base && this.name) {
-      registerModelConstant(this.name, this);
-    }
-    this._adapter = adapter;
-
-    const invalidate = (klass: typeof Base) => {
-      (ModelSchema.resetColumnInformation as any).call(klass);
-      (klass as unknown as { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-    };
-    invalidate(this);
-    for (const descendant of this.descendants) {
-      if (!Object.prototype.hasOwnProperty.call(descendant, "_adapter")) {
-        invalidate(descendant);
-      }
-    }
   }
 
   static async loadSchema(this: typeof Base): Promise<void> {

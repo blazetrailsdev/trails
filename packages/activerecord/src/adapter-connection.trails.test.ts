@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import { Base } from "./index.js";
 import { Result } from "./result.js";
 import { adapterType } from "./test-adapter.js";
+import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -81,7 +81,7 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   it("a from(Arel node) clause does not reset the SELECT's retryable classification", async () => {
     const adapter = new QueryTestAdapter({});
     adapter.simulateConnect();
-    PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
+    await establishConnectionTo(PostForRetryTest, adapter);
 
     const fromNode = new Nodes.SqlLiteral("posts", { retryable: true });
     await PostForRetryTest.where("1 = 1").from(fromNode).limit(1);
@@ -102,7 +102,7 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   it("findBySql tolerates a null opts argument without throwing", async () => {
     const adapter = new QueryTestAdapter({});
     adapter.simulateConnect();
-    PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
+    await establishConnectionTo(PostForRetryTest, adapter);
 
     await expect(PostForRetryTest.findBySql("SELECT * FROM posts", [], null)).resolves.toEqual([]);
   });

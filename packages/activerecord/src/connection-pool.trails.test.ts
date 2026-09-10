@@ -15,7 +15,6 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
-import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
@@ -1040,73 +1039,5 @@ describe("NullPool member parity", () => {
     expect(() =>
       expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),
     ).toThrow(/expected/i);
-  });
-});
-
-describe("seatConnection", () => {
-  it("makes a given adapter instance the pool's connection", async () => {
-    const dbConfig = makeAmbientDbConfig({ pool: 1 });
-    const conn = dbConfig.newConnection() as DatabaseAdapter;
-    expect(conn.pool).toBeInstanceOf(NullPool);
-
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
-    const pool = new ConnectionPool(pc);
-    try {
-      pool.seatConnection(conn);
-      expect(conn.pool).toBe(pool);
-
-      const checkedOut = await pool.checkout();
-      expect(checkedOut).toBe(conn);
-      pool.checkin(checkedOut);
-
-      expect(await pool.leaseConnection()).toBe(conn);
-      pool.releaseConnection();
-
-      expect(pool.leaseConnectionSync()).toBe(conn);
-      pool.releaseConnection();
-
-      const seen = await pool.withConnection((c) => c);
-      expect(seen).toBe(conn);
-    } finally {
-      await closePoolConnections(pool);
-    }
-  });
-
-  it("does not open a second connection beside the seated one", async () => {
-    const dbConfig = makeAmbientDbConfig({ pool: 1 });
-    const conn = dbConfig.newConnection() as DatabaseAdapter;
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
-    const pool = new ConnectionPool(pc);
-    try {
-      pool.seatConnection(conn);
-      expect(await pool.checkout()).toBe(conn);
-      expect(pool.connections).toEqual([conn]);
-    } finally {
-      await closePoolConnections(pool);
-    }
-  });
-});
-
-describe("seatConnection registration", () => {
-  it("a directly-bound model resolves its seated adapter through connectionPool", async () => {
-    class SeatedModel extends Base {
-      static _connectionClass = true;
-    }
-    await SeatedModel.establishConnection(
-      rawTestAdapterConfiguration() as Parameters<typeof SeatedModel.establishConnection>[0],
-    );
-    try {
-      expect(SeatedModel.connectionSpecificationName).toBe("SeatedModel");
-
-      const pool = SeatedModel.connectionPool();
-      const conn = pool.dbConfig.newConnection() as DatabaseAdapter;
-      pool.seatConnection(conn);
-
-      expect(await SeatedModel.leaseConnection()).toBe(conn);
-      SeatedModel.releaseConnection();
-      expect(await SeatedModel.withConnection((c) => c)).toBe(conn);
-    } finally {
-      SeatedModel.removeConnection();
-    }
   });
 });

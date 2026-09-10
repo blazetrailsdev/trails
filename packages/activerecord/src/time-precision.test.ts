@@ -31,7 +31,6 @@ describe("TimePrecisionTest", () => {
     class Foo extends Base {
       static override tableName = "foos";
     }
-    Foo.adapter = adapter;
     return Foo;
   }
 

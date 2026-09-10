@@ -48,7 +48,6 @@ describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
     class Default extends Base {
       static override tableName = "defaults";
     }
-    Default.adapter = adapter;
     await Default.loadSchema();
     const multiline = (new Default() as any).multiline_default;
     expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
@@ -69,7 +68,6 @@ describe("DefaultNumbersTest", () => {
     class DN extends Base {
       static override tableName = "default_numbers";
     }
-    DN.adapter = adapter;
     await DN.loadSchema();
     DefaultNumber = DN;
   });
@@ -110,7 +108,6 @@ describe("DefaultStringsTest", () => {
     class DS extends Base {
       static override tableName = "default_strings";
     }
-    DS.adapter = adapter;
     await DS.loadSchema();
     DefaultString = DS;
   });
@@ -141,7 +138,6 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
     class DB extends Base {
       static override tableName = "default_binaries";
     }
-    DB.adapter = adapter;
     await DB.loadSchema();
     DefaultBinary = DB;
   });
@@ -180,7 +176,6 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
     class DT extends Base {
       static override tableName = "default_texts";
     }
-    DT.adapter = adapter;
     await DT.loadSchema();
     DefaultText = DT;
   });

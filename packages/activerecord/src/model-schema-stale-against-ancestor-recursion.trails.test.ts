@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { loadSchema, reloadSchemaFromCache } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 
@@ -25,7 +25,7 @@ function makeAdapter(): unknown {
 }
 
 describe("loadSchema — subclass left stale by an ancestor invalidation", () => {
-  it("settles the load instead of re-entering it until the stack overflows", () => {
+  it("settles the load instead of re-entering it until the stack overflows", async () => {
     class Topic extends Base {
       static {
         this.tableName = "topics";
@@ -33,7 +33,7 @@ describe("loadSchema — subclass left stale by an ancestor invalidation", () =>
         this.attribute("title", "string");
       }
     }
-    (Topic as unknown as { adapter: unknown }).adapter = makeAdapter();
+    await establishConnectionTo(Topic, makeAdapter() as never);
 
     reloadSchemaFromCache.call(Base as never);
 

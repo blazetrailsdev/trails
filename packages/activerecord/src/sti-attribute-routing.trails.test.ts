@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 const attributeNamesOf = (klass: unknown): string[] =>
   Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
 
 describe("STI subclass attribute() registration", () => {
-  it("keeps subclass attribute() calls on the subclass, not the STI base", () => {
+  it("keeps subclass attribute() calls on the subclass, not the STI base", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -25,7 +25,7 @@ describe("STI subclass attribute() registration", () => {
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
-  it("still forks the STI base itself (non-subclass) on attribute() — unchanged", () => {
+  it("still forks the STI base itself (non-subclass) on attribute() — unchanged", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -38,7 +38,7 @@ describe("STI subclass attribute() registration", () => {
     expect(attributeNamesOf(Shape)).toContain("name");
   });
 
-  it("non-STI classes are unaffected", () => {
+  it("non-STI classes are unaffected", async () => {
     class Widget extends Base {
       static {
         this.attribute("price", "integer");
@@ -49,7 +49,7 @@ describe("STI subclass attribute() registration", () => {
     expect(attributeNamesOf(Widget)).toContain("price");
   });
 
-  it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
+  it("STI subclass attribute declared AFTER base inherits the base's attrs too", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -129,7 +129,7 @@ describe("STI subclass attribute() registration", () => {
         return col.sqlType === "uuid" ? new UuidT() : null;
       },
     });
-    (Shape as unknown as { adapter: unknown }).adapter = adapter;
+    await establishConnectionTo(Shape, adapter as never);
 
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
@@ -140,7 +140,7 @@ describe("STI subclass attribute() registration", () => {
     expect(Circle.typeForAttribute("radius")!.type()).toBe("integer");
     expect(Circle.typeForAttribute("guid")!.type()).toBe("uuid");
   });
-  it("own-table descendant under an STI ancestor keeps attribute() on itself", () => {
+  it("own-table descendant under an STI ancestor keeps attribute() on itself", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -170,7 +170,7 @@ describe("STI subclass attribute() registration", () => {
 
     expect(Ticket.typeForAttribute("radius")!.type()).toBe("integer");
   });
-  it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {
+  it("own-table descendant does not clobber the STI base's attributesBuilder cache", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
