@@ -231,25 +231,9 @@ export async function _updateRecord(
 
   applyDefaultAndGlobalConstraints(um as any, this as any);
 
-  const adapter = connectionPool.call(this as any).activeConnection ?? (this as any).connection;
-  if (typeof adapter.update === "function") {
-    return adapter.update(um, `${(this as any).name} Update`);
-  }
-  const sql = adapter.toSql(um);
-  return adapter.executeMutation(sql);
+  return (this as any).withConnection((c: any) => c.update(um, `${(this as any).name} Update`));
 }
 
-/**
- * Builds and executes a DELETE with the given constraints.
- *
- * Mirrors: ActiveRecord::Persistence::ClassMethods#_delete_record
- *
- * @missingRailsCall with_connection — CONVERGEABLE: persistence.rb:294-296 `with_connection {
- *   |c| c.delete(dm, ...) }` — trails resolves the adapter through
- *   `connectionPool.call(...).activeConnection ?? this.connection` (persistence.ts:266) rather
- *   than the block form; converging the whole package onto `withConnection` is
- *   RFC 0073's permanent-connection-checkout flip, tracked there.
- */
 export async function _deleteRecord(
   this: PersistenceHost,
   constraints: Record<string, unknown>,
@@ -263,12 +247,7 @@ export async function _deleteRecord(
 
   applyDefaultAndGlobalConstraints(dm as any, this as any);
 
-  const adapter = connectionPool.call(this as any).activeConnection ?? (this as any).connection;
-  if (typeof adapter.delete === "function") {
-    return adapter.delete(dm);
-  }
-  const sql = adapter.toSql(dm);
-  return adapter.executeMutation(sql);
+  return (this as any).withConnection((c: any) => c.delete(dm, `${(this as any).name} Destroy`));
 }
 
 interface PersistenceRecordFields {

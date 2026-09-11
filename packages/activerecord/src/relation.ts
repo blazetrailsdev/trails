@@ -721,22 +721,24 @@ export class Relation<T extends Base> {
       values = sql(this.model.sanitizeSqlForAssignment(updates, String(table.name)));
     }
 
-    const arel = this.isEagerLoading
-      ? await this.applyJoinDependency({}, (relation) => relation.arel())
-      : this.buildArel(this._conn());
-    arel.source.left = table;
-    const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this.groupValues)),
-    ) as Nodes.Node[];
-    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
-    const primaryKey = this.primaryKey;
-    const key = this.model.compositePrimaryKey
-      ? (primaryKey as string[]).map((pk) => table.get(pk))
-      : table.get((primaryKey as string | null) ?? null);
-    const stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
-    const count = await this._conn().update(stmtAst, `${this.model.name} Update All`);
-    this.reset();
-    return count;
+    return this.model.withConnection(async (c) => {
+      const arel = this.isEagerLoading
+        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        : this.buildArel(c);
+      arel.source.left = table;
+      const groupValuesArelColumns = this.arelColumns(
+        Array.from(new Set(this.groupValues)),
+      ) as Nodes.Node[];
+      const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
+      const primaryKey = this.primaryKey;
+      const key = this.model.compositePrimaryKey
+        ? (primaryKey as string[]).map((pk) => table.get(pk))
+        : table.get((primaryKey as string | null) ?? null);
+      const stmt = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
+      const count = await c.update(stmt, `${this.model.name} Update All`);
+      this.reset();
+      return count;
+    });
   }
 
   async destroyAll(): Promise<T[]> {
@@ -760,24 +762,26 @@ export class Relation<T extends Base> {
       throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
     }
 
-    const table = this.table;
-    const arel = this.isEagerLoading
-      ? await this.applyJoinDependency({}, (relation) => relation.arel())
-      : this.buildArel(this._conn());
-    arel.source.left = table;
-    const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this.groupValues)),
-    ) as Nodes.Node[];
-    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
-    const primaryKey = this.model.primaryKey;
-    const key = this.model.compositePrimaryKey
-      ? (primaryKey as string[]).map((pk) => table.get(pk))
-      : table.get((primaryKey as string | null) ?? null);
-    const stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
+    return this.model.withConnection(async (c) => {
+      const table = this.table;
+      const arel = this.isEagerLoading
+        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        : this.buildArel(c);
+      arel.source.left = table;
+      const groupValuesArelColumns = this.arelColumns(
+        Array.from(new Set(this.groupValues)),
+      ) as Nodes.Node[];
+      const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
+      const primaryKey = this.model.primaryKey;
+      const key = this.model.compositePrimaryKey
+        ? (primaryKey as string[]).map((pk) => table.get(pk))
+        : table.get((primaryKey as string | null) ?? null);
+      const stmt = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
 
-    const count = await this._conn().delete(stmtAst, `${this.model.name} Delete All`);
-    this.reset();
-    return count;
+      const count = await c.delete(stmt, `${this.model.name} Delete All`);
+      this.reset();
+      return count;
+    });
   }
 
   async touchAll(...args: TouchAllArgs): Promise<number> {
