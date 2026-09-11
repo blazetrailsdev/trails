@@ -28,7 +28,6 @@ import { Configurable } from "./configurable.js";
 import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
-import { currentAdapter } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import {
@@ -49,6 +48,11 @@ import {
 } from "../test-helpers/models/book-encrypted.js";
 import { isEncryptedAttribute } from "../encryption.js";
 import { RecordInvalid } from "../index.js";
+
+await freshAdapter();
+const EncryptedAuthor = makeEncryptedAuthor();
+await EncryptedAuthor.loadSchema();
+const authorNameLimit = EncryptedAuthor.columnsHash()["name"].limit;
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -452,18 +456,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
   });
 
-  const authorNameLimitPresent = currentAdapter("Mysql2Adapter", "TrilogyAdapter");
-
-  it.skipIf(!authorNameLimitPresent)("validate column sizes", async () => {
-    await freshAdapter();
-    const Author = makeEncryptedAuthor();
-    new Author();
-    await Author.loadSchema();
-    const authorNameLimit = (Author.columnsHash()["name"] as { limit: number }).limit;
-    const tooLong = "a".repeat(authorNameLimit + 1);
-    expect(await new Author({ name: "jorge" }).isValid()).toBe(true);
-    expect(await new Author({ name: tooLong }).isValid()).toBe(false);
-    const author = await Author.create({ name: tooLong });
+  it.skipIf(authorNameLimit == null)("validate column sizes", async () => {
+    expect(await new EncryptedAuthor({ name: "jorge" }).isValid()).toBe(true);
+    expect(await new EncryptedAuthor({ name: "a".repeat(authorNameLimit + 1) }).isValid()).toBe(
+      false,
+    );
+    const author = await EncryptedAuthor.create({ name: "a".repeat(authorNameLimit + 1) });
     expect(await author.isValid()).toBe(false);
   });
 

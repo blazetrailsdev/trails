@@ -1135,14 +1135,16 @@ describe("TimeExtCalculationsTest", () => {
 
   it("minus with time with zone", () => {
     expect(
-      RubyTime.utc(2000, 1, 2).minus(
+      RubyTime.utc(2000, 1, 2).minusWithCoercion(
         new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("UTC")!),
       ),
     ).toBe(86_400.0);
   });
 
   it("minus with datetime", () => {
-    expect(RubyTime.utc(2000, 1, 2).minus(RubyDateTime.civil(2000, 1, 1))).toBe(86_400.0);
+    expect(RubyTime.utc(2000, 1, 2).minusWithCoercion(RubyDateTime.civil(2000, 1, 1))).toBe(
+      86_400.0,
+    );
   });
 
   it("time created with local constructor cannot represent times during hour skipped by dst", () => {

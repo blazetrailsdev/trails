@@ -610,6 +610,7 @@ export class DatabaseTasks {
     return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
   }
 
+  /** @missingRailsArgs dump — CONVERGEABLE dump-schema-opens-the-file-around-the-dumper */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
@@ -624,9 +625,9 @@ export class DatabaseTasks {
       SchemaDumper.language = format === "js" ? "js" : "ts";
       try {
         const migrationConnectionPool = this.migrationConnectionPool();
-        const file: string[] = [];
-        await SchemaDumper.dump(migrationConnectionPool, file);
-        File.open(filename, "w", (f) => f.write(file.join("\n")));
+        await File.open(filename, "w:utf-8", async (file) => {
+          file.write((await SchemaDumper.dump(migrationConnectionPool)).join("\n"));
+        });
       } finally {
         SchemaDumper.language = languageWas;
       }

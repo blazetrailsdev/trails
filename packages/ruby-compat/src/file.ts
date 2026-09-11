@@ -320,6 +320,11 @@ export class File extends IO {
    * `:` is `parse_mode_enc`'s `"enc"`, `"enc2:enc"` or `"enc:-"`
    * (`io.c:6667,6883-6886`), which {@link IO#setEncoding} parses.
    *
+   * `rb_io_s_open` closes the stream through `rb_ensure` once the block has
+   * finished. A block that returns a promise has not finished until it
+   * settles, so the close waits for it — otherwise an async block would write
+   * to a closed stream.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
    */
@@ -348,11 +353,18 @@ export class File extends IO {
     if (estr !== null) file.setEncoding(estr);
     else if (opt?.externalEncoding != null) file.setEncoding(opt.externalEncoding);
     if (!block) return file;
+    let result: T;
     try {
-      return block(file);
-    } finally {
+      result = block(file);
+    } catch (error) {
       file.close();
+      throw error;
     }
+    if (result instanceof Promise) {
+      return result.finally(() => file.close()) as T;
+    }
+    file.close();
+    return result;
   }
 
   /**
