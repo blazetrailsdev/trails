@@ -2400,8 +2400,8 @@ export interface PostgreSQLAdapter {
   changeColumnNull(
     tableName: string,
     columnName: string,
-    nullable: boolean,
-    defaultValue?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void>;
 
   changeColumnComment(
