@@ -185,9 +185,12 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers installs extended deterministic query support when extend_queries is set", async () => {
+    const validator = ExtendedDeterministicUniquenessValidator as unknown as {
+      _installed: boolean;
+    };
     const validateEach = UniquenessValidator.prototype.validateEach;
-    (ExtendedDeterministicUniquenessValidator as unknown as { _installed: boolean })._installed =
-      false;
+    const installed = validator._installed;
+    validator._installed = false;
     EncryptionConfigurable.config.extendQueries = true;
 
     try {
@@ -197,13 +200,17 @@ describe("RailtieTest", () => {
       expect(UniquenessValidator.prototype.validateEach).not.toBe(validateEach);
     } finally {
       UniquenessValidator.prototype.validateEach = validateEach;
+      validator._installed = installed;
     }
   });
 
   it("runInitializers does not install extended deterministic query support when extend_queries is unset", async () => {
+    const validator = ExtendedDeterministicUniquenessValidator as unknown as {
+      _installed: boolean;
+    };
     const validateEach = UniquenessValidator.prototype.validateEach;
-    (ExtendedDeterministicUniquenessValidator as unknown as { _installed: boolean })._installed =
-      false;
+    const installed = validator._installed;
+    validator._installed = false;
     EncryptionConfigurable.config.extendQueries = false;
 
     try {
@@ -213,6 +220,7 @@ describe("RailtieTest", () => {
       expect(UniquenessValidator.prototype.validateEach).toBe(validateEach);
     } finally {
       UniquenessValidator.prototype.validateEach = validateEach;
+      validator._installed = installed;
     }
   });
 
