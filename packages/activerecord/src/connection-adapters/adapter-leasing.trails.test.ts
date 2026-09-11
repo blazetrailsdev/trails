@@ -27,4 +27,14 @@ describe("AdapterLeasingTest", () => {
       );
     });
   });
+
+  it("steal! from a different thread takes ownership", async () => {
+    const adapter = new AbstractAdapter({});
+    adapter.lease();
+    await withExecutionContext(async () => {
+      adapter.stealBang();
+      expect(() => adapter.expire()).not.toThrow();
+    });
+    expect(adapter.inUse).toBeFalsy();
+  });
 });
