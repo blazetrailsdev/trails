@@ -84,4 +84,13 @@ describe("PostgreSQLAdapter.dbconsole option keys", () => {
     });
     expect(env.PGPASSWORD).toBeUndefined();
   });
+
+  it("builds PGOPTIONS from variables, dropping only :default (not the bare string default)", () => {
+    const { env } = PostgreSQLAdapter.dbconsole(
+      dbConfig({
+        variables: { statement_timeout: "5s", search_path: "default", lock_timeout: ":default" },
+      }),
+    );
+    expect(env.PGOPTIONS).toBe("-c statement_timeout=5s -c search_path=default");
+  });
 });
