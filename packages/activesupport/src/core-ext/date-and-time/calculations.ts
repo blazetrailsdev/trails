@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Date as RubyDate } from "@blazetrails/date";
 import * as date from "../date/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -6,11 +6,11 @@ import { instantFrom } from "../../temporal.js";
 import { cmp, fetch, Range } from "@blazetrails/ruby-compat";
 import { Object } from "../object/acts-like.js";
 
-export type DateOrTime = Temporal.PlainDate | Date;
+export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
 
 export type Comparable = DateOrTime | TimeWithZone | Temporal.Instant;
 
-export type DateOrInstant = Temporal.PlainDate | Temporal.Instant;
+export type DateOrInstant = Temporal.PlainDate | RubyDate | Temporal.Instant;
 
 export const DAYS_INTO_WEEK: Record<string, number> = {
   ":sunday": 0,
@@ -37,13 +37,15 @@ function advance(
 
 function toDate(dateOrTime: DateOrTime): Temporal.PlainDate {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return dateOrTime instanceof Date ? time.toDate(dateOrTime) : dateOrTime;
+  if (dateOrTime instanceof Date) return time.toDate(dateOrTime);
+  return dateOrTime instanceof RubyDate ? dateOrTime.toDate() : dateOrTime;
 }
 
 function wday(dateOrTime: DateOrTime | Temporal.Instant): number {
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return dateOrTime instanceof Date ? dateOrTime.getDay() : dateOrTime.dayOfWeek % 7;
+  if (dateOrTime instanceof Date) return dateOrTime.getDay();
+  return dateOrTime instanceof RubyDate ? dateOrTime.wday : dateOrTime.dayOfWeek % 7;
 }
 
 function classCurrent(dateOrTime: DateOrTime): Temporal.PlainDate | TimeWithZone | Date {
@@ -60,7 +62,7 @@ function toInstant(dateOrTime: Comparable): Temporal.Instant {
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
-  return dateOrTime.toZonedDateTime("UTC").toInstant();
+  return toDate(dateOrTime).toZonedDateTime("UTC").toInstant();
 }
 
 function change(
@@ -92,7 +94,7 @@ function receiver(dateOrTime: DateOrTime | Temporal.Instant): DateOrTime {
 function year(dateOrTime: DateOrTime | Temporal.Instant): number {
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return dateOrTime instanceof Date ? dateOrTime.getFullYear() : dateOrTime.year;
+  return dateOrTime instanceof Date ? dateOrTime.getFullYear() : Number(dateOrTime.year);
 }
 
 function month(dateOrTime: DateOrTime | Temporal.Instant): number {
@@ -139,22 +141,24 @@ function beginningOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
     ? time.beginningOfDay(dateOrTime)
-    : date.beginningOfDay(dateOrTime);
+    : date.beginningOfDay(toDate(dateOrTime));
 }
 
 function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return dateOrTime instanceof Date ? time.endOfDay(dateOrTime) : date.endOfDay(dateOrTime);
+  return dateOrTime instanceof Date ? time.endOfDay(dateOrTime) : date.endOfDay(toDate(dateOrTime));
 }
 
 export function yesterday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function yesterday(dateOrTime: Date): Temporal.Instant;
+export function yesterday(dateOrTime: RubyDate): RubyDate;
 export function yesterday(dateOrTime: DateOrTime): DateOrInstant {
   return advance(dateOrTime, { days: -1 });
 }
 
 export function tomorrow(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function tomorrow(dateOrTime: Date): Temporal.Instant;
+export function tomorrow(dateOrTime: RubyDate): RubyDate;
 export function tomorrow(dateOrTime: DateOrTime): DateOrInstant {
   return advance(dateOrTime, { days: 1 });
 }
@@ -298,6 +302,11 @@ export function nextWeek(
   options?: { sameTime?: boolean },
 ): Temporal.Instant;
 export function nextWeek(
+  dateOrTime: RubyDate,
+  givenDayInNextWeek?: string,
+  options?: { sameTime?: boolean },
+): RubyDate;
+export function nextWeek(
   dateOrTime: DateOrTime,
   givenDayInNextWeek: string = date.beginningOfWeek(),
   { sameTime = false }: { sameTime?: boolean } = {},
@@ -375,6 +384,7 @@ export const lastQuarter = prevQuarter;
 
 export function lastYear(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function lastYear(dateOrTime: Date): Temporal.Instant;
+export function lastYear(dateOrTime: RubyDate): RubyDate;
 export function lastYear(dateOrTime: DateOrTime): DateOrInstant {
   return yearsAgo(dateOrTime as Date, 1);
 }
@@ -392,6 +402,7 @@ export function beginningOfWeek(
   startDay?: string,
 ): Temporal.PlainDate;
 export function beginningOfWeek(dateOrTime: Date, startDay?: string): Temporal.Instant;
+export function beginningOfWeek(dateOrTime: RubyDate, startDay?: string): RubyDate;
 export function beginningOfWeek(dateOrTime: DateOrInstant, startDay?: string): DateOrInstant;
 export function beginningOfWeek(
   dateOrTime: DateOrTime | Temporal.Instant,
@@ -411,6 +422,7 @@ export function monday(dateOrTime: DateOrTime): DateOrInstant {
 
 export function endOfWeek(dateOrTime: Temporal.PlainDate, startDay?: string): Temporal.PlainDate;
 export function endOfWeek(dateOrTime: Date, startDay?: string): Temporal.Instant;
+export function endOfWeek(dateOrTime: RubyDate, startDay?: string): RubyDate;
 export function endOfWeek(
   dateOrTime: DateOrTime,
   startDay: string = date.beginningOfWeek(),

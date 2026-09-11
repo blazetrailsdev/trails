@@ -133,7 +133,29 @@ export function minusWithoutDuration(
 export function advance(
   date: Temporal.PlainDate,
   options: { years?: number; months?: number; weeks?: number; days?: number },
-): Temporal.PlainDate {
+): Temporal.PlainDate;
+export function advance(
+  date: RubyDate,
+  options: { years?: number; months?: number; weeks?: number; days?: number },
+): RubyDate;
+export function advance(
+  date: Temporal.PlainDate | RubyDate,
+  options: { years?: number; months?: number; weeks?: number; days?: number },
+): Temporal.PlainDate | RubyDate;
+export function advance(
+  date: Temporal.PlainDate | RubyDate,
+  options: { years?: number; months?: number; weeks?: number; days?: number },
+): Temporal.PlainDate | RubyDate {
+  if (date instanceof RubyDate) {
+    let d = date;
+
+    if (options.years != null) d = d.rshift(options.years * 12);
+    if (options.months != null) d = d.rshift(options.months);
+    if (options.weeks != null) d = d.plus(options.weeks * 7);
+    if (options.days != null) d = d.plus(options.days);
+
+    return d;
+  }
   let d = date;
 
   if (options.years != null) d = d.add({ months: options.years * 12 });
@@ -147,7 +169,26 @@ export function advance(
 export function change(
   date: Temporal.PlainDate,
   options: { year?: number; month?: number; day?: number },
-): Temporal.PlainDate {
+): Temporal.PlainDate;
+export function change(
+  date: RubyDate,
+  options: { year?: number; month?: number; day?: number },
+): RubyDate;
+export function change(
+  date: Temporal.PlainDate | RubyDate,
+  options: { year?: number; month?: number; day?: number },
+): Temporal.PlainDate | RubyDate;
+export function change(
+  date: Temporal.PlainDate | RubyDate,
+  options: { year?: number; month?: number; day?: number },
+): Temporal.PlainDate | RubyDate {
+  if (date instanceof RubyDate) {
+    return new RubyDate(
+      "year" in options ? options.year! : date.year,
+      "month" in options ? options.month! : date.month,
+      "day" in options ? options.day! : date.day,
+    );
+  }
   return new Temporal.PlainDate(
     "year" in options ? options.year! : date.year,
     "month" in options ? options.month! : date.month,
