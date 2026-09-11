@@ -237,7 +237,8 @@ export class Collector {
   onMimeBody(mimeIndex: number, content: string) {
     const part = this.mimeParts[mimeIndex];
     if (typeof part.body === "string") part.body += content;
-    else if (typeof part.body?.write === "function") part.body.write(content);
+    else if (typeof part.body?.write === "function")
+      part.body.write(Uint8Array.from(content, (c) => c.charCodeAt(0)));
   }
 
   onMimeFinish(_mimeIndex: number) {}

@@ -89,6 +89,14 @@ describe("IO", () => {
     expect(File.binread(path)).toBe("h\u00c3\u00a9llo");
   });
 
+  it("write sends a Uint8Array's bytes unchanged, whatever the stream's encoding", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes.dat");
+    const file = File.open(path, "w:UTF-8");
+    expect(file.write(new Uint8Array([0x68, 0xc3, 0xa9, 0xff]))).toBe(4);
+    file.close();
+    expect(File.binread(path)).toBe("h\u00c3\u00a9\u00ff");
+  });
+
   it("read answers the mode string's external encoding, and write transcodes to it", () => {
     // vendor/ruby/io.c:6883-6886 — everything after the mode's `:` is the encoding.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "latin1.txt");

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { BoundedIO, EmptyContentError, Parser } from "./parser.js";
 import { QueryParser } from "../query-parser.js";
-import { EOFError } from "@blazetrails/ruby-compat";
+import { EOFError, File } from "@blazetrails/ruby-compat";
 
 const qp = QueryParser.makeDefault(100);
 
-function parseBody(body: string) {
+function parseBody(body: string, tempfile: typeof Parser.TEMPFILE_FACTORY | null = null) {
   let done = false;
   return Parser.parse(
     {
@@ -17,13 +17,30 @@ function parseBody(body: string) {
     },
     null,
     "multipart/form-data; boundary=AaB03x",
-    null,
+    tempfile,
     Parser.BUFSIZE,
     qp,
   );
 }
 
 describe("Rack::Multipart::Parser encodings", () => {
+  it("writes a non-ASCII binary upload to its tempfile byte-for-byte", () => {
+    let bytes = "";
+    for (let i = 0; i < 256; i++) bytes += String.fromCharCode(i);
+    const body =
+      "--AaB03x\r\n" +
+      'content-disposition: form-data; name="file"; filename="bytes.bin"\r\n' +
+      "content-type: application/octet-stream\r\n" +
+      "\r\n" +
+      bytes +
+      "\r\n" +
+      "--AaB03x--\r\n";
+
+    const file = parseBody(body, Parser.TEMPFILE_FACTORY).params!["file"];
+    file.tempfile.close();
+    expect(File.binread(file.tempfile.path)).toBe(bytes);
+  });
+
   it("decodes a text part's bytes under its charset", () => {
     const body =
       "--AaB03x\r\n" +
