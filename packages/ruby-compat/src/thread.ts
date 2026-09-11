@@ -7,6 +7,7 @@ import {
 let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
+const _locations = new WeakMap<object, string>();
 
 function currentSlot(): AsyncContext<Thread> {
   const adapter = getAsyncContext();
@@ -60,6 +61,9 @@ export class Thread<R = unknown> {
   constructor(block: () => R) {
     this.id = ++_threadIdCounter;
     this.status = "run";
+    const frame = new Error().stack?.split("\n")[2] ?? "";
+    const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
+    if (location) _locations.set(this, `${location[1]}:${location[2]}`);
     try {
       this.#value = currentSlot().run(this as Thread, block);
     } catch (error) {
@@ -88,6 +92,7 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/thread.c:3473`).
    */
   toString(): string {
-    return `#<Thread:0x${this.id.toString(16).padStart(16, "0")} ${this.status}>`;
+    const location = _locations.has(this) ? ` ${_locations.get(this)}` : "";
+    return `#<Thread:0x${this.id.toString(16).padStart(16, "0")}${location} ${this.status}>`;
   }
 }

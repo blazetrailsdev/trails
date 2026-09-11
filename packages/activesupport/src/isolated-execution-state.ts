@@ -64,7 +64,9 @@ export const IsolatedExecutionState = {
     return Thread.current();
   },
   shareWith(other: Thread): void {
-    _states.set(Thread.current(), new Map(_states.get(other)));
+    const scoped = ctx().getStore();
+    const state = scoped && scoped.thread === other ? scoped.state : _states.get(other);
+    _states.set(Thread.current(), new Map(state));
   },
   run<R>(fn: () => R): R {
     return new Thread(fn).value();

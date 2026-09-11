@@ -4,7 +4,7 @@ import { ConnectionPool } from "../connection-pool.js";
 import { PoolConfig } from "../../pool-config.js";
 import { ConnectionDescriptor } from "../connection-handler.js";
 import { HashConfig } from "../../../database-configurations/hash-config.js";
-import { executionContext } from "./execution-context.js";
+import { executionContext, withExecutionContext } from "./execution-context.js";
 
 describe("execution context per IsolatedExecutionState.run", () => {
   it("gives concurrent runs distinct leases and leaves top-level code on the root context", async () => {
@@ -24,5 +24,12 @@ describe("execution context per IsolatedExecutionState.run", () => {
     expect(executionContext().id).toBe(0);
     expect(lease()).not.toBe(a);
     expect(lease()).toBe(lease());
+  });
+
+  it("carries the caller's scoped state into the new thread", () => {
+    const seen = IsolatedExecutionState.scope("scoped_key", "scoped", () =>
+      withExecutionContext(() => IsolatedExecutionState.get("scoped_key")),
+    );
+    expect(seen).toBe("scoped");
   });
 });

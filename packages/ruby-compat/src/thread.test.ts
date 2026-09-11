@@ -34,7 +34,7 @@ describe("Thread", () => {
       throw new Error("boom");
     });
     expect(thread.status).toBe("dead");
-    expect(String(thread)).toMatch(/^#<Thread:0x[0-9a-f]{16} dead>$/);
+    expect(String(thread)).toMatch(/^#<Thread:0x[0-9a-f]{16} \S*thread\.test\.ts:\d+ dead>$/);
     expect(() => thread.value()).toThrow("boom");
   });
 });

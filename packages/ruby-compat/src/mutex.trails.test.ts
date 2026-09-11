@@ -83,9 +83,11 @@ describe("Mutex#try_lock / #unlock", () => {
     mutex.unlock();
   });
 
-  it("unlock releases a mutex taken by synchronize", async () => {
+  it("synchronize unlocks unconditionally, so an unlock inside the block raises on exit", async () => {
     const mutex = new Mutex();
-    await mutex.synchronize(() => void mutex.unlock());
+    await expect(mutex.synchronize(() => void mutex.unlock())).rejects.toThrow(
+      "Attempt to unlock a mutex which is not locked",
+    );
     expect(mutex.tryLock()).toBe(true);
     mutex.unlock();
   });

@@ -80,7 +80,7 @@ export class Mutex {
     try {
       return await storage.run(fiber, () => block());
     } finally {
-      if (data.unlock === release) this.unlock();
+      this.unlock();
     }
   }
 
