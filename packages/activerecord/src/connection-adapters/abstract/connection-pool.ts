@@ -890,8 +890,10 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  scheduleQuery(futureResult: { executeOrSkip(): void }): void {
-    this.asyncExecutor!.post(() => withExecutionContext(() => futureResult.executeOrSkip()));
+  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
+    this.asyncExecutor!.post(() => {
+      void withExecutionContext(() => futureResult.executeOrSkip());
+    });
   }
 
   /** @missingRailsArgs new — PERMANENT */

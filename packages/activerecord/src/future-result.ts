@@ -178,10 +178,10 @@ export class FutureResult {
     return this;
   }
 
-  executeOrSkip(): void {
+  executeOrSkip(): Promise<void> | void {
     if (!this.pending()) return;
 
-    this.#scheduled = this.#session!.synchronize(async () => {
+    return (this.#scheduled = this.#session!.synchronize(async () => {
       if (!this.pending()) return;
 
       await this.pool.withConnection(async (connection) => {
@@ -193,7 +193,7 @@ export class FutureResult {
           );
         }
       });
-    });
+    }));
   }
 
   async result(): Promise<Result> {

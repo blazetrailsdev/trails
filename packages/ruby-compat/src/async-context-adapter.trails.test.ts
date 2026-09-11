@@ -70,7 +70,8 @@ describe("fallback AsyncContextAdapter", () => {
       const a = ctx.run("a", () => tick(1));
       const b = ctx.run("b", () => tick(20));
       await expect(a).rejects.toThrow(/Overlapping async context scopes/);
-      await b;
+      await expect(b).rejects.toThrow(/Overlapping async context scopes/);
+      expect(ctx.getStore()).toBeUndefined();
     });
 
     it("keeps nested async scopes working", async () => {

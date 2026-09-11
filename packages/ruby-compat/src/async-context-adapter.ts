@@ -34,8 +34,10 @@ function createFallbackAdapter(): AsyncContextAdapter {
           run: (store, fn) => variable.run(store, fn),
         };
       }
-      const assertNotInterleaved = (store: T) => {
-        if (current !== store) {
+      const restore = (store: T, prev: T | undefined) => {
+        const interleaved = current !== store;
+        current = interleaved ? undefined : prev;
+        if (interleaved) {
           throw new Error(
             "Overlapping async context scopes are not supported without AsyncLocalStorage or AsyncContext.",
           );
@@ -54,13 +56,11 @@ function createFallbackAdapter(): AsyncContextAdapter {
             if (result && typeof (result as unknown as Promise<unknown>).then === "function") {
               return (result as unknown as Promise<unknown>).then(
                 (val) => {
-                  assertNotInterleaved(store);
-                  current = prev;
+                  restore(store, prev);
                   return val;
                 },
                 (err) => {
-                  assertNotInterleaved(store);
-                  current = prev;
+                  restore(store, prev);
                   throw err;
                 },
               ) as unknown as R;
