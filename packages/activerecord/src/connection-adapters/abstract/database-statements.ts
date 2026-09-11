@@ -49,7 +49,7 @@ import {
   type FutureResultConnection,
 } from "../../future-result.js";
 import type { Base } from "../../base.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
 
 /** @internal */
@@ -1092,7 +1092,7 @@ export function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string | null): string | null {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
-  for (const transformer of ActiveRecord.queryTransformers) {
+  for (const transformer of _Base!.queryTransformers) {
     sql = transformer.call(sql as string, this);
   }
 

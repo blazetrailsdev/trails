@@ -20,7 +20,7 @@ import {
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import { BinaryData } from "@blazetrails/activemodel";
 
 export function unquotedTrue(): number {
@@ -151,14 +151,14 @@ export function columnNameWithOrderMatcher(): RegExp {
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof TimeWithZone) {
-    if (ActiveRecord.defaultTimezone === "utc") {
+    if (_Base!.defaultTimezone === "utc") {
       return value.getutc();
     } else {
       return value.getlocal();
     }
   }
   if (value instanceof RubyTime) {
-    if (ActiveRecord.defaultTimezone === "utc") {
+    if (_Base!.defaultTimezone === "utc") {
       return value.isUtc() ? value : value.getutc();
     } else {
       return value.isUtc() ? value.getlocal() : value;

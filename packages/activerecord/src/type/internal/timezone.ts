@@ -5,10 +5,10 @@ export interface TimezoneOptions {
   limit?: number;
 }
 
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 
 export function isUtc(timezone?: "utc" | "local"): boolean {
-  return (timezone ?? ActiveRecord.defaultTimezone) === "utc";
+  return (timezone ?? _Base!.defaultTimezone) === "utc";
 }
 
 export class Timezone {
@@ -23,6 +23,6 @@ export class Timezone {
   }
 
   get defaultTimezone(): "utc" | "local" {
-    return this._timezone ?? ActiveRecord.defaultTimezone;
+    return this._timezone ?? _Base!.defaultTimezone;
   }
 }

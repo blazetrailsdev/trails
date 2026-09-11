@@ -5,7 +5,7 @@ import {
   type ValueType,
 } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import {
   quote as abstractQuote,
   lookupCastType as abstractLookupCastType,
@@ -95,7 +95,7 @@ export function quotedBinary(
 
 export function quote(this: QuotingDispatchHost, value: unknown): string | null {
   if (
-    ActiveRecord.raiseIntWiderThan64bit &&
+    _Base!.raiseIntWiderThan64bit &&
     (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value)))
   ) {
     checkIntInRange(value);

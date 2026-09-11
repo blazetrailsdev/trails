@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
 import {
@@ -484,7 +484,7 @@ export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
     if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
 
     warning.sql = sql;
-    ActiveRecord.dbWarningsAction!.call(this, warning as unknown as SQLWarning);
+    _Base!.dbWarningsAction!.call(this, warning as unknown as SQLWarning);
   }
 }
 

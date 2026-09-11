@@ -321,7 +321,7 @@ const CONNECTION_DEPRECATION_MSG =
 export function connection(this: typeof Base): DatabaseAdapter {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
-    const setting = ActiveRecord.permanentConnectionCheckout;
+    const setting = _Base!.permanentConnectionCheckout;
     if (setting === "deprecated") {
       console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
     } else if (setting === "disallowed") {
@@ -577,7 +577,7 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
     role,
     shard,
   });
-  if (tz) ActiveRecord.defaultTimezone = tz;
+  if (tz) _Base!.defaultTimezone = tz;
 }
 
 export const ClassMethods = {

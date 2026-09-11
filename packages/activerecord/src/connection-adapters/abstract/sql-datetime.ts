@@ -5,7 +5,7 @@
 
 import { Temporal, cCivilToJd, strftime, type StrftimeSubject } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 
 const TIME_DB_FORMAT = "%Y-%m-%d %H:%M:%S";
 const DATE_DB_FORMAT = "%Y-%m-%d";
@@ -48,7 +48,7 @@ function toFsDbWithUsec(subject: StrftimeSubject): string {
 }
 
 export function defaultSqlTimezone(): string {
-  return ActiveRecord.defaultTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId();
+  return _Base!.defaultTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId();
 }
 
 export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string {

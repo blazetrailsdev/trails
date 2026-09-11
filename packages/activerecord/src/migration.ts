@@ -63,7 +63,7 @@ export { PendingMigrationConnection } from "./migration/pending-migration-connec
 export { currentVersion, type Compatibility } from "./migration/compatibility.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
-import { ActiveRecord } from "./ar-config.js";
+import { _Base } from "./base-slot.js";
 import type { Base } from "./base.js";
 
 type BaseWithLogger = Pick<typeof Base, "logger">;
@@ -1036,7 +1036,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get executionStrategy(): ExecutionStrategy {
-    this._executionStrategy ??= new (ActiveRecord.migrationStrategy as new (
+    this._executionStrategy ??= new (_Base!.migrationStrategy as new (
       migration: Migration,
     ) => ExecutionStrategy)(this);
     return this._executionStrategy;
@@ -1066,7 +1066,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           ? number
           : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
     const n = raw < 0n ? 0n : raw;
-    if (!ActiveRecord.timestampedMigrations) return n.toString().padStart(3, "0");
+    if (!_Base!.timestampedMigrations) return n.toString().padStart(3, "0");
     const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
@@ -1199,7 +1199,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static async maintainTestSchemaBang(): Promise<void> {
-    if (ActiveRecord.maintainTestSchema) {
+    if (_Base!.maintainTestSchema) {
       await this.nearestDelegate?.suppressMessages(async () => {
         await this.loadSchemaIfPendingBang();
       });
@@ -1649,7 +1649,7 @@ export class MigrationContext<
 
   /** @internal */
   private isValidateTimestamp(): boolean {
-    return ActiveRecord.timestampedMigrations && ActiveRecord.validateMigrationTimestamps;
+    return _Base!.timestampedMigrations && _Base!.validateMigrationTimestamps;
   }
 
   /** @internal */

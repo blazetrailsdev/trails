@@ -1,7 +1,6 @@
 import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./ar-config.js";
 import { StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
@@ -447,7 +446,7 @@ export async function insertPreparedFixtureSets(
 }
 
 async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
-  if (!ActiveRecord.verifyForeignKeysForFixtures) return;
+  if (!Base.verifyForeignKeysForFixtures) return;
 
   try {
     await conn.checkAllForeignKeysValidBang();

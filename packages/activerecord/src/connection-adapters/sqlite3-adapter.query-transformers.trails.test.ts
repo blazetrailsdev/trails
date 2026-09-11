@@ -4,7 +4,6 @@ import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { ActiveRecord } from "../ar-config.js";
 import type { QueryTransformer } from "../query-transformers.js";
 
 fixtures([]);
@@ -15,13 +14,13 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
 
   beforeEach(() => {
     adapter = Base.connection as SQLite3Adapter;
-    savedTransformers = ActiveRecord.queryTransformers.slice();
-    ActiveRecord.queryTransformers.length = 0;
+    savedTransformers = Base.queryTransformers.slice();
+    Base.queryTransformers.length = 0;
   });
 
   afterEach(() => {
-    ActiveRecord.queryTransformers.length = 0;
-    ActiveRecord.queryTransformers.push(...savedTransformers);
+    Base.queryTransformers.length = 0;
+    Base.queryTransformers.push(...savedTransformers);
   });
 
   function captureSql<T>(fn: () => Promise<T>): Promise<{ result: T; sqls: string[] }> {
@@ -35,14 +34,14 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   }
 
   it("appends the comment to read queries and instruments the commented SQL", async () => {
-    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    Base.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { result, sqls } = await captureSql(() => adapter.execute("SELECT 1 AS one"));
     expect(result).toEqual([{ one: 1 }]);
     expect(sqls.some((s) => s === "SELECT 1 AS one /*app:test*/")).toBe(true);
   });
 
   it("applies the comment on write queries too", async () => {
-    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    Base.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       adapter.executeMutation("INSERT INTO customers (name) VALUES ('x')"),
     );
@@ -58,7 +57,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("leaves executeBatch statements uncommented (matches Rails execute_batch)", async () => {
-    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    Base.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       adapter.executeBatch([
         "INSERT INTO customers (name) VALUES ('a')",
@@ -70,7 +69,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("does not let a concurrent batch suppress a normal query's comment", async () => {
-    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    Base.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       Promise.all([
         adapter.executeBatch([
@@ -86,7 +85,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
 
   it("applies each transformer exactly once per query", async () => {
     let calls = 0;
-    ActiveRecord.queryTransformers.push({
+    Base.queryTransformers.push({
       call: (sql) => {
         calls++;
         return `${sql} /*c1*/`;

@@ -12,7 +12,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 
 /** @internal */
 export const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
@@ -460,7 +460,7 @@ export class Transaction {
     if (this._runCommitCallbacks) {
       const recs = this.records;
       if (recs) {
-        if (ActiveRecord.beforeCommittedOnAllRecords) {
+        if (_Base!.beforeCommittedOnAllRecords) {
           const ite = this.uniqueRecords();
 
           const entries: Array<[unknown, unknown]> = [];

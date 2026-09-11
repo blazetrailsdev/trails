@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
-import { ActiveRecord, Base, NotImplementedError, ReadonlyAttributeError } from "./index.js";
+import { Base, NotImplementedError, ReadonlyAttributeError } from "./index.js";
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
@@ -1089,8 +1089,8 @@ describe("BasicsTest", () => {
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
   it("readonly attributes when configured to not raise", async () => {
-    const prev = ActiveRecord.raiseOnAssignToAttrReadonly;
-    ActiveRecord.raiseOnAssignToAttrReadonly = false;
+    const prev = Base.raiseOnAssignToAttrReadonly;
+    Base.raiseOnAssignToAttrReadonly = false;
     try {
       class NonRaisingPost extends Base {
         static {
@@ -1128,7 +1128,7 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via update");
     } finally {
-      ActiveRecord.raiseOnAssignToAttrReadonly = prev;
+      Base.raiseOnAssignToAttrReadonly = prev;
     }
   });
   it("readonly attributes on belongs to association", async () => {

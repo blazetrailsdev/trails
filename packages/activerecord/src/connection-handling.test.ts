@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
@@ -35,11 +34,11 @@ describe("ConnectionHandlingTest", () => {
   let permanentConnectionCheckoutWas: true | "deprecated" | "disallowed";
 
   beforeEach(() => {
-    permanentConnectionCheckoutWas = ActiveRecord.permanentConnectionCheckout;
+    permanentConnectionCheckoutWas = Base.permanentConnectionCheckout;
   });
 
   afterEach(async () => {
-    ActiveRecord.permanentConnectionCheckout = permanentConnectionCheckoutWas;
+    Base.permanentConnectionCheckout = permanentConnectionCheckoutWas;
     connectedToStack().length = 0;
     await Post.where({ title: "foo" }).deleteAll();
   });
@@ -91,7 +90,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection is a soft-deprecated alias to #lease_connection", async () => {
-    ActiveRecord.permanentConnectionCheckout = true;
+    Base.permanentConnectionCheckout = true;
     Base.releaseConnection();
     expect(Base.connectionPool().activeConnection).toBeNull();
 
@@ -109,7 +108,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
-    ActiveRecord.permanentConnectionCheckout = "deprecated";
+    Base.permanentConnectionCheckout = "deprecated";
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       Base.releaseConnection();
@@ -138,7 +137,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
-    ActiveRecord.permanentConnectionCheckout = "disallowed";
+    Base.permanentConnectionCheckout = "disallowed";
     Base.releaseConnection();
 
     expect(() => Base.connection).toThrow(ActiveRecordError);
@@ -153,7 +152,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)", async () => {
-    ActiveRecord.permanentConnectionCheckout = "disallowed";
+    Base.permanentConnectionCheckout = "disallowed";
     Base.releaseConnection();
 
     await Base.withConnection(
@@ -167,7 +166,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", async () => {
-    ActiveRecord.permanentConnectionCheckout = "deprecated";
+    Base.permanentConnectionCheckout = "deprecated";
     Base.releaseConnection();
     expect(Base.connectionPool().activeConnection).toBeNull();
 

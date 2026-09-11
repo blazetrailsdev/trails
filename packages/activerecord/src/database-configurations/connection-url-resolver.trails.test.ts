@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
-import { ActiveRecord } from "../ar-config.js";
+import { Base } from "../base.js";
 
 describe("ConnectionUrlResolver", () => {
   it("parses a standard postgresql URL", () => {
@@ -91,13 +91,13 @@ describe("ConnectionUrlResolver", () => {
   });
 
   describe("protocol adapter mapping", () => {
-    const saved = { ...ActiveRecord.protocolAdapters };
+    const saved = { ...Base.protocolAdapters };
     afterEach(() => {
-      ActiveRecord.protocolAdapters = saved;
+      Base.protocolAdapters = saved;
     });
 
     it("resolves through a mapping replaced via setProtocolAdapters", () => {
-      ActiveRecord.protocolAdapters = { custom: "postgresql" };
+      Base.protocolAdapters = { custom: "postgresql" };
       const hash = new ConnectionUrlResolver("custom://localhost/db").toHash();
       expect(hash.adapter).toBe("postgresql");
     });

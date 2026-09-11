@@ -1,17 +1,16 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
-import { ActiveRecord } from "../ar-config.js";
 import { leaseFixtureConnection, leaseFixtureConnectionFor } from "./fixture-connection.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
 
 describe("fixture connection source", () => {
   afterEach(() => {
-    ActiveRecord.permanentConnectionCheckout = true;
+    Base.permanentConnectionCheckout = true;
   });
 
   it("leases without tripping permanentConnectionCheckout = disallowed", () => {
-    ActiveRecord.permanentConnectionCheckout = "disallowed";
+    Base.permanentConnectionCheckout = "disallowed";
 
     expect(() => leaseFixtureConnection()).not.toThrow();
   });

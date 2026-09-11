@@ -2,7 +2,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray as Array } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { WhereClause } from "./where-clause.js";
-import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
@@ -246,7 +246,7 @@ export class Batches {
 
   /** @internal */
   actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
-    const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
+    const raise = errorOnIgnore !== undefined ? errorOnIgnore : _Base!.errorOnIgnoredOrder;
     if (raise) {
       throw new ArgumentError(Batches.ORDER_IGNORE_MESSAGE);
     } else if (this.model.logger) {

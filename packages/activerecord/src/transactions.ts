@@ -16,7 +16,7 @@ import {
   runCallbacks,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { ActiveRecord } from "./ar-config.js";
+import { _Base } from "./base-slot.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
@@ -431,7 +431,7 @@ export function hasTransactionalCallbacks(this: Base): boolean {
 
 /** @internal */
 function prependOption(): Record<string, unknown> {
-  if (ActiveRecord.runAfterTransactionCallbacksInOrderDefined) {
+  if (_Base!.runAfterTransactionCallbacksInOrderDefined) {
     return { prepend: true };
   } else {
     return {};

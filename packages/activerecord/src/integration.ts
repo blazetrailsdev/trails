@@ -1,7 +1,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, toFs, truncate } from "@blazetrails/activesupport";
-import { ActiveRecord } from "./ar-config.js";
+import { _Base } from "./base-slot.js";
 
 interface Identifiable {
   id: unknown;
@@ -133,7 +133,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
-  if (ActiveRecord.defaultTimezone !== "utc") return false;
+  if (_Base!.defaultTimezone !== "utc") return false;
   if ((record as unknown as Record<string, boolean>)["updated_atCameFromUser"]) return false;
   return TIMESTAMP_RE.test(timestamp);
 }

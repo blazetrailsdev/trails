@@ -6,7 +6,6 @@ import {
   StatementInvalid,
   StrictLoadingViolationError,
 } from "./errors.js";
-import { ActiveRecord } from "./ar-config.js";
 import {
   DatabaseConfigurations,
   configurationsStore,
@@ -480,7 +479,7 @@ export function strictLoadingViolationBang({
   owner: unknown;
   reflection: { name: string; strictLoadingViolationMessage(owner: unknown): string };
 }): void {
-  switch (ActiveRecord.actionOnStrictLoadingViolation) {
+  switch (_Base!.actionOnStrictLoadingViolation) {
     case "raise": {
       const message = reflection.strictLoadingViolationMessage(owner);
       throw new StrictLoadingViolationError(message);

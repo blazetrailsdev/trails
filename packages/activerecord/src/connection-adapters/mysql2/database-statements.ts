@@ -4,7 +4,7 @@ import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 import type { StatementPool } from "../statement-pool.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 
@@ -158,7 +158,7 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Mysql2RawResult> {
-  this._databaseTimezone = ActiveRecord.defaultTimezone;
+  this._databaseTimezone = _Base!.defaultTimezone;
 
   const hasBinds = binds != null && binds.length > 0;
 

@@ -22,7 +22,6 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./ar-config.js";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
@@ -631,12 +630,12 @@ describe("PrimaryKeyErrorTest", () => {
 
 describe("FixturesWithForeignKeyViolationsTest", () => {
   async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
-    const settingWas = ActiveRecord.verifyForeignKeysForFixtures;
-    ActiveRecord.verifyForeignKeysForFixtures = true;
+    const settingWas = Base.verifyForeignKeysForFixtures;
+    Base.verifyForeignKeysForFixtures = true;
     try {
       await block();
     } finally {
-      ActiveRecord.verifyForeignKeysForFixtures = settingWas;
+      Base.verifyForeignKeysForFixtures = settingWas;
     }
   }
 

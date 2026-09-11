@@ -11,7 +11,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
-import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import { Name, Utils } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
@@ -247,7 +247,7 @@ export class PostgreSQLAdapter
           .join(" "),
       );
     }
-    return this.findCmdAndExec(ActiveRecord.databaseCli["postgresql"], config.database!);
+    return this.findCmdAndExec(_Base!.databaseCli["postgresql"], config.database!);
   }
 
   override async active(): Promise<boolean> {
@@ -555,7 +555,7 @@ export class PostgreSQLAdapter
   }
 
   private _attachNoticeListener(client: pg.Client): void {
-    if (ActiveRecord.dbWarningsAction == null) return;
+    if (_Base!.dbWarningsAction == null) return;
     client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
       this._noticeReceiverSqlWarnings.push(
         new SQLWarning(msg.message, msg.code ?? null, msg.severity ?? null, undefined, this.pool),
@@ -2236,7 +2236,7 @@ export class PostgreSQLAdapter
   async reconfigureConnectionTimezone(): Promise<void> {
     const variables = fetch<SessionVariables>(this._config, "variables", {});
     if (variables["timezone"]) return;
-    const tz = ActiveRecord.defaultTimezone;
+    const tz = _Base!.defaultTimezone;
     const client = await this._acquireFreshClient();
     try {
       if (tz === "utc") {
@@ -2284,7 +2284,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async updateTypemapForDefaultTimezone(): Promise<void> {
-    const tz = ActiveRecord.defaultTimezone;
+    const tz = _Base!.defaultTimezone;
     if (this._mappedDefaultTimezone === tz) return;
     this._mappedDefaultTimezone = tz;
     await this.reconfigureConnectionTimezone();

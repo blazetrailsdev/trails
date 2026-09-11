@@ -1,4 +1,3 @@
-import { ActiveRecord } from "../ar-config.js";
 import { Base } from "../base.js";
 import type { SQLWarning } from "../errors.js";
 
@@ -13,14 +12,14 @@ export async function withDbWarningsAction(
     typeof warningsToIgnore === "function" ? warningsToIgnore : fn
   ) as () => Promise<void> | void;
   const ignore = Array.isArray(warningsToIgnore) ? warningsToIgnore : [];
-  const savedAction = ActiveRecord.dbWarningsAction;
+  const savedAction = Base.dbWarningsAction;
   const savedIgnore = Base.dbWarningsIgnore;
-  ActiveRecord.dbWarningsAction = action;
+  Base.dbWarningsAction = action;
   Base.dbWarningsIgnore = ignore;
   try {
     await body();
   } finally {
-    ActiveRecord.dbWarningsAction = savedAction ?? "ignore";
+    Base.dbWarningsAction = savedAction ?? "ignore";
     Base.dbWarningsIgnore = savedIgnore;
   }
 }

@@ -4,7 +4,6 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
-import { ActiveRecord } from "./ar-config.js";
 
 function usec(ts: unknown): string {
   if (ts instanceof RubyTime) ts = ts.getutc().toTime().toInstant();
@@ -149,12 +148,12 @@ describe("CacheKeyTest", () => {
       const record = await CacheMeWithVersion.create({});
       const recordFromDb = await CacheMeWithVersion.find(record.id);
       const spy = vi.spyOn(recordFromDb, "readAttribute");
-      ActiveRecord.defaultTimezone = "local";
+      Base.defaultTimezone = "local";
       try {
         recordFromDb.cacheVersion();
         expect(spy).toHaveBeenCalledWith("updated_at");
       } finally {
-        ActiveRecord.defaultTimezone = "utc";
+        Base.defaultTimezone = "utc";
       }
     },
   );

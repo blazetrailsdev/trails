@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "./index.js";
 import { Batches } from "./relation/batches.js";
-import { ActiveRecord } from "./ar-config.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName } from "./support/quote-regex.js";
@@ -262,8 +261,8 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not error if config overridden", async () => {
-    const prev = ActiveRecord.errorOnIgnoredOrder;
-    ActiveRecord.errorOnIgnoredOrder = true;
+    const prev = Base.errorOnIgnoredOrder;
+    Base.errorOnIgnoredOrder = true;
     let threw = false;
     try {
       for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: false })) {
@@ -271,21 +270,21 @@ describe("EachTest", () => {
     } catch {
       threw = true;
     } finally {
-      ActiveRecord.errorOnIgnoredOrder = prev;
+      Base.errorOnIgnoredOrder = prev;
     }
     expect(threw).toBe(false);
   });
 
   it("find in batches should error on config specified to error", async () => {
-    const prev = ActiveRecord.errorOnIgnoredOrder;
-    ActiveRecord.errorOnIgnoredOrder = true;
+    const prev = Base.errorOnIgnoredOrder;
+    Base.errorOnIgnoredOrder = true;
     try {
       await expect(async () => {
         for await (const _b of PostWithDefaultScope.findInBatches({})) {
         }
       }).rejects.toThrow();
     } finally {
-      ActiveRecord.errorOnIgnoredOrder = prev;
+      Base.errorOnIgnoredOrder = prev;
     }
   });
 

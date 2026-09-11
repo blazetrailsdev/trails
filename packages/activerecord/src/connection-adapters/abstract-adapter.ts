@@ -42,7 +42,6 @@ type AdapterInstrumenter = {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T>;
 };
-import { ActiveRecord } from "../ar-config.js";
 import { _Base } from "../base-slot.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
@@ -815,7 +814,7 @@ export class AbstractAdapter implements Quoting {
     this._statements = this.buildStatementPool() as StatementPool | null;
 
     this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
+      !_Base!.disablePreparedStatements &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
         "preparedStatements" in this._config
           ? this._config.preparedStatements
@@ -1453,7 +1452,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get defaultTimezone(): string {
-    return this._defaultTimezone ?? ActiveRecord.defaultTimezone;
+    return this._defaultTimezone ?? _Base!.defaultTimezone;
   }
 
   get connectionDescriptor(): ConnectionDescriptor | undefined {
@@ -1529,7 +1528,7 @@ export class AbstractAdapter implements Quoting {
   asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
-      ActiveRecord.asyncQueryExecutor != null &&
+      _Base!.asyncQueryExecutor != null &&
       this.pool?.asyncExecutor != null
     );
   }

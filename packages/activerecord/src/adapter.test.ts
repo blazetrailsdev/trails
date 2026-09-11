@@ -7,7 +7,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import {
-  ActiveRecord,
   Base,
   NotNullViolation,
   RecordNotUnique,
@@ -331,18 +330,18 @@ describe("AdapterTest", () => {
   });
 
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
-    const original = ActiveRecord.disablePreparedStatements;
+    const original = Base.disablePreparedStatements;
     try {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(true);
 
-        ActiveRecord.disablePreparedStatements = true;
+        Base.disablePreparedStatements = true;
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(false);
       });
     } finally {
-      ActiveRecord.disablePreparedStatements = original;
+      Base.disablePreparedStatements = original;
     }
   });
 

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { ActiveRecord } from "./ar-config.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./attribute-methods/serialization.js";
@@ -32,8 +31,8 @@ class MyObject {
 describe("SerializedAttributeTest", () => {
   const { topics, posts } = fixtures(["topics", "posts"]);
 
-  beforeEach(() => (ActiveRecord.useYamlUnsafeLoad = true));
-  afterAll(() => (ActiveRecord.useYamlUnsafeLoad = false));
+  beforeEach(() => (Base.useYamlUnsafeLoad = true));
+  afterAll(() => (Base.useYamlUnsafeLoad = false));
 
   it("serialize does not eagerly load columns", () => {
     const spy = vi.spyOn(Base, "leaseConnection" as any);

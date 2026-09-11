@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
-import { ActiveRecord } from "./ar-config.js";
+import { Base } from "./base.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
 import { makeCachedSelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
@@ -156,11 +156,11 @@ describe("DatabaseStatements#select", () => {
 
   afterEach(() => {
     execution.completeBang();
-    ActiveRecord.asyncQueryExecutor = null;
+    Base.asyncQueryExecutor = null;
   });
 
   it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     const host = {
       asyncEnabled: () => true,
       currentTransaction: () => ({ open: true, joinable: true }),
@@ -184,7 +184,7 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("forwards prepare and async through to the connection's rawExecQuery", async () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
@@ -208,7 +208,7 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("schedules a FutureResult through the pool when async is enabled", async () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
@@ -228,7 +228,7 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("hands back a pending FutureResult without waiting for the query", async () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     const pool = deferredPool(result);
     const host = {
@@ -250,7 +250,7 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("runs the query to completion before returning when connections are not concurrent", async () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));

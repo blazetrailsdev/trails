@@ -23,7 +23,7 @@ import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import { ActiveRecord } from "../ar-config.js";
+import { Base } from "../base.js";
 
 class TestAdapter extends AbstractAdapter {
   static override readonly ADAPTER_NAME = "TestAdapter";
@@ -356,28 +356,28 @@ describe("per-adapter visitor isolation", () => {
 });
 
 describe("AbstractAdapter#defaultTimezone", () => {
-  it("falls back to ActiveRecord.defaultTimezone when the config sets none", async () => {
+  it("falls back to Base.defaultTimezone when the config sets none", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
-    const previous = ActiveRecord.defaultTimezone;
+    const previous = Base.defaultTimezone;
     try {
-      ActiveRecord.defaultTimezone = "local";
+      Base.defaultTimezone = "local";
       expect(adapter.defaultTimezone).toBe("local");
-      ActiveRecord.defaultTimezone = "utc";
+      Base.defaultTimezone = "utc";
       expect(adapter.defaultTimezone).toBe("utc");
     } finally {
-      ActiveRecord.defaultTimezone = previous;
+      Base.defaultTimezone = previous;
       await adapter.disconnectBang();
     }
   });
 
   it("prefers the configured default_timezone over the global one", async () => {
     const adapter = new BetterSQLite3Adapter({ database: ":memory:", defaultTimezone: "local" });
-    const previous = ActiveRecord.defaultTimezone;
+    const previous = Base.defaultTimezone;
     try {
-      ActiveRecord.defaultTimezone = "utc";
+      Base.defaultTimezone = "utc";
       expect(adapter.defaultTimezone).toBe("local");
     } finally {
-      ActiveRecord.defaultTimezone = previous;
+      Base.defaultTimezone = previous;
       await adapter.disconnectBang();
     }
   });
