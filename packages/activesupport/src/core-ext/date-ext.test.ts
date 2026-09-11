@@ -4,8 +4,6 @@ import {
   endOfMonth,
   endOfYear,
   advance,
-  prevDay,
-  nextDay,
   lastWeek,
   allDay,
   allWeek,
@@ -32,7 +30,10 @@ import {
   beginningOfWeek,
   isFuture,
   isPast,
+  lastYear,
   nextWeek,
+  tomorrow,
+  yesterday,
 } from "./date-and-time/calculations.js";
 import { isBlank } from "./object/blank.js";
 import { assertNothingRaised, assertNotPredicate, assertPredicate } from "../testing/assertions.js";
@@ -73,6 +74,10 @@ function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0,
 
 function pd(year: number, month: number, day: number): Temporal.PlainDate {
   return new Temporal.PlainDate(year, month, day);
+}
+
+function rd(year: number, month: number, day: number): RubyDate {
+  return new RubyDate(year, month, day);
 }
 
 function asDate(instant: Temporal.Instant): Date {
@@ -119,13 +124,11 @@ describe("DateExtBehaviorTest", () => {
 
 describe("DateExtCalculationsTest", () => {
   it("yesterday in calendar reform", () => {
-    const result = asDate(prevDay(d(1582, 10, 15)));
-    expect(result.getDate()).toBe(14);
+    expect(yesterday(rd(1582, 10, 15)).toS()).toBe(rd(1582, 10, 4).toS());
   });
 
   it("tomorrow in calendar reform", () => {
-    const result = asDate(nextDay(d(1582, 10, 4)));
-    expect(result.getDate()).toBe(5);
+    expect(tomorrow(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 15).toS());
   });
 
   it("to fs", () => {
@@ -194,21 +197,20 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("beginning of week in calendar reform", () => {
-    expect(beginningOfWeek(pd(1582, 10, 15)).toString()).toEqual(pd(1582, 10, 11).toString());
+    expect(beginningOfWeek(rd(1582, 10, 15)).toS()).toBe(rd(1582, 10, 1).toS());
   });
 
   it("end of week in calendar reform", () => {
-    expect(endOfWeek(pd(1582, 10, 4)).toString()).toEqual(pd(1582, 10, 10).toString());
+    expect(endOfWeek(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 17).toS());
   });
 
   it("next week in calendar reform", () => {
-    expect(nextWeek(pd(1582, 9, 30), ":friday").toString()).toEqual(pd(1582, 10, 8).toString());
-    expect(nextWeek(pd(1582, 10, 4)).toString()).toEqual(pd(1582, 10, 11).toString());
+    expect(nextWeek(rd(1582, 9, 30), ":friday").toS()).toBe(rd(1582, 10, 15).toS());
+    expect(nextWeek(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 18).toS());
   });
 
   it("last year in calendar reform", () => {
-    const result = asDate(advance(d(1583, 10, 14), { years: -1 }));
-    expect(result.getFullYear()).toBe(1582);
+    expect(lastYear(rd(1583, 10, 14)).toS()).toBe(rd(1582, 10, 4).toS());
   });
 
   it("advance does first years and then days", () => {
@@ -220,13 +222,13 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance in calendar reform", () => {
-    expect(toDate(asDate(advance(d(1582, 10, 4), { days: 1 })))).toEqual(pd(1582, 10, 5));
-    expect(toDate(asDate(advance(d(1582, 10, 15), { days: -1 })))).toEqual(pd(1582, 10, 14));
+    expect(DateExt.advance(rd(1582, 10, 4), { days: 1 }).toS()).toBe(rd(1582, 10, 15).toS());
+    expect(DateExt.advance(rd(1582, 10, 15), { days: -1 }).toS()).toBe(rd(1582, 10, 4).toS());
     for (let day = 5; day <= 14; day++) {
-      expect(toDate(asDate(advance(d(1582, 9, day), { months: 1 })))).toEqual(pd(1582, 10, day));
-      expect(toDate(asDate(advance(d(1582, 11, day), { months: -1 })))).toEqual(pd(1582, 10, day));
-      expect(toDate(asDate(advance(d(1581, 10, day), { years: 1 })))).toEqual(pd(1582, 10, day));
-      expect(toDate(asDate(advance(d(1583, 10, day), { years: -1 })))).toEqual(pd(1582, 10, day));
+      expect(DateExt.advance(rd(1582, 9, day), { months: 1 }).toS()).toBe(rd(1582, 10, 4).toS());
+      expect(DateExt.advance(rd(1582, 11, day), { months: -1 }).toS()).toBe(rd(1582, 10, 4).toS());
+      expect(DateExt.advance(rd(1581, 10, day), { years: 1 }).toS()).toBe(rd(1582, 10, 4).toS());
+      expect(DateExt.advance(rd(1583, 10, day), { years: -1 }).toS()).toBe(rd(1582, 10, 4).toS());
     }
   });
 
