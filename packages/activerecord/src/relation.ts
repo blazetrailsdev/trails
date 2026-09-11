@@ -703,7 +703,7 @@ export class Relation<T extends Base> {
     updates: Record<string, unknown> | string | [string, ...unknown[]],
   ): Promise<number> {
     if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
-    if (this._isNone) return 0;
+    if (this.isNullRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
@@ -750,7 +750,7 @@ export class Relation<T extends Base> {
   }
 
   async deleteAll(): Promise<number> {
-    if (this._isNone) return 0;
+    if (this.isNullRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     const invalidMethods = Relation.INVALID_METHODS_FOR_DELETE_ALL.filter((method) => {
