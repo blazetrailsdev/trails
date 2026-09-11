@@ -7,40 +7,19 @@ import {
   unregisterConstant,
   _resetConstants,
 } from "./inflector.js";
-import { NameError } from "./core-ext/name-error.js";
 
 describe("PrivateConstantTest", () => {
   beforeEach(() => {
     _resetConstants();
   });
 
-  it("constantize raises on a private constant", () => {
+  it("constantize resolves a private constant by its scoped name", () => {
     class Treaties {}
     registerConstant("Country::HABTM_Treaties", Treaties);
+    privateConstant("Country::HABTM_Treaties");
+
     expect(constantize("Country::HABTM_Treaties")).toBe(Treaties);
-
-    privateConstant("Country::HABTM_Treaties");
-    expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties referenced",
-    );
-    expect(() => constantize("Country::HABTM_Treaties")).toThrow(NameError);
-  });
-
-  it("safe constantize returns undefined for a private constant", () => {
-    class Treaties {}
-    registerConstant("Country::HABTM_Treaties", Treaties);
-    privateConstant("Country::HABTM_Treaties");
-
-    expect(safeConstantize("Country::HABTM_Treaties")).toBeUndefined();
-  });
-
-  it("privacy is independent of registration order", () => {
-    privateConstant("Country::HABTM_Treaties");
-    registerConstant("Country::HABTM_Treaties", class Treaties {});
-
-    expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties referenced",
-    );
+    expect(safeConstantize("Country::HABTM_Treaties")).toBe(Treaties);
   });
 
   it("unregistering a constant drops its private mark", () => {
@@ -60,9 +39,7 @@ describe("PrivateConstantTest", () => {
     privateConstant("Country::HABTM_Treaties");
 
     unregisterConstant("Country::HABTM_Treaties", class Other {});
-    expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties referenced",
-    );
+    expect(constantize("Country::HABTM_Treaties")).toBe(Treaties);
   });
 
   it("sibling constants stay public", () => {

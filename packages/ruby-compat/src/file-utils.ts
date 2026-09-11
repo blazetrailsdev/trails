@@ -296,17 +296,12 @@ class Entry_ {
     return files.map((n) => new Entry_(this.prefix as string, this.join(this.rel, n)));
   }
 
-  /**
-   * `Entry_#lstat` (`vendor/ruby/lib/fileutils.rb:2192-2198`) — `File.stat`
-   * under `dereference?`, `File.lstat` otherwise. An adapter with no
-   * `lstatSync` cannot draw the distinction and stats either way.
-   */
+  /** `Entry_#lstat` (`vendor/ruby/lib/fileutils.rb:2192-2198`). */
   lstat(): FsStatResult {
-    const fs = getFs();
-    if (this.isDereference || !fs.lstatSync) {
-      return (this._lstat ??= fs.statSync(this.path));
+    if (this.isDereference) {
+      return (this._lstat ??= getFs().statSync(this.path));
     } else {
-      return (this._lstat ??= fs.lstatSync(this.path));
+      return (this._lstat ??= getFs().lstatSync(this.path));
     }
   }
 

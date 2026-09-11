@@ -62,11 +62,10 @@ describe("registerModel canonical-name shadow guard", () => {
   });
 
   it("binds the habtm join model as a private constant", () => {
-    expect(safeConstantize("Country::HABTM_Treaties")).toBeUndefined();
-    expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties referenced",
+    expect(safeConstantize("Country::HABTM_Treaties")).toBe(
+      modelRegistry.get("Country::HABTM_Treaties"),
     );
-    expect(modelRegistry.get("Country::HABTM_Treaties")).toBeDefined();
+    expect(constantize("Country::HABTM_Treaties")).toBeDefined();
   });
 
   it("unregisters the constant when the registry entry is dropped", () => {

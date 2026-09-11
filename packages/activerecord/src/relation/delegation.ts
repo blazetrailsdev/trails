@@ -18,6 +18,7 @@ import {
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
 import { _Base } from "../base-slot.js";
+import { _CollectionProxyCtor } from "../associations/collection-proxy-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
@@ -55,8 +56,9 @@ export class GeneratedRelationMethods {
    * @missingRailsCall match? — PERMANENT
    * @missingRailsCall scoping — PERMANENT
    */
-  generateMethod(method: string, fn: AnyCallable): void {
+  generateMethod(method: string): void {
     if (this._methods.has(method)) return;
+    const fn = classMethodDelegator(method);
     this._methods.set(method, fn);
     for (const { carrier, priority } of this._carriers) {
       installOnCarrier(carrier, method, fn, priority);
@@ -271,12 +273,8 @@ export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
   );
 }
 
-export function generateRelationMethod(
-  modelClass: typeof Base,
-  method: string,
-  fn: AnyCallable,
-): void {
-  modelClass.generatedRelationMethods().generateMethod(method, fn);
+export function generateRelationMethod(this: typeof Base, method: string): void {
+  this.generatedRelationMethods().generateMethod(method);
 }
 
 /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
@@ -285,8 +283,10 @@ export function classMethodDelegator(prop: string): AnyCallable {
     const modelClass = this._model as typeof Base;
     guardBaseMethodDelegation(modelClass, prop);
     const classMethod = (modelClass as any)[prop] as AnyCallable;
+    const scope =
+      _CollectionProxyCtor && this instanceof _CollectionProxyCtor ? this.scope() : this;
     const prev = ScopeRegistry.currentScope(modelClass);
-    (modelClass as any).setCurrentScope(this);
+    (modelClass as any).setCurrentScope(scope);
     let result: unknown;
     try {
       result = classMethod.apply(modelClass, args);
@@ -435,12 +435,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       const modelClass = target._model as typeof Base;
 
-      if (modelClass._scopes.has(prop)) {
-        const scopeMethod = modelClass._scopes.get(prop)!;
-        return (...args: any[]) =>
-          scopeMethod.apply(Object.create(modelClass, { all: { value: () => target } }), args);
-      }
-
       if (target._loaded) {
         const records = () => target._records ?? [];
         const arrayDelegate = delegateArrayMethod(prop, records);
@@ -451,11 +445,10 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (enumerableDelegate) return enumerableDelegate;
 
       if (modelRespondTo(modelClass, prop)) {
-        const delegator = classMethodDelegator(prop);
         if (!uncacheableMethods().has(prop)) {
-          generateRelationMethod(modelClass, prop, delegator);
+          modelClass.generateRelationMethod(prop);
         }
-        return (...args: any[]) => delegator.apply(target, args);
+        return (...args: any[]) => classMethodDelegator(prop).apply(target, args);
       }
       return value;
     },
@@ -463,7 +456,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
       const modelClass = target._model as typeof Base;
-      if (modelClass._scopes.has(prop)) return true;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return modelRespondTo(modelClass, prop);
     },

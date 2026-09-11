@@ -9,7 +9,6 @@ import {
   delegateArrayMethod,
   delegateEnumerableMethod,
   classMethodDelegator,
-  generateRelationMethod,
   uncacheableMethods,
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
@@ -763,11 +762,10 @@ function wrapCollectionProxy<T extends Base = Base>(
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        const delegator = classMethodDelegator(prop);
         if (!uncacheableMethods().has(prop)) {
-          generateRelationMethod(modelClass, prop, delegator);
+          modelClass.generateRelationMethod(prop);
         }
-        return (...args: any[]) => delegator.apply(scope, args);
+        return (...args: any[]) => classMethodDelegator(prop).apply(scope, args);
       }
 
       return scopeVal;
@@ -775,8 +773,7 @@ function wrapCollectionProxy<T extends Base = Base>(
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
-      const modelClass = target.model as typeof Base & { _scopes?: Map<string, unknown> };
-      if (modelClass._scopes?.has(prop)) return true;
+      const modelClass = target.model as typeof Base;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return typeof (modelClass as any)[prop] === "function";
     },

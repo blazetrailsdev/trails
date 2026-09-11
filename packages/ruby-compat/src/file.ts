@@ -217,7 +217,7 @@ export class File extends IO {
    */
   static isSymlink(fileName: string): boolean {
     try {
-      return getFs().lstatSync!(fileName).isSymbolicLink?.() === true;
+      return getFs().lstatSync(fileName).isSymbolicLink?.() === true;
     } catch {
       return false;
     }

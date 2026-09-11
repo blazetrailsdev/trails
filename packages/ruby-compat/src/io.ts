@@ -1,4 +1,5 @@
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
+import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
@@ -120,7 +121,12 @@ function binaryBytes(string: string): Uint8Array {
  * {@link funSiFromUtf16} and {@link funSiFromUtf32} do, so a BOM-prefixed
  * stream reads through the concrete seat the BOM names.
  */
-function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
+function ioEncStr(
+  bytes: Uint8Array,
+  length: number,
+  enc: Encoding,
+  destination: Encoding = enc,
+): string {
   if (enc === Encoding.ASCII_8BIT) return binaryString(bytes, length);
   const read = bytes.subarray(0, length);
   if (enc.decoderLabel === null) {
@@ -132,14 +138,75 @@ function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
       if (sp !== 0) {
         return new TextDecoder(sp === LE ? "utf-16le" : "utf-16be").decode(read.subarray(2));
       }
+      if (read.length === 0) return "";
+      throw invalidByteSequence(read.subarray(0, 2), enc, destination);
     }
     if (enc.name === "UTF-32") {
       const sp = funSiFromUtf32(read);
       if (sp !== 0) return utf32Str(read.subarray(4), sp === LE);
+      if (read.length === 0) return "";
+      throw invalidByteSequence(read.subarray(0, 4), enc, destination);
     }
     throw new ConverterNotFoundError(`code converter not found (${enc} to UTF-8)`);
   }
   return new TextDecoder(enc.decoderLabel).decode(read);
+}
+
+/**
+ * `rb_str_dump` (`vendor/ruby/string.c:6901`) over the bytes of an ASCII-8BIT
+ * String, as `rb_econv_open_exc`'s sibling `make_econv_exception`
+ * (`vendor/ruby/transcode.c:2116`) quotes the bytes a converter rejected.
+ */
+function rbStrDump(bytes: Uint8Array): string {
+  const escapes: Record<number, string> = {
+    0x22: '\\"',
+    0x5c: "\\\\",
+    0x0a: "\\n",
+    0x0d: "\\r",
+    0x09: "\\t",
+    0x0c: "\\f",
+    0x0b: "\\v",
+    0x08: "\\b",
+    0x07: "\\a",
+    0x1b: "\\e",
+  };
+  let result = '"';
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (escapes[c] !== undefined) result += escapes[c];
+    else if (
+      c === 0x23 &&
+      i + 1 < bytes.length &&
+      "$@{".includes(String.fromCharCode(bytes[i + 1]))
+    )
+      result += "\\#";
+    else if (c >= 0x20 && c < 0x7f) result += String.fromCharCode(c);
+    else result += `\\x${c.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return result + '"';
+}
+
+/**
+ * The `econv_invalid_byte_sequence` / `econv_incomplete_input` arm of
+ * `make_econv_exception` (`vendor/ruby/transcode.c:2111-2144`): a dummy seat's
+ * converter rejects its first code unit, or runs out of input before one is
+ * whole (`vendor/ruby/enc/trans/utf_16_32.trans:290,310`).
+ */
+function invalidByteSequence(
+  errorBytes: Uint8Array,
+  source: Encoding,
+  destination: Encoding,
+): InvalidByteSequenceError {
+  const incompleteInput = errorBytes.length < (source.name === "UTF-16" ? 2 : 4);
+  const dumped = rbStrDump(errorBytes);
+  const mesg = incompleteInput ? `incomplete ${dumped} on ${source}` : `${dumped} on ${source}`;
+  const exc = new InvalidByteSequenceError(mesg);
+  exc._errorBytes = binaryString(errorBytes, errorBytes.length);
+  exc._readagainBytes = null;
+  exc._incompleteInput = incompleteInput;
+  exc._sourceEncoding = source;
+  exc._destinationEncoding = destination;
+  return exc;
 }
 
 /** `BE` (`vendor/ruby/enc/trans/utf_16_32.trans:281`). */
@@ -762,7 +829,7 @@ export class IO {
       bytes.set(chunk, at);
       at += chunk.length;
     }
-    return ioEncStr(bytes, total, this.ioReadEncoding());
+    return ioEncStr(bytes, total, this.enc2 ?? this.ioReadEncoding(), this.ioReadEncoding());
   }
 
   /**
