@@ -139,36 +139,47 @@ export class Files {
     if (request.getHeader("HTTP_IF_MODIFIED_SINCE") === lastModified) return [304, {}, []];
 
     const headers: Record<string, string> = { "last-modified": lastModified };
-    const mime = this.mimeType(path, this.defaultMime);
-    if (mime) headers[CONTENT_TYPE] = mime;
-    Object.assign(headers, this.headers);
+    const mimeType = this.mimeType(path, this.defaultMime);
+    if (mimeType) headers[CONTENT_TYPE] = mimeType;
 
-    const size = this.filesize(path);
-    const rawRange = request.getHeader("HTTP_RANGE") as string | undefined;
+    if (this.headers) Object.assign(headers, this.headers);
 
-    if (rawRange && size > 0) {
-      const ranges = this.parseByteRanges(rawRange, size);
-      if (!ranges || ranges.length === 0) {
-        const resp = this.fail(416, "Byte range unsatisfiable");
-        resp[1]["content-range"] = `bytes */${size}`;
-        return resp;
-      }
+    let status = 200;
+    let size = this.filesize(path);
+    let partialContent = false;
+    let body: any;
 
-      const status = 206;
+    let ranges = Utils.getByteRanges(request.getHeader("HTTP_RANGE") as string | undefined, size);
+    if (ranges === null) {
+      ranges = [[0, size - 1]];
+    } else if (ranges.length === 0) {
+      const response = this.fail(416, "Byte range unsatisfiable");
+      response[1]["content-range"] = `bytes */${size}`;
+      return response;
+    } else {
+      partialContent = true;
+
       if (ranges.length === 1) {
-        headers["content-range"] = `bytes ${ranges[0][0]}-${ranges[0][1]}/${size}`;
+        const range = ranges[0];
+        headers["content-range"] = `bytes ${range[0]}-${range[1]}/${size}`;
       } else {
         headers[CONTENT_TYPE] = `multipart/byteranges; boundary=${MULTIPART_BOUNDARY}`;
       }
-      const body = new BaseIterator(path, ranges, { mimeType: mime, size });
-      headers[CONTENT_LENGTH] = String(body.bytesize());
-      return [status, headers, request.isHead() ? [] : body];
+
+      status = 206;
+      body = new BaseIterator(path, ranges, { mimeType, size });
+      size = body.bytesize();
     }
 
-    const fullRanges: [number, number][] = size > 0 ? [[0, size - 1]] : [];
     headers[CONTENT_LENGTH] = String(size);
-    const body = request.isHead() ? [] : new Iterator(path, fullRanges, { mimeType: mime, size });
-    return [200, headers, body];
+
+    if (request.isHead()) {
+      body = [];
+    } else if (!partialContent) {
+      body = new Iterator(path, ranges, { mimeType, size });
+    }
+
+    return [status, headers, body];
   }
 
   /** @internal */
@@ -198,29 +209,5 @@ export class Files {
   /** @internal */
   filesize(path: string): number {
     return File.sizeQ(path) ?? Buffer.byteLength(File.read(path));
-  }
-
-  /** @internal */
-  private parseByteRanges(range: string, size: number): [number, number][] | null {
-    const m = range.match(/^bytes=(.+)$/);
-    if (!m) return null;
-
-    const result: [number, number][] = [];
-    for (const spec of m[1].split(",").map((s) => s.trim())) {
-      if (spec.startsWith("-")) {
-        const len = parseInt(spec.slice(1));
-        if (isNaN(len) || len <= 0) return null;
-        result.push([Math.max(0, size - len), size - 1]);
-      } else if (spec.endsWith("-")) {
-        const start = parseInt(spec);
-        if (isNaN(start) || start >= size) return null;
-        result.push([start, size - 1]);
-      } else {
-        const [a, b] = spec.split("-").map(Number);
-        if (isNaN(a) || isNaN(b) || a > b || a >= size) return null;
-        result.push([a, Math.min(b, size - 1)]);
-      }
-    }
-    return result.length > 0 ? result : null;
   }
 }
