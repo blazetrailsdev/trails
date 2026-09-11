@@ -23,6 +23,16 @@ describe("findWithIds — composite primary key", () => {
       new NoMethodError("undefined method 'first' for nil"),
     );
   });
+
+  it("compacts and uniqs tuples before dispatching to find_some", async () => {
+    const findSome = vi.fn(async (ids: unknown[]) => ids);
+    const r = { ...rel, findSome };
+    await findWithIds.call(r, [[1, 2], null, [1, 2], [1n, 3], [1, 3]]);
+    expect(findSome).toHaveBeenCalledWith([
+      [1, 2],
+      [1n, 3],
+    ]);
+  });
 });
 
 const postModelStub = {
