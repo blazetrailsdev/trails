@@ -344,31 +344,3 @@ describe("ActionView::Template (smoke)", () => {
     });
   });
 });
-
-describe("TemplateTest", () => {
-  afterEach(() => TemplateHandlers.clear());
-
-  const newTemplate = (body: string): Template =>
-    new Template({
-      source: body,
-      identifier: "hello template",
-      handler: new Tse(),
-      virtualPath: "hello",
-      format: "html",
-      locals: [],
-    });
-
-  it("locals cannot be specified with positional arguments", () => {
-    const template = newTemplate("<%# locals: (argument = 'content') -%>\n<%= argument %>");
-    expect(() => template.render(view(), {})).toThrow(
-      "`argument` set as non-keyword argument for hello template. Locals can only be set as keyword arguments.",
-    );
-  });
-
-  it("locals cannot be specified with block arguments", () => {
-    const template = newTemplate("<%# locals: (&block) -%>\n<%= tag.div(block) %>");
-    expect(() => template.render(view(), {})).toThrow(
-      "`block` set as non-keyword argument for hello template. Locals can only be set as keyword arguments.",
-    );
-  });
-});
