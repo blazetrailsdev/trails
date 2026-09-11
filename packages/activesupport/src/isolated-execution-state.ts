@@ -8,6 +8,8 @@ type Store = Map<IsolatedKey, unknown>;
 let _ctx: AsyncContext<Store> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 const _fallback: Store = new Map();
+const CONTEXT_KEY = Symbol.for("ar_execution_context_id");
+const ROOT_CONTEXT = { id: 0, toString: () => "#<Thread:0 run>" } as const;
 
 function ctx(): AsyncContext<Store> {
   const adapter = getAsyncContext();
@@ -48,6 +50,10 @@ export const IsolatedExecutionState = {
     const value = init();
     s.set(key, value);
     return value;
+  },
+  /** @missingRailsCall scope — PERMANENT */
+  context(): { readonly id: number } {
+    return (store().get(CONTEXT_KEY) as { readonly id: number } | undefined) ?? ROOT_CONTEXT;
   },
   run<R>(fn: () => R): R {
     return ctx().run(new Map(), fn);

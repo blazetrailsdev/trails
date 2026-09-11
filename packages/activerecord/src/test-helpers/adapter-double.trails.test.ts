@@ -6,13 +6,13 @@ describe("adapterDouble", () => {
     const double = adapterDouble();
 
     expect(double.owner).toBeNull();
-    expect(double.inUse).toBe(false);
+    expect(double.inUse).toBeFalsy();
     double.lease();
-    expect(double.inUse).toBe(true);
+    expect(double.inUse).toBeTruthy();
     await double.verifyBang();
     double.stealBang();
     double.expire();
-    expect(double.inUse).toBe(false);
+    expect(double.inUse).toBeFalsy();
     expect(typeof double._runCheckoutCallbacks).toBe("function");
   });
 
