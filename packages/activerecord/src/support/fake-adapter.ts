@@ -69,6 +69,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
 export function registerFakeAdapter(): void {
   register(
     "fake",
+    "FakeActiveRecordAdapter",
     "./support/fake-adapter.js",
     async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter,
   );

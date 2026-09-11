@@ -108,6 +108,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
 
 register(
   "transaction_aware_test",
+  "TrailsTestAdapter",
   "./connection-adapters/transaction-aware-test-adapter.js",
   async () => TransactionAwareTestAdapter,
 );

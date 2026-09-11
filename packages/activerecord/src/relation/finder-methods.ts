@@ -8,76 +8,13 @@ import {
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
+import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
-import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
+import { compactUniqTuples } from "./compact-uniq-ids.js";
 import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 import { rubyInspectArray } from "./ruby-inspect.js";
 
 const ONE_AS_ONE = "1 AS one";
-
-export interface NormalizedFindIds {
-  readonly ids: unknown[];
-
-  readonly wantArray: boolean;
-
-  readonly tuples: unknown[][] | null;
-
-  readonly emptyArray?: boolean;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function normalizeFindArgs(
-  modelName: string,
-  pk: string | string[],
-  args: unknown[],
-): NormalizedFindIds {
-  const composite = Array.isArray(pk);
-
-  const [first, ...rest] = args;
-
-  if (!composite && Array.isArray(first) && first.length === 0) {
-    return { ids: [], wantArray: true, tuples: null, emptyArray: true };
-  }
-
-  let ids: unknown[];
-  let wantArray: boolean;
-
-  if (composite) {
-    if (!Array.isArray(first)) {
-      throw new NoMethodError(
-        first == null
-          ? "undefined method 'first' for nil"
-          : `undefined method 'first' for an instance of ${rbObjClass(first)}`,
-      );
-    }
-    const expectsArray = Array.isArray(first[0]);
-    ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
-    wantArray = expectsArray || ids.length !== 1;
-  } else if (rest.length > 0) {
-    ids = compactUniqIds(args.flat(Infinity));
-    wantArray = true;
-  } else if (Array.isArray(first)) {
-    ids = compactUniqIds((first as unknown[]).flat(Infinity));
-    wantArray = true;
-  } else {
-    ids = compactUniqIds([first]);
-    wantArray = false;
-  }
-
-  if (ids.length === 0) {
-    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, pk);
-  }
-
-  if (composite) {
-    return { ids, wantArray, tuples: ids as unknown[][] };
-  }
-
-  return { ids, wantArray, tuples: null };
-}
 
 interface FinderRelation {
   model: FinderRelation["_model"];
@@ -159,7 +96,7 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 }
 
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
-  return findWithIds.call(this, args);
+  return findWithIds.call(this, ...args);
 }
 
 export async function findBy(
@@ -191,8 +128,8 @@ export async function findSoleBy(this: FinderRelation, ...conditions: unknown[])
   return sole.call((this.where as any)(...conditions));
 }
 
-export async function first(this: FinderRelation, n?: number): Promise<any> {
-  if (n !== undefined) return this.findNthWithLimit(0, n);
+export async function first(this: FinderRelation, limit?: number): Promise<any> {
+  if (limit !== undefined) return this.findNthWithLimit(0, limit);
   return findNth.call(this, 0);
 }
 
@@ -204,13 +141,13 @@ export async function firstBang(this: FinderRelation): Promise<any> {
   return record;
 }
 
-export async function last(this: FinderRelation, n?: number): Promise<any> {
+export async function last(this: FinderRelation, limit?: number): Promise<any> {
   if (this.isLoaded || (this as any).limitValue != null || (this as any).offsetValue != null) {
-    return findLast.call(this, n);
+    return findLast.call(this, limit);
   }
-  let result: any = orderedRelation.call(this).limit(n ?? null);
+  let result: any = orderedRelation.call(this).limit(limit ?? null);
   result = result.reverseOrderBang();
-  if (n !== undefined) return (await result.toArray()).reverse();
+  if (limit !== undefined) return (await result.toArray()).reverse();
   return await first.call(result);
 }
 
@@ -549,15 +486,40 @@ export function usingLimitableReflections(
  * @internal
  * @missingRailsCall first — PERMANENT
  */
-export async function findWithIds(this: FinderRelation, ids: unknown[]): Promise<any> {
-  const normalized = normalizeFindArgs(this.model.name, this.primaryKey, ids);
-  if (normalized.emptyArray) return [];
-  const expectsArray = normalized.wantArray;
-  if (normalized.ids.length === 1) {
-    const result = await findOne.call(this, normalized.ids[0]);
-    return expectsArray ? [result] : result;
+export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
+  if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
+
+  if (this.model.compositePrimaryKey && !Array.isArray(ids[0])) {
+    throw new NoMethodError(
+      ids[0] == null
+        ? "undefined method 'first' for nil"
+        : `undefined method 'first' for an instance of ${rbObjClass(ids[0])}`,
+    );
   }
-  return (this as any).findSome(normalized.ids);
+  const expectsArray = this.model.compositePrimaryKey
+    ? Array.isArray((ids[0] as unknown[])[0])
+    : Array.isArray(ids[0]);
+
+  if (expectsArray && (ids[0] as unknown[]).length === 0) return [];
+
+  if (expectsArray) ids = ids[0] as unknown[];
+
+  ids = compactUniqTuples(ids);
+
+  const modelName = this.model.name;
+
+  switch (ids.length) {
+    case 0: {
+      const errorMessage = `Couldn't find ${modelName} without an ID`;
+      throw new RecordNotFound(errorMessage, modelName, this.primaryKey);
+    }
+    case 1: {
+      const result = await findOne.call(this, ids[0]);
+      return expectsArray ? [result] : result;
+    }
+    default:
+      return (this as any).findSome(ids);
+  }
 }
 
 /** @internal */

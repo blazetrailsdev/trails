@@ -7,12 +7,17 @@ export interface ConnectionAdapters {
 
 type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
-const adapters = new Map<string, [AdapterLoader, string]>();
+const adapters = new Map<string, [string, string, AdapterLoader]>();
 const resolved = new Map<string, AdapterClass | Promise<AdapterClass>>();
 const resolveErrors = new Map<string, unknown>();
 
-export function register(name: string, path: string, loader: AdapterLoader): void {
-  adapters.set(name, [loader, path]);
+export function register(
+  name: string,
+  className: string,
+  path: string,
+  loader: AdapterLoader,
+): void {
+  adapters.set(name, [className, path, loader]);
   resolved.delete(name);
   resolveErrors.delete(name);
 }
@@ -21,9 +26,9 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
   const cached = resolved.get(adapterName ?? "");
   if (cached) return cached;
 
-  const [loader, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
+  const [className, pathToAdapter, loader] = adapters.get(adapterName ?? "") ?? [];
 
-  if (!loader) {
+  if (!className) {
     throw new AdapterNotFound(
       `Database configuration specifies nonexistent '${adapterName ?? ""}' adapter. ` +
         `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
@@ -35,8 +40,18 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
   const loadError = resolveErrors.get(adapterName ?? "");
   if (loadError !== undefined) throw loadError;
 
-  const promise = loader().then(
+  const promise = loader!().then(
     (klass) => {
+      if (klass === undefined) {
+        resolveErrors.set(
+          adapterName ?? "",
+          new AdapterNotFound(
+            `Could not load the ${className} Active Record adapter (uninitialized constant ${className}).`,
+          ),
+        );
+        resolved.delete(adapterName ?? "");
+        throw resolveErrors.get(adapterName ?? "");
+      }
       resolved.set(adapterName ?? "", klass);
       return klass;
     },
@@ -86,18 +101,43 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const builtinLoaders: Record<string, [string, AdapterLoader]> = {
-  sqlite3: ["./connection-adapters/better-sqlite3-adapter.js", sqlite3Loader],
-  "node-sqlite": ["./connection-adapters/node-sqlite-adapter.js", nodeSqliteLoader],
-  "expo-sqlite": ["./connection-adapters/expo-sqlite-adapter.js", expoSqliteLoader],
-  libsql: ["./connection-adapters/libsql-adapter.js", libsqlLoader],
-  "libsql-remote": ["./connection-adapters/libsql-remote-adapter.js", libsqlRemoteLoader],
-  "libsql-replica": ["./connection-adapters/libsql-replica-adapter.js", libsqlReplicaLoader],
-  mysql2: ["./connection-adapters/mysql2-adapter.js", mysql2Loader],
-  postgresql: ["./connection-adapters/postgresql-adapter.js", postgresqlLoader],
+const builtinLoaders: Record<string, [string, string, AdapterLoader]> = {
+  sqlite3: [
+    "BetterSQLite3Adapter",
+    "./connection-adapters/better-sqlite3-adapter.js",
+    sqlite3Loader,
+  ],
+  "node-sqlite": [
+    "NodeSQLiteAdapter",
+    "./connection-adapters/node-sqlite-adapter.js",
+    nodeSqliteLoader,
+  ],
+  "expo-sqlite": [
+    "ExpoSQLiteAdapter",
+    "./connection-adapters/expo-sqlite-adapter.js",
+    expoSqliteLoader,
+  ],
+  libsql: ["LibSQLAdapter", "./connection-adapters/libsql-adapter.js", libsqlLoader],
+  "libsql-remote": [
+    "LibSQLRemoteAdapter",
+    "./connection-adapters/libsql-remote-adapter.js",
+    libsqlRemoteLoader,
+  ],
+  "libsql-replica": [
+    "LibSQLReplicaAdapter",
+    "./connection-adapters/libsql-replica-adapter.js",
+    libsqlReplicaLoader,
+  ],
+  mysql2: ["Mysql2Adapter", "./connection-adapters/mysql2-adapter.js", mysql2Loader],
+  postgresql: [
+    "PostgreSQLAdapter",
+    "./connection-adapters/postgresql-adapter.js",
+    postgresqlLoader,
+  ],
 };
 
-for (const [name, [path, loader]] of Object.entries(builtinLoaders)) register(name, path, loader);
+for (const [name, [className, path, loader]] of Object.entries(builtinLoaders))
+  register(name, className, path, loader);
 
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
