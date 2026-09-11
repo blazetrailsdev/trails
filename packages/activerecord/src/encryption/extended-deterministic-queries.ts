@@ -71,6 +71,7 @@ export class ExtendedDeterministicQueries {
     this._installed = true;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE uniqueness-build-relation-uses-where-bang */
   static get installed(): boolean {
     return this._installed;
   }
@@ -194,6 +195,7 @@ export class CoreQueries {
 export class AdditionalValue {
   readonly value: unknown;
   readonly type: SerializableType;
+  /** @noRailsEquivalent PERMANENT */
   readonly [ADDITIONAL_VALUE_BRAND] = true;
 
   constructor(value: unknown, type: SerializableType) {
@@ -219,6 +221,7 @@ export class AdditionalValue {
     return this.value;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.toPrimitive](hint: string): string | number {
     if (hint === "number") {
       const n = Number(this.value);

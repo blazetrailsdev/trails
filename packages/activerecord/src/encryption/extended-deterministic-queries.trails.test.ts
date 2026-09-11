@@ -5,12 +5,7 @@ import { NoMethodError } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
-import { installExtendedQueriesIfConfigured } from "./install.js";
-import {
-  ExtendedDeterministicUniquenessValidator,
-  EncryptedUniquenessValidator,
-} from "./extended-deterministic-uniqueness-validator.js";
-import { UniquenessValidator } from "../validations.js";
+
 import { YAMLColumn } from "../coders/yaml-column.js";
 import { encryptedTypeOf } from "./encryptable-record.js";
 import "../encryption.js";
@@ -72,7 +67,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     savedMethods.findBy = baseStatics.findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
-    installExtendedQueriesIfConfigured();
+    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
 
     EncryptedSerializedBook = buildSerializedBook();
     PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
@@ -90,7 +85,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
     (ExtendedDeterministicQueries as unknown as Record<string, unknown>)._installed = false;
-    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
 
     Configurable.config.extendQueries = savedConfig.extendQueries;
     Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
@@ -137,27 +131,5 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(DisallowedClass);
     expect(() => fullType.serialize(av)).toThrow(/Tried to dump unspecified class/);
-  });
-
-  it("uniqueness ciphertext generation serializes through the full resolved type", () => {
-    const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
-      serialize(v: unknown): unknown;
-    };
-    expect(fullType).not.toBeInstanceOf(EncryptedAttributeType);
-
-    const candidates = EncryptedUniquenessValidator.allCiphertextsFor(
-      PreviousSchemeSerializedBook,
-      "name",
-      "Dune",
-    );
-    expect(candidates[0]).toBe("Dune");
-    expect(candidates.length).toBeGreaterThan(1);
-    const arelAttr = (
-      PreviousSchemeSerializedBook as unknown as {
-        arelTable: { get(name: string): { typeCaster: unknown } };
-      }
-    ).arelTable.get("name");
-    const caster = arelAttr.typeCaster as { serialize(v: unknown): unknown };
-    expect(caster.serialize("Dune")).toEqual(fullType.serialize("Dune"));
   });
 });

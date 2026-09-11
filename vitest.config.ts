@@ -257,10 +257,6 @@ const alias = {
     __dirname,
     "packages/activerecord/src/sqlite/expo-sqlite.ts",
   ),
-  "@blazetrails/activerecord/encryption/install": path.resolve(
-    __dirname,
-    "packages/activerecord/src/encryption/install.ts",
-  ),
   "@blazetrails/activerecord/encryption": path.resolve(
     __dirname,
     "packages/activerecord/src/encryption/index.ts",

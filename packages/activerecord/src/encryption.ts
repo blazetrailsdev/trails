@@ -37,6 +37,7 @@ interface PendingEncryption {
   scheme: Scheme;
 }
 
+/** @noRailsEquivalent CONVERGEABLE encryption-converge-pending-encryptions-to-decorate-attributes */
 export function applyPendingEncryptions(klass: any): void {
   const pending: PendingEncryption[] | undefined = klass._pendingEncryptions;
   if (!pending || pending.length === 0) return;

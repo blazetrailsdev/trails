@@ -11,9 +11,6 @@ import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Configurable } from "./configurable.js";
-import { installExtendedQueriesIfConfigured } from "./install.js";
-import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
-import { UniquenessValidator } from "../validations.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -103,7 +100,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     savedMethods.findBy = (Base as any).findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
-    installExtendedQueriesIfConfigured();
+    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
 
     books = buildBooks();
     await books.EncryptedBook.where("1=1");
@@ -119,7 +116,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
     (ExtendedDeterministicQueries as any)._installed = false;
-    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
 
     Configurable.config.extendQueries = savedConfig.extendQueries;
     Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
@@ -560,54 +556,5 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       expect(secondPatched).toBe(firstPatched);
       expect(ExtendedDeterministicQueries.installed).toBe(true);
     });
-  });
-});
-
-describe("installExtendedQueriesIfConfigured", () => {
-  it("is a no-op when Configurable.config.extendQueries is false", async () => {
-    const { Configurable } = await import("./configurable.js");
-    const { installExtendedQueriesIfConfigured } = await import("./install.js");
-    const prev = Configurable.config.extendQueries;
-    Configurable.config.extendQueries = false;
-    try {
-      (ExtendedDeterministicQueries as any)._installed = false;
-      const installed = installExtendedQueriesIfConfigured();
-      expect(installed).toBe(false);
-      expect(ExtendedDeterministicQueries.installed).toBe(false);
-    } finally {
-      Configurable.config.extendQueries = prev;
-      (ExtendedDeterministicQueries as any)._installed = false;
-    }
-  });
-
-  it("installs the patches onto the real Relation/Base/EncryptedAttributeType when extendQueries=true", async () => {
-    const { Configurable } = await import("./configurable.js");
-    const { installExtendedQueriesIfConfigured } = await import("./install.js");
-
-    const origWhere = Relation.prototype.where;
-    const origExists = (Relation.prototype as any).exists;
-    const origScopeForCreate = (Relation.prototype as any).scopeForCreate;
-    const origFindBy = (Base as any).findBy;
-    const origSerialize = EncryptedAttributeType.prototype.serialize;
-
-    const prev = Configurable.config.extendQueries;
-    Configurable.config.extendQueries = true;
-    (ExtendedDeterministicQueries as any)._installed = false;
-    try {
-      const installed = installExtendedQueriesIfConfigured();
-      expect(installed).toBe(true);
-      expect(Relation.prototype.where).not.toBe(origWhere);
-      expect((Base as any).findBy).not.toBe(origFindBy);
-      expect(EncryptedAttributeType.prototype.serialize).not.toBe(origSerialize);
-    } finally {
-      Relation.prototype.where = origWhere;
-      (Relation.prototype as any).exists = origExists;
-      (Relation.prototype as any).scopeForCreate = origScopeForCreate;
-      (Base as any).findBy = origFindBy;
-      EncryptedAttributeType.prototype.serialize = origSerialize;
-      (ExtendedDeterministicQueries as any)._installed = false;
-      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
-      Configurable.config.extendQueries = prev;
-    }
   });
 });

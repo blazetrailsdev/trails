@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 import { classify, singularize } from "@blazetrails/activesupport";
 import type { AssociationCall } from "./walker.js";
 

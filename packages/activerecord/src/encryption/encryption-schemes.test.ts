@@ -6,12 +6,9 @@ import { Decryption } from "./errors.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { encrypts } from "./encryptable-record.js";
 import type { SchemeOptions } from "./scheme.js";
-import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
-import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
-import { UniquenessValidator } from "../validations.js";
 import {
   freshAdapter,
   configureEncryption,
@@ -322,7 +319,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     };
 
     Configurable.config.extendQueries = true;
-    installExtendedQueriesIfConfigured();
+    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
     try {
       const prevEncryptor = new TestEncryptor({ alice: "alice_prev_cipher" });
       const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
@@ -366,7 +363,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
       (ExtendedDeterministicQueries as any)._installed = false;
-      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
       Configurable.config.extendQueries = savedExtendQueries;
     }
   });
@@ -385,7 +381,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     };
 
     Configurable.config.extendQueries = true;
-    installExtendedQueriesIfConfigured();
+    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
     try {
       Configurable.config.previousSchemes = [];
       Configurable.config.previous = [
@@ -415,7 +411,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
       (ExtendedDeterministicQueries as any)._installed = false;
-      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
       Configurable.config.extendQueries = savedExtendQueries;
     }
   });

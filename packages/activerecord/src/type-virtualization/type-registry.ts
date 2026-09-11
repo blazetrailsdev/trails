@@ -1,3 +1,5 @@
+/** @noRailsEquivalent PERMANENT */
+
 const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/activerecord").IPAddr`;
 const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;

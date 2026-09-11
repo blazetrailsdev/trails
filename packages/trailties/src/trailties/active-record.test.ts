@@ -7,9 +7,11 @@ import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
-import { Configurable as EncryptionConfigurable } from "@blazetrails/activerecord/encryption";
+import {
+  Configurable as EncryptionConfigurable,
+  EncryptedUniquenessValidator,
+} from "@blazetrails/activerecord/encryption";
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
-import { installExtendedQueriesIfConfigured } from "@blazetrails/activerecord/encryption/install";
 import { UniquenessValidator } from "@blazetrails/activerecord";
 import { deprecator } from "@blazetrails/activerecord";
 import { ActiveRecord } from "@blazetrails/activerecord";
@@ -70,7 +72,12 @@ describe("RailtieTest", () => {
     ActiveRecord.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
     EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
-    installExtendedQueriesIfConfigured();
+    if (savedExtendQueries) {
+      ExtendedDeterministicUniquenessValidator.installSupport({
+        UniquenessValidator,
+        EncryptedUniquenessValidator,
+      });
+    }
   });
 
   it("ActiveRecord::Railtie is registered in the global subclasses list", () => {
@@ -178,23 +185,35 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers installs extended deterministic query support when extend_queries is set", async () => {
-    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+    const validateEach = UniquenessValidator.prototype.validateEach;
+    (ExtendedDeterministicUniquenessValidator as unknown as { _installed: boolean })._installed =
+      false;
     EncryptionConfigurable.config.extendQueries = true;
 
-    await runTrailtieInitializers(Trailtie, blogApp());
-    runLoadHooks("active_record", Base);
+    try {
+      await runTrailtieInitializers(Trailtie, blogApp());
+      runLoadHooks("active_record", Base);
 
-    expect(ExtendedDeterministicUniquenessValidator.installed).toBe(true);
+      expect(UniquenessValidator.prototype.validateEach).not.toBe(validateEach);
+    } finally {
+      UniquenessValidator.prototype.validateEach = validateEach;
+    }
   });
 
   it("runInitializers does not install extended deterministic query support when extend_queries is unset", async () => {
-    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+    const validateEach = UniquenessValidator.prototype.validateEach;
+    (ExtendedDeterministicUniquenessValidator as unknown as { _installed: boolean })._installed =
+      false;
     EncryptionConfigurable.config.extendQueries = false;
 
-    await runTrailtieInitializers(Trailtie, blogApp());
-    runLoadHooks("active_record", Base);
+    try {
+      await runTrailtieInitializers(Trailtie, blogApp());
+      runLoadHooks("active_record", Base);
 
-    expect(ExtendedDeterministicUniquenessValidator.installed).toBe(false);
+      expect(UniquenessValidator.prototype.validateEach).toBe(validateEach);
+    } finally {
+      UniquenessValidator.prototype.validateEach = validateEach;
+    }
   });
 
   it("runInitializers applies partial_inserts from config.active_record to Base", async () => {

@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 import ts from "typescript";
 import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
 import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
