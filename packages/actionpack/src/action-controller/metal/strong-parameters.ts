@@ -102,7 +102,7 @@ function isPermittedScalar(value: unknown): boolean {
 export class Parameters {
   private _data: Record<string, unknown>;
   private _permitted: boolean;
-  private _loggingContext: Record<string, unknown>;
+  private loggingContext: Record<string, unknown>;
   private _convertedArrays?: Set<string>;
 
   static permitAllParameters = false;
@@ -113,7 +113,7 @@ export class Parameters {
 
   constructor(data: Record<string, unknown> = {}, loggingContext: Record<string, unknown> = {}) {
     this._data = { ...data };
-    this._loggingContext = loggingContext;
+    this.loggingContext = loggingContext;
     this._permitted = Parameters.permitAllParameters;
   }
 
@@ -606,7 +606,7 @@ export class Parameters {
   }
 
   deepDup(): Parameters {
-    const p = new Parameters(structuredClone(this._data), this._loggingContext);
+    const p = new Parameters(structuredClone(this._data), this.loggingContext);
     p._permitted = this._permitted;
     return p;
   }
@@ -672,7 +672,7 @@ export class Parameters {
   }
 
   private _newWithInheritedPermitted(data: Record<string, unknown>): Parameters {
-    const p = new Parameters(data, this._loggingContext);
+    const p = new Parameters(data, this.loggingContext);
     p._permitted = this._permitted;
     return p;
   }
@@ -849,12 +849,14 @@ export class Parameters {
     const unpermittedKeys = this.unpermittedKeys(params);
     if (unpermittedKeys.length > 0) {
       switch (onUnpermitted) {
-        case "log":
-          Notifications.instrument("unpermitted_parameters.action_controller", {
+        case "log": {
+          const name = "unpermitted_parameters.action_controller";
+          Notifications.instrument(name, {
             keys: unpermittedKeys,
-            context: this._loggingContext,
+            context: this.loggingContext,
           });
           break;
+        }
         case "raise":
           throw new UnpermittedParameters(unpermittedKeys);
       }
