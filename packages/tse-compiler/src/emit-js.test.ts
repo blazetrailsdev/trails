@@ -113,21 +113,23 @@ describe("compileJs", () => {
     });
 
     it("emits a runtime strict-locals check when a locals signature is present", () => {
-      const { code } = compileJs("<%# locals: (count:) %><%= count %>");
-      expect(code).toContain("StrictLocalsMismatch");
-      expect(code).toContain('["count"]');
-      expect(code).toContain("__extraKeys");
+      const { code } = compileJs("<%# locals: (count:) %><%= count %>", {
+        sourceFileName: "posts/_post.tse",
+      });
+      expect(code).toContain("StrictLocalsError");
+      expect(code).toContain('__allowedKeys = ["count"]');
+      expect(code).toContain('__missingKeys = ["count"]');
+      expect(code).toContain('{ shortIdentifier: "posts/_post.tse" }');
     });
 
     it("emits a runtime check for empty locals that rejects any key", () => {
       const { code } = compileJs("<%# locals: () %><p>hi</p>");
-      expect(code).toContain("StrictLocalsMismatch");
-      expect(code).toContain("__allowedKeys = []");
+      expect(code).toContain('new ArgumentError("no keywords accepted")');
     });
 
     it("does not emit a runtime check when no locals signature is present", () => {
       const { code } = compileJs("<p>hi</p>");
-      expect(code).not.toContain("StrictLocalsMismatch");
+      expect(code).not.toContain("StrictLocalsError");
       expect(code).not.toContain("__allowedKeys");
     });
 
@@ -135,15 +137,30 @@ describe("compileJs", () => {
       const { code } = compileJs("<%# locals: (count:) %>", {
         raiseOnStrictLocalsMismatch: false,
       });
-      expect(code).not.toContain("StrictLocalsMismatch");
+      expect(code).not.toContain("StrictLocalsError");
       expect(code).toContain("const { count } = locals;");
     });
 
-    it("imports StrictLocalsMismatch from @blazetrails/actionview/strict-locals", () => {
+    it("imports StrictLocalsError from @blazetrails/actionview", () => {
       const { code } = compileJs("<%# locals: (count:) %>");
-      expect(code).toContain(
-        'import { StrictLocalsMismatch } from "@blazetrails/actionview/strict-locals";',
+      expect(code).toContain('import { StrictLocalsError } from "@blazetrails/actionview";');
+      expect(code).toContain('import { ArgumentError } from "@blazetrails/ruby-compat";');
+    });
+
+    it("raises Rails' unknown local message for an extra local", () => {
+      class StrictLocalsError extends Error {
+        constructor(argumentError: Error, template: { shortIdentifier: string }) {
+          super(`${argumentError.message} for ${template.shortIdentifier}`);
+        }
+      }
+      const { code } = compileJs("<%# locals: (count: 0) %>", { sourceFileName: "_a.tse" });
+      const body = code.replace(/^import .*\n/gm, "").replace("export default ", "return ");
+      const render = new Function("StrictLocalsError", "ArgumentError", body)(
+        StrictLocalsError,
+        Error,
       );
+      const context = { outputBuffer: { append() {}, safeAppend() {}, safeExprAppend() {} } };
+      expect(() => render(context, { x: 1 })).toThrow("unknown keyword: :x for _a.tse");
     });
   });
 

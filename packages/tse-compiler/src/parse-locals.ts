@@ -20,7 +20,7 @@ const RESERVED_NAMES = new Set([
 // prettier-ignore
 const EMITTER_RESERVED = new Set([
   "context", "locals", "_ob",
-  "__allowedKeys", "__extraKeys",
+  "__allowedKeys", "__extraKeys", "__missingKeys",
 ]);
 
 function isUsableLocalName(name: string): boolean {

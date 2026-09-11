@@ -174,6 +174,23 @@ function toError(value: unknown): Error {
   }
 }
 
+function prepare(conn: pg.Client, stmtName: string, sql: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const submittable = {
+      name: stmtName,
+      text: sql,
+      submit(connection: { parse(q: object): void; sync(): void }): null {
+        connection.parse({ name: stmtName, text: sql });
+        connection.sync();
+        return null;
+      },
+      handleError: reject,
+      handleReadyForQuery: () => resolve(),
+    };
+    (conn.query as unknown as (s: object) => unknown)(submittable);
+  });
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostgreSQLAdapter
   extends AbstractAdapter
@@ -2196,17 +2213,19 @@ export class PostgreSQLAdapter
     return `${this._schemaSearchPathMemo ?? ""}-${sql}`;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall translate_exception_class — PERMANENT
-   */
-  async prepareStatement(sql: string | null, _binds: unknown[], _conn: pg.Client): Promise<string> {
-    const pool = this._statements;
-    const key = this.sqlKey(sql);
-    if (pool.isKey(key)) return pool.get(key)!.name;
-    const name = pool.nextKey();
-    await pool.set(key, { name });
-    return name;
+  /** @internal */
+  async prepareStatement(sql: string | null, binds: unknown[], conn: pg.Client): Promise<string> {
+    const sqlKey = this.sqlKey(sql);
+    if (!this._statements.isKey(sqlKey)) {
+      const nextkey = this._statements.nextKey();
+      try {
+        await prepare(conn, nextkey, sql as string);
+      } catch (e) {
+        throw this.translateExceptionClass(e, sql, binds);
+      }
+      await this._statements.set(sqlKey, { name: nextkey });
+    }
+    return this._statements.get(sqlKey)!.name;
   }
 
   /**
