@@ -1685,37 +1685,41 @@ export class Relation<T extends Base> {
         });
       }
 
-      const c = this._conn();
-      const column = c.visitor.compile(this.table.get(timestampColumn));
-      const selectValues = `COUNT(*) AS ${(
-        this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
-      ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
+      await this.withConnection(async (c) => {
+        const column = c.visitor.compile(this.table.get(timestampColumn));
+        const selectValues = `COUNT(*) AS ${(
+          this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
+        ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
 
-      let arel: unknown;
-      if (collection.hasLimitOrOffset) {
-        const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
-        if (this.distinctValue && isEmpty(collection.selectValues)) {
-          query.selectValues = [...query.selectValues, this.table.get(star())];
+        let arel: unknown;
+        if (collection.hasLimitOrOffset) {
+          const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
+          if (this.distinctValue && isEmpty(collection.selectValues)) {
+            query.selectValues = [...query.selectValues, this.table.get(star())];
+          }
+          const subqueryAlias = "subquery_for_cache_key";
+          const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
+          arel = query.buildSubquery(
+            subqueryAlias,
+            sql(selectValues.replace("%s", subqueryColumn)),
+          );
+        } else {
+          const query = collection.unscope("order");
+          query.selectValues = [sql(selectValues.replace("%s", column))];
+          arel = query.arel();
         }
-        const subqueryAlias = "subquery_for_cache_key";
-        const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
-        arel = query.buildSubquery(subqueryAlias, sql(selectValues.replace("%s", subqueryColumn)));
-      } else {
-        const query = collection.unscope("order");
-        query.selectValues = [sql(selectValues.replace("%s", column))];
-        arel = query.arel();
-      }
 
-      [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
+        [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
 
-      if (size != null) {
-        const columnType = this.model.typeForAttribute(timestampColumn);
-        timestamp = (columnType as unknown as { deserialize(value: unknown): unknown }).deserialize(
-          timestamp,
-        );
-      } else {
-        size = 0;
-      }
+        if (size != null) {
+          const columnType = this.model.typeForAttribute(timestampColumn);
+          timestamp = (
+            columnType as unknown as { deserialize(value: unknown): unknown }
+          ).deserialize(timestamp);
+        } else {
+          size = 0;
+        }
+      });
     }
 
     if (timestamp != null) {
