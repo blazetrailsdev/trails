@@ -215,10 +215,6 @@ class TestExtractor
     # inline array literal does.
     @const_arrays = {}
     collect_const_arrays(sexp)
-    # A table can live in a `require_relative`d sibling (`SingularToPlural` in
-    # activesupport/test/inflector_test_cases.rb, iterated at
-    # inflector_test.rb:91-109) — the Ruby constant is visible at the loop, so
-    # its literal resolves too. Same-file definitions win.
     required_relative_paths(sexp).each do |required|
       path = File.expand_path("#{required}.rb", File.dirname(filepath))
       next unless File.file?(path)
@@ -882,8 +878,6 @@ class TestExtractor
         values = array_literal_values(value[1])
         @const_arrays[name] = values if values
       elsif name && value.is_a?(Array) && value[0] == :hash
-        # `CONST = { k => v }.each do |k, v|` yields each pair, as an inline
-        # hash receiver does (`loop_elements`).
         pairs = hash_literal_pairs(value)
         @const_arrays[name] = pairs if pairs
       end
@@ -892,7 +886,6 @@ class TestExtractor
     node.each { |child| collect_const_arrays(child) if child.is_a?(Array) }
   end
 
-  # The literal paths of every `require_relative "..."` in the file.
   def required_relative_paths(node, out = [])
     return out unless node.is_a?(Array)
 

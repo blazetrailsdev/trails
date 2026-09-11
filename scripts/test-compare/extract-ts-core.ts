@@ -446,8 +446,6 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       });
     };
 
-    // A leading `if (...) continue;` skips an iteration's it(); every guard must
-    // evaluate for every element, or the loop is walked once as before.
     const skipped: boolean[] = [];
     for (const element of elements) {
       let skip: boolean | null = false;
