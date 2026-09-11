@@ -46,6 +46,13 @@ describe("Template::Handlers::Tse", () => {
     expect(code).toContain("<h1>hi</h1>");
   });
 
+  it("leaves strict-locals binding to Template#compile", () => {
+    const code = new Tse().call({ type: "text/html" }, "<%# locals: (name:) %><%= name %>");
+    expect(code).not.toContain("import ");
+    expect(code).not.toContain("StrictLocalsError");
+    expect(() => new Function("localAssigns", `return ${code}`)).not.toThrow();
+  });
+
   it("emits the escaping append for html templates", () => {
     const code = new Tse().call({ type: "text/html" }, "<%= name %>");
     expect(code).toMatch(/_ob\.append\(name\)/);

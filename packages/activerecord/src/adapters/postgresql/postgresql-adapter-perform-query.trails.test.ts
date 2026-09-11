@@ -4,7 +4,7 @@ import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value } from "../../type.js";
 import { Base } from "../../base.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
-import { ReadOnlyError } from "../../errors.js";
+import { ReadOnlyError, StatementInvalid } from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   let adapter: PostgreSQLAdapter;
@@ -106,5 +106,27 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     } finally {
       subscriber.stop();
     }
+  });
+
+  it("prepareStatement raises StatementInvalid on a bad prepare and records no statement", async () => {
+    const sql = "select * from pq_missing_table where id = $1";
+    await adapter.withRawConnection({}, async (conn) => {
+      await expect(
+        adapter.prepareStatement(
+          sql,
+          [1],
+          conn as unknown as Parameters<typeof adapter.prepareStatement>[2],
+        ),
+      ).rejects.toBeInstanceOf(StatementInvalid);
+    });
+    expect(adapter._statements.isKey(adapter.sqlKey(sql))).toBe(false);
+  });
+
+  it("prepareStatement parses once so the named query reuses the statement", async () => {
+    const sql = "select nick from pq where id = $1";
+    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+    const rows = await adapter.execQuery(sql, "SQL", [1], { prepare: true });
+    expect(rows.toArray()).toEqual([{ nick: "a" }]);
+    expect(adapter._statements.isKey(adapter.sqlKey(sql))).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ export interface EmitJsOptions {
   preamble?: string;
   postamble?: string;
   raiseOnStrictLocalsMismatch?: boolean;
+  shortIdentifier?: string;
   fileName?: string;
   sourceFileName?: string;
 }
@@ -58,21 +59,39 @@ function netUnclosedParens(code: string): number {
 function emitLocalsBlock(
   ast: TseAst,
   raiseOnMismatch: boolean,
+  shortIdentifierFor: string,
 ): { entries: LocalEntry[]; lines: string[] } {
   if (ast.localsSignature === null) return { entries: [], lines: [] };
   const entries = parseLocalsSignature(ast.localsSignature);
   const lines: string[] = [];
 
   if (raiseOnMismatch) {
-    const allowedKeys =
-      entries.length === 0 ? "[]" : `[${entries.map((e) => JSON.stringify(e.name)).join(", ")}]`;
-    lines.push(
-      `  const __allowedKeys = ${allowedKeys};`,
-      "  const __extraKeys = Object.keys(locals).filter((k) => !__allowedKeys.includes(k));",
-      "  if (__extraKeys.length > 0) {",
-      "    throw new StrictLocalsMismatch(__extraKeys, __allowedKeys);",
-      "  }",
-    );
+    const keyreq = entries.filter((e) => e.defaultExpr === null).map((e) => e.name);
+    const keywords = entries.map((e) => e.name);
+    const shortIdentifier = JSON.stringify(shortIdentifierFor);
+    if (keyreq.length > 0) {
+      lines.push(
+        `  const __missingKeys = ${JSON.stringify(keyreq)}.filter((k) => !Object.hasOwn(locals, k));`,
+        '  if (__missingKeys.length > 0) throw new StrictLocalsError(new ArgumentError(`missing keyword${__missingKeys.length > 1 ? "s" : ""}: ${__missingKeys.map((k) => ":" + k).join(", ")}`), { shortIdentifier: ' +
+          shortIdentifier +
+          " });",
+      );
+    }
+    if (keywords.length === 0) {
+      lines.push(
+        '  if (Object.keys(locals).length > 0) throw new StrictLocalsError(new ArgumentError("no keywords accepted"), { shortIdentifier: ' +
+          shortIdentifier +
+          " });",
+      );
+    } else {
+      lines.push(
+        `  const __allowedKeys = ${JSON.stringify(keywords)};`,
+        "  const __extraKeys = Object.keys(locals).filter((k) => !__allowedKeys.includes(k));",
+        '  if (__extraKeys.length > 0) throw new StrictLocalsError(new ArgumentError(`unknown keyword${__extraKeys.length > 1 ? "s" : ""}: ${__extraKeys.map((k) => ":" + k).join(", ")}`), { shortIdentifier: ' +
+          shortIdentifier +
+          " });",
+      );
+    }
   }
 
   if (entries.length > 0) {
@@ -87,8 +106,12 @@ function emitLocalsBlock(
 
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
+  const shortIdentifier = options.shortIdentifier ?? options.sourceFileName ?? options.fileName;
   const raiseOnMismatch = options.raiseOnStrictLocalsMismatch ?? ast.localsSignature !== null;
-  const { lines: localsLines } = emitLocalsBlock(ast, raiseOnMismatch);
+  if (raiseOnMismatch && ast.localsSignature !== null && shortIdentifier == null) {
+    throw new Error("TSE: raiseOnStrictLocalsMismatch requires a shortIdentifier");
+  }
+  const { lines: localsLines } = emitLocalsBlock(ast, raiseOnMismatch, shortIdentifier ?? "");
 
   const lines: string[] = [];
   const lineMappings: LineMapping[] = [];
@@ -105,7 +128,8 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   };
 
   if (raiseOnMismatch && ast.localsSignature !== null) {
-    push('import { StrictLocalsMismatch } from "@blazetrails/actionview/strict-locals";');
+    push('import { StrictLocalsError } from "@blazetrails/actionview";');
+    push('import { ArgumentError } from "@blazetrails/ruby-compat";');
   }
   push("export default function render(context, locals) {");
   push("  const _ob = context.outputBuffer;");

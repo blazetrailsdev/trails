@@ -28,10 +28,8 @@
     }
   },
   "activerecord": {
-    "total": 1,
-    "byFile": {
-      "connection-adapters/postgresql-adapter.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activerecord-test-support": {
     "total": 0,
