@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import { findStiClass } from "../inheritance.js";
@@ -118,10 +119,11 @@ export class TableRow {
     this.resolveStiReflections();
   }
 
+  /** @missingRailsCall include? — PERMANENT */
   private get reflectionClass(): typeof Base {
     return (this._reflectionClass ??= (() => {
       const inheritanceColumnName = this.modelMetadata.inheritanceColumnName;
-      if (inheritanceColumnName != null && inheritanceColumnName in this._row) {
+      if (inheritanceColumnName != null && hasKey(this._row, inheritanceColumnName)) {
         try {
           return findStiClass(this.modelClass!, String(this._row[inheritanceColumnName]));
         } catch {
@@ -136,7 +138,7 @@ export class TableRow {
   private fillTimestamps(): void {
     if (this.modelClass!.recordTimestamps) {
       for (const cName of this.modelMetadata.timestampColumnNames) {
-        if (!(cName in this._row)) this._row[cName] = this._now;
+        if (!hasKey(this._row, cName)) this._row[cName] = this._now;
       }
     }
   }
@@ -167,10 +169,12 @@ export class TableRow {
     }
   }
 
+  /** @missingRailsCall include? — PERMANENT */
   private isColumnDefined(col: string): boolean {
-    return !this.modelMetadata.hasColumn(col) || col in this._row;
+    return !this.modelMetadata.hasColumn(col) || hasKey(this._row, col);
   }
 
+  /** @missingRailsCall include? — PERMANENT */
   private resolveEnums(): void {
     const definedEnums = (
       this.reflectionClass as {
@@ -178,7 +182,7 @@ export class TableRow {
       }
     )._enums;
     for (const [name, values] of definedEnums ?? []) {
-      if (name in this._row) {
+      if (hasKey(this._row, name)) {
         const value = this._row[name];
         this._row[name] =
           typeof value === "string" && Object.hasOwn(values, value) ? values[value] : value;
@@ -186,6 +190,7 @@ export class TableRow {
     }
   }
 
+  /** @missingRailsCall delete — PERMANENT */
   private resolveStiReflections(): void {
     const reflections = (this.reflectionClass as { _reflections?: Record<string, unknown> })
       ._reflections;
@@ -195,11 +200,11 @@ export class TableRow {
           const fkName = association.joinForeignKey;
 
           let value: unknown;
-          if (
-            association.name !== fkName &&
-            (value = this.deleteRowKey(association.name)) != null &&
-            value !== false
-          ) {
+          if (association.name !== fkName) {
+            value = this._row[association.name];
+            delete this._row[association.name];
+          }
+          if (association.name !== fkName && value != null && value !== false) {
             if (association.isPolymorphic()) {
               const match = typeof value === "string" ? /\s*\(([^)]*)\)\s*$/.exec(value) : null;
               if (match) {
@@ -236,8 +241,10 @@ export class TableRow {
     }
   }
 
+  /** @missingRailsCall delete — PERMANENT */
   private addJoinRecords(association: HasManyThroughProxy): void {
-    let targets = this.deleteRowKey(association.name);
+    let targets = this._row[association.name];
+    delete this._row[association.name];
     if (targets != null && targets !== false) {
       const tableName = association.joinTable;
       const columnType = association.primaryKeyType;
@@ -256,13 +263,8 @@ export class TableRow {
         return join;
       });
       const tables = this._tableRows.tables;
-      tables.set(tableName, [...(tables.get(tableName) ?? []), ...joins]);
+      if (!tables.get(tableName)) tables.set(tableName, []);
+      tables.get(tableName)!.push(...joins);
     }
-  }
-
-  private deleteRowKey(key: string): unknown {
-    const value = this._row[key];
-    delete this._row[key];
-    return value;
   }
 }

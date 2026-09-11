@@ -818,7 +818,6 @@ export class Base extends Model {
     _asyncQueryExecutor = value;
   }
 
-  /** @internal */
   static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   }
