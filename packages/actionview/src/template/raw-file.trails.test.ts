@@ -7,7 +7,7 @@ import { Renderable } from "./renderable.js";
 describe("Template::RawFile", () => {
   it("reports the file's identifier and derives its type from the extension", () => {
     const template = new RawFile("/tmp/pdf-report.pdf");
-    expect(template.identifier()).toBe("/tmp/pdf-report.pdf");
+    expect(template.identifier).toBe("/tmp/pdf-report.pdf");
     expect(template.format).toBe("pdf");
   });
 

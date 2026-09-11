@@ -38,7 +38,7 @@ export class TemplateRenderer extends AbstractRenderer {
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
       if (File.isExist(options.file as string)) {
-        return new RawFile(options.file) as unknown as RenderableTemplate;
+        return new RawFile(options.file);
       } else {
         if (File.isAbsolutePath(options.file as string)) {
           throw new ArgumentError(`File ${options.file} does not exist`);

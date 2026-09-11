@@ -16,7 +16,7 @@ export class RawFile {
     this.format = this.type.symbol;
   }
 
-  identifier(): string {
+  get identifier(): string {
     return this.filename;
   }
 

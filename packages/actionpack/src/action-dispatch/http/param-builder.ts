@@ -154,7 +154,7 @@ export class ParamBuilder {
       after = "";
     }
 
-    if (k === "") return params;
+    if (k === "") return null;
 
     if (depth === 0 && typeof v === "string") {
       let designatedEncoding: string | undefined;
