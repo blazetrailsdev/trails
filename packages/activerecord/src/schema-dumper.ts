@@ -473,6 +473,7 @@ export abstract class SchemaDumper {
       const message = e instanceof Error ? e.message : String(e);
       stream.puts(`# Could not dump table ${JSON.stringify(table)} because of following ${cls}`);
       stream.puts(`#   ${message}`);
+      stream.puts();
     } finally {
       this.tableName = undefined;
     }
