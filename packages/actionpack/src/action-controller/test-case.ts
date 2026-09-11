@@ -1,5 +1,5 @@
 import { camelize, include, isPlainObject, toXml, type Included } from "@blazetrails/activesupport";
-import { KeyError, merge, SecureRandom } from "@blazetrails/ruby-compat";
+import { KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -340,7 +340,7 @@ export class TestCase {
 
     if (body) {
       env["RAW_POST_DATA"] = body;
-      env["rack.input"] = body;
+      env["rack.input"] = new StringIO(body);
     }
 
     if (xhr) {
@@ -405,7 +405,7 @@ export class TestCase {
     }
     delete env["CONTENT_LENGTH"];
     delete env["RAW_POST_DATA"];
-    env["rack.input"] = "";
+    env["rack.input"] = new StringIO();
     return env;
   }
 }
@@ -490,7 +490,7 @@ export class TestRequest extends AbstractTestRequest {
         this.setHeader("CONTENT_TYPE", TestRequest.ENCODER.contentType);
         const data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
         this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(data, "binary")));
-        this.setHeader("rack.input", data);
+        this.setHeader("rack.input", new StringIO(data));
         this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
       } else {
         this.fetchHeader("CONTENT_TYPE", (k) => {
@@ -518,7 +518,7 @@ export class TestRequest extends AbstractTestRequest {
 
         const encoded = new TextEncoder().encode(data);
         this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
-        this.setHeader("rack.input", data);
+        this.setHeader("rack.input", new StringIO(data));
       }
     }
 

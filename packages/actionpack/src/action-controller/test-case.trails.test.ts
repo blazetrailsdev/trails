@@ -17,7 +17,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
-    expect(req.getHeader("rack.input")).toContain("<x>1</x>");
+    expect(req.getHeader("rack.input").string()).toContain("<x>1</x>");
   });
 });
 

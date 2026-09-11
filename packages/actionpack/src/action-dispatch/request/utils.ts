@@ -1,3 +1,6 @@
+import { MissingController } from "../http/request.js";
+import type { EncodingTemplate } from "../http/param-builder.js";
+
 export type ParamValue =
   | string
   | number
@@ -39,6 +42,29 @@ export class RequestUtils {
 
   static deepMunge(params: ParamValue): ParamValue {
     return normalize(params, true);
+  }
+}
+
+export class CustomParamEncoder {
+  static actionEncodingTemplate(
+    request: { controllerClassFor(name: string): unknown },
+    controller: string | null | undefined,
+    action: string | null | undefined,
+  ): EncodingTemplate | false | null | undefined {
+    try {
+      if (controller == null) return controller;
+      return (
+        !/\p{Cs}/u.test(controller) &&
+        (
+          request.controllerClassFor(controller) as {
+            actionEncodingTemplate(action: string | null | undefined): EncodingTemplate | false;
+          }
+        ).actionEncodingTemplate(action)
+      );
+    } catch (e) {
+      if (e instanceof MissingController) return null;
+      throw e;
+    }
   }
 }
 

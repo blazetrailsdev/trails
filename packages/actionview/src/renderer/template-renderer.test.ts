@@ -99,7 +99,7 @@ describe("TemplateRenderer", () => {
       const templateFake = makeFakeTemplate("content");
       const layoutFake = makeFakeTemplate("LAYOUT[content]");
       vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
-      vi.spyOn(lc, "findLayout").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, {
         template: "posts/show",

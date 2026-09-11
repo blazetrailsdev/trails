@@ -1,7 +1,9 @@
 import { Notifications } from "@blazetrails/activesupport";
 
-import type { LookupContext } from "../lookup-context.js";
-import { MissingTemplate } from "../lookup-context.js";
+import { ArgumentError, File } from "@blazetrails/ruby-compat";
+
+import { LookupContext, MissingTemplate } from "../lookup-context.js";
+import { RawFile } from "../template/raw-file.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
@@ -35,9 +37,17 @@ export class TemplateRenderer extends AbstractRenderer {
       return new HtmlTemplate(String(options.html ?? ""), (this.formats[0] as string) ?? "html");
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
-      throw new Error(
-        "render file: is not supported. Use render template: with a template resolver instead.",
-      );
+      if (File.isExist(options.file as string)) {
+        return new RawFile(options.file);
+      } else {
+        if (File.isAbsolutePath(options.file as string)) {
+          throw new ArgumentError(`File ${options.file} does not exist`);
+        } else {
+          throw new ArgumentError(
+            `\`render file:\` should be given the absolute path to a file. '${options.file}' was given instead`,
+          );
+        }
+      }
     }
     if (Object.prototype.hasOwnProperty.call(options, "inline")) {
       const inlineFormat = (this.formats[0] as string | undefined) ?? null;
@@ -122,21 +132,24 @@ export class TemplateRenderer extends AbstractRenderer {
     keys: string[],
     formats: string[],
   ): RenderableTemplate | null {
+    const details = { ...this.details, formats };
+
     if (typeof layout === "string") {
-      if (layout.startsWith("/")) {
-        throw new Error("Rendering layouts from an absolute path is not supported.");
+      try {
+        if (layout.startsWith("/")) {
+          throw new ArgumentError("Rendering layouts from an absolute path is not supported.");
+        } else {
+          return this.lookupContext.find(layout, [], false, keys, details) as RenderableTemplate;
+        }
+      } catch (e) {
+        if (!(e instanceof MissingTemplate)) throw e;
+        const allDetails = {
+          ...this.details,
+          formats: LookupContext._defaultProcs()["formats"]() as readonly string[],
+        };
+        if (!this.templateExists(layout, [], false, keys, allDetails)) throw e;
+        return null;
       }
-      const detailsWithFormats = { ...this.details, formats };
-      const found = this.lookupContext.findAll(
-        layout,
-        [],
-        false,
-        keys,
-        detailsWithFormats,
-      ) as RenderableTemplate[];
-      if (found.length > 0) return found[0];
-      const fromResolver = this.lookupContext.findLayout(layout, ["layouts"], formats);
-      return fromResolver as unknown as RenderableTemplate | null;
     }
     if (typeof layout === "function") {
       const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);
