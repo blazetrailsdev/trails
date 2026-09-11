@@ -278,7 +278,6 @@ export interface CompositePrimaryKeyMismatchReflection {
   foreignKey?: string | string[];
   hasOne?: () => boolean;
   isCollection?: () => boolean;
-  belongsTo?: () => boolean;
   activeRecordPrimaryKey?: string | string[];
   associationPrimaryKey?: () => string | string[];
 }
