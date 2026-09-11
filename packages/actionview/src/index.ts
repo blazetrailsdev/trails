@@ -12,9 +12,9 @@ export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-
 export { FileSystemResolver, Resolver } from "./template/resolver.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
 
-export { LookupContext, MissingTemplate, DetailsKey } from "./lookup-context.js";
+export { LookupContext, DetailsKey } from "./lookup-context.js";
 
-export { TemplateError } from "./template/error.js";
+export { MissingTemplate, StrictLocalsError, TemplateError } from "./template/error.js";
 export type { TemplateErrorOptions } from "./template/error.js";
 
 export { PathRegistry } from "./path-registry.js";

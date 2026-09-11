@@ -1,9 +1,8 @@
 import { htmlSafe } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "./base.js";
-import { StrictLocalsMismatch } from "./strict-locals.js";
 import { Template } from "./template.js";
-import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
+import { StrictLocalsError, SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
@@ -332,7 +331,8 @@ describe("ActionView::Template (smoke)", () => {
       } catch (e) {
         raised = e;
       }
-      expect((raised as TemplateError).original).toBeInstanceOf(StrictLocalsMismatch);
+      expect((raised as TemplateError).original).toBeInstanceOf(StrictLocalsError);
+      expect((raised as TemplateError).message).toBe("unknown local: :extra for t");
     });
 
     it("memoizes the compile, so a second render of the same source reuses it", () => {
@@ -342,5 +342,33 @@ describe("ActionView::Template (smoke)", () => {
       expect(t.render(view, { n: 2 })).toBe("2");
       expect(view.compiledMethodContainer()._compiledMethods.size).toBe(1);
     });
+  });
+});
+
+describe("TemplateTest", () => {
+  afterEach(() => TemplateHandlers.clear());
+
+  const newTemplate = (body: string): Template =>
+    new Template({
+      source: body,
+      identifier: "hello template",
+      handler: new Tse(),
+      virtualPath: "hello",
+      format: "html",
+      locals: [],
+    });
+
+  it("locals cannot be specified with positional arguments", () => {
+    const template = newTemplate("<%# locals: (argument = 'content') -%>\n<%= argument %>");
+    expect(() => template.render(view(), {})).toThrow(
+      "`argument` set as non-keyword argument for hello template. Locals can only be set as keyword arguments.",
+    );
+  });
+
+  it("locals cannot be specified with block arguments", () => {
+    const template = newTemplate("<%# locals: (&block) -%>\n<%= tag.div(block) %>");
+    expect(() => template.render(view(), {})).toThrow(
+      "`block` set as non-keyword argument for hello template. Locals can only be set as keyword arguments.",
+    );
   });
 });

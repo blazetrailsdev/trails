@@ -18,14 +18,16 @@ import { Context } from "./context.js";
 import * as Helpers from "./helpers/index.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
+import { StrictLocalsError } from "./template/error.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
 import { ArgumentError, include } from "@blazetrails/ruby-compat";
 
-export type CompiledMethod = (
+export type CompiledMethod = ((
   this: Base,
   localAssigns: Record<string, unknown>,
   outputBuffer: OutputBuffer,
-) => unknown;
+  kwargs?: Record<string, unknown>,
+) => unknown) & { parameters?: Array<[type: string, name?: string]> };
 
 export interface CompiledMethodContainer {
   _compiledMethods: Map<string, CompiledMethod>;
@@ -209,18 +211,32 @@ export class Base {
     template: Template | null,
     locals: Record<string, unknown>,
     buffer: OutputBuffer,
-    options: { addToStack?: boolean } = {},
+    options: { addToStack?: boolean; hasStrictLocals?: boolean } = {},
   ): unknown {
     const compiled = this.compiledMethodContainer()._compiledMethods.get(method);
     if (!compiled) throw new Error(`undefined method '${method}'`);
     const addToStack = options.addToStack ?? true;
+    const hasStrictLocals = options.hasStrictLocals ?? false;
     const oldOutputBuffer = this.outputBuffer;
     const oldVirtualPath = this.virtualPath;
     const oldTemplate = this.currentTemplate;
     if (addToStack) this.currentTemplate = template;
     this.outputBuffer = buffer;
     try {
-      return compiled.call(this, locals, buffer);
+      if (hasStrictLocals) {
+        try {
+          return compiled.call(this, locals, buffer, locals);
+        } catch (argumentError) {
+          if (!(argumentError instanceof ArgumentError)) throw argumentError;
+          const frame = argumentError.stack?.split("\n")[1];
+          if (frame?.includes(method)) {
+            throw new StrictLocalsError(argumentError, this.currentTemplate!);
+          }
+          throw argumentError;
+        }
+      } else {
+        return compiled.call(this, locals, buffer);
+      }
     } finally {
       this.outputBuffer = oldOutputBuffer;
       this.virtualPath = oldVirtualPath;
