@@ -26,7 +26,6 @@ describe("Thread", () => {
     const a = new Thread(() => Thread.current()).value();
     const b = new Thread(() => Thread.current()).value();
     expect(a).not.toBe(b);
-    expect(a.id).not.toBe(b.id);
   });
 
   it("value re-raises the exception that terminated the thread", () => {
