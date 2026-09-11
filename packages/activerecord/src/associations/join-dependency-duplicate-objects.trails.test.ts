@@ -5,6 +5,7 @@ import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { Result } from "../result.js";
 import { Edge } from "../test-helpers/models/edge.js";
+import { CpkBook } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
@@ -87,6 +88,19 @@ describe("JoinDependency dedupes duplicate join rows", () => {
       Result.fromRowHashes([valued([1, 2], 0), valued([1, 2], 0), valued([1, 3], 0)]),
     );
     expect(byValue).toHaveLength(2);
+  });
+
+  it("keys composite primary keys by the value array, not a delimited string", () => {
+    registerModel(CpkBook);
+    const jd = new JoinDependency(CpkBook, null, [], Nodes.OuterJoin);
+
+    const rows = [
+      aliasedRow(jd, { "": { author_id: "a\u0000b", id: "c" } }),
+      aliasedRow(jd, { "": { author_id: "a", id: "b\u0000c" } }),
+      aliasedRow(jd, { "": { author_id: "a", id: "b\u0000c" } }),
+    ];
+
+    expect(jd.instantiate(Result.fromRowHashes(rows))).toHaveLength(2);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {

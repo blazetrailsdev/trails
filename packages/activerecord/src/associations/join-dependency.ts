@@ -409,7 +409,7 @@ export class JoinDependency {
       class_name: this.joinRoot.baseKlass.name,
     };
 
-    const rowHashKeys = new Map<number, Record<string, unknown>[]>();
+    const rowHashKeys: Record<string, unknown>[] = [];
 
     Notifications.instrument("instantiation.active_record", payload, () => {
       for (const rowHash of rows) {
@@ -417,12 +417,9 @@ export class JoinDependency {
         if (primaryKey) {
           parentKey = this._keyFor(primaryKey.map((k) => rowHash[k]));
         } else {
-          const hash = rbHash(rowHash);
-          let bucket = rowHashKeys.get(hash);
-          if (!bucket) rowHashKeys.set(hash, (bucket = []));
-          parentKey = bucket.find((key) => rbEqual(key, rowHash));
+          parentKey = rowHashKeys.find((key) => rbEqual(key, rowHash));
           if (parentKey === undefined) {
-            bucket.push(rowHash);
+            rowHashKeys.push(rowHash);
             parentKey = rowHash;
           }
         }
@@ -558,8 +555,17 @@ export class JoinDependency {
 
   /** @internal */
   private _keyFor(vals: unknown[]): unknown {
-    return vals.length === 1 ? vals[0] : vals.join("\u0000");
+    if (vals.length === 1) return vals[0];
+    const hash = rbHash(vals);
+    let bucket = this._compositeKeys.get(hash);
+    if (!bucket) this._compositeKeys.set(hash, (bucket = []));
+    let key = bucket.find((k) => rbEqual(k, vals));
+    if (!key) bucket.push((key = vals));
+    return key;
   }
+
+  /** @internal */
+  private _compositeKeys = new Map<number, unknown[][]>();
 
   protected get joinRootAlias(): string {
     return this._baseAlias;
