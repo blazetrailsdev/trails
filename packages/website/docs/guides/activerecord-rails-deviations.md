@@ -400,8 +400,8 @@ import {
   AssociationProxy,
   Relation,
   association,
-  defineEnum,
 } from "@blazetrails/activerecord";
+import { defineEnum } from "@blazetrails/activerecord/enum";
 
 class Author extends Base {}
 class Comment extends Base {}

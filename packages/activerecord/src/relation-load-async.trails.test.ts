@@ -90,7 +90,7 @@ describe("Relation#load_async", () => {
     relation.reset();
 
     expect(scheduled[0].pending()).toBe(false);
-    scheduled[0].executeOrSkip();
+    await scheduled[0].executeOrSkip();
     await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
   });
 
