@@ -1222,15 +1222,16 @@ export async function buildFixtureSql(
 }
 
 /** @internal */
-export function buildFixtureStatements(
+export async function buildFixtureStatements(
   this: BuildFixtureHost,
   fixtureSet: Record<string, Record<string, unknown>[]>,
 ): Promise<string[]> {
-  return Promise.all(
-    Object.entries(fixtureSet)
-      .filter(([, fixtures]) => fixtures.length > 0)
-      .map(([tableName, fixtures]) => buildFixtureSql.call(this, fixtures, tableName)),
-  );
+  const statements: string[] = [];
+  for (const [tableName, fixtures] of Object.entries(fixtureSet)) {
+    if (fixtures.length === 0) continue;
+    statements.push(await buildFixtureSql.call(this, fixtures, tableName));
+  }
+  return statements;
 }
 
 /** @internal */

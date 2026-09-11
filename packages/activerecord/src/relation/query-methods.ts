@@ -302,7 +302,9 @@ function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 
 async function extractAssociated(this: QueryMethodsHost, association: string): Promise<any[]> {
   const records = await preload.call(this, association);
-  return Promise.all(records.map((record: any) => record[association]()));
+  const associated: any[] = [];
+  for (const record of records) associated.push(await record[association]());
+  return associated;
 }
 
 function references(this: QueryMethodsHost, ...tableNames: Array<string | Nodes.SqlLiteral>): any {

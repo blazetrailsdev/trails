@@ -111,6 +111,7 @@ export class ThroughAssociation extends Association {
     return runnable;
   }
 
+  /** @missingRailsCall map — PERMANENT */
   async futureClasses(): Promise<(typeof Base)[]> {
     if (this.isRun()) return [];
 
@@ -204,17 +205,23 @@ export class ThroughAssociation extends Association {
     return [...(await this.throughRecordsByOwner()).values()].flat();
   }
 
+  /** @missingRailsCall map — PERMANENT */
   private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    this._sourceRecordsByOwner ??= (
-      await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()))
-    ).reduce(merge, new Map<Base, Base[]>());
+    if (this._sourceRecordsByOwner === undefined) {
+      const recordsByOwner: Map<Base, Base[]>[] = [];
+      for (const l of await this.sourcePreloaders()) recordsByOwner.push(await l.recordsByOwner());
+      this._sourceRecordsByOwner = recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+    }
     return this._sourceRecordsByOwner;
   }
 
+  /** @missingRailsCall map — PERMANENT */
   private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    this._throughRecordsByOwner ??= (
-      await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()))
-    ).reduce(merge, new Map<Base, Base[]>());
+    if (this._throughRecordsByOwner === undefined) {
+      const recordsByOwner: Map<Base, Base[]>[] = [];
+      for (const l of await this.throughPreloaders()) recordsByOwner.push(await l.recordsByOwner());
+      this._throughRecordsByOwner = recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+    }
     return this._throughRecordsByOwner;
   }
 

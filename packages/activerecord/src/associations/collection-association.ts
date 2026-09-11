@@ -449,9 +449,10 @@ export abstract class CollectionAssociation extends Association {
       ).association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
       const reader = (await assoc.reader) as Base[];
-      const targetReflections = await Promise.all(
-        reader.map((source) => (source as unknown as Record<string, unknown>)[sourceName]),
-      );
+      const targetReflections: unknown[] = [];
+      for (const source of reader) {
+        targetReflections.push(await (source as unknown as Record<string, unknown>)[sourceName]);
+      }
       return (
         targetReflections.some((targetReflection) =>
           Array.isArray(targetReflection)

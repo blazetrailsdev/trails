@@ -133,49 +133,36 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
         if (desc) entry.orders[column] = "desc";
       }
     }
-    return await Promise.all(
-      Array.from(byIndex.entries()).map(
-        async ([
-          name,
-          {
-            table,
-            columns: indexColumns,
-            unique,
+    const indexes: IndexDefinition[] = [];
+    for (const [
+      name,
+      { table, columns: indexColumns, unique, using, type, comment, lengths, orders, expressions },
+    ] of byIndex.entries()) {
+      if (Object.keys(expressions).length > 0) {
+        const columns = new Map<string, string>(
+          indexColumns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
+        );
+        await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths });
+        indexes.push(
+          new IndexDefinition(table, name, unique, Array.from(columns.values()).join(", "), {
             using,
             type,
             comment,
-            lengths,
-            orders,
-            expressions,
-          },
-        ]) => {
-          if (Object.keys(expressions).length > 0) {
-            const columns = new Map<string, string>(
-              indexColumns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
-            );
-            await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths });
-            return new IndexDefinition(
-              table,
-              name,
-              unique,
-              Array.from(columns.values()).join(", "),
-              {
-                using,
-                type,
-                comment,
-              },
-            );
-          }
-          return new IndexDefinition(table, name, unique, indexColumns, {
-            lengths,
-            orders,
-            using,
-            type,
-            comment,
-          });
-        },
-      ),
-    );
+          }),
+        );
+        continue;
+      }
+      indexes.push(
+        new IndexDefinition(table, name, unique, indexColumns, {
+          lengths,
+          orders,
+          using,
+          type,
+          comment,
+        }),
+      );
+    }
+    return indexes;
   }
 
   override get schemaCreation(): MysqlSchemaCreation {

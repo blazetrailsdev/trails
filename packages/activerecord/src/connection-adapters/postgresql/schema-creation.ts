@@ -41,20 +41,17 @@ export class SchemaCreation extends AbstractSchemaCreation {
     sql += ((o.constraintValidations as (string | undefined)[] | undefined) ?? [])
       .map((fk) => this.visitValidateConstraint(fk))
       .join(" ");
-    sql += (
-      await Promise.all(
-        ((o.exclusionConstraintAdds as ExclusionConstraintDefinition[] | undefined) ?? []).map(
-          (con) => this.visitAddExclusionConstraint(con),
-        ),
-      )
-    ).join(" ");
-    sql += (
-      await Promise.all(
-        ((o.uniqueConstraintAdds as UniqueConstraintDefinition[] | undefined) ?? []).map((con) =>
-          this.visitAddUniqueConstraint(con),
-        ),
-      )
-    ).join(" ");
+    const exclusionConstraintAdds: string[] = [];
+    for (const con of (o.exclusionConstraintAdds as ExclusionConstraintDefinition[] | undefined) ??
+      []) {
+      exclusionConstraintAdds.push(await this.visitAddExclusionConstraint(con));
+    }
+    sql += exclusionConstraintAdds.join(" ");
+    const uniqueConstraintAdds: string[] = [];
+    for (const con of (o.uniqueConstraintAdds as UniqueConstraintDefinition[] | undefined) ?? []) {
+      uniqueConstraintAdds.push(await this.visitAddUniqueConstraint(con));
+    }
+    sql += uniqueConstraintAdds.join(" ");
     return sql;
   }
 

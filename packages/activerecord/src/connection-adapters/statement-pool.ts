@@ -21,15 +21,16 @@ export class StatementPool<T = unknown> {
 
   /** @missingRailsCall last — PERMANENT */
   set(key: string, stmt: T): void | Promise<void> {
-    const deallocating: Array<Promise<void>> = [];
+    let deallocating: Promise<void> | undefined;
     while (this._statementLimit <= this.cache.size) {
       const [firstKey, evicted] = this.cache.entries().next().value!;
       this.cache.delete(firstKey);
-      const pending = this.dealloc(evicted);
-      if (pending) deallocating.push(pending);
+      deallocating = deallocating
+        ? deallocating.then(() => this.dealloc(evicted))
+        : (this.dealloc(evicted) ?? undefined);
     }
     this.cache.set(key, stmt);
-    if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
+    return deallocating;
   }
 
   isKey(key: string): boolean {
@@ -45,13 +46,14 @@ export class StatementPool<T = unknown> {
   }
 
   clear(): void | Promise<void> {
-    const deallocating: Array<Promise<void>> = [];
+    let deallocating: Promise<void> | undefined;
     for (const stmt of this.cache.values()) {
-      const pending = this.dealloc(stmt);
-      if (pending) deallocating.push(pending);
+      deallocating = deallocating
+        ? deallocating.then(() => this.dealloc(stmt))
+        : (this.dealloc(stmt) ?? undefined);
     }
     this.cache.clear();
-    if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
+    return deallocating;
   }
 
   reset(): void | Promise<void> {
