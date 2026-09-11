@@ -353,7 +353,7 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/io.c:2263`), delegated by Ruby stdlib `Tempfile`.
    */
-  write(string: string): number {
+  write(string: string | Uint8Array): number {
     return this.tmpfile.write(string);
   }
 

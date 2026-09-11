@@ -102,9 +102,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     if (this.mtime !== null && gzipped.length >= GZIP_HEADER_LENGTH) {
       setGzipHeaderMtime(gzipped, this.mtime);
     }
-    let out = "";
-    for (const byte of gzipped) out += String.fromCharCode(byte);
-    this.io.write(out);
+    this.io.write(gzipped);
     await super.close();
   }
 }

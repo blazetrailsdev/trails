@@ -599,8 +599,8 @@ it("parses multipart upload file using custom tempfile class", () => {
   const env = multipartFixture("text");
   let writtenContent = "";
   const myTempfile = {
-    write(data: string) {
-      writtenContent += data;
+    write(data: Uint8Array) {
+      writtenContent += String.fromCharCode(...data);
     },
     read() {
       return writtenContent;

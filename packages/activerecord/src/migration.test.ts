@@ -1596,9 +1596,9 @@ describe("MigrationTest", () => {
         })(),
       ).up();
       await bulkAdapter.executeMutation(
-        `INSERT INTO "bk1" ("name", "age", "email") VALUES ('test', 25, 'a@b.c')`,
+        `INSERT INTO bk1 (name, age, email) VALUES ('test', 25, 'a@b.c')`,
       );
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk1"`)).toArray();
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk1`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].age).toBe(25);
       expect(rows[0].email).toBe("a@b.c");
@@ -1623,8 +1623,8 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk2" ("new_c") VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk2"`)).toArray();
+      await bulkAdapter.executeMutation(`INSERT INTO bk2 (new_c) VALUES ('test')`);
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk2`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].new_c).toBe("test");
     });
@@ -1649,8 +1649,8 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk3" ("a") VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk3"`)).toArray();
+      await bulkAdapter.executeMutation(`INSERT INTO bk3 (a) VALUES ('test')`);
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk3`)).toArray();
       expect(rows.length).toBe(1);
     });
 
@@ -1674,9 +1674,9 @@ describe("MigrationTest", () => {
         })(),
       ).up();
       await bulkAdapter.executeMutation(
-        `INSERT INTO "bk4" ("x", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
+        `INSERT INTO bk4 (x, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
       );
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk4"`)).toArray();
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk4`)).toArray();
       expect(rows.length).toBe(1);
       const createdAt = rows[0].created_at;
       const dateStr =
@@ -1707,8 +1707,8 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk5" ("x") VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk5"`)).toArray();
+      await bulkAdapter.executeMutation(`INSERT INTO bk5 (x) VALUES ('test')`);
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk5`)).toArray();
       expect(rows.length).toBe(1);
     });
 
@@ -1731,8 +1731,8 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk6" ("email") VALUES ('test@test.com')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk6"`)).toArray();
+      await bulkAdapter.executeMutation(`INSERT INTO bk6 (email) VALUES ('test@test.com')`);
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk6`)).toArray();
       expect(rows.length).toBe(1);
     });
 
@@ -1756,8 +1756,8 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk7" ("email") VALUES ('test@test.com')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM "bk7"`)).toArray();
+      await bulkAdapter.executeMutation(`INSERT INTO bk7 (email) VALUES ('test@test.com')`);
+      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk7`)).toArray();
       expect(rows.length).toBe(1);
     });
 
@@ -1782,9 +1782,9 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO "bk_idx" ("username") VALUES ('alice')`);
+      await bulkAdapter.executeMutation(`INSERT INTO bk_idx (username) VALUES ('alice')`);
       await expect(
-        bulkAdapter.executeMutation(`INSERT INTO "bk_idx" ("username") VALUES ('alice')`),
+        bulkAdapter.executeMutation(`INSERT INTO bk_idx (username) VALUES ('alice')`),
       ).rejects.toThrow();
     });
   });
@@ -1806,15 +1806,13 @@ describe("MigrationTest", () => {
       }
       const m = makeRvMig(new BulkMig());
       await m.up();
-      await rvAdapter.executeMutation(
-        `INSERT INTO "rv_bulk" ("name", "extra") VALUES ('test', 'val')`,
-      );
-      const rows = (await rvAdapter.selectAll(`SELECT * FROM "rv_bulk"`)).toArray();
+      await rvAdapter.executeMutation(`INSERT INTO rv_bulk (name, extra) VALUES ('test', 'val')`);
+      const rows = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].extra).toBe("val");
       await m.down();
       try {
-        const after = (await rvAdapter.selectAll(`SELECT * FROM "rv_bulk"`)).toArray();
+        const after = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
         expect(after.length).toBe(0);
       } catch {}
     });

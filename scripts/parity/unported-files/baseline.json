@@ -73,18 +73,6 @@
     "reason": "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency on a single shared connection, asserting mutex-style serialization of #active?/#verify!/#disconnect! under the GVL. Node Worker threads use isolated heaps and structured-clone message passing, not the shared-memory Thread.new model this test relies on, so the GVL interleaving this test pins has no equivalent in our runtime target."
   },
   {
-    "testFile": "adapters/postgresql/dbconsole_test.rb",
-    "reason": "Tests `rails dbconsole` PTY/exec invocation for PostgreSQL. Spawning a PTY-backed interactive subprocess has no Node.js equivalent."
-  },
-  {
-    "testFile": "adapters/mysql2/dbconsole_test.rb",
-    "reason": "Tests `rails dbconsole` PTY/exec invocation for MySQL. Spawning a PTY-backed interactive subprocess has no Node.js equivalent."
-  },
-  {
-    "testFile": "adapters/sqlite3/dbconsole_test.rb",
-    "reason": "Tests `rails dbconsole` PTY/exec invocation for SQLite. Spawning a PTY-backed interactive subprocess has no Node.js equivalent."
-  },
-  {
     "testFile": "adapters/sqlite3/sqlite3_adapter_test.rb",
     "tests": ["supports extensions", "respond to enable extension", "respond to disable extension"],
     "reason": "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION entry points, so supports_extensions? / enable_extension / disable_extension cannot be implemented against the driver Trails uses."

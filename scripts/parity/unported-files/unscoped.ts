@@ -590,25 +590,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "shared-memory Thread.new model this test relies on, so the GVL interleaving " +
       "this test pins has no equivalent in our runtime target.",
   },
-  // --- Permanently not-portable: Rake tasks / dbconsole PTY ---
-  {
-    testFile: "adapters/postgresql/dbconsole_test.rb",
-    reason:
-      "Tests `rails dbconsole` PTY/exec invocation for PostgreSQL. " +
-      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
-  },
-  {
-    testFile: "adapters/mysql2/dbconsole_test.rb",
-    reason:
-      "Tests `rails dbconsole` PTY/exec invocation for MySQL. " +
-      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
-  },
-  {
-    testFile: "adapters/sqlite3/dbconsole_test.rb",
-    reason:
-      "Tests `rails dbconsole` PTY/exec invocation for SQLite. " +
-      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
-  },
   // --- Permanently not-portable: single-process SQLite driver limits ---
   {
     testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",

@@ -69,7 +69,14 @@ export class StringIO {
     return chunk;
   }
 
-  write(string: string): number {
+  write(string: string | Uint8Array): number {
+    if (typeof string !== "string") {
+      let chars = "";
+      for (let i = 0; i < string.length; i += 0x8000) {
+        chars += String.fromCharCode(...string.subarray(i, i + 0x8000));
+      }
+      string = chars;
+    }
     this._string =
       this._string.slice(0, this._pos) + string + this._string.slice(this._pos + string.length);
     this._pos += string.length;

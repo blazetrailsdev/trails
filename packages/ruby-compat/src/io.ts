@@ -803,13 +803,15 @@ export class IO {
    * answers the number of bytes written. On a binary stream — {@link binmode},
    * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` is an
    * ASCII-8BIT String and its characters go out as bytes; otherwise
-   * `do_writeconv` (`io.c:1904`) transcodes it to the external encoding.
+   * `do_writeconv` (`io.c:1904`) transcodes it to the external encoding. A
+   * `Uint8Array` is a String's bytes already and goes out unchanged, which is
+   * how a binary producer hands over bytes without a character per byte.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/io.c:2263`).
    */
-  write(string: string): number {
-    const buffer = doWriteconv(string, this.enc);
+  write(string: string | Uint8Array): number {
+    const buffer = typeof string === "string" ? doWriteconv(string, this.enc) : string;
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this._pos + n);
