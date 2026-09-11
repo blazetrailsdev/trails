@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { CollectionAssociation } from "./collection-association.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { CollectionIdsAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -24,10 +25,8 @@ const targetOf = (owner: Author): Post[] =>
 
 const writerOf =
   (owner: Author) =>
-  (records: Post[]): Promise<void> =>
-    (owner as unknown as { association(n: string): { writer(r: Post[]): Promise<void> } })
-      .association("posts")
-      .writer(records);
+  (records: Post[]): ReturnType<CollectionAssociation["writer"]> =>
+    (owner.association("posts") as CollectionAssociation).writer(records);
 
 const idsWriterOf =
   (owner: Author) =>

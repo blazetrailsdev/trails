@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SingularAssociation } from "../associations/singular-association.js";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -30,9 +31,7 @@ describe("AbsenceValidationTest", () => {
 
     const boy = new Boy();
     const face = new Face();
-    await (boy as unknown as { association(n: string): { writer(v: unknown): unknown } })
-      .association("face")
-      .writer(face);
+    await (boy.association("face") as SingularAssociation).writer(face);
     expect(await boy.isValid()).toBe(false);
     expect(boy.errors.messagesFor("face").length).toBe(1);
 

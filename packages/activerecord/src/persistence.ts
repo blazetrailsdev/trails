@@ -246,7 +246,7 @@ export async function _updateRecord(
  *
  * @missingRailsCall with_connection — CONVERGEABLE: persistence.rb:294-296 `with_connection {
  *   |c| c.delete(dm, ...) }` — trails resolves the adapter through
- *   `connectionPool.call(...).activeConnection ?? this.connection` (persistence.ts:366) rather
+ *   `connectionPool.call(...).activeConnection ?? this.connection` (persistence.ts:266) rather
  *   than the block form; converging the whole package onto `withConnection` is
  *   RFC 0073's permanent-connection-checkout flip, tracked there.
  */
