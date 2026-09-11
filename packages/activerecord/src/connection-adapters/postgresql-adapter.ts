@@ -3,7 +3,7 @@ import type {
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import pg from "pg";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, setEnv } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
@@ -207,31 +207,30 @@ export class PostgreSQLAdapter
   static override dbconsole(
     config: DatabaseConfig,
     options: { includePassword?: boolean } = {},
-  ): { env: Record<string, string>; argv: string[] } {
+  ): string[] {
     const pgConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 
-    const env: Record<string, string> = {};
-    if (isRubyTruthy(pgConfig.username)) env.PGUSER = String(pgConfig.username);
-    if (isRubyTruthy(pgConfig.host)) env.PGHOST = String(pgConfig.host);
-    if (isRubyTruthy(pgConfig.port)) env.PGPORT = String(pgConfig.port);
-    if (isRubyTruthy(pgConfig.password) && options.includePassword) {
-      env.PGPASSWORD = String(pgConfig.password);
+    if (isRubyTruthy(pgConfig.username)) setEnv("PGUSER", String(pgConfig.username));
+    if (isRubyTruthy(pgConfig.host)) setEnv("PGHOST", String(pgConfig.host));
+    if (isRubyTruthy(pgConfig.port)) setEnv("PGPORT", String(pgConfig.port));
+    if (isRubyTruthy(pgConfig.password) && isRubyTruthy(options.includePassword)) {
+      setEnv("PGPASSWORD", String(pgConfig.password));
     }
-    if (isRubyTruthy(pgConfig.sslmode)) env.PGSSLMODE = String(pgConfig.sslmode);
-    if (isRubyTruthy(pgConfig.sslcert)) env.PGSSLCERT = String(pgConfig.sslcert);
-    if (isRubyTruthy(pgConfig.sslkey)) env.PGSSLKEY = String(pgConfig.sslkey);
-    if (isRubyTruthy(pgConfig.sslrootcert)) env.PGSSLROOTCERT = String(pgConfig.sslrootcert);
-    const variables = pgConfig.variables as Record<string, unknown> | undefined;
-    if (variables) {
-      const pgOptions = Object.entries(variables)
-        .filter(([, v]) => v !== ":default")
-        .map(([name, v]) => `-c ${name}=${String(v).replace(/[ \\]/g, "\\$&")}`)
-        .join(" ");
-      if (pgOptions) env.PGOPTIONS = pgOptions;
+    if (isRubyTruthy(pgConfig.sslmode)) setEnv("PGSSLMODE", String(pgConfig.sslmode));
+    if (isRubyTruthy(pgConfig.sslcert)) setEnv("PGSSLCERT", String(pgConfig.sslcert));
+    if (isRubyTruthy(pgConfig.sslkey)) setEnv("PGSSLKEY", String(pgConfig.sslkey));
+    if (isRubyTruthy(pgConfig.sslrootcert)) setEnv("PGSSLROOTCERT", String(pgConfig.sslrootcert));
+    if (isRubyTruthy(pgConfig.variables)) {
+      setEnv(
+        "PGOPTIONS",
+        Object.entries(pgConfig.variables as Record<string, unknown>)
+          .filter(([, value]) => value !== ":default")
+          .map(([name, value]) => `-c ${name}=${String(value).replace(/[ \\]/g, "\\$&")}`)
+          .join(" "),
+      );
     }
-    const argv = this.findCmdAndExec(ActiveRecord.databaseCli["postgresql"], config.database!);
-    return { env, argv };
+    return this.findCmdAndExec(ActiveRecord.databaseCli["postgresql"], config.database!);
   }
 
   override async active(): Promise<boolean> {

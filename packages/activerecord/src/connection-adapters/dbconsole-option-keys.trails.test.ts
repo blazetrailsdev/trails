@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { File } from "@blazetrails/ruby-compat";
+import { File, env as ENV, setEnv } from "@blazetrails/ruby-compat";
 import { trailsRoot } from "@blazetrails/activesupport";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
@@ -70,27 +70,36 @@ describe("SQLite3Adapter.dbconsole option keys", () => {
 
 describe("PostgreSQLAdapter.dbconsole option keys", () => {
   const config = dbConfig({ username: "alice", host: "localhost", password: "secret" });
+  const ENV_VARS = ["PGUSER", "PGHOST", "PGPORT", "PGPASSWORD", "PGOPTIONS"];
+  let oldValues: (string | undefined)[] = [];
+  beforeEach(() => {
+    oldValues = ENV_VARS.map((v) => ENV[v]);
+    ENV_VARS.forEach((v) => setEnv(v, undefined));
+  });
+  afterEach(() => {
+    ENV_VARS.forEach((v, i) => setEnv(v, oldValues[i]));
+  });
 
   it("exports Ruby-truthy empty-string and zero config values", () => {
-    const { env } = PostgreSQLAdapter.dbconsole(dbConfig({ username: "", host: "", port: 0 }));
-    expect(env.PGUSER).toBe("");
-    expect(env.PGHOST).toBe("");
-    expect(env.PGPORT).toBe("0");
+    PostgreSQLAdapter.dbconsole(dbConfig({ username: "", host: "", port: 0 }));
+    expect(ENV["PGUSER"]).toBe("");
+    expect(ENV["PGHOST"]).toBe("");
+    expect(ENV["PGPORT"]).toBe("0");
   });
 
   it("skips a false password even when includePassword is set", () => {
-    const { env } = PostgreSQLAdapter.dbconsole(dbConfig({ password: false }), {
+    PostgreSQLAdapter.dbconsole(dbConfig({ password: false }), {
       includePassword: true,
     });
-    expect(env.PGPASSWORD).toBeUndefined();
+    expect(ENV["PGPASSWORD"]).toBeUndefined();
   });
 
   it("builds PGOPTIONS from variables, dropping only :default (not the bare string default)", () => {
-    const { env } = PostgreSQLAdapter.dbconsole(
+    PostgreSQLAdapter.dbconsole(
       dbConfig({
         variables: { statement_timeout: "5s", search_path: "default", lock_timeout: ":default" },
       }),
     );
-    expect(env.PGOPTIONS).toBe("-c statement_timeout=5s -c search_path=default");
+    expect(ENV["PGOPTIONS"]).toBe("-c statement_timeout=5s -c search_path=default");
   });
 });
