@@ -306,6 +306,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
+  override async getAdvisoryLock(
+    lockName: number | bigint | string,
+    timeout = 0,
+  ): Promise<boolean> {
+    return (
+      (await this.queryValue(`SELECT GET_LOCK(${this.quote(String(lockName))}, ${timeout})`)) === 1
+    );
+  }
+
+  override async releaseAdvisoryLock(lockName: number | bigint | string): Promise<boolean> {
+    return (await this.queryValue(`SELECT RELEASE_LOCK(${this.quote(String(lockName))})`)) === 1;
+  }
+
   async supportsInsertOnDuplicateSkip(): Promise<boolean> {
     return true;
   }
@@ -1241,6 +1254,59 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async supportsRenameColumn(): Promise<boolean> {
     if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
     return (await this.databaseVersion).compare("8.0.3") >= 0;
+  }
+
+  /** @internal */
+  override async configureConnection(): Promise<void> {
+    await super.configureConnection();
+    const variables: Record<string, unknown> = {
+      ...(fetch(this._config, "variables", {}) as Record<string, unknown>),
+    };
+
+    let waitTimeout = (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToInteger(
+      this._config.waitTimeout,
+    );
+    if (!Number.isInteger(waitTimeout)) waitTimeout = 2147483;
+    variables["wait_timeout"] = waitTimeout;
+
+    const defaults = new Set<unknown>([":default"]);
+
+    let sqlMode: unknown = variables["sql_mode"];
+    delete variables["sql_mode"];
+    if (sqlMode != null && sqlMode !== false) {
+      sqlMode = this.quote(sqlMode);
+    } else if (!defaults.has(this.isStrictMode())) {
+      if (isRubyTruthy(this.isStrictMode())) {
+        sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
+      } else {
+        sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
+        sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
+        sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
+      }
+      sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
+    }
+    const sqlModeAssignment =
+      sqlMode != null && sqlMode !== false ? `@@SESSION.sql_mode = ${sqlMode}, ` : "";
+
+    let encoding = "";
+    if (isRubyTruthy(this._config.encoding)) {
+      encoding = `NAMES ${this._config.encoding}`;
+      if (isRubyTruthy(this._config.collation)) encoding += ` COLLATE ${this._config.collation}`;
+      encoding += ", ";
+    }
+
+    const variableAssignments = Object.entries(variables)
+      .flatMap(([k, v]) => {
+        if (defaults.has(v)) {
+          return [`@@SESSION.${k} = DEFAULT`];
+        } else if (v != null) {
+          return [`@@SESSION.${k} = ${this.quote(v)}`];
+        }
+        return [];
+      })
+      .join(", ");
+
+    await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
   }
 
   /**

@@ -219,6 +219,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           uri = url.toString();
         }
       } catch {}
+      if (waitTimeout !== undefined) this._config.waitTimeout = waitTimeout;
       this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
       return;
     }
@@ -346,7 +347,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectingPromiseGen = gen;
     this._connectingPromise = Mysql2Adapter.newClient({
       ...this._poolConfig,
-      initSql: this._buildInitSql(),
+      initSql: "SET time_zone = '+00:00'",
     }).then(
       async (conn): Promise<mysql.Connection> => {
         if (this._connectGeneration !== gen) {
@@ -572,20 +573,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return true;
   }
 
-  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    const conn = await this.getConn();
-    const [rows] = await conn.query("SELECT GET_LOCK(?, 0) AS locked", [String(lockId)]);
-    return (rows as Record<string, unknown>[])[0]?.locked === 1;
-  }
-
-  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    if (!this._rawConnection) return false;
-    const [rows] = await this._rawConnection.query("SELECT RELEASE_LOCK(?) AS unlocked", [
-      String(lockId),
-    ]);
-    return (rows as Record<string, unknown>[])[0]?.unlocked === 1;
-  }
-
   /** @internal */
   async connect(): Promise<void> {
     try {
@@ -744,6 +731,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
+        flags: withoutDefaultIgnoreSpace(connOptions.flags),
         multipleStatements: true,
         typeCast: composedTypeCast,
       });
@@ -779,85 +767,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     return conn;
   }
+}
 
-  /** @internal */
-  private _buildInitSql(): string {
-    const { waitTimeout, variables: configVars } = this._poolConfig;
-    const vars: Record<string, string | number | boolean | null | ":default"> = {
-      ...(configVars ?? {}),
-    };
-
-    const SAFE_VAR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-    for (const k of Object.keys(vars)) {
-      if (!SAFE_VAR_NAME.test(k)) {
-        throw new Error(`Invalid MySQL session variable name: ${JSON.stringify(k)}`);
-      }
-    }
-
-    const wt = typeof waitTimeout === "string" ? parseInt(waitTimeout, 10) : waitTimeout;
-    vars["wait_timeout"] = Number.isInteger(wt) ? (wt as number) : 2147483;
-
-    const DEFAULTS = new Set([":default"]);
-
-    let sqlMode: string | undefined;
-    const varSqlMode = vars["sql_mode"];
-    if (varSqlMode !== undefined && varSqlMode !== null) {
-      delete vars["sql_mode"];
-      sqlMode = this.quote(String(varSqlMode));
-    } else if (!DEFAULTS.has(this.isStrictMode() as string)) {
-      if (isRubyTruthy(this.isStrictMode())) {
-        sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
-      } else {
-        sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
-        sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
-        sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
-      }
-      sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
-    } else {
-      sqlMode = "@@GLOBAL.sql_mode";
-    }
-
-    const sqlModeClause = sqlMode ? `@@SESSION.sql_mode = ${sqlMode}` : "";
-
-    const varEncoding = vars["encoding"];
-    if (varEncoding !== undefined) delete vars["encoding"];
-    const varCollation = vars["collation"];
-    if (varCollation !== undefined) delete vars["collation"];
-
-    const varClauses = Object.entries(vars)
-      .filter(([, v]) => v !== null && v !== undefined)
-      .map(([k, v]) => {
-        if (DEFAULTS.has(String(v))) return `@@SESSION.${k} = DEFAULT`;
-        if (typeof v === "number") return `@@SESSION.${k} = ${v}`;
-        if (typeof v === "boolean") return `@@SESSION.${k} = '${v ? 1 : 0}'`;
-        return `@@SESSION.${k} = ${this.quote(String(v))}`;
-      });
-
-    const sessionClauses = [sqlModeClause, ...varClauses].filter(Boolean).join(", ");
-
-    const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
-    const charset =
-      this._poolConfig.charset ??
-      (this._poolConfig as { encoding?: string }).encoding ??
-      (typeof varEncoding === "string" ? varEncoding : undefined);
-    const charsetCollation =
-      (this._poolConfig as { collation?: string }).collation ??
-      (typeof varCollation === "string" ? varCollation : undefined);
-    if (charset && !SAFE_CHARSET_RE.test(charset)) {
-      throw new Error(`Invalid MySQL charset: ${JSON.stringify(charset)}`);
-    }
-    if (charsetCollation && !SAFE_CHARSET_RE.test(charsetCollation)) {
-      throw new Error(`Invalid MySQL collation: ${JSON.stringify(charsetCollation)}`);
-    }
-    let namesPart = "";
-    if (charset) {
-      namesPart = `NAMES ${charset}`;
-      if (charsetCollation) namesPart += ` COLLATE ${charsetCollation}`;
-      namesPart += ", ";
-    }
-
-    return `SET ${namesPart}time_zone = '+00:00', ${sessionClauses}`;
-  }
+/** @internal */
+function withoutDefaultIgnoreSpace(flags: string | string[] | undefined): string[] {
+  const list = Array.isArray(flags)
+    ? flags
+    : String(flags ?? "")
+        .split(/\s*,+\s*/)
+        .filter(Boolean);
+  return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
 
 /** @internal */
