@@ -10,7 +10,6 @@ type Scoped = { thread: Thread; state: Store };
 let _ctx: AsyncContext<Scoped> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 const _states = new WeakMap<Thread, Store>();
-const CONTEXT_KEY = Symbol.for("ar_execution_context_id");
 
 function ctx(): AsyncContext<Scoped> {
   const adapter = getAsyncContext();
@@ -62,7 +61,10 @@ export const IsolatedExecutionState = {
   },
   /** @missingRailsCall scope — PERMANENT */
   context(): { readonly id: number } {
-    return (store().get(CONTEXT_KEY) as { readonly id: number } | undefined) ?? Thread.current();
+    return Thread.current();
+  },
+  shareWith(other: Thread): void {
+    _states.set(Thread.current(), new Map(_states.get(other)));
   },
   run<R>(fn: () => R): R {
     return new Thread(fn).value();

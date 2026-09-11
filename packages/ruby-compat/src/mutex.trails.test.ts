@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Mutex } from "./mutex.js";
 import { ThreadError } from "./thread-error.js";
+import { Thread } from "./thread.js";
 
 describe("Mutex", () => {
   it("queues distinct flows so only one holds the lock at a time", async () => {
@@ -71,5 +72,21 @@ describe("Mutex#try_lock / #unlock", () => {
     mutex.unlock();
     await waiting;
     expect(order).toEqual(["unlock", "synchronize"]);
+  });
+
+  it("unlock raises ThreadError when another thread holds the mutex", () => {
+    const mutex = new Mutex();
+    expect(mutex.tryLock()).toBe(true);
+    expect(() => new Thread(() => mutex.unlock()).value()).toThrow(
+      "Attempt to unlock a mutex which is locked by another thread/fiber",
+    );
+    mutex.unlock();
+  });
+
+  it("unlock releases a mutex taken by synchronize", async () => {
+    const mutex = new Mutex();
+    await mutex.synchronize(() => void mutex.unlock());
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
   });
 });

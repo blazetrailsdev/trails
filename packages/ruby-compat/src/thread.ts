@@ -26,6 +26,7 @@ export class Thread<R = unknown> {
    */
   static readonly main: Thread = Object.assign(Object.create(Thread.prototype) as Thread, {
     id: 0,
+    status: "run",
   });
 
   /**
@@ -43,23 +44,43 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread` identity (`vendor/ruby/thread.c:3473`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread` object identity (`vendor/ruby/thread.c:3473`).
    */
   readonly id: number;
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/thread.c:3480`).
+   */
+  status: "run" | "dead";
   #value!: R;
+  #error: { raised: unknown } | null = null;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/thread.c:897`).
    */
   constructor(block: () => R) {
     this.id = ++_threadIdCounter;
-    this.#value = currentSlot().run(this as Thread, block);
+    this.status = "run";
+    try {
+      this.#value = currentSlot().run(this as Thread, block);
+    } catch (error) {
+      this.#error = { raised: error };
+      this.status = "dead";
+      return;
+    }
+    const value = this.#value as unknown;
+    if (value && typeof (value as PromiseLike<unknown>).then === "function") {
+      const die = () => void (this.status = "dead");
+      (value as PromiseLike<unknown>).then(die, die);
+    } else {
+      this.status = "dead";
+    }
   }
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#value` (`vendor/ruby/thread.c:1222`).
    */
   value(): R {
+    if (this.#error) throw this.#error.raised;
     return this.#value;
   }
 
@@ -67,6 +88,6 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/thread.c:3473`).
    */
   toString(): string {
-    return `#<Thread:${this.id} run>`;
+    return `#<Thread:0x${this.id.toString(16).padStart(16, "0")} ${this.status}>`;
   }
 }
