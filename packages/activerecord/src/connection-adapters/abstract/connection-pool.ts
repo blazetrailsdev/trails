@@ -31,7 +31,6 @@ import {
 import {
   executionContext,
   executionContextId,
-  withExecutionContext,
   withLeaseContext,
 } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
@@ -911,7 +910,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   scheduleQuery(futureResult: { executeOrSkip(): void }): void {
-    this.asyncExecutor!.post(() => withExecutionContext(() => futureResult.executeOrSkip()));
+    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
   /** @missingRailsArgs new — PERMANENT */

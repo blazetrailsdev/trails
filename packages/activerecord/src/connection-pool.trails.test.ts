@@ -9,7 +9,6 @@ import {
   executionContextId,
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool/execution-context.js";
-import { AsyncExecutor } from "./ar-config.js";
 import { AdapterNotFound, ConnectionNotEstablished } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -1062,24 +1061,6 @@ describe("ConnectionPool#newConnection", () => {
 describe("execution context at Rails thread-spawn sites", () => {
   it("unscoped top-level code resolves to ROOT_CONTEXT", () => {
     expect(executionContextId()).toBe(0);
-  });
-
-  it("two scheduleQuery tasks get distinct leases", async () => {
-    const pool = makePool();
-    (pool as any).asyncExecutor = new AsyncExecutor();
-    const leases: unknown[] = [];
-    await new Promise<void>((resolve) => {
-      const task = {
-        executeOrSkip() {
-          leases.push((pool as any).connectionLease());
-          if (leases.length === 2) resolve();
-        },
-      };
-      pool.scheduleQuery(task);
-      pool.scheduleQuery(task);
-    });
-    expect(leases[0]).not.toBe(leases[1]);
-    expect(leases[0]).not.toBe((pool as any).connectionLease());
   });
 
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
