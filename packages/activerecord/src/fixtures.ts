@@ -648,7 +648,13 @@ export async function prepareModelFixtures(
             if (Array.isArray(fkName) && typeof val === "string") {
               const compositeKey = FixtureSet.compositeIdentify(val, fkName);
               for (const [column, value] of Object.entries(compositeKey)) {
-                if (column in attrs) continue;
+                if (
+                  (tableColumnNames !== null && !tableColumnNames.has(column)) ||
+                  column in row ||
+                  column in attrs
+                ) {
+                  continue;
+                }
 
                 row[column] = value;
               }
