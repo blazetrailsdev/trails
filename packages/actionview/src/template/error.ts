@@ -29,9 +29,49 @@ export class StrictLocalsError extends ArgumentError {
   }
 }
 
+export class Result {
+  constructor(
+    readonly path: string,
+    readonly score: number,
+  ) {}
+}
+
+export class Results {
+  static Result = Result;
+
+  private readonly size: number;
+  private readonly results: Result[] = [];
+
+  constructor(size: number) {
+    this.size = size;
+  }
+
+  toA(): string[] {
+    return this.results.map((r) => r.path);
+  }
+
+  shouldRecord(score: number): boolean {
+    if (this.results.length < this.size) {
+      return true;
+    } else {
+      return score < this.results[this.results.length - 1].score;
+    }
+  }
+
+  add(path: string, score: number): void {
+    if (this.shouldRecord(score)) {
+      this.results.push(new Result(path, score));
+      this.results.sort((a, b) => a.score - b.score);
+      if (this.results.length > this.size) this.results.pop();
+    }
+  }
+}
+
 type MissingTemplatePath = { allTemplatePaths?(): readonly TemplatePath[] } | null | undefined;
 
 export class MissingTemplate extends ActionViewError {
+  static Results = Results;
+
   readonly path: string;
   readonly paths: Iterable<MissingTemplatePath>;
   readonly prefixes: string[];
@@ -129,42 +169,6 @@ export class MissingTemplate extends ActionViewError {
       return results.toA().map((res) => res.replace(/_([^/]+)$/, "$1"));
     } else {
       return results.toA();
-    }
-  }
-}
-
-export class Result {
-  constructor(
-    readonly path: string,
-    readonly score: number,
-  ) {}
-}
-
-export class Results {
-  private readonly size: number;
-  private readonly results: Result[] = [];
-
-  constructor(size: number) {
-    this.size = size;
-  }
-
-  toA(): string[] {
-    return this.results.map((r) => r.path);
-  }
-
-  shouldRecord(score: number): boolean {
-    if (this.results.length < this.size) {
-      return true;
-    } else {
-      return score < this.results[this.results.length - 1].score;
-    }
-  }
-
-  add(path: string, score: number): void {
-    if (this.shouldRecord(score)) {
-      this.results.push(new Result(path, score));
-      this.results.sort((a, b) => a.score - b.score);
-      if (this.results.length > this.size) this.results.pop();
     }
   }
 }
