@@ -4,6 +4,7 @@ import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { Result } from "../result.js";
+import { Edge } from "../test-helpers/models/edge.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
@@ -57,6 +58,18 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     const comments = parents[0].association("comments")?.target;
     expect(comments).toHaveLength(1);
     expect(comments[0]._readAttribute("id")).toBe(10);
+  });
+
+  it("collapses equal rows to one parent when the root has no primary key", () => {
+    registerModel(Edge);
+    const jd = new JoinDependency(Edge, null, [], Nodes.OuterJoin);
+
+    const row = aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } });
+    const rows = [row, { ...row }, aliasedRow(jd, { "": { source_id: 1, sink_id: 3 } })];
+
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
+
+    expect(parents.map((e) => e._readAttribute("sink_id"))).toEqual([2, 3]);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {

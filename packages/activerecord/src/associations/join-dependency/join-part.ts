@@ -8,7 +8,6 @@ export abstract class JoinPart {
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
   tableIndex = -1;
   tableAlias = "";
-  columns: string[] = [];
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
   assocName = "";
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
@@ -105,10 +104,6 @@ export abstract class JoinPart {
     columnTypes: Record<string, { deserialize(value: unknown): unknown }> = {},
     block?: (record: any) => void,
   ): Base {
-    return (this.baseKlass as any)._instantiate(
-      this.extractRecord(row, aliases),
-      block,
-      columnTypes,
-    );
+    return this.baseKlass.instantiate(this.extractRecord(row, aliases), columnTypes, block);
   }
 }
