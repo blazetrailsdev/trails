@@ -1,3 +1,4 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -52,7 +53,9 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     SchemaDumper.language = "js";
     let dumped: string;
     try {
-      dumped = (await SchemaDumper.dump(DatabaseTasks.migrationConnectionPool(), [])).join("\n");
+      dumped = (
+        await SchemaDumper.dump(DatabaseTasks.migrationConnectionPool(), new StringIO())
+      ).string();
     } finally {
       SchemaDumper.language = languageWas;
     }

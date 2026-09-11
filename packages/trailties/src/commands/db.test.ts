@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
-import { env, setEnv, getProcessAdapter, registerProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  env,
+  setEnv,
+  getProcessAdapter,
+  registerProcessAdapter,
+  StringIO,
+} from "@blazetrails/ruby-compat";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,
@@ -888,7 +894,7 @@ describe("schema dump and load", () => {
       });
 
       const source = new AdapterSchemaSource(sourceAdapter);
-      const schema = (await SchemaDumper.dump(source, [], { language: "js" })).join("\n");
+      const schema = (await SchemaDumper.dump(source, new StringIO(), { language: "js" })).string();
       expect(schema).toContain("users");
       expect(schema).toContain("createTable");
 
@@ -900,7 +906,7 @@ describe("schema dump and load", () => {
             /export default async function defineSchema\(ctx(?:: any)?\) \{/,
             "return (async () => {",
           )
-          .replace(/}$/, "})();"),
+          .replace(/}\n$/, "})();"),
       );
       await defineSchema(targetAdapter);
 

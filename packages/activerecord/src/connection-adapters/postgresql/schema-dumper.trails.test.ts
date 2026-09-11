@@ -1,3 +1,4 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -264,8 +265,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         extensions: async () => ["plpgsql", "hstore"],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.extensions(lines);
+      const io = new StringIO();
+      await dumper.extensions(io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toContain("extensions that must be enabled");
       expect(lines[1]).toBe(`  await ctx.enableExtension("hstore");`);
       expect(lines[2]).toBe(`  await ctx.enableExtension("plpgsql");`);
@@ -275,8 +277,9 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("emits nothing when extensions list is empty", async () => {
       const adapter = { ...emptySource, extensions: async () => [] };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.extensions(lines);
+      const io = new StringIO();
+      await dumper.extensions(io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines).toHaveLength(0);
     });
   });
@@ -292,8 +295,9 @@ describe("PostgreSQL::SchemaDumper", () => {
           ] as [string, string[]][],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.types(lines);
+      const io = new StringIO();
+      await dumper.types(io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toBe("  // Custom types defined in this database.");
       expect(lines[2]).toBe(`  await ctx.createEnum("mood", ["happy","sad"]);`);
       expect(lines[3]).toBe(`  await ctx.createEnum("status", ["active","inactive"]);`);
@@ -303,8 +307,9 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("emits nothing when enum types list is empty", async () => {
       const adapter = { ...emptySource, enumTypes: async () => [] };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.types(lines);
+      const io = new StringIO();
+      await dumper.types(io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines).toHaveLength(0);
     });
   });
@@ -316,8 +321,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         schemaNames: async () => ["public", "myschema", "analytics"],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.schemas(lines);
+      const io = new StringIO();
+      await dumper.schemas(io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines).toEqual([
         `  await ctx.createSchema("analytics");`,
         `  await ctx.createSchema("myschema");`,
@@ -340,8 +346,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         ],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.exclusionConstraintsInCreate("rooms", lines);
+      const io = new StringIO();
+      await dumper.exclusionConstraintsInCreate("rooms", io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toContain(`t.exclusionConstraint("price WITH ="`);
       expect(lines[0]).toContain(`where: "(price > 0)"`);
       expect(lines[0]).toContain(`using: "gist"`);
@@ -360,8 +367,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         ],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.exclusionConstraintsInCreate("rooms", lines);
+      const io = new StringIO();
+      await dumper.exclusionConstraintsInCreate("rooms", io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toContain(`t.exclusionConstraint("price WITH ="`);
       expect(lines[0]).not.toContain("name:");
     });
@@ -380,8 +388,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         ],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.uniqueConstraintsInCreate("users", lines);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toContain(`t.uniqueConstraint(["email"]`);
       expect(lines[0]).toContain(`nullsNotDistinct: true`);
       expect(lines[0]).toContain(`name: "uniq_users_email"`);
@@ -398,8 +407,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         ],
       };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.uniqueConstraintsInCreate("users", lines);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines[0]).toContain(`t.uniqueConstraint(["email"]`);
       expect(lines[0]).not.toContain("name:");
     });
@@ -407,8 +417,9 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("emits nothing when no unique constraints", async () => {
       const adapter = { ...emptySource, uniqueConstraints: async () => [] };
       const dumper = new (SchemaDumper as any)(adapter);
-      const lines: string[] = [];
-      await dumper.uniqueConstraintsInCreate("users", lines);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
       expect(lines).toHaveLength(0);
     });
   });

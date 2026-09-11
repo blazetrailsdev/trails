@@ -72,6 +72,18 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
   }
 }
 
+/**
+ * `rb_io_print` (`vendor/ruby/io.c:8715`) with `$,` and `$\` nil: each
+ * argument's `to_s`, written with no separator, answering `nil`. Shared by
+ * `IO#print` and `StringIO#print` the way {@link puts} is.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO#print` (`vendor/ruby/io.c:8715`).
+ */
+export function print(this: GenericWritable, ...args: unknown[]): null {
+  for (const arg of args) this.write(arg == null ? "" : String(arg));
+  return null;
+}
+
 /** `vendor/ruby/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */
 const READ_CHUNK = 8192;
 
@@ -819,6 +831,18 @@ export class IO {
     this._pos += n;
     return n;
   }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#puts`
+   * (`vendor/ruby/io.c:15459`).
+   */
+  puts = puts;
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#print`
+   * (`vendor/ruby/io.c:15457`).
+   */
+  print = print;
 
   /**
    * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil` — and answers

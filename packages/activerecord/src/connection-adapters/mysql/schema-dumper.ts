@@ -1,3 +1,4 @@
+import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import type { Column as MysqlColumn } from "./column.js";
 import type { Result } from "../../result.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
@@ -128,7 +129,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * @internal
    * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
    */
-  override async table(tableName: string, stream: string[]): Promise<void> {
+  override async table(tableName: string, stream: IO | StringIO): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
     await this.populateTableCollationFromStatus(tableName);
     await super.table(tableName, stream);

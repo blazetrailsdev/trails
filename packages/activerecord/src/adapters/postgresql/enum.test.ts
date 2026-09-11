@@ -278,7 +278,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             )
           `);
 
-          const output = (await SchemaDumper.dump(adapter)).join("\n");
+          const output = (await SchemaDumper.dump(adapter)).string();
 
           expect(output).toContain('await ctx.createEnum("public.mood", ["sad","ok","happy"]);');
           expect(output).toContain(

@@ -11,7 +11,7 @@ export async function dumpTableSchema(pool: SchemaSource, ...tables: string[]): 
   const dataSources = enumerated.dataSources ? await enumerated.dataSources() : await pool.tables();
   BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
-    return (await SchemaDumper.dump(pool)).join("\n");
+    return (await SchemaDumper.dump(pool)).string();
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
@@ -24,7 +24,7 @@ export async function dumpAllTableSchema(
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
   try {
-    return (await SchemaDumper.dump(pool)).join("\n");
+    return (await SchemaDumper.dump(pool)).string();
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
