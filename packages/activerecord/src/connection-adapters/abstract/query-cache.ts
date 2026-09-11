@@ -109,10 +109,6 @@ export class QueryCacheRegistry {
     return cache;
   }
 
-  getCache(key: string): Store {
-    return this.computeIfAbsent(key, () => new Store());
-  }
-
   clear(): void {
     for (const cache of this._caches.values()) {
       cache.clear();
@@ -345,6 +341,7 @@ type BaseSelectAll = (
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Result | Promise<Result> | FutureResult | FutureResultComplete;
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   return function cachedSelectAll(
     this: QueryCacheHost,

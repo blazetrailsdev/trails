@@ -824,7 +824,7 @@ export async function executeSimpleCalculation(
       typeCasterFor(column) ??
       lookupCastTypeFromJoinDependencies(rel, String(columnName ?? "")) ??
       defaultValue();
-    if (type instanceof EnumType) type = type.subtypeType();
+    if (type instanceof EnumType) type = type.subtype;
   }
 
   return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
@@ -942,7 +942,7 @@ export async function executeGroupedCalculation(
         typeCasterFor(column) ??
         lookupCastTypeFromJoinDependencies(rel, String(columnName)) ??
         defaultValue();
-      if (type instanceof EnumType) type = type.subtypeType();
+      if (type instanceof EnumType) type = type.subtype;
     }
 
     const result = new Map<unknown, unknown>();

@@ -3109,6 +3109,11 @@ export function harvestObjectLiteralMethods(
     let aliasOf: string | undefined;
     let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
+    // A receipt read off the TARGET declaration (below) allows the name here but
+    // was not written here: `extend(Base, { delete: _Persistence.deleteRow })`
+    // must not report `deleteRow`'s receipt as a redundant tag on base.ts, where
+    // Rails' `delete` already allows the key.
+    const writtenOnProp = noRailsEquivalent !== undefined;
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
@@ -3185,6 +3190,9 @@ export function harvestObjectLiteralMethods(
       file,
       ...(internal ? { internal: true } : {}),
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...(noRailsEquivalent !== undefined && !writtenOnProp
+        ? { noRailsEquivalentInherited: true }
+        : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
       ...(callSeq !== undefined ? { callSeq } : {}),

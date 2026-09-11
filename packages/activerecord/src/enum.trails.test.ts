@@ -293,8 +293,8 @@ describe("Enum subtype resolved from the reflected column type", () => {
   it("delegates the enum subtype to the reflected decimal type, not the mapping shape", () => {
     const type = Book.typeForAttribute("status");
     expect(type).toBeInstanceOf(EnumType);
-    expect((type as EnumType).subtype).toBe("decimal");
-    expect((type as EnumType).subtypeType()).toBeInstanceOf(DecimalType);
+    expect((type as EnumType).type()).toBe("decimal");
+    expect((type as EnumType).subtype).toBeInstanceOf(DecimalType);
   });
 
   it("serializes an enum label through the reflected decimal subtype", () => {
@@ -336,12 +336,12 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
     const type = enumTypeOf(NumericEnum, "decimal_number");
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.subtype).toBe("decimal");
-    expect(type!.subtypeType().type()).toBe("decimal");
+    expect(type!.type()).toBe("decimal");
+    expect(type!.subtype.type()).toBe("decimal");
   });
 
   it("serializes labels through the reflected decimal subtype on both read paths", () => {
-    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtypeType();
+    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtype;
     expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(subtype.serialize(1));
     const caster = new MapCaster(NumericEnum);
     expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(subtype.serialize(1));
@@ -350,15 +350,15 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   it("resolves the reflected subtype for a default-only attribute (no explicit type)", () => {
     const type = enumTypeOf(DefaultOnlyNumericEnum, "decimal_number");
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.subtype).toBe("decimal");
-    expect(type!.subtypeType().type()).toBe("decimal");
+    expect(type!.type()).toBe("decimal");
+    expect(type!.subtype.type()).toBe("decimal");
   });
 
   it("keeps an explicitly-typed enum's declared subtype over the reflected column", () => {
     const type = enumTypeOf(ExplicitNumericEnum, "decimal_number");
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.subtype).toBe("integer");
-    expect(type!.subtypeType().type()).toBe("integer");
+    expect(type!.type()).toBe("integer");
+    expect(type!.subtype.type()).toBe("integer");
   });
 });
 

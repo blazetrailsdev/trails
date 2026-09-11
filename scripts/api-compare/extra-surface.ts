@@ -715,7 +715,7 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     out.push(entry);
   };
   const pushMethod = (pkg: string, tsFile: string, m: MethodInfo): void =>
-    push(pkg, tsFile, m.name, m.noRailsEquivalent);
+    push(pkg, tsFile, m.name, m.noRailsEquivalent, m.noRailsEquivalentInherited === true);
   for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
     for (const container of [tsPkg.classes, tsPkg.modules]) {
       for (const c of Object.values(container)) {

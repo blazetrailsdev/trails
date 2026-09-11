@@ -2,6 +2,7 @@ import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { NullPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function leaseFixtureConnection(): DatabaseAdapter {
   const pool = Base.connectionPool();
   if (pool.isPermanentLease()) return pool.leaseConnectionSync();
@@ -19,6 +20,7 @@ function modelFixturePool(model: unknown): ConnectionPool | null {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function leaseFixtureConnectionFor(
   model: unknown,
   fixtureConnection: DatabaseAdapter,

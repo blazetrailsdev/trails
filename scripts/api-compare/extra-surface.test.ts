@@ -2898,6 +2898,16 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(report.tagged.matched).toBe(1);
   });
 
+  it("does not report a receipt copied off a mixin property's target as redundant", () => {
+    const m = makeManifests("no counterpart");
+    const bar = m.ts.packages.activemodel.classes.Foo.instanceMethods[0];
+    bar.noRailsEquivalent = "no counterpart";
+    bar.noRailsEquivalentInherited = true;
+    const report = run(m);
+    expect(report.tagged.redundant).toEqual([]);
+    expect(report.tagged.stale).toEqual([]);
+  });
+
   it("does not report a tag that really does cover an extra", () => {
     const m = makeManifests("no counterpart");
     const report = run(m);

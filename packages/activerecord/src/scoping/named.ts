@@ -42,6 +42,7 @@ export function isDangerousClassMethod(name: string): boolean {
   return false;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function isRelationInstanceMethod(name: string): boolean {
   let proto: any = Relation.prototype;
   while (proto && proto !== Object.prototype) {

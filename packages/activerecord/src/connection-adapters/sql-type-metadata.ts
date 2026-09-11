@@ -35,6 +35,7 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   deduplicateKey(): string {
     return JSON.stringify(this.toJSON());
   }
@@ -49,6 +50,7 @@ export class SqlTypeMetadata implements Deduplicable {
     };
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
     const klass = TYPE_METADATA_CLASSES[data.class ?? ""];
     if (klass) return klass.fromJSON(data);
@@ -84,8 +86,15 @@ export interface SqlTypeMetadataJSON {
   scale: number | null;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const TYPE_METADATA_CLASSES: Record<
+const TYPE_METADATA_CLASSES: Record<
   string,
   { fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata }
 > = {};
+
+/** @noRailsEquivalent PERMANENT */
+export function registerTypeMetadataClass(
+  name: string,
+  klass: { fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata },
+): void {
+  TYPE_METADATA_CLASSES[name] = klass;
+}

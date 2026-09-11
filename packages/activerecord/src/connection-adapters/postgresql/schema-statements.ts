@@ -46,6 +46,7 @@ export interface CreateDatabaseOptions {
 
 interface PgSchemaAdapterPrivates {
   query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   quoteLiteral(value: unknown): string;
   _schemaSearchPathMemo: string | null;
 }

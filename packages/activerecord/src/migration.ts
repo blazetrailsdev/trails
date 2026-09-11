@@ -60,12 +60,7 @@ export type {
 export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-export {
-  registerVersion,
-  findVersion,
-  currentVersion,
-  type Compatibility,
-} from "./migration/compatibility.js";
+export { currentVersion, type Compatibility } from "./migration/compatibility.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
@@ -308,6 +303,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._version = version;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static forVersion(v: string | number): typeof Migration {
     return findVersion(v) as unknown as typeof Migration;
   }

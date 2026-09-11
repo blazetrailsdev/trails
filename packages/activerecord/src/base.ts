@@ -68,7 +68,7 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
+import { NotImplementedError, StaleObjectError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -989,6 +989,7 @@ export class Base extends Model {
   declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
+  /** @noRailsEquivalent PERMANENT */
   declare static adapterClassSync: typeof ConnectionHandling.adapterClassSync;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
   declare static schemaCache: typeof ConnectionHandling.schemaCache;
@@ -1776,6 +1777,7 @@ export class Base extends Model {
   declare static having: typeof Querying.having;
   declare static lock: typeof Querying.lock;
   declare static readonly: typeof Querying.readonly;
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   declare static withCte: typeof Querying.withCte;
   declare static with: typeof Querying.withCte;
   declare static withRecursive: typeof Querying.withRecursive;
@@ -2229,6 +2231,7 @@ export class Base extends Model {
     return this.toSgid(options);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
     options?: import("@blazetrails/globalid").LocateOptions,
@@ -2236,21 +2239,13 @@ export class Base extends Model {
     return _Locator.locate(input, options);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
   ): Promise<unknown | null> {
     const verifier = this.signedIdVerifier;
     return _Locator.locateSigned(input, { ...options, verifier });
-  }
-
-  static async findSignedGlobalIdBang(
-    input: string | _SignedGlobalIDType,
-    options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
-  ): Promise<unknown> {
-    const found = await this.findSignedGlobalId(input, options);
-    if (found == null) throw new RecordNotFound("Couldn't find SignedGlobalID");
-    return found;
   }
 
   declare touch: typeof TouchLater.touch;

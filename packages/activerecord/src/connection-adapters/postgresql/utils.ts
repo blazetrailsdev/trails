@@ -25,6 +25,7 @@ export class Name {
     return this.schema === other.schema && this.identifier === other.identifier;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   hashKey(): string {
     return JSON.stringify([this.schema, this.identifier]);
   }

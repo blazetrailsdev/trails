@@ -188,10 +188,6 @@ export class AbstractReflection {
     return this.hasOne();
   }
 
-  isHasMany(): boolean {
-    return this._concrete().macro === "hasMany";
-  }
-
   isCollection(): boolean {
     return false;
   }
@@ -200,6 +196,7 @@ export class AbstractReflection {
     return false;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   isThrough(): boolean {
     return this.isThroughReflection();
   }
@@ -645,6 +642,7 @@ export class AssociationReflection extends MacroReflection {
     return this.computeForeignKey();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   computeForeignKey(inferFromInverseOf = true): string | string[] {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 

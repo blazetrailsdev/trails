@@ -2,7 +2,9 @@ import { ValueType } from "@blazetrails/activemodel";
 
 export class IPAddr {
   constructor(
+    /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
     readonly address: string,
+    /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
     readonly prefixLength: number,
   ) {}
 

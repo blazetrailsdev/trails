@@ -67,6 +67,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static deferred<T extends Base>(
     klass: typeof Base,
     chainWalker: () => Promise<{ relation: Relation<T> }>,

@@ -343,6 +343,7 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
   >;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function adapterClassSync(
   this: typeof Base,
 ): (new (...args: any[]) => DatabaseAdapter) | null {

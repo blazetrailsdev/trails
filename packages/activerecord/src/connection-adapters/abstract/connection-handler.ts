@@ -302,7 +302,10 @@ export class ConnectionHandler {
     this.removeConnectionPool(owner, options);
   }
 
-  /** @deprecated */
+  /**
+   * @deprecated
+   * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+   */
   async clearAllConnections(): Promise<void> {
     await this.clearAllConnectionsBang();
   }

@@ -130,12 +130,6 @@ function hashesEqual(a: Record<string, unknown>, b: Record<string, unknown>): bo
   return true;
 }
 
-export function serializeHstore(obj: Record<string, string | null>): string {
-  return Object.entries(obj)
-    .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v)}`)
-    .join(", ");
-}
-
 /** @internal */
 function escapeHstore(value: string | null | undefined): string {
   if (value == null) return "NULL";

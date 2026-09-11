@@ -19,7 +19,10 @@ import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { Configurable } from "./encryption/configurable.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+ */
 export class FixtureSetPrimaryKeyError extends Error {
   constructor(
     label: string,
@@ -194,11 +197,6 @@ function getRegistry(adapter: object): Map<string, BaseClass> {
   return reg;
 }
 
-export function clearTableRegistry(adapter: DatabaseAdapter): void {
-  tableRegistries.delete(adapter);
-  declaredIds.delete(adapter);
-}
-
 /**
  * @internal
  * @noRailsEquivalent CONVERGEABLE FixtureSet#model_class (fixtures.rb:754) reached by table name because our registry is keyed that way.
@@ -234,6 +232,7 @@ interface ThroughLabelAssoc {
   isHabtm: boolean;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function throughLabelAssociations(ModelClass: BaseClass): Map<string, ThroughLabelAssoc> {
   const out = new Map<string, ThroughLabelAssoc>();
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -273,6 +272,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
   return out;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   const names: string[] = [];
@@ -460,6 +460,7 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
   ModelClass: T,
@@ -470,6 +471,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   return result as { [P in K]: InstanceType<T> };
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
   ModelClass: BaseClass,
@@ -866,6 +868,7 @@ export async function prepareModelFixtures(
   return { tables, serialReset, rollback, finalize };
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function defineJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -876,6 +879,7 @@ export async function defineJoinTableFixtures(
   return result as Record<string, FixtureAttrs>;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function prepareJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,

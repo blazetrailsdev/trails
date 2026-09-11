@@ -374,6 +374,7 @@ export function connectedToStack(): ConnectedToEntry[] {
   return IsolatedExecutionState.fetch<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY, () => []);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function withIsolatedConnectionState<T>(fn: () => T): T {
   return IsolatedExecutionState.scope(CONNECTED_TO_STACK_KEY, [] as ConnectedToEntry[], fn);
 }

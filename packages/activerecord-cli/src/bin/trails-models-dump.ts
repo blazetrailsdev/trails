@@ -1,6 +1,6 @@
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 
-import { generateModels } from "@blazetrails/activerecord";
+import { generateModels } from "@blazetrails/activerecord/model-codegen";
 
 import { parseSchemaForModels } from "../tsc-wrapper/schema-ts-model-parser.js";
 

@@ -91,6 +91,7 @@ export function cacheKeyWithVersion(this: Identifiable): string {
   return version ? `${base}-${version}` : base;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function toParamClass(
   this: { name: string; prototype: any },
   methodName?: string,

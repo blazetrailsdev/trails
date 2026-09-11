@@ -16,10 +16,9 @@ import {
   UnknownMigrationVersionError,
   Migration,
   Current,
-  registerVersion,
   currentVersion,
 } from "./migration.js";
-import { resetVersionRegistry } from "./migration/compatibility.js";
+import { registerVersion, resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";

@@ -128,10 +128,6 @@ function _setAutosavingBelongsToFor(record: any, association: unknown, value: bo
   }
 }
 
-export function isDestroyable(record: Base): boolean {
-  return !record.isNewRecord() && record.markedForDestruction();
-}
-
 export function build(_model: typeof Base, reflection: { options: Record<string, unknown> }): void {
   if (reflection.options.autosave && reflection.options.validate === undefined) {
     reflection.options.validate = true;
@@ -154,6 +150,7 @@ interface ExtensionList {
   }): void;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function flushPendingReplaces(record: Base): Promise<void> {
   const instances: Map<string, unknown> = (record as any)._associationInstances;
   if (!instances?.values) return;

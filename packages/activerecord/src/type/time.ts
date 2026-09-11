@@ -6,6 +6,7 @@ import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 export class Value {
   constructor(private readonly obj: Temporal.Instant | TimeWithZone | RubyTime) {}
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   getobj(): Temporal.Instant | TimeWithZone | RubyTime {
     return this.obj;
   }
