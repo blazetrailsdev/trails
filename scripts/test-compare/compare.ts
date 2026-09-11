@@ -271,6 +271,25 @@ export function rejectsSiblingClassCandidate(
   return !tsParts.slice(0, -1).some((n) => describedClass(n) === rubyClass);
 }
 
+/**
+ * Where a Ruby case missing from its convention file lives instead, or
+ * `undefined` when it is simply missing. A test in another TS file is never
+ * credited `matched` — it can only score `misplaced`, and only when it is
+ * unambiguously this case: same class/describe path, or same description when
+ * no other Rails file shares the name. A name several Rails files share, found
+ * elsewhere only by description, belongs to one of those other files.
+ */
+export function misplacedLocation(
+  pathOtherFiles: string[],
+  descOtherFiles: string[],
+  pathShared: boolean,
+  descShared: boolean,
+): string | undefined {
+  if (pathOtherFiles.length > 0) return pathShared ? undefined : pathOtherFiles[0];
+  if (descOtherFiles.length > 0 && !descShared) return descOtherFiles[0];
+  return undefined;
+}
+
 function normPath(ancestors: string[], description: string): string {
   return [...ancestors, description].map(normalizeErb).join(" > ");
 }
@@ -1029,44 +1048,21 @@ export function main(args: string[] = process.argv.slice(2)) {
           }
         }
 
-        const otherLocations = pathOtherFiles.length > 0 ? pathOtherFiles : descOtherFiles;
-        const isShared =
-          (rubyPathToFileCount.get(np) || 0) > 1 ||
-          (pathOtherFiles.length === 0 && (rubyDescToFileCount.get(nd) || 0) > 1);
+        const currentTsFile = misplacedLocation(
+          pathOtherFiles,
+          descOtherFiles,
+          (rubyPathToFileCount.get(np) || 0) > 1,
+          (rubyDescToFileCount.get(nd) || 0) > 1,
+        );
 
-        if (otherLocations.length >= 1 && !isShared) {
+        if (currentTsFile !== undefined) {
           misplaced++;
           totalMisplaced++;
           misplacedTests.push({
             description: tc.description,
-            currentTsFile: otherLocations[0],
+            currentTsFile,
             conventionTsFile: conventionTs,
           });
-        } else if (otherLocations.length >= 1) {
-          // Shared test — count as matched. Gate mismatches are intentionally
-          // NOT checked here: the test lives in a non-convention file, so the
-          // owning TS gate is ambiguous. Gate diagnostics cover the three
-          // direct convention-file match passes only.
-          matched++;
-          totalMatched++;
-          // Check if all matching instances in other files are pending.
-          // Use path-based check when path locations were used, desc-based otherwise.
-          let allPending = true;
-          const usePathCheck = pathOtherFiles.length > 0;
-          for (const f of otherLocations) {
-            const fTests = lookup.fileTests.get(f) || [];
-            const matchingTests = fTests.filter((t) =>
-              usePathCheck ? t.path === np : t.desc === nd,
-            );
-            if (matchingTests.some((t) => !t.pending)) {
-              allPending = false;
-              break;
-            }
-          }
-          if (allPending) {
-            matchedSkipped++;
-            totalMatchedSkipped++;
-          }
         } else {
           missingTests.push(tc.description);
         }

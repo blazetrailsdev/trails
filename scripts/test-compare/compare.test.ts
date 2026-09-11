@@ -5,6 +5,7 @@ import {
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
+  misplacedLocation,
   normalize,
   parseMinExtra,
   rejectsSiblingClassCandidate,
@@ -302,5 +303,30 @@ describe("arClosureResult", () => {
 
   it("reports zero percent for an empty side rather than dividing by zero", () => {
     expect(arClosureResult([], closure).inClosure.percent).toBe(0);
+  });
+});
+
+describe("misplacedLocation", () => {
+  // time_ext_test.rb's TimeExtMarshalingTest > last quarter on 31st, absent from
+  // core-ext/time-ext.test.ts, was credited by time-ext.test.ts's
+  // TimeExtCalculationsTest > last quarter on 31st — a name date_ext_test.rb and
+  // date_time_ext_test.rb also define.
+  it("reports a shared name found elsewhere only by description as missing", () => {
+    expect(misplacedLocation([], ["time-ext.test.ts"], false, true)).toBeUndefined();
+  });
+
+  it("reports a shared path found in another file as missing, never matched", () => {
+    expect(misplacedLocation(["behaviors.test.ts"], [], true, true)).toBeUndefined();
+  });
+
+  it("scores an unambiguous path or description elsewhere as misplaced", () => {
+    expect(misplacedLocation(["other.test.ts"], ["other.test.ts"], false, true)).toBe(
+      "other.test.ts",
+    );
+    expect(misplacedLocation([], ["other.test.ts"], false, false)).toBe("other.test.ts");
+  });
+
+  it("reports a case found nowhere as missing", () => {
+    expect(misplacedLocation([], [], false, false)).toBeUndefined();
   });
 });

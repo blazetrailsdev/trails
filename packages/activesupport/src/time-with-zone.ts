@@ -248,9 +248,9 @@ export class TimeWithZone {
     return this._timeZone;
   }
 
-  get time(): Temporal.PlainDateTime {
+  get time(): Time {
     this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset);
-    return this._transferTimeValuesToUtcConstructor(this._time).toTime().toPlainDateTime();
+    return this._transferTimeValuesToUtcConstructor(this._time);
   }
 
   get zone(): string {
@@ -526,48 +526,24 @@ export class TimeWithZone {
     return this.asJson();
   }
 
-  plus(interval: number | Duration | TimeWithZone | Time): TimeWithZone {
-    if (interval instanceof Duration) {
-      if (interval.isVariable()) {
-        return this.advance({
-          years: interval.parts.years || undefined,
-          months: interval.parts.months || undefined,
-          weeks: interval.parts.weeks || undefined,
-          days: interval.parts.days || undefined,
-          hours: interval.parts.hours || undefined,
-          minutes: interval.parts.minutes || undefined,
-          seconds: interval.parts.seconds || undefined,
-        });
-      }
-      const ms = interval.inSeconds() * 1000;
-      return new TimeWithZone(
-        Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._epochMs + ms)),
-        this._timeZone,
-      );
-    }
-    if (typeof interval !== "number") {
-      if (ObjectExt.actsLike(interval, "time")) {
-        const result = datetimeSince(
-          this.utc().toDatetime(),
-          (interval as { toR(): Rational }).toR(),
-        );
-        const otherClass =
-          (interval as { [rubyClass]?: string })[rubyClass] ??
-          (interval as object).constructor.name;
+  plus(other: number | Duration | TimeWithZone | Time): TimeWithZone {
+    if (this.durationOfVariableLength(other)) {
+      return this.methodMissing("plus", other) as TimeWithZone;
+    } else {
+      let result: unknown;
+      try {
+        result = this.utc().plus(other as number);
+      } catch (e) {
+        if (!(e instanceof TypeError)) throw e;
+        result = datetimeSince(this.utc().toDatetime(), (other as { toR(): Rational }).toR());
         deprecator().warn(
-          `Adding an instance of ${otherClass} to an instance of ${this[rubyClass]} is deprecated. This behavior will raise ` +
+          `Adding an instance of ${(other as { [rubyClass]?: string })[rubyClass] ?? (other as object).constructor.name} to an instance of ${this[rubyClass]} is deprecated. This behavior will raise ` +
             "a `TypeError` in Rails 8.1.",
         );
-        return inTimeZone(result, this.timeZone) as TimeWithZone;
+        inTimeZone(result as Time, this.timeZone);
       }
-      const desc =
-        interval === null ? "null" : interval === undefined ? "undefined" : typeof interval;
-      throw new TypeError(`no implicit conversion of ${desc} into number`);
+      return inTimeZone(result as Time, this.timeZone) as TimeWithZone;
     }
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._epochMs + interval * 1000)),
-      this._timeZone,
-    );
   }
 
   minus(interval: number | Duration): TimeWithZone;
@@ -589,16 +565,11 @@ export class TimeWithZone {
     return this.plus(-arg);
   }
 
-  since(other: number): TimeWithZone {
-    return this.plus(other);
-  }
+  declare since: TimeWithZone["plus"];
+  declare in: TimeWithZone["plus"];
 
   ago(other: number): TimeWithZone {
     return this.since(-other);
-  }
-
-  in(other: number): TimeWithZone {
-    return this.plus(other);
   }
 
   /** @missingRailsArgs in_time_zone — PERMANENT */
@@ -901,3 +872,6 @@ export class TimeWithZone {
     return this._epochMs;
   }
 }
+
+TimeWithZone.prototype.since = TimeWithZone.prototype.plus;
+TimeWithZone.prototype.in = TimeWithZone.prototype.plus;

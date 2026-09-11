@@ -1,5 +1,6 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
+import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
 import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -198,6 +199,26 @@ export function since(this: RubyTime, seconds: number): RubyTime {
   return this.plus(seconds);
 }
 
+const plusWithoutDuration = RubyTime.prototype.plus;
+
+export function plusWithDuration(this: RubyTime, other: unknown): RubyTime {
+  if (other instanceof Duration) {
+    return other.since(this);
+  } else {
+    return plusWithoutDuration.call(this, other as number);
+  }
+}
+
+const minusWithoutDuration = RubyTime.prototype.minus;
+
+export function minusWithDuration(this: RubyTime, other: unknown): RubyTime | number {
+  if (other instanceof Duration) {
+    return other.until(this);
+  } else {
+    return minusWithoutDuration.call(this, other as number);
+  }
+}
+
 export function beginningOfDay(this: RubyTime): RubyTime {
   return change.call(this, { hour: 0 });
 }
@@ -359,6 +380,10 @@ Object.assign(RubyTime.prototype, {
   nextMonth,
   prevYear,
   nextYear,
+  plusWithoutDuration,
+  plus: plusWithDuration,
+  minusWithoutDuration,
+  minus: minusWithDuration,
 });
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });

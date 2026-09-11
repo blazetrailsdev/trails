@@ -48,9 +48,7 @@ describe("TimeWithZoneTest", () => {
 
   it("time", () => {
     const twz = maketwz();
-    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(
-      Date.UTC(1999, 11, 31, 19, 0, 0),
-    );
+    expect(twz.time.toTime().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 19, 0, 0));
   });
 
   it("time zone", () => {
