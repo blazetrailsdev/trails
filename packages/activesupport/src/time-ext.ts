@@ -18,17 +18,34 @@ import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 import {
-  DAYS_INTO_WEEK,
+  allDay,
+  allMonth,
+  allQuarter,
   allWeek,
+  allYear,
   beginningOfWeek,
   endOfWeek,
   lastWeek,
+  nextOccurring,
   nextWeek,
+  prevOccurring,
   prevWeek,
 } from "./core-ext/date-and-time/calculations.js";
-import { fetch } from "@blazetrails/ruby-compat";
 
-export { nextWeek, prevWeek, lastWeek, beginningOfWeek, endOfWeek, allWeek };
+export {
+  nextWeek,
+  prevWeek,
+  lastWeek,
+  nextOccurring,
+  prevOccurring,
+  beginningOfWeek,
+  endOfWeek,
+  allDay,
+  allWeek,
+  allMonth,
+  allQuarter,
+  allYear,
+};
 
 function clone(date: Date): Date {
   return new Date(date.getTime());
@@ -163,24 +180,6 @@ export function prevDay(date: Date, days = 1): Temporal.Instant {
 
 export { nextDay as tomorrow, prevDay as yesterday };
 
-export function nextOccurring(date: Date, day: string): Temporal.Instant {
-  const targetDay = fetch<number>(DAYS_INTO_WEEK, day);
-  const d = clone(date);
-  let diff = targetDay - d.getDay();
-  if (diff <= 0) diff += 7;
-  d.setDate(d.getDate() + diff);
-  return instantFrom(d);
-}
-
-export function prevOccurring(date: Date, day: string): Temporal.Instant {
-  const targetDay = fetch<number>(DAYS_INTO_WEEK, day);
-  const d = clone(date);
-  let diff = d.getDay() - targetDay;
-  if (diff <= 0) diff += 7;
-  d.setDate(d.getDate() - diff);
-  return instantFrom(d);
-}
-
 interface AdvanceOptions {
   years?: number;
   months?: number;
@@ -258,22 +257,6 @@ export function daysInMonth(month: number, year: number): number {
 
 export function daysInYear(year: number): number {
   return daysInMonth(2, year) + 337;
-}
-
-export function allDay(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfDay(date), end: endOfDay(date) };
-}
-
-export function allMonth(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfMonth(date), end: endOfMonth(date) };
-}
-
-export function allQuarter(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfQuarter(date), end: endOfQuarter(date) };
-}
-
-export function allYear(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfYear(date), end: endOfYear(date) };
 }
 
 export function ago(date: Date, seconds: number): Temporal.Instant {

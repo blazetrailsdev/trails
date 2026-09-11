@@ -331,7 +331,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all_day", () => {
-    const { start, end } = allDay(d(2023, 5, 15, 10, 30, 0));
+    const range = allDay(d(2023, 5, 15, 10, 30, 0));
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(start).toEqual(i(2023, 5, 15, 0, 0, 0));
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getMinutes()).toBe(59);
@@ -344,19 +346,25 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all_month", () => {
-    const { start, end } = allMonth(d(2023, 2, 15));
+    const range = allMonth(d(2023, 2, 15));
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(start).toEqual(i(2023, 2, 1, 0, 0, 0));
     expect(asDate(end).getDate()).toBe(28);
   });
 
   it("all_quarter", () => {
-    const { start, end } = allQuarter(d(2023, 5, 15));
+    const range = allQuarter(d(2023, 5, 15));
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(start).toEqual(i(2023, 4, 1, 0, 0, 0));
     expect(asDate(end).getMonth()).toBe(5);
   });
 
   it("all_year", () => {
-    const { start, end } = allYear(d(2023, 6, 15));
+    const range = allYear(d(2023, 6, 15));
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(start).toEqual(i(2023, 1, 1, 0, 0, 0));
     expect(end).toEqual(i(2023, 12, 31, 23, 59, 59, 999));
   });
@@ -867,7 +875,9 @@ describe("DateExtCalculationsTest", () => {
 
   it("all day", () => {
     const date = d(2005, 2, 21);
-    const { start, end } = allDay(date);
+    const range = allDay(date);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getHours()).toBe(0);
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getDate()).toBe(21);
@@ -899,7 +909,9 @@ describe("DateExtCalculationsTest", () => {
 
   it("all day when zone is set", () => {
     const date = d(2005, 2, 21);
-    const { start, end } = allDay(date);
+    const range = allDay(date);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getDate()).toBe(21);
     expect(asDate(end).getDate()).toBe(21);
   });
@@ -913,7 +925,9 @@ describe("DateExtCalculationsTest", () => {
 
   it("all month", () => {
     const date = d(2005, 2, 15);
-    const { start, end } = allMonth(date);
+    const range = allMonth(date);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getDate()).toBe(1);
     expect(asDate(start).getMonth()).toBe(1);
     expect(asDate(end).getDate()).toBe(28);
@@ -921,14 +935,18 @@ describe("DateExtCalculationsTest", () => {
 
   it("all quarter", () => {
     const date = d(2005, 2, 15);
-    const { start, end } = allQuarter(date);
+    const range = allQuarter(date);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getMonth()).toBe(0);
     expect(asDate(end).getMonth()).toBe(2);
   });
 
   it("all year", () => {
     const date = d(2005, 6, 15);
-    const { start, end } = allYear(date);
+    const range = allYear(date);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getMonth()).toBe(0);
     expect(asDate(end).getMonth()).toBe(11);
   });
@@ -1055,7 +1073,9 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("all_day from datetime", () => {
     const dt = d(2005, 2, 4, 10, 30, 0);
-    const { start, end } = allDay(dt);
+    const range = allDay(dt);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getHours()).toBe(0);
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getDate()).toBe(4);
