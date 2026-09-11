@@ -188,8 +188,15 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
 
   let previous: ReturnType<typeof Base.removeConnection>;
 
+  const pool = () => {
+    const { connectionHandler } = Base;
+    return connectionHandler.retrieveConnectionPool("ActiveRecord::Base")!;
+  };
+
   async function lay(...statements: string[]): Promise<void> {
-    for (const statement of statements) await Base.connection.executeMutation(statement);
+    await pool().withConnection(async (conn) => {
+      for (const statement of statements) await conn.executeMutation(statement);
+    });
   }
 
   beforeEach(async () => {
@@ -257,8 +264,8 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
     );
 
-    const tables = (await Base.connection.execute(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'",
+    const tables = (await pool().withConnection((conn) =>
+      conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'"),
     )) as Array<{ name: string }>;
     expect(tables).toHaveLength(0);
   });
