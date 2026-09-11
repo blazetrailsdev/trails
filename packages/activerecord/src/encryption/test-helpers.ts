@@ -22,8 +22,11 @@ import { MessagePackMessageSerializer } from "./message-pack-message-serializer.
 export { withEncryptionContext, withoutEncryption } from "../encryption.js";
 export { Decryption, Encryption };
 
-export { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
-import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
+import {
+  TEST_PRIMARY_KEY,
+  TEST_DETERMINISTIC_KEY,
+  TEST_KEY_DERIVATION_SALT,
+} from "../cases/helper.js";
 
 interface ConfigSnapshot {
   primaryKey: string | string[] | undefined;

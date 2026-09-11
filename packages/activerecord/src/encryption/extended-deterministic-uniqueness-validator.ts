@@ -1,5 +1,4 @@
-import { deterministicEncryptedAttributes, encryptedTypeOf } from "./encryptable-record.js";
-import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { Contexts } from "./contexts.js";
 
 export class ExtendedDeterministicUniquenessValidator {
@@ -46,17 +45,12 @@ export class EncryptedUniquenessValidator {
     await originalValidateEach(record, attribute, value);
 
     const klass = record.constructor;
-    const deterministicAttrs = deterministicEncryptedAttributes.call(klass);
-    if (!deterministicAttrs.has(attribute)) return;
-
-    const encryptedType = encryptedTypeOf(klass.typeForAttribute(attribute));
-    if (!encryptedType) return;
-
-    if (!ExtendedDeterministicQueries.installed) {
-      const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
-      if (prevCiphertexts.length > 0) {
+    if (deterministicEncryptedAttributes.call(klass)?.has(attribute)) {
+      const encryptedType = klass.typeForAttribute(attribute);
+      for (const type of encryptedType.previousTypes) {
+        const encryptedValue = type.serialize(value);
         await Contexts.withoutEncryption(() =>
-          originalValidateEach(record, attribute, prevCiphertexts),
+          originalValidateEach(record, attribute, encryptedValue),
         );
       }
     }

@@ -427,6 +427,7 @@ class ApiExtractor
 
   def process_file(filepath, package_root)
     source = File.read(filepath)
+    @source_lines = source.lines
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -1168,7 +1169,7 @@ class ApiExtractor
     file = redirect_fqn ? (target[:file] || @current_file) : @current_file
 
     vis = current_visibility
-    names = extract_symbol_args(args)
+    names = extract_symbol_args(args) + star_const_symbols(args)
     names.each do |name|
       if kind == :reader || kind == :accessor
         entry = {
@@ -1219,7 +1220,7 @@ class ApiExtractor
     return unless target
 
     vis = current_visibility
-    names = extract_symbol_args_from_paren(args)
+    names = extract_symbol_args_from_paren(args) + star_const_symbols(args)
     bucket = @in_sclass ? :classMethods : :instanceMethods
     names.each do |name|
       if kind == :reader || kind == :accessor
@@ -1899,6 +1900,14 @@ class ApiExtractor
     return false unless target
 
     emitted = false
+    each_loop_delegate(block[2]) do |list|
+      members.each do |member|
+        name = unrolled_name(list[0], loop_var, member)
+        next unless name
+        record_metaprogrammed_method(fqn, target, name, [], "delegate")
+        emitted = true
+      end
+    end
     each_metaprogramming_call(block[2]) do |kind, args, params_node, body|
       list = positional_arg_list(args)
       next unless list.is_a?(Array)
@@ -2045,6 +2054,30 @@ class ApiExtractor
   # Yield each `define_method`/`alias_method` call in a loop body as
   # [command_name, args_node, block_params_node]. Does not descend into literal
   # `def`s (those are the extractor's normal business, not codegen).
+  # Yields the positional arg list of every `delegate <name>, to: …` command in
+  # an each-loop body — `Context::PROPERTIES.each { |name| delegate name, to: :context }`
+  # (activerecord/lib/active_record/encryption/configurable.rb:15-18).
+  def each_loop_delegate(node, &blk)
+    return unless node.is_a?(Array)
+    return if [:def, :defs].include?(node[0])
+    if node[0] == :command && ident_name(node[1]) == "delegate"
+      list = positional_arg_list(node[2])
+      has_to = false
+      walk = lambda do |n|
+        next unless n.is_a?(Array)
+        if n[0] == :bare_assoc_hash
+          has_to = true if assoc_has_key?(n, "to:")
+        else
+          n.each { |c| walk.call(c) }
+        end
+      end
+      walk.call(node[2])
+      yield list if has_to && list.is_a?(Array) && !list.empty?
+      return
+    end
+    node.each { |child| each_loop_delegate(child, &blk) if child.is_a?(Array) }
+  end
+
   def each_metaprogramming_call(node, &blk)
     return unless node.is_a?(Array)
     return if [:def, :defs].include?(node[0])
@@ -2893,16 +2926,33 @@ class ApiExtractor
     # additionally feeds `delegate(*CONST, to:)` expansion. Limit the general
     # case to pure symbol arrays so a hash/struct constant can't inject
     # phantom delegate targets.
-    unless const[1].include?("VALID_OPTIONS") || pure_symbol_array?(unwrap_freeze(rhs))
+    qsyms = qsymbols_members(unwrap_freeze(rhs))
+    unless const[1].include?("VALID_OPTIONS") || qsyms || pure_symbol_array?(unwrap_freeze(rhs))
       return
     end
-    syms = []
-    traverse_for_symbols(rhs, syms)
+    syms = qsyms || []
+    traverse_for_symbols(rhs, syms) unless qsyms
     return if syms.empty?
     (@const_symbol_arrays[current_fqn] ||= {})[const[1]] = syms
   end
 
   # `[:a, :b, :c]` (optionally `.freeze`d) with every element a literal symbol.
+  # Members of a `%i[...]` literal. Ripper.sexp gives `%i` and `%w` the same
+  # `[:array, [[:@tstring_content, …]]]` shape, so the sigil is read back from
+  # the source line of the first element.
+  def qsymbols_members(node)
+    return nil unless node.is_a?(Array) && node[0] == :array
+    elems = node[1]
+    return nil unless elems.is_a?(Array) && !elems.empty? &&
+                      elems.all? { |e| e.is_a?(Array) && e[0] == :@tstring_content }
+    line, col = elems[0][2]
+    text = @source_lines && @source_lines[line - 1]
+    return nil unless text
+    pct = text[0...col].rindex("%")
+    return nil unless pct && %w[i I].include?(text[pct + 1])
+    elems.map { |e| e[1] }
+  end
+
   def pure_symbol_array?(node)
     return false unless node.is_a?(Array) && node[0] == :array
     elems = node[1]
@@ -3920,6 +3970,22 @@ class ApiExtractor
     else
       false
     end
+  end
+
+  # Members of every `*CONST` splat in an argument list whose constant is a
+  # recorded symbol array — `attr_accessor(*PROPERTIES)`
+  # (activerecord/lib/active_record/encryption/context.rb:15).
+  def star_const_symbols(node, results = [])
+    return results unless node.is_a?(Array)
+    if node[0] == :args_add_star
+      star = node[2]
+      if star.is_a?(Array) && star[0] == :var_ref &&
+         star[1].is_a?(Array) && star[1][0] == :@const
+        results.concat(resolve_const_symbol_array(star[1][1]) || [])
+      end
+    end
+    node.each { |child| star_const_symbols(child, results) }
+    results
   end
 
   def extract_symbol_args(args)

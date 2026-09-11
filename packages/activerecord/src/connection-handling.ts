@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import { _Base } from "./base-slot.js";
-import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "./database-configurations/hash-config.js";
@@ -156,7 +155,7 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   }
 
   const { role, shard } = options;
-  const preventWrites = role === READING_ROLE || !!options.preventWrites;
+  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
 
   const klasses: any[] = [...normalized];
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
@@ -215,8 +214,8 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = WRITING_ROLE, shard = defaultShard.call(this) } = options;
-  const preventWrites = role === READING_ROLE || !!options.preventWrites;
+  const { role = _Base!.writingRole, shard = defaultShard.call(this) } = options;
+  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
   appendToConnectedToStack({
     role,
     shard,
@@ -460,7 +459,7 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  const resolvedPreventWrites = role === READING_ROLE || preventWrites;
+  const resolvedPreventWrites = role === _Base!.readingRole || preventWrites;
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack(
     (entry = {

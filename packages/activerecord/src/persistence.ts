@@ -42,7 +42,6 @@ interface PersistenceHost {
     row: Record<string, unknown>,
     block?: (record: any) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any;
   /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
@@ -119,7 +118,6 @@ export function instantiate(
   return klass._instantiate(
     attributes,
     block,
-    undefined,
     columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
   );
 }

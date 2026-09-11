@@ -3,7 +3,6 @@ import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-  makeKeyProvider,
 } from "./test-helpers.js";
 import { fixtures } from "../test-fixtures.js";
 import { Configurable } from "./configurable.js";
@@ -168,9 +167,6 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validation does not revalidate the attribute with current encryption type", async () => {
-    const prevKeyProvider = makeKeyProvider("prev-key-for-uniqueness-test-32b!!");
-    Configurable.config.previous = [{ keyProvider: prevKeyProvider, deterministic: true }];
-
     class EncryptedBookWithUniquenessValidation extends Base {
       static {
         this._tableName = "encrypted_books";
