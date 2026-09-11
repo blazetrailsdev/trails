@@ -1,10 +1,8 @@
-import { ref } from "../../fixtures.js";
-
 export const courseFixtureData = {
   ruby: {
     id: 1,
     name: "Ruby Development",
-    college_id: ref("colleges", "FIU"),
+    college_id: 1,
   },
   java: {
     id: 2,

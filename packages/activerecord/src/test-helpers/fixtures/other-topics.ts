@@ -1,5 +1,3 @@
-import { ref } from "../../fixtures.js";
-
 export const otherTopicFixtureData = {
   first: {
     id: 1,
@@ -21,7 +19,7 @@ export const otherTopicFixtureData = {
     content: "Have a nice day",
     approved: true,
     replies_count: 0,
-    parent_id: ref("topics", "first"),
+    parent_id: 1,
     type: "Reply",
   },
   third: {
@@ -41,6 +39,6 @@ export const otherTopicFixtureData = {
     content: "Why not?",
     approved: true,
     type: "Reply",
-    parent_id: ref("topics", "third"),
+    parent_id: 3,
   },
 };

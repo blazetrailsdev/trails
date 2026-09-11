@@ -1,9 +1,7 @@
-import { ref } from "../../fixtures.js";
-
 export const authorFavoriteFixtureData = {
   david_mary: {
     id: 1,
-    author_id: ref("authors", "david"),
-    favorite_author_id: ref("authors", "mary"),
+    author_id: 1,
+    favorite_author_id: 2,
   },
 };

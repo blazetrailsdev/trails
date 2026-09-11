@@ -1,22 +1,20 @@
-import { ref } from "../../fixtures.js";
-
 export const developersProjectsFixtureData = {
   david_action_controller: {
-    developer_id: ref("developers", "david"),
-    project_id: ref("projects", "action_controller"),
+    developer_id: 1,
+    project_id: 2,
     joined_on: "2004-10-10",
   },
   david_active_record: {
-    developer_id: ref("developers", "david"),
-    project_id: ref("projects", "active_record"),
+    developer_id: 1,
+    project_id: 1,
     joined_on: "2004-10-10",
   },
   jamis_active_record: {
-    developer_id: ref("developers", "jamis"),
-    project_id: ref("projects", "active_record"),
+    developer_id: 2,
+    project_id: 1,
   },
   poor_jamis_active_record: {
-    developer_id: ref("developers", "poor_jamis"),
-    project_id: ref("projects", "active_record"),
+    developer_id: 11,
+    project_id: 1,
   },
 };

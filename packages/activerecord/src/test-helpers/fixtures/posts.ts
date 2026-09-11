@@ -1,12 +1,10 @@
-import { ref } from "../../fixtures.js";
-
 export const postFixtureData = {
   welcome: {
     id: 1,
     title: "Welcome to the weblog",
     body: "Such a lovely day",
     type: "Post",
-    author_id: ref("authors", "david"),
+    author_id: 1,
     legacy_comments_count: 2,
     tags_count: 1,
   },
@@ -15,7 +13,7 @@ export const postFixtureData = {
     title: "So I was thinking",
     body: "Like I hopefully always am",
     type: "SpecialPost",
-    author_id: ref("authors", "david"),
+    author_id: 1,
     legacy_comments_count: 1,
     tags_count: 1,
   },
@@ -31,7 +29,7 @@ export const postFixtureData = {
     title: "sti comments",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "david"),
+    author_id: 1,
     legacy_comments_count: 5,
   },
   sti_post_and_comments: {
@@ -39,7 +37,7 @@ export const postFixtureData = {
     title: "sti me",
     body: "hello",
     type: "StiPost",
-    author_id: ref("authors", "david"),
+    author_id: 1,
     legacy_comments_count: 2,
   },
   sti_habtm: {
@@ -47,14 +45,14 @@ export const postFixtureData = {
     title: "habtm sti test",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "david"),
+    author_id: 1,
   },
   eager_other: {
     id: 7,
     title: "eager loading with OR'd conditions",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "mary"),
+    author_id: 2,
     legacy_comments_count: 1,
     tags_count: 3,
   },
@@ -63,7 +61,7 @@ export const postFixtureData = {
     title: "misc post by bob",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "bob"),
+    author_id: 3,
     tags_count: 1,
   },
   misc_by_mary: {
@@ -71,7 +69,7 @@ export const postFixtureData = {
     title: "misc post by mary",
     body: "hullo",
     type: "Post",
-    author_id: ref("authors", "mary"),
+    author_id: 2,
     tags_count: 1,
   },
   other_by_bob: {
@@ -79,7 +77,7 @@ export const postFixtureData = {
     title: "other post by bob",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "bob"),
+    author_id: 3,
     tags_count: 1,
   },
   other_by_mary: {
@@ -87,7 +85,7 @@ export const postFixtureData = {
     title: "other post by mary",
     body: "hello",
     type: "Post",
-    author_id: ref("authors", "mary"),
+    author_id: 2,
     tags_count: 1,
   },
 };

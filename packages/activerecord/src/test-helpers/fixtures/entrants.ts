@@ -1,19 +1,17 @@
-import { ref } from "../../fixtures.js";
-
 export const entrantFixtureData = {
   first: {
     id: 1,
-    course_id: ref("courses", "ruby"),
+    course_id: 1,
     name: "Ruby Developer",
   },
   second: {
     id: 2,
-    course_id: ref("courses", "ruby"),
+    course_id: 1,
     name: "Ruby Guru",
   },
   third: {
     id: 3,
-    course_id: ref("courses", "java"),
+    course_id: 2,
     name: "Java Lover",
   },
 };

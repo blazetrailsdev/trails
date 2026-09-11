@@ -19,6 +19,6 @@ export const priceEstimateFixtureData = {
   honda: {
     price: 40,
     estimate_of_type: "Car",
-    estimate_of_id: ref("cars", "honda"),
+    estimate_of_id: 1,
   },
 };

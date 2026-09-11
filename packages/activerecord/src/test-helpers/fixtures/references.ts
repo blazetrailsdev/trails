@@ -1,22 +1,20 @@
-import { ref } from "../../fixtures.js";
-
 export const referenceFixtureData = {
   michael_magician: {
     id: 1,
-    person_id: ref("people", "michael"),
-    job_id: ref("jobs", "magician"),
+    person_id: 1,
+    job_id: 3,
     favorite: false,
   },
   michael_unicyclist: {
     id: 2,
-    person_id: ref("people", "michael"),
-    job_id: ref("jobs", "unicyclist"),
+    person_id: 1,
+    job_id: 1,
     favorite: true,
   },
   david_unicyclist: {
     id: 3,
-    person_id: ref("people", "david"),
-    job_id: ref("jobs", "unicyclist"),
+    person_id: 2,
+    job_id: 1,
     favorite: false,
   },
 };

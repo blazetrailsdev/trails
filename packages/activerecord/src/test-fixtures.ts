@@ -6,7 +6,7 @@ import {
   prepareModelFixtures,
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
-  effectiveFixtureKey,
+  FixtureSet,
   type PreparedFixtureSet,
 } from "./fixtures.js";
 import {
@@ -30,6 +30,20 @@ import {
   leaseFixtureConnection,
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
+
+function effectiveFixtureKey(
+  model: typeof Base,
+  label: string,
+  row: Record<string, unknown>,
+): string {
+  const pk = model.primaryKey;
+  if (Array.isArray(pk)) {
+    const generated = FixtureSet.compositeIdentify(label, pk);
+    return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
+  }
+  if (typeof pk !== "string") return "l:" + label;
+  return "s:" + String(row[pk] ?? FixtureSet.identify(label));
+}
 
 export const TestFixtures = {
   [included](base: unknown): void {

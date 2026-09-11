@@ -69,6 +69,9 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    loadSchema: async () => {},
+    columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
+    typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }

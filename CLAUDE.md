@@ -821,6 +821,16 @@ extends Association`, whose modules reach `reflection.ts` back through
   layer loaded at all (the whole `sqlite-drivers` lane), so an unset slot
   there is not a load-order bug but a legitimate configuration in which
   Rails' `ActiveRecord::Base.logger` would still autoload and be `nil`.
+  It is also the read site for the `ActiveRecord` singleton config seats
+  (`active_record.rb:182-491`'s `singleton_class.attr_accessor` block, which the
+  api manifest flattens onto `base.rb`, so they are `static` accessor pairs on
+  `Base`): every module `base.ts` reaches at load that reads one —
+  `connection-adapters/**`, `transactions.ts`, `inheritance.ts`, `migration.ts`,
+  `integration.ts`, `readonly-attributes.ts`, `relation/batches.ts`,
+  `coders/yaml-column.ts`, `type/internal/timezone.ts`,
+  `associations/builder/belongs-to.ts`,
+  `database-configurations/connection-url-resolver.ts` — reads it as
+  `_Base!.<seat>`, unguarded like the rest.
 - `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
   `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
   (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle

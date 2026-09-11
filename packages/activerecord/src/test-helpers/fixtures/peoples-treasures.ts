@@ -2,7 +2,7 @@ import { ref } from "../../fixtures.js";
 
 export const peoplesTreasuresFixtureData = {
   michael_diamond: {
-    rich_person_id: ref("people", "michael"),
+    rich_person_id: 1,
     treasure_id: ref("treasures", "diamond"),
   },
 };

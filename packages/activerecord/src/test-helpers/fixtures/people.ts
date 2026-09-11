@@ -1,11 +1,9 @@
-import { ref } from "../../fixtures.js";
-
 export const personFixtureData = {
   michael: {
     id: 1,
     first_name: "Michael",
-    primary_contact_id: ref("people", "david"),
-    number1_fan_id: ref("people", "susan"),
+    primary_contact_id: 2,
+    number1_fan_id: 3,
     gender: "M",
     followers_count: 1,
     friends_too_count: 1,
@@ -14,8 +12,8 @@ export const personFixtureData = {
   david: {
     id: 2,
     first_name: "David",
-    primary_contact_id: ref("people", "susan"),
-    number1_fan_id: ref("people", "michael"),
+    primary_contact_id: 3,
+    number1_fan_id: 1,
     gender: "M",
     followers_count: 1,
     friends_too_count: 1,
@@ -24,8 +22,8 @@ export const personFixtureData = {
   susan: {
     id: 3,
     first_name: "Susan",
-    primary_contact_id: ref("people", "david"),
-    number1_fan_id: ref("people", "michael"),
+    primary_contact_id: 2,
+    number1_fan_id: 1,
     gender: "F",
     followers_count: 1,
     friends_too_count: 1,

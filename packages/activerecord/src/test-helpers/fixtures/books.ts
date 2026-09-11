@@ -1,9 +1,7 @@
-import { ref } from "../../fixtures.js";
-
 export const bookFixtureData = {
   awdr: {
     id: 1,
-    author_id: ref("authors", "david"),
+    author_id: 1,
     name: "Agile Web Development with Rails",
     format: "paperback",
     status: 2,
@@ -18,7 +16,7 @@ export const bookFixtureData = {
   },
   rfr: {
     id: 2,
-    author_id: ref("authors", "david"),
+    author_id: 1,
     name: "Ruby for Rails",
     format: "ebook",
     status: 0,
@@ -26,7 +24,7 @@ export const bookFixtureData = {
   },
   ddd: {
     id: 3,
-    author_id: ref("authors", "david"),
+    author_id: 1,
     name: "Domain-Driven Design",
     format: "hardcover",
     status: 2,
@@ -34,7 +32,7 @@ export const bookFixtureData = {
   },
   tlg: {
     id: 4,
-    author_id: ref("authors", "david"),
+    author_id: 1,
     name: "Thoughtleadering",
   },
 };

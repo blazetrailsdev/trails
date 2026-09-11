@@ -1,5 +1,3 @@
-import { ref } from "../../fixtures.js";
-
 export const vegetableFixtureData = {
   first_cucumber: {
     id: 1,
@@ -20,6 +18,6 @@ export const vegetableFixtureData = {
     id: 4,
     custom_type: "RedCabbage",
     name: "red cabbage",
-    seller_id: ref("vegetables", "second_cabbage"),
+    seller_id: 3,
   },
 };
