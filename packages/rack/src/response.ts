@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -250,6 +250,11 @@ export class Response {
     headers: Record<string, string | string[]> = {},
   ) {
     this.status = typeof status === "number" ? status : parseInt(String(status));
+
+    if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+      throw new ArgumentError("Headers must be a Hash!");
+    }
+
     this.headers = {};
     for (const [k, v] of Object.entries(headers)) {
       this.headers[k.toLowerCase()] = v;

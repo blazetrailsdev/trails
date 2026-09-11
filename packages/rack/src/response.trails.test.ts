@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ResponseRaw } from "./response.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { Response, ResponseRaw } from "./response.js";
 
 describe("Rack::Response::Raw", () => {
   it("answers the Helpers status predicates", () => {
@@ -34,5 +35,12 @@ describe("Rack::Response::Raw", () => {
 
     response.cacheBang(1000);
     expect(response.cacheControl).toBe("no-cache, must-revalidate");
+  });
+});
+
+describe("Rack::Response.new", () => {
+  it("raises unless headers is a Hash", () => {
+    expect(() => new Response(null, 200, [] as never)).toThrow(ArgumentError);
+    expect(() => new Response(null, 200, [] as never)).toThrow("Headers must be a Hash!");
   });
 });

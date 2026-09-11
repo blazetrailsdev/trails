@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
@@ -67,7 +67,7 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
     exponent: number,
   ): string {
     const exp = DECIMAL_UNITS[exponent];
-    if (typeof units === "object" && units !== null) {
+    if (typeof units === "object" && units !== null && !Array.isArray(units)) {
       return units[exp] ?? "";
     }
     if (typeof units === "string") {
@@ -89,7 +89,7 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
 
   private unitExponents(units: Record<string, string> | string | undefined): number[] {
     let unitKeys: string[];
-    if (typeof units === "object" && units !== null) {
+    if (typeof units === "object" && units !== null && !Array.isArray(units)) {
       unitKeys = Object.keys(units);
     } else if (typeof units === "string") {
       const translated = I18n.translate(units, {
@@ -100,12 +100,14 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
         typeof translated === "object" && translated !== null
           ? Object.keys(translated as Record<string, unknown>)
           : [];
-    } else {
+    } else if (units == null) {
       const translated = this.translateInLocale("human.decimal_units.units", { raise: true });
       unitKeys =
         typeof translated === "object" && translated !== null
           ? Object.keys(translated as Record<string, unknown>)
           : [];
+    } else {
+      throw new ArgumentError(":units must be a Hash or String translation scope.");
     }
     return unitKeys
       .map((name) => INVERTED_DECIMAL_UNITS[name])

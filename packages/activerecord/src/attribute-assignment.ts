@@ -1,7 +1,9 @@
 import {
   extractMultiparameterCallstack,
-  executeMultiparameterAssignment,
+  assignMultiparameterValues,
 } from "./multiparameter-attribute-assignment.js";
+import { rubyInspectArray } from "./relation/ruby-inspect.js";
+import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -86,10 +88,36 @@ export function executeCallstackForMultiparameterAttributes(
   this: AttributeAssignmentHost,
   callstack: Record<string, Record<number, unknown>>,
 ): void {
-  executeMultiparameterAssignment(
-    this as Parameters<typeof executeMultiparameterAssignment>[0],
-    callstack,
-  );
+  const errors: AttributeAssignmentError[] = [];
+  for (const [name, valuesWithEmptyParameters] of Object.entries(callstack)) {
+    let values: Record<number, unknown> | null;
+    try {
+      if (Object.values(valuesWithEmptyParameters).every((v) => v == null)) {
+        values = null;
+      } else {
+        values = valuesWithEmptyParameters;
+      }
+      assignMultiparameterValues(
+        this as unknown as Parameters<typeof assignMultiparameterValues>[0],
+        name,
+        values,
+      );
+    } catch (ex) {
+      errors.push(
+        new AttributeAssignmentError(
+          `error on assignment ${rubyInspectArray(Object.values(valuesWithEmptyParameters))} to ${name} (${(ex as Error).message})`,
+          ex as Error,
+          name,
+        ),
+      );
+    }
+  }
+  if (errors.length !== 0) {
+    const errorDescriptions = errors.map((e) => e.message).join(",");
+    const error = new MultiparameterAssignmentErrors(errors);
+    error.message = `${errors.length} error(s) on assignment of multiparameter attributes [${errorDescriptions}]`;
+    throw error;
+  }
 }
 
 /** @internal */

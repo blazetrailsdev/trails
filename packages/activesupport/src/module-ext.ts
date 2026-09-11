@@ -1,3 +1,4 @@
+import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -68,7 +69,7 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
   const instanceAccessor = options.instanceAccessor !== false;
 
   for (const sym of names) {
-    assertValidAttrName(sym);
+    if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
     const storageKey = `__mattr_${sym}__`;
 
     defineAccessorHalf(target, sym, { get: () => target[storageKey] });
@@ -90,7 +91,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
   const instanceAccessor = options.instanceAccessor !== false;
 
   for (const sym of names) {
-    assertValidAttrName(sym);
+    if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
     const storageKey = `__mattr_${sym}__`;
 
     defineAccessorHalf(target, sym, {
@@ -256,7 +257,7 @@ export function descendants(klass: AnyClass): AnyClass[] {
 type ErrorHandler = ((error: Error) => void) | string;
 
 interface RescueEntry {
-  errorClasses: Array<new (...args: any[]) => Error>;
+  key: (new (...args: any[]) => Error) | string;
   handler: ErrorHandler;
 }
 
@@ -269,21 +270,36 @@ function getRescueHandlers(target: object): RescueEntry[] {
 
 export function rescueFrom(
   this: any,
-  ...klasses: Array<(new (...args: any[]) => Error) | { with?: ErrorHandler }>
+  ...klasses: Array<(new (...args: any[]) => Error) | string | { with?: ErrorHandler }>
 ): void {
-  const [errorClasses, options] = extractOptionsBang(klasses) as [
-    Array<new (...args: any[]) => Error>,
-    { with?: ErrorHandler },
-  ];
+  const [keys, options] = extractOptionsBang(klasses) as [unknown[], { with?: ErrorHandler }];
   const handler = options.with;
-  if (!handler) throw new Error("rescueFrom requires a :with handler");
-  getRescueHandlers(this).push({ errorClasses, handler });
+  if (!handler) {
+    throw new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block.");
+  }
+
+  for (const klass of keys) {
+    let key: RescueEntry["key"];
+    if (typeof klass === "function") {
+      key = klass as new (...args: any[]) => Error;
+    } else if (typeof klass === "string") {
+      key = klass;
+    } else {
+      throw new ArgumentError(
+        `${rbInspect(klass)} must be an Exception class or a String referencing an Exception class`,
+      );
+    }
+
+    getRescueHandlers(this).push({ key, handler });
+  }
 }
 
 export function handleRescue(target: any, error: Error): boolean {
   const handlers = getRescueHandlers(target);
-  for (const { errorClasses, handler } of [...handlers].reverse()) {
-    if (errorClasses.some((cls) => error instanceof cls)) {
+  for (const { key, handler } of [...handlers].reverse()) {
+    const klass =
+      typeof key === "string" ? (constantize(key) as new (...args: any[]) => Error) : key;
+    if (error instanceof klass) {
       if (typeof handler === "function") {
         handler(error);
       } else if (typeof handler === "string") {

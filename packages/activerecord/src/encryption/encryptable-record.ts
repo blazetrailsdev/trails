@@ -365,7 +365,16 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   }
   modelClass._ignoreCasePreservedAttributes.add(name);
 
-  EncryptableRecord.requireOriginalColumnPresent(this, name, this.columnNames?.() ?? []);
+  const columnNames: string[] = this.columnNames?.() ?? [];
+  if (
+    !Configurable.config.supportUnencryptedData &&
+    columnNames.length !== 0 &&
+    !columnNames.includes(originalAttributeName)
+  ) {
+    throw new Configuration(
+      `To use :ignore_case for '${name}' you must create an additional column named '${originalAttributeName}'`,
+    );
+  }
 
   encrypts.call(this, originalAttributeName);
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);

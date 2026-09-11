@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, rbObjClass, RuntimeError } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -2337,29 +2337,6 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function selectInnerNamedJoins(
-  this: QueryMethodsHost,
-  values: unknown[],
-  stashedJoins: unknown[],
-  joinNodes: Nodes.Join[],
-): AssociationSpec[] {
-  return selectNamedJoins.call(this, values, stashedJoins, (join) => {
-    if (join instanceof Nodes.Join) {
-      joinNodes.push(join);
-    } else if (join instanceof CTEJoin) {
-      joinNodes.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join);
-    } else {
-      throw new Error(
-        `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
-      );
-    }
-  }) as AssociationSpec[];
-}
-
-/**
- * @internal
  * @missingRailsCall empty? — PERMANENT
  */
 export function buildJoinBuckets(
@@ -2427,11 +2404,15 @@ export function buildJoinBuckets(
     }
   }
 
-  const innerJoinNodes: Nodes.Join[] = [];
-  buckets.named_join.push(
-    ...selectInnerNamedJoins.call(this, joins, buckets.stashed_join, innerJoinNodes),
-  );
-  buckets.join_node.push(...innerJoinNodes);
+  buckets.named_join = selectNamedJoins.call(this, joins, buckets.stashed_join, (join) => {
+    if (join instanceof Nodes.Join) {
+      buckets.join_node.push(join);
+    } else if (join instanceof CTEJoin) {
+      buckets.join_node.push(buildWithJoinNode.call(this, join.name));
+    } else {
+      throw new RuntimeError(`unknown class: ${rbObjClass(join)}`);
+    }
+  });
 
   buckets.stashed_join.push(...stashedLeft);
   if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
