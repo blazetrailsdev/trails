@@ -106,12 +106,14 @@ function emitLocalsBlock(
 
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
-  const raiseOnMismatch = options.raiseOnStrictLocalsMismatch ?? ast.localsSignature !== null;
-  const { lines: localsLines } = emitLocalsBlock(
-    ast,
-    raiseOnMismatch,
-    options.shortIdentifier ?? options.sourceFileName ?? options.fileName ?? "",
-  );
+  const shortIdentifier = options.shortIdentifier ?? options.sourceFileName ?? options.fileName;
+  const raiseOnMismatch =
+    options.raiseOnStrictLocalsMismatch ??
+    (ast.localsSignature !== null && shortIdentifier != null);
+  if (raiseOnMismatch && ast.localsSignature !== null && shortIdentifier == null) {
+    throw new Error("TSE: raiseOnStrictLocalsMismatch requires a shortIdentifier");
+  }
+  const { lines: localsLines } = emitLocalsBlock(ast, raiseOnMismatch, shortIdentifier ?? "");
 
   const lines: string[] = [];
   const lineMappings: LineMapping[] = [];

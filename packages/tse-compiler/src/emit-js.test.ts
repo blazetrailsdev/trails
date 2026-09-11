@@ -123,7 +123,7 @@ describe("compileJs", () => {
     });
 
     it("emits a runtime check for empty locals that rejects any key", () => {
-      const { code } = compileJs("<%# locals: () %><p>hi</p>");
+      const { code } = compileJs("<%# locals: () %><p>hi</p>", { shortIdentifier: "_e" });
       expect(code).toContain('new ArgumentError("no keywords accepted")');
     });
 
@@ -142,9 +142,17 @@ describe("compileJs", () => {
     });
 
     it("imports StrictLocalsError from @blazetrails/actionview", () => {
-      const { code } = compileJs("<%# locals: (count:) %>");
+      const { code } = compileJs("<%# locals: (count:) %>", { shortIdentifier: "_c" });
       expect(code).toContain('import { StrictLocalsError } from "@blazetrails/actionview";');
       expect(code).toContain('import { ArgumentError } from "@blazetrails/ruby-compat";');
+    });
+
+    it("emits no strict-locals check without a template identifier", () => {
+      const { code } = compileJs("<%# locals: (count:) %>");
+      expect(code).not.toContain("StrictLocalsError");
+      expect(() =>
+        compileJs("<%# locals: (count:) %>", { raiseOnStrictLocalsMismatch: true }),
+      ).toThrow("requires a shortIdentifier");
     });
 
     it("raises Rails' unknown local message for an extra local", () => {
