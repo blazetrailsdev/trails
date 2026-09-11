@@ -147,6 +147,7 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
+import { ActiveRecord } from "./ar-config.js";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -2341,7 +2342,7 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  static defaultRole: string = "writing";
+  static defaultRole: string = ActiveRecord.writingRole;
 
   static belongsToRequiredByDefault = false;
 
