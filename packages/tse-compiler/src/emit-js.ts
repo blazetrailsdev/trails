@@ -7,6 +7,7 @@ export interface EmitJsOptions {
   preamble?: string;
   postamble?: string;
   raiseOnStrictLocalsMismatch?: boolean;
+  shortIdentifier?: string;
   fileName?: string;
   sourceFileName?: string;
 }
@@ -109,7 +110,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   const { lines: localsLines } = emitLocalsBlock(
     ast,
     raiseOnMismatch,
-    options.sourceFileName ?? options.fileName ?? "template",
+    options.shortIdentifier ?? options.sourceFileName ?? options.fileName ?? "",
   );
 
   const lines: string[] = [];

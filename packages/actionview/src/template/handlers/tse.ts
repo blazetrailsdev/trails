@@ -54,7 +54,7 @@ export class Tse implements TemplateHandler {
     const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
     const mime = template.type != null ? formatToMimeType(template.type) : null;
     const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
-    const options: EmitJsOptions = { escapeIgnore };
+    const options: EmitJsOptions = { escapeIgnore, raiseOnStrictLocalsMismatch: false };
     const format = template.format ?? (mime === "text/html" ? "html" : null);
     if (_Base!.annotateRenderedViewWithFilenames && format === "html" && template.shortIdentifier) {
       const id = template.shortIdentifier;

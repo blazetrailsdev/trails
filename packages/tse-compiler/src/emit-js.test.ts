@@ -150,17 +150,24 @@ describe("compileJs", () => {
     it("raises Rails' unknown local message for an extra local", () => {
       class StrictLocalsError extends Error {
         constructor(argumentError: Error, template: { shortIdentifier: string }) {
-          super(`${argumentError.message} for ${template.shortIdentifier}`);
+          super(
+            argumentError.message
+              .replaceAll("unknown keyword:", "unknown local:")
+              .replaceAll("missing keyword:", "missing local:")
+              .replaceAll("no keywords accepted", "no locals accepted")
+              .concat(` for ${template.shortIdentifier}`),
+          );
         }
       }
-      const { code } = compileJs("<%# locals: (count: 0) %>", { sourceFileName: "_a.tse" });
+      const { code } = compileJs("<%# locals: (count: 0) %>", { shortIdentifier: "posts/_a" });
       const body = code.replace(/^import .*\n/gm, "").replace("export default ", "return ");
       const render = new Function("StrictLocalsError", "ArgumentError", body)(
         StrictLocalsError,
         Error,
       );
       const context = { outputBuffer: { append() {}, safeAppend() {}, safeExprAppend() {} } };
-      expect(() => render(context, { x: 1 })).toThrow("unknown keyword: :x for _a.tse");
+      expect(() => render(context, { x: 1 })).toThrow("unknown local: :x for posts/_a");
+      expect(() => render(context, {})).not.toThrow();
     });
   });
 
