@@ -18,11 +18,6 @@ import {
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { UniquenessValidator } from "../validations.js";
-import {
-  TEST_PRIMARY_KEY,
-  TEST_DETERMINISTIC_KEY,
-  TEST_KEY_DERIVATION_SALT,
-} from "../encryption/test-keys.js";
 
 registerFakeAdapter();
 
@@ -35,6 +30,10 @@ Base.automaticallyInvertPluralAssociations = true;
 ActiveRecord.raiseOnAssignToAttrReadonly = true;
 
 ActiveRecord.belongsToRequiredValidatesForeignKey = false;
+
+export const TEST_PRIMARY_KEY = "test master key";
+export const TEST_DETERMINISTIC_KEY = "test deterministic key";
+export const TEST_KEY_DERIVATION_SALT = "testing key derivation salt";
 
 EncryptionConfigurable.configure({
   primaryKey: TEST_PRIMARY_KEY,

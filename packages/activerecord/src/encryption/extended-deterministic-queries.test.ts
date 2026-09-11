@@ -554,7 +554,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       const secondPatched = targets.Relation.prototype.where;
       expect(firstPatched).not.toBe(originalWhere);
       expect(secondPatched).toBe(firstPatched);
-      expect(ExtendedDeterministicQueries.installed).toBe(true);
     });
   });
 });

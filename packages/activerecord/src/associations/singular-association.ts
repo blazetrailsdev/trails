@@ -4,10 +4,8 @@ import {
   _builtAssociationScope,
   _ownerChainReflection,
   _loadSingularViaStatementCache,
-  _resolveInverseName,
   _scopeForAssociation,
   _skipSingularStatementCache,
-  _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
 } from "../associations.js";
@@ -164,10 +162,7 @@ export class SingularAssociation extends Association {
         result = await rel.take();
       }
 
-      if (result) {
-        const inverseName = _resolveInverseName(ctor, assocName, options);
-        if (inverseName) _wireInverseAssociation(owner, result, inverseName);
-      }
+      if (result) this.setInverseInstance(result);
 
       return result;
     } finally {

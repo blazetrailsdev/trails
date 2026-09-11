@@ -71,6 +71,8 @@ let _raiseIntWiderThan64bit = true;
 let _yamlColumnPermittedClasses: unknown[] = [Symbol];
 let _generateSecureTokenOn: "create" | "initialize" = "create";
 let _raiseOnAssignToAttrReadonly = false;
+let _writingRole = "writing";
+let _readingRole = "reading";
 
 export const ActiveRecord = {
   get protocolAdapters(): Record<string, string> {
@@ -333,5 +335,21 @@ export const ActiveRecord = {
 
   set raiseOnAssignToAttrReadonly(value: boolean) {
     _raiseOnAssignToAttrReadonly = value;
+  },
+
+  get writingRole(): string {
+    return _writingRole;
+  },
+
+  set writingRole(value: string) {
+    _writingRole = value;
+  },
+
+  get readingRole(): string {
+    return _readingRole;
+  },
+
+  set readingRole(value: string) {
+    _readingRole = value;
   },
 };

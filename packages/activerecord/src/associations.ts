@@ -245,34 +245,6 @@ export function resolveAssocClass(
 }
 
 /** @internal */
-export function _resolveInverseName(
-  ownerCtor: typeof Base,
-  assocName: string,
-  options: AssociationOptions,
-): string | null {
-  if (options.inverseOf === false) return null;
-  if (typeof options.inverseOf === "string") return options.inverseOf;
-  if (options.polymorphic) return null;
-  const refl = ownerCtor._reflectOnAssociation?.(assocName);
-  const inverseName = refl?.inverseName?.();
-  return inverseName != null && inverseName !== false ? inverseName : null;
-}
-
-/** @internal */
-export function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
-  const childCtor = child.constructor as typeof Base;
-  const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
-  if (inverseRefl?.macro === "hasMany") {
-    if (!inverseRefl.klass?.hasManyInversing) return;
-    (
-      child.association(inverseName) as unknown as { inversedFrom(record: Base): void }
-    ).inversedFrom(owner);
-    return;
-  }
-  _cacheSingularTarget(child, inverseName, owner);
-}
-
-/** @internal */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
   const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {

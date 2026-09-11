@@ -1,4 +1,5 @@
 import { Notifications } from "@blazetrails/activesupport";
+import { ActiveRecord } from "../../ar-config.js";
 import { Temporal } from "@blazetrails/date";
 import { Session } from "./resolver/session.js";
 import { Base } from "../../base.js";
@@ -61,7 +62,7 @@ export class Resolver {
   }
 
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: Base.writingRole, preventWrites: true }, () =>
+    return Base.connectedTo({ role: ActiveRecord.writingRole, preventWrites: true }, () =>
       this.instrumenter.instrument("database_selector.active_record.read_from_primary", {}, () =>
         Promise.resolve(blk()),
       ),
@@ -69,7 +70,7 @@ export class Resolver {
   }
 
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: Base.readingRole, preventWrites: true }, () =>
+    return Base.connectedTo({ role: ActiveRecord.readingRole, preventWrites: true }, () =>
       this.instrumenter.instrument("database_selector.active_record.read_from_replica", {}, () =>
         Promise.resolve(blk()),
       ),
@@ -77,7 +78,7 @@ export class Resolver {
   }
 
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: Base.writingRole, preventWrites: false }, () =>
+    return Base.connectedTo({ role: ActiveRecord.writingRole, preventWrites: false }, () =>
       this.instrumenter.instrument(
         "database_selector.active_record.wrote_to_primary",
         {},

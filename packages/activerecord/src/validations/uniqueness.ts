@@ -173,7 +173,7 @@ export class UniquenessValidator extends EachValidator {
     }
 
     if (value == null) {
-      return [base.where({ [attribute]: null })];
+      return [base.whereBang({ [attribute]: null })];
     }
 
     const arel = klass.arelTable as { get?: (n: string) => any } | null;
@@ -186,7 +186,7 @@ export class UniquenessValidator extends EachValidator {
       typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
 
     if (typeObj?.supportUnencryptedData) {
-      return [base.where({ [attribute]: value })];
+      return [base.whereBang({ [attribute]: value })];
     }
 
     if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
@@ -213,10 +213,10 @@ export class UniquenessValidator extends EachValidator {
         }
       }
       if (comparison != null && typeof base.where === "function") {
-        return [base.where(comparison)];
+        return [base.whereBang(comparison)];
       }
     }
-    return [base.where({ [attribute]: value })];
+    return [base.whereBang({ [attribute]: value })];
   }
 
   /** @internal */

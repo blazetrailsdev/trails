@@ -111,7 +111,6 @@ import {
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
-import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
@@ -148,6 +147,7 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
+import { ActiveRecord } from "./ar-config.js";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -698,9 +698,6 @@ export class Base extends Model {
   static set dbWarningsIgnore(value: (string | RegExp)[]) {
     _dbWarningsIgnore = value;
   }
-
-  static writingRole = WRITING_ROLE;
-  static readingRole = READING_ROLE;
 
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
 
@@ -1821,7 +1818,6 @@ export class Base extends Model {
     row: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
     const klass = discriminateClassForRecord(this, row);
     if (klass !== this) {
@@ -1829,7 +1825,6 @@ export class Base extends Model {
         row,
         block as ((record: Base) => void) | undefined,
         columnTypes,
-        overrideTypes,
       ) as InstanceType<T>;
     }
 
@@ -1862,9 +1857,8 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    const additionalTypes = { ...(columnTypes ?? {}), ...(overrideTypes ?? {}) };
     (record as any).initWithAttributes(
-      (this as any).attributesBuilder().buildFromDatabase(row, additionalTypes),
+      (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {}),
     );
     defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;
@@ -2348,7 +2342,7 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  static defaultRole: string = WRITING_ROLE;
+  static defaultRole: string = ActiveRecord.writingRole;
 
   static belongsToRequiredByDefault = false;
 

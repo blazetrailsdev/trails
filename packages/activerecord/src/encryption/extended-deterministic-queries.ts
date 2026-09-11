@@ -70,11 +70,6 @@ export class ExtendedDeterministicQueries {
 
     this._installed = true;
   }
-
-  /** @noRailsEquivalent CONVERGEABLE uniqueness-build-relation-uses-where-bang */
-  static get installed(): boolean {
-    return this._installed;
-  }
 }
 
 export class EncryptedQuery {

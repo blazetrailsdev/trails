@@ -7,7 +7,6 @@ import {
   StrictLoadingViolationError,
 } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
-import { WRITING_ROLE } from "./roles.js";
 import {
   DatabaseConfigurations,
   configurationsStore,
@@ -394,7 +393,7 @@ export function currentRole(this: CoreHost): string {
     if (hash.role && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.role;
   }
 
-  return (this as CoreHost & { defaultRole?: string }).defaultRole ?? WRITING_ROLE;
+  return (this as CoreHost & { defaultRole: string }).defaultRole;
 }
 
 export function currentShard(this: CoreHost): string {

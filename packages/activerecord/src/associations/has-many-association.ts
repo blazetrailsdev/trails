@@ -8,9 +8,7 @@ import {
   _inlinePolymorphicKeys,
   _ownerChainReflection,
   associationInstanceGet,
-  _resolveInverseName,
   _scopeForAssociation,
-  _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
   syncToAssociationInstance,
@@ -421,12 +419,10 @@ async function findTarget(
   const rel = scope(record, assocName, assocDef);
   if (rel === null) return [];
 
-  const inverseName = _resolveInverseName(ctor, assocName, options);
-  if (inverseName) {
-    rel._instantiateBlock = (child: Base) => {
-      _wireInverseAssociation(record, child, inverseName);
-    };
-  }
+  const association = record.association(assocName);
+  rel._instantiateBlock = (child: Base) => {
+    association.setInverseInstance(child);
+  };
   const results: Base[] = await rel.toArray();
 
   syncToAssociationInstance(record, assocName, results);

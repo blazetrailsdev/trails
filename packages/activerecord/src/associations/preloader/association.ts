@@ -1,8 +1,6 @@
 import { wrap } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
-import { ConnectionNotDefined } from "../../errors.js";
-import { _wireInverseAssociation } from "../../associations.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -228,17 +226,8 @@ export class Association {
       association._setTargetFromLoader(value);
     }
 
-    let inverseName: string | undefined;
-    try {
-      inverseName =
-        (this.reflection as any).inverseName?.() ?? (this.reflection as any).options?.inverseOf;
-    } catch {
-      inverseName = (this.reflection as any).options?.inverseOf;
-    }
-    if (inverseName) {
-      for (const child of records) {
-        _wireInverseAssociation(owner, child, inverseName);
-      }
+    for (const record of records) {
+      association.setInverseInstance(record);
     }
   }
 
@@ -340,9 +329,11 @@ export class LoaderQuery {
         this.associationKeyName.every((k, i) => k === (other.associationKeyName as string[])[i]));
     return (
       keysMatch &&
-      this._scopeAdapterId() === other._scopeAdapterId() &&
-      this._scopeTableName() === other._scopeTableName() &&
-      this._valuesForQueries() === other._valuesForQueries()
+      this.scope.tableName === other.scope.tableName &&
+      this.scope.model.connectionSpecificationName ===
+        other.scope.model.connectionSpecificationName &&
+      JSON.stringify(this.scope.valuesForQueries()) ===
+        JSON.stringify(other.scope.valuesForQueries())
     );
   }
 
@@ -350,37 +341,7 @@ export class LoaderQuery {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
-    return `${keyName}::${this._scopeAdapterId()}::${this._scopeTableName()}::${this._valuesForQueries()}`;
-  }
-
-  private _scopeTableName(): string {
-    return this.scope?._model?.tableName ?? this.scope?.tableName ?? "";
-  }
-
-  private _scopeAdapterId(): string {
-    const klass = this.scope?._model;
-    if (klass == null) return "";
-    const spec = klass.connectionSpecificationName ?? "";
-    let adapter: object;
-    try {
-      adapter = klass.connection;
-    } catch (e) {
-      if (e instanceof ConnectionNotDefined) return spec;
-      throw e;
-    }
-    let id = LoaderQuery._adapterIds.get(adapter);
-    if (id == null) {
-      id = ++LoaderQuery._idCounter;
-      LoaderQuery._adapterIds.set(adapter, id);
-    }
-    return `${spec}:${id}`;
-  }
-
-  private static _adapterIds = new WeakMap<object, number>();
-  private static _idCounter = 0;
-
-  private _valuesForQueries(): string {
-    return JSON.stringify(this.scope.valuesForQueries());
+    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries())}`;
   }
 
   async loadRecordsForKeys(

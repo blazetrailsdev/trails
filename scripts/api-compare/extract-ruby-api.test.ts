@@ -2250,6 +2250,32 @@ describe(
       expect(appendBefore.notes).toBe("alias");
     });
 
+    it("credits attr_accessor(*CONST) and a CONST.each delegate loop over a symbol-array constant", () => {
+      const m = metaMethods(`
+      class Context
+        PROPERTIES = %i[ key_provider message_serializer ]
+
+        attr_accessor(*PROPERTIES)
+      end
+
+      module Configurable
+        Context::PROPERTIES.each do |name|
+          delegate name, to: :context
+        end
+      end
+    `);
+      expect(m["Context"].map((x) => x.name)).toEqual([
+        "key_provider",
+        "key_provider=",
+        "message_serializer",
+        "message_serializer=",
+      ]);
+      expect(m["Configurable"].map((x) => [x.name, x.notes])).toEqual([
+        ["key_provider", "delegate"],
+        ["message_serializer", "delegate"],
+      ]);
+    });
+
     it("records both block-less define_method shapes exactly once", () => {
       // Bare command (action_view/layouts.rb:311's shape) and parenthesized
       // (rack/utils.rb:183's). The block forms below must not be recorded twice
