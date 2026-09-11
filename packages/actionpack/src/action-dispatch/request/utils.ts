@@ -52,8 +52,8 @@ export class CustomParamEncoder {
     action: string | null | undefined,
   ): EncodingTemplate | false | null | undefined {
     try {
+      if (controller == null) return controller;
       return (
-        controller &&
         !/\p{Cs}/u.test(controller) &&
         (
           request.controllerClassFor(controller) as {
