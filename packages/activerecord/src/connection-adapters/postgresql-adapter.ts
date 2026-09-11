@@ -901,6 +901,7 @@ export class PostgreSQLAdapter
     return pgAffectedRows(result);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   async executeMutation(
     sql: string,
     binds: unknown[] = [],

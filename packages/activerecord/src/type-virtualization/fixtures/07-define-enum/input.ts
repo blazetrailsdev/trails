@@ -1,4 +1,4 @@
-import { defineEnum } from "@blazetrails/activerecord";
+import { defineEnum } from "@blazetrails/activerecord/enum";
 
 export class Article extends Base {
   static {

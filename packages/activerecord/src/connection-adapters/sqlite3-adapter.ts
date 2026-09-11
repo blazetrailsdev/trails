@@ -341,6 +341,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   async executeMutation(
     sql: string,
     binds: unknown[] = [],

@@ -101,6 +101,7 @@ export class PoolConfig {
     return this._pool;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   get poolInitialized(): boolean {
     return this._pool !== null;
   }
@@ -181,16 +182,13 @@ export class PoolConfig {
     this.schemaReflection.loadedCache = cache;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   get connectionSpecName(): string {
     return this.dbConfig.name;
   }
 
   get adapter(): string | undefined {
     return this.dbConfig.adapter;
-  }
-
-  get poolKey(): string {
-    return `${this.connectionSpecName}:${this.role}:${this.shard}`;
   }
 
   get connectionDescriptor(): ConnectionDescriptor {

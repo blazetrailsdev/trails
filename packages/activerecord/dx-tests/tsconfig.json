@@ -5,6 +5,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
+      "@blazetrails/activerecord/enum": ["../src/enum.ts"],
       "@blazetrails/activerecord": ["../src/index.ts"],
       "@blazetrails/rack-session": ["../../rack-session/src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],

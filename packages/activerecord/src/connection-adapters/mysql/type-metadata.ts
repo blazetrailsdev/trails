@@ -1,6 +1,6 @@
 import {
   SqlTypeMetadata,
-  TYPE_METADATA_CLASSES,
+  registerTypeMetadataClass,
   type SqlTypeMetadataJSON,
 } from "../sql-type-metadata.js";
 
@@ -34,9 +34,9 @@ export class TypeMetadata extends SqlTypeMetadata {
   }
 }
 
-TYPE_METADATA_CLASSES["MySQL::TypeMetadata"] = {
+registerTypeMetadataClass("MySQL::TypeMetadata", {
   fromJSON(data: SqlTypeMetadataJSON): TypeMetadata {
     const row = data as TypeMetadataJSON;
     return new TypeMetadata(row, { extra: row.extra });
   },
-};
+});

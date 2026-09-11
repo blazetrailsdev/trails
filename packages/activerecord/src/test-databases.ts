@@ -2,6 +2,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function eachDatabase(
   adapters: DatabaseAdapter[],
   callback: (adapter: DatabaseAdapter, index: number) => void | Promise<void>,

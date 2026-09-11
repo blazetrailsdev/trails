@@ -26,7 +26,10 @@ function slotIsEmpty(slot: AssociationCacheSlot): boolean {
   return !slot.hasInstance && !slot.hasProxy;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+ */
 export class AssociationCacheFacet<V> implements Map<string, V> {
   private readonly presence: keyof AssociationCacheSlot;
 
@@ -52,6 +55,7 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
     return slot && this.present(slot) ? (slot[this.field] as V) : undefined;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   has(name: string): boolean {
     const slot = this.store.get(name);
     return slot ? this.present(slot) : false;
@@ -102,6 +106,7 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): MapIterator<[string, V]> {
     return this.entries();
   }
@@ -110,14 +115,19 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
     for (const [name, value] of this.entries()) cb.call(thisArg, value, name, this);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get [Symbol.toStringTag](): string {
     return "Map";
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+ */
 export class AssociationCache {
   readonly store = new Map<string, AssociationCacheSlot>();
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   readonly instances = new AssociationCacheFacet<unknown>(this.store, "instance");
   readonly proxies = new AssociationCacheFacet<unknown>(this.store, "proxy");
 

@@ -1,5 +1,6 @@
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export class Stats {
   sqlRuntime = 0.0;
   asyncSqlRuntime = 0.0;

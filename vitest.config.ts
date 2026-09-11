@@ -261,6 +261,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/encryption/index.ts",
   ),
+  "@blazetrails/activerecord/model-codegen": path.resolve(
+    __dirname,
+    "packages/activerecord/src/model-codegen.ts",
+  ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/src") + "/",
   "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/src/index.ts"),

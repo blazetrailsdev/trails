@@ -5,8 +5,8 @@ import {
   AssociationProxy,
   Relation,
   association,
-  defineEnum,
 } from "@blazetrails/activerecord";
+import { defineEnum } from "@blazetrails/activerecord/enum";
 
 class User extends Base {
   declare name: string;

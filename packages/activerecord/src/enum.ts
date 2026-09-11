@@ -46,7 +46,7 @@ export function installEnumAttribute(
           " via `attribute`.",
       );
     }
-    if (subtype instanceof EnumType) subtype = subtype.subtypeType();
+    if (subtype instanceof EnumType) subtype = subtype.subtype;
     return new EnumType(
       name,
       new HashWithIndifferentAccess<EnumValue>(mapping),
@@ -73,6 +73,7 @@ interface EnumInstanceHost {
   writeAttribute(name: string, value: unknown): void;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
@@ -108,15 +109,11 @@ export class EnumType extends ValueType<string> {
     this._subtypeType = subtype;
   }
 
-  get subtype(): string | undefined {
-    return this._subtypeType.type();
-  }
-
   override type(): string | undefined {
-    return this.subtype;
+    return this.subtype.type();
   }
 
-  subtypeType(): ValueType<unknown> {
+  get subtype(): ValueType<unknown> {
     return this._subtypeType;
   }
 
@@ -254,6 +251,7 @@ export interface EnumMacroOptions {
   default?: unknown;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function enumMethod(
   this: typeof Base,
   name: string,
@@ -527,17 +525,7 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   return type instanceof EnumType ? type : null;
 }
 
-export function readEnumValue(record: Base, attribute: string): string | null {
-  const ctor = record.constructor as typeof Base;
-  const mapping = ctor._enums?.get(attribute);
-  if (!mapping) return null;
-
-  const stored = record.readAttribute(attribute);
-  if (typeof stored === "string" && Object.prototype.hasOwnProperty.call(mapping, stored))
-    return stored;
-  return enumTypeOf(ctor, attribute)?.deserialize(stored) ?? null;
-}
-
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,

@@ -22,6 +22,7 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
   return await IsolatedExecutionState.scope(SUPPRESSOR_REGISTRY_KEY, child, fn);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function isSuppressed(modelClass: typeof Base): boolean {
   return !!registry()[modelClass.name];
 }

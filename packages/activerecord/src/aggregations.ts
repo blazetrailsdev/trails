@@ -2,6 +2,7 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/activesupport";
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function getAggregationCache(record: Base): Map<string, unknown> {
   const self = record as any;
   if (!self._aggregationCache) self._aggregationCache = new Map<string, unknown>();
@@ -183,6 +184,7 @@ function writerMethod(
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function copyAggregationCacheForDup(this: Base, other: unknown): void {
   const src = (other as { _aggregationCache?: Map<string, unknown> })?._aggregationCache;
   if (src) (this as { _aggregationCache?: Map<string, unknown> })._aggregationCache = new Map(src);
@@ -200,6 +202,7 @@ export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T
 
 const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsIncluded");
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function includeAggregations(modelClass: typeof Base): void {
   const proto = modelClass.prototype as Record<string | symbol, any>;
   if (proto[aggregationsIncluded]) return;

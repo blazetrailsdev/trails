@@ -23,6 +23,7 @@ export class ExplainRegistry {
     currentSlot().collect = value;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static collectEnabled(): boolean {
     return currentSlot().collect;
   }
@@ -37,6 +38,7 @@ export class ExplainRegistry {
     slot.queries = [];
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static async collectingQueries<T>(
     fn: () => Promise<T>,
   ): Promise<{ value: T; queries: [string, unknown[]][] }> {

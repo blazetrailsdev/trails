@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateModels } from "@blazetrails/activerecord";
+import { generateModels } from "@blazetrails/activerecord/model-codegen";
 import { parseSchemaForModels } from "./schema-ts-model-parser.js";
 
 const FILE = "db/schema.ts";

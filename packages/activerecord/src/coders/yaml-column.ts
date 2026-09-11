@@ -5,6 +5,7 @@ import { ColumnSerializer } from "./column-serializer.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export class DisallowedClass extends globalThis.Error {
   constructor(action: string, klassName: string) {
     super(`Tried to ${action} unspecified class: ${klassName}`);

@@ -112,6 +112,7 @@ export class HashObject {
   constructor() {
     return {};
   }
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](value: unknown): boolean {
     return value != null && typeof value === "object" && !Array.isArray(value);
   }

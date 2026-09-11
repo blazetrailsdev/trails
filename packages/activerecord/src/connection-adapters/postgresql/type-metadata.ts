@@ -1,6 +1,6 @@
 import {
   SqlTypeMetadata,
-  TYPE_METADATA_CLASSES,
+  registerTypeMetadataClass,
   type SqlTypeMetadataJSON,
 } from "../sql-type-metadata.js";
 
@@ -42,9 +42,9 @@ export class TypeMetadata extends SqlTypeMetadata {
   }
 }
 
-TYPE_METADATA_CLASSES["PostgreSQL::TypeMetadata"] = {
+registerTypeMetadataClass("PostgreSQL::TypeMetadata", {
   fromJSON(data: SqlTypeMetadataJSON): TypeMetadata {
     const row = data as TypeMetadataJSON;
     return new TypeMetadata(row, { oid: row.oid, fmod: row.fmod });
   },
-};
+});

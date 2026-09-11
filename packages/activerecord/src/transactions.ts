@@ -33,12 +33,14 @@ export function currentTransaction(): Transaction | null {
   return IsolatedExecutionState.get<Transaction | null>(CURRENT_TRANSACTION_KEY) ?? null;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function currentTransactionPublic(): PublicTransaction {
   const internalTx = currentTransaction();
   if (!internalTx) return PublicTransaction.NULL_TRANSACTION;
   return (internalTx as any).userTransaction ?? new PublicTransaction(internalTx);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void | Promise<void> {
   const tx = currentTransactionPublic();
   if (tx.isClosed()) {
@@ -70,6 +72,7 @@ export async function transaction<T>(
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export async function savepoint<T>(
   modelClass: typeof Base,
   _name: string,

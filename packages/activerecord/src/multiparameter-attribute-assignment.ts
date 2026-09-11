@@ -7,6 +7,7 @@ const MAX_MULTIPARAMETER_INDEX = 100;
 
 const MULTIPARAMETER_ATTRIBUTE_PATTERN = /^([^(]+)\((\d+)([if]?)\)$/;
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function extractMultiparameterCallstack(attrs: Record<string, unknown>): {
   multiparams: Record<string, Record<number, unknown>>;
   regular: Record<string, unknown>;
@@ -49,6 +50,7 @@ export function extractMultiparameterCallstack(attrs: Record<string, unknown>): 
   return { multiparams, regular };
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function assignMultiparameterValues(
   instance: { constructor: any; writeAttribute(name: string, value: unknown): void },
   name: string,

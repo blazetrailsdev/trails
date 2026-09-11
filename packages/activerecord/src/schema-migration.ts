@@ -92,6 +92,7 @@ export class SchemaMigration {
     )) as string[];
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   async allVersions(): Promise<string[]> {
     return this.versions();
   }

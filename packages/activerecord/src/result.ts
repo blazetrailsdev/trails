@@ -100,6 +100,7 @@ export class Result {
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static fromRowHashes(rows: Record<string, unknown>[]): Result {
     if (rows.length === 0) return new Result([], []);
     const columns = Object.keys(rows[0]);

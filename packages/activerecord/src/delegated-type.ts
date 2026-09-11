@@ -153,10 +153,3 @@ export function defineDelegatedTypeMethods(
     });
   }
 }
-
-export function getDelegatedTypeConfig(
-  modelClass: typeof Base,
-  role: string,
-): DelegatedTypeOptions | undefined {
-  return (modelClass as any)._delegatedTypes?.get(role);
-}

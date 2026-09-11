@@ -214,6 +214,7 @@ export class PostgreSQLDatabaseTasks {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function normalizeSchemaSearchPath(raw: string): string[] {
   return raw
     .split(",")

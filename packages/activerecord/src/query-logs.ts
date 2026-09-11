@@ -111,6 +111,7 @@ export class QueryLogs implements QueryTransformer {
     this._cachedComment = undefined;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   clearContext(): void {
     this._context = {};
     this._cachedComment = undefined;
@@ -205,6 +206,7 @@ export class QueryLogs implements QueryTransformer {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function escapeComment(content: string): string {
   return String(content)
     .replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "")

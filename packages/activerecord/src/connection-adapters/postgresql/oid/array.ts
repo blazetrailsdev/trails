@@ -249,8 +249,4 @@ export class Data {
   toString(): string {
     return this.encoder.encode(this.values);
   }
-
-  toPostgres(): string {
-    return this.toString();
-  }
 }

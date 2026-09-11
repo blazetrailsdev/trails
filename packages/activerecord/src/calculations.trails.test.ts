@@ -197,7 +197,7 @@ describe("typeFor", () => {
 
   it("returns the model's own type for an enum attribute without unwrapping the subtype", async () => {
     const { Book } = await import("./test-helpers/models/book.js");
-    expect(Book.typeForAttribute("status")).toHaveProperty("subtypeType");
+    expect(Book.typeForAttribute("status")).toHaveProperty("subtype");
     expect(typeFor(Book.all() as unknown as Parameters<typeof typeFor>[0], "status")).toBe(
       Book.typeForAttribute("status"),
     );

@@ -1,4 +1,5 @@
 export interface Deduplicable {
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   deduplicateKey(): string;
   /** @internal */
   deduplicated(): this;
@@ -35,17 +36,4 @@ export function deduplicate<T extends Deduplicable>(obj: T): T {
 /** @internal */
 function deduplicated<T extends object>(obj: T): T {
   return obj;
-}
-
-export abstract class DeduplicableBase implements Deduplicable {
-  constructor() {
-    return deduplicate(this);
-  }
-
-  abstract deduplicateKey(): string;
-
-  /** @internal */
-  deduplicated(): this {
-    return this;
-  }
 }

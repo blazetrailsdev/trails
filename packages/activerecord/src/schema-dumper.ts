@@ -135,6 +135,7 @@ class AdapterSchemaSource implements SchemaSource {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function statelessTest(pattern: RegExp, value: string): boolean {
   const safe =
     pattern.global || pattern.sticky

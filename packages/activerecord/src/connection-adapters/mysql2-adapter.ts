@@ -421,6 +421,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return mysql2AffectedRows.call(this as any, rawResult);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   async executeMutation(
     sql: string,
     binds: unknown[] = [],

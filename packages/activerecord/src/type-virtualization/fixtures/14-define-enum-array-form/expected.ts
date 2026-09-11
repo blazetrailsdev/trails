@@ -1,4 +1,4 @@
-import { defineEnum } from "@blazetrails/activerecord";
+import { defineEnum } from "@blazetrails/activerecord/enum";
 
 export class Conversation extends Base {
   declare isActive: () => boolean;

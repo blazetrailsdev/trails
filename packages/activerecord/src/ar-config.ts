@@ -202,6 +202,7 @@ export const ActiveRecord = {
     _asyncQueryExecutor = value;
   },
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   },

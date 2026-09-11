@@ -123,6 +123,7 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function findRangeSeparator(value: string): number {
   let inQuotes = false;
   for (let i = 0; i < value.length; i++) {
@@ -140,6 +141,7 @@ export function findRangeSeparator(value: string): number {
   return value.length;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function unquoteRangeBound(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");

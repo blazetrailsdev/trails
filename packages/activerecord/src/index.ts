@@ -87,10 +87,7 @@ _Notifications.subscribe("sql.active_record", (event) => {
 });
 export {
   transaction,
-  savepoint,
   currentTransaction,
-  currentTransactionPublic,
-  afterAllTransactionsCommit,
   beforeCommittedBang,
   committedBang,
   rolledbackBang,
@@ -100,7 +97,6 @@ export {
 export { resetCallbacks } from "./callbacks.js";
 export { delegate } from "./delegate.js";
 export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
-export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";
 export { LockingType } from "./locking/optimistic.js";
@@ -112,7 +108,7 @@ export {
 } from "./store.js";
 export { QueryCache } from "./query-cache.js";
 export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
-export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
+export { QueryLogs, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
 export type { QueryTransformer } from "./query-transformers.js";
 export {
@@ -130,7 +126,6 @@ export { SchemaStatements } from "./connection-adapters/abstract/schema-statemen
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type { SchemaSource, IndexInfo } from "./schema-dumper.js";
 export type { Column } from "./connection-adapters/column.js";
-export { generateModels } from "./model-codegen.js";
 export type { IntrospectedTable, GenerateModelsOptions } from "./model-codegen.js";
 export {
   ActiveRecordError,
@@ -246,7 +241,7 @@ export {
 } from "./nested-attributes.js";
 export { composedOf } from "./aggregations.js";
 export { ColumnNotSerializableError } from "./attribute-methods/serialization.js";
-export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
+export { delegatedType } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
 export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
 export { HashConfig } from "./database-configurations/hash-config.js";
@@ -287,7 +282,6 @@ export { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 export { MigrationProxy } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 
-export { isDestroyable } from "./autosave-association.js";
 export { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 export { Map as TypeCasterMap } from "./type-caster/map.js";
 

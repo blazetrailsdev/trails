@@ -70,6 +70,7 @@ export class DatabaseTasks {
   static dbDir: string = "db";
   private static _migrationsPaths: string[] = ["db/migrate"];
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static get migrationsPath(): string[] {
     return this._migrationsPaths;
   }
@@ -157,6 +158,7 @@ export class DatabaseTasks {
     return new ctor(config, ...args);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static clearRegisteredTasks(): void {
     this._registeredTasks = [];
   }
@@ -374,6 +376,7 @@ export class DatabaseTasks {
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
@@ -1016,6 +1019,7 @@ export function isVerbose(): boolean {
   return v !== undefined ? v !== "false" : true;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function metadataTableNames(): Set<string> {
   const base = baseClass();
   const prefix = base.tableNamePrefix;

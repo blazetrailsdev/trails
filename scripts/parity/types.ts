@@ -208,6 +208,13 @@ export interface MethodInfo {
    */
   noRailsEquivalent?: string;
   /**
+   * TS-side only: `noRailsEquivalent` was read off the declaration a bodyless
+   * object-literal member references (`delete: _Persistence.deleteRow`), not
+   * written on the member. It still allows the name, but is not a written tag,
+   * so it is never reported as redundant or stale at the install site.
+   */
+  noRailsEquivalentInherited?: boolean;
+  /**
    * Ruby-side only: how the extractor synthesized this entry when it was NOT a
    * literal `def` — `"delegate"`, `"alias"`, `"scope"`, `"class_attribute"`,
    * `"define_column_methods"`, `"class_eval"`. See extract-ruby-api.rb. The
