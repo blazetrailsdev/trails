@@ -188,6 +188,10 @@ export class PredicateBuilder {
     return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
+  get(attrName: string, value: unknown): Nodes.Node {
+    return this.build(this.table.arelTable.get(attrName), value);
+  }
+
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;

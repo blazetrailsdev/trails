@@ -702,9 +702,8 @@ export class Relation<T extends Base> {
   async updateAll(
     updates: Record<string, unknown> | string | [string, ...unknown[]],
   ): Promise<number> {
-    const table = this.table;
     if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
-    if (this.isNullRelation()) return 0;
+    if (this._isNone) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
@@ -713,27 +712,27 @@ export class Relation<T extends Base> {
         this.model.lockingEnabled &&
         !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
       ) {
-        const attr = table.get(this.model.lockingColumn);
+        const attr = this.table.get(this.model.lockingColumn);
         updates[String(attr.name)] = this._incrementAttribute(attr);
       }
       values = this._substituteValues(Object.entries(updates));
     } else {
-      values = sql(this.model.sanitizeSqlForAssignment(updates, String(table.name)));
+      values = sql(this.model.sanitizeSqlForAssignment(updates, String(this.table.name)));
     }
 
     return this.model.withConnection(async (c) => {
       const arel = this.isEagerLoading
         ? await this.applyJoinDependency({}, (relation) => relation.arel())
         : this.buildArel(c);
-      arel.source.left = table;
+      arel.source.left = this.table;
       const groupValuesArelColumns = this.arelColumns(
         Array.from(new Set(this.groupValues)),
       ) as Nodes.Node[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.primaryKey;
       const key = this.model.compositePrimaryKey
-        ? (primaryKey as string[]).map((pk) => table.get(pk))
-        : table.get((primaryKey as string | null) ?? null);
+        ? (primaryKey as string[]).map((pk) => this.table.get(pk))
+        : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
       const count = await c.update(stmt, `${this.model.name} Update All`);
       this.reset();
@@ -751,7 +750,7 @@ export class Relation<T extends Base> {
   }
 
   async deleteAll(): Promise<number> {
-    if (this.isNullRelation()) return 0;
+    if (this._isNone) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     const invalidMethods = Relation.INVALID_METHODS_FOR_DELETE_ALL.filter((method) => {
@@ -763,19 +762,18 @@ export class Relation<T extends Base> {
     }
 
     return this.model.withConnection(async (c) => {
-      const table = this.table;
       const arel = this.isEagerLoading
         ? await this.applyJoinDependency({}, (relation) => relation.arel())
         : this.buildArel(c);
-      arel.source.left = table;
+      arel.source.left = this.table;
       const groupValuesArelColumns = this.arelColumns(
         Array.from(new Set(this.groupValues)),
       ) as Nodes.Node[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.model.primaryKey;
       const key = this.model.compositePrimaryKey
-        ? (primaryKey as string[]).map((pk) => table.get(pk))
-        : table.get((primaryKey as string | null) ?? null);
+        ? (primaryKey as string[]).map((pk) => this.table.get(pk))
+        : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
 
       const count = await c.delete(stmt, `${this.model.name} Delete All`);

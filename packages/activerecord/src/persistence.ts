@@ -4,7 +4,13 @@ import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { runCallbacks } from "@blazetrails/activesupport";
-import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
+import {
+  InsertManager,
+  UpdateManager,
+  DeleteManager,
+  Table as ArelTable,
+  type Nodes,
+} from "@blazetrails/arel";
 import {
   ActiveRecordError,
   ReadOnlyRecord,
@@ -217,37 +223,48 @@ export async function _updateRecord(
   values: Record<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const setEntries = Object.entries(values);
-  if (setEntries.length === 0) return 0;
+  const klass = this as unknown as typeof Base;
+  const arelTable: ArelTable = klass.arelTable;
+  const wheres = Object.entries(constraints).map(([name, value]) =>
+    klass.predicateBuilder.get(name, value),
+  );
 
-  const arelTable: ArelTable = (this as any).arelTable;
-  const um = new UpdateManager();
-  um.table(arelTable);
-  um.set(setEntries.map(([col, val]) => [arelTable.get(col), val]));
+  const defaultConstraint = buildDefaultConstraint.call(klass as any);
+  if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
 
-  for (const [col, val] of Object.entries(constraints)) {
-    um.where(arelTable.get(col).eq(val));
+  const currentScope = klass.globalCurrentScope();
+  if (currentScope) {
+    wheres.push(currentScope.whereClause.ast);
   }
 
-  applyDefaultAndGlobalConstraints(um as any, this as any);
+  const um = new UpdateManager(arelTable);
+  um.set(Object.entries(values).map(([name, value]) => [arelTable.get(name), value]));
+  um.wheres = wheres;
 
-  return (this as any).withConnection((c: any) => c.update(um, `${(this as any).name} Update`));
+  return klass.withConnection((c) => c.update(um, `${klass.name} Update`));
 }
 
 export async function _deleteRecord(
   this: PersistenceHost,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const arelTable: ArelTable = (this as any).arelTable;
-  const dm = new DeleteManager(arelTable);
+  const klass = this as unknown as typeof Base;
+  const wheres = Object.entries(constraints).map(([name, value]) =>
+    klass.predicateBuilder.get(name, value),
+  );
 
-  for (const [col, val] of Object.entries(constraints)) {
-    dm.where(arelTable.get(col).eq(val));
+  const defaultConstraint = buildDefaultConstraint.call(klass as any);
+  if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
+
+  const currentScope = klass.globalCurrentScope();
+  if (currentScope) {
+    wheres.push(currentScope.whereClause.ast);
   }
 
-  applyDefaultAndGlobalConstraints(dm as any, this as any);
+  const dm = new DeleteManager(klass.arelTable);
+  dm.wheres = wheres;
 
-  return (this as any).withConnection((c: any) => c.delete(dm, `${(this as any).name} Destroy`));
+  return klass.withConnection((c) => c.delete(dm, `${klass.name} Destroy`));
 }
 
 interface PersistenceRecordFields {
