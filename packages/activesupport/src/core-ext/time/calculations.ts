@@ -199,26 +199,6 @@ export function since(this: RubyTime, seconds: number): RubyTime {
   return this.plus(seconds);
 }
 
-const plusWithoutDuration = RubyTime.prototype.plus;
-
-export function plusWithDuration(this: RubyTime, other: unknown): RubyTime {
-  if (other instanceof Duration) {
-    return other.since(this);
-  } else {
-    return plusWithoutDuration.call(this, other as number);
-  }
-}
-
-const minusWithoutDuration = RubyTime.prototype.minus;
-
-export function minusWithDuration(this: RubyTime, other: unknown): RubyTime | number {
-  if (other instanceof Duration) {
-    return other.until(this);
-  } else {
-    return minusWithoutDuration.call(this, other as number);
-  }
-}
-
 export function beginningOfDay(this: RubyTime): RubyTime {
   return change.call(this, { hour: 0 });
 }
@@ -257,6 +237,26 @@ export function endOfMinute(this: RubyTime): RubyTime {
     sec: 59,
     usec: new Rational(999999999, 1000),
   });
+}
+
+const plusWithoutDuration = RubyTime.prototype.plus;
+
+export function plusWithDuration(this: RubyTime, other: unknown): RubyTime {
+  if (other instanceof Duration) {
+    return other.since(this);
+  } else {
+    return plusWithoutDuration.call(this, other as number);
+  }
+}
+
+const minusWithoutDuration = RubyTime.prototype.minus;
+
+export function minusWithDuration(this: RubyTime, other: unknown): RubyTime | number {
+  if (other instanceof Duration) {
+    return other.until(this);
+  } else {
+    return minusWithoutDuration.call(this, other as number);
+  }
 }
 
 export { since as in };

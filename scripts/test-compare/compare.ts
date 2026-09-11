@@ -578,7 +578,7 @@ export function compareFileResults(
 // Main
 // ---------------------------------------------------------------------------
 
-export function main(args: string[] = process.argv.slice(2)) {
+export function main(args: string[] = process.argv.slice(2), outputDir: string = OUTPUT_DIR) {
   const pkgIndex = args.indexOf("--package");
   let filterPkg: string | null = null;
   if (pkgIndex !== -1) {
@@ -619,8 +619,8 @@ export function main(args: string[] = process.argv.slice(2)) {
     process.exit(1);
   }
 
-  const rubyPath = path.join(OUTPUT_DIR, "rails-tests.json");
-  const tsPath = path.join(OUTPUT_DIR, "ts-tests.json");
+  const rubyPath = path.join(outputDir, "rails-tests.json");
+  const tsPath = path.join(outputDir, "ts-tests.json");
 
   if (!fs.existsSync(rubyPath) || !fs.existsSync(tsPath)) {
     console.error("Missing rails-tests.json or ts-tests.json in output/");
@@ -1120,7 +1120,7 @@ export function main(args: string[] = process.argv.slice(2)) {
   }
 
   // Always write JSON output
-  const outPath = path.join(OUTPUT_DIR, "convention-comparison.json");
+  const outPath = path.join(outputDir, "convention-comparison.json");
   fs.writeFileSync(
     outPath,
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),

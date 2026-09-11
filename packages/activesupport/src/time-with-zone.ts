@@ -565,11 +565,16 @@ export class TimeWithZone {
     return this.plus(-arg);
   }
 
-  declare since: TimeWithZone["plus"];
-  declare in: TimeWithZone["plus"];
+  since(other: Parameters<TimeWithZone["plus"]>[0]): TimeWithZone {
+    return this.plus(other);
+  }
 
   ago(other: number): TimeWithZone {
     return this.since(-other);
+  }
+
+  in(other: Parameters<TimeWithZone["plus"]>[0]): TimeWithZone {
+    return this.plus(other);
   }
 
   /** @missingRailsArgs in_time_zone — PERMANENT */
@@ -872,6 +877,3 @@ export class TimeWithZone {
     return this._epochMs;
   }
 }
-
-TimeWithZone.prototype.since = TimeWithZone.prototype.plus;
-TimeWithZone.prototype.in = TimeWithZone.prototype.plus;

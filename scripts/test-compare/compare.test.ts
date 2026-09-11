@@ -1,3 +1,6 @@
+import * as fs from "fs/promises";
+import * as os from "os";
+import * as path from "path";
 import { describe, expect, it } from "vitest";
 import {
   aliasKey,
@@ -5,6 +8,8 @@ import {
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
+  main,
+  PKG_SRC_DIRS,
   misplacedLocation,
   normalize,
   parseMinExtra,
@@ -324,5 +329,59 @@ describe("misplacedLocation", () => {
 
   it("reports a case found nowhere as missing", () => {
     expect(misplacedLocation([], [], false, false)).toBeUndefined();
+  });
+});
+
+describe("main cross-file credit", () => {
+  it("reports a case absent from its convention file as missing despite a same-named test elsewhere", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "activesupport";
+    const src = PKG_SRC_DIRS[pkg];
+    const tc = (ancestors: string[], description: string) => ({ ancestors, description });
+    const ruby = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: "core_ext/time_ext_test.rb",
+              testCases: [tc(["TimeExtMarshalingTest"], "last quarter on 31st")],
+            },
+            {
+              file: "core_ext/date_ext_test.rb",
+              testCases: [tc(["DateExtCalculationsTest"], "last quarter on 31st")],
+            },
+          ],
+        },
+      },
+    };
+    const ts = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: `${src}${rubyToConventionTs("core_ext/time_ext_test.rb", pkg)}`,
+              testCases: [tc(["TimeExtMarshalingTest"], "marshaling preserves fractional seconds")],
+            },
+            {
+              file: `${src}time-ext.test.ts`,
+              testCases: [tc(["TimeExtCalculationsTest"], "last quarter on 31st")],
+            },
+          ],
+        },
+      },
+    };
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    main(["--package", pkg, "--json"], dir);
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    const timeExt = results[0].files.find((f) => f.rubyFile === "core_ext/time_ext_test.rb")!;
+    expect([timeExt.matched, timeExt.misplaced, timeExt.missing]).toEqual([0, 0, 1]);
+    await fs.rm(dir, { recursive: true });
   });
 });
