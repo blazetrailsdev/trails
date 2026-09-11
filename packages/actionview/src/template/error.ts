@@ -1,8 +1,21 @@
 import { isPresent } from "@blazetrails/activesupport";
 import { Jaro } from "@blazetrails/did-you-mean";
-import { ArgumentError, File, rbInspect, regexpEscape } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  rbInspect,
+  regexpEscape,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import type { TemplatePath } from "../template-path.js";
 import type { Template } from "../template.js";
+
+export class ActionViewError extends StandardError {
+  constructor(message?: string) {
+    super(message);
+    this.name = "ActionView::ActionViewError";
+  }
+}
 
 export class StrictLocalsError extends ArgumentError {
   constructor(argumentError: Error, template: { shortIdentifier: string }) {
@@ -18,7 +31,7 @@ export class StrictLocalsError extends ArgumentError {
 
 type MissingTemplatePath = { allTemplatePaths?(): readonly TemplatePath[] } | null | undefined;
 
-export class MissingTemplate extends Error {
+export class MissingTemplate extends ActionViewError {
   readonly path: string;
   readonly paths: Iterable<MissingTemplatePath>;
   readonly prefixes: string[];

@@ -408,7 +408,10 @@ export class LookupContext {
     const format = String(formats[0] ?? "html");
     const template = this.findTemplate(action, prefixes, formats);
     if (!template) {
-      throw new MissingTemplate(this._viewPaths, action, prefixes, false, { formats });
+      throw new MissingTemplate(this._viewPaths, action, prefixes, false, {
+        ...this._details,
+        formats,
+      });
     }
 
     const context: RenderContext = {
@@ -441,7 +444,10 @@ export class LookupContext {
   ): Promise<string> {
     const template = this.findPartial(name, [prefix], [format]);
     if (!template) {
-      throw new MissingTemplate(this._viewPaths, name, [prefix], true, { formats: [format] });
+      throw new MissingTemplate(this._viewPaths, name, [prefix], true, {
+        ...this._details,
+        formats: [format],
+      });
     }
 
     const context: RenderContext = {
@@ -500,6 +506,7 @@ export class LookupContext {
     const template = this.findPartial(partialName, [partialPrefix], [format]);
     if (!template) {
       throw new MissingTemplate(this._viewPaths, partialName, [partialPrefix], true, {
+        ...this._details,
         formats: [format],
       });
     }
@@ -524,6 +531,7 @@ export class LookupContext {
     const template = this.findTemplate(templateName, [templatePrefix], [format]);
     if (!template) {
       throw new MissingTemplate(this._viewPaths, templateName, [templatePrefix], false, {
+        ...this._details,
         formats: [format],
       });
     }
