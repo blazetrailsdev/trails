@@ -29,14 +29,6 @@ export function executionContext(): { readonly id: number } {
   return IsolatedExecutionState.context();
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function withLeaseContext<T>(fn: () => T): T {
-  return IsolatedExecutionState.scope(CONTEXT_ID_KEY, executionContext(), fn);
-}
-
 /** @noRailsEquivalent PERMANENT */
 export function withExecutionContext<T>(fn: () => T): T {
   const id = ++_contextIdCounter;

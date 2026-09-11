@@ -28,11 +28,7 @@ import {
   type QueryCacheHost,
   type Store,
 } from "./query-cache.js";
-import {
-  executionContext,
-  executionContextId,
-  withLeaseContext,
-} from "./connection-pool/execution-context.js";
+import { executionContext, executionContextId } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -590,42 +586,23 @@ export class ConnectionPool implements ReapablePool {
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
   ): Promise<T> {
-    const preventPermanent = options.preventPermanentCheckout ?? false;
+    const preventPermanentCheckout = options.preventPermanentCheckout ?? false;
     const lease = this.connectionLease();
+    const stickyWas = lease.sticky;
+    if (preventPermanentCheckout) lease.sticky = false;
 
     if (lease.connection) {
-      const stickyWas = lease.sticky;
-      if (preventPermanent) lease.sticky = false;
       try {
         return await fn(lease.connection);
       } finally {
-        if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
+        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
       }
     } else {
-      let forkedLease!: Lease;
       try {
-        return await withLeaseContext(async () => {
-          const lease = (forkedLease = this.connectionLease());
-          const stickyWas = lease.sticky;
-          if (preventPermanent) lease.sticky = false;
-          try {
-            return await fn((lease.connection = await this.checkout()));
-          } finally {
-            if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
-            if (!lease.sticky) this.releaseConnection(lease);
-          }
-        });
+        return await fn((lease.connection = await this.checkout()));
       } finally {
-        const sticky = forkedLease?.sticky ?? null;
-        const conn = forkedLease?.release();
-        if (conn) {
-          if (lease.connection) {
-            this.checkin(conn);
-          } else {
-            lease.connection = conn;
-            lease.sticky = sticky;
-          }
-        }
+        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+        if (!lease.sticky) this.releaseConnection(lease);
       }
     }
   }
