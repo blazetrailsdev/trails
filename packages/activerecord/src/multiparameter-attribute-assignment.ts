@@ -56,7 +56,11 @@ export function assignMultiparameterValues(
 ): void {
   const aggregation = getAggregation(instance.constructor, name);
   if (aggregation) {
-    if (values !== null) assignAggregation(instance as any, name, values, aggregation);
+    if (values === null) {
+      (instance as unknown as Record<string, unknown>)[name] = values;
+    } else {
+      assignAggregation(instance as any, name, values, aggregation);
+    }
   } else {
     instance.writeAttribute(name, values);
   }
