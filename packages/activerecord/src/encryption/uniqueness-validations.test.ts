@@ -10,6 +10,7 @@ import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.j
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
+import { RecordInvalid } from "../validations.js";
 
 fixtures([]);
 
@@ -161,9 +162,11 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       }
     }
 
-    await OldEncryptionBook.create({ name: "dune" });
-    const dup = await OldEncryptionBook.create({ name: "DUNE" });
-    expect(dup.errors.count).toBe(1);
+    await (OldEncryptionBook as any).createBang({ name: "dune" });
+
+    await expect((OldEncryptionBook as any).createBang({ name: "DUNE" })).rejects.toThrow(
+      RecordInvalid,
+    );
   });
 
   it("uniqueness validation does not revalidate the attribute with current encryption type", async () => {
