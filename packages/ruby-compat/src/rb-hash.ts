@@ -48,6 +48,16 @@ export function rbHash(value: unknown): number {
   if (typeof (value as { equals?: unknown }).equals === "function") {
     return stringHash(`${(value as object).constructor.name}(${String(value)})`);
   }
+  /* A `Uint8Array` stands in for a Ruby binary String, which `rbEqual` compares
+     by bytes, so it hashes by bytes too (`vendor/ruby/string.c:3629`). */
+  if (value instanceof Uint8Array) {
+    let h = 0x811c9dc5;
+    for (const byte of value) {
+      h ^= byte;
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
   /* boundary: a JS Date reaches a ported `hash` the same way it reaches
      `rbEqual`, and Ruby hashes it by value. */
   if (value instanceof Date) return stringHash(`Date(${value.toISOString()})`);

@@ -77,6 +77,16 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     });
     const distinct = jd.instantiate(Result.fromRowHashes([bigRow, { ...bigRow }, undefinedRow]));
     expect(distinct).toHaveLength(2);
+
+    const valued = (bytes: number[], at: number) => ({
+      ...aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } }),
+      blob: new Uint8Array(bytes),
+      at: new Date(at),
+    });
+    const byValue = jd.instantiate(
+      Result.fromRowHashes([valued([1, 2], 0), valued([1, 2], 0), valued([1, 3], 0)]),
+    );
+    expect(byValue).toHaveLength(2);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {

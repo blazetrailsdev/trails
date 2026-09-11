@@ -1,4 +1,5 @@
 import { Notifications } from "@blazetrails/activesupport";
+import { rbEqual, rbHash } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
@@ -408,7 +409,7 @@ export class JoinDependency {
       class_name: this.joinRoot.baseKlass.name,
     };
 
-    const rowHashKeys = new Map<unknown, any>();
+    const rowHashKeys = new Map<number, Record<string, unknown>[]>();
 
     Notifications.instrument("instantiation.active_record", payload, () => {
       for (const rowHash of rows) {
@@ -416,13 +417,14 @@ export class JoinDependency {
         if (primaryKey) {
           parentKey = this._keyFor(primaryKey.map((k) => rowHash[k]));
         } else {
-          let level = rowHashKeys;
-          for (const name of resultSet.columns) {
-            const value = rowHash[name];
-            if (!level.has(value)) level.set(value, new Map());
-            level = level.get(value);
+          const hash = rbHash(rowHash);
+          let bucket = rowHashKeys.get(hash);
+          if (!bucket) rowHashKeys.set(hash, (bucket = []));
+          parentKey = bucket.find((key) => rbEqual(key, rowHash));
+          if (parentKey === undefined) {
+            bucket.push(rowHash);
+            parentKey = rowHash;
           }
-          parentKey = level;
         }
         let parent = parents.get(parentKey);
         if (!parent) {
