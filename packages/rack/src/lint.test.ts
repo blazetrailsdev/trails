@@ -101,8 +101,29 @@ it("notice status errors", async () => {
 });
 
 it("notice header errors", async () => {
-  const app = new Lint(async () => [200, { "Content-Type": "text/plain" }, ["OK"]]);
-  await expect(app.call(validEnv())).rejects.toThrow(LintError);
+  const lint = (headers: unknown) =>
+    new Lint(async () => [200, headers as Record<string, string>, []]).call(validEnv());
+
+  await expect(lint(Object.freeze({}))).rejects.toThrow(
+    "headers object should not be frozen, but is",
+  );
+  await expect(lint({ status: "404" })).rejects.toThrow(/must not contain status/);
+  for (const invalidHeader of ["(", ",", "/", "@", "\\", "{", "\x7F", "\x01"]) {
+    await expect(lint({ [invalidHeader]: "text/plain" })).rejects.toThrow(
+      `invalid header name: ${invalidHeader}`,
+    );
+  }
+  await expect(lint({ A: "text/plain" })).rejects.toThrow("uppercase character in header name: A");
+  await expect(lint({ foo: new (class Object {})() })).rejects.toThrow(
+    "a header value must be a String or Array of Strings, but the value of 'foo' is a Object",
+  );
+  await expect(lint({ "foo-bar": "text\0plain" })).rejects.toThrow(/invalid header/);
+  await expect(
+    lint([
+      ["content-type", "text/plain"],
+      ["content-length", "0"],
+    ]),
+  ).rejects.toThrow("headers object should be a hash, but isn't (got Array as headers)");
 });
 
 it("notice rack.early_hints errors", async () => {

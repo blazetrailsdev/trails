@@ -1,3 +1,4 @@
+import { rbObjClass, stringInspect } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import {
   REQUEST_METHOD,
@@ -186,22 +187,44 @@ export class Lint {
   }
 
   private checkHeaders(headers: Record<string, any>): void {
-    if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
-      throw new LintError("headers is not an object");
+    if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+      throw new LintError(
+        `headers object should be a hash, but isn't (got ${rbObjClass(headers)} as headers)`,
+      );
     }
+
+    if (Object.isFrozen(headers)) {
+      throw new LintError("headers object should not be frozen, but is");
+    }
+
     for (const [key, value] of Object.entries(headers)) {
       if (typeof key !== "string") {
-        throw new LintError("header key must be a string");
+        throw new LintError(`header key must be a string, was ${rbObjClass(key)}`);
       }
-      if (key !== key.toLowerCase()) {
-        throw new LintError(`header key must be lowercase: ${key}`);
+
+      if (key.startsWith("rack.")) continue;
+
+      if (key === "status") throw new LintError("header must not contain status");
+      if (/[(),/:;<=>?@[\\\]{}\p{Cc}]/u.test(key)) {
+        throw new LintError(`invalid header name: ${key}`);
       }
-      if (key === "status") {
-        throw new LintError("header must not contain 'status'");
+      if (/[A-Z]/.test(key)) throw new LintError(`uppercase character in header name: ${key}`);
+
+      if (typeof value === "string") {
+        this.checkHeaderValue(key, value);
+      } else if (Array.isArray(value)) {
+        for (const v of value) this.checkHeaderValue(key, v);
+      } else {
+        throw new LintError(
+          `a header value must be a String or Array of Strings, but the value of '${key}' is a ${rbObjClass(value)}`,
+        );
       }
-      if (typeof value !== "string" && !Array.isArray(value)) {
-        throw new LintError(`header value must be a string: ${key}`);
-      }
+    }
+  }
+
+  private checkHeaderValue(key: string, value: string): void {
+    if (/[^\x20-\u{10ffff}]/u.test(value)) {
+      throw new LintError(`invalid header value ${key}: ${stringInspect(value)}`);
     }
   }
 

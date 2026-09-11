@@ -11,8 +11,20 @@ export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
-    const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
-    return attribute.in(relation.arel());
+    value = this.applyJoinDependency(value);
+
+    if (value.selectValues.length === 0) {
+      const model = value.model;
+      if (model.compositePrimaryKey) {
+        throw new ArgumentError(
+          `Cannot map composite primary key ${rubyInspectArray(model.primaryKey)} to ${attribute.name}`,
+        );
+      } else {
+        value = value.select(value.table.get(model.primaryKey));
+      }
+    }
+
+    return attribute.in(value.arel());
   }
 
   private deferDistinctPkMaterialization(
@@ -45,20 +57,5 @@ export class RelationHandler {
       );
     }
     return resolved;
-  }
-
-  private injectPrimaryKeySelect(attribute: Nodes.Attribute, value: any): any {
-    if (value.selectValues.length !== 0) {
-      return value;
-    }
-
-    const model = value._model;
-    const pk = model?.primaryKey ?? "id";
-    if (Array.isArray(pk)) {
-      throw new ArgumentError(
-        `Cannot map composite primary key ${rubyInspectArray(pk)} to ${attribute.name}`,
-      );
-    }
-    return value.select(model.arelTable.get(pk));
   }
 }

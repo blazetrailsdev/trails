@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { NameError } from "@blazetrails/ruby-compat";
 
 import {
   cattrAccessor,
@@ -83,8 +84,21 @@ describe("ModuleAttributeAccessorTest", () => {
   });
 
   it("should raise name error if attribute name is invalid", () => {
-    class MyModule {}
-    expect(() => mattrAccessor.call(MyModule, "1invalid")).toThrow();
+    expect(() => cattrReader.call(class {}, "1nvalid")).toThrow(NameError);
+    expect(() => cattrReader.call(class {}, "1nvalid")).toThrow("invalid attribute name: 1nvalid");
+
+    expect(() => cattrWriter.call(class {}, "1nvalid")).toThrow(NameError);
+    expect(() => cattrWriter.call(class {}, "1nvalid")).toThrow("invalid attribute name: 1nvalid");
+
+    expect(() => mattrReader.call(class {}, "valid_part\ninvalid_part")).toThrow(NameError);
+    expect(() => mattrReader.call(class {}, "valid_part\ninvalid_part")).toThrow(
+      "invalid attribute name: valid_part\ninvalid_part",
+    );
+
+    expect(() => mattrWriter.call(class {}, "valid_part\ninvalid_part")).toThrow(NameError);
+    expect(() => mattrWriter.call(class {}, "valid_part\ninvalid_part")).toThrow(
+      "invalid attribute name: valid_part\ninvalid_part",
+    );
   });
 
   it("should use default value if block passed", () => {

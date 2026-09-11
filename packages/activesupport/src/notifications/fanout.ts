@@ -289,9 +289,11 @@ export class Fanout {
       }
       list.push(subscriber);
       this.clearCache(pattern);
-    } else {
+    } else if (pattern == null || pattern instanceof RegExp) {
       this.otherSubscribers.push(subscriber);
       this.clearCache();
+    } else {
+      throw new ArgumentError("pattern must be specified as a String, Regexp or empty");
     }
 
     return subscriber;

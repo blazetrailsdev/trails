@@ -33,9 +33,8 @@
     }
   },
   "activerecord": {
-    "total": 22,
+    "total": 17,
     "byFile": {
-      "attribute-assignment.ts": 1,
       "connection-adapters.ts": 1,
       "connection-adapters/abstract-adapter.ts": 1,
       "connection-adapters/abstract-mysql-adapter.ts": 1,
@@ -48,26 +47,18 @@
       "connection-adapters/postgresql/oid/hstore.ts": 1,
       "connection-adapters/postgresql/schema-creation.ts": 1,
       "connection-adapters/sqlite3-adapter.ts": 2,
-      "encryption/encryptable-record.ts": 1,
-      "inheritance.ts": 1,
-      "relation/finder-methods.ts": 1,
-      "relation/predicate-builder/relation-handler.ts": 1,
-      "relation/query-methods.ts": 1
+      "relation/finder-methods.ts": 1
     }
   },
   "activerecord-test-support": {
-    "total": 1,
-    "byFile": {
-      "connection.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activesupport": {
-    "total": 7,
+    "total": 4,
     "byFile": {
       "error-reporter.ts": 1,
-      "module-ext.ts": 3,
-      "notifications/fanout.ts": 1,
-      "number-helper/number-to-human-converter.ts": 1,
+      "module-ext.ts": 2,
       "time-with-zone.ts": 1
     }
   },
@@ -90,10 +81,8 @@
     "byFile": {}
   },
   "rack": {
-    "total": 3,
+    "total": 1,
     "byFile": {
-      "lint.ts": 1,
-      "response.ts": 1,
       "rewindable-input.ts": 1
     }
   },

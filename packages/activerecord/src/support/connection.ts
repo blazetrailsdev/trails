@@ -150,13 +150,6 @@ export async function testConfigurationHashes(): Promise<{
 
   const configurationHashes = expandConfig(connection, await connection.build());
   const envConfig = configurationHashes[0];
-  const builtAdapter = String(envConfig.configurationHash.adapter);
-  if (!name.includes(builtAdapter)) {
-    throw new ArgumentError(
-      `The connection name did not match the adapter name. Connection name is ` +
-        `'${name}' and the adapter name is '${builtAdapter}'.`,
-    );
-  }
 
   return { adapter: connection.lane, envConfig, configurationHashes };
 }
@@ -178,6 +171,7 @@ async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<stri
 }
 
 export async function connect(): Promise<TestDatabaseConfig> {
+  const name = connectionName();
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
   const configs = new DatabaseConfigurations(configurationHashes);
   Base.configurations(configs);
@@ -203,6 +197,14 @@ export async function connect(): Promise<TestDatabaseConfig> {
 
   await Base.establishConnection("arunit");
   await ARUnit2Model.establishConnection("arunit2");
+
+  const arunitAdapter = (await Base.leaseConnection()).pool.dbConfig.adapter as string;
+
+  if (!name.includes(arunitAdapter)) {
+    throw new ArgumentError(
+      `The connection name did not match the adapter name. Connection name is '${name}' and the adapter name is '${arunitAdapter}'.`,
+    );
+  }
 
   return { configs, adapter, envConfig };
 }

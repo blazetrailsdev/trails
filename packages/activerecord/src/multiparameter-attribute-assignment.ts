@@ -1,5 +1,3 @@
-import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-
 function getAggregation(modelClass: any, name: string): { klass: any } | null {
   const aggs: Record<string, { klass: any }> | undefined = modelClass.aggregateReflections;
   return aggs?.[name] ?? null;
@@ -51,34 +49,20 @@ export function extractMultiparameterCallstack(attrs: Record<string, unknown>): 
   return { multiparams, regular };
 }
 
-export function executeMultiparameterAssignment(
+export function assignMultiparameterValues(
   instance: { constructor: any; writeAttribute(name: string, value: unknown): void },
-  callstack: Record<string, Record<number, unknown>>,
+  name: string,
+  values: Record<number, unknown> | null,
 ): void {
-  const errors: Error[] = [];
-  const modelClass = instance.constructor;
-
-  for (const [name, partsMap] of Object.entries(callstack)) {
-    try {
-      const aggregation = getAggregation(modelClass, name);
-      if (aggregation) {
-        assignAggregation(instance as any, name, partsMap, aggregation);
-      } else {
-        assignDateTimeAttribute(instance, name, partsMap);
-      }
-    } catch (e) {
-      errors.push(
-        new AttributeAssignmentError(
-          `error on assignment of multiparameter attributes for column ${name}`,
-          e instanceof Error ? e : undefined,
-          name,
-        ),
-      );
+  const aggregation = getAggregation(instance.constructor, name);
+  if (aggregation) {
+    if (values === null) {
+      (instance as unknown as Record<string, unknown>)[name] = values;
+    } else {
+      assignAggregation(instance as any, name, values, aggregation);
     }
-  }
-
-  if (errors.length > 0) {
-    throw new MultiparameterAssignmentErrors(errors);
+  } else {
+    instance.writeAttribute(name, values);
   }
 }
 
@@ -95,15 +79,6 @@ function assignAggregation(
 
   const AggClass = aggregation.klass as new (...args: unknown[]) => unknown;
   instance[name] = new AggClass(...values);
-}
-
-function assignDateTimeAttribute(
-  instance: { writeAttribute(name: string, value: unknown): void },
-  name: string,
-  partsMap: Record<number, unknown>,
-): void {
-  const values = Object.values(partsMap).every((v) => v === null) ? null : partsMap;
-  instance.writeAttribute(name, values);
 }
 
 function isBlank(v: unknown): boolean {
