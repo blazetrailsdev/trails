@@ -1,5 +1,4 @@
 const TEST_FNS = new Set(["it", "test"]);
-// Rails' test/support/adapter_helper.rb predicates: current_adapter?, in_memory_db?
 const ADAPTER_PREDICATES = new Set(["currentAdapter", "inMemoryDb"]);
 
 function calleeRoot(callee) {
