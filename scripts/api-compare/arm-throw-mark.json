@@ -18,11 +18,8 @@
     "byFile": {}
   },
   "actionview": {
-    "total": 2,
-    "byFile": {
-      "base.ts": 1,
-      "template.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activemodel": {
     "total": 1,

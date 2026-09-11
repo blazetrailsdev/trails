@@ -1,9 +1,9 @@
 import { htmlSafe } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "./base.js";
-import { StrictLocalsMismatch } from "./strict-locals.js";
 import { Template } from "./template.js";
-import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
+import { StrictLocalsError, SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
@@ -332,7 +332,23 @@ describe("ActionView::Template (smoke)", () => {
       } catch (e) {
         raised = e;
       }
-      expect((raised as TemplateError).original).toBeInstanceOf(StrictLocalsMismatch);
+      expect((raised as TemplateError).original).toBeInstanceOf(StrictLocalsError);
+      expect((raised as TemplateError).message).toBe("unknown local: :extra for t");
+    });
+
+    it("leaves an ArgumentError raised inside a strict-locals template body untranslated", () => {
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      (view as unknown as Record<string, unknown>).boom = () => {
+        throw new ArgumentError("missing keyword: :other");
+      };
+      let raised: unknown;
+      try {
+        template("<%# locals: (name:) %>\n<%= boom() %>").render(view, { name: "Ada" });
+      } catch (e) {
+        raised = e;
+      }
+      expect((raised as TemplateError).original).toBeInstanceOf(ArgumentError);
+      expect((raised as TemplateError).original).not.toBeInstanceOf(StrictLocalsError);
     });
 
     it("memoizes the compile, so a second render of the same source reuses it", () => {

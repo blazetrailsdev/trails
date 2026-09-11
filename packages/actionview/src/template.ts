@@ -1,7 +1,7 @@
-import { htmlSafe, Notifications } from "@blazetrails/activesupport";
+import { htmlSafe, Notifications, pluralize, toSentence } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
-import { StrictLocalsMismatch } from "./strict-locals.js";
 import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
@@ -218,11 +218,15 @@ export class Template {
         }
 
         if (buffer) {
-          view._run(this.methodName(), this, locals, buffer, { addToStack });
+          view._run(this.methodName(), this, locals, buffer, {
+            addToStack,
+            hasStrictLocals: this.strictLocalsQ(),
+          });
           return "";
         } else {
           const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
             addToStack,
+            hasStrictLocals: this.strictLocalsQ(),
           });
           return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
         }
@@ -277,8 +281,8 @@ export class Template {
 
   /** @internal */
   private compiledSource(): string {
+    const setStrictLocals = this.strictLocalsBang();
     const source = this.source;
-    this.strictLocalsBang();
     const handler = this.resolveHandler();
     if (!handler) {
       throw new Error(
@@ -288,33 +292,43 @@ export class Template {
     }
     const code = handler.call(this, source);
 
-    return `function ${this.methodName()}(localAssigns, outputBuffer) {
+    let methodArguments: string;
+    if (setStrictLocals != null) {
+      if (setStrictLocals.includes("&")) {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}`;
+      } else {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}, &_`;
+      }
+    } else {
+      methodArguments = "local_assigns, output_buffer, &_";
+    }
+    const parameters = methodParameters(methodArguments);
+    const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
+
+    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}) {${setStrictLocals != null ? kwargsCode(parameters) : ""}
   this.virtualPath = ${JSON.stringify(this.virtualPath)};
-  with (this) { with (localAssigns) {${this.localsCode()}
+  with (this) { with (${scope}) {${this.localsCode()}
     return ${code};
   } }
-}`;
+}, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall to_sentence — PERMANENT
-   */
+  /** @internal */
   protected compile(mod: CompiledMethodContainer): void {
     const compiledSource = this.compiledSource();
     let factory: (
-      mismatch: typeof StrictLocalsMismatch,
+      argumentError: typeof ArgumentError,
       safe: typeof htmlSafe,
       outputBuffer: typeof OutputBuffer,
     ) => CompiledMethod;
     try {
       factory = new Function(
-        "StrictLocalsMismatch",
+        "ArgumentError",
         "htmlSafe",
         "OutputBuffer",
         `return ${compiledSource};`,
       ) as (
-        mismatch: typeof StrictLocalsMismatch,
+        argumentError: typeof ArgumentError,
         safe: typeof htmlSafe,
         outputBuffer: typeof OutputBuffer,
       ) => CompiledMethod;
@@ -322,10 +336,35 @@ export class Template {
       throw new SyntaxErrorInTemplate(this, this.source, error as Error);
     }
 
-    mod._compiledMethods.set(
-      this.methodName(),
-      factory(StrictLocalsMismatch, htmlSafe, OutputBuffer),
+    const method = factory(ArgumentError, htmlSafe, OutputBuffer);
+    mod._compiledMethods.set(this.methodName(), method);
+
+    if (!this.strictLocalsQ()) return;
+
+    const parameters = method.parameters!.filter(
+      ([type, name]) => !(type === "req" && (name === "local_assigns" || name === "output_buffer")),
     );
+
+    const nonKwargParameters = parameters.filter(
+      ([type]) => !["keyreq", "key", "keyrest", "nokey"].includes(type),
+    );
+
+    const last = nonKwargParameters.at(-1);
+    if (last?.[0] === "block" && last[1] === "_") nonKwargParameters.pop();
+
+    if (nonKwargParameters.length > 0) {
+      mod._compiledMethods.delete(this.methodName());
+
+      throw new ArgumentError(
+        `${toSentence(nonKwargParameters.map(([, name]) => `\`${name}\``))} set as non-keyword ` +
+          `${pluralize("argument", nonKwargParameters.length)} for ${this.shortIdentifier}. ` +
+          "Locals can only be set as keyword arguments.",
+      );
+    }
+
+    if (!parameters.some(([type]) => type === "keyrest")) {
+      this._strictLocalKeys = Object.freeze(parameters.map((p) => p[p.length - 1]!).sort());
+    }
   }
 
   private handleRenderError(view: Base, e: unknown): never {
@@ -382,6 +421,90 @@ export class Template {
   private resolveHandler(): TemplateHandler | undefined {
     return this.handler ?? TemplateHandlers.handlerForExtension(this.extension);
   }
+}
+
+type Parameter = [type: string, name?: string, defaultExpr?: string];
+
+function methodParameters(methodArguments: string): Parameter[] {
+  const args: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let i = 0; i < methodArguments.length; i++) {
+    const c = methodArguments[i];
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = null;
+    } else if (c === "'" || c === '"' || c === "`") quote = c;
+    else if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) depth--;
+    else if (c === "," && depth === 0) {
+      args.push(methodArguments.slice(start, i));
+      start = i + 1;
+    }
+  }
+  args.push(methodArguments.slice(start));
+
+  return args
+    .map((arg) => arg.trim())
+    .filter((arg) => arg !== "")
+    .map((arg): Parameter => {
+      let m: RegExpExecArray | null;
+      if ((m = /^&(\w*)$/.exec(arg))) return ["block", m[1] || "&"];
+      if (arg === "**nil") return ["nokey"];
+      if ((m = /^\*\*(\w*)$/.exec(arg))) return ["keyrest", m[1] || "**"];
+      if ((m = /^\*(\w*)$/.exec(arg))) return ["rest", m[1] || "*"];
+      if ((m = /^(\w+):\s*([\s\S]*)$/.exec(arg))) {
+        return m[2] === "" ? ["keyreq", m[1]] : ["key", m[1], m[2]];
+      }
+      if ((m = /^(\w+)\s*=\s*([\s\S]+)$/.exec(arg))) return ["opt", m[1], m[2]];
+      if (/^\w+$/.test(arg)) return ["req", arg];
+      throw new SyntaxError(`invalid locals signature argument: ${arg}`);
+    });
+}
+
+function kwargsCode(parameters: Parameter[]): string {
+  const keyreq = parameters.filter(([type]) => type === "keyreq").map(([, name]) => name!);
+  const keywords = parameters
+    .filter(([type]) => type === "keyreq" || type === "key")
+    .map(([, name]) => name!);
+  const keyrest = parameters.find(([type]) => type === "keyrest");
+  const lines: string[] = [];
+
+  if (keyreq.length > 0) {
+    lines.push(
+      `const __missing = ${JSON.stringify(keyreq)}.filter((k) => !Object.hasOwn(__kwargs, k));`,
+      'if (__missing.length > 0) throw new ArgumentError(`missing keyword${__missing.length > 1 ? "s" : ""}: ${__missing.map((k) => ":" + k).join(", ")}`);',
+    );
+  }
+  if (parameters.some(([type]) => type === "nokey")) {
+    lines.push(
+      'if (Object.keys(__kwargs).length > 0) throw new ArgumentError("no keywords accepted");',
+    );
+  } else if (!keyrest) {
+    lines.push(
+      `const __unknown = Object.keys(__kwargs).filter((k) => !${JSON.stringify(keywords)}.includes(k));`,
+      'if (__unknown.length > 0) throw new ArgumentError(`unknown keyword${__unknown.length > 1 ? "s" : ""}: ${__unknown.map((k) => ":" + k).join(", ")}`);',
+    );
+  }
+
+  lines.push("const __strictLocals = {};");
+  for (const [type, name, defaultExpr] of parameters) {
+    const key = JSON.stringify(name);
+    if (type === "keyreq") lines.push(`__strictLocals[${key}] = __kwargs[${key}];`);
+    if (type === "key") {
+      lines.push(
+        `__strictLocals[${key}] = Object.hasOwn(__kwargs, ${key}) ? __kwargs[${key}] : (${defaultExpr});`,
+      );
+    }
+  }
+  if (keyrest && keyrest[1] !== "**") {
+    lines.push(
+      `__strictLocals[${JSON.stringify(keyrest[1])}] = Object.fromEntries(Object.entries(__kwargs).filter(([k]) => !${JSON.stringify(keywords)}.includes(k)));`,
+    );
+  }
+
+  return lines.map((line) => `\n  ${line}`).join("");
 }
 
 function stringHash(value: string): number {

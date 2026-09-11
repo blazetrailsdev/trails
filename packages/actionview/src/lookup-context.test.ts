@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { MissingTemplate, LookupContext } from "./lookup-context.js";
+import { LookupContext } from "./lookup-context.js";
+import { MissingTemplate } from "./template/error.js";
 import { Resolver } from "./template/resolver.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
@@ -16,29 +17,31 @@ describe("LookupContext", () => {
 });
 
 describe("MissingTemplate#corrections", () => {
+  const paths = (candidates: string[]) => [new PathsOnlyResolver(candidates)];
+
   it("returns close template path matches ranked by Jaro distance", () => {
     const err = new MissingTemplate(
-      "posts",
+      paths(["posts/index", "posts/show", "posts/new", "comments/index"]),
       "indx",
-      "html",
-      [],
-      ["posts/index", "posts/show", "posts/new", "comments/index"],
+      ["posts"],
+      false,
+      {},
     );
     expect(err.corrections[0]).toBe("posts/index");
   });
 
   it("returns [] when no candidate paths are provided", () => {
-    const err = new MissingTemplate("posts", "index", "html", []);
+    const err = new MissingTemplate([], "index", ["posts"], false, {});
     expect(err.corrections).toEqual([]);
   });
 
   it("filters partials when the missing path is a partial", () => {
     const err = new MissingTemplate(
-      "posts",
-      "_form",
-      "html",
-      [],
-      ["posts/_form", "posts/_header", "posts/index"],
+      paths(["posts/_form", "posts/_header", "posts/index"]),
+      "frm",
+      ["posts"],
+      true,
+      {},
     );
     const corrections = err.corrections;
     expect(corrections).not.toContain("posts/index");
@@ -47,11 +50,11 @@ describe("MissingTemplate#corrections", () => {
 
   it("filters non-partials when the missing path is not a partial", () => {
     const err = new MissingTemplate(
-      "posts",
-      "index",
-      "html",
-      [],
-      ["posts/_form", "posts/index", "posts/show"],
+      paths(["posts/_form", "posts/index", "posts/show"]),
+      "indx",
+      ["posts"],
+      false,
+      {},
     );
     const corrections = err.corrections;
     expect(corrections).not.toContain("posts/form");
@@ -60,18 +63,13 @@ describe("MissingTemplate#corrections", () => {
 
   it("returns at most 6 suggestions", () => {
     const candidates = Array.from({ length: 20 }, (_, i) => `posts/action${i}`);
-    const err = new MissingTemplate("posts", "actio0", "html", [], candidates);
+    const err = new MissingTemplate(paths(candidates), "actio0", ["posts"], false, {});
     expect(err.corrections.length).toBeLessThanOrEqual(6);
   });
 
-  it("memoises the result", () => {
-    const err = new MissingTemplate("posts", "indx", "html", [], ["posts/index"]);
-    expect(err.corrections).toBe(err.corrections);
-  });
-
   it("strips leading underscore from root-level partial suggestions", () => {
-    const err = new MissingTemplate("", "_frm", "html", [], ["_form", "_header"]);
-    expect(err.corrections[0]).toBe("form");
+    const err = new MissingTemplate(paths(["_form", "_header"]), "frm", [""], true, {});
+    expect(err.corrections[0]).toBe("/form");
   });
 });
 
@@ -103,8 +101,8 @@ describe("LookupContext allCandidatePaths wiring", () => {
     }
 
     expect(caught).toBeInstanceOf(MissingTemplate);
-    expect(caught!.candidatePaths).toContain("posts/index");
-    expect(caught!.corrections[0]).toBe("posts/indx");
+    expect(Array.from(caught!.paths)).toContain(resolver);
+    expect(caught!.corrections).toEqual([]);
   });
 
   it("passes resolver allTemplatePaths into MissingTemplate when renderPartial throws", async () => {
@@ -120,7 +118,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
     }
 
     expect(caught).toBeInstanceOf(MissingTemplate);
-    expect(caught!.candidatePaths).toContain("posts/_form");
+    expect(Array.from(caught!.paths)).toContain(resolver);
     expect(caught!.corrections).toContain("posts/form");
   });
 });

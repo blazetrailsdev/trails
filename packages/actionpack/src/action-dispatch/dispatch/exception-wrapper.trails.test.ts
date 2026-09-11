@@ -54,7 +54,10 @@ describe("ExceptionWrapper tables keyed on qualified class names", () => {
   });
 
   it("rescue_templates maps a raised ActionView::MissingTemplate to missing_template", () => {
-    const wrapper = new ExceptionWrapper(null, new MissingTemplate("posts", "index", "html", []));
+    const wrapper = new ExceptionWrapper(
+      null,
+      new MissingTemplate([], "index", ["posts"], false, {}),
+    );
     expect(wrapper.rescueTemplate()).toBe("missing_template");
   });
 

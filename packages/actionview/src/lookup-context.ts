@@ -2,10 +2,10 @@ import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import type { Template } from "./template.js";
-import { Jaro } from "@blazetrails/did-you-mean";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
+import { MissingTemplate } from "./template/error.js";
 import { Types } from "./template/types.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
@@ -27,74 +27,6 @@ registerDetail(
 );
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
-
-export class MissingTemplate extends Error {
-  /** @internal */
-  readonly path: string;
-  /** @internal */
-  readonly paths: string[];
-  /** @internal */
-  readonly prefixes: string[];
-  /** @internal */
-  readonly partial: boolean;
-  /** @internal */
-  readonly templateKeys: readonly string[];
-
-  /** @internal */
-  readonly candidatePaths: readonly string[];
-
-  #cachedCorrections?: string[];
-
-  constructor(
-    public readonly controller: string,
-    public readonly action: string,
-    public readonly format: string,
-    public readonly searchedPaths: string[],
-    candidatePaths: readonly string[] = [],
-  ) {
-    const templatePath = controller ? `${controller}/${action}` : action;
-    super(
-      `Missing template ${templatePath} with format "${format}". ` +
-        `Searched in: ${searchedPaths.length > 0 ? searchedPaths.join(", ") : "(no resolvers)"}`,
-    );
-    this.name = "ActionView::MissingTemplate";
-    this.path = controller ? `${controller}/${action}` : action;
-    this.paths = searchedPaths;
-    this.prefixes = controller ? [controller] : [];
-    this.partial = action.startsWith("_");
-    this.templateKeys = [format];
-    this.candidatePaths = candidatePaths;
-  }
-
-  get corrections(): string[] {
-    if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
-
-    const isPartialBasename = (p: string) => {
-      const slash = p.lastIndexOf("/");
-      const base = slash === -1 ? p : p.slice(slash + 1);
-      return base.startsWith("_");
-    };
-
-    const candidates = this.candidatePaths.filter((p) =>
-      this.partial ? isPartialBasename(p) : !isPartialBasename(p),
-    );
-
-    if (candidates.length === 0) {
-      this.#cachedCorrections = [];
-      return this.#cachedCorrections;
-    }
-
-    const lookup = this.path;
-    const scored = candidates.map((c) => ({ c, score: -Jaro.distance(lookup, c) }));
-    scored.sort((a, b) => a.score - b.score);
-    const top = scored
-      .slice(0, 6)
-      .map(({ c }) => (this.partial ? c.replace(/_([^/]+)$/, "$1") : c));
-
-    this.#cachedCorrections = top;
-    return this.#cachedCorrections;
-  }
-}
 
 export class DetailsKey {
   /** @internal */
@@ -476,13 +408,10 @@ export class LookupContext {
     const format = String(formats[0] ?? "html");
     const template = this.findTemplate(action, prefixes, formats);
     if (!template) {
-      throw new MissingTemplate(
-        controller,
-        action,
-        format,
-        this.resolverNames(),
-        this.allCandidatePaths(),
-      );
+      throw new MissingTemplate(this._viewPaths, action, prefixes, false, {
+        ...this._details,
+        formats,
+      });
     }
 
     const context: RenderContext = {
@@ -515,13 +444,10 @@ export class LookupContext {
   ): Promise<string> {
     const template = this.findPartial(name, [prefix], [format]);
     if (!template) {
-      throw new MissingTemplate(
-        prefix,
-        `_${name}`,
-        format,
-        this.resolverNames(),
-        this.allCandidatePaths(),
-      );
+      throw new MissingTemplate(this._viewPaths, name, [prefix], true, {
+        ...this._details,
+        formats: [format],
+      });
     }
 
     const context: RenderContext = {
@@ -579,13 +505,10 @@ export class LookupContext {
 
     const template = this.findPartial(partialName, [partialPrefix], [format]);
     if (!template) {
-      throw new MissingTemplate(
-        partialPrefix,
-        `_${partialName}`,
-        format,
-        this.resolverNames(),
-        this.allCandidatePaths(),
-      );
+      throw new MissingTemplate(this._viewPaths, partialName, [partialPrefix], true, {
+        ...this._details,
+        formats: [format],
+      });
     }
 
     const partialView = view ?? this.buildViewContext();
@@ -607,13 +530,10 @@ export class LookupContext {
 
     const template = this.findTemplate(templateName, [templatePrefix], [format]);
     if (!template) {
-      throw new MissingTemplate(
-        templatePrefix,
-        templateName,
-        format,
-        this.resolverNames(),
-        this.allCandidatePaths(),
-      );
+      throw new MissingTemplate(this._viewPaths, templateName, [templatePrefix], false, {
+        ...this._details,
+        formats: [format],
+      });
     }
 
     return template.render(view ?? this.buildViewContext(), locals);
@@ -621,26 +541,6 @@ export class LookupContext {
 
   private buildViewContext(): Base {
     return new (DetailsKey.viewContextClass())(this, {}, null);
-  }
-
-  private resolverNames(): string[] {
-    return this._viewPaths.toArray().map((r) => r.constructor.name);
-  }
-
-  /** @internal */
-  private allCandidatePaths(): string[] {
-    const seen = new Set<string>();
-    for (const resolver of this._viewPaths) {
-      try {
-        const paths = resolver.allTemplatePaths?.();
-        if (paths) {
-          for (const p of paths) seen.add(p.virtual);
-        }
-      } catch {
-        /** @empty */
-      }
-    }
-    return Array.from(seen);
   }
 }
 

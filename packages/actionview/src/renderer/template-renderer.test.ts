@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TemplateRenderer } from "./template-renderer.js";
 import { Renderer } from "./renderer.js";
-import { LookupContext, MissingTemplate } from "../lookup-context.js";
+import { LookupContext } from "../lookup-context.js";
+import { MissingTemplate } from "../template/error.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 
 function makeFakeTemplate(body: string, format = "html"): RenderableTemplate {

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { TemplateRenderer } from "./template-renderer.js";
-import { LookupContext, MissingTemplate } from "../lookup-context.js";
+import { LookupContext } from "../lookup-context.js";
+import { MissingTemplate } from "../template/error.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 
 const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };

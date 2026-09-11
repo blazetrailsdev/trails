@@ -2,7 +2,8 @@ import { Notifications } from "@blazetrails/activesupport";
 
 import { ArgumentError, File } from "@blazetrails/ruby-compat";
 
-import { LookupContext, MissingTemplate } from "../lookup-context.js";
+import { LookupContext } from "../lookup-context.js";
+import { MissingTemplate } from "../template/error.js";
 import { RawFile } from "../template/raw-file.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
@@ -180,7 +181,10 @@ export class TemplateRenderer extends AbstractRenderer {
     const template = this.lookupContext.findTemplate(baseName, [prefix], [format]);
     if (template) return template as unknown as RenderableTemplate;
 
-    throw new MissingTemplate(prefix, baseName, format, [], []);
+    throw new MissingTemplate(this.lookupContext.viewPaths, baseName, [prefix], false, {
+      ...this.details,
+      formats: [format],
+    });
   }
 }
 

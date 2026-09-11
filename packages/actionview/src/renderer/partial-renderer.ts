@@ -1,7 +1,7 @@
 import { Notifications } from "@blazetrails/activesupport";
 
 import type { LookupContext } from "../lookup-context.js";
-import { MissingTemplate } from "../lookup-context.js";
+import { MissingTemplate } from "../template/error.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import {
   cacheCollectionRender,
@@ -110,7 +110,10 @@ export class PartialRenderer extends AbstractRenderer {
     if (!template) {
       const { name, prefix } = this.parsePartialPath(path);
       const format = (this.lookupContext.formats[0] as string | undefined) ?? "html";
-      throw new MissingTemplate(prefix, `_${name}`, format, [], []);
+      throw new MissingTemplate(this.lookupContext.viewPaths, name, [prefix], true, {
+        ...this.details,
+        formats: [format],
+      });
     }
     return template as RenderableTemplate;
   }

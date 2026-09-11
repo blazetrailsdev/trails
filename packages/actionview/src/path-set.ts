@@ -1,7 +1,7 @@
 import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
 import type { Template } from "./template.js";
-import { MissingTemplate } from "./lookup-context.js";
+import { MissingTemplate } from "./template/error.js";
 
 export type LookupDetails =
   | TemplateDetails
@@ -81,11 +81,7 @@ export class PathSet implements Iterable<PathSetResolver> {
   ): unknown {
     const found = this.findAll(path, prefixes, partial, details, detailsKey, locals);
     if (found.length > 0) return found[0];
-    const pfxs: ReadonlyArray<string> = Array.isArray(prefixes) ? prefixes : [prefixes];
-    const formats = (details as { formats?: ReadonlyArray<string | symbol> }).formats ?? [];
-    throw new MissingTemplate(pfxs[0] ?? "", String(path), formats.map(String).join(", "), [
-      ...pfxs,
-    ]);
+    throw new MissingTemplate(this, String(path), prefixes, partial, details, detailsKey, locals);
   }
 
   findAll(
