@@ -535,7 +535,7 @@ export class TimeWithZone {
         result = this.utc().plus(other as number);
       } catch (e) {
         if (!(e instanceof TypeError)) throw e;
-        result = datetimeSince(this.utc().toDatetime(), (other as { toR(): Rational }).toR());
+        result = datetimeSince(this.utc().toDatetime(), other as { toR(): Rational });
         deprecator().warn(
           `Adding an instance of ${(other as { [rubyClass]?: string })[rubyClass] ?? (other as object).constructor.name} to an instance of ${this[rubyClass]} is deprecated. This behavior will raise ` +
             "a `TypeError` in Rails 8.1.",

@@ -138,7 +138,10 @@ export function ago(datetime: DateTime, seconds: number): DateTime {
   return since(datetime, -seconds);
 }
 
-export function since(datetime: DateTime, seconds: number | Rational): DateTime {
+export function since(
+  datetime: DateTime,
+  seconds: number | Rational | { toR(): Rational },
+): DateTime {
   return new RubyDateTime(datetime).plus(rational(seconds, 86400)).toDatetime();
 }
 

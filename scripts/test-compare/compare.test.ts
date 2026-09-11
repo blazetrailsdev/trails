@@ -307,10 +307,6 @@ describe("arClosureResult", () => {
 });
 
 describe("misplacedLocation", () => {
-  // time_ext_test.rb's TimeExtMarshalingTest > last quarter on 31st, absent from
-  // core-ext/time-ext.test.ts, was credited by time-ext.test.ts's
-  // TimeExtCalculationsTest > last quarter on 31st — a name date_ext_test.rb and
-  // date_time_ext_test.rb also define.
   it("reports a shared name found elsewhere only by description as missing", () => {
     expect(misplacedLocation([], ["time-ext.test.ts"], false, true)).toBeUndefined();
   });

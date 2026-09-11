@@ -250,9 +250,17 @@ export class Rational {
  * exact-one denominator, and otherwise leaves the canonicalizer for `f_div`
  * (`vendor/ruby/rational.c:2668`), so `Rational(r, 1000000)` is a division.
  *
+ * A non-numeric operand is converted through its `to_r`
+ * (`vendor/ruby/rational.c:2591,2647`), and `nil` raises TypeError (`:2564-2567`).
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
-export function rational(numv: number | bigint | Rational, denv: number | bigint = 1): Rational {
+export function rational(
+  numv: number | bigint | Rational | { toR(): Rational },
+  denv: number | bigint = 1,
+): Rational {
+  if (numv == null) throw new TypeError("can't convert nil into Rational");
+  if (typeof numv === "object" && !(numv instanceof Rational)) numv = numv.toR();
   if (numv instanceof Rational) {
     return denv === 1 || denv === 1n ? numv : numv.quo(denv);
   }
