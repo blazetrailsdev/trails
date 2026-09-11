@@ -28,58 +28,58 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (typeof value !== "string") return value as Record<string, string | null> | null;
 
+    const string = value;
     let pos = 0;
     const scan = (pattern: RegExp): string | null => {
       pattern.lastIndex = pos;
-      const match = pattern.exec(value);
+      const match = pattern.exec(string);
       if (match === null) return null;
       pos = pattern.lastIndex;
       return match[0];
     };
     const hash: Record<string, string | null> = {};
 
-    while (pos < value.length) {
+    while (pos < string.length) {
       if (scan(/"/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
       }
 
       let key = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
       if (key === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
       }
 
       if (scan(/"=>?/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
       }
 
-      let entry: string | null;
       if (scan(/NULL/y) !== null) {
-        entry = null;
+        value = null;
       } else {
         if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
         }
 
-        entry = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
-        if (entry === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+        value = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+        if (value === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
         }
 
         if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
         }
       }
 
       key = key.replaceAll('\\"', '"').replaceAll("\\\\", "\\");
 
-      if (entry !== null) {
-        entry = entry.replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+      if (value !== null) {
+        value = (value as string).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
       }
 
-      hash[key] = entry;
+      hash[key] = value as string | null;
 
-      if (scan(/, /y) === null && pos < value.length) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(value)));
+      if (scan(/, /y) === null && pos < string.length) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
       }
     }
 
