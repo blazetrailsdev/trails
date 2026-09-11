@@ -1,154 +1,265 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LogSubscriber as BaseLogSubscriber, Notifications } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
+import { LogSubscriber } from "../../log-subscriber.js";
 
 describe("LogOnUnpermittedParamsTest", () => {
+  let log: string[];
+
+  beforeEach(() => {
+    Parameters.actionOnUnpermittedParameters = "log";
+  });
+
   afterEach(() => {
     Parameters.actionOnUnpermittedParameters = false;
     vi.restoreAllMocks();
+    Notifications.unsubscribeAll();
   });
 
+  function assertLogged(message: string, block: () => void): void {
+    log = [];
+    const push = (msg?: string | (() => string)) => {
+      log.push(typeof msg === "function" ? msg() : (msg ?? ""));
+      return true;
+    };
+    const logger = { "debug?": true, debug: push, info: push, warn: push, error: push };
+    vi.spyOn(BaseLogSubscriber, "logger", "get").mockReturnValue(logger as never);
+    Notifications.unsubscribeAll();
+    LogSubscriber.attachTo("action_controller");
+    block();
+    expect(log.join("\n")).toContain(message);
+  }
+
   it("logs on unexpected param", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    new Parameters({ name: "John", admin: true }).permit("name");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("admin"));
+    const requestParams = { book: { pages: 65 }, fishing: "Turnips" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :fishing. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.permit({ book: ["pages"] });
+      },
+    );
   });
 
   it("logs on unexpected params", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    new Parameters({ name: "John", admin: true, secret: "x" }).permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { book: { pages: 65 }, fishing: "Turnips", car: "Mercedes" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.permit({ book: ["pages"] });
+      },
+    );
   });
 
   it("logs on unexpected nested param", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const inner = new Parameters({ title: "Hi", admin: true });
-    new Parameters({ post: inner }).permit({ post: ["title"] });
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { book: { pages: 65, title: "Green Cats and where to find then." } };
+    const params = new Parameters(requestParams);
+
+    assertLogged("Unpermitted parameter: :title. Context: {  }", () => {
+      params.permit({ book: ["pages"] });
+    });
   });
 
   it("logs on unexpected nested params", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const inner = new Parameters({ title: "Hi", admin: true, secret: "x" });
-    new Parameters({ post: inner }).permit({ post: ["title"] });
-    expect(spy).toHaveBeenCalled();
+    const requestParams = {
+      book: { pages: 65, title: "Green Cats and where to find then.", author: "G. A. Dog" },
+    };
+    const params = new Parameters(requestParams);
+
+    assertLogged("Unpermitted parameters: :title, :author. Context: {  }", () => {
+      params.permit({ book: ["pages"] });
+    });
   });
 
   it("does not log on unexpected nested params with expect", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const inner = new Parameters({ title: "Hi", admin: true });
-    const params = new Parameters({ post: inner });
-    params.expect({ post: ["title"] });
-    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining("admin"));
+    const requestParams = {
+      book: { pages: 65, title: "Green Cats and where to find then.", author: "G. A. Dog" },
+    };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged("", () => {
+      params.expect({ book: "pages" });
+    });
   });
 
   it("does not log on unexpected nested params with expect!", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const inner = new Parameters({ title: "Hi", admin: true });
-    const params = new Parameters({ post: inner });
-    params.expectBang({ post: ["title"] });
-    expect(spy).not.toHaveBeenCalled();
+    const requestParams = {
+      book: { pages: 65, title: "Green Cats and where to find then.", author: "G. A. Dog" },
+    };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged("", () => {
+      params.expectBang({ book: "pages" });
+    });
   });
 
   it("logs on unexpected param with deep_dup", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true });
-    params.deepDup().permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { book: { pages: 3, author: "YY" } };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :author. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.deepDup().permit({ book: ["pages"] });
+      },
+    );
   });
 
   it("logs on unexpected params with slice", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).slice("name", "admin");
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.slice("food", "fishing", "car").permit("food");
+      },
+    );
   });
 
   it("logs on unexpected params with except", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true, extra: "x" }).except("extra");
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
-  });
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
 
-  it("logs on unexpected params with extract!", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true });
-    const extracted = params.extractBang("admin");
-    params.permit("name");
-    expect(extracted.get("admin")).toBe(true);
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.except("music").permit("food");
+      },
+    );
   });
 
   it("logs on unexpected params with transform_values", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).transformValues((v) => v);
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car, :music. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.transformValues((v) => String(v).toUpperCase()).permit("food");
+      },
+    );
   });
 
   it("logs on unexpected params with transform_keys", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).transformKeys((k) => k);
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :FISHING, :CAR, :MUSIC. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.transformKeys((k) => k.toUpperCase()).permit("FOOD");
+      },
+    );
   });
 
   it("logs on unexpected param with deep_transform_keys", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).deepTransformKeys((k) => k);
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { book: { pages: 48, title: "Hope" } };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :TITLE. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.deepTransformKeys((k) => k.toUpperCase()).permit({ BOOK: ["PAGES"] });
+      },
+    );
   });
 
   it("logs on unexpected param with select", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).select(() => true);
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :music. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.select((k) => k === "music").permit("food");
+      },
+    );
   });
 
   it("logs on unexpected params with reject", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).reject(() => false);
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.reject((k) => k === "music").permit("food");
+      },
+    );
   });
 
   it("logs on unexpected param with compact", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John", admin: true }).compact();
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato", fishing: "Turnips", car: null, music: null };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :fishing. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.compact().permit("food");
+      },
+    );
   });
 
   it("logs on unexpected param with merge", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John" }).merge({ admin: true });
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :album. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.merge({ album: "My favorites" }).permit("food");
+      },
+    );
   });
 
   it("logs on unexpected param with reverse_merge", () => {
-    Parameters.actionOnUnpermittedParameters = "log";
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const params = new Parameters({ name: "John" }).reverseMerge({ admin: true });
-    params.permit("name");
-    expect(spy).toHaveBeenCalled();
+    const requestParams = { food: "tomato" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameter: :album. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.reverseMerge({ album: "My favorites" }).permit("food");
+      },
+    );
+  });
+
+  it("logs on unexpected params with extract!", () => {
+    const requestParams = { food: "tomato", fishing: "Turnips", car: "Mercedes", music: "No. 9" };
+    const context = { action: "my_action", controller: "my_controller" };
+    const params = new Parameters(requestParams, context);
+
+    assertLogged(
+      "Unpermitted parameters: :fishing, :car. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.extractBang("food", "fishing", "car").permit("food");
+      },
+    );
+
+    assertLogged(
+      "Unpermitted parameter: :music. Context: { action: my_action, controller: my_controller }",
+      () => {
+        params.permit("food");
+      },
+    );
   });
 });
