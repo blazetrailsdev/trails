@@ -177,7 +177,7 @@ did `import { deflateSync, inflateSync } from "zlib"` at module
 top-level, reachable from the activerecord barrel via:
 
 ```
-index.ts → encryption/install.js (installExtendedQueriesIfConfigured)
+index.ts → encryption/extended-deterministic-queries.js (ExtendedDeterministicQueries.installSupport)
   → encryption.ts → encryption/configurable.ts → encryption/config.ts → "zlib"
 ```
 

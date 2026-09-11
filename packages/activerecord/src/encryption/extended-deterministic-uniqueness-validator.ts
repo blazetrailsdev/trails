@@ -1,14 +1,9 @@
 import { deterministicEncryptedAttributes, encryptedTypeOf } from "./encryptable-record.js";
-import {
-  AdditionalValue,
-  ExtendedDeterministicQueries,
-  type SerializableType,
-} from "./extended-deterministic-queries.js";
+import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { Contexts } from "./contexts.js";
 
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
-  private static _originalValidateEach: ((...args: any[]) => unknown) | undefined;
 
   /** @missingRailsCall prepend — PERMANENT */
   static installSupport({
@@ -27,7 +22,6 @@ export class ExtendedDeterministicUniquenessValidator {
       );
     }
 
-    this._originalValidateEach = original;
     this._installed = true;
 
     const validator = new EUV();
@@ -39,19 +33,6 @@ export class ExtendedDeterministicUniquenessValidator {
     ) {
       return validator.validateEach(original.bind(this), record, attribute, value);
     };
-  }
-
-  static resetSupport(UniquenessValidator: {
-    prototype: { validateEach: (...args: any[]) => unknown };
-  }): void {
-    if (!this._installed || !this._originalValidateEach) return;
-    UniquenessValidator.prototype.validateEach = this._originalValidateEach;
-    this._installed = false;
-    this._originalValidateEach = undefined;
-  }
-
-  static get installed(): boolean {
-    return this._installed;
   }
 }
 
@@ -79,15 +60,5 @@ export class EncryptedUniquenessValidator {
         );
       }
     }
-  }
-
-  static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    const fullType = klass.typeForAttribute(attribute) as SerializableType | undefined;
-    const type = encryptedTypeOf(fullType);
-    if (!fullType || !type?.deterministic) {
-      return [value];
-    }
-
-    return [value, ...type.previousTypes.map((prevType) => new AdditionalValue(value, prevType))];
   }
 }

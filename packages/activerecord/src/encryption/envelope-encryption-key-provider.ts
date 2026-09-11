@@ -37,10 +37,6 @@ export class EnvelopeEncryptionKeyProvider {
     return this._activePrimaryKey;
   }
 
-  generateRandomEncryptionKey(): string {
-    return this.generateRandomSecret();
-  }
-
   /** @internal */
   private encryptDataKey(randomSecret: string): string {
     return new Encryptor({ compress: false }).encrypt(randomSecret, {

@@ -43,10 +43,6 @@ export class Properties {
     this._data.set(key, value);
   }
 
-  has(key: string): boolean {
-    return this._data.has(key);
-  }
-
   each(fn: (key: string, value: unknown) => void): void {
     for (const [key, value] of this._data) {
       fn(key, value);

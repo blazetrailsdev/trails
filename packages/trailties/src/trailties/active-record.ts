@@ -11,12 +11,19 @@ import {
   AutoFilteredParameters,
   type AutoFilteredParametersApp,
   SchemaReflection,
+  Relation,
+  UniquenessValidator,
   deprecator,
 } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
-import { Configurable as EncryptionConfigurable } from "@blazetrails/activerecord/encryption";
-import { installExtendedQueriesIfConfigured } from "@blazetrails/activerecord/encryption/install";
+import {
+  Configurable as EncryptionConfigurable,
+  EncryptedAttributeType,
+  EncryptedUniquenessValidator,
+  ExtendedDeterministicQueries,
+  ExtendedDeterministicUniquenessValidator,
+} from "@blazetrails/activerecord/encryption";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
@@ -56,7 +63,13 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
 };
 
 const installEncryptionExtendedQueries = (): void => {
-  installExtendedQueriesIfConfigured();
+  if (EncryptionConfigurable.config.extendQueries) {
+    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicUniquenessValidator.installSupport({
+      UniquenessValidator,
+      EncryptedUniquenessValidator,
+    });
+  }
 };
 
 const setSqlite3StrictStringsByDefault = (adapter: typeof SQLite3Adapter): void => {

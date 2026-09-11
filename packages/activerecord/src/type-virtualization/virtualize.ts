@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 import ts from "typescript";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";

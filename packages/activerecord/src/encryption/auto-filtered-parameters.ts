@@ -9,17 +9,11 @@ export class AutoFilteredParameters {
   private _app: AutoFilteredParametersApp;
   private _attributesByClass: Map<any, string[]>;
   private _collecting = true;
-  private _hookDisposer?: () => void;
 
   constructor(app: AutoFilteredParametersApp) {
     this._app = app;
     this._attributesByClass = new Map();
     this.installCollectingHook();
-  }
-
-  dispose(): void {
-    this._hookDisposer?.();
-    this._hookDisposer = undefined;
   }
 
   enable(): void {
@@ -44,11 +38,9 @@ export class AutoFilteredParameters {
 
   /** @internal */
   private installCollectingHook(): void {
-    this._hookDisposer = Configurable.onEncryptedAttributeDeclared(
-      (klass: any, attribute: string) => {
-        this.attributeWasDeclared(klass, attribute);
-      },
-    );
+    Configurable.onEncryptedAttributeDeclared((klass: any, attribute: string) => {
+      this.attributeWasDeclared(klass, attribute);
+    });
   }
 
   /** @internal */

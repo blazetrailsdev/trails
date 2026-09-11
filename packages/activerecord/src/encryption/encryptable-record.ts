@@ -380,6 +380,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
 }
 
+/** @noRailsEquivalent CONVERGEABLE encryption-converge-pending-encryptions-to-decorate-attributes */
 export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefined {
   let current: any = type;
   while (current) {

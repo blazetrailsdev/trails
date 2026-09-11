@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 import ts from "typescript";
 
 export interface WalkerResult {

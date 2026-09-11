@@ -26,8 +26,7 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
   it("generate_random_encryption_key generates keys of 32 bytes", () => {
     const primaryProvider = new KeyProvider(makeKey());
     const provider = new EnvelopeEncryptionKeyProvider(primaryProvider);
-    const keyStr = provider.generateRandomEncryptionKey();
-    const buf = Buffer.from(keyStr, "base64");
+    const buf = Buffer.from(provider.encryptionKey().secret, "base64");
     expect(buf.length).toBe(32);
   });
 

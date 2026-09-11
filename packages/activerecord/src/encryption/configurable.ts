@@ -38,6 +38,7 @@ export class Configurable {
     return Contexts.context.cipher as Cipher;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE ruby-extractor-credit-context-properties-splat */
   static get messageSerializer(): MessageSerializerLike | undefined {
     return Contexts.context.messageSerializer;
   }

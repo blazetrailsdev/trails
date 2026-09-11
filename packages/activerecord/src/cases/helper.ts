@@ -10,7 +10,14 @@ import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
 import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
-import { installExtendedQueriesIfConfigured } from "../encryption/install.js";
+import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
+import {
+  ExtendedDeterministicUniquenessValidator,
+  EncryptedUniquenessValidator,
+} from "../encryption/extended-deterministic-uniqueness-validator.js";
+import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
+import { Relation } from "../relation.js";
+import { UniquenessValidator } from "../validations.js";
 import {
   TEST_PRIMARY_KEY,
   TEST_DETERMINISTIC_KEY,
@@ -36,7 +43,11 @@ EncryptionConfigurable.configure({
 });
 
 EncryptionConfigurable.config.extendQueries = true;
-installExtendedQueriesIfConfigured();
+ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+ExtendedDeterministicUniquenessValidator.installSupport({
+  UniquenessValidator,
+  EncryptedUniquenessValidator,
+});
 
 function writingPoolCensus(): Map<string, Map<string, number>> {
   const census = new Map<string, Map<string, number>>();

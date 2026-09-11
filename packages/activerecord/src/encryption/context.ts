@@ -18,6 +18,7 @@ export class Context {
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
   cipher?: unknown;
+  /** @noRailsEquivalent CONVERGEABLE ruby-extractor-credit-context-properties-splat */
   messageSerializer?: MessageSerializerLike;
   encryptor?: unknown;
   frozenEncryption: boolean = false;
