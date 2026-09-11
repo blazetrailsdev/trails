@@ -167,17 +167,50 @@ describe("IO", () => {
       });
     }
 
-    const nobom = join(dir, "nobom.bin");
-    writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
-    File.open(nobom, "rb:UTF-16", (file) => {
-      expect(() => file.read()).toThrow(InvalidByteSequenceError);
-    });
-    File.open(nobom, "rb:UTF-16", (file) => {
-      expect(() => file.read()).toThrow('"\\x00h" on UTF-16');
-    });
-    File.open(nobom, "rb:UTF-32", (file) => {
-      expect(() => file.read()).toThrow('"\\x00h\\x00i" on UTF-32');
-    });
+    const previousInternal = Encoding.defaultInternal;
+    Encoding.defaultInternal = "UTF-8";
+    try {
+      const nobom = join(dir, "nobom.bin");
+      writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
+      File.open(nobom, "rb:UTF-16", (file) => {
+        let error: unknown;
+        try {
+          file.read();
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(InvalidByteSequenceError);
+        const invalid = error as InvalidByteSequenceError;
+        expect(invalid.message).toBe('"\\x00h" on UTF-16');
+        expect(invalid.errorBytes()).toBe("\x00h");
+        expect(invalid.readagainBytes()).toBeNull();
+        expect(invalid.isIncompleteInput()).toBe(false);
+        expect(invalid.sourceEncodingName()).toBe("UTF-16");
+        expect(invalid.destinationEncodingName()).toBe("UTF-8");
+      });
+      File.open(nobom, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('"\\x00h\\x00i" on UTF-32');
+      });
+
+      const one = join(dir, "one.bin");
+      writeFileSync(one, Uint8Array.from([0]));
+      File.open(one, "rb:UTF-16", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-16');
+      });
+      File.open(one, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-32');
+      });
+
+      const empty = join(dir, "empty.bin");
+      writeFileSync(empty, Uint8Array.from([]));
+      for (const encoding of ["UTF-16", "UTF-32"]) {
+        File.open(empty, `rb:${encoding}`, (file) => {
+          expect(file.read()).toBe("");
+        });
+      }
+    } finally {
+      Encoding.defaultInternal = previousInternal;
+    }
   });
 
   it("read falls back to Encoding.default_external where the stream carries none", () => {

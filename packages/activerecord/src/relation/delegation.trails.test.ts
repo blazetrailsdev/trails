@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   delegateArrayMethod,
-  generateRelationMethod,
   relationClassFor,
   associationRelationClassFor,
   disableJoinsAssociationRelationClassFor,
@@ -17,30 +16,33 @@ import { CollectionProxy } from "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../disable-joins-association-relation.js";
 
+const defineClassMethod = (model: object, name: string, fn: (...args: never[]) => unknown) =>
+  Object.defineProperty(model, name, { value: fn, writable: true, configurable: true });
+
 describe("generated relation methods — per-model prototype carrier", () => {
   it("installs a generated delegator as a real method on the per-model carrier", () => {
-    const fn = function (this: unknown) {
-      return "generated-result";
-    };
-    generateRelationMethod(Post as never, "somethingGenerated", fn);
+    defineClassMethod(Post, "somethingGenerated", () => "generated-result");
+    Post.generateRelationMethod("somethingGenerated");
 
     const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(carrier, "somethingGenerated")).toBe(true);
-    expect(carrier.somethingGenerated).toBe(fn);
+    const rel = Post.all() as unknown as { somethingGenerated: () => string };
+    expect(rel.somethingGenerated()).toBe("generated-result");
   });
 
   it("keeps the first generated delegator for a name (Rails' method_defined? memo)", () => {
-    generateRelationMethod(Post as never, "memoizedGenerated", () => "first");
-    generateRelationMethod(Post as never, "memoizedGenerated", () => "second");
+    defineClassMethod(Post, "memoizedGenerated", () => "first");
+    Post.generateRelationMethod("memoizedGenerated");
+    const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
+    const first = carrier.memoizedGenerated;
+    Post.generateRelationMethod("memoizedGenerated");
 
-    const rel = Post.all() as unknown as { memoizedGenerated: () => string };
-    expect(rel.memoizedGenerated()).toBe("first");
+    expect(carrier.memoizedGenerated).toBe(first);
   });
 
   it("resolves the generated method on a constructed relation via prototype lookup", () => {
-    generateRelationMethod(Post as never, "anotherGenerated", function () {
-      return 42;
-    });
+    defineClassMethod(Post, "anotherGenerated", () => 42);
+    Post.generateRelationMethod("anotherGenerated");
     const rel = Post.all() as unknown as { anotherGenerated: () => number };
     expect(typeof rel.anotherGenerated).toBe("function");
     expect(rel.anotherGenerated()).toBe(42);
@@ -55,7 +57,8 @@ describe("generated relation methods — per-model prototype carrier", () => {
   });
 
   it("gives distinct models distinct carriers (no cross-model leakage)", () => {
-    generateRelationMethod(Post as never, "postOnly", () => "post");
+    defineClassMethod(Post, "postOnly", () => "post");
+    Post.generateRelationMethod("postOnly");
     expect(relationClassFor(Post as never)).not.toBe(relationClassFor(Comment as never));
     const commentCarrier = relationClassFor(Comment as never).prototype as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(commentCarrier, "postOnly")).toBe(false);
@@ -82,8 +85,9 @@ describe("generated relation methods — remaining delegate-class carriers", () 
 
   it("feeds one generated method to all four per-model carriers (propagation)", () => {
     const carriers = allCarriersFor(Post as never);
-    const fn = () => "shared";
-    generateRelationMethod(Post as never, "sharedAcrossCarriers", fn);
+    defineClassMethod(Post, "sharedAcrossCarriers", () => "shared");
+    Post.generateRelationMethod("sharedAcrossCarriers");
+    const fn = (carriers[0].prototype as Record<string, unknown>).sharedAcrossCarriers;
     for (const carrier of carriers) {
       const proto = carrier.prototype as Record<string, unknown>;
       expect(Object.prototype.hasOwnProperty.call(proto, "sharedAcrossCarriers")).toBe(true);
@@ -92,7 +96,8 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("installs already-generated methods when a carrier is created later (includeInto catch-up)", () => {
-    generateRelationMethod(Comment as never, "lateCarrierGenerated", () => "late");
+    defineClassMethod(Comment, "lateCarrierGenerated", () => "late");
+    Comment.generateRelationMethod("lateCarrierGenerated");
     for (const carrier of [
       associationRelationClassFor(Comment as never),
       disableJoinsAssociationRelationClassFor(Comment as never),
@@ -112,19 +117,26 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
-    generateRelationMethod(Company as never, "stiBaseGenerated", () => "base");
+    defineClassMethod(Company, "stiBaseGenerated", () => "base");
+    Company.generateRelationMethod("stiBaseGenerated");
     const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(firmCarrier, "stiBaseGenerated")).toBe(true);
-    expect((firmCarrier.stiBaseGenerated as () => string)()).toBe("base");
+    expect((Firm.all() as unknown as { stiBaseGenerated: () => string }).stiBaseGenerated()).toBe(
+      "base",
+    );
   });
 
   it("lets a child model's own generated method win over an inherited one", () => {
-    generateRelationMethod(Firm as never, "stiOverridden", () => "child");
-    generateRelationMethod(Company as never, "stiOverridden", () => "base");
-    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
-    expect((firmCarrier.stiOverridden as () => string)()).toBe("child");
-    const companyCarrier = relationClassFor(Company as never).prototype as Record<string, unknown>;
-    expect((companyCarrier.stiOverridden as () => string)()).toBe("base");
+    defineClassMethod(Firm, "stiOverridden", () => "child");
+    defineClassMethod(Company, "stiOverridden", () => "base");
+    Firm.generateRelationMethod("stiOverridden");
+    Company.generateRelationMethod("stiOverridden");
+    expect((Firm.all() as unknown as { stiOverridden: () => string }).stiOverridden()).toBe(
+      "child",
+    );
+    expect((Company.all() as unknown as { stiOverridden: () => string }).stiOverridden()).toBe(
+      "base",
+    );
   });
 
   it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {

@@ -9,7 +9,6 @@ import {
   delegateArrayMethod,
   delegateEnumerableMethod,
   classMethodDelegator,
-  generateRelationMethod,
   uncacheableMethods,
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
@@ -763,11 +762,10 @@ function wrapCollectionProxy<T extends Base = Base>(
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        const delegator = classMethodDelegator(prop);
         if (!uncacheableMethods().has(prop)) {
-          generateRelationMethod(modelClass, prop, delegator);
+          modelClass.generateRelationMethod(prop);
         }
-        return (...args: any[]) => delegator.apply(scope, args);
+        return (...args: any[]) => classMethodDelegator(prop).apply(scope, args);
       }
 
       return scopeVal;

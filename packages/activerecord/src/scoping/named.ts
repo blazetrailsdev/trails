@@ -17,7 +17,6 @@ function baseClass(): typeof Base {
 
 import { Relation } from "../relation.js";
 import { Default } from "./default.js";
-import { generateRelationMethod } from "../relation/delegation.js";
 
 const RESTRICTED_CLASS_METHODS = new Set([
   "private",
@@ -61,7 +60,6 @@ export type ScopeOn<T extends Base, M extends Base, A extends unknown[] = []> = 
   ? ScopeMethod<T, A>
   : never;
 
-/** @missingRailsArgs generate_relation_method — CONVERGEABLE converge-relation-delegation-helper-layer */
 export function scope<T extends typeof Base>(
   this: T,
   name: string,
@@ -108,10 +106,7 @@ export function scope<T extends typeof Base>(
   }
   Object.defineProperty(modelClass, name, { value: method, writable: true, configurable: true });
 
-  generateRelationMethod(modelClass, name, function (this: any, ...args: any[]) {
-    const model = this._model;
-    return model[name].apply(Object.create(model, { all: { value: () => this } }), args);
-  });
+  modelClass.generateRelationMethod(name);
 }
 
 interface NamedHost {
