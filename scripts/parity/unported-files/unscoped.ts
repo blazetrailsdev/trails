@@ -448,23 +448,12 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
-    tests: [
-      "auto value on primary key",
-      "binary in fixtures",
-      "insert with default function",
-      "logger level invariant",
-    ],
+    tests: ["binary in fixtures"],
     reason:
-      "One-off surfaces. 'auto value on primary key' calls insert_fixtures_set with a " +
-      "positional row array and no labels, which trails' label-keyed prepare path has no " +
-      "shape for. 'binary in fixtures' reads ASSETS_ROOT + '/flowers.jpg' off disk. " +
-      "'insert with default function' asserts a CURRENT_TIMESTAMP column default within " +
-      "1.1s of Time.now, which has no stable cross-adapter read back through the attribute " +
-      "reader. 'logger level invariant' swaps ActiveRecord::Base.logger for " +
-      "ActiveSupport::Logger.new(nil) and asserts the level survives a fixture load. " +
-      "CONVERGEABLE converge-fixtures-test-grouped-one-off-exclusions: insertFixturesSet, " +
-      "Base.logger and Logger#level all exist, so at least two of these four converge and " +
-      "the group is split into per-case rows there.",
+      "test-helpers/fixtures/binaries.ts carries only the two ids; binaries.yml:3,137 fill " +
+      '`data` from a `!binary` literal and `<%= binary(ASSETS_ROOT + "/flowers.jpg") %>`, ' +
+      "which the TS fixture module has no async asset read for. " +
+      "CONVERGEABLE binaries-fixture-data-from-flowers-asset.",
   },
   {
     pattern: "fixture_set/model_metadata.rb",

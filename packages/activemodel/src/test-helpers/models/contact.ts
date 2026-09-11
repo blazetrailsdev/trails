@@ -1,14 +1,25 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (contact.rb:3-7); the class/interface merge is how `include()` surfaces those members on the type side. */
-import { InstanceVariablesObject, exceptBang, include } from "@blazetrails/activesupport";
-import { Model } from "../../index.js";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (contact.rb:3-7); the class/interface merge is how `include()` surfaces those members on the type side. */
+import { InstanceVariablesObject, exceptBang, extend, include } from "@blazetrails/activesupport";
+import { Conversion, ClassMethods as ConversionClassMethods } from "../../conversion.js";
+import { Naming } from "../../naming.js";
+import type { ModelName } from "../../naming.js";
+import { NoMethodError } from "../../attribute-assignment.js";
+import { Validations } from "../../validations.js";
 import { JSON as SerializersJSON } from "../../serializers/json.js";
 
-export interface Contact extends SerializersJSON {}
+export interface Contact extends Conversion, Validations, SerializersJSON {}
 
-export class Contact extends Model {
+export class Contact {
+  declare static modelName: ModelName;
   declare static includeRootInJson: boolean | string;
+  declare static paramDelimiter: string;
 
   static {
+    extend(this, Naming);
+    include(this, Conversion);
+    extend(this, ConversionClassMethods);
+    include(this, Validations);
+
     include(this, SerializersJSON);
   }
 
@@ -102,15 +113,24 @@ export class Contact extends Model {
     return { git: ":github" };
   }
 
+  constructor(options: Record<string, unknown> = {}) {
+    for (const [name, value] of Object.entries(options)) {
+      if (!(name in this)) {
+        throw new NoMethodError(`undefined method '${name}=' for an instance of Contact`);
+      }
+      (this as unknown as Record<string, unknown>)[name] = value;
+    }
+  }
+
   pseudonyms(): null {
     return null;
   }
 
-  override isPersisted(): boolean {
+  isPersisted(): boolean {
     return this.id != null && this.id !== false;
   }
 
-  set attributes(hash: Record<string, unknown>) {
+  setAttributes(hash: Record<string, unknown>): void {
     for (const [k, v] of Object.entries(hash)) {
       (this as unknown as Record<string, unknown>)[`_${k}`] = v;
     }
@@ -121,12 +141,11 @@ export class Contact extends Model {
   }
 }
 
-const MODEL_BASE_IVARS = ["_errors", "_contextForValidation"];
-
 function instanceValues(contact: Contact): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(InstanceVariablesObject.instanceValues(contact))
-      .filter(([ivar]) => !MODEL_BASE_IVARS.includes(ivar))
-      .map(([ivar, value]) => [ivar.replace(/^_/, ""), value]),
+    Object.entries(InstanceVariablesObject.instanceValues(contact)).map(([ivar, value]) => [
+      ivar.replace(/^_/, ""),
+      value,
+    ]),
   );
 }
