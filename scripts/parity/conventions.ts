@@ -657,27 +657,19 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Rails' alias_method chains around Ruby's Time OPERATORS — `+`/`-`/`<=>`/" +
-      "`eql?` (time/calculations.rb:304-355). Each pair exists only so the " +
-      "redefined operator can fall back to the original core-Ruby one under " +
-      "its `*_without_*` name. JS has no operator overloading and no way to " +
-      "reopen `Date`'s operators, so trails' ported arithmetic is the plain " +
-      "`since`/`ago`/`compare` functions and the chain halves have no receiver " +
-      "to attach to. `at_without_coercion` (:59) is here for a narrower reason: " +
-      "it aliases core Ruby's `Time.at`, which in trails IS `Time.at` on " +
-      "`@blazetrails/date`'s `Time`, so it has nothing of its own to name. " +
-      "`at`/`at_with_coercion` are NOT skipped — they are ported onto `Time` in " +
-      "core-ext/time/calculations.ts. Scoped to time/calculations.rb.",
+      "The `*_without_*` halves of Rails' alias_method chains around Ruby's " +
+      "Time operators `+`/`-`/`<=>`/`eql?` (time/calculations.rb:304-355). " +
+      "Each aliases the core-Ruby operator, which in trails IS " +
+      "`@blazetrails/date`'s own `Time#plus`/`#minus`/`#compare`/`#eql`, so " +
+      "it has nothing of its own to name. `at_without_coercion` (:59) is the " +
+      "same case for core `Time.at`. The `*_with_*` halves are NOT skipped — " +
+      "they are ported onto `Time` in core-ext/time/calculations.ts. Scoped " +
+      "to time/calculations.rb.",
     names: [
-      "plus_with_duration",
       "plus_without_duration",
-      "minus_with_duration",
       "minus_without_duration",
-      "minus_with_coercion",
       "minus_without_coercion",
-      "compare_with_coercion",
       "compare_without_coercion",
-      "eql_with_coercion",
       "eql_without_coercion",
       "at_without_coercion",
     ],

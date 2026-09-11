@@ -430,22 +430,8 @@ export function assignNestedAttributesForCollectionAssociation(
 
   const primaryKey = (collectionTargetModel as any).primaryKey;
   const scope = association.scope();
-  /** @missingRailsArgs where — CONVERGEABLE expand-from-hash-drops-the-general-array-key-arm */
-  const existingRecordsScope = Array.isArray(primaryKey)
-    ? attributeIds
-        .map((id) =>
-          scope.where(
-            Object.fromEntries(
-              (primaryKey as string[]).map((column, i) => [
-                column,
-                (Array.isArray(id) ? id : [id])[i],
-              ]),
-            ),
-          ),
-        )
-        .reduce((left: any, right: any) => left.or(right))
-    : scope.where({ [primaryKey]: attributeIds });
-  return existingRecordsScope
+  return scope
+    .where(new Map([[primaryKey, attributeIds]]))
     .toArray()
     .then((existingRecords: Base[]) => assignRecords(existingRecords));
 }
