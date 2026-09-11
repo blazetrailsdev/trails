@@ -5,7 +5,11 @@ import { describe, it, expect, vi } from "vitest";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
+import {
+  executionContextId,
+  withExecutionContext,
+} from "./connection-adapters/abstract/connection-pool/execution-context.js";
+import { AsyncExecutor } from "./ar-config.js";
 import { AdapterNotFound, ConnectionNotEstablished } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -1052,5 +1056,57 @@ describe("ConnectionPool#newConnection", () => {
 
     expect(() => pool.newConnection()).toThrow(error);
     expect(error.connectionPool).toBe(pool);
+  });
+});
+
+describe("execution context at Rails thread-spawn sites", () => {
+  it("unscoped top-level code resolves to ROOT_CONTEXT", () => {
+    expect(executionContextId()).toBe(0);
+  });
+
+  it("two scheduleQuery tasks get distinct leases", async () => {
+    const pool = makePool();
+    (pool as any).asyncExecutor = new AsyncExecutor();
+    const leases: unknown[] = [];
+    await new Promise<void>((resolve) => {
+      const task = {
+        executeOrSkip() {
+          leases.push((pool as any).connectionLease());
+          if (leases.length === 2) resolve();
+        },
+      };
+      pool.scheduleQuery(task);
+      pool.scheduleQuery(task);
+    });
+    expect(leases[0]).not.toBe(leases[1]);
+    expect(leases[0]).not.toBe((pool as any).connectionLease());
+  });
+
+  it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
+    const seen = new Map<number, number[]>();
+    const pools = [0.01, 0.02].map((frequency) => ({
+      reap: () => {
+        const ids = seen.get(frequency) ?? [];
+        ids.push(executionContextId());
+        seen.set(frequency, ids);
+      },
+    }));
+    Reaper.registerPool(pools[0], 0.01);
+    Reaper.registerPool(pools[1], 0.02);
+    try {
+      await vi.waitFor(() => {
+        expect(seen.get(0.01)?.length ?? 0).toBeGreaterThanOrEqual(2);
+        expect(seen.get(0.02)?.length ?? 0).toBeGreaterThanOrEqual(2);
+      });
+    } finally {
+      (Reaper as any)._pools.delete(0.01);
+      (Reaper as any)._pools.delete(0.02);
+    }
+    const [a1, a2] = seen.get(0.01)!;
+    const [b1, b2] = seen.get(0.02)!;
+    expect(a1).not.toBe(0);
+    expect(a1).toBe(a2);
+    expect(b1).toBe(b2);
+    expect(a1).not.toBe(b1);
   });
 });

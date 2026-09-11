@@ -1,3 +1,5 @@
+import { withExecutionContext } from "./execution-context.js";
+
 export interface ReapablePool {
   reap?(): void;
   flush?(): Promise<void>;
@@ -54,34 +56,42 @@ export class Reaper {
   }
 
   private static _spawnTimer(frequency: number): ReturnType<typeof setInterval> {
-    const timer = setInterval(() => {
-      const refs = Reaper._pools.get(frequency);
-      if (!refs) {
-        Reaper._stopTimer(frequency);
-        return;
-      }
+    let timer!: ReturnType<typeof setInterval>;
+    void withExecutionContext(
+      () =>
+        new Promise<void>((running) => {
+          timer = setInterval(() => {
+            const refs = Reaper._pools.get(frequency);
+            if (!refs) {
+              Reaper._stopTimer(frequency);
+              running();
+              return;
+            }
 
-      const alive = refs.filter((ref) => {
-        const p = ref.deref();
-        return p != null && !p.isDiscarded?.();
-      });
+            const alive = refs.filter((ref) => {
+              const p = ref.deref();
+              return p != null && !p.isDiscarded?.();
+            });
 
-      if (alive.length === 0) {
-        Reaper._pools.delete(frequency);
-        Reaper._stopTimer(frequency);
-        return;
-      }
+            if (alive.length === 0) {
+              Reaper._pools.delete(frequency);
+              Reaper._stopTimer(frequency);
+              running();
+              return;
+            }
 
-      Reaper._pools.set(frequency, alive);
+            Reaper._pools.set(frequency, alive);
 
-      for (const ref of alive) {
-        const p = ref.deref();
-        if (p) {
-          p.reap?.();
-          void p.flush?.()?.catch(() => {});
-        }
-      }
-    }, frequency * 1000);
+            for (const ref of alive) {
+              const p = ref.deref();
+              if (p) {
+                p.reap?.();
+                void p.flush?.()?.catch(() => {});
+              }
+            }
+          }, frequency * 1000);
+        }),
+    );
 
     if (typeof timer === "object" && "unref" in timer) {
       timer.unref();
