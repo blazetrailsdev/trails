@@ -63,8 +63,8 @@ export interface SchemaStatementsLike {
   changeColumnNull(
     tableName: string,
     columnName: string,
-    isNull: boolean,
-    defaultValue?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void>;
   addForeignKey(
     tableName: string,

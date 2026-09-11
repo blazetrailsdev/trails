@@ -816,9 +816,15 @@ export class ConnectionPool implements ReapablePool {
   }
 
   newConnection(): DatabaseAdapter {
-    const conn = this.dbConfig.newConnection() as DatabaseAdapter;
-    if (conn instanceof AbstractAdapter) {
-      (conn as unknown as { pool: unknown }).pool = this;
+    let conn: DatabaseAdapter;
+    try {
+      conn = this.dbConfig.newConnection() as DatabaseAdapter;
+      if (conn instanceof AbstractAdapter) {
+        (conn as unknown as { pool: unknown }).pool = this;
+      }
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this);
+      throw ex;
     }
     if (
       SchemaReflection.lazilyLoadSchemaCache &&

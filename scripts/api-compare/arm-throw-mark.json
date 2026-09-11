@@ -33,20 +33,13 @@
     }
   },
   "activerecord": {
-    "total": 17,
+    "total": 6,
     "byFile": {
       "connection-adapters.ts": 1,
       "connection-adapters/abstract-adapter.ts": 1,
-      "connection-adapters/abstract-mysql-adapter.ts": 1,
-      "connection-adapters/abstract/connection-pool.ts": 1,
-      "connection-adapters/abstract/schema-statements.ts": 3,
-      "connection-adapters/abstract/transaction.ts": 1,
-      "connection-adapters/mysql2-adapter.ts": 1,
       "connection-adapters/mysql2/database-statements.ts": 1,
-      "connection-adapters/postgresql-adapter.ts": 2,
-      "connection-adapters/postgresql/oid/hstore.ts": 1,
-      "connection-adapters/postgresql/schema-creation.ts": 1,
-      "connection-adapters/sqlite3-adapter.ts": 2,
+      "connection-adapters/postgresql-adapter.ts": 1,
+      "connection-adapters/sqlite3-adapter.ts": 1,
       "relation/finder-methods.ts": 1
     }
   },

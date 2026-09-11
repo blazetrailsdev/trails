@@ -1,8 +1,9 @@
-import { ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { stringInspect } from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 
-const HSTORE_ERROR = "Invalid Hstore document: %s";
+const ERROR = "Invalid Hstore document: %s";
 
 export class Hstore extends ValueType<Record<string, string | null>> {
   override type(): string {
@@ -24,14 +25,65 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return this.deserialize(serialized);
   }
 
-  /** @missingRailsCall new — PERMANENT */
   override deserialize(value: unknown): Record<string, string | null> | null {
-    if (value == null) return null;
-    if (typeof value !== "string") {
-      return value as Record<string, string | null>;
+    if (typeof value !== "string") return value as Record<string, string | null> | null;
+
+    const string = value;
+    let pos = 0;
+    const scan = (pattern: RegExp): string | null => {
+      pattern.lastIndex = pos;
+      const match = pattern.exec(string);
+      if (match === null) return null;
+      pos = pattern.lastIndex;
+      return match[0];
+    };
+    const hash: Record<string, string | null> = {};
+
+    while (pos < string.length) {
+      if (scan(/"/y) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      }
+
+      let key = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+      if (key === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      }
+
+      if (scan(/"=>?/y) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      }
+
+      if (scan(/NULL/y) !== null) {
+        value = null;
+      } else {
+        if (scan(/"/y) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        }
+
+        value = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+        if (value === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        }
+
+        if (scan(/"/y) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        }
+      }
+
+      key = key.replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+
+      if (value !== null) {
+        value = (value as string).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+      }
+
+      hash[key] = value as string | null;
+
+      if (scan(/, /y) === null && pos < string.length) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      }
     }
-    if (value.trim() === "") return {};
-    return parseHstoreString(value);
+
+    return hash;
   }
 
   override serialize(value: unknown): string | null {
@@ -78,11 +130,6 @@ function hashesEqual(a: Record<string, unknown>, b: Record<string, unknown>): bo
   return true;
 }
 
-export function parseHstore(input: string): Record<string, string | null> {
-  if (!input || input.trim() === "") return {};
-  return parseHstoreString(input);
-}
-
 export function serializeHstore(obj: Record<string, string | null>): string {
   return Object.entries(obj)
     .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v)}`)
@@ -94,60 +141,4 @@ function escapeHstore(value: string | null | undefined): string {
   if (value == null) return "NULL";
   if (value === "") return '""';
   return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
-}
-
-function parseHstoreString(value: string): Record<string, string | null> {
-  const hash: Record<string, string | null> = {};
-  let i = 0;
-
-  while (i < value.length) {
-    if (value[i] !== '"') throw hstoreError(value);
-    i += 1;
-
-    const keyStart = i;
-    while (i < value.length && value[i] !== '"') {
-      if (value[i] === "\\" && i + 1 < value.length) i += 2;
-      else i += 1;
-    }
-    if (i >= value.length) throw hstoreError(value);
-    const rawKey = value.slice(keyStart, i);
-    i += 1;
-
-    if (value[i] !== "=" || value[i + 1] !== ">") throw hstoreError(value);
-    i += 2;
-
-    let rawValue: string | null;
-    if (value.slice(i, i + 4) === "NULL") {
-      rawValue = null;
-      i += 4;
-    } else {
-      if (value[i] !== '"') throw hstoreError(value);
-      i += 1;
-      const valueStart = i;
-      while (i < value.length && value[i] !== '"') {
-        if (value[i] === "\\" && i + 1 < value.length) i += 2;
-        else i += 1;
-      }
-      if (i >= value.length) throw hstoreError(value);
-      rawValue = unescapeHstore(value.slice(valueStart, i));
-      i += 1;
-    }
-
-    hash[unescapeHstore(rawKey)] = rawValue;
-
-    if (i < value.length) {
-      if (value[i] !== "," || value[i + 1] !== " ") throw hstoreError(value);
-      i += 2;
-    }
-  }
-
-  return hash;
-}
-
-function unescapeHstore(raw: string): string {
-  return raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-}
-
-function hstoreError(input: string): Error {
-  return new Error(HSTORE_ERROR.replace("%s", JSON.stringify(input)));
 }

@@ -208,9 +208,10 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new SuperCallingAdapter();
-    await stub.changeColumnDefault("widgets", "title", { from: null, to: "hi" });
+    await expect(
+      stub.changeColumnDefault("widgets", "title", { from: null, to: "hi" }),
+    ).rejects.toThrow(new NotImplementedError("change_column_default is not implemented"));
     expect(stub.changeColumnDefaultCalls).toBe(1);
-    expect(stub.allSql.at(-1)).toMatch(/ALTER TABLE "widgets" ALTER COLUMN "title" SET DEFAULT/);
 
     await stub.addCheckConstraint("widgets", "price > 0", { name: "price_check" });
     expect(stub.addCheckConstraintCalls).toBe(1);
@@ -226,8 +227,13 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new OverridingAdapter();
-    await stub.renameColumn("widgets", "title", "name");
+    await expect(stub.renameColumn("widgets", "title", "name")).rejects.toThrow(
+      new NotImplementedError("rename_column is not implemented"),
+    );
     expect(stub.renameColumnCalls).toBe(1);
+    await expect(stub.changeColumnNull("widgets", "title", false)).rejects.toThrow(
+      new NotImplementedError("change_column_null is not implemented"),
+    );
   });
 
   it("removeForeignKey ifExists probe matches on to_table only, not name (Rails)", async () => {

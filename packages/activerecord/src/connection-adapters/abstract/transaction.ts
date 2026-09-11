@@ -1041,51 +1041,45 @@ export class TransactionManager {
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
-    return await this._connection.lock.synchronize(() =>
-      this._withinNewTransactionBody(options, fn),
-    );
-  }
-
-  /** @internal */
-  private async _withinNewTransactionBody<T>(
-    options: { isolation?: string | null; joinable?: boolean },
-    fn: (tx: UserTransaction) => Promise<T> | T,
-  ): Promise<T> {
-    let transaction: Transaction | undefined;
-    try {
-      transaction = await this.beginTransaction({
-        isolation: options.isolation,
-        joinable: options.joinable,
-      });
-      let result: T;
+    return await this._connection.lock.synchronize(async () => {
+      let transaction: Transaction | undefined;
       try {
-        result = await fn(transaction.userTransaction);
-      } catch (e) {
-        await this.rollbackTransaction();
-        await this.afterFailureActions(transaction, e);
-        throw e;
-      }
-
-      try {
-        await this.commitTransaction();
-      } catch (commitError) {
-        if (commitError instanceof ConnectionFailed) {
-          if (!transaction.state.isCompleted()) {
-            transaction.invalidateBang();
-          }
-        } else if (!transaction.state.isCompleted()) {
-          await this.rollbackTransaction(transaction);
+        transaction = await this.beginTransaction({
+          isolation: options.isolation,
+          joinable: options.joinable,
+        });
+        let result: T;
+        try {
+          result = await fn(transaction.userTransaction);
+        } catch (e) {
+          await this.rollbackTransaction();
+          await this.afterFailureActions(transaction, e);
+          throw e;
         }
-        throw commitError;
-      }
 
-      return result;
-    } finally {
-      if (!transaction || !transaction.state.isCompleted()) {
-        await this._connection.throwAwayBang?.();
-        transaction?.incompleteBang();
+        try {
+          await this.commitTransaction();
+        } catch (commitError) {
+          if (commitError instanceof ConnectionFailed) {
+            if (!transaction.state.isCompleted()) {
+              transaction.invalidateBang();
+            }
+            throw commitError;
+          }
+          if (!transaction.state.isCompleted()) {
+            await this.rollbackTransaction(transaction);
+          }
+          throw commitError;
+        }
+
+        return result;
+      } finally {
+        if (!transaction || !transaction.state.isCompleted()) {
+          await this._connection.throwAwayBang?.();
+          transaction?.incompleteBang();
+        }
       }
-    }
+    });
   }
 }
 

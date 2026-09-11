@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaCreation } from "./schema-creation.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
@@ -151,7 +152,12 @@ describe("PostgreSQL SchemaCreation", () => {
     ).toContain("STORED");
     await expect(async () =>
       s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col }),
-    ).rejects.toThrow("VIRTUAL");
+    ).rejects.toThrow(
+      new ArgumentError(
+        "PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n" +
+          "Specify 'stored: true' option for 'n'\n",
+      ),
+    );
   });
 
   it("visitExclusionConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {

@@ -730,22 +730,22 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async changeColumnNull(
     tableName: string,
     columnName: string,
-    nullable: boolean,
-    defaultValue: unknown = null,
+    null_: boolean,
+    default_: unknown = null,
   ): Promise<void> {
-    this.validateChangeColumnNullArgumentBang(nullable);
+    this.validateChangeColumnNullArgumentBang(null_);
     await this.clearCacheBang();
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteColumnName(columnName);
-    if (!nullable && defaultValue != null) {
+    if (!null_ && default_ != null) {
       const column = await this.columnFor(tableName, columnName);
-      const expr = await this.quoteDefaultExpression(defaultValue, column);
+      const expr = await this.quoteDefaultExpression(default_, column);
       await this.execute(
         `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
       );
     }
     await this.execute(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
+      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${null_ ? "DROP" : "SET"} NOT NULL`,
     );
   }
 

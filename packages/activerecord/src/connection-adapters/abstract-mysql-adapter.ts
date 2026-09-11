@@ -382,8 +382,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     };
   }
 
-  errorNumber(exception: Error & { errno?: number }): number | null {
-    return exception.errno ?? null;
+  errorNumber(_exception: Error & { errno?: number }): number | null {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:206
+    throw new NotImplementedError();
   }
 
   async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {

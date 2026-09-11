@@ -1283,7 +1283,12 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async connect(): Promise<void> {
-    await this._acquireFreshClient();
+    try {
+      await this._acquireFreshClient();
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
   }
 
   /** @internal */
@@ -2394,8 +2399,8 @@ export interface PostgreSQLAdapter {
   changeColumnNull(
     tableName: string,
     columnName: string,
-    nullable: boolean,
-    defaultValue?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void>;
 
   changeColumnComment(
