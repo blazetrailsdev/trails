@@ -1155,7 +1155,7 @@ function acquireConnection(
 }
 
 /** @internal */
-function removeConnectionFromThreadCache(
+export function removeConnectionFromThreadCache(
   pool: Pool,
   conn: DatabaseAdapter,
   ownerThread?: object,

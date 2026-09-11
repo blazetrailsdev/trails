@@ -46,7 +46,7 @@ import { ActiveRecord } from "../ar-config.js";
 import { _Base } from "../base-slot.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
-import { NullPool } from "./abstract/connection-pool.js";
+import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import {
@@ -832,8 +832,7 @@ export class AbstractAdapter implements Quoting {
 
   protected _visitor!: Visitors.ToSql;
   protected _connection: AbstractAdapter | null = null;
-  private _owner: string | null = null;
-  private _inUse = false;
+  private _owner: { readonly id: number } | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -984,11 +983,11 @@ export class AbstractAdapter implements Quoting {
     clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
   }
 
-  get inUse(): boolean {
-    return this._inUse;
+  get inUse(): { readonly id: number } | null {
+    return this.owner;
   }
 
-  get owner(): string | null {
+  get owner(): { readonly id: number } | null {
     return this._owner;
   }
 
@@ -1009,21 +1008,36 @@ export class AbstractAdapter implements Quoting {
   }
 
   lease(): void {
-    if (this._inUse) {
-      throw new ActiveRecordError(
-        "Cannot lease connection, it is already leased by the current thread.",
-      );
+    if (this.inUse) {
+      let msg = "Cannot lease connection, ";
+      if (this._owner === IsolatedExecutionState.context()) {
+        msg += "it is already leased by the current thread.";
+      } else {
+        msg +=
+          `it is already in use by a different thread: ${this._owner}. ` +
+          `Current thread: ${IsolatedExecutionState.context()}.`;
+      }
+      throw new ActiveRecordError(msg);
     }
-    this._inUse = true;
+
+    this._owner = IsolatedExecutionState.context();
   }
 
   expire(): void {
-    if (!this._inUse) {
+    if (this.inUse) {
+      if (this._owner !== IsolatedExecutionState.context()) {
+        throw new ActiveRecordError(
+          "Cannot expire connection, " +
+            `it is owned by a different thread: ${this._owner}. ` +
+            `Current thread: ${IsolatedExecutionState.context()}.`,
+        );
+      }
+
+      this._idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
+      this._owner = null;
+    } else {
       throw new ActiveRecordError("Cannot expire connection, it is not currently leased.");
     }
-    this._inUse = false;
-    this._owner = null;
-    this._idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
   }
 
   protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
@@ -1405,7 +1419,7 @@ export class AbstractAdapter implements Quoting {
     const pool = this.pool;
     if (!(pool instanceof NullPool)) {
       pool.checkin(this);
-    } else if (this._inUse) {
+    } else if (this.inUse) {
       this.expire();
     }
   }
@@ -1462,14 +1476,19 @@ export class AbstractAdapter implements Quoting {
   }
 
   stealBang(): void {
-    if (!this._inUse) {
+    if (this.inUse) {
+      if (this._owner !== IsolatedExecutionState.context()) {
+        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
+
+        this._owner = IsolatedExecutionState.context();
+      }
+    } else {
       throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
     }
-    this._owner = null;
   }
 
   get secondsIdle(): number {
-    if (this._inUse) return 0;
+    if (this.inUse) return 0;
     return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._idleSince;
   }
 
