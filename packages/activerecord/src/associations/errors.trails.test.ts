@@ -59,7 +59,6 @@ describe("AssociationErrors", () => {
     const reflection = {
       activeRecord: { name: "CpkBrokenBook" },
       name: "order",
-      belongsTo: () => true,
       associationPrimaryKey: () => ["shop_id", "status"],
       activeRecordPrimaryKey: "id",
       foreignKey: "order_id",
