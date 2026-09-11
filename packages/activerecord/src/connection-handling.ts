@@ -38,20 +38,6 @@ export function currentQueryConnection(): DatabaseAdapter | null {
   return IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY) ?? null;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE the same threaded connection narrowed to the model's own pool, which Ruby gets from per-pool lease state (connection_handling.rb:309).
- */
-export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter | null {
-  const threaded = currentQueryConnection();
-  if (!threaded) return null;
-  try {
-    return connectionPool.call(modelClass).activeConnection === threaded ? threaded : null;
-  } catch {
-    return null;
-  }
-}
-
 function isBaseClass(klass: typeof Base): boolean {
   return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
 }

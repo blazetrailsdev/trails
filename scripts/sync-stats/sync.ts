@@ -1256,19 +1256,21 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
 
   if (mode === "refresh") {
     const staleCount = (
-      await Base.adapter.selectAll(`SELECT COUNT(*) as cnt FROM pull_requests WHERE state IS NULL`)
+      await Base.connection.selectAll(
+        `SELECT COUNT(*) as cnt FROM pull_requests WHERE state IS NULL`,
+      )
     ).toArray();
     const cnt = (staleCount[0] as { cnt: number }).cnt;
     if (cnt > 0) {
       console.log(`Backfilling state for ${cnt} existing PRs from merged_at/closed_at...`);
-      await Base.adapter.executeMutation(
+      await Base.connection.executeMutation(
         `UPDATE pull_requests SET state = CASE
           WHEN merged_at IS NOT NULL THEN 'merged'
           WHEN closed_at IS NOT NULL THEN 'closed'
           ELSE 'open'
         END WHERE state IS NULL`,
       );
-      await Base.adapter.executeMutation(
+      await Base.connection.executeMutation(
         `UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`,
       );
     }
@@ -1310,7 +1312,7 @@ async function syncPrFiles() {
     const number = pr.readAttribute("number") as number;
     try {
       const files = ghJson<GhPrFile[]>(`api repos/${REPO}/pulls/${number}/files --paginate`);
-      await PrFile.adapter.executeMutation(`DELETE FROM pr_files WHERE pr_number = ?`, [number]);
+      await PrFile.connection.executeMutation(`DELETE FROM pr_files WHERE pr_number = ?`, [number]);
       if (files.length > 0) {
         await PrFile.insertAll(
           files.map((f) => ({
@@ -1345,7 +1347,7 @@ async function syncPrCommits() {
     const number = pr.readAttribute("number") as number;
     try {
       const commits = ghJson<GhPrCommit[]>(`api repos/${REPO}/pulls/${number}/commits --paginate`);
-      await PrCommit.adapter.executeMutation(`DELETE FROM pr_commits WHERE pr_number = ?`, [
+      await PrCommit.connection.executeMutation(`DELETE FROM pr_commits WHERE pr_number = ?`, [
         number,
       ]);
       if (commits.length > 0) {
@@ -1656,7 +1658,7 @@ async function syncPrTimelineEvents() {
       const events = ghJson<GhTimelineEvent[]>(
         `api repos/${REPO}/issues/${number}/timeline --paginate`,
       );
-      await PrTimelineEvent.adapter.executeMutation(
+      await PrTimelineEvent.connection.executeMutation(
         `DELETE FROM pr_timeline_events WHERE pr_number = ?`,
         [number],
       );
@@ -1934,7 +1936,7 @@ function parseApiCompareFromLogs(logs: string) {
 async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToSync = (
-    await Base.adapter.selectAll(`
+    await Base.connection.selectAll(`
     SELECT wj.id as job_id, wr.id as run_id
     FROM workflow_jobs wj
     JOIN workflow_runs wr ON wr.id = wj.run_id
@@ -1957,7 +1959,7 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
       const annotations = ghJson<GhCheckAnnotation[]>(
         `api repos/${REPO}/check-runs/${jobId}/annotations --paginate`,
       );
-      await CheckAnnotation.adapter.executeMutation(
+      await CheckAnnotation.connection.executeMutation(
         `DELETE FROM check_annotations WHERE job_id = ?`,
         [jobId],
       );
@@ -1987,7 +1989,7 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
 async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<number> {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToFetch = (
-    await Base.adapter.selectAll(`
+    await Base.connection.selectAll(`
     SELECT wj.id as job_id, wj.run_id, wj.name as job_name,
            wr.head_sha, wr.pr_number
     FROM workflow_jobs wj
@@ -2129,7 +2131,7 @@ async function syncCompareStats(
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const missingStatsClause = mode === "reparse" ? "" : `AND (${MISSING_STATS_PREDICATE})`;
   const runsToProcess = (
-    await Base.adapter.selectAll(`
+    await Base.connection.selectAll(`
     SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
     FROM raw_job_logs rjl
     JOIN workflow_jobs wj ON wj.id = rjl.job_id
@@ -2165,9 +2167,11 @@ async function syncCompareStats(
     const prNumber = row.pr_number as number;
 
     const logRows = (
-      await Base.adapter.execQuery(`SELECT log_output FROM raw_job_logs WHERE job_id = ?`, "SQL", [
-        jobId,
-      ])
+      await Base.connection.execQuery(
+        `SELECT log_output FROM raw_job_logs WHERE job_id = ?`,
+        "SQL",
+        [jobId],
+      )
     ).toArray();
     if (logRows.length === 0) continue;
     const logs = logRows[0].log_output as string;
@@ -2323,12 +2327,14 @@ async function syncCompareStats(
 
 async function printSummary() {
   const count = async (table: string) => {
-    const rows = (await Base.adapter.selectAll(`SELECT COUNT(*) as cnt FROM ${table}`)).toArray();
+    const rows = (
+      await Base.connection.selectAll(`SELECT COUNT(*) as cnt FROM ${table}`)
+    ).toArray();
     return (rows[0] as { cnt: number }).cnt;
   };
   const countDistinct = async (table: string, col: string) => {
     const rows = (
-      await Base.adapter.selectAll(`SELECT COUNT(DISTINCT ${col}) as cnt FROM ${table}`)
+      await Base.connection.selectAll(`SELECT COUNT(DISTINCT ${col}) as cnt FROM ${table}`)
     ).toArray();
     return (rows[0] as { cnt: number }).cnt;
   };
@@ -2356,7 +2362,7 @@ async function printSummary() {
   ]);
 
   const stateRows = (
-    await Base.adapter.selectAll(
+    await Base.connection.selectAll(
       `SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`,
     )
   ).toArray() as { cnt: number; state: string }[];
@@ -2546,7 +2552,7 @@ async function main() {
     console.log("Running full refresh sync.\n");
   }
 
-  const adapter = Base.adapter as SQLite3Adapter;
+  const adapter = Base.connection as SQLite3Adapter;
 
   try {
     await migrateDb(adapter);

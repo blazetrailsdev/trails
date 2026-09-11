@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
+import { SingularAssociation } from "./associations/singular-association.js";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
@@ -2001,7 +2002,7 @@ describe("AssociationsTest", () => {
 
     const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
     await blogPost.save();
-    await (comment.association("blogPost") as any).writer(blogPost);
+    await (comment.association("blogPost") as SingularAssociation).writer(blogPost);
 
     const loaded = await (comment as any).loadBelongsTo("blogPost");
     expect(loaded.id).toBe((blogPost as any).id);
@@ -2014,7 +2015,7 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one");
     expect(await (comment as any).loadBelongsTo("blogPost")).not.toBeNull();
 
-    await (comment.association("blogPost") as any).writer(null);
+    await (comment.association("blogPost") as SingularAssociation).writer(null);
     expect((comment as any).blog_id).toBeNull();
     expect((comment as any).blog_post_id).toBeNull();
 
@@ -2030,7 +2031,7 @@ describe("AssociationsTest", () => {
     expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
 
     const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
-    await (comment.association("blogPost") as any).writer(blogPost);
+    await (comment.association("blogPost") as SingularAssociation).writer(blogPost);
 
     const loaded = (comment.association("blogPost") as any).target;
     expect(loaded).toBe(blogPost);
@@ -2044,7 +2045,7 @@ describe("AssociationsTest", () => {
     expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
 
     const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
-    await (comment.association("blogPost") as any).writer(blogPost);
+    await (comment.association("blogPost") as SingularAssociation).writer(blogPost);
     await comment.save();
 
     expect(blogPost.isPersisted()).toBe(true);
@@ -2062,7 +2063,7 @@ describe("AssociationsTest", () => {
       title: "Following best practices",
     });
 
-    await (comment.association("blogPostById") as any).writer(blogPost);
+    await (comment.association("blogPostById") as SingularAssociation).writer(blogPost);
     await comment.save();
 
     expect(blogPost.isPersisted()).toBe(true);
@@ -2076,7 +2077,7 @@ describe("AssociationsTest", () => {
       title: "Child post",
       blog_id: (parentPost as any).blog_id,
     });
-    await (childPost.association("parent") as any).writer(parentPost);
+    await (childPost.association("parent") as SingularAssociation).writer(parentPost);
     await childPost.save();
 
     const reloaded = await ShardedBlogPost.find((childPost as any).id);
@@ -2126,7 +2127,7 @@ describe("AssociationsTest", () => {
     const order = cpkOrders("cpk_groceries_order_1");
     const agreement = new CpkOrderAgreement({ signature: "signed" });
 
-    await (agreement.association("order") as any).writer(order);
+    await (agreement.association("order") as SingularAssociation).writer(order);
     await agreement.save();
 
     await agreement.reload();

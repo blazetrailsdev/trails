@@ -41,7 +41,7 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
 }
 
 beforeAll(() => {
-  adapter = Base.adapter;
+  adapter = Base.connection;
 });
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {

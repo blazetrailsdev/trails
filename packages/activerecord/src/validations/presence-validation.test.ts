@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { SingularAssociation } from "../associations/singular-association.js";
 import { Base, registerModel } from "../index.js";
 import { association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -13,10 +14,8 @@ class Boy extends Human {
   static name = "Boy";
 }
 
-function setAssoc(record: Base, name: string, value: unknown): unknown {
-  return (record as unknown as { association(n: string): { writer(v: unknown): unknown } })
-    .association(name)
-    .writer(value);
+function setAssoc(record: Base, name: string, value: Base | null): void | Promise<void> {
+  return (record.association(name) as SingularAssociation).writer(value);
 }
 
 describe("PresenceValidationTest", () => {

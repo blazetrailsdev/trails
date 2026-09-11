@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     // A bare path is treated as a configuration name, not a URL, so pass an
     // explicit hash config.
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    const adapter = Base.adapter;
+    const adapter = Base.connection;
 
     // 3. Introspect tables, columns, indexes
     const tables = (await adapter.tables()).filter((t) => !FILTERED_TABLES.has(t)).sort();
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     // Base.removeConnection() only drops the pool reference; the adapter (and
     // its better-sqlite3 handle) may still be open, causing EBUSY on Windows.
     try {
-      const a = Base.adapter as { close?: () => void };
+      const a = Base.connection as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

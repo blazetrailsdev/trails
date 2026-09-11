@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
-import { threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecord } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
@@ -779,41 +778,6 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       if (priorConfigs) Base.configurations(priorConfigs);
       await restoreWorkerConnection();
     }
-  });
-});
-
-describe("threadedConnectionFor pool-identity guard", () => {
-  class Secondary extends Base {}
-
-  beforeEach(async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-        database: "secondary.db",
-        pool: 5,
-        reapingFrequency: null,
-      }),
-      { ownerName: "Secondary" },
-    );
-    Secondary.connectionSpecificationName = "Secondary";
-  });
-
-  afterEach(async () => {
-    Base.connectionHandler.removeConnectionPool("Secondary");
-  });
-
-  it("adopts the threaded connection for its own pool but not a foreign pool", async () => {
-    await Base.withConnection(async () => {
-      const threaded = Base.connectionPool().activeConnection;
-      expect(threaded).toBeTruthy();
-      expect(threadedConnectionFor(Base)).toBe(threaded);
-      expect(Secondary.connectionPool().activeConnection).toBeNull();
-      expect(threadedConnectionFor(Secondary)).toBeNull();
-    });
-  });
-
-  it("returns null outside any withConnection wrap", async () => {
-    expect(threadedConnectionFor(Base)).toBeNull();
   });
 });
 

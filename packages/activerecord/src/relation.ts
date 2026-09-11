@@ -5,7 +5,6 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { max } from "@blazetrails/ruby-compat";
@@ -1230,7 +1229,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private _conn(): DatabaseAdapter {
-    return threadedConnectionFor(this._model) ?? this._model.connection;
+    return this._model.connectionPool().activeConnection ?? this._model.connection;
   }
 
   async preloadAssociations(records: T[]): Promise<void> {

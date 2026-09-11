@@ -939,11 +939,6 @@ export class Base extends Model {
     return this.loadSchema();
   }
 
-  /** @deprecated */
-  static get adapter(): DatabaseAdapter {
-    return this.connection;
-  }
-
   static get connectionHandler(): ConnectionHandler {
     return _Core.connectionHandler.call(this);
   }
@@ -2142,7 +2137,8 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
+        const adapter =
+          ConnectionHandling.connectionPool.call(ctor).activeConnection ?? ctor.connection;
         const affected = await adapter.delete(dm, `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");

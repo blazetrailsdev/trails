@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { SingularAssociation } from "./associations/singular-association.js";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, StrictLoadingViolationError, registerModel } from "./index.js";
@@ -371,9 +372,11 @@ describe("StrictLoadingTest", () => {
     const computer = new Computer({ extendedWarranty: 1 });
     computer.strictLoadingBang();
 
-    await (computer.association("firm") as any).writer(firm);
+    await (computer.association("firm") as SingularAssociation).writer(firm);
     ((computer as any).developer as Developer).name = "Joe";
-    await (firm.association("leadDeveloper") as any).writer((computer as any).developer);
+    await (firm.association("leadDeveloper") as SingularAssociation).writer(
+      (computer as any).developer,
+    );
 
     await computer.save();
     expect(computer.isNewRecord()).toBe(false);

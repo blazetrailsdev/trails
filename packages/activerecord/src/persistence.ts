@@ -12,7 +12,7 @@ import {
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
-import { threadedConnectionFor, withConnection } from "./connection-handling.js";
+import { connectionPool, withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import {
   attributesForCreate,
@@ -231,7 +231,7 @@ export async function _updateRecord(
 
   applyDefaultAndGlobalConstraints(um as any, this as any);
 
-  const adapter = threadedConnectionFor((this as any).constructor) ?? (this as any).connection;
+  const adapter = connectionPool.call(this as any).activeConnection ?? (this as any).connection;
   if (typeof adapter.update === "function") {
     return adapter.update(um, `${(this as any).name} Update`);
   }
@@ -246,7 +246,7 @@ export async function _updateRecord(
  *
  * @missingRailsCall with_connection — CONVERGEABLE: persistence.rb:294-296 `with_connection {
  *   |c| c.delete(dm, ...) }` — trails resolves the adapter through
- *   `threadedConnectionFor(...) ?? this.connection` (persistence.ts:366) rather
+ *   `connectionPool.call(...).activeConnection ?? this.connection` (persistence.ts:266) rather
  *   than the block form; converging the whole package onto `withConnection` is
  *   RFC 0073's permanent-connection-checkout flip, tracked there.
  */
@@ -263,7 +263,7 @@ export async function _deleteRecord(
 
   applyDefaultAndGlobalConstraints(dm as any, this as any);
 
-  const adapter = threadedConnectionFor((this as any).constructor) ?? (this as any).connection;
+  const adapter = connectionPool.call(this as any).activeConnection ?? (this as any).connection;
   if (typeof adapter.delete === "function") {
     return adapter.delete(dm);
   }
@@ -440,7 +440,8 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
       .from(ctor.arelTable)
       .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
     const adapter =
-      threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) ?? ctor.connection;
+      connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection ??
+      ctor.connection;
     await adapter.delete(dm, "Delete");
   }
   this._destroyed = true;
@@ -722,7 +723,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
 
   const adapter =
-    (threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) as
+    (connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection as
       | typeof ctor.connection
       | null) ?? ctor.connection;
   const affectedRows = await adapter.update(um, "Update Columns");
