@@ -10,6 +10,7 @@ let _adapter: AsyncContextAdapter | null = null;
 const _fallback: Store = new Map();
 const CONTEXT_KEY = Symbol.for("ar_execution_context_id");
 const ROOT_CONTEXT = { id: 0, toString: () => "#<Thread:0 run>" } as const;
+let _contextIdCounter = 0;
 
 function ctx(): AsyncContext<Store> {
   const adapter = getAsyncContext();
@@ -56,7 +57,9 @@ export const IsolatedExecutionState = {
     return (store().get(CONTEXT_KEY) as { readonly id: number } | undefined) ?? ROOT_CONTEXT;
   },
   run<R>(fn: () => R): R {
-    return ctx().run(new Map(), fn);
+    const id = ++_contextIdCounter;
+    const context = { id, toString: () => `#<Thread:${id} run>` };
+    return ctx().run(new Map<IsolatedKey, unknown>([[CONTEXT_KEY, context]]), fn);
   },
   scope<T, R>(key: IsolatedKey, value: T, fn: () => R): R {
     const forked = new Map(store());

@@ -10,6 +10,7 @@ import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
+import { withExecutionContext } from "./abstract/connection-pool/execution-context.js";
 
 const UUID_OID = 2950;
 
@@ -373,13 +374,15 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
     }
 
     const insert = (title: string) =>
-      pool.withConnection((conn) =>
-        conn.execInsert(
-          `INSERT INTO posts (title) VALUES ('${title}')`,
-          "SQL",
-          [],
-          "id",
-          "posts_id_seq",
+      withExecutionContext(() =>
+        pool.withConnection((conn) =>
+          conn.execInsert(
+            `INSERT INTO posts (title) VALUES ('${title}')`,
+            "SQL",
+            [],
+            "id",
+            "posts_id_seq",
+          ),
         ),
       );
     const p1 = insert("a");

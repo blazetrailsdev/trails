@@ -1,3 +1,4 @@
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { BodyProxy } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
@@ -24,34 +25,41 @@ export class Executor {
     this.executor = executor;
   }
 
-  async call(env: RackEnv): Promise<RackResponse> {
-    const state = this.executor.runBang({ reset: true });
-    let returned = false;
-    try {
-      const response = await this.app(env);
+  call(env: RackEnv): Promise<RackResponse> {
+    return IsolatedExecutionState.run(async (): Promise<RackResponse> => {
+      const context = IsolatedExecutionState.context();
+      const state = this.executor.runBang({ reset: true });
+      let returned = false;
+      try {
+        const response = await this.app(env);
 
-      if (env["action_dispatch.report_exception"]) {
-        const error = env["action_dispatch.exception"];
-        this.executor.errorReporter().report(error, {
+        if (env["action_dispatch.report_exception"]) {
+          const error = env["action_dispatch.exception"];
+          this.executor.errorReporter().report(error, {
+            handled: false,
+            source: "application.action_dispatch",
+          });
+        }
+
+        const [status, headers, body] = response;
+        const wrapped = new BodyProxy(body, () =>
+          IsolatedExecutionState.scope(Symbol.for("ar_execution_context_id"), context, () =>
+            state.completeBang(),
+          ),
+        );
+        returned = true;
+        return [status, headers, wrapped];
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        const wrapper = new ExceptionWrapper(err);
+        this.executor.errorReporter().report(wrapper.unwrappedException, {
           handled: false,
           source: "application.action_dispatch",
         });
+        throw err;
+      } finally {
+        if (!returned) state.completeBang();
       }
-
-      const [status, headers, body] = response;
-      const wrapped = new BodyProxy(body, () => state.completeBang());
-      returned = true;
-      return [status, headers, wrapped];
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      const wrapper = new ExceptionWrapper(err);
-      this.executor.errorReporter().report(wrapper.unwrappedException, {
-        handled: false,
-        source: "application.action_dispatch",
-      });
-      throw err;
-    } finally {
-      if (!returned) state.completeBang();
-    }
+    });
   }
 }

@@ -41,21 +41,21 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   it("opens a query session for the request body and finalizes it on close", async () => {
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
 
-    let sessionActiveInRequest: boolean | null = null;
+    let session: ReturnType<typeof Base.asynchronousQueriesSession> | null = null;
     let rows: unknown[] | null = null;
     const middleware = new ActionDispatchExecutor(async () => {
-      sessionActiveInRequest = Base.asynchronousQueriesSession().active();
+      session = Base.asynchronousQueriesSession();
       rows = await selectOneAsync();
       return [200, {}, []] as unknown as RackResponse;
     }, app.executor);
 
     const [, , body] = await middleware.call({} as RackEnv);
 
-    expect(sessionActiveInRequest).toBe(true);
     expect(rows).toEqual([{ one: 1 }]);
 
-    expect(Base.asynchronousQueriesSession().active()).toBe(true);
+    expect(session!.active()).toBe(true);
     (body as unknown as { close(): void }).close();
+    expect(session!.active()).toBe(false);
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
   });
 

@@ -5,6 +5,7 @@ import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { withExecutionContext } from "./abstract/connection-pool/execution-context.js";
 
 import {
   ConnectionNotEstablished,
@@ -72,19 +73,23 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const p1 = pool.withConnection((conn) =>
-      conn.withRawConnection({}, async () => {
-        order.push(1);
-        await gate;
-        order.push(2);
-        return "a";
-      }),
+    const p1 = withExecutionContext(() =>
+      pool.withConnection((conn) =>
+        conn.withRawConnection({}, async () => {
+          order.push(1);
+          await gate;
+          order.push(2);
+          return "a";
+        }),
+      ),
     );
-    const p2 = pool.withConnection((conn) =>
-      conn.withRawConnection({}, async () => {
-        order.push(3);
-        return "b";
-      }),
+    const p2 = withExecutionContext(() =>
+      pool.withConnection((conn) =>
+        conn.withRawConnection({}, async () => {
+          order.push(3);
+          return "b";
+        }),
+      ),
     );
     await new Promise((r) => setTimeout(r, 0));
     release();
@@ -145,8 +150,8 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
     (a as any).attemptConfigureConnection = async () => {};
     (a as any).active = async () => true;
 
-    const p1 = pool.withConnection((conn) => conn.reconnectBang());
-    const p2 = pool.withConnection((conn) => conn.reconnectBang());
+    const p1 = withExecutionContext(() => pool.withConnection((conn) => conn.reconnectBang()));
+    const p2 = withExecutionContext(() => pool.withConnection((conn) => conn.reconnectBang()));
     await Promise.resolve();
     release();
     await Promise.all([p1, p2]);
@@ -169,7 +174,10 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
       events.push("reconnect");
     };
 
-    await Promise.all([pool.withConnection(() => undefined), pool.withConnection(() => undefined)]);
+    await Promise.all([
+      withExecutionContext(() => pool.withConnection(() => undefined)),
+      withExecutionContext(() => pool.withConnection(() => undefined)),
+    ]);
 
     expect(events).toEqual([
       "configure:enter",
