@@ -11,7 +11,9 @@ import {
   _setActionDispatchRequest,
   type ActionDispatchRequestConstructor,
 } from "@blazetrails/activesupport";
-import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { BadRequest, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { ParamBuilder } from "./param-builder.js";
+import { ParamError } from "./param-error.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import {
@@ -415,31 +417,11 @@ export class Request {
   }
 
   get queryParameters(): Record<string, unknown> {
-    return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
-      const qs = this.queryString;
-      const params = qs
-        ? (RequestUtils.normalizeEncodeParams(parseNestedQuery(qs) as ParamValue) as Record<
-            string,
-            unknown
-          >)
-        : {};
-      return this.setHeader(k, params);
-    }) as Record<string, unknown>;
+    return this.GET();
   }
 
   get requestParameters(): Record<string, unknown> {
-    return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
-      const host = this._paramsHost;
-      const params = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
-        this._fallbackRequestParameters(),
-      );
-
-      const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
-        string,
-        unknown
-      >;
-      return this.setHeader(k, normalized);
-    }) as Record<string, unknown>;
+    return this.POST();
   }
 
   get pathParameters(): Record<string, unknown> {
@@ -746,12 +728,41 @@ export class Request {
     this.cookieJar().commitBang();
   }
 
+  /** @missingRailsArgs from_query_string — CONVERGEABLE inline-store-nested-param-and-port-custom-param-encoder */
   GET(): Record<string, unknown> {
-    return this.queryParameters;
+    try {
+      return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
+        const rackQueryParams = ParamBuilder.fromQueryString(this.queryString);
+
+        return this.setHeader(k, rackQueryParams);
+      }) as Record<string, unknown>;
+    } catch (e) {
+      if (e instanceof ParamError) {
+        throw new BadRequest(`Invalid query parameters: ${e.message}`);
+      }
+      throw e;
+    }
   }
 
   POST(): Record<string, unknown> {
-    return this.requestParameters;
+    try {
+      return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
+        const host = this._paramsHost;
+        const pr = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
+          this._fallbackRequestParameters(),
+        );
+
+        return this.setHeader(
+          k,
+          RequestUtils.normalizeEncodeParams(pr as ParamValue) as Record<string, unknown>,
+        );
+      }) as Record<string, unknown>;
+    } catch (e) {
+      if (e instanceof ParamError) {
+        throw new BadRequest(`Invalid request parameters: ${e.message}`);
+      }
+      throw e;
+    }
   }
 
   get parameters(): Record<string, unknown> {

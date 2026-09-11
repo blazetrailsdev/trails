@@ -1,3 +1,5 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
+
 export interface NamedRoutesLike {
   helperNames(): readonly string[];
 }
@@ -25,8 +27,11 @@ export const UrlForDefaults = {
 } as const;
 
 /** @internal */
-export function _routes(host?: { _routes?: RouteSetLike | null }): RouteSetLike | null {
-  return host?._routes ?? _routesClassDefault;
+export function _routes(): never {
+  throw new RuntimeError(
+    "In order to use #url_for, you must include routing helpers explicitly. " +
+      "For instance, `include Rails.application.routes.url_helpers`.",
+  );
 }
 
 /** @internal */

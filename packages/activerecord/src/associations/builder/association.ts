@@ -233,7 +233,7 @@ export class Association {
     const name = reflection.name ?? reflection;
     model.beforeDestroy(async (record: any) => {
       try {
-        if ((await record.association(name).handleDependency()) === false) throwAbort();
+        await record.association(name).handleDependency();
       } catch (e) {
         if (e instanceof RecordNotDestroyed) {
           record._associationDestroyException = e;

@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
@@ -110,6 +111,8 @@ export class AliasTracker {
         count += matches ? matches.length : 0;
       } else if (join instanceof Nodes.Join) {
         if ((join.left as any)?.name === name) count += 1;
+      } else {
+        throw new ArgumentError("joins list should be initialized by list of Arel::Nodes::Join");
       }
     }
 

@@ -636,7 +636,7 @@ export class Parameters {
     }
 
     if (!options.suppressUnpermitted) {
-      this._unpermittedParameters(params);
+      this.unpermittedParametersBang(params);
     }
     params._permitted = true;
     return params;
@@ -667,21 +667,6 @@ export class Parameters {
       const result = this.permitValue(value, filter[key], options);
       if (result != null) params.set(key, result);
     });
-  }
-
-  private _unpermittedParameters(params: Parameters): void {
-    if (!Parameters.actionOnUnpermittedParameters) return;
-    const alwaysPermitted = new Set(Parameters.alwaysPermittedParameters);
-    const unpermitted = Object.keys(this._data).filter(
-      (k) => !(k in params._data) && !alwaysPermitted.has(k),
-    );
-    if (unpermitted.length === 0) return;
-
-    if (Parameters.actionOnUnpermittedParameters === "raise") {
-      throw new UnpermittedParameters(unpermitted);
-    } else if (Parameters.actionOnUnpermittedParameters === "log") {
-      console.warn(`found unpermitted parameters: ${unpermitted.join(", ")}`);
-    }
   }
 
   private _newWithInheritedPermitted(data: Record<string, unknown>): Parameters {
@@ -852,8 +837,23 @@ export class Parameters {
   }
 
   /** @internal */
-  unpermittedParametersBang(params: Parameters): void {
-    this._unpermittedParameters(params);
+  unpermittedParametersBang(
+    params: Parameters,
+    {
+      onUnpermitted = Parameters.actionOnUnpermittedParameters,
+    }: { onUnpermitted?: "log" | "raise" | false } = {},
+  ): void {
+    if (!onUnpermitted) return;
+    const unpermittedKeys = this.unpermittedKeys(params);
+    if (unpermittedKeys.length > 0) {
+      switch (onUnpermitted) {
+        case "log":
+          console.warn(`found unpermitted parameters: ${unpermittedKeys.join(", ")}`);
+          break;
+        case "raise":
+          throw new UnpermittedParameters(unpermittedKeys);
+      }
+    }
   }
 
   /** @internal */
