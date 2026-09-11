@@ -1,4 +1,4 @@
-import { Mutex, synchronize } from "@blazetrails/ruby-compat";
+import { Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import {
@@ -890,10 +890,11 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
+  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): Promise<null> {
     this.asyncExecutor!.post(() => {
       void withExecutionContext(() => futureResult.executeOrSkip());
     });
+    return Thread.pass();
   }
 
   /** @missingRailsArgs new — PERMANENT */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Mutex } from "./mutex.js";
+import { ThreadError } from "./thread-error.js";
 
 describe("Mutex", () => {
   it("queues distinct flows so only one holds the lock at a time", async () => {
@@ -41,5 +42,34 @@ describe("Mutex", () => {
     ).rejects.toThrow("boom");
 
     expect(await mutex.synchronize(async () => "ok")).toBe("ok");
+  });
+});
+
+describe("Mutex#try_lock / #unlock", () => {
+  it("try_lock takes a free mutex once and fails while it is held", () => {
+    const mutex = new Mutex();
+    expect(mutex.tryLock()).toBe(true);
+    expect(mutex.tryLock()).toBe(false);
+    mutex.unlock();
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("unlock raises ThreadError on a mutex that is not locked", () => {
+    const mutex = new Mutex();
+    expect(() => mutex.unlock()).toThrow(ThreadError);
+    expect(() => mutex.unlock()).toThrow("Attempt to unlock a mutex which is not locked");
+  });
+
+  it("synchronize waits for a try_lock holder to unlock", async () => {
+    const mutex = new Mutex();
+    const order: string[] = [];
+    expect(mutex.tryLock()).toBe(true);
+    const waiting = mutex.synchronize(() => void order.push("synchronize"));
+    await Promise.resolve();
+    order.push("unlock");
+    mutex.unlock();
+    await waiting;
+    expect(order).toEqual(["unlock", "synchronize"]);
   });
 });

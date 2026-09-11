@@ -1,28 +1,36 @@
-import { getAsyncContext } from "@blazetrails/ruby-compat";
+import { getAsyncContext, Thread } from "@blazetrails/ruby-compat";
 import type { AsyncContext, AsyncContextAdapter } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
 type Store = Map<IsolatedKey, unknown>;
 
-let _ctx: AsyncContext<Store> | null = null;
-let _adapter: AsyncContextAdapter | null = null;
-const _fallback: Store = new Map();
-const CONTEXT_KEY = Symbol.for("ar_execution_context_id");
-const ROOT_CONTEXT = { id: 0, toString: () => "#<Thread:0 run>" } as const;
-let _contextIdCounter = 0;
+type Scoped = { thread: Thread; state: Store };
 
-function ctx(): AsyncContext<Store> {
+let _ctx: AsyncContext<Scoped> | null = null;
+let _adapter: AsyncContextAdapter | null = null;
+const _states = new WeakMap<Thread, Store>();
+const CONTEXT_KEY = Symbol.for("ar_execution_context_id");
+
+function ctx(): AsyncContext<Scoped> {
   const adapter = getAsyncContext();
   if (!_ctx || _adapter !== adapter) {
     _adapter = adapter;
-    _ctx = adapter.create<Store>();
+    _ctx = adapter.create<Scoped>();
   }
   return _ctx;
 }
 
 function store(): Store {
-  return ctx().getStore() ?? _fallback;
+  const thread = Thread.current();
+  const scoped = ctx().getStore();
+  if (scoped && scoped.thread === thread) return scoped.state;
+  let state = _states.get(thread);
+  if (!state) {
+    state = new Map();
+    _states.set(thread, state);
+  }
+  return state;
 }
 
 export const IsolatedExecutionState = {
@@ -54,16 +62,14 @@ export const IsolatedExecutionState = {
   },
   /** @missingRailsCall scope — PERMANENT */
   context(): { readonly id: number } {
-    return (store().get(CONTEXT_KEY) as { readonly id: number } | undefined) ?? ROOT_CONTEXT;
+    return (store().get(CONTEXT_KEY) as { readonly id: number } | undefined) ?? Thread.current();
   },
   run<R>(fn: () => R): R {
-    const id = ++_contextIdCounter;
-    const context = { id, toString: () => `#<Thread:${id} run>` };
-    return ctx().run(new Map<IsolatedKey, unknown>([[CONTEXT_KEY, context]]), fn);
+    return new Thread(fn).value();
   },
   scope<T, R>(key: IsolatedKey, value: T, fn: () => R): R {
     const forked = new Map(store());
     forked.set(key, value);
-    return ctx().run(forked, fn);
+    return ctx().run({ thread: Thread.current(), state: forked }, fn);
   },
 };

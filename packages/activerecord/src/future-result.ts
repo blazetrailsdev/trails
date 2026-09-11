@@ -7,7 +7,7 @@ import {
   type EventPayload,
   type Instrumenter,
 } from "@blazetrails/activesupport";
-import { Process } from "@blazetrails/ruby-compat";
+import { Mutex, Process } from "@blazetrails/ruby-compat";
 import { Result } from "./result.js";
 
 /** @internal */
@@ -15,7 +15,7 @@ export const ACTIVE_RECORD_INSTRUMENTER = "active_record_instrumenter";
 
 /** @internal */
 export interface FutureResultPool {
-  scheduleQuery(futureResult: FutureResult): void;
+  scheduleQuery(futureResult: FutureResult): Promise<unknown> | void;
   withConnection<T>(fn: (connection: FutureResultConnection) => Promise<T> | T): Promise<T>;
 }
 
@@ -132,12 +132,11 @@ export class FutureResult {
   protected args: unknown[];
   protected kwargs: Record<string, unknown>;
 
+  #mutex = new Mutex();
   #session: FutureResultSession | null = null;
   #pending = true;
   #error: unknown = null;
   #result: Result | null = null;
-  #executing: Promise<void> | null = null;
-  #scheduled: Promise<void> | null = null;
   #instrumenter: Instrumenter;
   #eventBuffer: EventBuffer | null = null;
 
@@ -163,9 +162,9 @@ export class FutureResult {
     return this.result().then(onFulfilled, onRejected);
   }
 
-  scheduleBang(session: FutureResultSession): void {
+  scheduleBang(session: FutureResultSession): Promise<unknown> | void {
     this.#session = session;
-    this.pool.scheduleQuery(this);
+    return this.pool.scheduleQuery(this);
   }
 
   executeBang(connection: FutureResultConnection): Promise<void> {
@@ -181,19 +180,23 @@ export class FutureResult {
   executeOrSkip(): Promise<void> | void {
     if (!this.pending()) return;
 
-    return (this.#scheduled = this.#session!.synchronize(async () => {
+    return this.#session!.synchronize(async () => {
       if (!this.pending()) return;
 
       await this.pool.withConnection(async (connection) => {
-        if (this.#executing) return;
-        if (this.pending()) {
-          this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
-          await IsolatedExecutionState.scope(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer, () =>
-            this.executeQuery(connection, { async: true }),
-          );
+        if (!this.#mutex.tryLock()) return;
+        try {
+          if (this.pending()) {
+            this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
+            await IsolatedExecutionState.scope(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer, () =>
+              this.executeQuery(connection, { async: true }),
+            );
+          }
+        } finally {
+          this.#mutex.unlock();
         }
       });
-    }));
+    });
   }
 
   async result(): Promise<Result> {
@@ -220,36 +223,33 @@ export class FutureResult {
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
       const start = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
-      if (this.#scheduled) await this.#scheduled;
-      if (this.#executing) {
-        await this.#executing;
-        this.lockWait = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;
-      } else {
-        await this.pool.withConnection((connection) => this.executeQuery(connection));
-      }
+      await this.#mutex.synchronize(async () => {
+        if (this.pending()) {
+          await this.pool.withConnection((connection) => this.executeQuery(connection));
+        } else {
+          this.lockWait =
+            Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;
+        }
+      });
     } else {
       this.lockWait = 0.0;
     }
   }
 
-  protected executeQuery(
+  protected async executeQuery(
     connection: FutureResultConnection,
     kwargs: { async?: boolean } = {},
   ): Promise<void> {
-    const running = (async () => {
-      try {
-        this.#result = await this.execQuery(connection, this.args, {
-          ...this.kwargs,
-          async: kwargs.async ?? false,
-        });
-      } catch (error) {
-        this.#error = error;
-      } finally {
-        this.#pending = false;
-      }
-    })();
-    this.#executing = running;
-    return running;
+    try {
+      this.#result = await this.execQuery(connection, this.args, {
+        ...this.kwargs,
+        async: kwargs.async ?? false,
+      });
+    } catch (error) {
+      this.#error = error;
+    } finally {
+      this.#pending = false;
+    }
   }
 
   protected execQuery(

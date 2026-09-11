@@ -10,6 +10,7 @@ interface MutexData {
   chain: Promise<void> | null;
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
+  unlock: (() => void) | null;
 }
 
 const MUTEX_DATA = new WeakMap<object, MutexData>();
@@ -17,7 +18,7 @@ const MUTEX_DATA = new WeakMap<object, MutexData>();
 function mutexData(self: object): MutexData {
   let data = MUTEX_DATA.get(self);
   if (!data) {
-    data = { fiber: null, chain: null, storage: null, adapter: null };
+    data = { fiber: null, chain: null, storage: null, adapter: null, unlock: null };
     MUTEX_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -74,5 +75,42 @@ export class Mutex {
       if (data.chain === tail) data.chain = null;
       unlock();
     }
+  }
+
+  /**
+   * `vendor/ruby/thread_sync.c:292` `rb_mutex_trylock`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Mutex#try_lock`
+   * (`vendor/ruby/thread_sync.c:1664`).
+   */
+  tryLock(): boolean {
+    const data = mutexData(this);
+    if (data.chain !== null) return false;
+
+    let unlock!: () => void;
+    const mine = new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+    data.chain = mine;
+    data.unlock = () => {
+      if (data.chain === mine) data.chain = null;
+      unlock();
+    };
+    return true;
+  }
+
+  /**
+   * `vendor/ruby/thread_sync.c:548` `rb_mutex_unlock`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Mutex#unlock`
+   * (`vendor/ruby/thread_sync.c:1666`).
+   */
+  unlock(): this {
+    const data = mutexData(this);
+    const unlock = data.unlock;
+    if (!unlock) throw new ThreadError("Attempt to unlock a mutex which is not locked");
+    data.unlock = null;
+    unlock();
+    return this;
   }
 }

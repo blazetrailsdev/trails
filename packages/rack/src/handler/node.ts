@@ -1,4 +1,4 @@
-import { getHttpAsync, stderr, StringIO } from "@blazetrails/ruby-compat";
+import { getHttpAsync, stderr, StringIO, Thread } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer } from "@blazetrails/ruby-compat";
 import {
   HTTPS,
@@ -54,50 +54,57 @@ export class Node {
     });
   }
 
-  async service(req: HttpRequest, res: HttpResponse): Promise<void> {
-    const env = await this.metaVars(req);
-    for (const key of Object.keys(env)) {
-      if (env[key] == null) delete env[key];
-    }
-
-    const input = new StringIO(await readBody(req));
-
-    env[RACK_INPUT] = input;
-    env[RACK_ERRORS] = stderr;
-    env[RACK_URL_SCHEME] = ["yes", "on", "1"].includes(env[HTTPS] as string) ? "https" : "http";
-    env[RACK_IS_HIJACK] = false;
-
-    env[QUERY_STRING] ??= "";
-    if (env[PATH_INFO] !== "") {
-      const path = new URL(env["REQUEST_URI"] as string).pathname;
-      const n = (env[SCRIPT_NAME] as string).length;
-      env[PATH_INFO] = path.slice(n, path.length);
-    }
-    env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
-
-    const [status, headers, body] = await this.app(env);
-    try {
-      const sent: Record<string, string | string[]> = {};
-      const setCookie = headers[SET_COOKIE];
-      if (setCookie) {
-        sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
+  /** @noRailsEquivalent PERMANENT */
+  service(req: HttpRequest, res: HttpResponse): Promise<void> {
+    return new Thread(async (): Promise<void> => {
+      const env = await this.metaVars(req);
+      for (const key of Object.keys(env)) {
+        if (env[key] == null) delete env[key];
       }
 
-      for (const [key, value] of Object.entries(headers)) {
-        if (key.startsWith("rack.")) continue;
-        if (key === SET_COOKIE) continue;
-        sent[key] = Array.isArray(value) ? value.join(", ") : value;
-      }
+      const input = new StringIO(await readBody(req));
 
-      res.writeHead(status, sent);
-      for await (const chunk of body) {
-        res.write(chunk);
+      env[RACK_INPUT] = input;
+      env[RACK_ERRORS] = stderr;
+      env[RACK_URL_SCHEME] = ["yes", "on", "1"].includes(env[HTTPS] as string) ? "https" : "http";
+      env[RACK_IS_HIJACK] = false;
+
+      env[QUERY_STRING] ??= "";
+      if (env[PATH_INFO] !== "") {
+        const path = new URL(env["REQUEST_URI"] as string).pathname;
+        const n = (env[SCRIPT_NAME] as string).length;
+        env[PATH_INFO] = path.slice(n, path.length);
       }
-      res.end();
-    } finally {
-      const close = (body as { return?: () => Promise<unknown> }).return;
-      if (close) await close.call(body);
-    }
+      env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
+
+      const [status, headers, body] = await this.app(env);
+      try {
+        const sent: Record<string, string | string[]> = {};
+        const setCookie = headers[SET_COOKIE];
+        if (setCookie) {
+          sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
+        }
+
+        for (const [key, value] of Object.entries(headers)) {
+          if (key.startsWith("rack.")) continue;
+          if (key === SET_COOKIE) continue;
+          sent[key] = Array.isArray(value) ? value.join(", ") : value;
+        }
+
+        res.writeHead(status, sent);
+        for await (const chunk of body) {
+          res.write(chunk);
+        }
+        res.end();
+      } finally {
+        const { close, return: finish } = body as {
+          close?: () => void;
+          return?: () => Promise<unknown>;
+        };
+        if (close) close.call(body);
+        else if (finish) await finish.call(body);
+      }
+    }).value();
   }
 
   async metaVars(req: HttpRequest): Promise<RackEnv> {
