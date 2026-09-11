@@ -436,9 +436,7 @@ export class JoinDependency {
         const parentKey = primaryKey ? this._keyFor(primaryKey.map((k) => rowHash[k])) : rowHash;
         let parent = parents.get(parentKey);
         if (!parent) {
-          const attrs: Record<string, unknown> = {};
-          for (const { name, alias } of columnAliases) attrs[name] = rowHash[alias];
-          parent = (this.joinRoot.baseKlass as any)._instantiate(attrs, block, columnTypes);
+          parent = this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block);
           parents.set(parentKey, parent);
         }
         this.construct(parent, this.joinRoot, rowHash, seen, modelCache, strictLoadingValue);
@@ -632,12 +630,7 @@ export class JoinDependency {
     }
     let model = nodeCache.get(id);
     if (!model) {
-      const attrs: Record<string, unknown> = {};
-      const columnAliases = this.aliases().columnAliases(node)!;
-      for (const { name, alias } of columnAliases) {
-        attrs[name] = row[alias];
-      }
-      model = (node.baseKlass as any)._instantiate(attrs, (built: any) => {
+      model = node.instantiate(row, this.aliases().columnAliases(node)!, {}, (built: any) => {
         if (strictLoadingValue && typeof built.strictLoadingBang === "function") {
           built.strictLoadingBang();
         }
