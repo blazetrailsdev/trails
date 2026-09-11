@@ -260,20 +260,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "MultipleFixtureConnectionsTest",
-    tests: [
-      "resolves associations using composite primary keys",
-      "resolves associations using composite primary keys with partially filled values",
-    ],
-    reason:
-      "Rails' cpk_reviews.yml names the book by association label (book: " +
-      "cpk_book_with_generated_pk), which TableRow#resolve_sti_reflections expands through " +
-      "composite_identify over the [author_id, number] foreign key (fixture_set/table_row.rb:166-172). " +
-      "trails' cpk-reviews.ts spells it as per-column ref()s instead, and those resolve " +
-      "number to the book's author_id slot, so review.book misses.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
     tests: ["model class in fixture file is respected"],
     reason:

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest } from "./compare.js";
+import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -733,5 +733,18 @@ describe("compareModelClass", () => {
         "foo.ts",
       ).valsMatched,
     ).toBe(0);
+  });
+});
+
+describe("TS-side _fixture.ignore and composite-FK labels", () => {
+  it("drops _fixture and its ignore labels (string or array), keeping the rest", () => {
+    expect(withoutIgnoredFixtures({ _fixture: { ignore: "DEAD" }, DEAD: { a: 1 }, polly: { b: 2 } })).toEqual({ polly: { b: 2 } }); // prettier-ignore
+    expect(withoutIgnoredFixtures({ _fixture: { ignore: ["P", "Q"] }, P: {}, Q: {}, awdr: { c: 3 } })).toEqual({ awdr: { c: 3 } }); // prettier-ignore
+  });
+
+  it("compares a composite-FK belongs_to label verbatim instead of dropping it", () => {
+    expect(COMPOSITE_FK_LABEL_ATTRS.cpk_reviews.has("book")).toBe(true);
+    const cols = new Set(["author_id", "number", "rating"]);
+    expect(canonicalizeRailsRow({ book: "b1", rating: 5 }, { book: "b1", rating: 5 }, cols, "cpk_reviews")).toEqual({ book: "b1", rating: 5 }); // prettier-ignore
   });
 });

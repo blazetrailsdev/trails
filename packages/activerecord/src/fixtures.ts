@@ -517,7 +517,16 @@ export async function prepareModelFixtures(
     { rows: FixtureAttrs[]; throughModel: BaseClass | undefined; isHabtm: boolean }
   >();
 
-  const labels = Object.keys(fixtures).filter((label) => label !== "DEFAULTS");
+  const base = (fixtures["_fixture"] as { ignore?: unknown } | undefined)?.ignore;
+  const ignoredFixtures: string[] = Array.isArray(base)
+    ? [...base]
+    : typeof base === "string"
+      ? [base]
+      : [];
+  if (!ignoredFixtures.includes("DEFAULTS")) ignoredFixtures.push("DEFAULTS");
+  const labels = Object.keys(fixtures).filter(
+    (label) => label !== "_fixture" && !ignoredFixtures.includes(label),
+  );
 
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
@@ -635,6 +644,21 @@ export async function prepareModelFixtures(
                 typeof fkStr === "string" ? fkStr : col,
                 refl.klass?.name ?? "Unknown",
               );
+            }
+            if (Array.isArray(fkName) && typeof val === "string") {
+              const compositeKey = FixtureSet.compositeIdentify(val, fkName);
+              for (const [column, value] of Object.entries(compositeKey)) {
+                if (
+                  (tableColumnNames !== null && !tableColumnNames.has(column)) ||
+                  column in row ||
+                  column in attrs
+                ) {
+                  continue;
+                }
+
+                row[column] = value;
+              }
+              continue;
             }
           }
         }

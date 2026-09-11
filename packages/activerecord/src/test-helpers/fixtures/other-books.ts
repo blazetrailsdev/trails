@@ -1,13 +1,31 @@
+const PUBLISHED = {
+  status: 2,
+};
+
+const PUBLISHED_PAPERBACK = {
+  ...PUBLISHED,
+  format: "paperback",
+  language: 0,
+};
+
+const PUBLISHED_EBOOK = {
+  ...PUBLISHED,
+  format: "ebook",
+};
+
 export const otherBookFixtureData = {
+  _fixture: {
+    ignore: ["PUBLISHED", "PUBLISHED_PAPERBACK", "PUBLISHED_EBOOK"],
+  },
+  PUBLISHED,
+  PUBLISHED_PAPERBACK,
+  PUBLISHED_EBOOK,
   awdr: {
-    status: 2,
-    format: "paperback",
-    language: 0,
+    ...PUBLISHED_PAPERBACK,
     name: "Agile Web Development with Rails",
   },
   rfr: {
-    status: 2,
-    format: "ebook",
+    ...PUBLISHED_EBOOK,
     name: "Ruby for Rails",
   },
 };

@@ -336,7 +336,7 @@ function calleeRootName(expression: ts.Expression): string | null {
 export function extractTestsFromSource(content: string, relativePath: string): TestFileInfo {
   const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
   const helpers = collectHelpers(sourceFile);
-  const literalArrays = collectLiteralArrays(sourceFile);
+  const constDecls = collectConstDeclarations(sourceFile);
   const bindings = new Map<string, string>();
 
   const fileInfo: TestFileInfo = {
@@ -413,7 +413,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       return false;
     }
     const name = initializer.declarations[0].name;
-    const elements = staticIterableElements(node.expression, literalArrays);
+    const elements = staticIterableElements(node.expression, constDecls);
     if (!elements) return false;
 
     let names: string[];
@@ -429,7 +429,8 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       return false;
     }
 
-    for (const element of elements) {
+    const guards = continueGuards(node.statement);
+    const bind = (element: IterableElement, run: () => void) => {
       const values = ts.isIdentifier(name) ? [element.scalar] : (element.tuple ?? []);
       const shadowed = names.map((n) => bindings.get(n));
       names.forEach((n, i) => {
@@ -437,13 +438,31 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         if (value === null || value === undefined) bindings.delete(n);
         else bindings.set(n, value);
       });
-      visit(node.statement);
+      run();
       names.forEach((n, i) => {
         const prior = shadowed[i];
         if (prior === undefined) bindings.delete(n);
         else bindings.set(n, prior);
       });
+    };
+
+    const skipped: boolean[] = [];
+    for (const element of elements) {
+      let skip: boolean | null = false;
+      bind(element, () => {
+        for (const guard of guards) {
+          const value = evalPredicate(guard, bindings, constDecls);
+          if (value === null) skip = null;
+          else if (value && skip === false) skip = true;
+        }
+      });
+      if (skip === null) return false;
+      skipped.push(skip);
     }
+
+    elements.forEach((element, i) => {
+      if (!skipped[i]) bind(element, () => visit(node.statement));
+    });
     return true;
   }
 
@@ -833,24 +852,66 @@ function literalValue(expr: ts.Expression): string | null {
 type IterableElement = { scalar: string | null; tuple: (string | null)[] | null };
 
 /**
- * The statically-known elements of a `for...of` iterable: an array literal, or
- * an identifier declared once in this file with an array-literal initializer
- * (`const DELEGATED_ARRAY_METHODS = [...]`). Anything computed — `Object.keys`,
- * `.filter(...)`, an import — returns null and the loop is walked once, as
- * before. One unresolved element rejects the whole array, the same way the Ruby
- * extractor's `array_literal_values` does (extract-ruby-tests.rb:686-692), so a
- * partly-computed array keeps its single dynamic skeleton rather than emitting
- * one duplicate skeleton per element.
+ * The statically-known elements of a `for...of` iterable: an array literal; an
+ * identifier declared once in this file whose initializer is itself static
+ * (`const DELEGATED_ARRAY_METHODS = [...]`, or a chain such as
+ * `const NON_LEGACY = FORMATS.filter(...)`); `Object.keys(X)` /
+ * `Object.entries(X)` over an object literal declared once in the file (the TS
+ * twin of the Ruby extractor's constant-hash expansion); or `.filter(cb)` /
+ * `.map(cb)` over a static array whose callback evaluates for every element.
+ * Anything else — an import, a computed key — returns null and the loop is
+ * walked once, as before. One unresolved element rejects the whole array, the
+ * same way the Ruby extractor's `array_literal_values` does
+ * (extract-ruby-tests.rb:686-692), so a partly-computed array keeps its single
+ * dynamic skeleton rather than emitting one duplicate skeleton per element.
  */
 function staticIterableElements(
   expr: ts.Expression,
-  arrays: ReadonlyMap<string, ts.ArrayLiteralExpression>,
+  decls: ReadonlyMap<string, ts.Expression>,
+  seen: ReadonlySet<string> = new Set(),
 ): IterableElement[] | null {
-  let e = unwrapExpression(expr);
+  const e = unwrapExpression(expr);
   if (ts.isIdentifier(e)) {
-    const declared = arrays.get(e.text);
-    if (!declared) return null;
-    e = declared;
+    const declared = decls.get(e.text);
+    if (!declared || seen.has(e.text)) return null;
+    return staticIterableElements(declared, decls, new Set([...seen, e.text]));
+  }
+  if (ts.isCallExpression(e) && ts.isPropertyAccessExpression(e.expression)) {
+    const receiver = unwrapExpression(e.expression.expression);
+    const method = e.expression.name.text;
+    if (ts.isIdentifier(receiver) && receiver.text === "Object") {
+      if ((method !== "keys" && method !== "entries") || e.arguments.length !== 1) return null;
+      const entries = staticObjectEntries(e.arguments[0], decls);
+      if (!entries) return null;
+      if (method === "keys") return entries.map(([key]) => ({ scalar: key, tuple: null }));
+      if (entries.some(([, value]) => value === null)) return null;
+      return entries.map(([key, value]) => ({ scalar: null, tuple: [key, value] }));
+    }
+    if ((method === "filter" || method === "map") && e.arguments.length === 1) {
+      const source = staticIterableElements(receiver, decls, seen);
+      const callback = unwrapExpression(e.arguments[0]);
+      if (!source || !ts.isArrowFunction(callback) || callback.parameters.length !== 1) {
+        return null;
+      }
+      const param = callback.parameters[0].name;
+      if (!ts.isIdentifier(param) || !ts.isExpression(callback.body)) return null;
+      const out: IterableElement[] = [];
+      for (const element of source) {
+        if (element.scalar === null) return null;
+        const bound = new Map([[param.text, element.scalar]]);
+        if (method === "filter") {
+          const keep = evalPredicate(callback.body, bound, decls);
+          if (keep === null) return null;
+          if (keep) out.push(element);
+        } else {
+          const mapped = evalBoundExpression(callback.body, bound);
+          if (mapped === null) return null;
+          out.push({ scalar: mapped, tuple: null });
+        }
+      }
+      return out;
+    }
+    return null;
   }
   if (!ts.isArrayLiteralExpression(e)) return null;
   const out: IterableElement[] = [];
@@ -870,13 +931,126 @@ function staticIterableElements(
 }
 
 /**
- * Every `const NAME = [...]` in the file, keyed by name. A name declared more
+ * `[key, value]` pairs of an object literal (inline, or an identifier declared
+ * once in the file). A spread, method, or computed key rejects the whole
+ * object; a non-literal value is kept as null, so `Object.keys` still resolves.
+ */
+function staticObjectEntries(
+  expr: ts.Expression,
+  decls: ReadonlyMap<string, ts.Expression>,
+): [string, string | null][] | null {
+  let e = unwrapExpression(expr);
+  if (ts.isIdentifier(e)) {
+    const declared = decls.get(e.text);
+    if (!declared) return null;
+    e = unwrapExpression(declared);
+  }
+  if (!ts.isObjectLiteralExpression(e)) return null;
+  const out: [string, string | null][] = [];
+  for (const property of e.properties) {
+    if (!ts.isPropertyAssignment(property)) return null;
+    const key = property.name;
+    if (!(ts.isIdentifier(key) || ts.isStringLiteral(key) || ts.isNumericLiteral(key))) {
+      return null;
+    }
+    out.push([key.text, literalValue(property.initializer)]);
+  }
+  return out;
+}
+
+/**
+ * A boolean over bound loop variables and literals: `!`, `&&`, `||`,
+ * `===`/`!==`/`==`/`!=`, and `ARR.includes(x)` / `SET.has(x)` where the
+ * receiver is a static array or a `new Set([...])` of one. Null when any part
+ * is not statically evaluable.
+ */
+function evalPredicate(
+  expr: ts.Expression,
+  bindings: ReadonlyMap<string, string>,
+  decls: ReadonlyMap<string, ts.Expression>,
+): boolean | null {
+  const e = unwrapExpression(expr);
+  if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.ExclamationToken) {
+    const inner = evalPredicate(e.operand, bindings, decls);
+    return inner === null ? null : !inner;
+  }
+  if (ts.isBinaryExpression(e)) {
+    const op = e.operatorToken.kind;
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken) {
+      const left = evalPredicate(e.left, bindings, decls);
+      const right = evalPredicate(e.right, bindings, decls);
+      if (left === null || right === null) return null;
+      return op === ts.SyntaxKind.AmpersandAmpersandToken ? left && right : left || right;
+    }
+    const equal =
+      op === ts.SyntaxKind.EqualsEqualsEqualsToken || op === ts.SyntaxKind.EqualsEqualsToken;
+    const notEqual =
+      op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+      op === ts.SyntaxKind.ExclamationEqualsToken;
+    if (!equal && !notEqual) return null;
+    const left = literalValue(e.left) ?? evalBoundExpression(e.left, bindings);
+    const right = literalValue(e.right) ?? evalBoundExpression(e.right, bindings);
+    if (left === null || right === null) return null;
+    return equal ? left === right : left !== right;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    (e.expression.name.text === "includes" || e.expression.name.text === "has") &&
+    e.arguments.length === 1
+  ) {
+    let receiver = unwrapExpression(e.expression.expression);
+    if (ts.isIdentifier(receiver)) {
+      const declared = decls.get(receiver.text);
+      if (!declared) return null;
+      receiver = unwrapExpression(declared);
+    }
+    if (e.expression.name.text === "has") {
+      if (
+        !ts.isNewExpression(receiver) ||
+        !ts.isIdentifier(receiver.expression) ||
+        receiver.expression.text !== "Set" ||
+        receiver.arguments?.length !== 1
+      ) {
+        return null;
+      }
+      receiver = receiver.arguments[0];
+    }
+    const members = staticIterableElements(receiver, decls);
+    const needle = literalValue(e.arguments[0]) ?? evalBoundExpression(e.arguments[0], bindings);
+    if (!members || needle === null || members.some((m) => m.scalar === null)) return null;
+    return members.some((m) => m.scalar === needle);
+  }
+  return null;
+}
+
+/**
+ * The conditions of the `if (...) continue;` statements that open a loop body,
+ * in order — the iterations they skip register no `it()`.
+ */
+function continueGuards(statement: ts.Statement): ts.Expression[] {
+  if (!ts.isBlock(statement)) return [];
+  const guards: ts.Expression[] = [];
+  for (const s of statement.statements) {
+    if (!ts.isIfStatement(s) || s.elseStatement) break;
+    const then = s.thenStatement;
+    const isContinue =
+      ts.isContinueStatement(then) ||
+      (ts.isBlock(then) &&
+        then.statements.length === 1 &&
+        ts.isContinueStatement(then.statements[0]));
+    if (!isContinue) break;
+    guards.push(s.expression);
+  }
+  return guards;
+}
+
+/**
+ * Every `const NAME = <expr>` in the file, keyed by name. A name declared more
  * than once is dropped rather than guessed at.
  */
-function collectLiteralArrays(
-  sourceFile: ts.SourceFile,
-): ReadonlyMap<string, ts.ArrayLiteralExpression> {
-  const arrays = new Map<string, ts.ArrayLiteralExpression>();
+function collectConstDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Expression> {
+  const decls = new Map<string, ts.Expression>();
   const seen = new Set<string>();
   function walk(node: ts.Node) {
     if (
@@ -884,17 +1058,14 @@ function collectLiteralArrays(
       ts.isIdentifier(node.name) &&
       node.initializer !== undefined
     ) {
-      const init = unwrapExpression(node.initializer);
-      if (ts.isArrayLiteralExpression(init)) {
-        if (seen.has(node.name.text)) arrays.delete(node.name.text);
-        else arrays.set(node.name.text, init);
-      }
+      if (seen.has(node.name.text)) decls.delete(node.name.text);
+      else decls.set(node.name.text, node.initializer);
       seen.add(node.name.text);
     }
     ts.forEachChild(node, walk);
   }
   walk(sourceFile);
-  return arrays;
+  return decls;
 }
 
 function getArgTemplateSkeleton(node: ts.CallExpression, index: number): string | null {

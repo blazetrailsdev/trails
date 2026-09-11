@@ -41,67 +41,105 @@ const SingularToPlural: Record<string, string> = {
   wish: "wishes",
   fish: "fish",
   jeans: "jeans",
-  funky_jeans: "funky_jeans",
+  "funky jeans": "funky jeans",
+  "my money": "my money",
+
   category: "categories",
   query: "queries",
   ability: "abilities",
   agency: "agencies",
   movie: "movies",
+
   archive: "archives",
-  index: "indexes",
+
+  index: "indices",
+
   wife: "wives",
   safe: "saves",
   half: "halves",
+
   move: "moves",
-  testis: "testes",
-  virus: "viri",
-  octopus: "octopi",
-  status: "statuses",
-  alias: "aliases",
-  bus: "buses",
-  buffalo: "buffaloes",
-  tomato: "tomatoes",
+
+  salesperson: "salespeople",
+  person: "people",
+
+  spokesman: "spokesmen",
+  man: "men",
+  woman: "women",
+
+  basis: "bases",
+  diagnosis: "diagnoses",
+  diagnosis_a: "diagnosis_as",
+
   datum: "data",
   medium: "media",
   stadium: "stadia",
   analysis: "analyses",
-  diagnosis: "diagnoses",
-  diagnosis_a: "diagnosis_as",
-  thesis: "theses",
-  parenthesis: "parentheses",
-  prognosis: "prognoses",
-  basis: "bases",
-  synopsis: "synopses",
-  hive: "hives",
-  quiz: "quizzes",
-  matrix: "matrices",
-  vertex: "vertexes",
-  appendix: "appendices",
-  ox: "oxen",
-  mouse: "mice",
-  louse: "lice",
-  series: "series",
-  sheep: "sheep",
-  person: "people",
-  man: "men",
+  my_analysis: "my_analyses",
+
+  node_child: "node_children",
   child: "children",
-  sex: "sexes",
-  zombie: "zombies",
-  edge: "edges",
-  cow: "cows",
-  database: "databases",
-  shoe: "shoes",
-  horse: "horses",
-  rice: "rice",
-  equipment: "equipment",
-  information: "information",
-  money: "money",
-  species: "species",
-  police: "police",
+
+  experience: "experiences",
+  day: "days",
+
+  comment: "comments",
+  foobar: "foobars",
+  newsletter: "newsletters",
+
+  old_news: "old_news",
   news: "news",
+
+  series: "series",
+  miniseries: "miniseries",
+  species: "species",
+
+  quiz: "quizzes",
+
   perspective: "perspectives",
+
+  ox: "oxen",
+  photo: "photos",
+  buffalo: "buffaloes",
+  tomato: "tomatoes",
+  dwarf: "dwarves",
+  elf: "elves",
+  information: "information",
+  equipment: "equipment",
+  bus: "buses",
+  status: "statuses",
+  status_code: "status_codes",
+  mouse: "mice",
+
+  louse: "lice",
+  house: "houses",
+  octopus: "octopi",
+  virus: "viri",
+  alias: "aliases",
+  portfolio: "portfolios",
+
+  vertex: "vertices",
+  matrix: "matrices",
+  matrix_fu: "matrix_fus",
+
   axis: "axes",
   taxi: "taxis",
+  testis: "testes",
+  crisis: "crises",
+
+  rice: "rice",
+  shoe: "shoes",
+
+  horse: "horses",
+  prize: "prizes",
+  edge: "edges",
+
+  database: "databases",
+
+  "|ice": "|ices",
+  "|ouse": "|ouses",
+  slice: "slices",
+  police: "police",
 };
 
 const StringToParameterizedAndNormalized: Record<string, string> = {
@@ -672,24 +710,33 @@ describe("InflectorTest", () => {
     expect(result).toBe("words");
   });
 
-  describe("pluralize singular", () => {
-    for (const [singular, plural] of Object.entries(SingularToPlural)) {
-      it(`pluralize singular ${singular}`, () => {
-        expect(pluralize(singular)).toBe(plural);
-      });
-    }
-  });
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
-  describe("singularize plural", () => {
-    const skipSingularize = new Set(["appendices"]);
-    for (const [singular, plural] of Object.entries(SingularToPlural)) {
-      if (singular === plural) continue;
-      if (skipSingularize.has(plural)) continue;
-      it(`singularize plural ${plural}`, () => {
-        expect(singularize(plural)).toBe(singular);
-      });
-    }
-  });
+  for (const [singular, plural] of Object.entries(SingularToPlural)) {
+    it(`pluralize singular ${singular}`, () => {
+      expect(pluralize(singular)).toBe(plural);
+      expect(pluralize(capitalize(singular))).toBe(capitalize(plural));
+    });
+  }
+
+  for (const [singular, plural] of Object.entries(SingularToPlural)) {
+    it(`singularize plural ${plural}`, () => {
+      expect(singularize(plural)).toBe(singular);
+      expect(singularize(capitalize(plural))).toBe(capitalize(singular));
+    });
+  }
+
+  for (const [singular, plural] of Object.entries(SingularToPlural)) {
+    it(`pluralize plural ${plural}`, () => {
+      expect(pluralize(plural)).toBe(plural);
+      expect(pluralize(capitalize(plural))).toBe(capitalize(plural));
+    });
+
+    it(`singularize singular ${singular}`, () => {
+      expect(singularize(singular)).toBe(singular);
+      expect(singularize(capitalize(singular))).toBe(capitalize(singular));
+    });
+  }
 
   describe("titleize", () => {
     it("titleize mixture to title case", () => {

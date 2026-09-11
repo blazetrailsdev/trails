@@ -1382,7 +1382,7 @@ describe("FixtureClassNamesTest", () => {
 
 describe("MultipleFixtureConnectionsTest", () => {
   describe("CompositePkFixturesTest", () => {
-    const { cpkOrders, cpkBooks, cpkAuthors, cpkOrderAgreements } = fixtures([
+    const { cpkOrders, cpkBooks, cpkAuthors, cpkReviews, cpkOrderAgreements } = fixtures([
       "cpkOrders",
       "cpkBooks",
       "cpkAuthors",
@@ -1410,6 +1410,22 @@ describe("MultipleFixtureConnectionsTest", () => {
 
     it("generates composite primary key with unique components", () => {
       expect(new Set(cpkOrders("cpk_groceries_order_1").id as unknown[]).size).toBe(2);
+    });
+
+    it("resolves associations using composite primary keys", async () => {
+      const review = cpkReviews("first_book_review");
+      const generatedBook = cpkBooks("cpk_book_with_generated_pk");
+
+      expect([review.author_id, review.number]).toEqual(generatedBook.id);
+      expect(await review.book).toEqual(generatedBook);
+    });
+
+    it("resolves associations using composite primary keys with partially filled values", async () => {
+      const review = cpkReviews("second_book_review_for_book_with_partial_pk_defined");
+      const bookWithPartiallyFilledCpk = cpkBooks("cpk_great_author_first_book");
+
+      expect([review.author_id, review.number]).toEqual(bookWithPartiallyFilledCpk.id);
+      expect(await review.book).toEqual(bookWithPartiallyFilledCpk);
     });
 
     it("association with custom primary key", async () => {

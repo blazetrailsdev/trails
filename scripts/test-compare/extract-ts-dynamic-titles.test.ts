@@ -8,6 +8,75 @@ function titles(source: string) {
 }
 
 describe("statically expanded loop-generated it() titles", () => {
+  it("expands Object.keys and Object.entries over a const object literal", () => {
+    expect(
+      titles(`
+        const SingularToPlural = { search: "searches", fish: "fish" };
+        for (const [singular, plural] of Object.entries(SingularToPlural)) {
+          it(\`pluralize singular \${singular}\`, () => {});
+        }
+        for (const format of Object.keys(SingularToPlural)) {
+          it(\`key \${format}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ["pluralize singular search", false],
+      ["pluralize singular fish", false],
+      ["key search", false],
+      ["key fish", false],
+    ]);
+  });
+
+  it("resolves filter/map chains over an already-resolved const array", () => {
+    expect(
+      titles(`
+        const FORMATS = Object.keys({ passthrough: 1, marshal_7_1: 2, message_pack: 3 });
+        const LEGACY_FORMATS = ["passthrough"];
+        const NON_LEGACY_FORMATS = FORMATS.filter((f) => !LEGACY_FORMATS.includes(f));
+        for (const dumper of NON_LEGACY_FORMATS.map((f) => f)) {
+          it(\`can load \${JSON.stringify(dumper)} dump\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ['can load "marshal_7_1" dump', false],
+      ['can load "message_pack" dump', false],
+    ]);
+  });
+
+  it("skips iterations a leading continue guard rejects", () => {
+    expect(
+      titles(`
+        const SingularToPlural = { search: "searches", fish: "fish", appendix: "appendices" };
+        const skipSingularize = new Set(["appendices"]);
+        for (const [singular, plural] of Object.entries(SingularToPlural)) {
+          if (singular === plural) continue;
+          if (skipSingularize.has(plural)) continue;
+          it(\`singularize plural \${plural}\`, () => {});
+        }
+      `),
+    ).toEqual([["singularize plural searches", false]]);
+  });
+
+  it("keeps a single dynamic skeleton when the iterable is not evaluable", () => {
+    expect(
+      titles(`
+        import { SERIALIZERS } from "./serializers.js";
+        const FORMATS = Object.keys(SERIALIZERS);
+        const OTHER = FORMATS.filter((f) => f.startsWith("m"));
+        for (const format of OTHER) {
+          it(\`loads \${format}\`, () => {});
+        }
+        const MIXED = { a: "x", b: someCall() };
+        for (const [k, v] of Object.entries(MIXED)) {
+          it(\`entry \${k}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ["loads <expr>", true],
+      ["entry <expr>", true],
+    ]);
+  });
+
   it("expands a loop over a literal array", () => {
     expect(
       titles(`

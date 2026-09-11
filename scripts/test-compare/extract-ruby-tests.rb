@@ -215,6 +215,16 @@ class TestExtractor
     # inline array literal does.
     @const_arrays = {}
     collect_const_arrays(sexp)
+    required_relative_paths(sexp).each do |required|
+      path = File.expand_path("#{required}.rb", File.dirname(filepath))
+      next unless File.file?(path)
+      required_sexp = Ripper.sexp(File.read(path))
+      next unless required_sexp
+      own = @const_arrays
+      @const_arrays = {}
+      collect_const_arrays(required_sexp)
+      @const_arrays = @const_arrays.merge(own)
+    end
 
     @module_defs = Set.new
     collect_module_defs(sexp, [])
@@ -867,10 +877,28 @@ class TestExtractor
       if name && value.is_a?(Array) && value[0] == :array
         values = array_literal_values(value[1])
         @const_arrays[name] = values if values
+      elsif name && value.is_a?(Array) && value[0] == :hash
+        pairs = hash_literal_pairs(value)
+        @const_arrays[name] = pairs if pairs
       end
     end
 
     node.each { |child| collect_const_arrays(child) if child.is_a?(Array) }
+  end
+
+  def required_relative_paths(node, out = [])
+    return out unless node.is_a?(Array)
+
+    if node[0] == :command && ident_name(node[1]) == "require_relative"
+      args = node[2]
+      args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+      arg = args.is_a?(Array) ? args.first : nil
+      path = arg.is_a?(Array) && arg[0] == :string_literal ? extract_string_content(arg) : nil
+      out << path if path
+    end
+
+    node.each { |child| required_relative_paths(child, out) if child.is_a?(Array) }
+    out
   end
 
   def emit_test_macro_case(desc, node)

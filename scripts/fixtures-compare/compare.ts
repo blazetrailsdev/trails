@@ -113,6 +113,16 @@ export const HABTM_LABEL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = 
   parrots: new Set<string>(["treasures"]),
 };
 
+/**
+ * Per-table composite-foreign-key belongs_to labels (`book: cpk_book_with_generated_pk`
+ * in cpk_reviews.yml). Both sides spell the label, and `TableRow#resolve_sti_reflections`
+ * expands it through `composite_identify` (table_row.rb:166-172), so the key is
+ * compared verbatim rather than read as a schema column or an `<assoc>_id` shorthand.
+ */
+export const COMPOSITE_FK_LABEL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
+  cpk_reviews: new Set<string>(["book"]),
+};
+
 // prettier-ignore
 interface FileResult { yamlPath: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; attrsSkipped: number; schemaPorted: boolean; schemaExtras: number; notes: string[]; }
 
@@ -129,7 +139,7 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // + 4 all/ fixtures ported in Phase 9 (missing: 5 → 1).
 // + Phase 10 (primary_key_error/) — missing: 1 → 0; diff: 9 → 10 (intentional: negative-
 //   assertion fixture omits ownedEssay column by design, not a data parity gap).
-const CI_BASELINE = { match: 134, diff: 9, missing: 0 } as const;
+const CI_BASELINE = { match: 135, diff: 8, missing: 0 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
@@ -567,6 +577,18 @@ function tableShape(table: TableSchema): {
  * expected during the 0.5a..0.5h schema port and treated as informational,
  * not drift.
  */
+/**
+ * A TS fixture map with `_fixture` and its `ignore` labels removed, mirroring
+ * the Rails-side stripping in `loadRailsYaml` (`fixtures.rb:762-775`), so a
+ * converged corpus that carries Rails' ignored anchor rows compares row-for-row.
+ */
+export function withoutIgnoredFixtures(rows: FixtureMap): FixtureMap {
+  const meta = rows["_fixture"] as { ignore?: unknown } | undefined;
+  const ignore = meta?.ignore;
+  const ignored = new Set<string>(["_fixture", ...(Array.isArray(ignore) ? ignore : typeof ignore === "string" ? [ignore] : [])]); // prettier-ignore
+  return Object.fromEntries(Object.entries(rows).filter(([label]) => !ignored.has(label)));
+}
+
 export function schemaCheck(
   snake: string,
   tsRows: FixtureMap,
@@ -590,6 +612,7 @@ export function schemaCheck(
       // A declared HABTM / has_many:through association label isn't a column —
       // the fixture loader materializes it into a join table (see HABTM_LABEL_ATTRS).
       if (labelAttrs?.has(attr)) continue;
+      if (COMPOSITE_FK_LABEL_ATTRS[snake]?.has(attr)) continue;
       notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
       extras++;
     }
@@ -626,7 +649,7 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
     // HashWithIndifferentAccess#convert_key (`Symbol#to_s`), so `:id` is the
     // `id` column — normalize before column matching, as the value side does.
     const k = normalizeSymbolKey(rawKey);
-    if (known(k)) { out[k] = v; continue; } // prettier-ignore
+    if (known(k) || COMPOSITE_FK_LABEL_ATTRS[table]?.has(k)) { out[k] = v; continue; } // prettier-ignore
     // Rails' `replace_belongs_to_keys` also handles polymorphic shorthand —
     // `assoc: label (Type)` splits into `<col>` + `<assoc>_type`. Shared
     // between the convention path and FK_OVERRIDES so an override on a
@@ -696,7 +719,8 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
   // developers-projects.ts uses developersProjectsFixtureData — too irregular to derive from the
   // file stem. Require exactly one *FixtureData export so an ambiguous file fails loudly.
   const keys = Object.keys(mod).filter((n) => n.endsWith("FixtureData"));
-  const tsRows = keys.length === 1 ? (mod[keys[0]] as FixtureMap | undefined) : undefined;
+  const tsExport = keys.length === 1 ? (mod[keys[0]] as FixtureMap | undefined) : undefined;
+  const tsRows = tsExport && typeof tsExport === "object" ? withoutIgnoredFixtures(tsExport) : tsExport;
   if (!tsRows || typeof tsRows !== "object") {
     r.status = "TS-EXPORT-MISSING";
     r.notes.push(keys.length > 1 ? `${tsBase} exports ${keys.length} *FixtureData symbols (expected 1)` : `no *FixtureData export in ${tsBase}`); // prettier-ignore
