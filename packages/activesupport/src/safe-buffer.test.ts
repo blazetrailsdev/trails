@@ -46,6 +46,7 @@ describe("SafeBufferTest", () => {
   it("Should return a safe buffer when calling to_s", () => {
     const buf = htmlSafe("test");
     expect(buf.toString()).toBe("test");
+    expect(isHtmlSafe(buf)).toBe(true);
   });
 
   it("Should escape dirty buffers on add", () => {
@@ -109,21 +110,18 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should escape unsafe interpolated args", () => {
-    const safe = htmlSafe("Hello, ");
-    const result = safe.concat("<b>World</b>");
-    expect(result.toString()).toBe("Hello, &lt;b&gt;World&lt;/b&gt;");
+    const x = htmlSafe("foo %{x} bar").format({ x: "<br/>" });
+    expect(x.toString()).toBe("foo &lt;br/&gt; bar");
   });
 
   it("Should not escape safe interpolated args", () => {
-    const safe = htmlSafe("Hello, ");
-    const result = safe.concat(htmlSafe("<b>World</b>"));
-    expect(result.toString()).toBe("Hello, <b>World</b>");
+    const x = htmlSafe("foo %{x} bar").format({ x: htmlSafe("<br/>") });
+    expect(x.toString()).toBe("foo <br/> bar");
   });
 
   it("Should interpolate to a safe string", () => {
-    const safe = htmlSafe("prefix");
-    const result = safe.concat(htmlSafe(" suffix"));
-    expect(result.htmlSafe).toBe(true);
+    const x = htmlSafe("foo %{x} bar").format({ x: "qux" });
+    expect(x.htmlSafe).toBe(true);
   });
 
   it("titleize", () => {
