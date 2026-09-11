@@ -137,6 +137,7 @@ export class FutureResult {
   #error: unknown = null;
   #result: Result | null = null;
   #executing: Promise<void> | null = null;
+  #scheduled: Promise<void> | null = null;
   #instrumenter: Instrumenter;
   #eventBuffer: EventBuffer | null = null;
 
@@ -177,10 +178,10 @@ export class FutureResult {
     return this;
   }
 
-  executeOrSkip(): void {
+  executeOrSkip(): Promise<void> | void {
     if (!this.pending()) return;
 
-    void this.#session!.synchronize(async () => {
+    return (this.#scheduled = this.#session!.synchronize(async () => {
       if (!this.pending()) return;
 
       await this.pool.withConnection(async (connection) => {
@@ -192,7 +193,7 @@ export class FutureResult {
           );
         }
       });
-    });
+    }));
   }
 
   async result(): Promise<Result> {
@@ -219,6 +220,7 @@ export class FutureResult {
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
       const start = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
+      if (this.#scheduled) await this.#scheduled;
       if (this.#executing) {
         await this.#executing;
         this.lockWait = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;

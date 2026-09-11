@@ -28,7 +28,11 @@ import {
   type QueryCacheHost,
   type Store,
 } from "./query-cache.js";
-import { executionContext, executionContextId } from "./connection-pool/execution-context.js";
+import {
+  executionContext,
+  executionContextId,
+  withExecutionContext,
+} from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -886,8 +890,10 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  scheduleQuery(futureResult: { executeOrSkip(): void }): void {
-    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
+  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
+    this.asyncExecutor!.post(() => {
+      void withExecutionContext(() => futureResult.executeOrSkip());
+    });
   }
 
   /** @missingRailsArgs new — PERMANENT */
