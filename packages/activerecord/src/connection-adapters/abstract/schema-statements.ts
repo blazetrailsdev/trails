@@ -467,8 +467,8 @@ export class SchemaStatements {
   async changeColumnNull(
     _tableName: string,
     _columnName: string,
-    _null: boolean,
-    _default?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:758
     throw new NotImplementedError("change_column_null is not implemented");

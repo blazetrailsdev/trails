@@ -257,8 +257,8 @@ export interface AbstractAdapter {
   changeColumnNull(
     tableName: string,
     columnName: string,
-    _null: boolean,
-    _default?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void>;
   addColumns(
     tableName: string,
