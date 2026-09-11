@@ -1003,6 +1003,18 @@ function inMemoryDatabase(node, sourceCode) {
 }
 
 /**
+ * Whether the create at `node` sits under Rails' `if in_memory_db?` guard —
+ * `if (inMemoryDb())` — so it only ever runs against a throwaway `:memory:`
+ * database and has no shared table to tear down.
+ */
+function guardedByInMemoryDb(node, sourceCode) {
+  for (let n = node.parent; n && n.type !== "Program"; n = n.parent) {
+    if (n.type === "IfStatement" && sourceCode.getText(n.test) === "inMemoryDb()") return true;
+  }
+  return false;
+}
+
+/**
  * Whether a drop at `node` still runs when an assertion above it throws. The
  * lexical walk outward stops at the first construct that settles it: a
  * `finally` or an `afterEach`/`afterAll` callback (safe), or an `it`/`test`
@@ -1141,6 +1153,7 @@ const rule = {
     }
 
     function recordCreate(table, node) {
+      if (guardedByInMemoryDb(node, sourceCode)) return;
       const nodes = created.get(table);
       // Dedupe by NODE, not by name: a raw-SQL create can be recorded twice
       // through the same node (once for the SQL text, once for the exec call),
