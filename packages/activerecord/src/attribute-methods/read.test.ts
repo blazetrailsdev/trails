@@ -15,6 +15,7 @@ fixtures({});
 describe("ReadTest", () => {
   function buildKlass() {
     class Klass {
+      static _primaryKey = null;
       static _attributeMethodsGenerated = false;
       static _schemaLoaded = true;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
