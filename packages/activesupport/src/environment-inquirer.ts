@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
-import { isIn } from "./enumerable-utils.js";
+import { isIn } from "./core-ext/object/inclusion.js";
 
 export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach } from "vitest";
-import { included } from "@blazetrails/ruby-compat";
+import { getCurrentSuite } from "vitest/suite";
+import { include, included } from "@blazetrails/ruby-compat";
 import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
 import {
   prepareModelFixtures,
@@ -348,19 +349,38 @@ function useFixtures(
 
 type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
+type SuiteScope = { suite?: SuiteScope };
+type TestCaseClass = (new () => object) & { fixtureTableNames: string[] };
+
+const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
+
+function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
+  if (suite === undefined) {
+    const klass = class {} as TestCaseClass;
+    include(klass, TestFixtures);
+    return klass;
+  }
+  let klass = testCaseClasses.get(suite);
+  if (klass === undefined) {
+    klass = class extends testCaseClassFor(suite.suite) {} as TestCaseClass;
+    testCaseClasses.set(suite, klass);
+  }
+  return klass;
+}
+
 /** @internal */
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
   options?: FixturesOptions,
-): UseFixturesResult<M>;
+): UseFixturesResult<M> & { readonly fixtureTableNames: string[] };
 export function fixtures<const N extends FixtureName>(
   names: readonly N[],
   options?: FixturesOptions,
-): UseFixturesByNameResult<N>;
+): UseFixturesByNameResult<N> & { readonly fixtureTableNames: string[] };
 export function fixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
   options?: FixturesOptions,
-): UseTablelessFixturesResult<T>;
+): UseTablelessFixturesResult<T> & { readonly fixtureTableNames: string[] };
 export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: FixturesOptions | undefined = undefined,
@@ -375,5 +395,15 @@ export function fixtures(
     warmSchemaCacheBeforeFirstTest(getConnection);
   }
 
-  return useFixtures(fixturesOrNames as FixtureMap, getConnection);
+  const fixtureSetNames = Array.isArray(fixturesOrNames)
+    ? (fixturesOrNames as readonly (string | TablelessFixtureEntry)[]).map((entry) =>
+        typeof entry === "string" ? entry : entry.table,
+      )
+    : Object.keys(fixturesOrNames);
+  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  klass.fixtureTableNames = [...new Set([...klass.fixtureTableNames, ...fixtureSetNames])].sort();
+
+  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection);
+  Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
+  return result;
 }

@@ -243,9 +243,8 @@ export {
   without,
   pick,
   sole,
-  isIn,
-  presenceIn,
 } from "./enumerable-utils.js";
+export { isIn, presenceIn } from "./core-ext/object/inclusion.js";
 
 export { atomicWrite } from "./core-ext/file/atomic.js";
 export { sliceBang } from "./core-ext/hash/slice.js";
