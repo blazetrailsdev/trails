@@ -19,6 +19,7 @@ async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string
   const adapter = `sqlite3_test_${(registeredTestAdapters += 1)}`;
   register(
     adapter,
+    "SQLite3TestAdapter",
     "./connection-adapters/sqlite3-test-adapter.js",
     async () =>
       function () {

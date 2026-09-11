@@ -2059,7 +2059,7 @@ export interface Relation<T extends Base>
   /** @internal */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   /** @internal */
-  findWithIds(ids: unknown[]): Promise<T | T[]>;
+  findWithIds(...ids: unknown[]): Promise<T | T[]>;
   /** @internal */
   findOne(id: unknown): Promise<T>;
   /** @internal */

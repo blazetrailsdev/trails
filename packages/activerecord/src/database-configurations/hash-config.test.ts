@@ -7,6 +7,7 @@ import "../connection-handling.js";
 
 connectionAdapters.register(
   "abstract",
+  "AbstractAdapter",
   "./connection-adapters/abstract-adapter.js",
   async () => AbstractAdapter as any,
 );

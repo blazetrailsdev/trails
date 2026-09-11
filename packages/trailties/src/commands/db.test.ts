@@ -47,6 +47,7 @@ async function establishMigrationConnection(
   const adapterName = `sqlite3_migration_${(migrationAdapters += 1)}`;
   ConnectionAdapters.register(
     adapterName,
+    "SQLite3MigrationAdapter",
     "./connection-adapters/sqlite3-migration-adapter.js",
     async () =>
       function () {

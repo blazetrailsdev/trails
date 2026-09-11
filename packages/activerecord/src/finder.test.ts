@@ -36,11 +36,12 @@ import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer
 import { Tag as CanonicalTag } from "./test-helpers/models/tag.js";
 import { Car as CanonicalCar } from "./test-helpers/models/car.js";
 import { Toy } from "./test-helpers/models/toy.js";
+import { Matey } from "./test-helpers/models/matey.js";
 import {
   Company as CanonicalCompany,
   Firm as CanonicalFirm,
 } from "./test-helpers/models/company.js";
-import { PreparedStatementInvalid, StatementInvalid } from "./index.js";
+import { PreparedStatementInvalid, StatementInvalid, UnknownPrimaryKey } from "./index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
@@ -1526,8 +1527,7 @@ describe("FinderTest", () => {
   });
 
   it("find without primary key", async () => {
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
+    await expect(Matey.find(1)).rejects.toBeInstanceOf(UnknownPrimaryKey);
   });
 
   it("finder with offset string", async () => {

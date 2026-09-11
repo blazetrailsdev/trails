@@ -10,8 +10,6 @@ export class Matey extends Base {
   declare target_id: number;
   declare weight: number;
 
-  static _primaryKey = "";
-
   static {
     this.belongsTo("pirate");
     this.belongsTo("target", { className: "Pirate" });

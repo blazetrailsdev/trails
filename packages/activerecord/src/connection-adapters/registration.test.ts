@@ -13,6 +13,7 @@ describe("RegistrationTest", () => {
     );
     ConnectionAdapters.register(
       name,
+      "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );
@@ -28,6 +29,7 @@ describe("RegistrationTest", () => {
     );
     ConnectionAdapters.register(
       name,
+      "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );
@@ -43,6 +45,7 @@ describe("RegistrationTest", () => {
     );
     ConnectionAdapters.register(
       name,
+      "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );

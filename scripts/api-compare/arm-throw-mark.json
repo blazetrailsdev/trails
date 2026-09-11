@@ -33,14 +33,12 @@
     }
   },
   "activerecord": {
-    "total": 6,
+    "total": 4,
     "byFile": {
-      "connection-adapters.ts": 1,
       "connection-adapters/abstract-adapter.ts": 1,
       "connection-adapters/mysql2/database-statements.ts": 1,
       "connection-adapters/postgresql-adapter.ts": 1,
-      "connection-adapters/sqlite3-adapter.ts": 1,
-      "relation/finder-methods.ts": 1
+      "connection-adapters/sqlite3-adapter.ts": 1
     }
   },
   "activerecord-test-support": {

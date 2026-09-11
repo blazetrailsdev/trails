@@ -25,7 +25,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("validate reports a registered adapter whose loader failed", async () => {
-      register("trails_broken_adapter", "./trails-broken-adapter.js", () =>
+      register("trails_broken_adapter", "TrailsTestAdapter", "./trails-broken-adapter.js", () =>
         Promise.reject(new Error("Cannot find module 'pg'")),
       );
       const config = new HashConfig("default_env", "primary", {
@@ -41,34 +41,60 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("resolve raises AdapterNotFound when the registered class_name does not resolve", async () => {
+      register("trails_nameless_adapter", "NoSuchAdapter", "./trails-nameless-adapter.js", () =>
+        Promise.resolve(undefined as never),
+      );
+      const error = await Promise.resolve(resolve("trails_nameless_adapter")).catch((e) => e);
+      expect(error).toBeInstanceOf(AdapterNotFound);
+      expect(error.message).toBe(
+        "Could not load the NoSuchAdapter Active Record adapter (uninitialized constant NoSuchAdapter).",
+      );
+    });
+
     it("validate reports a registered adapter whose own path does not resolve", async () => {
-      register("trails_mispathed_adapter", "./no-such-adapter.js", async () => {
-        await import("./no-such-adapter.js" as string);
-        return null as never;
-      });
+      register(
+        "trails_mispathed_adapter",
+        "TrailsTestAdapter",
+        "./no-such-adapter.js",
+        async () => {
+          await import("./no-such-adapter.js" as string);
+          return null as never;
+        },
+      );
       await expect(resolve("trails_mispathed_adapter")).rejects.toThrow(
         "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
       );
     });
 
     it("validate reports a registered adapter whose package does not resolve", async () => {
-      register("trails_unpackaged_adapter", "@blazetrails/no-such-adapter/index.js", async () => {
-        await import("@blazetrails/no-such-adapter/index.js" as string);
-        return null as never;
-      });
+      register(
+        "trails_unpackaged_adapter",
+        "TrailsTestAdapter",
+        "@blazetrails/no-such-adapter/index.js",
+        async () => {
+          await import("@blazetrails/no-such-adapter/index.js" as string);
+          return null as never;
+        },
+      );
       await expect(resolve("trails_unpackaged_adapter")).rejects.toThrow(
         "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
       );
     });
 
     it("validate reports a registered adapter whose own dependency does not resolve", async () => {
-      register("trails_depless_adapter", "./trails-depless-adapter.js", async () => {
-        await import("./hash-config.js");
-        throw Object.assign(
-          new Error("Cannot find package 'mysql2' imported from /adapters/mysql2-adapter.js"),
-          { code: "ERR_MODULE_NOT_FOUND" },
-        );
-      });
+      register(
+        "trails_depless_adapter",
+        "TrailsTestAdapter",
+        "./trails-depless-adapter.js",
+        async () => {
+          await import("./hash-config.js");
+          throw Object.assign(
+            new Error("Cannot find package 'mysql2' imported from /adapters/mysql2-adapter.js"),
+            { code: "ERR_MODULE_NOT_FOUND" },
+          );
+        },
+      );
       await expect(resolve("trails_depless_adapter")).rejects.toThrow(
         "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a package it depends on? Cannot find package 'mysql2'",
       );
@@ -78,6 +104,7 @@ describe("DatabaseConfigurations", () => {
       class TrailsInspectAdapter {}
       register(
         "trails_inspect_adapter",
+        "TrailsTestAdapter",
         "./trails-inspect-adapter.js",
         () => Promise.resolve(TrailsInspectAdapter) as never,
       );
@@ -92,8 +119,11 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("inspect does not leave the driver load rejection unhandled", async () => {
-      register("trails_inspect_broken_adapter", "./trails-inspect-broken-adapter.js", () =>
-        Promise.reject(new Error("Cannot find module 'pg'")),
+      register(
+        "trails_inspect_broken_adapter",
+        "TrailsTestAdapter",
+        "./trails-inspect-broken-adapter.js",
+        () => Promise.reject(new Error("Cannot find module 'pg'")),
       );
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_inspect_broken_adapter",
@@ -105,6 +135,7 @@ describe("DatabaseConfigurations", () => {
     it("inspect falls back to the adapter name while the adapter is still loading", () => {
       register(
         "trails_inflight_adapter",
+        "TrailsTestAdapter",
         "./trails-inflight-adapter.js",
         () => new Promise<never>(() => {}),
       );
@@ -117,7 +148,7 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("re-registering an adapter clears the recorded load failure", async () => {
-      register("trails_refixed_adapter", "./trails-refixed-adapter.js", () =>
+      register("trails_refixed_adapter", "TrailsTestAdapter", "./trails-refixed-adapter.js", () =>
         Promise.reject(new Error("boom")),
       );
       const config = new HashConfig("default_env", "primary", {
@@ -128,6 +159,7 @@ describe("DatabaseConfigurations", () => {
 
       register(
         "trails_refixed_adapter",
+        "TrailsTestAdapter",
         "./trails-refixed-adapter.js",
         () => Promise.resolve(class {}) as never,
       );
