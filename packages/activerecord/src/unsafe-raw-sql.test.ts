@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
+import { quoteTableName } from "./support/quote-regex.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -63,7 +64,7 @@ describe("UnsafeRawSqlTest", () => {
 
   it("order: allows quoted table and column names", async () => {
     const idsExpected = await Post.order(arelSql("title")).pluck("id");
-    const ids = await Post.order('"posts"."title"').pluck("id");
+    const ids = await Post.order(quoteTableName("posts.title")).pluck("id");
     expect(ids).toEqual(idsExpected);
   });
 
@@ -219,7 +220,7 @@ describe("UnsafeRawSqlTest", () => {
 
   it("pluck: allows quoted table and column names", async () => {
     const titlesExpected = await Post.pluck(arelSql("title"));
-    const titles = await Post.pluck('"posts"."title"');
+    const titles = await Post.pluck(quoteTableName("posts.title"));
     expect(titles).toEqual(titlesExpected);
   });
 

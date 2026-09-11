@@ -78,10 +78,8 @@ describe("ActiveRecordSchemaTest", () => {
         t.integer("count");
       });
     });
-    await adapter.executeMutation(
-      `INSERT INTO "schema_test" ("title", "count") VALUES ('hello', 1)`,
-    );
-    const rows = (await adapter.selectAll(`SELECT * FROM "schema_test"`)).toArray();
+    await adapter.executeMutation(`INSERT INTO schema_test (title, count) VALUES ('hello', 1)`);
+    const rows = (await adapter.selectAll(`SELECT * FROM schema_test`)).toArray();
     expect(rows.length).toBe(1);
     expect(rows[0].title).toBe("hello");
   });
@@ -136,8 +134,8 @@ describe("ActiveRecordSchemaTest", () => {
         t.index(["email"], { name: "idx_email_2", unique: true });
       });
     });
-    await adapter.executeMutation(`INSERT INTO "multi_idx" ("email") VALUES ('test@test.com')`);
-    const rows = (await adapter.selectAll(`SELECT * FROM "multi_idx"`)).toArray();
+    await adapter.executeMutation(`INSERT INTO multi_idx (email) VALUES ('test@test.com')`);
+    const rows = (await adapter.selectAll(`SELECT * FROM multi_idx`)).toArray();
     expect(rows.length).toBe(1);
   });
 
@@ -185,9 +183,9 @@ describe("ActiveRecordSchemaTest", () => {
     m.connection = adapter;
     await m.up();
     await adapter.executeMutation(
-      `INSERT INTO "ts_change" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
+      `INSERT INTO ts_change (name, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
     );
-    const rows = (await adapter.selectAll(`SELECT * FROM "ts_change"`)).toArray();
+    const rows = (await adapter.selectAll(`SELECT * FROM ts_change`)).toArray();
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
     expect(
@@ -218,9 +216,9 @@ describe("ActiveRecordSchemaTest", () => {
       m.connection = adapter;
       await m.up();
       await adapter.executeMutation(
-        `INSERT INTO "has_timestamps" ("name", "created_at", "updated_at") VALUES ('x', '2023-01-01', '2023-01-01')`,
+        `INSERT INTO has_timestamps (name, created_at, updated_at) VALUES ('x', '2023-01-01', '2023-01-01')`,
       );
-      const rows = (await adapter.selectAll(`SELECT * FROM "has_timestamps"`)).toArray();
+      const rows = (await adapter.selectAll(`SELECT * FROM has_timestamps`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].created_at).not.toBeNull();
       expect(rows[0].updated_at).not.toBeNull();
@@ -242,8 +240,8 @@ describe("ActiveRecordSchemaTest", () => {
     const m = new TsOptMig();
     m.connection = adapter;
     await m.up();
-    await adapter.executeMutation(`INSERT INTO "ts_opts" ("name") VALUES ('test')`);
-    const rows = (await adapter.selectAll(`SELECT * FROM "ts_opts"`)).toArray();
+    await adapter.executeMutation(`INSERT INTO ts_opts (name) VALUES ('test')`);
+    const rows = (await adapter.selectAll(`SELECT * FROM ts_opts`)).toArray();
     expect(rows.length).toBe(1);
     expect(rows[0].created_at).toBeNull();
     expect(rows[0].updated_at).toBeNull();
@@ -265,9 +263,9 @@ describe("ActiveRecordSchemaTest", () => {
     m.connection = adapter;
     await m.up();
     await adapter.executeMutation(
-      `INSERT INTO "ts_add" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
+      `INSERT INTO ts_add (name, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
     );
-    const rows = (await adapter.selectAll(`SELECT * FROM "ts_add"`)).toArray();
+    const rows = (await adapter.selectAll(`SELECT * FROM ts_add`)).toArray();
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
     expect(

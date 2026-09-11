@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Post } from "../test-helpers/models/post.js";
+import { CategoryPost, Post } from "../test-helpers/models/post.js";
 import { Tag, OrderedTag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Member } from "../test-helpers/models/member.js";
@@ -33,6 +33,7 @@ import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions
 
 registerModel(Author);
 registerModel(Post);
+registerModel(CategoryPost);
 registerModel(Tag);
 registerModel(OrderedTag);
 registerModel(Tagging);
@@ -794,11 +795,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const post = await Post.create({ title: "Catchy Title", body: "Interesting body." });
     const category = await Category.create({ name: "Anything" });
-    await (
-      await (Post as any).leaseConnection()
-    ).executeMutation(
-      `INSERT INTO "categories_posts" ("category_id", "post_id") VALUES (${category.id}, ${post.id})`,
-    );
+    await CategoryPost.create({ post, category });
     const bob = authors("bob");
     await Essay.create({ writer: bob, category });
 
