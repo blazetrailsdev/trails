@@ -146,7 +146,7 @@ function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
 }
 
 /**
- * `rb_str_dump` (`vendor/ruby/string.c`) over the bytes of an ASCII-8BIT
+ * `rb_str_dump` (`vendor/ruby/string.c:6901`) over the bytes of an ASCII-8BIT
  * String, as `rb_econv_open_exc`'s sibling `make_econv_exception`
  * (`vendor/ruby/transcode.c:2116`) quotes the bytes a converter rejected.
  */
