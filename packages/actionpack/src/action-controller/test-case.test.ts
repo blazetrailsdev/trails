@@ -158,7 +158,7 @@ describe("ActionController::TestRequest helpers", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
     req.assignParameters(null, "posts", "create", { title: "Hello" }, "/posts", ["title"]);
-    const body = req.getHeader("rack.input") ?? "";
+    const body = req.getHeader("rack.input").string();
     expect(body).toContain("title=Hello");
     expect(req.requestParameters).toMatchObject({ title: "Hello" });
   });
@@ -173,7 +173,7 @@ describe("ActionController::TestRequest helpers", () => {
     const ct = req.getHeader("CONTENT_TYPE") ?? "";
     expect(ct).toContain("multipart/form-data");
     expect(ct).toContain("boundary=");
-    const body = req.getHeader("rack.input") ?? "";
+    const body = req.getHeader("rack.input").string();
     expect(body).toContain(`name="upload"; filename="hello.txt"`);
     expect(req.requestParameters["upload"]).toBeInstanceOf(UploadedFile);
   });
