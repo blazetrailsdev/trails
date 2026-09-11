@@ -317,7 +317,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/hash/deep_merge.rb": "hash-utils.ts",
   "activesupport:core_ext/array/conversions.rb": "array-utils.ts",
   "activesupport:core_ext/string/exclude.rb": "string-utils.ts",
-  "activesupport:core_ext/object/inclusion.rb": "enumerable-utils.ts",
   "activesupport:core_ext/object/with.rb": "core-ext/object/with.ts",
   "activesupport:core_ext/class/subclasses.rb": "module-ext.ts",
   "activesupport:core_ext/kernel/reporting.rb": "module-ext.ts",

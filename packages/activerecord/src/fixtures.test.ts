@@ -894,6 +894,15 @@ interface SetupTestState {
   second?: boolean;
 }
 
+describe("MultipleFixturesTest", () => {
+  fixtures(["topics"]);
+  const test = fixtures(["developers", "accounts"]);
+
+  it("fixture table names", () => {
+    expect(test.fixtureTableNames).toEqual(["accounts", "developers", "topics"]);
+  });
+});
+
 function setupTest(): SetupTestState {
   const state: SetupTestState = {};
 
@@ -920,6 +929,15 @@ describe("SetupSubclassTest", () => {
   it("subclassing should preserve setups", () => {
     expect(state.first).toBeTruthy();
     expect(state.second).toBeTruthy();
+  });
+});
+
+describe("OverlappingFixturesTest", () => {
+  fixtures(["topics", "developers"]);
+  const test = fixtures(["developers", "accounts"]);
+
+  it("fixture table names", () => {
+    expect(test.fixtureTableNames).toEqual(["accounts", "developers", "topics"]);
   });
 });
 

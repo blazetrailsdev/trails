@@ -1,4 +1,5 @@
 import { afterEach, beforeEach } from "vitest";
+import { getCurrentSuite } from "vitest/suite";
 import { included } from "@blazetrails/ruby-compat";
 import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
 import {
@@ -348,19 +349,31 @@ function useFixtures(
 
 type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
+type SuiteScope = { suite?: SuiteScope };
+
+const fixtureTableNamesBySuite = new WeakMap<SuiteScope, string[]>();
+
+function inheritedFixtureTableNames(suite: SuiteScope | undefined): string[] {
+  for (let s = suite; s !== undefined; s = s.suite) {
+    const names = fixtureTableNamesBySuite.get(s);
+    if (names !== undefined) return names;
+  }
+  return [];
+}
+
 /** @internal */
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
   options?: FixturesOptions,
-): UseFixturesResult<M>;
+): UseFixturesResult<M> & { readonly fixtureTableNames: string[] };
 export function fixtures<const N extends FixtureName>(
   names: readonly N[],
   options?: FixturesOptions,
-): UseFixturesByNameResult<N>;
+): UseFixturesByNameResult<N> & { readonly fixtureTableNames: string[] };
 export function fixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
   options?: FixturesOptions,
-): UseTablelessFixturesResult<T>;
+): UseTablelessFixturesResult<T> & { readonly fixtureTableNames: string[] };
 export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: FixturesOptions | undefined = undefined,
@@ -375,5 +388,23 @@ export function fixtures(
     warmSchemaCacheBeforeFirstTest(getConnection);
   }
 
-  return useFixtures(fixturesOrNames as FixtureMap, getConnection);
+  const fixtureSetNames = Array.isArray(fixturesOrNames)
+    ? (fixturesOrNames as readonly (string | TablelessFixtureEntry)[]).map((entry) =>
+        typeof entry === "string" ? entry : entry.table,
+      )
+    : Object.keys(fixturesOrNames);
+  const suite = getCurrentSuite().suite as SuiteScope | undefined;
+  if (suite !== undefined) {
+    const fixtureTableNames = inheritedFixtureTableNames(suite);
+    fixtureTableNamesBySuite.set(
+      suite,
+      [...new Set([...fixtureTableNames, ...fixtureSetNames])].sort(),
+    );
+  }
+
+  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection);
+  Object.defineProperty(result, "fixtureTableNames", {
+    get: () => inheritedFixtureTableNames(suite),
+  });
+  return result;
 }

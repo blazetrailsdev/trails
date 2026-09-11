@@ -427,26 +427,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "MultipleFixturesTest",
-    tests: ["fixture table names"],
-    reason:
-      "Asserts fixture_table_names returns the merged, sorted table list after two separate " +
-      "fixtures declarations (fixtures_test.rb:826). trails' fixtures() returns accessors " +
-      "and exposes no fixtureTableNames reader, so there is nothing to assert against. " +
-      "CONVERGEABLE implement-fixture-table-names: the merge-and-dedupe behaviour these " +
-      "two cases specify is Rails' `self.fixture_table_names |= table_names` " +
-      "(test_fixtures.rb:38-52).",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "OverlappingFixturesTest",
-    tests: ["fixture table names"],
-    reason:
-      "Same missing fixtureTableNames reader as the row above, for the overlapping-" +
-      "declarations case (fixtures_test.rb:859). CONVERGEABLE implement-fixture-table-names.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["binary in fixtures"],
     reason:
