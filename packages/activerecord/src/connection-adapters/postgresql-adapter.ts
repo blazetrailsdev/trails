@@ -633,7 +633,12 @@ export class PostgreSQLAdapter
     sql: string,
     name: string | null = "SQL",
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: {
+      prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     interface ArrayQueryResult {
@@ -647,7 +652,7 @@ export class PostgreSQLAdapter
       name,
       binds ?? [],
       bindArray,
-      false,
+      options?.async ?? false,
       async (payload) => {
         try {
           const r = await this.withRawConnection(
