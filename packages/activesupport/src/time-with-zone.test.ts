@@ -887,16 +887,16 @@ describe("TimeWithZoneTest", () => {
 
   it("method missing with time return value", () => {
     const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
-    const result = (twz as unknown as { add(d: object): unknown }).add({ months: 1 });
+    const result = (twz as unknown as { nextMonth(): unknown }).nextMonth();
     expect(result).toBeInstanceOf(TimeWithZone);
-    expect((result as TimeWithZone).time.toString()).toBe("2000-01-31T19:00:00");
+    expect((result as TimeWithZone).time.eql(Time.utc(2000, 1, 31, 19, 0, 0))).toBe(true);
   });
 
   it("method missing with non time return value", () => {
     const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
-    const result = (twz as unknown as { toPlainDate(): unknown }).toPlainDate();
-    expect(result).toBeInstanceOf(Temporal.PlainDate);
-    expect(String(result)).toBe("1999-12-31");
+    const time = twz.time as unknown as { foo(): string };
+    time.foo = () => "bar";
+    expect((twz as unknown as { foo(): unknown }).foo()).toBe("bar");
   });
 });
 

@@ -537,8 +537,8 @@ describe("AttributeMethodsTest", () => {
         record.get("written_on").time.month,
         record.get("written_on").time.day,
         record.get("written_on").time.hour,
-        record.get("written_on").time.minute,
-        record.get("written_on").time.second,
+        record.get("written_on").time.min,
+        record.get("written_on").time.sec,
       ]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
   });
@@ -558,8 +558,8 @@ describe("AttributeMethodsTest", () => {
           record.written_on.time.month,
           record.written_on.time.day,
           record.written_on.time.hour,
-          record.written_on.time.minute,
-          record.written_on.time.second,
+          record.written_on.time.min,
+          record.written_on.time.sec,
         ]).toEqual([2007, 12, 31, 16, 0, 0]);
       });
     }
@@ -598,8 +598,8 @@ describe("AttributeMethodsTest", () => {
           record.written_on.time.month,
           record.written_on.time.day,
           record.written_on.time.hour,
-          record.written_on.time.minute,
-          record.written_on.time.second,
+          record.written_on.time.min,
+          record.written_on.time.sec,
         ]).toEqual([2008, 1, 1, 0, 0, 0]);
       });
     }
@@ -616,8 +616,8 @@ describe("AttributeMethodsTest", () => {
         record.written_on.time.month,
         record.written_on.time.day,
         record.written_on.time.hour,
-        record.written_on.time.minute,
-        record.written_on.time.second,
+        record.written_on.time.min,
+        record.written_on.time.sec,
       ]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
   });
@@ -1352,9 +1352,7 @@ describe("AttributeMethodsTest", () => {
       expect(wo).toBeInstanceOf(TimeWithZone);
       expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
       const t = wo.time;
-      expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([
-        2007, 12, 31, 16, 0, 0,
-      ]);
+      expect([t.year, t.month, t.day, t.hour, t.min, t.sec]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
   });
 
@@ -1373,9 +1371,7 @@ describe("AttributeMethodsTest", () => {
       expect(wo.utc().toTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
       expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
       const t = wo.time;
-      expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([
-        2007, 12, 31, 16, 0, 0,
-      ]);
+      expect([t.year, t.month, t.day, t.hour, t.min, t.sec]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
   });
 

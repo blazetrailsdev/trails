@@ -109,14 +109,10 @@ describe("TimeWithZone method_missing", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
 
   class AllDayTime extends TimeWithZone {
-    override get time(): Temporal.PlainDateTime {
+    override get time(): Time {
       const t = super.time;
       const allDay = () =>
-        new Range(
-          t.with({ hour: 0, minute: 0, second: 0 }),
-          t.with({ hour: 23, minute: 59, second: 59 }),
-          true,
-        );
+        new Range(t.change({ hour: 0 }), t.change({ hour: 23, min: 59, sec: 59 }), true);
       return new Proxy(t, {
         get: (target, prop) => (prop === "allDay" ? allDay : Reflect.get(target, prop, target)),
       });
