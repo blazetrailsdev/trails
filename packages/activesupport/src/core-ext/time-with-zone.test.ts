@@ -594,11 +594,29 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change", () => {
-    const twz = eastern.local(2024, 3, 15, 10, 30, 45);
-    const result = twz.change({ year: 2025 });
-    expect(result.year).toBe(2025);
-    expect(result.month).toBe(3);
-    expect(result.hour).toBe(10);
+    const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+    expect(twz.inspect()).toBe("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.change({ year: 2001 }).inspect()).toBe("2001-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.change({ month: 3 }).inspect()).toBe("1999-03-31 19:00:00.000000000 EST -05:00");
+    expect(twz.change({ month: 2 }).inspect()).toBe("1999-03-03 19:00:00.000000000 EST -05:00");
+    expect(twz.change({ day: 15 }).inspect()).toBe("1999-12-15 19:00:00.000000000 EST -05:00");
+    expect(twz.change({ hour: 6 }).inspect()).toBe("1999-12-31 06:00:00.000000000 EST -05:00");
+    expect(twz.change({ min: 15 }).inspect()).toBe("1999-12-31 19:15:00.000000000 EST -05:00");
+    expect(twz.change({ sec: 30 }).inspect()).toBe("1999-12-31 19:00:30.000000000 EST -05:00");
+    expect(twz.change({ offset: "-10:00" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(twz.change({ offset: -36000 }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(twz.change({ zone: "Hawaii" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(twz.change({ zone: -10 }).inspect()).toBe("1999-12-31 19:00:00.000000000 HST -10:00");
+    expect(twz.change({ zone: -36000 }).inspect()).toBe("1999-12-31 19:00:00.000000000 HST -10:00");
+    expect(twz.change({ zone: "Pacific/Honolulu" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
   });
 
   it("advance", () => {

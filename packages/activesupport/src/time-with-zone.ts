@@ -12,13 +12,18 @@ import {
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
+import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
+import {
+  change as timeChange,
+  type ChangeOptions as TimeChangeOptions,
+} from "./core-ext/time/calculations.js";
 import { advance as timeAdvance } from "./time-ext.js";
 import { since as datetimeSince } from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
@@ -28,15 +33,8 @@ import {
   utcToLocalReturnsUtcOffsetTimes,
 } from "./core-ext/date-and-time/compatibility.js";
 
-export interface ChangeOptions {
-  year?: number;
-  month?: number;
-  day?: number;
-  hour?: number;
-  min?: number;
-  sec?: number;
-  usec?: number;
-  nsec?: number;
+export interface ChangeOptions extends TimeChangeOptions {
+  zone?: unknown;
 }
 
 export interface AdvanceOptions {
@@ -588,65 +586,33 @@ export class TimeWithZone {
     }
   }
 
-  /** @missingRailsCall find_zone — CONVERGEABLE time-with-zone-advance-change-delegations */
   change(options: ChangeOptions): TimeWithZone {
-    const l = this._local();
-
-    const year = options.year ?? l.year;
-    const month = options.month ?? l.month;
-    const day = Math.min(options.day ?? l.day, daysInMonth(year, month));
-    const hour = options.hour ?? l.hour;
-    const min = options.min ?? (options.hour !== undefined ? 0 : l.minute);
-    const sec =
-      options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : l.second);
-    let ms = l.millisecond;
-    let subMsNsec = l.nsec % 1_000_000;
-    if (options.usec !== undefined) {
-      ms = Math.floor(options.usec / 1000);
-      subMsNsec = (options.usec % 1000) * 1_000;
-    } else if (options.nsec !== undefined) {
-      ms = Math.floor(options.nsec / 1_000_000);
-      subMsNsec = options.nsec % 1_000_000;
-    } else if (
-      options.hour !== undefined ||
-      options.min !== undefined ||
-      options.sec !== undefined
-    ) {
-      ms = 0;
-      subMsNsec = 0;
+    if (options.zone != null && options.zone !== false && options.offset != null) {
+      throw new ArgumentError(
+        `Can't change both :offset and :zone at the same time: ${rbInspect(options)}`,
+      );
     }
 
-    const newTime = Temporal.Instant.fromEpochMilliseconds(
-      Date.UTC(year, month - 1, day, hour, min, sec, ms),
-    );
-    const periods = this._timeZone.periodsForLocal(
-      this._transferTimeValuesToUtcConstructor(newTime),
-    );
-    const period = periods.find(
+    const newTime = timeChange.call(this.time, options);
+
+    let newZone: TimeZone | null | false = null;
+    if (options.zone != null && options.zone !== false) {
+      newZone = findZone(options.zone);
+    } else if (options.offset != null) {
+      newZone = findZone(newTime.utcOffset);
+    }
+
+    newZone ||= this.timeZone;
+    const periods = newZone.periodsForLocal(newTime);
+    const period = this.period;
+    const included = periods.some(
       (p) =>
-        p.observedUtcOffset === this.period.observedUtcOffset && p.isDst() === this.period.isDst(),
+        p.abbreviation === period.abbreviation &&
+        p.observedUtcOffset === period.observedUtcOffset &&
+        p.isDst() === period.isDst(),
     );
-    if (!period) {
-      const base = this._timeZone.local(year, month, day, hour, min, sec, ms);
-      return subMsNsec === 0 ? base : this._withSubMsNsec(base, subMsNsec);
-    }
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(
-        BigInt(newTime.epochMilliseconds - period.observedUtcOffset * 1000) * 1_000_000n +
-          BigInt(subMsNsec),
-      ),
-      this._timeZone,
-    );
-  }
 
-  /** @internal */
-  private _withSubMsNsec(base: TimeWithZone, subMsNsec: number): TimeWithZone {
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(
-        base.utc().toTime().toInstant().epochNanoseconds + BigInt(subMsNsec),
-      ),
-      base.timeZone,
-    );
+    return new TimeWithZone(null, newZone, newTime, included ? period : null);
   }
 
   compareTo(other: unknown): number | null {

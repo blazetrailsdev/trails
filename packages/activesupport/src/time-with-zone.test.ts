@@ -470,12 +470,6 @@ describe("TimeWithZoneTest", () => {
     expect(result.sec).toBe(20);
   });
 
-  it("clamps day to valid range for new month", () => {
-    const twz = eastern.local(2024, 1, 31, 10, 0, 0);
-    const result = twz.change({ month: 2 });
-    expect(result.day).toBe(29);
-  });
-
   it("changes usec", () => {
     const twz = eastern.local(2024, 3, 15, 10, 30, 45, 0);
     const result = twz.change({ usec: 500000 });
@@ -652,13 +646,6 @@ describe("TimeWithZoneTest", () => {
     expect(result.month).toBe(3);
     expect(result.day).toBe(31);
     expect(result.hour).toBe(19);
-  });
-
-  it("change month clamps day (Feb has fewer days)", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    const result = twz.change({ month: 2 });
-    expect(result.month).toBe(2);
-    expect(result.day).toBeLessThanOrEqual(28);
   });
 
   it("change day", () => {

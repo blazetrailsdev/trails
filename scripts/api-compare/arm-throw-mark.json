@@ -48,11 +48,10 @@
     "byFile": {}
   },
   "activesupport": {
-    "total": 4,
+    "total": 3,
     "byFile": {
       "error-reporter.ts": 1,
-      "module-ext.ts": 2,
-      "time-with-zone.ts": 1
+      "module-ext.ts": 2
     }
   },
   "arel": {

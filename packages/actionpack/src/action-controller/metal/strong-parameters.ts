@@ -15,7 +15,7 @@ import {
   merge,
   mergeBang,
 } from "@blazetrails/ruby-compat";
-import { BigDecimal, isBlank } from "@blazetrails/activesupport";
+import { BigDecimal, Notifications, isBlank } from "@blazetrails/activesupport";
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 
@@ -102,6 +102,7 @@ function isPermittedScalar(value: unknown): boolean {
 export class Parameters {
   private _data: Record<string, unknown>;
   private _permitted: boolean;
+  private loggingContext: Record<string, unknown>;
   private _convertedArrays?: Set<string>;
 
   static permitAllParameters = false;
@@ -110,8 +111,9 @@ export class Parameters {
 
   static hookIntoYamlLoading(): void {}
 
-  constructor(data: Record<string, unknown> = {}) {
+  constructor(data: Record<string, unknown> = {}, loggingContext: Record<string, unknown> = {}) {
     this._data = { ...data };
+    this.loggingContext = loggingContext;
     this._permitted = Parameters.permitAllParameters;
   }
 
@@ -604,7 +606,7 @@ export class Parameters {
   }
 
   deepDup(): Parameters {
-    const p = new Parameters(structuredClone(this._data));
+    const p = new Parameters(structuredClone(this._data), this.loggingContext);
     p._permitted = this._permitted;
     return p;
   }
@@ -670,7 +672,7 @@ export class Parameters {
   }
 
   private _newWithInheritedPermitted(data: Record<string, unknown>): Parameters {
-    const p = new Parameters(data);
+    const p = new Parameters(data, this.loggingContext);
     p._permitted = this._permitted;
     return p;
   }
@@ -847,9 +849,14 @@ export class Parameters {
     const unpermittedKeys = this.unpermittedKeys(params);
     if (unpermittedKeys.length > 0) {
       switch (onUnpermitted) {
-        case "log":
-          console.warn(`found unpermitted parameters: ${unpermittedKeys.join(", ")}`);
+        case "log": {
+          const name = "unpermitted_parameters.action_controller";
+          Notifications.instrument(name, {
+            keys: unpermittedKeys,
+            context: this.loggingContext,
+          });
           break;
+        }
         case "raise":
           throw new UnpermittedParameters(unpermittedKeys);
       }
