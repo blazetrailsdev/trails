@@ -3,7 +3,7 @@ import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
+import { isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
@@ -183,17 +183,6 @@ export class JoinDependency {
   /** @internal */
   get joinRoot(): JoinBase {
     return this._joinRoot;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-join-dependency-nodes-and-instantiate-from-rows */
-  get nodes(): JoinPart[] {
-    const result: JoinPart[] = [];
-    this._joinRoot.each((part) => {
-      if (part !== this._joinRoot && part.tableIndex >= 0) {
-        result.push(part);
-      }
-    });
-    return result;
   }
 
   /** @internal */
@@ -395,61 +384,68 @@ export class JoinDependency {
     strictLoadingValue?: boolean | null,
     block?: (record: any) => void,
   ): any[] {
-    const columnNames = resultSet.columns.filter((name) => !/^t\d+_r\d+$/.test(name));
-    let columnTypes: Record<string, { deserialize(value: unknown): unknown }> = {};
-    if (columnNames.length !== 0) {
-      const reported = resultSet.columnTypes as Record<
+    const joinRootPk = this.joinRoot.baseKlass.primaryKey as string | string[] | null;
+    const primaryKey = joinRootPk
+      ? (Array.isArray(joinRootPk) ? joinRootPk : [joinRootPk]).map(
+          (column) => this.aliases().columnAlias(this.joinRoot, column)!,
+        )
+      : null;
+
+    const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
+
+    const modelCache = new Map<JoinPart, Map<unknown, any>>();
+    const parents = new Map<unknown, any>();
+    modelCache.set(this.joinRoot, parents);
+
+    let columnAliases = this.aliases().columnAliases(this.joinRoot)!;
+    const columnNames: string[] = [];
+
+    for (const name of resultSet.columns) {
+      if (!/^t\d+_r\d+$/.test(name)) columnNames.push(name);
+    }
+
+    let columnTypes: Record<string, { deserialize(value: unknown): unknown }>;
+    if (columnNames.length === 0) {
+      columnTypes = {};
+    } else {
+      columnTypes = resultSet.columnTypes as Record<
         string,
         { deserialize(value: unknown): unknown }
       >;
-      if (Object.keys(reported).length !== 0) {
-        const attributeTypes = this._baseModel.attributeTypes();
+      if (Object.keys(columnTypes).length !== 0) {
+        const attributeTypes = this.joinRoot.attributeTypes();
         columnTypes = Object.fromEntries(
           columnNames
-            .filter((name) => Object.hasOwn(reported, name) && !Object.hasOwn(attributeTypes, name))
-            .map((name) => [name, reported[name]]),
+            .filter((k) => Object.hasOwn(columnTypes, k) && !Object.hasOwn(attributeTypes, k))
+            .map((k) => [k, columnTypes[k]]),
         );
       }
+      columnAliases = columnAliases.concat(
+        columnNames.map((name) => new Aliases.Column(name, name)),
+      );
     }
 
     const rows = resultSet.toArray();
     const payload = {
       record_count: rows.length,
-      class_name: this._baseModel.baseClass.name,
+      class_name: this.joinRoot.baseKlass.name,
     };
-    const { parents, associations, parentKeys } = Notifications.instrument(
-      "instantiation.active_record",
-      payload,
-      () => this.instantiateFromRows(rows, strictLoadingValue, columnTypes),
-    );
 
-    const inverseMap = new Map<string, string | undefined>();
-    const modelReflections: Record<string, any> = (this._baseModel as any)._reflections ?? {};
-    for (const [assocName, reflection] of Object.entries(modelReflections)) {
-      inverseMap.set(assocName, reflection.options?.inverseOf);
-    }
-
-    for (const parent of parents) {
-      const pk = parentKeys.get(parent);
-      const assocs = associations.get(pk);
-      for (const node of this.nodes) {
-        if (node.immediateAssocName.startsWith("_through_")) continue;
-        if (node.parentPath !== null) continue;
-        const children = assocs?.get(node.immediateAssocName) ?? [];
-        const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
-
-        const inverseName = inverseMap.get(node.immediateAssocName);
-        if (inverseName) {
-          const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
-          for (const child of targets) {
-            _cacheSingularTarget(child, inverseName, parent);
-          }
+    Notifications.instrument("instantiation.active_record", payload, () => {
+      for (const rowHash of rows) {
+        const parentKey = primaryKey ? this._keyFor(primaryKey.map((k) => rowHash[k])) : rowHash;
+        let parent = parents.get(parentKey);
+        if (!parent) {
+          const attrs: Record<string, unknown> = {};
+          for (const { name, alias } of columnAliases) attrs[name] = rowHash[alias];
+          parent = (this.joinRoot.baseKlass as any)._instantiate(attrs, block, columnTypes);
+          parents.set(parentKey, parent);
         }
+        this.construct(parent, this.joinRoot, rowHash, seen, modelCache, strictLoadingValue);
       }
-    }
+    });
 
-    if (block) for (const parent of parents) block(parent);
-    return parents;
+    return [...parents.values()];
   }
 
   /** @missingRailsCall empty? — PERMANENT */
@@ -459,13 +455,13 @@ export class JoinDependency {
     return relation._selectBang(() => this.aliases().columns());
   }
 
-  each(callback: (part: JoinPart, index: number) => void): void {
-    this.nodes.forEach(callback);
+  each(block: (part: JoinPart) => void): void {
+    this.joinRoot.each(block);
   }
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<JoinPart> {
-    return this.nodes[Symbol.iterator]();
+    return this.joinRoot[Symbol.iterator]();
   }
 
   static makeTree(associations: any): Record<string, any> {
@@ -501,59 +497,6 @@ export class JoinDependency {
       }
       throw new ConfigurationError(`Invalid association spec: ${desc}`);
     }
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-join-dependency-nodes-and-instantiate-from-rows */
-  instantiateFromRows(
-    rows: Record<string, unknown>[],
-    strictLoadingValue?: boolean | null,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): {
-    parents: any[];
-    associations: Map<unknown, Map<string, any[]>>;
-    parentKeys: Map<any, unknown>;
-  } {
-    const joinRoot = this._joinRoot;
-    const aliases = this.aliases();
-    const basePk = (this._baseModel as any).primaryKey ?? "id";
-    const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
-    const columnAliases = aliases.columnAliases(joinRoot)!;
-
-    const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
-    const modelCache = new Map<JoinPart, Map<unknown, any>>();
-    const parents = new Map<unknown, any>();
-    modelCache.set(joinRoot, parents);
-
-    for (const row of rows) {
-      const parentAttrs: Record<string, unknown> = Object.create(null);
-      for (const { name, alias } of columnAliases) {
-        parentAttrs[name] = row[alias];
-      }
-      for (const key of Object.keys(row)) {
-        if (!/^t\d+_r\d+$/.test(key)) parentAttrs[key] = row[key];
-      }
-
-      const parentKey = this._keyFor(basePkCols.map((c) => parentAttrs[c]));
-      let parent = parents.get(parentKey);
-      if (!parent) {
-        parent = (this._baseModel as any)._instantiate(parentAttrs, undefined, columnTypes);
-        if (strictLoadingValue && typeof parent.strictLoadingBang === "function") {
-          parent.strictLoadingBang();
-        }
-        parents.set(parentKey, parent);
-      }
-
-      this.construct(parent, joinRoot, row, seen, modelCache, strictLoadingValue);
-    }
-
-    const parentList = [...parents.values()];
-    const parentKeys = new Map<any, unknown>();
-    for (const [key, parent] of parents) parentKeys.set(parent, key);
-    return {
-      parents: parentList,
-      associations: this._collectAssociations(parents),
-      parentKeys,
-    };
   }
 
   /** @internal */
@@ -628,25 +571,6 @@ export class JoinDependency {
     return vals.length === 1 ? vals[0] : vals.join("\u0000");
   }
 
-  /** @internal */
-  private _collectAssociations(parents: Map<unknown, any>): Map<unknown, Map<string, any[]>> {
-    const associations = new Map<unknown, Map<string, any[]>>();
-    for (const [key, parent] of parents) {
-      const assocs = new Map<string, any[]>();
-      for (const child of this._joinRoot.children) {
-        if (child.tableIndex < 0) continue;
-        const proxy = parent.association?.(child.immediateAssocName);
-        const target = proxy?.target;
-        assocs.set(
-          child.immediateAssocName,
-          Array.isArray(target) ? target : target ? [target] : [],
-        );
-      }
-      associations.set(key, assocs);
-    }
-    return associations;
-  }
-
   protected get joinRootAlias(): string {
     return this._baseAlias;
   }
@@ -676,7 +600,7 @@ export class JoinDependency {
   /** @internal */
   private aliases(): Aliases {
     return (this._aliasesCache ??= new Aliases(
-      [this._joinRoot, ...this.nodes].map((joinPart) => {
+      [...this.joinRoot].map((joinPart, i) => {
         const isJoinRoot = joinPart === this._joinRoot;
         let columnNames: string[];
         if (isJoinRoot && !this._joinRootAlias) {
@@ -685,7 +609,6 @@ export class JoinDependency {
         } else {
           columnNames = isJoinRoot ? getModelColumns(this._baseModel) : joinPart.columns;
         }
-        const i = isJoinRoot ? 0 : joinPart.tableIndex;
         const columns = columnNames.map(
           (columnName, j) => new Aliases.Column(columnName, `t${i}_r${j}`),
         );

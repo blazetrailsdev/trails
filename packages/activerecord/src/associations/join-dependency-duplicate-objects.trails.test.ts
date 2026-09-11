@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
+import { Result } from "../result.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
@@ -50,7 +51,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     });
     const rows = [row, { ...row }];
 
-    const { parents } = jd.instantiateFromRows(rows);
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
 
     expect(parents).toHaveLength(1);
     const comments = parents[0].association("comments")?.target;
@@ -74,7 +75,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
       }),
     ];
 
-    const { parents } = jd.instantiateFromRows(rows);
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
 
     expect(parents).toHaveLength(2);
     const post0 = parents[0].association("post")?.target;
