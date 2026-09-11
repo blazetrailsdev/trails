@@ -37,7 +37,6 @@ export function isWriteQuery(sql: string | null): boolean {
   }
 }
 
-/** @missingRailsArgs internal_exec_query — CONVERGEABLE sqlite3-explain-passes-empty-binds */
 export async function explain(
   this: ExplainHost,
   arel: string,
@@ -45,7 +44,7 @@ export async function explain(
   _options: ExplainOption[] = [],
 ): Promise<string> {
   const sql = "EXPLAIN QUERY PLAN " + this.toSql(arel, binds);
-  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
+  const result = await this.internalExecQuery(sql, "EXPLAIN", []);
   return new ExplainPrettyPrinter().pp(result);
 }
 
