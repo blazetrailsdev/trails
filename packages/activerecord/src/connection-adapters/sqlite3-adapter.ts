@@ -1,5 +1,5 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { anybits, fetch, hasKey } from "@blazetrails/ruby-compat";
+import { anybits, fetch, hasKey, merge } from "@blazetrails/ruby-compat";
 import type {
   SqliteConnection,
   SqliteDriver,
@@ -117,7 +117,6 @@ function isStructuredDefault(value: unknown): boolean {
 }
 
 type SQLite3ConnectionParameters = SQLite3Config & {
-  driver: SqliteDriver;
   database: string;
   resultsAsHash: true;
   defaultTransactionMode: "immediate";
@@ -244,7 +243,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     cache_size: 2000,
   };
 
-  /** @missingRailsCall merge — CONVERGEABLE converge-sqlite3-connection-parameters-merge */
   constructor(config: SQLite3Config) {
     const { database, ...options } = config;
     if (database === undefined || database === "") {
@@ -262,17 +260,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._filename = filename;
     this._strict = strict;
     this._asyncConnectPending = this.driverIsAsync();
-    this._connectionParameters = {
-      ...(this._config as SQLite3Config),
-      driver: this.resolveDriverFactory(),
+    this._connectionParameters = merge(this._config as SQLite3Config, {
       database: filename,
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
-    };
+    });
   }
 
   /** @internal */
-  private prepareDatabasePath(filename: string): string {
+  protected prepareDatabasePath(filename: string): string {
     const expanded = File.expandPath(filename, trailsRoot() ?? undefined);
     const dirname = File.dirname(expanded);
     if (!File.isDirectory(dirname)) {
@@ -716,6 +712,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   static newClient(
+    this: typeof SQLite3Adapter,
     config: SQLite3ConnectionParameters,
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
@@ -742,7 +739,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       driverOptions: config.driverOptions,
     };
     try {
-      const driver = config.driver;
+      const driver = this.resolveDriverFactory(config);
       if (!driver.openSync) return driver.open(openConfig).catch(rescue);
       return driver.openSync(openConfig) as SqliteConnection;
     } catch (error) {
@@ -1497,13 +1494,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /** @internal */
-  protected defaultSqliteDriver(): SqliteDriver | undefined {
+  protected static defaultSqliteDriver(): SqliteDriver | undefined {
     return undefined;
   }
 
   /** @internal */
-  private resolveDriverFactory(): SqliteDriver {
-    const driverOpt = (this._config as SQLite3Config).driver;
+  private static resolveDriverFactory(config: SQLite3Config): SqliteDriver {
+    const driverOpt = config.driver;
     if (driverOpt != null) {
       if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
         throw new TypeError(
@@ -1525,7 +1522,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   private connect(): void {
-    if (!this._connectionParameters.driver.openSync) {
+    if (this.driverIsAsync()) {
       this._asyncConnectPending = true;
       return;
     }
@@ -1590,7 +1587,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   private driverIsAsync(): boolean {
-    return !this.resolveDriverFactory().openSync;
+    return !(this.constructor as typeof SQLite3Adapter).resolveDriverFactory(
+      this._config as SQLite3Config,
+    ).openSync;
   }
 
   /** @internal */

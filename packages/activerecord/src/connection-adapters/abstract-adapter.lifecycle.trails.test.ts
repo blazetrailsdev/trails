@@ -181,3 +181,20 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
     expect((a as any)._connection).toEqual({ handle: 1 });
   });
 });
+
+describe("AbstractAdapter#initialize", () => {
+  it("assigns ActiveRecord::Base.logger in both branches", async () => {
+    const { Base } = await import("../base.js");
+    const previous = Base.logger;
+    const logger = { info() {} } as unknown as NonNullable<typeof Base.logger>;
+    Base.logger = logger;
+    try {
+      expect(new AbstractAdapter({}).logger).toBe(logger);
+      expect(new AbstractAdapter(null).logger).toBe(logger);
+      const deprecated = { info() {} };
+      expect(new AbstractAdapter(null, deprecated).logger).toBe(deprecated);
+    } finally {
+      Base.logger = previous;
+    }
+  });
+});

@@ -5,7 +5,7 @@ import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/li
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 export class LibSQLReplicaAdapter extends SQLite3Adapter {
-  protected override defaultSqliteDriver(): SqliteDriver {
+  protected static override defaultSqliteDriver(): SqliteDriver {
     return libsqlReplicaDriver;
   }
 

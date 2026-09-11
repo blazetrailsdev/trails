@@ -113,6 +113,15 @@ export type ConflictBlock<T> = ((key: string, oldValue: T, newValue: T) => T) & 
  * that call.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/hash.c:4144`).
  */
+export function merge<H extends object, const O extends object>(
+  hash: H,
+  other: O,
+): Omit<H, keyof O> & O;
+export function merge<T>(
+  hash: Record<string, T>,
+  ...others: (Record<string, T> | ConflictBlock<T>)[]
+): Record<string, T>;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/hash.c:4144`). */
 export function merge<T>(
   hash: Record<string, T>,
   ...others: (Record<string, T> | ConflictBlock<T>)[]
