@@ -5,7 +5,7 @@ import {
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../base.js";
-import { ReadOnlyError } from "../../errors.js";
+import { ReadOnlyError, RecordNotUnique } from "../../errors.js";
 import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
@@ -88,5 +88,20 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
     await adapter.internalExecute("SELECT 2", "SQL", [], { prepare: false });
     const pool = adapter._statements;
     expect(pool?.get("SELECT 2")).toBeFalsy();
+  });
+
+  it("closes the statement when an unprepared bound query raises", async () => {
+    const closed = async () =>
+      Number(
+        ((await adapter.execute(`SHOW SESSION STATUS LIKE 'Com_stmt_close'`)) as Mysql2RawResult)
+          .rows![0][1],
+      );
+    const sql = "INSERT INTO pq (id, nick) VALUES (?, ?)";
+    await adapter.internalExecute(sql, "SQL", [1, "a"], { prepare: false });
+    const before = await closed();
+    await expect(adapter.internalExecute(sql, "SQL", [1, "a"], { prepare: false })).rejects.toThrow(
+      RecordNotUnique,
+    );
+    expect(await closed()).toBe(before + 1);
   });
 });

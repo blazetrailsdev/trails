@@ -7,8 +7,4 @@ export class LibSQLRemoteAdapter extends SQLite3Adapter {
   protected static override defaultSqliteDriver(): SqliteDriver {
     return libsqlRemoteDriver;
   }
-
-  protected override prepareDatabasePath(filename: string): string {
-    return filename;
-  }
 }

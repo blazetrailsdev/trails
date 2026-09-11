@@ -2,6 +2,20 @@
  * @internal
  * @noRailsEquivalent PERMANENT
  */
+export function isRemoteLibsqlUrl(url: string): boolean {
+  return (
+    url.startsWith("libsql://") ||
+    url.startsWith("https://") ||
+    url.startsWith("http://") ||
+    url.startsWith("wss://") ||
+    url.startsWith("ws://")
+  );
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export function isInMemoryDatabase(database: string): boolean {
   if (database === ":memory:") return true;
   if (!database.startsWith("file:")) return false;

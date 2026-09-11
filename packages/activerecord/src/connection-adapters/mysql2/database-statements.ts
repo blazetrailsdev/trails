@@ -189,10 +189,17 @@ export async function performQuery(
       throw err;
     }
   } else {
-    [rawResult, rawFields] = (await rawConnection.query(
-      { sql, rowsAsArray: true } as any,
-      driverBinds as any[],
-    )) as [unknown, mysql.FieldPacket[]];
+    const stmt = { sql, rowsAsArray: true };
+    try {
+      [rawResult, rawFields] = (await rawConnection.execute(stmt as any, driverBinds as any[])) as [
+        unknown,
+        mysql.FieldPacket[],
+      ];
+      rawConnection.unprepare(stmt as any);
+    } catch (err) {
+      rawConnection.unprepare(stmt as any);
+      throw err;
+    }
   }
 
   let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
