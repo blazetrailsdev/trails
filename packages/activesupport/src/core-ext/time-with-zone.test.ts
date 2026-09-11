@@ -599,6 +599,21 @@ describe("TimeWithZoneTest", () => {
     expect(result.year).toBe(2025);
     expect(result.month).toBe(3);
     expect(result.hour).toBe(10);
+    const est = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+    expect(est.change({ offset: "-10:00" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(est.change({ offset: -36000 }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(est.change({ zone: "Hawaii" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
+    expect(est.change({ zone: -10 }).inspect()).toBe("1999-12-31 19:00:00.000000000 HST -10:00");
+    expect(est.change({ zone: -36000 }).inspect()).toBe("1999-12-31 19:00:00.000000000 HST -10:00");
+    expect(est.change({ zone: "Pacific/Honolulu" }).inspect()).toBe(
+      "1999-12-31 19:00:00.000000000 HST -10:00",
+    );
   });
 
   it("advance", () => {

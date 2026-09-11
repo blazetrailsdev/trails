@@ -12,11 +12,12 @@ import {
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
+import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import { advance as timeAdvance } from "./time-ext.js";
@@ -37,6 +38,8 @@ export interface ChangeOptions {
   sec?: number;
   usec?: number;
   nsec?: number;
+  offset?: number | string;
+  zone?: unknown;
 }
 
 export interface AdvanceOptions {
@@ -588,8 +591,13 @@ export class TimeWithZone {
     }
   }
 
-  /** @missingRailsCall find_zone — CONVERGEABLE time-with-zone-advance-change-delegations */
   change(options: ChangeOptions): TimeWithZone {
+    if (options.zone != null && options.offset != null) {
+      throw new ArgumentError(
+        `Can't change both :offset and :zone at the same time: ${rbInspect(options)}`,
+      );
+    }
+
     const l = this._local();
 
     const year = options.year ?? l.year;
@@ -619,15 +627,27 @@ export class TimeWithZone {
     const newTime = Temporal.Instant.fromEpochMilliseconds(
       Date.UTC(year, month - 1, day, hour, min, sec, ms),
     );
-    const periods = this._timeZone.periodsForLocal(
-      this._transferTimeValuesToUtcConstructor(newTime),
-    );
+
+    let newZone: TimeZone | null | false = null;
+    if (options.zone != null) {
+      newZone = findZone(options.zone);
+    } else if (options.offset != null) {
+      newZone = findZone(
+        typeof options.offset === "string"
+          ? (options.offset.startsWith("-") ? -1 : 1) *
+              (Number(options.offset.slice(1, 3)) * 3600 + Number(options.offset.slice(-2)) * 60)
+          : options.offset,
+      );
+    }
+
+    newZone ||= this._timeZone;
+    const periods = newZone.periodsForLocal(this._transferTimeValuesToUtcConstructor(newTime));
     const period = periods.find(
       (p) =>
         p.observedUtcOffset === this.period.observedUtcOffset && p.isDst() === this.period.isDst(),
     );
     if (!period) {
-      const base = this._timeZone.local(year, month, day, hour, min, sec, ms);
+      const base = newZone.local(year, month, day, hour, min, sec, ms);
       return subMsNsec === 0 ? base : this._withSubMsNsec(base, subMsNsec);
     }
     return new TimeWithZone(
@@ -635,7 +655,7 @@ export class TimeWithZone {
         BigInt(newTime.epochMilliseconds - period.observedUtcOffset * 1000) * 1_000_000n +
           BigInt(subMsNsec),
       ),
-      this._timeZone,
+      newZone,
     );
   }
 
