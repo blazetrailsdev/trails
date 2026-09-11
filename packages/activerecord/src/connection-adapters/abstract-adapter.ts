@@ -656,9 +656,10 @@ export interface AbstractAdapter {
     name?: string,
     binds?: unknown[],
     opts?: {
-      materializeTransactions?: boolean;
-      allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
     },
   ): Promise<unknown>;
   /** @internal */
@@ -666,7 +667,12 @@ export interface AbstractAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: {
+      prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
   ): Promise<Result>;
   /** @internal */
   castResult(rawResult: unknown): Result;

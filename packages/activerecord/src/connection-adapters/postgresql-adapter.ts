@@ -633,7 +633,12 @@ export class PostgreSQLAdapter
     sql: string,
     name: string | null = "SQL",
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: {
+      prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     interface ArrayQueryResult {
@@ -647,7 +652,7 @@ export class PostgreSQLAdapter
       name,
       binds ?? [],
       bindArray,
-      false,
+      options?.async ?? false,
       async (payload) => {
         try {
           const r = await this.withRawConnection(
@@ -1112,10 +1117,12 @@ export class PostgreSQLAdapter
       materializeTransactions = true,
       allowRetry = false,
       prepare = false,
+      async = false,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
     } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql) as string;
@@ -1124,7 +1131,7 @@ export class PostgreSQLAdapter
       const hasBinds = binds.length > 0;
       const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
-      const result = await this.log(runSql, name, binds, bindArray, false, (payload) =>
+      const result = await this.log(runSql, name, binds, bindArray, async, (payload) =>
         this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
           const runResult = await this._performQuery(client, runSql, binds, bindArray, {

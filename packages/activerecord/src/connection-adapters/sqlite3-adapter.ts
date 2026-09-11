@@ -374,15 +374,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     {
       materializeTransactions = true,
       prepare = false,
+      async = false,
       allowRetry = false,
     }: {
       materializeTransactions?: boolean;
       prepare?: boolean;
+      async?: boolean;
       allowRetry?: boolean;
     } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
-    return this.rawExecute(sql, name, binds, prepare, false, allowRetry, materializeTransactions);
+    return this.rawExecute(sql, name, binds, prepare, async, allowRetry, materializeTransactions);
   }
 
   override quote(value: unknown): string {

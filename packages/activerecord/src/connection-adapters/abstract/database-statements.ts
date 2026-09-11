@@ -96,9 +96,10 @@ export interface DatabaseStatementsHost {
     name?: string | null,
     binds?: unknown[],
     opts?: {
-      materializeTransactions?: boolean;
-      allowRetry?: boolean;
       prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
     },
   ): Promise<unknown>;
   /** @internal */
@@ -106,7 +107,12 @@ export interface DatabaseStatementsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    opts?: {
+      prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
   ): Promise<Result>;
   /** @internal */
   dirtyCurrentTransaction(): void;
@@ -699,15 +705,14 @@ export async function internalExecQuery(
   sql: string,
   name: string | null = "SQL",
   binds?: unknown[],
-  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  options?: {
+    prepare?: boolean;
+    async?: boolean;
+    allowRetry?: boolean;
+    materializeTransactions?: boolean;
+  },
 ): Promise<Result> {
-  return this.castResult(
-    await this.internalExecute(sql, name, binds, {
-      prepare: options?.prepare,
-      allowRetry: options?.allowRetry,
-      materializeTransactions: options?.materializeTransactions,
-    }),
-  );
+  return this.castResult(await this.internalExecute(sql, name, binds, options));
 }
 
 /** @internal */
@@ -747,7 +752,12 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: {
+      prepare?: boolean;
+      async?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
   ): Promise<Result>;
   /** @internal */
   internalExecute(
@@ -756,6 +766,7 @@ interface DatabaseStatementsDefaultsHost {
     binds?: unknown[],
     options?: {
       prepare?: boolean;
+      async?: boolean;
       allowRetry?: boolean;
       materializeTransactions?: boolean;
     },
@@ -1095,10 +1106,12 @@ export function internalExecute(
   binds: unknown[] = [],
   {
     prepare = false,
+    async = false,
     allowRetry = false,
     materializeTransactions = true,
   }: {
     prepare?: boolean;
+    async?: boolean;
     allowRetry?: boolean;
     materializeTransactions?: boolean;
   } = {},
@@ -1109,7 +1122,7 @@ export function internalExecute(
     name,
     binds,
     prepare,
-    false,
+    async,
     allowRetry,
     materializeTransactions,
   );
