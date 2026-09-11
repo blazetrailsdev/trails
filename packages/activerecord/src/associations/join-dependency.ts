@@ -1,5 +1,5 @@
 import { Notifications } from "@blazetrails/activesupport";
-import { rbEqual, rbHash } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
@@ -556,16 +556,13 @@ export class JoinDependency {
   /** @internal */
   private _keyFor(vals: unknown[]): unknown {
     if (vals.length === 1) return vals[0];
-    const hash = rbHash(vals);
-    let bucket = this._compositeKeys.get(hash);
-    if (!bucket) this._compositeKeys.set(hash, (bucket = []));
-    let key = bucket.find((k) => rbEqual(k, vals));
-    if (!key) bucket.push((key = vals));
+    let key = this._compositeKeys.find((k) => rbEqual(k, vals));
+    if (!key) this._compositeKeys.push((key = vals));
     return key;
   }
 
   /** @internal */
-  private _compositeKeys = new Map<number, unknown[][]>();
+  private _compositeKeys: unknown[][] = [];
 
   protected get joinRootAlias(): string {
     return this._baseAlias;

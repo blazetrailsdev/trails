@@ -101,6 +101,12 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     ];
 
     expect(jd.instantiate(Result.fromRowHashes(rows))).toHaveLength(2);
+
+    const binaryRows = [
+      aliasedRow(jd, { "": { author_id: new Uint8Array([1, 2]), id: 1 } }),
+      aliasedRow(jd, { "": { author_id: new Uint8Array([1, 2]), id: 1 } }),
+    ];
+    expect(jd.instantiate(Result.fromRowHashes(binaryRows))).toHaveLength(1);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
