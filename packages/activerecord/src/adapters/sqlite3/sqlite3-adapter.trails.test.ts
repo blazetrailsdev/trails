@@ -5,6 +5,7 @@ import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
   ActiveRecordError,
   NoDatabaseError,
@@ -147,6 +148,24 @@ describe("SQLite3Adapter pragmas option", () => {
       readonly: true,
     });
     await expect(missing.connectBang()).rejects.toThrow(NoDatabaseError);
+  });
+
+  it("raises NoDatabaseError with the pool when the database directory cannot be created", () => {
+    FileUtils.mkdirP("tmp");
+    File.write("tmp/not-a-directory", "");
+    try {
+      let error: unknown;
+      try {
+        new BetterSQLite3Adapter({ database: "tmp/not-a-directory/db.sqlite3" });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(NoDatabaseError);
+      expect((error as NoDatabaseError).message).toBe("Database not found");
+      expect((error as NoDatabaseError).connectionPool).toBeDefined();
+    } finally {
+      FileUtils.rmRf("tmp/not-a-directory");
+    }
   });
 
   it("converts boolean false to 0 for pragma", async () => {

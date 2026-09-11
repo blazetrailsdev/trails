@@ -16,7 +16,7 @@ import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
-import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
+import { isInMemoryDatabase, isRemoteLibsqlUrl } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -245,17 +245,29 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   constructor(config: SQLite3Config) {
     const { database, ...options } = config;
-    if (database === undefined || database === "") {
-      throw new ArgumentError("No database file specified. Missing argument: database");
-    }
-    let filename = database;
+    let filename = database ?? "";
     const strict = hasKey(options, "strict")
       ? options.strict!
       : SQLite3Adapter.strictStringsByDefault;
     super({ ...options, strict });
-    this._memoryDatabase = isInMemoryDatabase(filename);
-    if (!this._memoryDatabase && !filename.startsWith("file:")) {
-      filename = this.prepareDatabasePath(filename);
+
+    this._memoryDatabase = false;
+    if (filename === "") {
+      throw new ArgumentError("No database file specified. Missing argument: database");
+    } else if (filename === ":memory:") {
+      this._memoryDatabase = true;
+    } else if (/^file:/.test(filename) || isRemoteLibsqlUrl(filename)) {
+      this._memoryDatabase = isInMemoryDatabase(filename);
+    } else {
+      filename = File.expandPath(filename, trailsRoot() ?? undefined);
+      const dirname = File.dirname(filename);
+      if (!File.isDirectory(dirname)) {
+        try {
+          FileUtils.mkdirP(dirname);
+        } catch {
+          throw new NoDatabaseError(undefined, { connectionPool: this.pool });
+        }
+      }
     }
     this._filename = filename;
     this._strict = strict;
@@ -265,20 +277,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
     });
-  }
-
-  /** @internal */
-  protected prepareDatabasePath(filename: string): string {
-    const expanded = File.expandPath(filename, trailsRoot() ?? undefined);
-    const dirname = File.dirname(expanded);
-    if (!File.isDirectory(dirname)) {
-      try {
-        FileUtils.mkdirP(dirname);
-      } catch (e) {
-        throw new NoDatabaseError(`Could not create database directory '${dirname}'`, { cause: e });
-      }
-    }
-    return expanded;
   }
 
   /** @internal */

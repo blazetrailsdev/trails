@@ -28,6 +28,7 @@ export interface Mysql2RawResult {
   fields: Mysql2FieldDescriptor[];
   affectedRows: number;
   insertId?: number;
+  _arStmtToClose?: { close(): void };
 }
 
 /** @internal */
@@ -173,6 +174,7 @@ export async function performQuery(
 
   let rawResult: unknown;
   let rawFields: mysql.FieldPacket[] | undefined;
+  let stmtToClose: { close(): void } | undefined;
   if (!hasBinds) {
     [rawResult, rawFields] = (await rawConnection.query({
       sql,
@@ -189,10 +191,21 @@ export async function performQuery(
       throw err;
     }
   } else {
-    [rawResult, rawFields] = (await rawConnection.query(
-      { sql, rowsAsArray: true } as any,
-      driverBinds as any[],
-    )) as [unknown, mysql.FieldPacket[]];
+    const stmt = { sql, rowsAsArray: true };
+    try {
+      [rawResult, rawFields] = (await rawConnection.execute(stmt as any, driverBinds as any[])) as [
+        unknown,
+        mysql.FieldPacket[],
+      ];
+      if (Array.isArray(rawResult)) {
+        stmtToClose = { close: () => void rawConnection.unprepare(stmt as any) };
+      } else {
+        rawConnection.unprepare(stmt as any);
+      }
+    } catch (err) {
+      rawConnection.unprepare(stmt as any);
+      throw err;
+    }
   }
 
   let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
@@ -227,7 +240,7 @@ export async function performQuery(
   this.verified?.();
   await this.handleWarnings?.(sql);
 
-  return { rows, fields: fieldList, affectedRows, insertId };
+  return { rows, fields: fieldList, affectedRows, insertId, _arStmtToClose: stmtToClose };
 }
 
 /** @internal */
@@ -277,4 +290,7 @@ export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult)
 }
 
 /** @internal */
-export function freeRawResult(_rawResult: Mysql2RawResult): void {}
+export function freeRawResult(rawResult: Mysql2RawResult): void {
+  const stmt = rawResult._arStmtToClose;
+  if (stmt) stmt.close();
+}

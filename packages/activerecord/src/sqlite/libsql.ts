@@ -15,7 +15,7 @@ import {
   type SyncSqliteConnection,
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
-import { resolveUriDatabasePath } from "./sqlite-uri.js";
+import { isRemoteLibsqlUrl, resolveUriDatabasePath } from "./sqlite-uri.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -146,15 +146,7 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
   return new Database(sharedCacheDatabase(config), opts);
 }
 
-export function isRemoteLibsqlUrl(url: string): boolean {
-  return (
-    url.startsWith("libsql://") ||
-    url.startsWith("https://") ||
-    url.startsWith("http://") ||
-    url.startsWith("wss://") ||
-    url.startsWith("ws://")
-  );
-}
+export { isRemoteLibsqlUrl };
 
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
