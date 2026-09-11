@@ -435,12 +435,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       const modelClass = target._model as typeof Base;
 
-      if (modelClass._scopes.has(prop)) {
-        const scopeMethod = modelClass._scopes.get(prop)!;
-        return (...args: any[]) =>
-          scopeMethod.apply(Object.create(modelClass, { all: { value: () => target } }), args);
-      }
-
       if (target._loaded) {
         const records = () => target._records ?? [];
         const arrayDelegate = delegateArrayMethod(prop, records);
@@ -463,7 +457,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
       const modelClass = target._model as typeof Base;
-      if (modelClass._scopes.has(prop)) return true;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return modelRespondTo(modelClass, prop);
     },

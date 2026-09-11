@@ -154,6 +154,20 @@ describe("FileUtils", () => {
     expect(nodeFs.existsSync(nodePath.join(outside, "keep"))).toBe(true);
   });
 
+  it("remove_entry unlinks a symlink to a directory rather than descending into it", () => {
+    // vendor/ruby/lib/fileutils.rb:2192-2198 Entry_#lstat is File.lstat unless dereference?.
+    const outside = nodePath.join(root, "outside");
+    FileUtils.mkdirP(outside);
+    FileUtils.touch(nodePath.join(outside, "keep"));
+    const link = nodePath.join(root, "link");
+    nodeFs.symlinkSync(outside, link);
+
+    FileUtils.removeEntry(link);
+
+    expect(nodeFs.existsSync(link)).toBe(false);
+    expect(nodeFs.existsSync(nodePath.join(outside, "keep"))).toBe(true);
+  });
+
   it("cp copies the file's contents", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");

@@ -1348,8 +1348,6 @@ export class Base extends Model {
 
   static storedAttributes = _storedAttributes;
 
-  static _scopes: Map<string, (this: any, ...args: any[]) => any> = new Map();
-
   declare static defaultScope: typeof _defaultScope;
   declare static unscoped: typeof _unscoped;
 

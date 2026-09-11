@@ -229,9 +229,6 @@ export function constantize(camelCasedWord: string): unknown {
   if (!isValidConstantPath(path)) {
     throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
-  if (_privateConstants.has(path)) {
-    throw new NameError(`private constant ${path} referenced`, demodulize(path));
-  }
   if (!_constants.has(path)) {
     throw new NameError(`uninitialized constant ${path}`, missingSegment(path));
   }

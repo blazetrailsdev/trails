@@ -17,6 +17,7 @@ function baseClass(): typeof Base {
 
 import { Relation } from "../relation.js";
 import { Default } from "./default.js";
+import { generateRelationMethod } from "../relation/delegation.js";
 
 const RESTRICTED_CLASS_METHODS = new Set([
   "private",
@@ -60,6 +61,7 @@ export type ScopeOn<T extends Base, M extends Base, A extends unknown[] = []> = 
   ? ScopeMethod<T, A>
   : never;
 
+/** @missingRailsArgs generate_relation_method — CONVERGEABLE converge-relation-delegation-helper-layer */
 export function scope<T extends typeof Base>(
   this: T,
   name: string,
@@ -90,35 +92,25 @@ export function scope<T extends typeof Base>(
 
   const extension = block;
 
+  let method: (this: any, ...args: any[]) => any;
   if (typeof body === "function") {
-    singletonClassDefineMethod(modelClass, name, function (this: any, ...args: any[]) {
+    method = function (this: any, ...args: any[]) {
       let scope = this.all()._execScope(...args, body);
       if (extension) scope = scope.extending(extension);
       return scope;
-    });
+    };
   } else {
-    singletonClassDefineMethod(modelClass, name, function (this: any, ...args: any[]) {
+    method = function (this: any, ...args: any[]) {
       let scope = (body as { call(...args: any[]): any }).call(...args) || this.all();
       if (extension) scope = scope.extending(extension);
       return scope;
-    });
+    };
   }
-}
+  Object.defineProperty(modelClass, name, { value: method, writable: true, configurable: true });
 
-/** @noRailsEquivalent PERMANENT */
-function singletonClassDefineMethod(
-  modelClass: any,
-  name: string,
-  fn: (this: any, ...args: any[]) => any,
-): void {
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_scopes")) {
-    modelClass._scopes = new Map(modelClass._scopes);
-  }
-  modelClass._scopes.set(name, fn);
-  Object.defineProperty(modelClass, name, {
-    value: fn,
-    writable: true,
-    configurable: true,
+  generateRelationMethod(modelClass, name, function (this: any, ...args: any[]) {
+    const model = this._model;
+    return model[name].apply(Object.create(model, { all: { value: () => this } }), args);
   });
 }
 

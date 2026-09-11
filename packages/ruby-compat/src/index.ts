@@ -2,6 +2,7 @@ export { ArgumentError } from "./argument-error.js";
 export { ConverterNotFoundError } from "./converter-not-found-error.js";
 export { Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
+export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 export { EOFError } from "./eof-error.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";

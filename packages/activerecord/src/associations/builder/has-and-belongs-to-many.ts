@@ -142,7 +142,6 @@ export class HasAndBelongsToMany {
     if (hasKey(this.options, "foreignKey")) {
       middleOptions.foreignKey = this.options.foreignKey;
     }
-    middleOptions.anonymousClass = joinModel;
     return middleOptions;
   }
 

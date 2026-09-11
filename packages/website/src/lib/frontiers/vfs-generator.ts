@@ -115,6 +115,9 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
         gid: 0,
       };
     },
+    lstatSync(path: string) {
+      return this.statSync(path);
+    },
     cwd(): string {
       return "/";
     },

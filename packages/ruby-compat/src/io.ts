@@ -1,4 +1,5 @@
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
+import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
@@ -132,14 +133,50 @@ function ioEncStr(bytes: Uint8Array, length: number, enc: Encoding): string {
       if (sp !== 0) {
         return new TextDecoder(sp === LE ? "utf-16le" : "utf-16be").decode(read.subarray(2));
       }
+      throw new InvalidByteSequenceError(`${rbStrDump(read.subarray(0, 2))} on ${enc}`);
     }
     if (enc.name === "UTF-32") {
       const sp = funSiFromUtf32(read);
       if (sp !== 0) return utf32Str(read.subarray(4), sp === LE);
+      throw new InvalidByteSequenceError(`${rbStrDump(read.subarray(0, 4))} on ${enc}`);
     }
     throw new ConverterNotFoundError(`code converter not found (${enc} to UTF-8)`);
   }
   return new TextDecoder(enc.decoderLabel).decode(read);
+}
+
+/**
+ * `rb_str_dump` (`vendor/ruby/string.c`) over the bytes of an ASCII-8BIT
+ * String, as `rb_econv_open_exc`'s sibling `make_econv_exception`
+ * (`vendor/ruby/transcode.c:2116`) quotes the bytes a converter rejected.
+ */
+function rbStrDump(bytes: Uint8Array): string {
+  const escapes: Record<number, string> = {
+    0x22: '\\"',
+    0x5c: "\\\\",
+    0x0a: "\\n",
+    0x0d: "\\r",
+    0x09: "\\t",
+    0x0c: "\\f",
+    0x0b: "\\v",
+    0x08: "\\b",
+    0x07: "\\a",
+    0x1b: "\\e",
+  };
+  let result = '"';
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (escapes[c] !== undefined) result += escapes[c];
+    else if (
+      c === 0x23 &&
+      i + 1 < bytes.length &&
+      "$@{".includes(String.fromCharCode(bytes[i + 1]))
+    )
+      result += "\\#";
+    else if (c >= 0x20 && c < 0x7f) result += String.fromCharCode(c);
+    else result += `\\x${c.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return result + '"';
 }
 
 /** `BE` (`vendor/ruby/enc/trans/utf_16_32.trans:281`). */

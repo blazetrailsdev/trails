@@ -775,8 +775,7 @@ function wrapCollectionProxy<T extends Base = Base>(
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
-      const modelClass = target.model as typeof Base & { _scopes?: Map<string, unknown> };
-      if (modelClass._scopes?.has(prop)) return true;
+      const modelClass = target.model as typeof Base;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return typeof (modelClass as any)[prop] === "function";
     },

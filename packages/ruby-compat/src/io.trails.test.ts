@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
 import { IO, puts } from "./io.js";
+import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { stderr } from "./process-adapter.js";
 
 describe("IO", () => {
@@ -169,10 +170,13 @@ describe("IO", () => {
     const nobom = join(dir, "nobom.bin");
     writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
     File.open(nobom, "rb:UTF-16", (file) => {
-      expect(() => file.read()).toThrow("code converter not found (UTF-16 to UTF-8)");
+      expect(() => file.read()).toThrow(InvalidByteSequenceError);
+    });
+    File.open(nobom, "rb:UTF-16", (file) => {
+      expect(() => file.read()).toThrow('"\\x00h" on UTF-16');
     });
     File.open(nobom, "rb:UTF-32", (file) => {
-      expect(() => file.read()).toThrow("code converter not found (UTF-32 to UTF-8)");
+      expect(() => file.read()).toThrow('"\\x00h\\x00i" on UTF-32');
     });
   });
 
