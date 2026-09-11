@@ -159,9 +159,10 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
     adapter.typeMap.aliasType(INT4_OID, "int4");
     capturedQueryArg = undefined;
     const fakeClient = {
-      query: async (arg: unknown) => {
+      query: (arg: { submit?: unknown; handleReadyForQuery?: () => void }) => {
+        if (arg.submit) return arg.handleReadyForQuery!();
         capturedQueryArg = arg;
-        return fakeResult;
+        return Promise.resolve(fakeResult);
       },
       release: () => {},
     };
@@ -250,7 +251,10 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   });
 
   it("preparing the same SQL under two different search paths yields two pool entries", async () => {
-    const fakeClient = { query: async () => undefined, release: () => {} };
+    const fakeClient = {
+      query: (arg: { handleReadyForQuery?: () => void }) => arg.handleReadyForQuery?.(),
+      release: () => {},
+    };
     const pool = poolFor(fakeClient);
 
     setMemo("schema_a, public");
