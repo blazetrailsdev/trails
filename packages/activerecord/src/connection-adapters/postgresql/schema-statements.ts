@@ -117,6 +117,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
+  /** @missingRailsCall order:split,map — PERMANENT */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     const scope = this.quotedScope(tableName);
 
@@ -135,54 +136,55 @@ export class SchemaStatements extends AbstractSchemaStatements {
       "SCHEMA",
     );
 
-    return Promise.all(
-      result.map(async (row) => {
-        const indexName = row[0] as string;
-        const unique = row[1] as boolean;
-        const indkey = toS(row[2])
-          .split(/\s+/)
-          .filter((n) => n !== "")
-          .map((n) => Number(n));
-        const inddef = row[3] as string;
-        const oid = Number(row[4]);
-        const comment = row[5] as string | null;
-        const valid = row[6] as boolean;
+    const indexes: IndexDefinition[] = [];
+    for (const row of result) {
+      const indexName = row[0] as string;
+      const unique = row[1] as boolean;
+      const indkey = toS(row[2])
+        .split(/\s+/)
+        .filter((n) => n !== "")
+        .map((n) => Number(n));
+      const inddef = row[3] as string;
+      const oid = Number(row[4]);
+      const comment = row[5] as string | null;
+      const valid = row[6] as boolean;
 
-        const defMatch = inddef.match(
-          / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
-        );
-        const using = defMatch?.[1] ?? "";
-        const expressions = defMatch?.[2] ?? "";
-        const includeStr = defMatch?.[3];
-        const nullsNotDistinctStr = defMatch?.[4];
-        const whereStr = defMatch?.[5];
+      const defMatch = inddef.match(
+        / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
+      );
+      const using = defMatch?.[1] ?? "";
+      const expressions = defMatch?.[2] ?? "";
+      const includeStr = defMatch?.[3];
+      const nullsNotDistinctStr = defMatch?.[4];
+      const whereStr = defMatch?.[5];
 
-        const orders: Record<string, string> = {};
-        const opclasses: Record<string, string> = {};
-        const includeColumns = includeStr
-          ? includeStr.split(",").map((c) => Utils.unquoteIdentifier(c.trim().replace(/""/g, '"')))
-          : [];
+      const orders: Record<string, string> = {};
+      const opclasses: Record<string, string> = {};
+      const includeColumns = includeStr
+        ? includeStr.split(",").map((c) => Utils.unquoteIdentifier(c.trim().replace(/""/g, '"')))
+        : [];
 
-        let columns: string | string[];
-        if (indkey.includes(0)) {
-          columns = expressions;
-        } else {
-          const names = await this.columnNamesFromColumnNumbers(oid, indkey);
+      let columns: string | string[];
+      if (indkey.includes(0)) {
+        columns = expressions;
+      } else {
+        const names = await this.columnNamesFromColumnNumbers(oid, indkey);
 
-          columns = names.filter((c) => !includeColumns.includes(c));
+        columns = names.filter((c) => !includeColumns.includes(c));
 
-          const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-          for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
-            if (opclass) opclasses[column] = opclass;
-            if (nulls) {
-              orders[column] = [desc, nulls].filter(Boolean).join(" ");
-            } else if (desc) {
-              orders[column] = "desc";
-            }
+        const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+        for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
+          if (opclass) opclasses[column] = opclass;
+          if (nulls) {
+            orders[column] = [desc, nulls].filter(Boolean).join(" ");
+          } else if (desc) {
+            orders[column] = "desc";
           }
         }
+      }
 
-        return new IndexDefinition(tableName, indexName, unique, columns, {
+      indexes.push(
+        new IndexDefinition(tableName, indexName, unique, columns, {
           orders,
           opclasses,
           where: whereStr,
@@ -191,9 +193,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
           nullsNotDistinct: nullsNotDistinctStr ? true : undefined,
           comment: comment?.trim() ? comment : undefined,
           valid,
-        });
-      }),
-    );
+        }),
+      );
+    }
+    return indexes;
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
@@ -840,6 +843,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return deferrable && (deferred ? "deferred" : "immediate");
   }
 
+  /** @missingRailsCall order:unquoteIdentifier,map — PERMANENT */
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const scope = this.quotedScope(tableName);
     const fkInfo = await this.internalExecQuery(
@@ -863,38 +867,38 @@ export class SchemaStatements extends AbstractSchemaStatements {
       [],
       { allowRetry: true, materializeTransactions: false },
     );
-    return Promise.all(
-      fkInfo.toArray().map(async (row) => {
-        const toTable = Utils.unquoteIdentifier(row.to_table as string);
-        const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
-        const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
-        let column: string | string[];
-        let primaryKey: string | string[];
-        if (conkey.length > 1) {
-          column = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
-          primaryKey = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
-        } else {
-          column = Utils.unquoteIdentifier(row.column as string);
-          primaryKey = row.primary_key as string;
-        }
-        const options: Partial<AddForeignKeyOptions> = {
-          column,
-          name: row.name as string,
-          primaryKey,
-        };
+    const foreignKeys: ForeignKeyDefinition[] = [];
+    for (const row of fkInfo.toArray()) {
+      const toTable = Utils.unquoteIdentifier(row.to_table as string);
+      const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
+      const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
+      let column: string | string[];
+      let primaryKey: string | string[];
+      if (conkey.length > 1) {
+        column = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+        primaryKey = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
+      } else {
+        column = Utils.unquoteIdentifier(row.column as string);
+        primaryKey = row.primary_key as string;
+      }
+      const options: Partial<AddForeignKeyOptions> = {
+        column,
+        name: row.name as string,
+        primaryKey,
+      };
 
-        options.onDelete = this.extractForeignKeyAction(row.on_delete as string);
-        options.onUpdate = this.extractForeignKeyAction(row.on_update as string);
-        options.deferrable = this.extractConstraintDeferrable(
-          row.deferrable as boolean,
-          row.deferred as boolean,
-        );
+      options.onDelete = this.extractForeignKeyAction(row.on_delete as string);
+      options.onUpdate = this.extractForeignKeyAction(row.on_update as string);
+      options.deferrable = this.extractConstraintDeferrable(
+        row.deferrable as boolean,
+        row.deferred as boolean,
+      );
 
-        options.validate = row.valid as boolean;
+      options.validate = row.valid as boolean;
 
-        return new ForeignKeyDefinition(tableName, toTable, options);
-      }),
-    );
+      foreignKeys.push(new ForeignKeyDefinition(tableName, toTable, options));
+    }
+    return foreignKeys;
   }
 
   override async addForeignKey(
@@ -1086,6 +1090,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
+  /** @missingRailsCall order:split,map — PERMANENT */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const uniqueInfo = await this.internalExecQuery(
@@ -1103,25 +1108,25 @@ export class SchemaStatements extends AbstractSchemaStatements {
       [],
       { allowRetry: true, materializeTransactions: false },
     );
-    return Promise.all(
-      uniqueInfo.toArray().map(async (row) => {
-        const r = row;
-        const conkey = stringDelete(String(r.conkey), "{}").split(",").map(Number);
-        const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
-        const nullsNotDistinct = (r.constraintdef as string).startsWith(
-          "UNIQUE NULLS NOT DISTINCT",
-        );
-        const deferrable = this.extractConstraintDeferrable(
-          r.condeferrable as boolean,
-          r.condeferred as boolean,
-        );
-        return new UniqueConstraintDefinition(tableName, columns, {
+    const uniqueConstraints: UniqueConstraintDefinition[] = [];
+    for (const row of uniqueInfo.toArray()) {
+      const r = row;
+      const conkey = stringDelete(String(r.conkey), "{}").split(",").map(Number);
+      const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
+      const nullsNotDistinct = (r.constraintdef as string).startsWith("UNIQUE NULLS NOT DISTINCT");
+      const deferrable = this.extractConstraintDeferrable(
+        r.condeferrable as boolean,
+        r.condeferred as boolean,
+      );
+      uniqueConstraints.push(
+        new UniqueConstraintDefinition(tableName, columns, {
           name: r.conname as string,
           nullsNotDistinct: nullsNotDistinct || undefined,
           deferrable,
-        });
-      }),
-    );
+        }),
+      );
+    }
+    return uniqueConstraints;
   }
 
   /** @internal */

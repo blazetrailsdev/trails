@@ -762,20 +762,20 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
-    return Promise.all(
-      chkInfo.toArray().map(async (row) => {
-        const options = { name: row["name"] as string };
-        let expression = row["expression"] as string;
-        if (expression.startsWith("(") && expression.endsWith(")")) {
-          expression = expression.slice(1, -1);
-        }
-        expression = this.stripWhitespaceCharacters(expression);
-        if (!(await this.isMariadb())) {
-          expression = expression.replace(/\\'/g, "'");
-        }
-        return new CheckConstraintDefinition(tableName, expression, options);
-      }),
-    );
+    const checkConstraints: CheckConstraintDefinition[] = [];
+    for (const row of chkInfo.toArray()) {
+      const options = { name: row["name"] as string };
+      let expression = row["expression"] as string;
+      if (expression.startsWith("(") && expression.endsWith(")")) {
+        expression = expression.slice(1, -1);
+      }
+      expression = this.stripWhitespaceCharacters(expression);
+      if (!(await this.isMariadb())) {
+        expression = expression.replace(/\\'/g, "'");
+      }
+      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, options));
+    }
+    return checkConstraints;
   }
 
   async tableOptions(tableName: string): Promise<Record<string, string>> {

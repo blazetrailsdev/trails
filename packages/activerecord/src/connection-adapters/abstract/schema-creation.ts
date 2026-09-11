@@ -175,18 +175,27 @@ export class SchemaCreation {
     return `ADD ${await this.accept(o.column)}`;
   }
 
+  /** @missingRailsCall order:accept,map — PERMANENT */
   protected async visitAlterTable(o: AlterTable): Promise<string> {
     let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
 
-    sql += (await Promise.all(o.adds.map((col) => this.accept(col)))).join(" ");
-    sql += (await Promise.all(o.foreignKeyAdds.map((fk) => this.visitAddForeignKey(fk)))).join(" ");
+    const adds: string[] = [];
+    for (const col of o.adds) adds.push(await this.accept(col));
+    sql += adds.join(" ");
+    const foreignKeyAdds: string[] = [];
+    for (const fk of o.foreignKeyAdds) foreignKeyAdds.push(await this.visitAddForeignKey(fk));
+    sql += foreignKeyAdds.join(" ");
     sql += o.foreignKeyDrops.map((fk) => this.visitDropForeignKey(fk)).join(" ");
-    sql += (
-      await Promise.all(o.checkConstraintAdds.map((con) => this.visitAddCheckConstraint(con)))
-    ).join(" ");
-    sql += (
-      await Promise.all(o.checkConstraintDrops.map((con) => this.visitDropCheckConstraint(con)))
-    ).join(" ");
+    const checkConstraintAdds: string[] = [];
+    for (const con of o.checkConstraintAdds) {
+      checkConstraintAdds.push(await this.visitAddCheckConstraint(con));
+    }
+    sql += checkConstraintAdds.join(" ");
+    const checkConstraintDrops: string[] = [];
+    for (const con of o.checkConstraintDrops) {
+      checkConstraintDrops.push(await this.visitDropCheckConstraint(con));
+    }
+    sql += checkConstraintDrops.join(" ");
     sql += o.constraintDrops.map((con) => this.visitDropConstraint(con)).join(" ");
 
     return sql;

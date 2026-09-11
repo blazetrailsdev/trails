@@ -437,6 +437,7 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
+  /** @missingRailsCall any? — PERMANENT */
   private async isIncludeInMemory(record: Base): Promise<boolean> {
     const reflection = this.reflection as unknown as {
       isThroughReflection?: () => boolean;
@@ -449,16 +450,17 @@ export abstract class CollectionAssociation extends Association {
       ).association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
       const reader = (await assoc.reader) as Base[];
-      const targetReflections = await Promise.all(
-        reader.map((source) => (source as unknown as Record<string, unknown>)[sourceName]),
-      );
-      return (
-        targetReflections.some((targetReflection) =>
+      for (const source of reader) {
+        const targetReflection = await (source as unknown as Record<string, unknown>)[sourceName];
+        if (
           Array.isArray(targetReflection)
             ? targetReflection.includes(record)
-            : targetReflection === record,
-        ) || this.target.includes(record)
-      );
+            : targetReflection === record
+        ) {
+          return true;
+        }
+      }
+      return this.target.includes(record);
     }
     return this.target.includes(record);
   }

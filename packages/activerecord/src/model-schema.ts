@@ -371,14 +371,15 @@ export async function _returningColumnsForInsert(
   }
   const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
   const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
-  const keep = await Promise.all(
-    cols.map(
-      async (c) =>
-        typeof c.isAutoPopulated === "function" &&
-        ((await connection.returnValueAfterInsert?.(c)) ?? false),
-    ),
-  );
-  const autoPopulated = cols.filter((_c, i) => keep[i]).map((c) => c.name);
+  const autoPopulated: string[] = [];
+  for (const c of cols) {
+    if (
+      typeof c.isAutoPopulated === "function" &&
+      ((await connection.returnValueAfterInsert?.(c)) ?? false)
+    ) {
+      autoPopulated.push(c.name);
+    }
+  }
   if (autoPopulated.length > 0) return memoize(autoPopulated);
   const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
