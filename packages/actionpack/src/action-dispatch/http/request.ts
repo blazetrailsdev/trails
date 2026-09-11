@@ -66,7 +66,7 @@ import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
-import { RequestUtils, type ParamValue } from "../request/utils.js";
+import { CustomParamEncoder, type ParamHash } from "../request/utils.js";
 import {
   authenticatedEncryptedCookieSalt as _authenticatedEncryptedCookieSalt,
   cookieJar as _cookieJar,
@@ -728,11 +728,17 @@ export class Request {
     this.cookieJar().commitBang();
   }
 
-  /** @missingRailsArgs from_query_string — CONVERGEABLE inline-store-nested-param-and-port-custom-param-encoder */
   GET(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
-        const rackQueryParams = ParamBuilder.fromQueryString(this.queryString);
+        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+          this,
+          this.pathParameters["controller"] as string | undefined,
+          this.pathParameters["action"] as string | undefined,
+        );
+        const rackQueryParams = ParamBuilder.fromQueryString(this.rackRequest.queryString, {
+          encodingTemplate: encodingTemplate,
+        });
 
         return this.setHeader(k, rackQueryParams);
       }) as Record<string, unknown>;
@@ -747,15 +753,27 @@ export class Request {
   POST(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
-        const host = this._paramsHost;
-        const pr = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
-          this._fallbackRequestParameters(),
+        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+          this,
+          this.pathParameters["controller"] as string | undefined,
+          this.pathParameters["action"] as string | undefined,
         );
 
-        return this.setHeader(
-          k,
-          RequestUtils.normalizeEncodeParams(pr as ParamValue) as Record<string, unknown>,
-        );
+        let paramList: Array<[string, unknown]> | null = null;
+        const host = this._paramsHost;
+        let pr = _parseFormattedParameters.call(host, _paramsParsers.call(host), () => {
+          if ((paramList = this.requestParametersList()) != null) {
+            return ParamBuilder.fromPairs(paramList, { encodingTemplate: encodingTemplate });
+          } else {
+            return this._fallbackRequestParameters();
+          }
+        });
+
+        if (paramList === null) {
+          pr = ParamBuilder.fromHash(pr as ParamHash, { encodingTemplate: encodingTemplate });
+        }
+
+        return this.setHeader(k, pr);
       }) as Record<string, unknown>;
     } catch (e) {
       if (e instanceof ParamError) {

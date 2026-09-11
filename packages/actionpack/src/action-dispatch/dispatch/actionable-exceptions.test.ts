@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ActionableError, NonActionable } from "@blazetrails/activesupport";
+import { StringIO } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionableExceptions } from "../middleware/actionable-exceptions.js";
 
@@ -21,7 +22,7 @@ function postEnv(params: Record<string, string>, headers: Record<string, unknown
     REQUEST_METHOD: "POST",
     PATH_INFO: ActionableExceptions.endpoint,
     CONTENT_TYPE: "application/x-www-form-urlencoded",
-    "rack.input": body,
+    "rack.input": new StringIO(body),
     ...headers,
   };
 }

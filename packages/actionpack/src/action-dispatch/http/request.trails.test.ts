@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "./request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 describe("Request#GET / #POST", () => {
   it("GET raises BadRequest when the query string cannot be parsed", () => {
@@ -17,7 +18,7 @@ describe("Request#GET / #POST", () => {
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
       CONTENT_LENGTH: String(body.length),
-      "rack.input": body,
+      "rack.input": new StringIO(body),
     });
     expect(() => req.POST()).toThrow(BadRequest);
     expect(() => req.POST()).toThrow("Invalid request parameters:");
