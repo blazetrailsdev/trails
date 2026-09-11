@@ -4,7 +4,11 @@ import { libsqlRemoteDriver } from "../sqlite/libsql.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 export class LibSQLRemoteAdapter extends SQLite3Adapter {
-  protected override defaultSqliteDriver(): SqliteDriver {
+  protected static override defaultSqliteDriver(): SqliteDriver {
     return libsqlRemoteDriver;
+  }
+
+  protected override prepareDatabasePath(filename: string): string {
+    return filename;
   }
 }

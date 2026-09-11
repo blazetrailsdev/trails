@@ -813,7 +813,14 @@ extends Association`, whose modules reach `reflection.ts` back through
   `connection-handling.ts` and `core.ts` for Rails' `self == Base`
   (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
   The cycle is closed by `base.ts` importing all three, so none of them can
-  import `base.ts` back.
+  import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
+  it: bare for `db_warnings_ignore` (`abstract_adapter.rb`, reached only from a
+  live query), and as `_Base?.logger ?? null` in the constructor
+  (`abstract_adapter.rb:132,140`). That one read is the sole guarded slot read:
+  an adapter is a standalone public entry point, constructed with no model
+  layer loaded at all (the whole `sqlite-drivers` lane), so an unset slot
+  there is not a load-order bug but a legitimate configuration in which
+  Rails' `ActiveRecord::Base.logger` would still autoload and be `nil`.
 - `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
   `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
   (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle

@@ -785,6 +785,8 @@ export class AbstractAdapter implements Quoting {
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
       this._config = configOrDeprecatedConnection;
+      this.logger = _Base?.logger ?? null;
+
       if (
         isRubyTruthy(deprecatedLogger) ||
         isRubyTruthy(deprecatedConnectionOptions) ||
@@ -797,6 +799,7 @@ export class AbstractAdapter implements Quoting {
     } else {
       this._unconfiguredConnection = (configOrDeprecatedConnection ??
         null) as AbstractAdapter | null;
+      this.logger = isRubyTruthy(deprecatedLogger) ? deprecatedLogger : (_Base?.logger ?? null);
       if (isRubyTruthy(deprecatedConfig)) {
         this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
         this._connectionParameters = deprecatedConnectionOptions;
@@ -1596,12 +1599,7 @@ export class AbstractAdapter implements Quoting {
 
   static async databaseExists(config: unknown): Promise<boolean> {
     const ctor = this as unknown as new (config: unknown) => AbstractAdapter;
-    const adapter = new ctor(config);
-    try {
-      return await adapter.databaseExists();
-    } finally {
-      await adapter.disconnectBang();
-    }
+    return new ctor(config).databaseExists();
   }
 
   async databaseExists(): Promise<boolean> {

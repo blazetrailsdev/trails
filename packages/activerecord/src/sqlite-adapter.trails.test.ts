@@ -3,6 +3,8 @@ import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
 import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
+import { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
+import { File } from "@blazetrails/ruby-compat";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -560,5 +562,28 @@ describe("SQLite adapter driver binding", () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncOnlyDriver });
     expect(adapter.isOpen).toBe(false);
     expect(adapter.raw).toBeUndefined();
+  });
+});
+
+describe("SQLite3Adapter connection parameters", () => {
+  it("carry only the keys Rails' merge produces, and newClient resolves the driver by class", async () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const params = adapter._connectionParameters;
+    expect(params).not.toHaveProperty("driver");
+    expect(params).toMatchObject({
+      database: ":memory:",
+      resultsAsHash: true,
+      defaultTransactionMode: "immediate",
+    });
+    const conn = await BetterSQLite3Adapter.newClient(params);
+    expect(conn.isOpen()).toBe(true);
+    await conn.close();
+    expect(() => SQLite3Adapter.newClient(params)).toThrow(/No SQLite driver configured/);
+  });
+
+  it("does not expand or mkdir a libsql remote URL as a local path", () => {
+    const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
+    expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
+    expect(File.isDirectory("libsql:")).toBe(false);
   });
 });
