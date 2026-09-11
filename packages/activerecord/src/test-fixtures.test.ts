@@ -333,8 +333,9 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
     const row = peoplesTreasures("michael_diamond");
-    expect(Number(row.rich_person_id)).toBe(Number(people("michael").readAttribute("id")));
+    expect(Number(row.rich_person_id)).toBe(Number(FixtureSet.identify("michael")));
     expect(Number(row.treasure_id)).toBe(Number(treasures("diamond").readAttribute("id")));
+    expect(Number(people("michael").readAttribute("id"))).toBe(1);
   });
 });
 
