@@ -1,6 +1,6 @@
 import { afterEach, beforeEach } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
-import { included } from "@blazetrails/ruby-compat";
+import { include, included } from "@blazetrails/ruby-compat";
 import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
 import {
   prepareModelFixtures,
@@ -350,15 +350,22 @@ function useFixtures(
 type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
 type SuiteScope = { suite?: SuiteScope };
+type TestCaseClass = (new () => object) & { fixtureTableNames: string[] };
 
-const fixtureTableNamesBySuite = new WeakMap<SuiteScope, string[]>();
+const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
 
-function inheritedFixtureTableNames(suite: SuiteScope | undefined): string[] {
-  for (let s = suite; s !== undefined; s = s.suite) {
-    const names = fixtureTableNamesBySuite.get(s);
-    if (names !== undefined) return names;
+function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
+  if (suite === undefined) {
+    const klass = class {} as TestCaseClass;
+    include(klass, TestFixtures);
+    return klass;
   }
-  return [];
+  let klass = testCaseClasses.get(suite);
+  if (klass === undefined) {
+    klass = class extends testCaseClassFor(suite.suite) {} as TestCaseClass;
+    testCaseClasses.set(suite, klass);
+  }
+  return klass;
 }
 
 /** @internal */
@@ -393,18 +400,10 @@ export function fixtures(
         typeof entry === "string" ? entry : entry.table,
       )
     : Object.keys(fixturesOrNames);
-  const suite = getCurrentSuite().suite as SuiteScope | undefined;
-  if (suite !== undefined) {
-    const fixtureTableNames = inheritedFixtureTableNames(suite);
-    fixtureTableNamesBySuite.set(
-      suite,
-      [...new Set([...fixtureTableNames, ...fixtureSetNames])].sort(),
-    );
-  }
+  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  klass.fixtureTableNames = [...new Set([...klass.fixtureTableNames, ...fixtureSetNames])].sort();
 
   const result = useFixtures(fixturesOrNames as FixtureMap, getConnection);
-  Object.defineProperty(result, "fixtureTableNames", {
-    get: () => inheritedFixtureTableNames(suite),
-  });
+  Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
   return result;
 }
