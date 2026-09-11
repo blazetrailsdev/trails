@@ -922,7 +922,7 @@ export async function executeGroupedCalculation(
       const keyIds = rows
         .map((row) => groupAliases.map((aliaz) => row[aliaz]))
         .filter((vals) => vals.every((v) => v != null));
-      const records: any[] = await klass.where(primaryKey, keyIds).toArray();
+      const records: any[] = await klass.where(new Map([[primaryKey, keyIds]])).toArray();
       keyRecords = new Map(
         records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
       );

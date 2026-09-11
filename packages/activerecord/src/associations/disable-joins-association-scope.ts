@@ -147,7 +147,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         }
         return t;
       }) as unknown[][];
-      scope = (scope as { where: (c: string[], t: unknown[][]) => unknown }).where(keyCols, tuples);
+      scope = (scope as { where: (c: Map<string[], unknown[][]>) => unknown }).where(
+        new Map([[keyCols, tuples]]),
+      );
     }
 
     const sfa = (

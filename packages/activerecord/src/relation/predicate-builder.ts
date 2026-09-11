@@ -182,7 +182,6 @@ export class PredicateBuilder {
 
   /** @internal */
   private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[] {
-    if (queries.length === 0) return [];
     if (queries.length === 1) return queries[0];
     const reduced = queries.map((query) => query.reduce((left, right) => left.and(right)));
     return [new Nodes.Grouping(new Nodes.Or(reduced))];
