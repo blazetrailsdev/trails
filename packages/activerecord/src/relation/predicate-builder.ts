@@ -230,43 +230,6 @@ export class PredicateBuilder {
     return this.table.type(columnName).cast(value);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-build-composite-and-perform-merge */
-  buildComposite(
-    cols: string[],
-    tuples: unknown[][],
-    fallback?: (name: string) => typeof Base | null,
-  ): Nodes.Node[] {
-    if (cols.length === 0) {
-      throw new ArgumentError("PredicateBuilder.buildComposite: empty column list");
-    }
-    if (!Array.isArray(tuples)) {
-      throw new ArgumentError(
-        `PredicateBuilder.buildComposite: tuples must be an array, got ${tuples === null ? "null" : typeof tuples}`,
-      );
-    }
-    for (const tuple of tuples) {
-      if (!Array.isArray(tuple)) {
-        throw new ArgumentError(
-          `PredicateBuilder.buildComposite: tuple must be an array, got ${typeof tuple}`,
-        );
-      }
-      if (tuple.length !== cols.length) {
-        throw new ArgumentError(
-          `PredicateBuilder.buildComposite: tuple arity ${tuple.length} does not match column count ${cols.length} (cols=[${cols.join(", ")}])`,
-        );
-      }
-    }
-    const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
-    if (validTuples.length === 0) return [];
-    if (cols.length === 1) {
-      return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }, fallback);
-    }
-    const queryGroups = validTuples.map((tuple) =>
-      this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]])), fallback),
-    );
-    return this.groupingQueries(queryGroups);
-  }
-
   registerHandler(
     klass: any,
     handler: { call(attr: Nodes.Attribute, value: any): Nodes.Node },

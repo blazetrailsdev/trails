@@ -55,9 +55,8 @@ export class WhereChain<R = any> {
       opts.every((c) => typeof c === "string") &&
       Array.isArray(rest[0])
     ) {
-      const nodes = scope.predicateBuilder.buildComposite(
-        opts as string[],
-        rest[0] as unknown[][],
+      const nodes = scope.predicateBuilder.buildFromHash(
+        new Map([[opts as string[], rest[0] as unknown[][]]]),
         (tableName) =>
           lookupTableKlassFromJoinDependencies.call(scope, tableName) as
             | QueryMethodsHost["_model"]
@@ -820,9 +819,8 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
     }
     const cols = opts;
     const tuples = rest[0] as unknown[][];
-    const nodes = this.predicateBuilder.buildComposite(
-      cols,
-      tuples,
+    const nodes = this.predicateBuilder.buildFromHash(
+      new Map([[cols, tuples]]),
       (tableName) =>
         lookupTableKlassFromJoinDependencies.call(this, tableName) as
           | QueryMethodsHost["_model"]

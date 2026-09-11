@@ -77,10 +77,9 @@
  * the row.
  *
  * arel enrolled first, being the only package measured at `novel: 0`;
- * ruby-compat joined it once RFC 0129 burnt its 4 down to zero.
- * activerecord's 340 stays ungated on `novel` until its own burndown (the
- * `activerecord-extra-surface-receipt-burndown` RFC) retires it, one receipt
- * or one deletion at a time.
+ * ruby-compat joined it once RFC 0129 burnt its 4 down to zero, and
+ * activerecord once RFC 0130 (`activerecord-extra-surface-receipt-burndown`)
+ * burnt its 399 down the same way. No package is counted any more.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
@@ -99,7 +98,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
-export const COUNTED_PACKAGES = ["activerecord"] as const;
+export const COUNTED_PACKAGES = [] as const;
 
 /**
  * Gated packages whose `novel` is pinned at the constant 0 regardless of what
@@ -107,7 +106,7 @@ export const COUNTED_PACKAGES = ["activerecord"] as const;
  * a row, because `total` stays gated in both modes. Only-grow: a package joins
  * on reaching zero and never leaves.
  */
-export const TAGGED_ONLY_PACKAGES = ["arel", "ruby-compat"] as const;
+export const TAGGED_ONLY_PACKAGES = ["activerecord", "arel", "ruby-compat"] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

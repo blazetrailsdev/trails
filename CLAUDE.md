@@ -460,8 +460,8 @@ write.
    never up. There is **no reseed**, for the same reason the call baselines
    forbid one.
 
-   A package that has burnt its untagged novel surface to zero (`arel` today)
-   is additionally **pinned**: its `novel` is the constant 0 regardless of what
+   A package that has burnt its untagged novel surface to zero (all three
+   today) is additionally **pinned**: its `novel` is the constant 0 regardless of what
    its row says, so widening the row cannot clear a red run. The only two
    remedies are a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
    receipt at the declaration, or deleting the name. That is where every gated
@@ -475,7 +475,7 @@ write.
    reports. So `total` stays gated in both modes.
 
    A package gets pinned as a reviewed step of its own burndown (the
-   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342,
+   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 399,
    RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
    is ever un-pinned to turn a red run green. Other packages are still measured
    and ungated; widening `GATED_PACKAGES` is a separate decision with its own

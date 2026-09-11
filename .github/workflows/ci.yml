@@ -1697,13 +1697,15 @@ jobs:
         # joined under RFC 0119 with the connection-adapter burndown behind it.
         #
         # A package that reaches zero untagged novel surface additionally has
-        # its `novel` PINNED at 0 independently of its row (arel today), so a
+        # its `novel` PINNED at 0 independently of its row (activerecord, arel
+        # and ruby-compat — every gated package today), so a
         # widened row cannot clear a red run — the only remedies are a
         # `@noRailsEquivalent` receipt at the declaration or deleting the name.
         # `total` stays gated in both modes: nothing else in the repo catches a
         # name Rails defines in a different `.rb`. Enrollment is only-grow;
-        # activerecord joins when the extra-surface receipt burndown clears its
-        # 342. activemodel stays ungated until it has a burndown of its own.
+        # activerecord joined once RFC 0130's receipt burndown cleared its
+        # novel surface. activemodel stays ungated until it has a burndown of
+        # its own.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose
