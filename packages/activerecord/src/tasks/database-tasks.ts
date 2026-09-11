@@ -22,7 +22,7 @@ import {
   getPath,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
-import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
+import { ActiveRecordError } from "../errors.js";
 import type { Base } from "../base.js";
 
 let _base: typeof Base | undefined;
@@ -610,7 +610,6 @@ export class DatabaseTasks {
     return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
   }
 
-  /** @missingRailsArgs dump — CONVERGEABLE dump-schema-opens-the-file-around-the-dumper */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
@@ -626,14 +625,19 @@ export class DatabaseTasks {
       try {
         const migrationConnectionPool = this.migrationConnectionPool();
         await File.open(filename, "w:utf-8", async (file) => {
-          file.write((await SchemaDumper.dump(migrationConnectionPool)).join("\n"));
+          await SchemaDumper.dump(migrationConnectionPool, file);
         });
       } finally {
         SchemaDumper.language = languageWas;
       }
     } else {
       await this.structureDump(dbConfig, filename);
-      await this._appendSchemaInformation(filename);
+      if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
+        await File.open(filename, "a", async (f) => {
+          f.puts(await this.migrationConnection().dumpSchemaInformation!());
+          f.print("\n");
+        });
+      }
     }
   }
 
@@ -916,32 +920,6 @@ export class DatabaseTasks {
     const hash = crypto.createHash("sha1");
     hash.update(bytes);
     return hash.digest("hex");
-  }
-
-  private static async _appendSchemaInformation(filename: string): Promise<void> {
-    let adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter;
-    try {
-      adapter = await this._migrationAdapter();
-    } catch (error) {
-      if (error instanceof ConnectionNotDefined) return;
-      throw error;
-    }
-
-    const { SchemaMigration } = await import("../schema-migration.js");
-    const migration = new SchemaMigration(adapter.pool);
-    if (!(await migration.tableExists())) return;
-
-    const versions = await migration.allVersions();
-    if (versions.length === 0) return;
-
-    const quotedTable = adapter.quoteTableName(migration.tableName);
-    const quoted = versions
-      .slice()
-      .reverse()
-      .map((v) => `('${String(v).replace(/'/g, "''")}')`)
-      .join(",\n");
-    const insertSql = `\nINSERT INTO ${quotedTable} (version) VALUES\n${quoted};\n`;
-    File.open(filename, "a", (f) => f.write(insertSql));
   }
 
   static setupInitialDatabaseYaml(): Record<string, unknown> {

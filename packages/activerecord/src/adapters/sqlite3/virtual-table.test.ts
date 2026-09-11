@@ -26,7 +26,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   it("schema dump", async () => {
-    const output = (await SchemaDumper.dump(adapter)).join("\n");
+    const output = (await SchemaDumper.dump(adapter)).string();
 
     expect(output).not.toContain("searchables_docsize");
     expect(output).toContain(

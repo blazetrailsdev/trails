@@ -1,3 +1,4 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
@@ -127,9 +128,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
-      const lines: string[] = [];
+      const lines = new StringIO();
       await adapter.createSchemaDumper().dumpTable(lines, "ex_idx_both");
-      const indexLine = lines.find((l) => l.includes("ex_idx_both_i"))!;
+      const indexLine = lines
+        .string()
+        .split("\n")
+        .find((l) => l.includes("ex_idx_both_i"))!;
       expect(indexLine.indexOf("include:")).toBeGreaterThan(-1);
       expect(indexLine.indexOf("include:")).toBeLessThan(indexLine.indexOf("nullsNotDistinct:"));
     });

@@ -32,12 +32,9 @@ export async function updateCounters(
   counters: CounterCacheCounters,
 ): Promise<number> {
   if (this.compositePrimaryKey && Array.isArray(id) && !Array.isArray(id[0])) id = [id];
-  const unscoped = this.unscoped();
-  const primaryKey = this.primaryKey;
-  const relation = Array.isArray(primaryKey)
-    ? unscoped.whereBang(primaryKey, id)
-    : unscoped.whereBang({ [primaryKey]: id });
-  return relation.updateCounters(counters);
+  return this.unscoped()
+    .whereBang(new Map([[this.primaryKey, id]]))
+    .updateCounters(counters);
 }
 
 export type CounterCacheCounters = Record<string, number | CounterCacheTouchOption | undefined>;
@@ -109,12 +106,9 @@ export async function resetCounters(
   }
 
   if (Object.keys(updates).length > 0) {
-    const unscoped = this.unscoped();
-    const primaryKey = this.primaryKey;
-    const relation = Array.isArray(primaryKey)
-      ? unscoped.where(primaryKey, [object.id] as unknown[][])
-      : unscoped.where({ [primaryKey]: [object.id] });
-    await relation.updateAll(updates);
+    await this.unscoped()
+      .where(new Map([[this.primaryKey, [object.id]]]))
+      .updateAll(updates);
   }
 }
 

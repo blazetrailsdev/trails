@@ -1,3 +1,4 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -64,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await new EnableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
-      const dump = (await adapter.createSchemaDumper().dump()).join("\n");
+      const dump = (await adapter.createSchemaDumper().dump(new StringIO())).string();
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
     }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {

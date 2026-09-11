@@ -1,6 +1,6 @@
 import { Encoding } from "./encoding.js";
 import { EOFError } from "./eof-error.js";
-import { puts as ioPuts } from "./io.js";
+import { print as ioPrint, puts as ioPuts } from "./io.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -93,6 +93,13 @@ export class StringIO {
    * `IO::generic_writable#puts` (`vendor/ruby/ext/stringio/stringio.c:1530`).
    */
   puts = ioPuts;
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
+   * `IO::generic_writable#print` (`vendor/ruby/ext/stringio/stringio.c:1956`
+   * aliases it to `rb_io_print`, `vendor/ruby/io.c:8715`).
+   */
+  print = ioPrint;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `strio_flush`

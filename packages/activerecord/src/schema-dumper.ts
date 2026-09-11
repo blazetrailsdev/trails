@@ -1,3 +1,4 @@
+import { StringIO, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
@@ -221,11 +222,11 @@ export abstract class SchemaDumper {
     ) => InstanceType<T>)(connection, options);
   }
 
-  static dump(
+  static dump<S extends IO | StringIO = StringIO>(
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
-    stream: string[] = [],
+    stream: S = new StringIO() as S,
     config: SchemaDumperConfig = baseClass(),
-  ): Promise<string[]> {
+  ): Promise<S> {
     const options = this.generateOptions(config);
     if (isDatabaseAdapter(pool)) {
       const source = new AdapterSchemaSource(pool);
@@ -267,15 +268,15 @@ export abstract class SchemaDumper {
     } else {
       dumper = this.create(wrappedSource);
     }
-    const stream: string[] = [];
+    const stream = new StringIO();
     await dumper.schemas(stream);
     await dumper.extensions(stream);
     await dumper.types(stream);
     await dumper.dumpTable(stream, tableName);
-    return stream.join("\n");
+    return stream.string();
   }
 
-  async dump(stream: string[] = []): Promise<string[]> {
+  async dump<S extends IO | StringIO>(stream: S): Promise<S> {
     this.header(stream);
     await this.schemas(stream);
     await this.extensions(stream);
@@ -287,69 +288,68 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected extensions(_stream: string[]): Promise<void> {
+  protected extensions(_stream: IO | StringIO): Promise<void> {
     return Promise.resolve();
   }
 
   /** @internal */
-  protected types(_stream: string[]): Promise<void> {
+  protected types(_stream: IO | StringIO): Promise<void> {
     return Promise.resolve();
   }
 
   /** @internal */
-  protected schemas(_stream: string[]): Promise<void> {
+  protected schemas(_stream: IO | StringIO): Promise<void> {
     return Promise.resolve();
   }
 
   /** @internal */
-  protected virtualTables(_stream: string[]): Promise<void> {
+  protected virtualTables(_stream: IO | StringIO): Promise<void> {
     return Promise.resolve();
   }
 
-  private header(stream: string[]): void {
-    stream.push("// This file is auto-generated from the current state of the database.");
-    stream.push("// Instead of editing this file, please use the migrations feature.");
-    stream.push("");
+  private header(stream: IO | StringIO): void {
+    stream.puts("// This file is auto-generated from the current state of the database.");
+    stream.puts("// Instead of editing this file, please use the migrations feature.");
+    stream.puts("");
     if (this._language === "ts") {
-      stream.push(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
-      stream.push("");
+      stream.puts(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
+      stream.puts("");
     }
     const params = this.defineParams();
     if (params) {
-      stream.push(`export const defineParams = { ${params} };`);
-      stream.push("");
+      stream.puts(`export const defineParams = { ${params} };`);
+      stream.puts("");
     }
     if (this._language === "ts") {
-      stream.push("export default async function defineSchema(ctx: DatabaseAdapter) {");
+      stream.puts("export default async function defineSchema(ctx: DatabaseAdapter) {");
     } else {
-      stream.push("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
-      stream.push("export default async function defineSchema(ctx) {");
+      stream.puts("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
+      stream.puts("export default async function defineSchema(ctx) {");
     }
   }
 
-  private trailer(stream: string[]): void {
-    stream.push("}");
+  private trailer(stream: IO | StringIO): void {
+    stream.puts("}");
   }
 
-  private async tables(stream: string[]): Promise<void> {
+  private async tables(stream: IO | StringIO): Promise<void> {
     const sortedTables = [...(await this._source.tables())].sort();
 
     const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
 
     for (const [index, tableName] of notIgnoredTables.entries()) {
       await this.table(tableName, stream);
-      if (index < notIgnoredTables.length - 1) stream.push("");
+      if (index < notIgnoredTables.length - 1) stream.puts("");
     }
 
     if (this._fkHookHost() !== undefined) {
-      const foreignKeysStream: string[] = [];
+      const foreignKeysStream = new StringIO();
       for (const tbl of notIgnoredTables) {
         await this.foreignKeys(tbl, foreignKeysStream);
       }
-
-      if (foreignKeysStream.length > 0) stream.push("");
-
-      for (const line of foreignKeysStream) stream.push(line);
+      const foreignKeysString = foreignKeysStream.string();
+      if (foreignKeysString.length > 0) stream.puts();
+      stream.print(foreignKeysString);
     }
   }
 
@@ -380,12 +380,12 @@ export abstract class SchemaDumper {
    * @internal Used by `dumpTableSchema` and external callers.
    * @noRailsEquivalent CONVERGEABLE the per-table body of SchemaDumper#tables (schema_dumper.rb:134), extracted so dumpTableSchema shares it.
    */
-  async dumpTable(stream: string[], tableName: string): Promise<void> {
+  async dumpTable(stream: IO | StringIO, tableName: string): Promise<void> {
     await this.table(tableName, stream);
   }
 
   /** @internal */
-  async table(table: string, stream: string[]): Promise<void> {
+  async table(table: string, stream: IO | StringIO): Promise<void> {
     const adapter = this._adapter();
     if (adapter && typeof adapter.supportsVirtualColumns === "function") {
       try {
@@ -396,17 +396,17 @@ export abstract class SchemaDumper {
     }
     const columns = await this._source.columns(table);
 
-    let pk: string | string[] | null = null;
-    if (adapter && typeof adapter.primaryKey === "function") {
-      try {
-        pk = await adapter.primaryKey(table);
-      } catch {}
-    }
-
     try {
       this.tableName = table;
 
-      const tbl: string[] = [];
+      const tbl = new StringIO();
+
+      let pk: string | string[] | null = null;
+      if (adapter && typeof adapter.primaryKey === "function") {
+        try {
+          pk = await adapter.primaryKey(table);
+        } catch {}
+      }
 
       const stripped = this.removePrefixAndSuffix(table);
       const opts: string[] = [];
@@ -433,7 +433,7 @@ export abstract class SchemaDumper {
       }
 
       opts.push('force: "cascade"');
-      tbl.push(
+      tbl.puts(
         `  await ctx.createTable(${JSON.stringify(stripped)}, { ${opts.join(", ")} }, (t) => {`,
       );
 
@@ -446,9 +446,9 @@ export abstract class SchemaDumper {
         const optStr =
           Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
         if (type.startsWith(":")) {
-          tbl.push(`    t.${type.slice(1)}(${JSON.stringify(column.name)}${optStr});`);
+          tbl.puts(`    t.${type.slice(1)}(${JSON.stringify(column.name)}${optStr});`);
         } else {
-          tbl.push(
+          tbl.puts(
             `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(type)}${optStr});`,
           );
         }
@@ -463,16 +463,17 @@ export abstract class SchemaDumper {
       if (adapter?.supportsUniqueConstraints?.())
         await this.uniqueConstraintsInCreate?.(table, tbl);
 
-      tbl.push("  });");
+      tbl.puts("  });");
 
-      if (remaining && remaining.length > 0) tbl.push("", ...remaining);
+      if (remaining && remaining.length > 0) tbl.puts("", ...remaining);
 
-      stream.push(...tbl);
+      stream.print(tbl.string());
     } catch (e) {
       const cls = e instanceof Error && e.name !== "Error" ? e.name : "StandardError";
       const message = e instanceof Error ? e.message : String(e);
-      stream.push(`# Could not dump table ${JSON.stringify(table)} because of following ${cls}`);
-      stream.push(`#   ${message}`);
+      stream.puts(`# Could not dump table ${JSON.stringify(table)} because of following ${cls}`);
+      stream.puts(`#   ${message}`);
+      stream.puts();
     } finally {
       this.tableName = undefined;
     }
@@ -484,7 +485,7 @@ export abstract class SchemaDumper {
    */
   protected async checkConstraintsInCreate(
     table: string,
-    stream: string[],
+    stream: IO | StringIO,
   ): Promise<string[] | undefined> {
     const host = this._hookHost("checkConstraints") as
       | {
@@ -506,7 +507,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `    t.checkConstraint(${expr}${optStr});`;
       });
-      stream.push(checkConstraintStatements.sort().join("\n"));
+      stream.puts(checkConstraintStatements.sort().join("\n"));
     }
 
     if (checkInvalid.length > 0) {
@@ -536,10 +537,10 @@ export abstract class SchemaDumper {
   protected abstract validType(type: string | null | undefined): boolean;
 
   /** @internal */
-  protected exclusionConstraintsInCreate?(table: string, stream: string[]): Promise<void>;
+  protected exclusionConstraintsInCreate?(table: string, stream: IO | StringIO): Promise<void>;
 
   /** @internal */
-  protected uniqueConstraintsInCreate?(table: string, stream: string[]): Promise<void>;
+  protected uniqueConstraintsInCreate?(table: string, stream: IO | StringIO): Promise<void>;
 
   /** @internal */
   protected abstract columnSpec(column: Column): [string, Record<string, unknown>];
@@ -615,7 +616,7 @@ export abstract class SchemaDumper {
    * @internal
    * @missingRailsCall any? — PERMANENT
    */
-  async indexes(table: string, stream: string[]): Promise<void> {
+  async indexes(table: string, stream: IO | StringIO): Promise<void> {
     const indexes = await this._source.indexes(table);
     if (indexes.length > 0) {
       const addIndexStatements = indexes.map((index) => {
@@ -624,8 +625,8 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `  addIndex(${tableName}, ${cols}${optStr});`;
       });
-      stream.push(addIndexStatements.sort().join("\n"));
-      stream.push("");
+      stream.puts(addIndexStatements.sort().join("\n"));
+      stream.puts("");
     }
   }
 
@@ -633,7 +634,7 @@ export abstract class SchemaDumper {
    * @internal
    * @missingRailsCall any? — PERMANENT
    */
-  async indexesInCreate(table: string, stream: string[]): Promise<void> {
+  async indexesInCreate(table: string, stream: IO | StringIO): Promise<void> {
     let indexes = await this._source.indexes(table);
     if (indexes.length > 0) {
       const adapter = this._adapter();
@@ -660,7 +661,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `    t.index(${cols}${optStr});`;
       });
-      stream.push(indexStatements.sort().join("\n"));
+      stream.puts(indexStatements.sort().join("\n"));
     }
   }
 
@@ -695,7 +696,7 @@ export abstract class SchemaDumper {
    * @missingRailsCall any? — PERMANENT
    * @missingRailsCall order:foreignKeyColumnFor,removePrefixAndSuffix — PERMANENT
    */
-  async foreignKeys(table: string, stream: string[]): Promise<void> {
+  async foreignKeys(table: string, stream: IO | StringIO): Promise<void> {
     const host = this._hookHost("foreignKeys");
     if (!host) return;
     const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
@@ -722,7 +723,7 @@ export abstract class SchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
-    stream.push(statements.sort().join("\n"));
+    stream.puts(statements.sort().join("\n"));
   }
 
   /** @internal */

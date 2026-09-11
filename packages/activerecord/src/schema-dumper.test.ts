@@ -1,3 +1,4 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
@@ -350,7 +351,7 @@ describe("SchemaDumperTest", () => {
     const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     await sm.createVersion("20240601120000");
-    const output = (await TopLevelDumper.dump(adapter)).join("\n");
+    const output = (await TopLevelDumper.dump(adapter)).string();
     expect(output).toMatch(/export const defineParams = \{ version: 2024_06_01_120000 \};/);
     expect(output).toContain("defineSchema");
   }, 60000);
@@ -362,7 +363,7 @@ describe("SchemaDumperTest", () => {
       indexes: async () => [],
     };
     SchemaDumper.ignoreTables = [/^temp_/];
-    const output = (await SchemaDumper.dump(source as any)).join("\n");
+    const output = (await SchemaDumper.dump(source as any)).string();
     expect(output).toContain("users");
     expect(output).not.toContain("temp_cache");
   });
@@ -585,7 +586,7 @@ describe("SchemaDumperTest", () => {
               ]
             : [],
       };
-      const output = (await SchemaDumper.dump(source as any)).join("\n");
+      const output = (await SchemaDumper.dump(source as any)).string();
       const authorsIdx = output.indexOf('createTable("authors"');
       const booksIdx = output.indexOf('createTable("books"');
       const fkIdx = output.indexOf("addForeignKey");
@@ -613,7 +614,7 @@ describe("SchemaDumperTest", () => {
             ]
           : [],
     };
-    const output = (await SchemaDumper.dump(source as any)).join("\n");
+    const output = (await SchemaDumper.dump(source as any)).string();
     expect(output).not.toContain("addForeignKey");
     expect(output).not.toContain('"books"');
   });
@@ -624,7 +625,7 @@ describe("SchemaDumperTest", () => {
       indexes: async () => [],
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await SchemaDumper.dump(source as any)).join("\n");
+    const output = (await SchemaDumper.dump(source as any)).string();
     expect(output).not.toContain("addForeignKey");
   });
 
@@ -636,11 +637,11 @@ describe("SchemaDumperTest", () => {
       adapter: PRIMARY_KEY_ADAPTER,
     };
     const output = (
-      await SchemaDumper.dump(source as any, [], {
+      await SchemaDumper.dump(source as any, new StringIO(), {
         tableNamePrefix: "myapp_",
         tableNameSuffix: "_v1",
       })
-    ).join("\n");
+    ).string();
     expect(output).toContain('"users"');
     expect(output).not.toContain("myapp_users_v1");
   });
@@ -653,8 +654,8 @@ describe("SchemaDumperTest", () => {
       adapter: PRIMARY_KEY_ADAPTER,
     };
     const output = (
-      await SchemaDumper.dump(source as any, [], { tableNamePrefix: "app.prefix_" })
-    ).join("\n");
+      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "app.prefix_" })
+    ).string();
     expect(output).toContain('"users"');
     expect(output).not.toContain("app.prefix_users");
   });
@@ -666,9 +667,9 @@ describe("SchemaDumperTest", () => {
       adapter: PRIMARY_KEY_ADAPTER,
     };
     SchemaDumper.ignoreTables = ["posts"];
-    const output = (await SchemaDumper.dump(source as any, [], { tableNamePrefix: "myapp_" })).join(
-      "\n",
-    );
+    const output = (
+      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "myapp_" })
+    ).string();
     expect(output).toContain('"users"');
     expect(output).not.toContain('"posts"');
     expect(output).not.toContain("myapp_");

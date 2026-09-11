@@ -141,7 +141,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   };
 
   it("emits the Could-not-dump comment instead of a fabricated t.column line", async () => {
-    const output = (await SchemaDumper.dump(source as any)).join("\n");
+    const output = (await SchemaDumper.dump(source as any)).string();
     expect(output).toContain(`# Could not dump table "widgets" because of following StandardError`);
     expect(output).toContain(`#   Unknown type 'composite_type' for column 'kind'`);
     expect(output).not.toContain("createTable");
@@ -159,7 +159,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
       isValidType: (type: string | null | undefined) => type === "integer" || type === "string",
       primaryKey: async () => "id",
     };
-    const output = (await SchemaDumper.dump(validSource as any)).join("\n");
+    const output = (await SchemaDumper.dump(validSource as any)).string();
     expect(output).not.toContain("# Could not dump table");
     expect(output).toContain(`await ctx.createTable("widgets"`);
     expect(output).toContain(`t.string("name"`);

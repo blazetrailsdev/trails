@@ -1,3 +1,4 @@
+import { StringIO, type IO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";
@@ -44,7 +45,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).join("\n");
+    const output = (await TopLevelDumper.dump(source)).string();
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
@@ -58,10 +59,10 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     });
-    const one = (await TopLevelDumper.dump(source(["books"]))).join("\n");
+    const one = (await TopLevelDumper.dump(source(["books"]))).string();
     expect(one).not.toContain("});\n\n}");
 
-    const two = (await TopLevelDumper.dump(source(["authors", "books"]))).join("\n");
+    const two = (await TopLevelDumper.dump(source(["authors", "books"]))).string();
     expect(two).toContain('});\n\n  await ctx.createTable("books"');
     expect(two).not.toContain("});\n\n}");
   });
@@ -88,7 +89,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).join("\n");
+    const output = (await TopLevelDumper.dump(source)).string();
     for (const helper of [
       "int4range",
       "int8range",
@@ -125,7 +126,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).join("\n");
+    const output = (await TopLevelDumper.dump(source)).string();
     expect(output).toContain('t.timestamptz("ts"');
     expect(output).toContain('t.uuid("guid"');
     expect(output).toContain('t.interval("span"');
@@ -226,11 +227,11 @@ describe("SchemaDumper trails-only cases", () => {
       ],
     });
     const autoName = "fk_rails_abc123def4";
-    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");
+    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).string();
     expect(autoOutput).toContain("addForeignKey");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     const customName = "fk_books_author_id";
-    const customOutput = (await SchemaDumper.dump(mkSource(customName) as any)).join("\n");
+    const customOutput = (await SchemaDumper.dump(mkSource(customName) as any)).string();
     expect(customOutput).toContain(`name: "${customName}"`);
   });
 
@@ -244,11 +245,11 @@ describe("SchemaDumper trails-only cases", () => {
       ],
     });
     const autoName = "chk_rails_abc123def4";
-    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");
+    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).string();
     expect(autoOutput).toContain("t.checkConstraint");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     const customChkName = "products_price_check";
-    const customOutput = (await SchemaDumper.dump(mkSource(customChkName) as any)).join("\n");
+    const customOutput = (await SchemaDumper.dump(mkSource(customChkName) as any)).string();
     expect(customOutput).toContain(`name: "${customChkName}"`);
   });
 });
@@ -317,7 +318,7 @@ describe("SchemaDumperAdapterTest", () => {
     await adapter.createTable("reminders", {}, (t) => {
       t.string("name");
     });
-    const result = (await TopLevelDumper.dump(adapter)).join("\n");
+    const result = (await TopLevelDumper.dump(adapter)).string();
     expect(result).toContain("reminders");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");
@@ -339,9 +340,9 @@ describe("SchemaDumperAdapterTest", () => {
       }
     }
     const dumper = CommentDumper.create(source as any);
-    const lines: string[] = [];
+    const lines = new StringIO();
     await (dumper as any).table("users", lines);
-    expect(lines.join("\n")).toContain(`comment: "user accounts"`);
+    expect(lines.string()).toContain(`comment: "user accounts"`);
   });
 
   it("emitTable emits charset and collation from adapterTableOpts before force", async () => {
@@ -360,9 +361,9 @@ describe("SchemaDumperAdapterTest", () => {
       }
     }
     const dumper = MysqlDumper.create(source as any);
-    const lines: string[] = [];
+    const lines = new StringIO();
     await (dumper as any).table("t", lines);
-    const header = lines[0];
+    const header = lines.string().split("\n")[0];
     expect(header).toContain(`charset: "utf8mb4"`);
     expect(header).toContain(`collation: "utf8mb4_bin"`);
     expect(header.indexOf("charset")).toBeLessThan(header.indexOf("force"));
@@ -379,10 +380,10 @@ describe("SchemaDumperAdapterTest", () => {
       adapter: { ...PRIMARY_KEY_ADAPTER, primaryKey: async () => ["id", "account_id"] },
     };
     const dumper = TopLevelDumper.create(source as any);
-    const lines: string[] = [];
+    const lines = new StringIO();
     await (dumper as any).table("t", lines);
-    expect(lines[0]).toContain(`primaryKey: ["id","account_id"]`);
-    expect(lines[0]).not.toContain(`id: false`);
+    expect(lines.string().split("\n")[0]).toContain(`primaryKey: ["id","account_id"]`);
+    expect(lines.string().split("\n")[0]).not.toContain(`id: false`);
   });
 
   afterEach(async () => {
@@ -401,25 +402,25 @@ describe("SchemaDumper async header ordering", () => {
       await import("./connection-adapters/abstract/schema-dumper.js");
     const log: string[] = [];
     class OrderedDumper extends TopLevelDumper {
-      protected override async schemas(lines: string[]): Promise<void> {
+      protected override async schemas(lines: IO | StringIO): Promise<void> {
         await Promise.resolve();
-        lines.push("SCHEMAS");
+        lines.puts("SCHEMAS");
         log.push("schemas");
       }
-      protected override async extensions(lines: string[]): Promise<void> {
+      protected override async extensions(lines: IO | StringIO): Promise<void> {
         await Promise.resolve();
-        lines.push("EXTENSIONS");
+        lines.puts("EXTENSIONS");
         log.push("extensions");
       }
-      protected override async types(lines: string[]): Promise<void> {
+      protected override async types(lines: IO | StringIO): Promise<void> {
         await Promise.resolve();
-        lines.push("TYPES");
+        lines.puts("TYPES");
         log.push("types");
       }
     }
     const source = { tables: async () => [], columns: async () => [], indexes: async () => [] };
     const dumper = new (OrderedDumper as any)(source);
-    const result = (await (dumper.dump() as Promise<string[]>)).join("\n");
+    const result = (await dumper.dump(new StringIO())).string();
     expect(log).toEqual(["schemas", "extensions", "types"]);
     const schemasIdx = result.indexOf("SCHEMAS");
     const extensionsIdx = result.indexOf("EXTENSIONS");
@@ -470,13 +471,12 @@ describe("SchemaDumper#indexes", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: { defaultIndexType: AbstractAdapter.prototype.defaultIndexType },
     } as never);
-    const stream: string[] = [];
+    const stream = new StringIO();
     await dumper.indexes("posts", stream);
-    expect(stream[0]).toBe(
+    expect(stream.string()).toBe(
       '  addIndex("posts", ["body"], { name: "index_posts_on_body" });\n' +
-        '  addIndex("posts", ["title"], { name: "index_posts_on_title", unique: true });',
+        '  addIndex("posts", ["title"], { name: "index_posts_on_title", unique: true });\n\n',
     );
-    expect(stream[1]).toBe("");
   });
 
   it("writes nothing when the table has no indexes", async () => {
@@ -487,8 +487,8 @@ describe("SchemaDumper#indexes", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     } as never);
-    const stream: string[] = [];
+    const stream = new StringIO();
     await dumper.indexes("posts", stream);
-    expect(stream).toEqual([]);
+    expect(stream.string()).toBe("");
   });
 });

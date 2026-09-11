@@ -1,3 +1,4 @@
+import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import type {
   ExclusionConstraintDefinition,
@@ -97,45 +98,45 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async extensions(stream: string[]): Promise<void> {
+  protected override async extensions(stream: IO | StringIO): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.extensions) return;
     const exts: string[] = await adapter.extensions();
     if (exts.length === 0) return;
-    stream.push("  // These are extensions that must be enabled in order to support this database");
+    stream.puts("  // These are extensions that must be enabled in order to support this database");
     for (const ext of exts.sort()) {
-      stream.push(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
+      stream.puts(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
     }
-    stream.push("");
+    stream.puts("");
   }
 
   /** @internal */
-  protected override async types(stream: string[]): Promise<void> {
+  protected override async types(stream: IO | StringIO): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.enumTypes) return;
     const enumTypes: [string, string[]][] = await adapter.enumTypes();
     if (enumTypes.length === 0) return;
-    stream.push("  // Custom types defined in this database.");
-    stream.push(
+    stream.puts("  // Custom types defined in this database.");
+    stream.puts(
       "  // Note that some types may not work with other database engines. Be careful if changing database.",
     );
     for (const [name, values] of enumTypes.sort((a, b) => a[0].localeCompare(b[0]))) {
-      stream.push(`  await ctx.createEnum(${JSON.stringify(name)}, ${JSON.stringify(values)});`);
+      stream.puts(`  await ctx.createEnum(${JSON.stringify(name)}, ${JSON.stringify(values)});`);
     }
-    stream.push("");
+    stream.puts("");
   }
 
   /** @internal */
-  protected override async schemas(stream: string[]): Promise<void> {
+  protected override async schemas(stream: IO | StringIO): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.schemaNames) return;
     const allNames: string[] = await adapter.schemaNames();
     const names = allNames.filter((n) => n !== "public").sort();
     if (names.length === 0) return;
     for (const name of names) {
-      stream.push(`  await ctx.createSchema(${JSON.stringify(name)});`);
+      stream.puts(`  await ctx.createSchema(${JSON.stringify(name)});`);
     }
-    stream.push("");
+    stream.puts("");
   }
 
   /**
@@ -144,7 +145,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   protected override async exclusionConstraintsInCreate(
     table: string,
-    stream: string[],
+    stream: IO | StringIO,
   ): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
@@ -160,7 +161,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `    t.exclusionConstraint(${JSON.stringify(ec.expression)}${optStr});`;
     });
-    stream.push(stmts.sort().join("\n"));
+    stream.puts(stmts.sort().join("\n"));
   }
 
   /**
@@ -169,7 +170,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   protected override async uniqueConstraintsInCreate(
     table: string,
-    stream: string[],
+    stream: IO | StringIO,
   ): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: UniqueConstraintDefinition[] = adapter?.uniqueConstraints
@@ -185,7 +186,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `    t.uniqueConstraint(${JSON.stringify(uc.column)}${optStr});`;
     });
-    stream.push(stmts.sort().join("\n"));
+    stream.puts(stmts.sort().join("\n"));
   }
 
   /** @internal */
