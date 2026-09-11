@@ -1,20 +1,40 @@
-import { it, expect, vi } from "vitest";
+import { it, expect, vi, beforeEach, afterEach } from "vitest";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { describeIfPg } from "../../support/describe-if-pg.js";
 import { ActiveRecord } from "../../ar-config.js";
 import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "../../database-configurations/database-config.js";
 
+const ENV_VARS = [
+  "PGUSER",
+  "PGHOST",
+  "PGPORT",
+  "PGPASSWORD",
+  "PGSSLMODE",
+  "PGSSLCERT",
+  "PGSSLKEY",
+  "PGSSLROOTCERT",
+  "PGOPTIONS",
+];
+
 describeIfPg("PostgresqlDbConsoleTest", () => {
+  let oldValues: (string | undefined)[] = [];
+  beforeEach(() => {
+    oldValues = ENV_VARS.map((v) => env[v]);
+  });
+  afterEach(() => {
+    ENV_VARS.forEach((v, i) => setEnv(v, oldValues[i]));
+  });
+
   const makeDbConfig = (config: Record<string, unknown>) =>
     new HashConfig("test", "primary", config as DatabaseConfigOptions);
 
-  const assertFindCmdAndExecCalledWith = <T>(args: unknown[], block: () => T): T => {
+  const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown): void => {
     const spy = vi.spyOn(PostgreSQLAdapter, "findCmdAndExec").mockImplementation(() => []);
     try {
-      const result = block();
+      block();
       expect(spy).toHaveBeenCalledWith(...args);
-      return result;
     } finally {
       spy.mockRestore();
     }
@@ -36,9 +56,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
       port: 5432,
     });
 
-    const { env } = assertFindCmdAndExecCalledWith(["psql", "db"], () =>
-      PostgreSQLAdapter.dbconsole(config),
-    );
+    assertFindCmdAndExecCalledWith(["psql", "db"], () => PostgreSQLAdapter.dbconsole(config));
 
     expect(env.PGUSER).toBe("user");
     expect(env.PGHOST).toBe("host");
@@ -56,9 +74,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
       sslrootcert: "root.crt",
     });
 
-    const { env } = assertFindCmdAndExecCalledWith(["psql", "db"], () =>
-      PostgreSQLAdapter.dbconsole(config),
-    );
+    assertFindCmdAndExecCalledWith(["psql", "db"], () => PostgreSQLAdapter.dbconsole(config));
 
     expect(env.PGSSLMODE).toBe("verify-full");
     expect(env.PGSSLCERT).toBe("client.crt");
@@ -74,7 +90,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
       password: "q1w2e3",
     });
 
-    const { env } = assertFindCmdAndExecCalledWith(["psql", "db"], () =>
+    assertFindCmdAndExecCalledWith(["psql", "db"], () =>
       PostgreSQLAdapter.dbconsole(config, { includePassword: true }),
     );
 
@@ -93,9 +109,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
       },
     });
 
-    const { env } = assertFindCmdAndExecCalledWith(["psql", "db"], () =>
-      PostgreSQLAdapter.dbconsole(config),
-    );
+    assertFindCmdAndExecCalledWith(["psql", "db"], () => PostgreSQLAdapter.dbconsole(config));
 
     expect(env.PGOPTIONS).toBe(
       "-c search_path=my_schema,\\ default,\\ \\\\my_schema -c statement_timeout=5000",

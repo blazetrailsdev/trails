@@ -4,7 +4,9 @@ import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SQLite3Constants } from "../../sqlite-adapter.js";
 import { NodeSQLiteAdapter } from "../../connection-adapters/node-sqlite-adapter.js";
-import { TransactionIsolationError } from "../../errors.js";
+import { Rollback, TransactionIsolationError } from "../../errors.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
+import { ambientPoolConfiguration } from "../../test-adapter.js";
 
 const openAdapters: SQLite3Adapter[] = [];
 afterEach(async () => {
@@ -24,7 +26,8 @@ function sharedCacheFlags(): number {
 }
 
 async function withConn(options: { flags?: number } = {}): Promise<SQLite3Adapter> {
-  const adapter = new NodeSQLiteAdapter({ ...options, database: ":memory:" });
+  const database = inMemoryDb() ? ":memory:" : (ambientPoolConfiguration().database as string);
+  const adapter = new NodeSQLiteAdapter({ ...options, database });
   openAdapters.push(adapter);
   await adapter.connectBang();
   return adapter;
@@ -72,21 +75,28 @@ describeIfSqlite("SQLite3TransactionTest", () => {
 
   it("opens a `read_uncommitted` transaction", async () => {
     const conn1 = await withConn({ flags: sharedCacheFlags() });
-    await conn1.execute(
-      `CREATE TABLE IF NOT EXISTS "zines" ("id" INTEGER PRIMARY KEY, "title" TEXT)`,
-    );
-    await conn1.beginDbTransaction();
-    await conn1.executeMutation(`INSERT INTO "zines" ("title") VALUES ('foo')`);
+    if (inMemoryDb())
+      await conn1.createTable("zines", {}, (t) => {
+        t.column("title", "string");
+      });
+    try {
+      await conn1.transaction(async () => {
+        await conn1.transactionManager.materializeTransactions();
+        await conn1.execute("INSERT INTO zines (title) VALUES ('foo')");
 
-    const conn2 = await withConn({ flags: sharedCacheFlags() });
-    await conn2.beginIsolatedDbTransaction(":read_uncommitted");
-    const rows = (await conn2.execute(`SELECT * FROM "zines" WHERE title = 'foo'`))!;
-    assertNotEmpty(rows);
-    await conn2.rollbackDbTransaction();
+        const conn2 = await withConn({ flags: sharedCacheFlags() });
+        await conn2.transaction(
+          async () => {
+            assertNotEmpty((await conn2.execute("SELECT * FROM zines WHERE title = 'foo'"))!);
+          },
+          { joinable: false, isolation: ":read_uncommitted" },
+        );
 
-    await conn1.rollbackDbTransaction();
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await conn1.execute(`DROP TABLE IF EXISTS "zines"`);
+        throw new Rollback();
+      });
+    } finally {
+      if (inMemoryDb()) await conn1.dropTable("zines");
+    }
   });
 
   it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {

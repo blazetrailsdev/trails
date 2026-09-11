@@ -15,6 +15,7 @@ tester.run("no-conditional-in-test", rule, {
     'it("x", async () => { if (adapterType === "postgres") {} else if (adapterType === "mysql") {} else {} });',
     'test("x", () => { if (currentAdapter("postgres")) {} });',
     'it("x", () => { if (adapterType === "mysql" || !currentAdapter("postgres")) {} });',
+    'it("x", () => { if (inMemoryDb()) {} });',
     "function helper(x) { if (x) {} }",
     'describe("x", () => { beforeEach(() => { if (y) {} }); });',
   ],
