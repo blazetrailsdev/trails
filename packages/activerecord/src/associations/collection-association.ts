@@ -299,7 +299,8 @@ export abstract class CollectionAssociation extends Association {
         return inserted.then(async (first) => {
           result = result && first;
           for (const record of rest) {
-            result = result && (await addRecord(record));
+            const inserted = await addRecord(record);
+            result = result && inserted;
           }
           if (!result) throw new Rollback();
           return records;
