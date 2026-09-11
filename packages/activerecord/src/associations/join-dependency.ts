@@ -408,11 +408,22 @@ export class JoinDependency {
       class_name: this.joinRoot.baseKlass.name,
     };
 
+    const rowHashKeys = new Map<unknown, any>();
+
     Notifications.instrument("instantiation.active_record", payload, () => {
       for (const rowHash of rows) {
-        const parentKey = primaryKey
-          ? this._keyFor(primaryKey.map((k) => rowHash[k]))
-          : JSON.stringify(Object.entries(rowHash));
+        let parentKey: unknown;
+        if (primaryKey) {
+          parentKey = this._keyFor(primaryKey.map((k) => rowHash[k]));
+        } else {
+          let level = rowHashKeys;
+          for (const name of resultSet.columns) {
+            const value = rowHash[name];
+            if (!level.has(value)) level.set(value, new Map());
+            level = level.get(value);
+          }
+          parentKey = level;
+        }
         let parent = parents.get(parentKey);
         if (!parent) {
           parent = this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block);

@@ -70,6 +70,13 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     const parents = jd.instantiate(Result.fromRowHashes(rows));
 
     expect(parents.map((e) => e._readAttribute("sink_id"))).toEqual([2, 3]);
+
+    const bigRow = aliasedRow(jd, { "": { source_id: 9007199254740993n, sink_id: null } });
+    const undefinedRow = aliasedRow(jd, {
+      "": { source_id: 9007199254740993n, sink_id: undefined },
+    });
+    const distinct = jd.instantiate(Result.fromRowHashes([bigRow, { ...bigRow }, undefinedRow]));
+    expect(distinct).toHaveLength(2);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
