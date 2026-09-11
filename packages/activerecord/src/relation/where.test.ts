@@ -145,15 +145,16 @@ describe("WhereTest", () => {
     const first = topics("first") as any;
     const third = topics("third") as any;
 
-    const r1 = await Topic.where(["id"], [[first.id]]);
-    expect(ids(r1)).toStrictEqual([first.id]);
-
     const key = ["title", "author_name"];
     const conditions = [
       [first.title, first.author_name],
       [third.title, third.author_name],
     ];
-    const r2 = await Topic.where(key, conditions);
+
+    const r1 = await Topic.where(new Map([[["id"], [[first.id]]]]));
+    expect(ids(r1)).toStrictEqual([first.id]);
+
+    const r2 = await Topic.where(new Map([[key, conditions]]));
     expect(sortedIds(r2)).toStrictEqual([first.id, third.id].slice().sort());
   });
 
@@ -161,31 +162,50 @@ describe("WhereTest", () => {
     const bookOne = await CpkBook.create({ id: [1, 2] });
     const bookTwo = await CpkBook.create({ id: [3, 4] });
 
-    const r1 = await CpkBook.where(["author_id", "id"], [[1, 2]]);
+    const r1 = await CpkBook.where(new Map([[["author_id", "id"], [[1, 2]]]]));
     expect(ids(r1)).toStrictEqual([(bookOne as any).id]);
 
     const r2 = await CpkBook.where(
-      ["author_id", "id"],
-      [
-        [1, 2],
-        [3, 4],
-      ],
+      new Map([
+        [
+          CpkBook.primaryKey,
+          [
+            [1, 2],
+            [3, 4],
+          ],
+        ],
+      ]),
     );
     expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
     const r3 = await CpkBook.where(
-      ["author_id", "id"],
-      [
-        [1, 4],
-        [3, 2],
-      ],
+      new Map([
+        [
+          ["author_id", "id"],
+          [
+            [1, 4],
+            [3, 2],
+          ],
+        ],
+      ]),
     );
     expect(r3).toHaveLength(0);
   });
 
   it("where with tuple syntax with incorrect arity", () => {
-    expect(() => CpkBook.where(["one", "two", "three"], [1, 2, 3] as any)).toThrow();
-    expect(() => CpkBook.where(["one", "two"], 1 as any)).toThrow();
+    expect(() =>
+      CpkBook.where(
+        new Map([
+          [
+            ["one", "two", "three"],
+            [1, 2, 3],
+          ],
+        ]),
+      ),
+    ).toThrow(/Expected corresponding value for.*to be an Array/);
+    expect(() => CpkBook.where(new Map([[["one", "two"], 1]]))).toThrow(
+      /Expected corresponding value for.*to be an Array/,
+    );
   });
 
   it("where with tuple syntax and regular syntax combined", async () => {
@@ -196,22 +216,28 @@ describe("WhereTest", () => {
     expect(sortedIds(r1)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
     const r2 = await CpkBook.where({ title: "The Alchemist" }).where(
-      ["author_id", "id"],
-      [
-        [1, 2],
-        [3, 4],
-      ],
+      new Map([
+        [
+          ["author_id", "id"],
+          [
+            [1, 2],
+            [3, 4],
+          ],
+        ],
+      ]),
     );
     expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
-    const r3 = await CpkBook.where({ title: "The Alchemist" }).where(["author_id", "id"], [[3, 4]]);
+    const r3 = await CpkBook.where({ title: "The Alchemist" }).where(
+      new Map([[["author_id", "id"], [[3, 4]]]]),
+    );
     expect(ids(r3)).toStrictEqual([(bookTwo as any).id]);
   });
 
   it.skipIf(adapterType === "sqlite")("with tuple syntax and large values list", () => {
     const tupleIds: [number, number][] = [];
     for (let i = 0; i < 1500; i++) tupleIds.push([1, 2]);
-    expect(() => CpkBook.where(["author_id", "id"], tupleIds).toSql()).not.toThrow();
+    expect(() => CpkBook.where(new Map([[["author_id", "id"], tupleIds]])).toSql()).not.toThrow();
   });
 
   it("array first arg discards extra positional rest", () => {

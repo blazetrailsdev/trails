@@ -46,27 +46,8 @@ export class WhereChain<R = any> {
 
   not(opts: Record<string, unknown>): R;
   not(opts: unknown[]): R;
-  not(cols: string[], tuples: unknown[][]): R;
-  not(opts: Record<string, unknown> | string[] | unknown[], ...rest: unknown[]): R {
+  not(opts: Record<string, unknown> | unknown[], ...rest: unknown[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
-    if (
-      Array.isArray(opts) &&
-      rest.length > 0 &&
-      opts.every((c) => typeof c === "string") &&
-      Array.isArray(rest[0])
-    ) {
-      const nodes = scope.predicateBuilder.buildFromHash(
-        new Map([[opts as string[], rest[0] as unknown[][]]]),
-        (tableName) =>
-          lookupTableKlassFromJoinDependencies.call(scope, tableName) as
-            | QueryMethodsHost["_model"]
-            | null,
-      );
-      if (nodes.length > 0) {
-        scope.whereClause = scope.whereClause.plus(new WhereClause(nodes).invert());
-      }
-      return this._scope;
-    }
     const whereClause = buildWhereClause.call(scope, opts, rest);
     scope.whereClause = scope.whereClause.plus(whereClause.invert());
     return this._scope;
@@ -811,25 +792,6 @@ function where(
 }
 
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
-  if (Array.isArray(opts) && rest.length > 0 && opts.every((c) => typeof c === "string")) {
-    if (rest.length !== 1 || !Array.isArray(rest[0])) {
-      throw new ArgumentError(
-        "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
-      );
-    }
-    const cols = opts;
-    const tuples = rest[0] as unknown[][];
-    const nodes = this.predicateBuilder.buildFromHash(
-      new Map([[cols, tuples]]),
-      (tableName) =>
-        lookupTableKlassFromJoinDependencies.call(this, tableName) as
-          | QueryMethodsHost["_model"]
-          | null,
-    );
-    if (nodes.length === 0) return noneBang.call(this);
-    this.whereClause = this.whereClause.plus(new WhereClause([...nodes]));
-    return this;
-  }
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;

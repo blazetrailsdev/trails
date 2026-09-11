@@ -1450,11 +1450,6 @@ export class Base extends Model {
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(
-    this: T,
-    cols: string[],
-    tuples: unknown[][],
-  ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
@@ -1475,18 +1470,6 @@ export class Base extends Model {
     }
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
-    }
-    if (
-      Array.isArray(conditionsOrSql) &&
-      rest.length > 0 &&
-      conditionsOrSql.every((c) => typeof c === "string")
-    ) {
-      if (rest.length !== 1 || !Array.isArray(rest[0])) {
-        throw new ArgumentError(
-          `${(this as { name?: string }).name ?? "Model"}.where(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
-        );
-      }
-      return this.all().where(conditionsOrSql as string[], rest[0] as unknown[][]);
     }
     if (Array.isArray(conditionsOrSql)) {
       return this.all().where(conditionsOrSql as unknown[]);
@@ -2157,7 +2140,9 @@ export class Base extends Model {
           );
         }
       }
-      return this.all().where(pk, tuples).deleteAll();
+      return this.all()
+        .where(new Map([[pk, tuples]]))
+        .deleteAll();
     }
     return this.all()
       .where({ [pk]: id as unknown })

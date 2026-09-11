@@ -2034,7 +2034,6 @@ export interface Relation<T extends Base>
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(args: Nodes.Node): Relation<T>;
   where(args: unknown[]): Relation<T>;
-  where(cols: string[], tuples: unknown[][]): Relation<T>;
   rewhere(conditions: Record<string, unknown> | null): Relation<T>;
   invertWhere(): Relation<T>;
   structurallyCompatible(other: Relation<T>): boolean;
