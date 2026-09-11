@@ -1092,7 +1092,7 @@ export function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string | null): string | null {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
-  for (const transformer of _Base!.queryTransformers) {
+  for (const transformer of _Base?.queryTransformers ?? []) {
     sql = transformer.call(sql as string, this);
   }
 

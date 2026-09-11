@@ -693,12 +693,9 @@ let _raiseIntWiderThan64bit = true;
 let _yamlColumnPermittedClasses: unknown[] = [Symbol];
 let _generateSecureTokenOn: "create" | "initialize" = "create";
 let _protocolAdapters: Record<string, string> = {
-  postgres: "postgresql",
-  postgresql: "postgresql",
-  mysql: "mysql2",
-  mysql2: "mysql2",
   sqlite: "sqlite3",
-  sqlite3: "sqlite3",
+  mysql: "mysql2",
+  postgres: "postgresql",
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -818,10 +815,13 @@ export class Base extends Model {
     _asyncQueryExecutor = value;
   }
 
+  /**
+   * @missingRailsArgs new — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+   */
   static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   }
-
   static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
     return _permanentConnectionCheckout;
   }

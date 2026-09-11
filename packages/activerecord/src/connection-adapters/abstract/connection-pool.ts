@@ -899,7 +899,7 @@ export class ConnectionPool implements ReapablePool {
 
   /** @missingRailsArgs new — PERMANENT */
   private buildAsyncExecutor(): AsyncExecutor | null {
-    switch (_Base!.asyncQueryExecutor) {
+    switch (_Base?.asyncQueryExecutor ?? null) {
       case "multi_thread_pool":
         return this.dbConfig.maxThreads > 0 ? new AsyncExecutor() : null;
       case "global_thread_pool":

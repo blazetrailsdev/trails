@@ -814,7 +814,7 @@ export class AbstractAdapter implements Quoting {
     this._statements = this.buildStatementPool() as StatementPool | null;
 
     this.preparedStatements =
-      !_Base!.disablePreparedStatements &&
+      !(_Base?.disablePreparedStatements ?? false) &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
         "preparedStatements" in this._config
           ? this._config.preparedStatements
@@ -1528,7 +1528,7 @@ export class AbstractAdapter implements Quoting {
   asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
-      _Base!.asyncQueryExecutor != null &&
+      (_Base?.asyncQueryExecutor ?? null) != null &&
       this.pool?.asyncExecutor != null
     );
   }
