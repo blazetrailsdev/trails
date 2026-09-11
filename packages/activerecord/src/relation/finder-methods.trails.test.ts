@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   findOne,
+  findWithIds,
   findSome,
   findSomeOrdered,
   findTake,
@@ -8,7 +9,21 @@ import {
   raiseRecordNotFoundExceptionBang,
   _orderColumns,
 } from "./finder-methods.js";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { RecordNotFound } from "../errors.js";
+
+describe("findWithIds — composite primary key", () => {
+  const rel: any = { primaryKey: ["shop_id", "id"], model: { compositePrimaryKey: true } };
+
+  it("raises NoMethodError from ids.first.first when the first id is not a tuple", async () => {
+    await expect(findWithIds.call(rel, 1)).rejects.toThrow(
+      new NoMethodError("undefined method 'first' for an instance of Integer"),
+    );
+    await expect(findWithIds.call(rel)).rejects.toThrow(
+      new NoMethodError("undefined method 'first' for nil"),
+    );
+  });
+});
 
 const postModelStub = {
   primaryKey: "id",

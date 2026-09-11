@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
 import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
@@ -489,6 +489,13 @@ export function usingLimitableReflections(
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
+  if (this.model.compositePrimaryKey && !Array.isArray(ids[0])) {
+    throw new NoMethodError(
+      ids[0] == null
+        ? "undefined method 'first' for nil"
+        : `undefined method 'first' for an instance of ${rbObjClass(ids[0])}`,
+    );
+  }
   const expectsArray = this.model.compositePrimaryKey
     ? Array.isArray((ids[0] as unknown[])[0])
     : Array.isArray(ids[0]);
