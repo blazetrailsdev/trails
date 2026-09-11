@@ -28,6 +28,7 @@ export class Thread<R = unknown> {
   static readonly main: Thread = Object.assign(Object.create(Thread.prototype) as Thread, {
     id: 0,
     status: "run",
+    name: null,
   });
 
   /**
@@ -52,6 +53,10 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/thread.c:3480`).
    */
   status: "run" | "dead";
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/thread.c:3396`).
+   */
+  name: string | null = null;
   #value!: R;
   #error: { raised: unknown } | null = null;
 
@@ -93,6 +98,8 @@ export class Thread<R = unknown> {
    */
   toString(): string {
     const location = _locations.has(this) ? ` ${_locations.get(this)}` : "";
-    return `#<Thread:0x${this.id.toString(16).padStart(16, "0")}${location} ${this.status}>`;
+    const name = this.name != null ? `@${this.name}` : "";
+    const cname = this.constructor.name;
+    return `#<${cname}:0x${this.id.toString(16).padStart(16, "0")}${name}${location} ${this.status}>`;
   }
 }

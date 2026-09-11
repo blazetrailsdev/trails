@@ -37,4 +37,11 @@ describe("Thread", () => {
     expect(String(thread)).toMatch(/^#<Thread:0x[0-9a-f]{16} \S*thread\.test\.ts:\d+ dead>$/);
     expect(() => thread.value()).toThrow("boom");
   });
+
+  it("to_s names the runtime class and the thread name", () => {
+    class Worker extends Thread {}
+    const thread = new Worker(() => null);
+    thread.name = "reaper";
+    expect(String(thread)).toMatch(/^#<Worker:0x[0-9a-f]{16}@reaper \S+:\d+ dead>$/);
+  });
 });
