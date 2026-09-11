@@ -1592,28 +1592,20 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     ).openSync;
   }
 
-  /** @internal */
-  private castTimeout(): number | undefined {
-    const cfg = this._config as SQLite3Config;
-    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
-      throw new ArgumentError("Cannot specify both timeout and retries arguments");
-    }
-    if (!isRubyTruthy(cfg.timeout)) return undefined;
-    const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
-    if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
-      throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
-    }
-    return timeout;
-  }
-
   /**
    * @missingRailsArgs fetch — PERMANENT
    * @internal
    */
   override async configureConnection(): Promise<void> {
-    this.castTimeout();
     const cfg = this._config as SQLite3Config;
-    if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
+    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
+      throw new ArgumentError("Cannot specify both timeout and retries arguments");
+    } else if (isRubyTruthy(cfg.timeout)) {
+      const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+      if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
+        throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
+      }
+    } else if (isRubyTruthy(cfg.retries)) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );

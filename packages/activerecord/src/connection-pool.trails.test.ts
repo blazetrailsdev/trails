@@ -6,7 +6,7 @@ import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
-import { AdapterNotFound } from "./errors.js";
+import { AdapterNotFound, ConnectionNotEstablished } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
@@ -1039,5 +1039,18 @@ describe("NullPool member parity", () => {
     expect(() =>
       expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),
     ).toThrow(/expected/i);
+  });
+});
+
+describe("ConnectionPool#newConnection", () => {
+  it("stamps the pool onto a ConnectionNotEstablished raised by the db config", () => {
+    const pool = makeAmbientPool();
+    const error = new ConnectionNotEstablished("connection refused");
+    vi.spyOn(pool.dbConfig, "newConnection").mockImplementation(() => {
+      throw error;
+    });
+
+    expect(() => pool.newConnection()).toThrow(error);
+    expect(error.connectionPool).toBe(pool);
   });
 });

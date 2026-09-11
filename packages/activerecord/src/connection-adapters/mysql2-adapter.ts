@@ -323,6 +323,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return true;
   }
 
+  override errorNumber(exception: Error & { errno?: number }): number | null {
+    return exception.errno ?? null;
+  }
+
   /** @internal */
   isTextType(type: string): boolean {
     return (
@@ -584,7 +588,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   async connect(): Promise<void> {
-    await this._ensureClient();
+    try {
+      await this._ensureClient();
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
   }
 
   /** @internal */

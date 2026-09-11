@@ -1,5 +1,6 @@
 import { isSymbol } from "@blazetrails/ruby-compat";
 import { wrap } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   SchemaCreation as AbstractSchemaCreation,
   type SchemaCreationConn,
@@ -25,22 +26,6 @@ type PgTableDef = AbstractTableDefinition & {
 export interface PgSchemaCreationHost extends SchemaCreationConn {
   typeToSql(type: string, options?: Record<string, unknown>): string;
   quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string>;
-}
-
-/** @internal */
-export function _pgGeneratedClause(
-  columnName: string,
-  as: string | undefined,
-  stored: boolean | undefined,
-): string {
-  if (!as) return "";
-  if (!stored) {
-    throw new Error(
-      `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
-        `Specify 'stored: true' option for '${columnName}'`,
-    );
-  }
-  return ` GENERATED ALWAYS AS (${as}) STORED`;
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
@@ -188,12 +173,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
       sql += " DEFAULT gen_random_uuid()";
     }
-    const colName = col?.name ?? "unknown";
-    sql += _pgGeneratedClause(
-      colName,
-      opts["as"] as string | undefined,
-      opts["stored"] as boolean | undefined,
-    );
+    const as = opts["as"];
+    if (as != null && as !== false) {
+      sql += ` GENERATED ALWAYS AS (${as})`;
+
+      if (opts["stored"] != null && opts["stored"] !== false) {
+        sql += " STORED";
+      } else {
+        throw new ArgumentError(
+          `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
+            `Specify 'stored: true' option for '${col?.name}'\n`,
+        );
+      }
+    }
     return super.addColumnOptionsBang(sql, options);
   }
 

@@ -1284,7 +1284,12 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async connect(): Promise<void> {
-    await this._acquireFreshClient();
+    try {
+      await this._acquireFreshClient();
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
   }
 
   /** @internal */

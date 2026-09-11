@@ -354,10 +354,13 @@ export class SchemaStatements {
     );
   }
 
-  async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
-    await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
-    );
+  async renameColumn(
+    _tableName: string,
+    _columnName: string,
+    _newColumnName: string,
+  ): Promise<void> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:766
+    throw new NotImplementedError("rename_column is not implemented");
   }
 
   async addIndex(
@@ -453,36 +456,22 @@ export class SchemaStatements {
   }
 
   async changeColumnDefault(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
+    _tableName: string,
+    _columnName: string,
+    _defaultOrChanges: unknown,
   ): Promise<void> {
-    const defaultVal = this.extractNewDefaultValue(defaultOrChanges);
-    const column = await this.columnFor(tableName, columnName);
-    const clause = await this.quoteDefaultExpression(defaultVal, column);
-    await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause}`,
-    );
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:729
+    throw new NotImplementedError("change_column_default is not implemented");
   }
 
   async changeColumnNull(
-    tableName: string,
-    columnName: string,
-    allowNull: boolean,
-    defaultValue?: unknown,
+    _tableName: string,
+    _columnName: string,
+    _null: boolean,
+    _default?: unknown,
   ): Promise<void> {
-    this.validateChangeColumnNullArgumentBang(allowNull);
-    if (!allowNull && defaultValue !== undefined) {
-      const column = await this.columnFor(tableName, columnName);
-      const quoted = await this.quoteDefaultExpression(defaultValue, column);
-      await this.execute(
-        `UPDATE ${this.quoteColumnName(tableName)} SET ${this.quoteColumnName(columnName)} = ${quoted} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
-      );
-    }
-    const constraint = allowNull ? "DROP NOT NULL" : "SET NOT NULL";
-    await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} ${constraint}`,
-    );
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:758
+    throw new NotImplementedError("change_column_null is not implemented");
   }
 
   async addReference(
