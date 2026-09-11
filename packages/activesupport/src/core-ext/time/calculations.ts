@@ -6,7 +6,9 @@ import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
+import { compare as dateTimeCompare } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
+import { toTime } from "./compatibility.js";
 
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -259,6 +261,42 @@ export function minusWithDuration(this: RubyTime, other: unknown): RubyTime | nu
   }
 }
 
+const minusWithoutCoercion = minusWithDuration;
+
+export function minusWithCoercion(this: RubyTime, other: unknown): RubyTime | number {
+  if (typeof (other as { comparableTime?: unknown })?.comparableTime === "function") {
+    other = (other as TimeWithZone).comparableTime();
+  }
+  return other instanceof Temporal.PlainDateTime || other instanceof Temporal.ZonedDateTime
+    ? this.toF() - toF(other)
+    : minusWithoutCoercion.call(this, other);
+}
+
+const compareWithoutCoercion = RubyTime.prototype.compare;
+
+export function compareWithCoercion(this: RubyTime, other: unknown): number | null {
+  if (other != null && (other as object).constructor === RubyTime) {
+    return compareWithoutCoercion.call(this, other);
+  } else if (other instanceof RubyTime || other instanceof TimeWithZone) {
+    if (typeof (other as { comparableTime?: unknown }).comparableTime === "function") {
+      return compareWithoutCoercion.call(this, (other as TimeWithZone).comparableTime());
+    } else {
+      return compareWithoutCoercion.call(this, toTime(other as RubyTime));
+    }
+  } else {
+    return dateTimeCompare(this.toDatetime(), other);
+  }
+}
+
+const eqlWithoutCoercion = RubyTime.prototype.eql;
+
+export function eqlWithCoercion(this: RubyTime, other: unknown): boolean {
+  if (typeof (other as { comparableTime?: unknown })?.comparableTime === "function") {
+    other = (other as TimeWithZone).comparableTime();
+  }
+  return eqlWithoutCoercion.call(this, other);
+}
+
 export { since as in };
 export { beginningOfDay as midnight };
 export { beginningOfDay as atMidnight };
@@ -334,6 +372,11 @@ declare module "@blazetrails/date" {
     nextMonth(months?: number): Time;
     prevYear(years?: number): Time;
     nextYear(years?: number): Time;
+    plusWithDuration(other: unknown): Time;
+    minusWithDuration(other: unknown): Time | number;
+    minusWithCoercion(other: unknown): Time | number;
+    compareWithCoercion(other: unknown): number | null;
+    eqlWithCoercion(other: unknown): boolean;
   }
 
   namespace Time {
@@ -381,9 +424,16 @@ Object.assign(RubyTime.prototype, {
   prevYear,
   nextYear,
   plusWithoutDuration,
+  plusWithDuration,
   plus: plusWithDuration,
   minusWithoutDuration,
-  minus: minusWithDuration,
+  minusWithDuration,
+  minusWithCoercion,
+  minus: minusWithCoercion,
+  compareWithCoercion,
+  compare: compareWithCoercion,
+  eqlWithCoercion,
+  eql: eqlWithCoercion,
 });
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });

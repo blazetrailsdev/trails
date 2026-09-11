@@ -998,35 +998,40 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("compare with time", () => {
-    const t1 = utc(2000);
-    const t2 = utc(1999, 12, 31, 23, 59, 59);
-    expect(t1.getTime()).toBeGreaterThan(t2.getTime());
-    const t3 = utc(2000, 1, 1, 0, 0, 0);
-    expect(t1.getTime()).toBe(t3.getTime());
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(1999, 12, 31, 23, 59, 59, 999))).toBe(1);
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 0))).toBe(0);
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 0, 1))).toBe(-1);
   });
 
   it("compare with datetime", () => {
-    const t1 = utc(2000);
-    const t2 = utc(2000, 1, 1, 0, 0, 0);
-    expect(t1.getTime()).toBe(t2.getTime());
-    const t3 = utc(2000, 1, 1, 0, 0, 1);
-    expect(t1.getTime()).toBeLessThan(t3.getTime());
+    expect(RubyTime.utc(2000).compare(RubyDateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(1);
+    expect(RubyTime.utc(2000).compare(RubyDateTime.civil(2000, 1, 1, 0, 0, 0))).toBe(0);
+    expect(RubyTime.utc(2000).compare(RubyDateTime.civil(2000, 1, 1, 0, 0, 1))).toBe(-1);
   });
 
   it("compare with time with zone", () => {
-    const t1 = utc(2000);
-    const t2 = utc(1999, 12, 31, 23, 59, 59);
-    expect(t1.getTime()).toBeGreaterThan(t2.getTime());
-    const t3 = utc(2000, 1, 1, 0, 0, 0);
-    expect(t1.getTime()).toBe(t3.getTime());
-    const t4 = utc(2000, 1, 1, 0, 0, 1);
-    expect(t1.getTime()).toBeLessThan(t4.getTime());
+    expect(
+      RubyTime.utc(2000).compare(
+        new TimeWithZone(RubyTime.utc(1999, 12, 31, 23, 59, 59), TimeZone.find("UTC")!),
+      ),
+    ).toBe(1);
+    expect(
+      RubyTime.utc(2000).compare(
+        new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 0), TimeZone.find("UTC")!),
+      ),
+    ).toBe(0);
+    expect(
+      RubyTime.utc(2000).compare(
+        new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 1), TimeZone.find("UTC")!),
+      ),
+    ).toBe(-1);
   });
 
   it("compare with string", () => {
-    const t = utc(2000);
-    const str = utc(2000, 1, 1, 0, 0, 0).toISOString();
-    expect(t.getTime()).toBe(new Date(str).getTime());
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(1999, 12, 31, 23, 59, 59, 999).toS())).toBe(1);
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 0).toS())).toBe(0);
+    expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 1, 0).toS())).toBe(-1);
+    expect(RubyTime.utc(2000).compare("Invalid as Time")).toBeNull();
   });
 
   it("at with datetime", () => {
@@ -1115,25 +1120,29 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("eql?", () => {
-    const t1 = utc(2000);
-    const t2 = utc(2000, 1, 1, 0, 0, 0);
-    expect(t1.getTime()).toBe(t2.getTime());
-    const t3 = utc(2000, 1, 1, 0, 0, 1);
-    expect(t1.getTime()).not.toBe(t3.getTime());
+    expect(
+      RubyTime.utc(2000).eql(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("UTC")!)),
+    ).toBe(true);
+    expect(
+      RubyTime.utc(2000).eql(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Hawaii")!)),
+    ).toBe(true);
+    expect(
+      RubyTime.utc(2000, 1, 1, 0, 0, 1).eql(
+        new TimeWithZone(RubyTime.utc(2000), TimeZone.find("UTC")!),
+      ),
+    ).toBe(false);
   });
 
   it("minus with time with zone", () => {
-    const t1 = utc(2000, 1, 2);
-    const t2 = utc(2000, 1, 1);
-    const diffSec = (t1.getTime() - t2.getTime()) / 1000;
-    expect(diffSec).toBe(86400);
+    expect(
+      RubyTime.utc(2000, 1, 2).minus(
+        new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("UTC")!),
+      ),
+    ).toBe(86_400.0);
   });
 
   it("minus with datetime", () => {
-    const t1 = utc(2000, 1, 2);
-    const t2 = utc(2000, 1, 1);
-    const diffSec = (t1.getTime() - t2.getTime()) / 1000;
-    expect(diffSec).toBe(86400);
+    expect(RubyTime.utc(2000, 1, 2).minus(RubyDateTime.civil(2000, 1, 1))).toBe(86_400.0);
   });
 
   it("time created with local constructor cannot represent times during hour skipped by dst", () => {
