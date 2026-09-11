@@ -103,12 +103,14 @@ describe("compileJs", () => {
 
   describe("strict locals", () => {
     it("emits locals destructuring with defaults when a locals signature is present", () => {
-      const { code } = compileJs('<%# locals: (count: 0, name: "x") %><%= name %>');
+      const { code } = compileJs('<%# locals: (count: 0, name: "x") %><%= name %>', {
+        shortIdentifier: "_d",
+      });
       expect(code).toContain('const { count = 0, name = "x" } = locals;');
     });
 
     it("emits no destructuring when there are no declared locals (empty parens)", () => {
-      const { code } = compileJs("<%# locals: () %><p>hi</p>");
+      const { code } = compileJs("<%# locals: () %><p>hi</p>", { shortIdentifier: "_d" });
       expect(code).not.toContain("const {");
     });
 
@@ -147,12 +149,8 @@ describe("compileJs", () => {
       expect(code).toContain('import { ArgumentError } from "@blazetrails/ruby-compat";');
     });
 
-    it("emits no strict-locals check without a template identifier", () => {
-      const { code } = compileJs("<%# locals: (count:) %>");
-      expect(code).not.toContain("StrictLocalsError");
-      expect(() =>
-        compileJs("<%# locals: (count:) %>", { raiseOnStrictLocalsMismatch: true }),
-      ).toThrow("requires a shortIdentifier");
+    it("requires a template identifier to enforce a strict-locals signature", () => {
+      expect(() => compileJs("<%# locals: (count:) %>")).toThrow("requires a shortIdentifier");
     });
 
     it("raises Rails' unknown local message for an extra local", () => {

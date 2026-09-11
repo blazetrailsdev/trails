@@ -107,9 +107,7 @@ function emitLocalsBlock(
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
   const shortIdentifier = options.shortIdentifier ?? options.sourceFileName ?? options.fileName;
-  const raiseOnMismatch =
-    options.raiseOnStrictLocalsMismatch ??
-    (ast.localsSignature !== null && shortIdentifier != null);
+  const raiseOnMismatch = options.raiseOnStrictLocalsMismatch ?? ast.localsSignature !== null;
   if (raiseOnMismatch && ast.localsSignature !== null && shortIdentifier == null) {
     throw new Error("TSE: raiseOnStrictLocalsMismatch requires a shortIdentifier");
   }
