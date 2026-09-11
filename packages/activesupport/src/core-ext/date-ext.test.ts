@@ -87,10 +87,6 @@ function seconds(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 
-function range(r: { start: Temporal.Instant; end: Temporal.Instant }): Temporal.PlainDate[] {
-  return [toDate(asDate(r.start)), toDate(asDate(r.end))];
-}
-
 function rubyRange(r: { begin: unknown; end: unknown }): Temporal.PlainDate[] {
   return [toDate(asDate(r.begin as Temporal.Instant)), toDate(asDate(r.end as Temporal.Instant))];
 }
@@ -358,10 +354,8 @@ describe("DateExtCalculationsTest", () => {
   it("all day", () => {
     const beginningOfDay = d(2011, 6, 7, 0, 0, 0);
     const endOfDay = d(2011, 6, 7, 23, 59, 59, 999);
-    expect(allDay(d(2011, 6, 7))).toEqual({
-      start: instant(beginningOfDay),
-      end: instant(endOfDay),
-    });
+    const { begin, end } = allDay(d(2011, 6, 7));
+    expect([begin, end]).toEqual([instant(beginningOfDay), instant(endOfDay)]);
   });
 
   it("all day when zone is set", () => {
@@ -385,15 +379,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("all month", () => {
-    expect(range(allMonth(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allMonth(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
   });
 
   it("all quarter", () => {
-    expect(range(allQuarter(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allQuarter(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
   });
 
   it("all year", () => {
-    expect(range(allYear(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
+    expect(rubyRange(allYear(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
   });
 
   it("xmlschema", () => {

@@ -2,6 +2,8 @@ import { File, IO } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";
+import { Head } from "./head.js";
+import * as Utils from "./utils.js";
 
 const ALLOWED_VERBS = ["GET", "HEAD", "OPTIONS"];
 const ALLOW_HEADER = ALLOWED_VERBS.join(", ");
@@ -89,7 +91,9 @@ export class Files {
   root: string;
   private headers: Record<string, string>;
   private defaultMime: string | null;
+  private head: Head;
 
+  /** @missingRailsArgs new — PERMANENT */
   constructor(
     root: string,
     headers: Record<string, string> = {},
@@ -98,12 +102,11 @@ export class Files {
     this.root = root ? File.expandPath(root) : "";
     this.headers = headers;
     this.defaultMime = defaultMime;
+    this.head = new Head((env) => this.get(env));
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const method = env["REQUEST_METHOD"];
-    const [status, headers, body] = this.get(env);
-    return method === "HEAD" ? [status, headers, []] : [status, headers, body];
+    return this.head.call(env);
   }
 
   get(env: Record<string, any>): [number, Record<string, any>, any] {
@@ -112,32 +115,22 @@ export class Files {
       return this.fail(405, "Method Not Allowed", { allow: ALLOW_HEADER });
     }
 
-    let pathInfo: string;
-    try {
-      pathInfo = decodeURIComponent(env["PATH_INFO"] || "/");
-    } catch {
-      return this.fail(400, "Bad Request");
-    }
-    if (!this.validPath(pathInfo)) return this.fail(400, "Bad Request");
+    const pathInfo = Utils.unescapePath(request.pathInfo);
+    if (!Utils.validPath(pathInfo)) return this.fail(400, "Bad Request");
 
-    const cleanPath = pathInfo;
-    const filePath = this.root ? File.join(this.root, cleanPath) : cleanPath;
-    const resolved = File.expandPath(filePath);
+    const cleanPathInfo = Utils.cleanPathInfo(pathInfo);
+    const path = File.join(this.root, cleanPathInfo);
 
-    if (this.root && resolved !== this.root && !resolved.startsWith(this.root + File.SEPARATOR)) {
+    const available = File.isFile(path) && File.isReadable(path);
+
+    if (available) {
+      return this.serving(request, path);
+    } else {
       return this.fail(404, `File not found: ${pathInfo}`);
     }
-
-    const available = File.isFile(resolved) && File.isReadable(resolved);
-
-    return available
-      ? this.serving(request, resolved)
-      : this.fail(404, `File not found: ${pathInfo}`);
   }
 
   serving(request: Request, path: string): [number, Record<string, any>, any] {
-    const method = request.requestMethod;
-
     if (request.isOptions()) {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
     }
@@ -146,36 +139,47 @@ export class Files {
     if (request.getHeader("HTTP_IF_MODIFIED_SINCE") === lastModified) return [304, {}, []];
 
     const headers: Record<string, string> = { "last-modified": lastModified };
-    const mime = this.mimeType(path, this.defaultMime);
-    if (mime) headers[CONTENT_TYPE] = mime;
-    Object.assign(headers, this.headers);
+    const mimeType = this.mimeType(path, this.defaultMime);
+    if (mimeType) headers[CONTENT_TYPE] = mimeType;
 
-    const size = this.filesize(path);
-    const rawRange = request.getHeader("HTTP_RANGE") as string | undefined;
+    if (this.headers) Object.assign(headers, this.headers);
 
-    if (rawRange && size > 0) {
-      const ranges = this.parseByteRanges(rawRange, size);
-      if (!ranges || ranges.length === 0) {
-        const resp = this.fail(416, "Byte range unsatisfiable");
-        resp[1]["content-range"] = `bytes */${size}`;
-        return resp;
-      }
+    let status = 200;
+    let size = this.filesize(path);
+    let partialContent = false;
+    let body: any;
 
-      const status = 206;
+    let ranges = Utils.getByteRanges(request.getHeader("HTTP_RANGE") as string | undefined, size);
+    if (ranges === null) {
+      ranges = [[0, size - 1]];
+    } else if (ranges.length === 0) {
+      const response = this.fail(416, "Byte range unsatisfiable");
+      response[1]["content-range"] = `bytes */${size}`;
+      return response;
+    } else {
+      partialContent = true;
+
       if (ranges.length === 1) {
-        headers["content-range"] = `bytes ${ranges[0][0]}-${ranges[0][1]}/${size}`;
+        const range = ranges[0];
+        headers["content-range"] = `bytes ${range[0]}-${range[1]}/${size}`;
       } else {
         headers[CONTENT_TYPE] = `multipart/byteranges; boundary=${MULTIPART_BOUNDARY}`;
       }
-      const body = new BaseIterator(path, ranges, { mimeType: mime, size });
-      headers[CONTENT_LENGTH] = String(body.bytesize());
-      return method === "HEAD" ? [status, headers, []] : [status, headers, body];
+
+      status = 206;
+      body = new BaseIterator(path, ranges, { mimeType, size });
+      size = body.bytesize();
     }
 
-    const fullRanges: [number, number][] = size > 0 ? [[0, size - 1]] : [];
-    const body = new Iterator(path, fullRanges, { mimeType: mime, size });
     headers[CONTENT_LENGTH] = String(size);
-    return method === "HEAD" ? [200, headers, []] : [200, headers, body];
+
+    if (request.isHead()) {
+      body = [];
+    } else if (!partialContent) {
+      body = new Iterator(path, ranges, { mimeType, size });
+    }
+
+    return [status, headers, body];
   }
 
   /** @internal */
@@ -205,34 +209,5 @@ export class Files {
   /** @internal */
   filesize(path: string): number {
     return File.sizeQ(path) ?? Buffer.byteLength(File.read(path));
-  }
-
-  /** @internal */
-  private validPath(pathInfo: string): boolean {
-    return !pathInfo.includes("\0");
-  }
-
-  /** @internal */
-  private parseByteRanges(range: string, size: number): [number, number][] | null {
-    const m = range.match(/^bytes=(.+)$/);
-    if (!m) return null;
-
-    const result: [number, number][] = [];
-    for (const spec of m[1].split(",").map((s) => s.trim())) {
-      if (spec.startsWith("-")) {
-        const len = parseInt(spec.slice(1));
-        if (isNaN(len) || len <= 0) return null;
-        result.push([Math.max(0, size - len), size - 1]);
-      } else if (spec.endsWith("-")) {
-        const start = parseInt(spec);
-        if (isNaN(start) || start >= size) return null;
-        result.push([start, size - 1]);
-      } else {
-        const [a, b] = spec.split("-").map(Number);
-        if (isNaN(a) || isNaN(b) || a > b || a >= size) return null;
-        result.push([a, Math.min(b, size - 1)]);
-      }
-    }
-    return result.length > 0 ? result : null;
   }
 }

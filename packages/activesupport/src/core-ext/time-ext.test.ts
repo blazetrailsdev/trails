@@ -1150,7 +1150,9 @@ describe("TimeExtCalculationsTest", () => {
 
   it("all day with timezone", () => {
     const t = d(2011, 6, 7, 10, 10, 10);
-    const { start, end } = allDay(t);
+    const range = allDay(t);
+    const start = range.begin as Temporal.Instant;
+    const end = range.end as Temporal.Instant;
     expect(asDate(start).getHours()).toBe(0);
     expect(asDate(start).getMinutes()).toBe(0);
     expect(asDate(end).getHours()).toBe(23);
