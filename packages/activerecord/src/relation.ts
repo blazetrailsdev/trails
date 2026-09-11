@@ -702,7 +702,6 @@ export class Relation<T extends Base> {
   async updateAll(
     updates: Record<string, unknown> | string | [string, ...unknown[]],
   ): Promise<number> {
-    const table = this.table;
     if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
     if (this.isNullRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
@@ -713,30 +712,32 @@ export class Relation<T extends Base> {
         this.model.lockingEnabled &&
         !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
       ) {
-        const attr = table.get(this.model.lockingColumn);
+        const attr = this.table.get(this.model.lockingColumn);
         updates[String(attr.name)] = this._incrementAttribute(attr);
       }
       values = this._substituteValues(Object.entries(updates));
     } else {
-      values = sql(this.model.sanitizeSqlForAssignment(updates, String(table.name)));
+      values = sql(this.model.sanitizeSqlForAssignment(updates, String(this.table.name)));
     }
 
-    const arel = this.isEagerLoading
-      ? await this.applyJoinDependency({}, (relation) => relation.arel())
-      : this.buildArel(this._conn());
-    arel.source.left = table;
-    const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this.groupValues)),
-    ) as Nodes.Node[];
-    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
-    const primaryKey = this.primaryKey;
-    const key = this.model.compositePrimaryKey
-      ? (primaryKey as string[]).map((pk) => table.get(pk))
-      : table.get((primaryKey as string | null) ?? null);
-    const stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
-    const count = await this._conn().update(stmtAst, `${this.model.name} Update All`);
-    this.reset();
-    return count;
+    return this.model.withConnection(async (c) => {
+      const arel = this.isEagerLoading
+        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        : this.buildArel(c);
+      arel.source.left = this.table;
+      const groupValuesArelColumns = this.arelColumns(
+        Array.from(new Set(this.groupValues)),
+      ) as Nodes.Node[];
+      const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
+      const primaryKey = this.primaryKey;
+      const key = this.model.compositePrimaryKey
+        ? (primaryKey as string[]).map((pk) => this.table.get(pk))
+        : this.table.get((primaryKey as string | null) ?? null);
+      const stmt = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
+      const count = await c.update(stmt, `${this.model.name} Update All`);
+      this.reset();
+      return count;
+    });
   }
 
   async destroyAll(): Promise<T[]> {
@@ -760,24 +761,25 @@ export class Relation<T extends Base> {
       throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
     }
 
-    const table = this.table;
-    const arel = this.isEagerLoading
-      ? await this.applyJoinDependency({}, (relation) => relation.arel())
-      : this.buildArel(this._conn());
-    arel.source.left = table;
-    const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this.groupValues)),
-    ) as Nodes.Node[];
-    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
-    const primaryKey = this.model.primaryKey;
-    const key = this.model.compositePrimaryKey
-      ? (primaryKey as string[]).map((pk) => table.get(pk))
-      : table.get((primaryKey as string | null) ?? null);
-    const stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
+    return this.model.withConnection(async (c) => {
+      const arel = this.isEagerLoading
+        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        : this.buildArel(c);
+      arel.source.left = this.table;
+      const groupValuesArelColumns = this.arelColumns(
+        Array.from(new Set(this.groupValues)),
+      ) as Nodes.Node[];
+      const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
+      const primaryKey = this.model.primaryKey;
+      const key = this.model.compositePrimaryKey
+        ? (primaryKey as string[]).map((pk) => this.table.get(pk))
+        : this.table.get((primaryKey as string | null) ?? null);
+      const stmt = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
 
-    const count = await this._conn().delete(stmtAst, `${this.model.name} Delete All`);
-    this.reset();
-    return count;
+      const count = await c.delete(stmt, `${this.model.name} Delete All`);
+      this.reset();
+      return count;
+    });
   }
 
   async touchAll(...args: TouchAllArgs): Promise<number> {
@@ -1681,37 +1683,41 @@ export class Relation<T extends Base> {
         });
       }
 
-      const c = this._conn();
-      const column = c.visitor.compile(this.table.get(timestampColumn));
-      const selectValues = `COUNT(*) AS ${(
-        this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
-      ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
+      await this.withConnection(async (c) => {
+        const column = c.visitor.compile(this.table.get(timestampColumn));
+        const selectValues = `COUNT(*) AS ${(
+          this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
+        ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
 
-      let arel: unknown;
-      if (collection.hasLimitOrOffset) {
-        const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
-        if (this.distinctValue && isEmpty(collection.selectValues)) {
-          query.selectValues = [...query.selectValues, this.table.get(star())];
+        let arel: unknown;
+        if (collection.hasLimitOrOffset) {
+          const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
+          if (this.distinctValue && isEmpty(collection.selectValues)) {
+            query.selectValues = [...query.selectValues, this.table.get(star())];
+          }
+          const subqueryAlias = "subquery_for_cache_key";
+          const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
+          arel = query.buildSubquery(
+            subqueryAlias,
+            sql(selectValues.replace("%s", subqueryColumn)),
+          );
+        } else {
+          const query = collection.unscope("order");
+          query.selectValues = [sql(selectValues.replace("%s", column))];
+          arel = query.arel();
         }
-        const subqueryAlias = "subquery_for_cache_key";
-        const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
-        arel = query.buildSubquery(subqueryAlias, sql(selectValues.replace("%s", subqueryColumn)));
-      } else {
-        const query = collection.unscope("order");
-        query.selectValues = [sql(selectValues.replace("%s", column))];
-        arel = query.arel();
-      }
 
-      [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
+        [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
 
-      if (size != null) {
-        const columnType = this.model.typeForAttribute(timestampColumn);
-        timestamp = (columnType as unknown as { deserialize(value: unknown): unknown }).deserialize(
-          timestamp,
-        );
-      } else {
-        size = 0;
-      }
+        if (size != null) {
+          const columnType = this.model.typeForAttribute(timestampColumn);
+          timestamp = (
+            columnType as unknown as { deserialize(value: unknown): unknown }
+          ).deserialize(timestamp);
+        } else {
+          size = 0;
+        }
+      });
     }
 
     if (timestamp != null) {
