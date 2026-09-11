@@ -698,9 +698,6 @@ export class Base extends Model {
     _dbWarningsIgnore = value;
   }
 
-  static writingRole = "writing";
-  static readingRole = "reading";
-
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
 
   static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
