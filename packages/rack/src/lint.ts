@@ -205,8 +205,7 @@ export class Lint {
       if (key.startsWith("rack.")) continue;
 
       if (key === "status") throw new LintError("header must not contain status");
-      // eslint-disable-next-line no-control-regex
-      if (/[(),/:;<=>?@[\\\]{}\x00-\x1f\x7f]/.test(key)) {
+      if (/[(),/:;<=>?@[\\\]{}\p{Cc}]/u.test(key)) {
         throw new LintError(`invalid header name: ${key}`);
       }
       if (/[A-Z]/.test(key)) throw new LintError(`uppercase character in header name: ${key}`);
@@ -224,8 +223,7 @@ export class Lint {
   }
 
   private checkHeaderValue(key: string, value: string): void {
-    // eslint-disable-next-line no-control-regex
-    if (/[\x00-\x1f]/.test(value)) {
+    if (/[^\x20-\u{10ffff}]/u.test(value)) {
       throw new LintError(`invalid header value ${key}: ${stringInspect(value)}`);
     }
   }
