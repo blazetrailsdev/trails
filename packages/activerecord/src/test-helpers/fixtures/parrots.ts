@@ -1,6 +1,14 @@
 import { ref } from "../../fixtures.js";
 
+const DEAD_PARROT = {
+  parrot_sti_class: "DeadParrot",
+};
+
 export const parrotFixtureData = {
+  _fixture: {
+    ignore: "DEAD_PARROT",
+  },
+  DEAD_PARROT,
   george: {
     name: "Curious George",
     treasures: "diamond, sapphire",
@@ -23,7 +31,7 @@ export const parrotFixtureData = {
     name: "polly",
     killer_id: ref("pirates", "blackbeard"),
     treasures: "sapphire, ruby",
-    parrot_sti_class: "DeadParrot",
+    ...DEAD_PARROT,
   },
   DEFAULTS: {
     treasures: "sapphire, ruby",
