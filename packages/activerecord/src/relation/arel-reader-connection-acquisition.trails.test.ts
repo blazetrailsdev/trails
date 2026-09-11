@@ -11,18 +11,18 @@ describe("Relation#arel connection acquisition", () => {
 
   it("raises ConnectionNotEstablished rather than building against a substitute", () => {
     const relation = Post.limit(1);
-    const descriptor = Object.getOwnPropertyDescriptor(Post, "connection");
-    Object.defineProperty(Post, "connection", {
+    const descriptor = Object.getOwnPropertyDescriptor(Post, "connectionPool");
+    Object.defineProperty(Post, "connectionPool", {
       configurable: true,
-      get() {
+      value() {
         throw new ConnectionNotEstablished("no pool for Post");
       },
     });
     try {
       expect(() => relation.arel()).toThrow(ConnectionNotEstablished);
     } finally {
-      if (descriptor) Object.defineProperty(Post, "connection", descriptor);
-      else delete (Post as unknown as Record<string, unknown>).connection;
+      if (descriptor) Object.defineProperty(Post, "connectionPool", descriptor);
+      else delete (Post as unknown as Record<string, unknown>).connectionPool;
     }
   });
 });

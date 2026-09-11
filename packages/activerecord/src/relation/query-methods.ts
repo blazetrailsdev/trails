@@ -24,7 +24,7 @@ import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
-import { threadedConnectionFor } from "../connection-handling.js";
+import { connectionPool } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
 import {
   any,
@@ -1930,7 +1930,7 @@ function escapeRegex(s: string): string {
 }
 
 function connectionFor(modelClass: any): any {
-  return threadedConnectionFor(modelClass) ?? modelClass?.connection;
+  return modelClass && (connectionPool.call(modelClass).activeConnection ?? modelClass.connection);
 }
 
 /** @internal */

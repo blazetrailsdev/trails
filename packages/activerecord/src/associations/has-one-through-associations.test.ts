@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -133,7 +134,9 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("creating association creates through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
-    await (newMember.association("club") as any).writer(await Club.create({ name: "LRUG" }));
+    await (newMember.association("club") as SingularAssociation).writer(
+      await Club.create({ name: "LRUG" }),
+    );
     await newMember.save();
     expect(await readHasOne(newMember, "currentMembership")).not.toBeNull();
     expect(await readHasOne(newMember, "club")).not.toBeNull();
@@ -172,7 +175,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("creating association builds through record for new", async () => {
     const newMember = new Member({ name: "Jane" });
-    await (newMember.association("club") as any).writer(clubs("moustache_club"));
+    await (newMember.association("club") as SingularAssociation).writer(clubs("moustache_club"));
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
     expect(
       tgt(newMember, "currentMembership").club?.id ?? tgt(newMember, "currentMembership").club_id,
@@ -226,7 +229,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("building works with has one through belongs to with unloaded existing join row", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as any).writer(oldClub);
+    await (newMember.association("club") as SingularAssociation).writer(oldClub);
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
@@ -244,7 +247,9 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("unloaded reconcile does not permanently disable the through association autosave", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await (newMember.association("club") as SingularAssociation).writer(
+      await Club.create({ name: "Old Club" }),
+    );
     await newMember.save();
 
     const refetched = await Member.find(newMember.id);
@@ -262,7 +267,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("creating works with has one through belongs to with unloaded existing join row", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as any).writer(oldClub);
+    await (newMember.association("club") as SingularAssociation).writer(oldClub);
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
@@ -280,7 +285,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("creating with unloaded existing join row updates the join row without an owner save", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const oldClub = await Club.create({ name: "Old Club" });
-    await (newMember.association("club") as any).writer(oldClub);
+    await (newMember.association("club") as SingularAssociation).writer(oldClub);
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
@@ -326,7 +331,9 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("building with unloaded existing join row reconciles regardless of through-proxy access order", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await (newMember.association("club") as SingularAssociation).writer(
+      await Club.create({ name: "Old Club" }),
+    );
     await newMember.save();
 
     const refetched = await Member.find(newMember.id);
@@ -341,7 +348,9 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("repeated build on unloaded existing join row keeps the last club", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await (newMember.association("club") as SingularAssociation).writer(
+      await Club.create({ name: "Old Club" }),
+    );
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
@@ -368,7 +377,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("creating association sets both parent ids for new", async () => {
     const member = new Member({ name: "Sean Griffin" });
     const club = new Club({ name: "Da Club" });
-    await (member.association("club") as any).writer(club);
+    await (member.association("club") as SingularAssociation).writer(club);
     await member.save();
     expect(member.id).toBeTruthy();
     expect(club.id).toBeTruthy();
@@ -380,7 +389,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("replace target record", async () => {
     const member = members("groucho");
     const newClub = await Club.create({ name: "Marx Bros" });
-    await (member.association("club") as any).writer(newClub);
+    await (member.association("club") as SingularAssociation).writer(newClub);
     await member.save();
     await member.reload();
     expect((await readHasOne(member, "club"))?.id).toBe(newClub.id);
@@ -390,7 +399,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = members("groucho");
     const club = await readHasOne(member, "club");
     const before = (await Membership.count()) as number;
-    await (member.association("club") as any).writer(club);
+    await (member.association("club") as SingularAssociation).writer(club);
     await member.save();
     await member.reload();
     expect((await readHasOne(member, "club"))?.id).toBe(clubs("boring_club").id);
@@ -401,7 +410,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = members("groucho");
     const before = (await Membership.count()) as number;
     const newClub = await Club.create({ name: "Bananarama" });
-    await (member.association("club") as any).writer(newClub);
+    await (member.association("club") as SingularAssociation).writer(newClub);
     await member.save();
     await member.reload();
     expect((await Membership.count()) as number).toBe(before);
@@ -409,7 +418,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("set record to nil should delete association", async () => {
     const member = members("groucho");
-    await (member.association("club") as any).writer(null);
+    await (member.association("club") as SingularAssociation).writer(null);
     await member.save();
     await member.reload();
     expect(await readHasOne(member, "currentMembership")).toBeNull();
@@ -418,9 +427,9 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("set record after delete association", async () => {
     const member = members("groucho");
-    await (member.association("club") as any).writer(null);
+    await (member.association("club") as SingularAssociation).writer(null);
     await member.save();
-    await (member.association("club") as any).writer(clubs("moustache_club"));
+    await (member.association("club") as SingularAssociation).writer(clubs("moustache_club"));
     await member.save();
     await member.reload();
     expect((await readHasOne(member, "club"))?.id).toBe(clubs("moustache_club").id);
@@ -545,7 +554,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("assigning association correctly assigns target", async () => {
     const newMember = await Member.create({ name: "Chris" });
     const newClub = await Club.create({ name: "LRUG" });
-    await (newMember.association("club") as any).writer(newClub);
+    await (newMember.association("club") as SingularAssociation).writer(newClub);
     expect(tgt(newMember, "club")?.id).toBe(newClub.id);
   });
 
@@ -565,8 +574,8 @@ describe("HasOneThroughAssociationsTest", () => {
     const organization = organizations("nsa");
     const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    await (member.association("memberDetail") as any).writer(memberDetail);
-    await (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
+    await (member.association("organization") as SingularAssociation).writer(organization);
     await member.save();
     expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
@@ -587,8 +596,8 @@ describe("HasOneThroughAssociationsTest", () => {
 
     let before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    await (member.association("memberDetail") as any).writer(memberDetail);
-    await (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
+    await (member.association("organization") as SingularAssociation).writer(organization);
     await member.save();
     expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
@@ -597,7 +606,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await includesMember(newOrganization)).toBe(false);
 
     before = await memberDetailCount(member);
-    await (member.association("organization") as any).writer(newOrganization);
+    await (member.association("organization") as SingularAssociation).writer(newOrganization);
     await member.save();
     expect(await memberDetailCount(member)).toBe(before);
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
@@ -612,8 +621,8 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await readHasOne(member, "memberType")).not.toBeNull();
     const organization = organizations("nsa");
     const memberDetail = new MemberDetail({});
-    await (member.association("memberDetail") as any).writer(memberDetail);
-    await (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
+    await (member.association("organization") as SingularAssociation).writer(organization);
     await member.save();
     await member.reload();
     let loaded: any[] = [];
@@ -644,7 +653,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("through belongs to after destroy", async () => {
     const member = members("groucho");
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
     await member.save();
 
     expect(await readHasOne(memberDetail, "memberType")).not.toBeNull();
@@ -737,7 +746,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("assigning has one through belongs to with new record owner", async () => {
     const minivan = new Minivan();
     const dashboard = dashboards("cool_first");
-    await (minivan.association("dashboard") as any).writer(dashboard);
+    await (minivan.association("dashboard") as SingularAssociation).writer(dashboard);
     expect(tgt(minivan, "dashboard")?.id).toBe(dashboard.id);
     const speedometer = await readHasOne(minivan, "speedometer");
     expect((await readHasOne(speedometer, "dashboard"))?.id).toBe(dashboard.id);
@@ -812,7 +821,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await CpkOrderAgreement.create({ order });
 
     await readHasOne(book, "orderAgreement");
-    await (book.association("order") as any).writer(new CpkOrder());
+    await (book.association("order") as SingularAssociation).writer(new CpkOrder());
     expect(book.association("orderAgreement").isStaleTarget?.()).toBe(true);
   });
 });

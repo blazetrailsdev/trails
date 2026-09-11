@@ -131,14 +131,14 @@ async function main(): Promise<void> {
     }
 
     // 2. Connect via trails AR — the models module's class definitions
-    //    inherit from Base and read Base.adapter lazily, so the connection
+    //    inherit from Base and read Base.connection lazily, so the connection
     //    must exist before any model method is invoked. establishConnection
-    //    registers the connection pool; accessing Base.adapter immediately
+    //    registers the connection pool; accessing Base.connection immediately
     //    after checks out the connection and triggers _wireArelVisitor, which
     //    sets the adapter-specific Arel visitor (e.g. Visitors.SQLite) on the
     //    process-global registry. Without this eager access Relation#toSql()
     //    would use the default generic visitor since it never touches
-    //    Base.adapter itself, producing incorrect boolean/date literals.
+    //    Base.connection itself, producing incorrect boolean/date literals.
     //
     //    The config must be an explicit adapter/database hash, mirroring the
     //    Rails side's `establish_connection adapter: "sqlite3", database: ...`.
@@ -146,7 +146,7 @@ async function main(): Promise<void> {
     //    (`resolve_config_for_connection`), failing with "the `<path>` database
     //    is not configured for the `development` environment".
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    void Base.adapter; // trigger _wireArelVisitor so the correct Arel visitor is active
+    void Base.connection; // trigger _wireArelVisitor so the correct Arel visitor is active
     // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
     // distinct wrong literal under the generic visitor (TRUE/FALSE, FOR UPDATE)
     // vs the correct SQLite literal (1/0, empty lock). Their PASS status in CI
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
           // execution dialect. Not `arelVisitor` — that is the *factory* method
           // (abstract-adapter.ts:1715, Rails' `arel_visitor`); `visitor` is the
           // instance it built at connect time.
-          const visitor = (Base.adapter as { visitor?: InstanceType<typeof Visitors.ToSql> })
+          const visitor = (Base.connection as { visitor?: InstanceType<typeof Visitors.ToSql> })
             .visitor;
           if (visitor == null) throw new Error("connection has no Arel visitor");
           const collector = new Collectors.Composite(
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
     // EPERM on Windows when rmSync tries to delete the .db file. Pattern
     // mirrors scripts/parity/pipeline/schema/node/dump.ts:152-153.
     try {
-      const a = Base.adapter as { close?: () => void };
+      const a = Base.connection as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { SingularAssociation } from "./singular-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { registerModel, registerSubclass } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
@@ -93,7 +94,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   beforeEach(async () => {
     member = members("groucho");
     const organization = organizations("discordians");
-    await (member.association("organization") as any).writer(organization);
+    await (member.association("organization") as SingularAssociation).writer(organization);
     await member.save();
     await member.reload();
   });

@@ -2,7 +2,7 @@ import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { except, hasKey } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
-import { threadedConnectionFor } from "../connection-handling.js";
+import { connectionPool } from "../connection-handling.js";
 
 export function validatesUniquenessOf(
   this: {
@@ -301,7 +301,7 @@ async function isCoveredByUniqueIndex(
 async function tableIndexes(
   klass: any,
 ): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
-  const adapter = threadedConnectionFor(klass) ?? klass?.connection;
+  const adapter = klass && (connectionPool.call(klass).activeConnection ?? klass.connection);
   const tableName = klass?.tableName;
   if (!adapter || !tableName) return [];
 

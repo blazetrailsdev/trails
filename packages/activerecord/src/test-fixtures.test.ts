@@ -224,7 +224,7 @@ describe("useFixtures by registry name", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { authors, posts } = fixtures(["authorAddresses", "authors", "posts"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
@@ -232,8 +232,8 @@ describe("useFixtures by registry name", () => {
     const david = authors("david");
     expect(Number(david.id)).toBe(1);
     const [row] = (
-      await Base.adapter.selectAll(
-        `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
+      await Base.connection.selectAll(
+        `SELECT name FROM ${Base.connection.quoteTableName(Author.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("David");
@@ -245,14 +245,14 @@ describe("useFixtures by registry name", () => {
 
   it("resolves cross-fixture ref() to the target fixture's declared id", async () => {
     const [a] = (
-      await Base.adapter.selectAll(
-        `SELECT author_address_id FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
+      await Base.connection.selectAll(
+        `SELECT author_address_id FROM ${Base.connection.quoteTableName(Author.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect(Number((a as { author_address_id: unknown }).author_address_id)).toBe(1);
     const [p] = (
-      await Base.adapter.selectAll(
-        `SELECT author_id FROM ${Base.adapter.quoteTableName(Post.tableName)} WHERE id = 1`,
+      await Base.connection.selectAll(
+        `SELECT author_id FROM ${Base.connection.quoteTableName(Post.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect(Number((p as { author_id: unknown }).author_id)).toBe(1);
@@ -260,8 +260,8 @@ describe("useFixtures by registry name", () => {
 
   it("isolation part 1 — a delete lands within the test", async () => {
     expect(await Author.count()).toBe(3);
-    await Base.adapter.executeMutation(
-      `DELETE FROM ${Base.adapter.quoteTableName(Author.tableName)}`,
+    await Base.connection.executeMutation(
+      `DELETE FROM ${Base.connection.quoteTableName(Author.tableName)}`,
     );
     expect(await Author.count()).toBe(0);
   });
@@ -282,7 +282,7 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 
   const { categories, posts, categoriesPosts } = fixtures(
     ["categories", "posts", "categoriesPosts"],
-    { connection: () => Base.adapter, useTransactionalTests: false },
+    { connection: () => Base.connection, useTransactionalTests: false },
   );
 
   it("resolves each join row's FK pair to the referenced rows' ids", () => {
@@ -294,8 +294,8 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
   it("seeds every label-less join row (HABTM rows carry no id/label column)", async () => {
     expect(categoriesPosts.all().length).toBe(8);
     const [{ n }] = (
-      await Base.adapter.selectAll(
-        `SELECT COUNT(*) AS n FROM ${Base.adapter.quoteTableName("categories_posts")}`,
+      await Base.connection.selectAll(
+        `SELECT COUNT(*) AS n FROM ${Base.connection.quoteTableName("categories_posts")}`,
       )
     ).toArray() as [{ n: number }];
     expect(Number(n)).toBe(8);
@@ -305,13 +305,13 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
     for (const row of categoriesPosts.all()) {
       const r = row as { category_id: number; post_id: number };
       const [cat] = (
-        await Base.adapter.selectAll(
-          `SELECT id FROM ${Base.adapter.quoteTableName("categories")} WHERE id = ${r.category_id}`,
+        await Base.connection.selectAll(
+          `SELECT id FROM ${Base.connection.quoteTableName("categories")} WHERE id = ${r.category_id}`,
         )
       ).toArray();
       const [post] = (
-        await Base.adapter.selectAll(
-          `SELECT id FROM ${Base.adapter.quoteTableName("posts")} WHERE id = ${r.post_id}`,
+        await Base.connection.selectAll(
+          `SELECT id FROM ${Base.connection.quoteTableName("posts")} WHERE id = ${r.post_id}`,
         )
       ).toArray();
       expect(cat, `category_id ${r.category_id} must reference a real Category`).toBeDefined();
@@ -325,7 +325,7 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 
   const { people, treasures, peoplesTreasures } = fixtures(
     ["people", "treasures", "peoplesTreasures"],
-    { connection: () => Base.adapter, useTransactionalTests: false },
+    { connection: () => Base.connection, useTransactionalTests: false },
   );
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
@@ -339,7 +339,7 @@ describe("useFixtures vertices and edges", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { vertices, edges } = fixtures(["vertices", "edges"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
@@ -361,15 +361,15 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { people } = fixtures(["people"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
   it("fills created_at/updated_at for a row that omits them", async () => {
     const id = people("michael").id;
     const [row] = (
-      await Base.adapter.selectAll(
-        `SELECT created_at, updated_at FROM ${Base.adapter.quoteTableName("people")} WHERE id = ${id}`,
+      await Base.connection.selectAll(
+        `SELECT created_at, updated_at FROM ${Base.connection.quoteTableName("people")} WHERE id = ${id}`,
       )
     ).toArray();
     const r = row as { created_at: unknown; updated_at: unknown };
@@ -383,7 +383,7 @@ describe("useFixtures with a string primary key", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { subscribers } = fixtures(["subscribers"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
@@ -391,8 +391,8 @@ describe("useFixtures with a string primary key", () => {
     const luke = subscribers("first");
     expect(luke.readAttribute("nick")).toBe("alterself");
     const [row] = (
-      await Base.adapter.selectAll(
-        `SELECT name FROM ${Base.adapter.quoteTableName("subscribers")} WHERE nick = 'alterself'`,
+      await Base.connection.selectAll(
+        `SELECT name FROM ${Base.connection.quoteTableName("subscribers")} WHERE nick = 'alterself'`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("Luke Holden");
@@ -407,15 +407,15 @@ describe("useFixtures reconciles the PK column against the schema", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { bulbs } = fixtures(["bulbs"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
   const { mixedCaseMonkeys } = fixtures(["mixedCaseMonkeys"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
   const { mateys } = fixtures(["mateys"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
@@ -424,8 +424,8 @@ describe("useFixtures reconciles the PK column against the schema", () => {
     expect(special.readAttribute("ID")).not.toBeNull();
     expect(special.readAttribute("ID")).not.toBeUndefined();
     const [row] = (
-      await Base.adapter.selectAll(
-        `SELECT name FROM ${Base.adapter.quoteTableName("bulbs")} WHERE ${Base.adapter.quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
+      await Base.connection.selectAll(
+        `SELECT name FROM ${Base.connection.quoteTableName("bulbs")} WHERE ${Base.connection.quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("special");
@@ -440,7 +440,9 @@ describe("useFixtures reconciles the PK column against the schema", () => {
     const m = mateys("blackbeard_to_redbeard");
     expect(m.readAttribute("weight")).toBe(10);
     const rows = (
-      await Base.adapter.selectAll(`SELECT weight FROM ${Base.adapter.quoteTableName("mateys")}`)
+      await Base.connection.selectAll(
+        `SELECT weight FROM ${Base.connection.quoteTableName("mateys")}`,
+      )
     ).toArray();
     expect(rows.length).toBe(1);
   });
@@ -451,7 +453,7 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 
   const { cpkOrders, cpkOrderTags, cpkBooks } = fixtures(
     ["cpkOrders", "cpkOrderTags", "cpkBooks"],
-    { connection: () => Base.adapter, useTransactionalTests: false },
+    { connection: () => Base.connection, useTransactionalTests: false },
   );
 
   it("seeds a composite-model-PK order against the schema's single id", () => {
@@ -487,11 +489,11 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { parrots } = fixtures(["parrots"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
   const { vegetables } = fixtures(["vegetables"], {
-    connection: () => Base.adapter,
+    connection: () => Base.connection,
     useTransactionalTests: false,
   });
 
@@ -507,8 +509,8 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
 
   it("resolves the subclass-only `breed` enum via the row's STI class", async () => {
     const [row] = (
-      await Base.adapter.selectAll(
-        `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
+      await Base.connection.selectAll(
+        `SELECT breed FROM ${Base.connection.quoteTableName("parrots")} WHERE name = 'Curious George'`,
       )
     ).toArray() as { breed: number }[];
     expect(row.breed).toBe(1);
@@ -633,8 +635,8 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
 
   it("inserts both sets' rows into the shared table", async () => {
     const rows = (
-      await Base.adapter.selectAll(
-        `SELECT name FROM ${Base.adapter.quoteTableName("parrots")} ORDER BY name`,
+      await Base.connection.selectAll(
+        `SELECT name FROM ${Base.connection.quoteTableName("parrots")} ORDER BY name`,
       )
     ).toArray() as { name: string }[];
     const names = rows.map((r) => r.name);
@@ -659,11 +661,11 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
       try {
         const data = (entry as { data: Record<string, Record<string, unknown>> }).data;
         if (isJoinTableEntry(entry)) {
-          await defineJoinTableFixtures(Base.adapter, entry.joinTable, data);
+          await defineJoinTableFixtures(Base.connection, entry.joinTable, data);
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          const seedAdapter = await leaseFixtureConnectionFor(ModelClass, Base.adapter);
+          const seedAdapter = await leaseFixtureConnectionFor(ModelClass, Base.connection);
           await defineFixtures(seedAdapter, ModelClass, data);
         }
       } catch (e) {
@@ -688,7 +690,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
 
   describe("encryptedBooks set", () => {
     const { encryptedBooks } = fixtures(["encryptedBooks"], {
-      connection: () => Base.adapter,
+      connection: () => Base.connection,
       useTransactionalTests: false,
     });
 
@@ -708,7 +710,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
 
   describe("encryptedBookThatIgnoresCases set", () => {
     const { encryptedBookThatIgnoresCases } = fixtures(["encryptedBookThatIgnoresCases"], {
-      connection: () => Base.adapter,
+      connection: () => Base.connection,
       useTransactionalTests: false,
     });
 

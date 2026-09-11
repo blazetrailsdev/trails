@@ -12,7 +12,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 let adapter: DatabaseAdapter;
 
 beforeAll(() => {
-  adapter = Base.adapter;
+  adapter = Base.connection;
 });
 
 const createdTables = new Set<string>();

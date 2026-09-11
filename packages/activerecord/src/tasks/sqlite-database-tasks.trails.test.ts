@@ -189,7 +189,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   let previous: ReturnType<typeof Base.removeConnection>;
 
   async function lay(...statements: string[]): Promise<void> {
-    for (const statement of statements) await Base.adapter.executeMutation(statement);
+    for (const statement of statements) await Base.connection.executeMutation(statement);
   }
 
   beforeEach(async () => {
@@ -257,7 +257,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
     );
 
-    const tables = (await Base.adapter.execute(
+    const tables = (await Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'",
     )) as Array<{ name: string }>;
     expect(tables).toHaveLength(0);

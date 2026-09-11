@@ -30,7 +30,7 @@ describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   function canonicalSource(): SchemaSource {
-    return Base.adapter as unknown as SchemaSource;
+    return Base.connection as unknown as SchemaSource;
   }
   function standardDump(ignoreTables: (string | RegExp)[] = []): Promise<string> {
     return dumpAllTableSchema(ignoreTables, canonicalSource());
@@ -40,7 +40,7 @@ describe("SchemaDumperTest", () => {
   }
   async function dumpsIndexSortOrder(): Promise<boolean> {
     return (
-      Base.adapter as unknown as { supportsIndexSortOrder(): Promise<boolean> }
+      Base.connection as unknown as { supportsIndexSortOrder(): Promise<boolean> }
     ).supportsIndexSortOrder();
   }
 

@@ -21,16 +21,9 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { NullColumn } from "./connection-adapters/column.js";
-import {
-  threadedConnectionFor,
-  connectionPool,
-  withConnection,
-  connectedQ,
-} from "./connection-handling.js";
+import { connectionPool, withConnection, connectedQ } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
-  const threaded = threadedConnectionFor(klass);
-  if (threaded) return threaded;
   const pool = connectionPool.call(klass);
   return pool.activeConnection ?? pool.leaseConnectionSync();
 }
@@ -256,11 +249,9 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
     return cache?.getCachedColumnsHash?.(klass.tableName);
   };
   try {
-    const hash =
-      cachedFrom(threadedConnectionFor(klass)) ??
-      cachedFrom(
-        connectionPool.call(klass).activeConnection as { internalSchemaCache?: unknown } | null,
-      );
+    const hash = cachedFrom(
+      connectionPool.call(klass).activeConnection as { internalSchemaCache?: unknown } | null,
+    );
     if (hash) return hash;
   } catch {}
   return undefined;
@@ -644,8 +635,13 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
-  const startingAdapter: SchemaHost["connection"] | undefined =
-    threadedConnectionFor(this as unknown as typeof Base) ?? undefined;
+  let startingAdapter: SchemaHost["connection"] | undefined;
+  try {
+    startingAdapter =
+      connectionPool.call(this as unknown as typeof Base).activeConnection ?? undefined;
+  } catch {
+    startingAdapter = undefined;
+  }
   if (!startingAdapter) {
     try {
       return await withConnection.call<typeof Base, [() => Promise<void>], Promise<void>>(

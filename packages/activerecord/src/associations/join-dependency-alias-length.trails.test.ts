@@ -10,6 +10,7 @@ function stubBaseModel(tableAliasLength: number): BaseModelArg {
   return {
     tableName: "posts",
     arelTable: new Table("posts"),
+    connectionPool: () => ({ activeConnection: null }),
     connection: { tableAliasLength: () => tableAliasLength },
   } as unknown as BaseModelArg;
 }
@@ -57,6 +58,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const noConnModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
+      connectionPool: () => ({ activeConnection: null }),
       get connection(): never {
         throw new ConnectionNotDefined("No connection pool for posts");
       },
@@ -74,6 +76,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const brokenModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
+      connectionPool: () => ({ activeConnection: null }),
       get connection(): never {
         throw new Error("adapter blew up");
       },
@@ -87,6 +90,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const timingOutModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
+      connectionPool: () => ({ activeConnection: null }),
       get connection(): never {
         throw new ConnectionTimeoutError("could not obtain a connection");
       },

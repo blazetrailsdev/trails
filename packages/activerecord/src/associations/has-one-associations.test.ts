@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
@@ -1175,7 +1176,9 @@ describe("HasOneAssociationsTest", () => {
     const author = await DbaReplAuthor.create({ name: "Test" });
     const book = await (DbaReplBook as any).create({ author });
     await (author.association("book") as any).loadTarget();
-    await (author.association("book") as any).writer(await (DbaReplBook as any).create({}));
+    await (author.association("book") as SingularAssociation).writer(
+      await (DbaReplBook as any).create({}),
+    );
     await author.save();
     expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
   });

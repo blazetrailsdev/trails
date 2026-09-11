@@ -16,7 +16,6 @@ import {
   aliasedArelTableFor,
   aliasedArelTableForReflection,
 } from "./alias-tracker.js";
-import { threadedConnectionFor } from "../connection-handling.js";
 
 const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
 
@@ -148,7 +147,9 @@ export class JoinDependency {
   private _baseTableAliasLength(): number | undefined {
     let connection;
     try {
-      connection = threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
+      connection =
+        (this._baseModel as any).connectionPool().activeConnection ??
+        (this._baseModel as any).connection;
     } catch (error) {
       if (error instanceof ConnectionNotDefined) return undefined;
       throw error;

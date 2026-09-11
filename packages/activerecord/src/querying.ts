@@ -1,7 +1,7 @@
 import { hasKey } from "@blazetrails/ruby-compat";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
-import { threadedConnectionFor } from "./connection-handling.js";
+import { connectionPool } from "./connection-handling.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import { toI } from "./relation/query-methods.js";
@@ -82,7 +82,7 @@ export async function _queryBySql(
     allowRetry: opts.allowRetry ?? false,
   };
   if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  const adapter = threadedConnectionFor(this) ?? this.connection;
+  const adapter = connectionPool.call(this).activeConnection ?? this.connection;
   return adapter.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
 }
 

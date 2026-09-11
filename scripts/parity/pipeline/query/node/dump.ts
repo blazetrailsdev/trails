@@ -149,7 +149,7 @@ async function main(): Promise<void> {
     //    RFC 0007 deleted the connection-less quoters, so a visitor built with
     //    no connection dies on `quoteTableName` (to-sql.ts:1665-1667).
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    void Base.adapter; // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
+    void Base.connection; // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
 
     // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/pipeline/translate/arel.ts (generateTs).
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
     // try/catches, matching ar_dump.ts and scripts/parity/pipeline/schema/node/dump.ts:
     // a throwing close() must not skip removeConnection().
     try {
-      const a = Base.adapter as { close?: () => void };
+      const a = Base.connection as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

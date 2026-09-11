@@ -1,4 +1,5 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
+import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
@@ -1800,10 +1801,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   }
 
   async function setBilling(order: Base, customer: Base) {
-    await (order.association("billing") as any).writer(customer);
+    await (order.association("billing") as SingularAssociation).writer(customer);
   }
   async function setShipping(order: Base, customer: Base) {
-    await (order.association("shipping") as any).writer(customer);
+    await (order.association("shipping") as SingularAssociation).writer(customer);
   }
 
   it("should save parent but not invalid child", async () => {
