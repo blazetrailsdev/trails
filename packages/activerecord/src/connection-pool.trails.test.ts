@@ -19,6 +19,7 @@ import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
+import { AsyncExecutor } from "./ar-config.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -262,6 +263,23 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
   } finally {
     await closePoolConnections(pool);
   }
+});
+
+it("scheduleQuery runs each task on its own lease", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  (pool as unknown as { asyncExecutor: AsyncExecutor }).asyncExecutor = new AsyncExecutor();
+  const leases: unknown[] = [];
+  const task = {
+    executeOrSkip: () => {
+      leases.push((pool as unknown as { connectionLease(): unknown }).connectionLease());
+    },
+  };
+  pool.scheduleQuery(task);
+  pool.scheduleQuery(task);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(leases).toHaveLength(2);
+  expect(leases[0]).not.toBe(leases[1]);
 });
 
 it("a nested execution context shares the pool's single pinned connection", async () => {

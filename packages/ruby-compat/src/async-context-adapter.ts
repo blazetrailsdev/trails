@@ -19,9 +19,28 @@ function wrapNodeAsyncHooks(asyncHooks: NodeAsyncHooks): AsyncContextAdapter {
   };
 }
 
+type AsyncContextNamespace = {
+  Variable: new <T>() => { get(): T | undefined; run<R>(value: T, fn: () => R): R };
+};
+
 function createFallbackAdapter(): AsyncContextAdapter {
   return {
     create<T>(): AsyncContext<T> {
+      const tc39 = (globalThis as { AsyncContext?: AsyncContextNamespace }).AsyncContext;
+      if (tc39) {
+        const variable = new tc39.Variable<T>();
+        return {
+          getStore: () => variable.get(),
+          run: (store, fn) => variable.run(store, fn),
+        };
+      }
+      const assertNotInterleaved = (store: T) => {
+        if (current !== store) {
+          throw new Error(
+            "Overlapping async context scopes are not supported without AsyncLocalStorage or AsyncContext.",
+          );
+        }
+      };
       let current: T | undefined;
       return {
         getStore(): T | undefined {
@@ -35,10 +54,12 @@ function createFallbackAdapter(): AsyncContextAdapter {
             if (result && typeof (result as unknown as Promise<unknown>).then === "function") {
               return (result as unknown as Promise<unknown>).then(
                 (val) => {
+                  assertNotInterleaved(store);
                   current = prev;
                   return val;
                 },
                 (err) => {
+                  assertNotInterleaved(store);
                   current = prev;
                   throw err;
                 },
@@ -56,7 +77,7 @@ function createFallbackAdapter(): AsyncContextAdapter {
   };
 }
 
-const registry = new Map<string, AsyncContextAdapter>();
+const registry = new Map<string, AsyncContextAdapter>([["fallback", createFallbackAdapter()]]);
 let currentAdapterName: string | null = null;
 let resolved: AsyncContextAdapter | null = null;
 
@@ -130,7 +151,7 @@ function resolve(): AsyncContextAdapter {
     return resolved;
   }
 
-  resolved = createFallbackAdapter();
+  resolved = registry.get("fallback")!;
   return resolved;
 }
 
