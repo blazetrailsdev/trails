@@ -3,7 +3,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
+import { throwAbort, underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
@@ -35,7 +35,7 @@ export class HasOneAssociation extends SingularAssociation {
     return this.replace(record);
   }
 
-  async handleDependency(): Promise<void | false> {
+  async handleDependency(): Promise<void> {
     switch (this.reflection.options.dependent) {
       case "restrictWithException":
         if (await this.loadTarget()) {
@@ -53,7 +53,7 @@ export class HasOneAssociation extends SingularAssociation {
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
           owner.errors.add("base", ":restrict_dependent_destroy.has_one", { record });
-          return false;
+          throwAbort();
         }
         break;
 
@@ -65,7 +65,7 @@ export class HasOneAssociation extends SingularAssociation {
   /** @missingRailsCall fetch — PERMANENT */
   async delete(
     method: string | undefined = this.reflection.options.dependent as string | undefined,
-  ): Promise<void | false> {
+  ): Promise<void> {
     if (!(await this.loadTarget())) return;
     const target = this.target!;
 
@@ -83,7 +83,7 @@ export class HasOneAssociation extends SingularAssociation {
           await (target as any).destroy();
         }
         if (typeof (target as any).isDestroyed === "function" && !(target as any).isDestroyed()) {
-          return false;
+          throwAbort();
         }
         break;
 

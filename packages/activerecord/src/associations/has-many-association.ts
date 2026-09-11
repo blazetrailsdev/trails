@@ -1,4 +1,5 @@
 import { _setHasManyAssociation } from "./association-class-slots.js";
+import { throwAbort } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -66,7 +67,7 @@ export class HasManyAssociation extends CollectionAssociation {
    * @missingRailsCall fetch — PERMANENT
    * @missingRailsCall first — PERMANENT
    */
-  async handleDependency(): Promise<void | false> {
+  async handleDependency(): Promise<void> {
     const dependent = this.reflection.options.dependent;
     if (!dependent) return;
 
@@ -88,7 +89,7 @@ export class HasManyAssociation extends CollectionAssociation {
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
           owner.errors.add("base", ":restrict_dependent_destroy.has_many", { record });
-          return false;
+          throwAbort();
         }
         break;
       }

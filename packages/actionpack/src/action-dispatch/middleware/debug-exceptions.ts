@@ -1,7 +1,10 @@
-import { stderr } from "@blazetrails/ruby-compat";
+import { rbInspect, stderr } from "@blazetrails/ruby-compat";
+import type { BacktraceCleaner } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import { X_CASCADE } from "../constants.js";
+import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -166,31 +169,43 @@ export class DebugExceptions {
   async call(env: RackEnv): Promise<RackResponse> {
     try {
       const response = await this.app(env);
+      const [, headers, body] = response;
+
+      if (headers[X_CASCADE] === "pass") {
+        const closable = body as { close?: () => void };
+        if (typeof closable.close === "function") closable.close();
+        throw new RoutingError(
+          `No route matches [${env["REQUEST_METHOD"]}] ${rbInspect(env["PATH_INFO"])}`,
+        );
+      }
+
       return response;
     } catch (error) {
       const exception = error instanceof Error ? error : new Error(String(error));
-      return this.renderException(env, exception);
+      const backtraceCleaner =
+        (env["action_dispatch.backtrace_cleaner"] as BacktraceCleaner | undefined) ?? null;
+      const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
+
+      this.invokeInterceptors(env, exception, wrapper);
+      if (!this.showExceptions) throw exception;
+      return this.renderException(env, exception, wrapper);
     }
   }
 
-  private renderException(env: RackEnv, exception: Error): RackResponse {
-    const wrapper = new ExceptionWrapper(exception);
+  private renderException(
+    request: RackEnv,
+    exception: Error,
+    wrapper: ExceptionWrapper,
+  ): RackResponse {
+    this.logError(request, wrapper);
 
-    this.invokeInterceptors(env, exception, wrapper);
-
-    this.logError(env, wrapper);
-
-    if (!this.showExceptions) {
+    if (!this.showDetailedExceptions) {
       throw exception;
     }
 
-    if (!this.showDetailedExceptions) {
-      return this.renderMinimalError(wrapper);
-    }
-
-    const accept = (env["HTTP_ACCEPT"] as string) ?? "";
-    const xhr = env["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
-    const contentType = (env["CONTENT_TYPE"] as string) ?? "";
+    const accept = (request["HTTP_ACCEPT"] as string) ?? "";
+    const xhr = request["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
+    const contentType = (request["CONTENT_TYPE"] as string) ?? "";
 
     const negotiated = accept || contentType;
     if (this.isApiRequest(negotiated)) {
@@ -202,22 +217,14 @@ export class DebugExceptions {
     }
 
     if (accept.includes("application/json") || contentType.includes("application/json")) {
-      return this.renderJsonError(wrapper, env);
+      return this.renderJsonError(wrapper, request);
     }
 
     if (accept.includes("application/xml") || accept.includes("text/xml")) {
       return this.renderXmlError(wrapper);
     }
 
-    return this.renderHtmlError(wrapper, env);
-  }
-
-  private renderMinimalError(wrapper: ExceptionWrapper): RackResponse {
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString(`${wrapper.statusCode} ${wrapper.statusText}\n`),
-    ];
+    return this.renderHtmlError(wrapper, request);
   }
 
   private renderTextError(wrapper: ExceptionWrapper): RackResponse {

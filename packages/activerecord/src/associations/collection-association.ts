@@ -276,20 +276,42 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
-    const looped = concatRecordsLoop(records, (record, resultStillTrue) => {
+    let result = true;
+
+    const addRecord = (record: Base): Promise<boolean> | boolean => {
       (this as any).raiseOnTypeMismatchBang(record);
       let inserted = true;
       const added = this.addToTarget(record, {}, () => {
-        if (this.owner.isNewRecord() || !resultStillTrue) return;
+        if (this.owner.isNewRecord() || !result) return;
         return this.insertRecord(record, true, raise, () => {
           this._wasLoaded = this.isLoaded();
-        }).then((result) => {
-          inserted = result;
+        }).then((r) => {
+          inserted = r;
         });
       });
       return isThenable(added) ? added.then(() => inserted) : inserted;
-    });
-    return isThenable(looped) ? looped.then(() => records) : records;
+    };
+
+    for (let i = 0; i < records.length; i++) {
+      const inserted = addRecord(records[i]);
+      if (isThenable(inserted)) {
+        const rest = records.slice(i + 1);
+        return inserted.then(async (first) => {
+          result = result && first;
+          for (const record of rest) {
+            const inserted = await addRecord(record);
+            result = result && inserted;
+          }
+          if (!result) throw new Rollback();
+          return records;
+        });
+      }
+      result = result && inserted;
+    }
+
+    if (!result) throw new Rollback();
+
+    return records;
   }
 
   async deleteAll(dependent?: string): Promise<number> {
@@ -858,29 +880,6 @@ export abstract class CollectionAssociation extends Association {
  * @internal
  * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
-export function concatRecordsLoop(
-  records: Base[],
-  addRecord: (record: Base, resultStillTrue: boolean) => Promise<boolean> | boolean,
-): Promise<void> | void {
-  let result = true;
-  for (let i = 0; i < records.length; i++) {
-    const inserted = addRecord(records[i], result);
-    if (isThenable(inserted)) {
-      const rest = records.slice(i + 1);
-      return inserted.then(async (first) => {
-        result = result && first;
-        for (const record of rest) {
-          const inserted = await addRecord(record, result);
-          result = result && inserted;
-        }
-        if (!result) throw new Rollback();
-      });
-    }
-    result = result && inserted;
-  }
-  if (!result) throw new Rollback();
-}
-
 /**
  * @internal
  * @noRailsEquivalent PERMANENT

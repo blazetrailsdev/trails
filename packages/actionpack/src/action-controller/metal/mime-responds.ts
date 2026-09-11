@@ -2,8 +2,10 @@ import {
   Collector as DispatchCollector,
   type FormatHandler,
 } from "../../action-dispatch/respond-to.js";
-import { UnknownFormat } from "./exceptions.js";
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
+import { _processFormat } from "../../abstract-controller/rendering.js";
+import { _setRenderedContentType } from "./rendering.js";
+import { ArgumentError, symbolToS } from "@blazetrails/ruby-compat";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
@@ -82,18 +84,35 @@ export class Collector extends DispatchCollector {
 }
 
 export function respondTo(
-  block: (collector: Collector) => void,
-  options: { accept?: string; format?: string; variant?: string } = {},
-): unknown {
-  const collector = new Collector();
-  block(collector);
-
-  const result = collector.negotiate(options);
-  if (!result) {
-    throw new UnknownFormat();
+  this: {
+    request?: { variant?: string | string[] | null; accept?: string } | null;
+    mediaType?: string | null;
+    contentType: string | null;
+    response: { contentType?: string };
+  },
+  ...mimes: Array<string | ((collector: Collector) => void)>
+): void {
+  const last = mimes[mimes.length - 1];
+  const block = typeof last === "function" ? (mimes.pop() as (c: Collector) => void) : undefined;
+  if (mimes.length > 0 && block) {
+    throw new ArgumentError("respond_to takes either types or a block, never both");
   }
 
-  return result.handler();
+  const collector = new Collector(mimes as string[], this.request?.variant ?? null);
+  if (block) block(collector);
+
+  const format = collector.negotiateFormat(this.request ?? {});
+  if (format != null) {
+    if (this.mediaType && this.mediaType !== format) {
+      throw new RespondToMismatchError();
+    }
+    _processFormat.call(this, format);
+    if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
+    const response = collector.response;
+    if (response) response();
+  } else {
+    throw new UnknownFormat();
+  }
 }
 
 export class VariantCollector {

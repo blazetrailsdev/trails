@@ -2,6 +2,7 @@ import { _setHasManyThroughAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { association as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
@@ -40,7 +41,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare ensureNotNested: () => void;
 
-  protected override async findTarget(): Promise<Base[]> {
+  protected override async findTarget({ async = false }: { async?: boolean } = {}): Promise<
+    Base[]
+  > {
+    if (async)
+      // @nie disposition=TODO
+      throw new NotImplementedError("No async loading for HasManyThroughAssociation yet");
     if (this._queryExecutor) return super.findTarget();
     if (!this.targetReflectionHasAssociatedRecord()) return [];
     if (this.disableJoins) return this.scope().toArray();

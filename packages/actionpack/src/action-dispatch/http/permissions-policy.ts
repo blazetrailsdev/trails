@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { _RequestCtor } from "./request-slot.js";
@@ -148,19 +148,25 @@ export class PermissionsPolicy {
 
   /** @internal */
   private applyMappings(sources: PolicySource[]): PolicySource[] {
-    return sources.map((source) => this.applyMapping(source));
+    return sources.map((source) => {
+      if (typeof source === "string" && source.startsWith(":")) {
+        return this.applyMapping(source);
+      }
+      if (typeof source === "string" || typeof source === "function") {
+        return source;
+      }
+      throw new ArgumentError(`Invalid HTTP permissions policy source: ${rbInspect(source)}`);
+    });
   }
 
   /** @internal */
-  private applyMapping(source: PolicySource): PolicySource {
-    if (typeof source === "function") return source;
-    if (typeof source === "string") {
-      if (Object.prototype.hasOwnProperty.call(MAPPINGS, source)) {
-        return MAPPINGS[source];
-      }
-      return source;
+  private applyMapping(source: string): string {
+    if (!Object.hasOwn(MAPPINGS, source.slice(1))) {
+      throw new ArgumentError(
+        `Unknown HTTP permissions policy source mapping: ${rbInspect(source)}`,
+      );
     }
-    throw new ArgumentError(`Invalid HTTP permissions policy source: ${JSON.stringify(source)}`);
+    return MAPPINGS[source.slice(1)];
   }
 
   /** @internal */

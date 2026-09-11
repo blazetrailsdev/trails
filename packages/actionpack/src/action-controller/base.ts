@@ -1,5 +1,4 @@
 import {
-  ArgumentError,
   Benchmark,
   Notifications,
   classAttribute,
@@ -12,11 +11,9 @@ import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
-import { Collector } from "./metal/mime-responds.js";
+import { respondTo } from "./metal/mime-responds.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import { MissingFile, RespondToMismatchError, UnknownFormat } from "./metal/exceptions.js";
-import { _processFormat } from "../abstract-controller/rendering.js";
-import { _setRenderedContentType } from "./metal/rendering.js";
+import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -476,29 +473,7 @@ export class Base extends Metal {
     this.redirectTo(url, { status: options.status });
   }
 
-  respondTo(...mimes: Array<string | ((collector: Collector) => void)>): void {
-    const last = mimes[mimes.length - 1];
-    const block = typeof last === "function" ? (mimes.pop() as (c: Collector) => void) : undefined;
-    if (mimes.length > 0 && block) {
-      throw new ArgumentError("respond_to takes either types or a block, never both");
-    }
-
-    const collector = new Collector(mimes as string[], this.request?.variant ?? null);
-    if (block) block(collector);
-
-    const format = collector.negotiateFormat(this.request ?? {});
-    if (format != null) {
-      if (this.mediaType && this.mediaType !== format) {
-        throw new RespondToMismatchError();
-      }
-      _processFormat.call(this, format);
-      if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
-      const response = collector.response;
-      if (response) response();
-    } else {
-      throw new UnknownFormat();
-    }
-  }
+  respondTo = respondTo;
 
   set notice(value: string) {
     this.flash.notice = value;

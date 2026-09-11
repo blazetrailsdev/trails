@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import {
+  _routes,
   _routesInstanceDefault,
   _routesClassDefault,
   UrlForDefaults,
@@ -8,6 +10,11 @@ import {
 } from "./url-for.js";
 
 describe("AbstractController::UrlFor", () => {
+  it("_routes raises until routing helpers are included", () => {
+    expect(() => _routes()).toThrow(RuntimeError);
+    expect(() => _routes()).toThrow(/you must include routing helpers explicitly/);
+  });
+
   describe("_routes property defaults", () => {
     it("both instance and class defaults are null (consistent with property contract)", () => {
       expect(_routesInstanceDefault).toBeNull();

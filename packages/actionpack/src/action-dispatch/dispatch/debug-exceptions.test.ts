@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import { RoutingError as RoutingErrorClass } from "../../action-controller/metal/exceptions.js";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
@@ -28,10 +29,7 @@ function makeEnv(overrides: Partial<RackEnv> = {}): RackEnv {
 describe("DebugExceptionsTest", () => {
   it("skip diagnosis if not showing detailed exceptions", async () => {
     const mw = new DebugExceptions(errorApp, { showDetailedExceptions: false });
-    const [status, , body] = await mw.call(makeEnv());
-    expect(status).toBe(500);
-    const text = await bodyToString(body);
-    expect(text).not.toContain("Something went wrong");
+    await expect(mw.call(makeEnv())).rejects.toThrow("Something went wrong");
   });
 
   it("skip diagnosis if not showing exceptions", async () => {
@@ -224,6 +222,35 @@ describe("DebugExceptionsTest", () => {
     const [, , body] = await mw.call(makeEnv({ PATH_INFO: "/users/1" }));
     const html = await bodyToString(body);
     expect(html).toContain("/users/1");
+  });
+
+  it("raise an exception on cascade pass", async () => {
+    const passApp = async (_env: RackEnv): Promise<RackResponse> => [
+      404,
+      { "x-cascade": "pass" },
+      bodyFromString(""),
+    ];
+    const mw = new DebugExceptions(passApp, { showExceptions: false });
+    await expect(mw.call(makeEnv({ PATH_INFO: "/pass" }))).rejects.toThrow(
+      'No route matches [GET] "/pass"',
+    );
+  });
+
+  it("closes the response body on cascade pass", async () => {
+    let closed = false;
+    const body = Object.assign(bodyFromString(""), {
+      close: () => {
+        closed = true;
+      },
+    });
+    const passApp = async (_env: RackEnv): Promise<RackResponse> => [
+      404,
+      { "x-cascade": "pass" },
+      body,
+    ];
+    const mw = new DebugExceptions(passApp, { showExceptions: false });
+    await expect(mw.call(makeEnv({ PATH_INFO: "/pass" }))).rejects.toThrow(RoutingErrorClass);
+    expect(closed).toBe(true);
   });
 
   it("displays request and response info when a RoutingError occurs", async () => {

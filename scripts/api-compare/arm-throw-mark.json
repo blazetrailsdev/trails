@@ -1,25 +1,17 @@
 {
   "abstractcontroller": {
-    "total": 1,
-    "byFile": {
-      "url-for.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "actioncontroller": {
-    "total": 2,
-    "byFile": {
-      "metal/mime-responds.ts": 1,
-      "metal/strong-parameters.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "actiondispatch": {
-    "total": 7,
+    "total": 2,
     "byFile": {
       "http/param-builder.ts": 1,
-      "http/permissions-policy.ts": 1,
-      "http/request.ts": 3,
-      "middleware/debug-exceptions.ts": 1,
-      "routing/route-set.ts": 1
+      "http/request.ts": 1
     }
   },
   "actionpackversion": {
@@ -41,17 +33,9 @@
     }
   },
   "activerecord": {
-    "total": 35,
+    "total": 22,
     "byFile": {
-      "associations/alias-tracker.ts": 1,
-      "associations/collection-association.ts": 1,
-      "associations/has-many-association.ts": 1,
-      "associations/has-many-through-association.ts": 1,
-      "associations/has-one-association.ts": 2,
-      "associations/preloader/branch.ts": 1,
-      "associations/singular-association.ts": 1,
       "attribute-assignment.ts": 1,
-      "attribute-methods.ts": 1,
       "connection-adapters.ts": 1,
       "connection-adapters/abstract-adapter.ts": 1,
       "connection-adapters/abstract-mysql-adapter.ts": 1,
@@ -60,13 +44,13 @@
       "connection-adapters/abstract/transaction.ts": 1,
       "connection-adapters/mysql2-adapter.ts": 1,
       "connection-adapters/mysql2/database-statements.ts": 1,
-      "connection-adapters/postgresql-adapter.ts": 4,
+      "connection-adapters/postgresql-adapter.ts": 2,
       "connection-adapters/postgresql/oid/hstore.ts": 1,
       "connection-adapters/postgresql/schema-creation.ts": 1,
-      "connection-adapters/sqlite3-adapter.ts": 3,
+      "connection-adapters/sqlite3-adapter.ts": 2,
       "encryption/encryptable-record.ts": 1,
       "inheritance.ts": 1,
-      "relation/finder-methods.ts": 2,
+      "relation/finder-methods.ts": 1,
       "relation/predicate-builder/relation-handler.ts": 1,
       "relation/query-methods.ts": 1
     }

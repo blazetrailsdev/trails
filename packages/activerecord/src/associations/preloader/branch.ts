@@ -6,7 +6,7 @@ import { Association } from "./association.js";
 import { ThroughAssociation } from "./through-association.js";
 
 export interface BranchOptions {
-  association: string | symbol | null;
+  association: string | null;
   children: any;
   parent: Branch | null;
   associateByDefault: boolean;
@@ -25,7 +25,16 @@ export class Branch {
   private _polymorphic: boolean | undefined;
 
   constructor(options: BranchOptions) {
-    this.association = this._normalizeAssociationName(options.association);
+    const association = options.association;
+    if (association == null) {
+      this.association = null;
+    } else if (typeof association !== "string") {
+      throw new ArgumentError(
+        `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
+      );
+    } else {
+      this.association = association.startsWith(":") ? association.slice(1) : association;
+    }
     this.parent = options.parent;
     this.scope = options.scope;
     this.associateByDefault = options.associateByDefault;
@@ -266,18 +275,16 @@ export class Branch {
       }
 
       if (typeof assoc === "object" && assoc !== null) {
-        return Reflect.ownKeys(assoc)
-          .filter((k): k is string | symbol => typeof k === "string" || typeof k === "symbol")
-          .map(
-            (parent) =>
-              new Branch({
-                parent: this,
-                association: parent,
-                children: assoc[parent],
-                associateByDefault: this.associateByDefault,
-                scope: this.scope,
-              }),
-          );
+        return Object.keys(assoc).map(
+          (parent) =>
+            new Branch({
+              parent: this,
+              association: parent,
+              children: assoc[parent],
+              associateByDefault: this.associateByDefault,
+              scope: this.scope,
+            }),
+        );
       }
 
       return [
@@ -290,23 +297,6 @@ export class Branch {
         }),
       ];
     });
-  }
-
-  private _normalizeAssociationName(association: string | symbol | null): string | null {
-    if (association == null) return null;
-    if (typeof association === "symbol") {
-      const description = association.description;
-      if (description == null || description.length === 0) {
-        throw new TypeError("Association symbol must have a non-empty description");
-      }
-      return description;
-    }
-    if (typeof association !== "string") {
-      throw new ArgumentError(
-        `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
-      );
-    }
-    return association.startsWith(":") ? association.slice(1) : association;
   }
 
   private preloaderFor(
