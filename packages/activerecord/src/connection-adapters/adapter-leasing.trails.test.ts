@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { withExecutionContext } from "./abstract/connection-pool/execution-context.js";
+import { ConnectionPool } from "./abstract/connection-pool.js";
+import { PoolConfig } from "./pool-config.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
 import { ActiveRecordError } from "../errors.js";
 
 describe("AdapterLeasingTest", () => {
@@ -30,6 +34,10 @@ describe("AdapterLeasingTest", () => {
 
   it("steal! from a different thread takes ownership", async () => {
     const adapter = new AbstractAdapter({});
+    const dbConfig = new HashConfig("test", "primary", { adapter: "abstract" });
+    adapter.pool = new ConnectionPool(
+      new PoolConfig(new ConnectionDescriptor("primary"), dbConfig),
+    );
     adapter.lease();
     await withExecutionContext(async () => {
       adapter.stealBang();
