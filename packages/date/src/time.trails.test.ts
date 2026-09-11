@@ -563,7 +563,7 @@ describe("Time", () => {
     });
 
     it("answers nil for an operand that is not a Time", () => {
-      expect(Time.utc(2000, 1, 1).compare(0)).toBeNull();
+      expect(Time.utc(2000, 1, 1).compare(new Object())).toBeNull();
     });
 
     it("eql? requires the same subsecond value", () => {
