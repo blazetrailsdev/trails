@@ -191,8 +191,8 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
   }
   const result = new Set<string>();
   for (const attributeName of this.encryptedAttributes ?? new Set<string>()) {
-    const type = encryptedTypeOf(this.typeForAttribute(attributeName));
-    if (type?.deterministic) {
+    const type = this.typeForAttribute(attributeName) as EncryptedAttributeType;
+    if (type.deterministic) {
       result.add(attributeName);
     }
   }
@@ -204,8 +204,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
 export function encryptedAttribute(this: any, attributeName: string): boolean {
   const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
   if (!(this.constructor.encryptedAttributes ?? new Set<string>()).has(name)) return false;
-  const type = encryptedTypeOf(this.constructor.typeForAttribute(name));
-  if (!type) return false;
+  const type = this.constructor.typeForAttribute(name) as EncryptedAttributeType;
   return type.isEncrypted(this.readAttributeBeforeTypeCast?.(name));
 }
 
@@ -331,16 +330,6 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 
   encrypts.call(this, originalAttributeName);
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
-}
-
-/** @noRailsEquivalent CONVERGEABLE port-type-serialized-as-a-delegate-class */
-export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefined {
-  let current: any = type;
-  while (current) {
-    if (current instanceof EncryptedAttributeType) return current;
-    current = current.subtype ?? current.castType;
-  }
-  return undefined;
 }
 
 registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);

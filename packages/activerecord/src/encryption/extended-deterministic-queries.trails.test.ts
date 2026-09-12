@@ -7,7 +7,6 @@ import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
 
 import { YAMLColumn } from "../coders/yaml-column.js";
-import { encryptedTypeOf } from "./encryptable-record.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -111,8 +110,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
-    const prevType = encryptedTypeOf(PreviousSchemeSerializedBook.typeForAttribute("name"))!
-      .previousTypes[0];
+    const prevType = (
+      PreviousSchemeSerializedBook.typeForAttribute("name") as unknown as EncryptedAttributeType
+    ).previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(NoMethodError);
   });
@@ -126,8 +126,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     const fullType = PreviousSchemeYamlBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
-    const prevType = encryptedTypeOf(PreviousSchemeYamlBook.typeForAttribute("name"))!
-      .previousTypes[0];
+    const prevType = (
+      PreviousSchemeYamlBook.typeForAttribute("name") as unknown as EncryptedAttributeType
+    ).previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(DisallowedClass);
     expect(() => fullType.serialize(av)).toThrow(/Tried to dump unspecified class/);

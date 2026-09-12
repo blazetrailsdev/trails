@@ -1,6 +1,6 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { methodMissingProxy, rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -20,6 +20,7 @@ export class Serialized extends ValueType {
     super();
     this.subtype = subtype;
     this.coder = coder;
+    return methodMissingProxy(this, { delegate: (self) => self.subtype });
   }
 
   /** @noRailsEquivalent CONVERGEABLE api-compare-nulls-a-delegateclass-superclass */
