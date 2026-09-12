@@ -676,11 +676,15 @@ them `Promise`.
 
 ## `Relation` is evaluated by an async query (`records`, and the predicates it carries)
 
-Ruby's `Relation` is an Enumerable: every terminal call funnels through
-`records` (`activerecord/lib/active_record/relation.rb:342-345`), which calls
-`load` (`:1179-1186`) and runs the query **synchronously**. Nothing in Rails' relation surface
-is a promise, so a `Relation` is both the query and its result, and a predicate
-that needs a second query to build itself can just run it in place.
+Ruby's `Relation` is an Enumerable, and every call that needs the records
+themselves reaches them through `records`
+(`activerecord/lib/active_record/relation.rb:342-345`), which calls `load`
+(`:1179-1186`) and runs the query **synchronously**. Some terminal calls answer
+without materializing anything — an unloaded `size` is `count(:all)` and an
+unloaded `empty?` is `!exists?` (`:352-369`) — but those run a query
+synchronously too. Nothing in Rails' relation surface is a promise, so a
+`Relation` is both the query and its result, and a predicate that needs a
+second query to build itself can just run it in place.
 
 In trails the query is `await`ed, and that costs two shapes Rails has no
 counterpart for:
