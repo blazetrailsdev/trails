@@ -1,41 +1,47 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 const REGISTRY_KEY = "active_record_explain_registry";
-const SLOT_KEY = Symbol.for("ar_explain_registry_slot");
-
-interface Slot {
-  collect: boolean;
-  queries: [string, unknown[]][];
-}
-
-function currentSlot(): Slot {
-  return IsolatedExecutionState.fetch<Slot>(SLOT_KEY, () => ({ collect: false, queries: [] }));
-}
 
 export class ExplainRegistry {
-  constructor() {}
-
   static get collect(): boolean {
-    return currentSlot().collect;
+    return instance().collect;
   }
 
   static set collect(value: boolean) {
-    currentSlot().collect = value;
+    instance().collect = value;
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   static collectEnabled(): boolean {
-    return currentSlot().collect;
+    return instance().collectQ();
   }
 
   static get queries(): [string, unknown[]][] {
-    return currentSlot().queries;
+    return instance().queries;
   }
 
   static reset(): void {
-    const slot = currentSlot();
-    slot.collect = false;
-    slot.queries = [];
+    instance().reset();
+  }
+
+  collect!: boolean;
+  #queries!: [string, unknown[]][];
+
+  constructor() {
+    this.reset();
+  }
+
+  get queries(): [string, unknown[]][] {
+    return this.#queries;
+  }
+
+  collectQ(): boolean {
+    return this.collect;
+  }
+
+  reset(): void {
+    this.collect = false;
+    this.#queries = [];
   }
 }
 

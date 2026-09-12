@@ -175,6 +175,7 @@ export class WeakThreadKeyMap<V> {
     return this._map.get(key);
   }
 
+  /** @missingRailsCall select! — PERMANENT */
   set(key: Thread, value: V): void {
     for (const c of [...this._map.keys()]) {
       if (c.status === "dead") this._map.delete(c);
