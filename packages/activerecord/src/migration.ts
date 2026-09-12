@@ -10,10 +10,9 @@ import {
   Monitor,
   NameError,
 } from "@blazetrails/activesupport";
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout, rbInspect } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Zlib } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -1260,15 +1259,17 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   formatArguments(arguments_: unknown[]): string {
-    const argList = arguments_.slice(0, -1).map((a) => rubyInspect(a));
+    const argList = arguments_.slice(0, -1).map((a) => rbInspect(a));
     const last = arguments_[arguments_.length - 1];
     if (isPlainObject(last)) {
       const filtered = Object.fromEntries(
-        Object.entries(last).filter(([k]) => !this.isInternalOption(k)),
+        Object.entries(last)
+          .filter(([k]) => !this.isInternalOption(k))
+          .map(([k, v]) => [`:${k}`, v]),
       );
-      if (Object.keys(filtered).length > 0) argList.push(rubyInspect(filtered));
+      if (Object.keys(filtered).length > 0) argList.push(rbInspect(filtered));
     } else {
-      argList.push(rubyInspect(last));
+      argList.push(rbInspect(last));
     }
     return argList.join(", ");
   }

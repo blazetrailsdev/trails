@@ -1,9 +1,9 @@
 import { ExplainRegistry } from "./explain-registry.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
-import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Attribute } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export interface ExplainHost {
@@ -33,7 +33,7 @@ export async function execExplain(
       let msg = `${await buildExplainClause(c, options)} ${sql}`;
       if (binds.length > 0) {
         msg += " ";
-        msg += rubyInspect(binds.map((attr) => renderBind(c, attr)));
+        msg += rbInspect(binds.map((attr) => renderBind(c, attr)));
       }
       msg += "\n";
       msg += await c.explain(sql, binds, options);

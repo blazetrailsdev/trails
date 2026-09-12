@@ -12,8 +12,45 @@ import { temporalTag, widenPlainDate } from "./temporal-tag.js";
  *   one copy serves every ported `==`.
  */
 export function rbEqual(a: unknown, b: unknown): boolean {
+  return equalOrEql(a, b, false);
+}
+
+/**
+ * Ruby's `rb_eql` (`vendor/ruby/object.c:159`) — the C primitive behind every
+ * `eql?` send, and the equality a Hash keys on. It is `rb_equal` with one arm
+ * removed: `Kernel#eql?` defaults to `rb_obj_equal`
+ * (`vendor/ruby/object.c:4374`), identity, so a class that defines `==` and no
+ * `eql?` is `eql?` only to itself, where `==` may answer true. The value
+ * classes that override it — String, Array, Hash, Integer, Date, Time — are
+ * shared with `rb_equal` and compare the same, which is why MRI threads the
+ * difference as a flag through one body (`hash_equal`'s `int eql`,
+ * `vendor/ruby/hash.c:3746`) rather than writing the walk twice.
+ *
+ * @noRailsEquivalent PERMANENT — `rb_eql` is a C primitive
+ *   (`vendor/ruby/object.c:159`), not a Ruby method, so it has no counterpart
+ *   file; JS has no `eql?` send at all, so one copy serves every ported
+ *   `eql?`.
+ */
+export function rbEql(a: unknown, b: unknown): boolean {
+  return equalOrEql(a, b, true);
+}
+
+/**
+ * `rb_equal` (`vendor/ruby/object.c:147`) and `rb_eql`
+ * (`object.c:159`) over one body, the way `hash_equal`
+ * (`vendor/ruby/hash.c:3746`) carries both behind its `int eql`.
+ */
+function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* `rb_int_equal` (`vendor/ruby/numeric.c:4634`) compares by value, and Ruby
+     has one Integer for every magnitude. JS splits that seat across `number`
+     and `bigint`, so `===` answers false for two seats of the same Ruby
+     Integer. */
+  if (typeof a === "bigint" || typeof b === "bigint") {
+    if (typeof a === "number") return Number.isInteger(a) && BigInt(a) === b;
+    if (typeof b === "number") return Number.isInteger(b) && a === BigInt(b);
+  }
   /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
      `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
      answers `false` for an operand of another class instead of raising, and a
@@ -34,7 +71,10 @@ export function rbEqual(a: unknown, b: unknown): boolean {
       ) === 0
     );
   }
-  if (typeof (a as { equals?: unknown }).equals === "function") {
+  /* `Kernel#eql?` is `rb_obj_equal` (`vendor/ruby/object.c:4374`), identity, so
+     a class's `==` answers only the `rb_equal` send; the `eql` arm below is the
+     one an `eql?` send reaches. */
+  if (!eql && typeof (a as { equals?: unknown }).equals === "function") {
     return (a as { equals(other: unknown): boolean }).equals(b);
   }
   /* `vendor/ruby/object.c:147`. A class whose Ruby `==` is `alias :== :eql?`
@@ -51,7 +91,9 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      equality. */
   if (Array.isArray(a)) {
     return (
-      Array.isArray(b) && a.length === b.length && a.every((element, i) => rbEqual(element, b[i]))
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((element, i) => equalOrEql(element, b[i], eql))
     );
   }
   /* A `Uint8Array` stands in for a Ruby binary String (the representation
@@ -65,20 +107,34 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
   if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
-  /* A plain object stands in for a Ruby Hash, whose `==`
-     (`vendor/ruby/hash.c:3808` `rb_hash_equal`) compares keys and values
-     rather than identity. */
-  if (isPlainObject(a)) {
-    if (!isPlainObject(b)) return false;
-    const keys = Object.keys(a);
-    return (
-      keys.length === Object.keys(b).length &&
-      keys.every((key) => key in b && rbEqual(a[key], b[key]))
-    );
+  /* `rb_hash_equal` (`vendor/ruby/hash.c:3808`), which `hash_equal`
+     (`hash.c:3746`) answers by size and then by `rb_equal` per key. A Ruby
+     Hash has two JS seats — a plain object and a `Map` (ruby-compat's `Hash`,
+     and `HashWithIndifferentAccess` under it) — and both stand for the same
+     Ruby value, so the arm reads whichever the operand is. */
+  const entriesA = hashEntries(a);
+  if (entriesA !== null) {
+    const entriesB = hashEntries(b);
+    if (entriesB === null || entriesA.length !== entriesB.length) return false;
+    /* `eql_i` (`vendor/ruby/hash.c:3714`) finds hash2's entry with
+       `hash_stlike_lookup` (`hash.c:3719`), by
+       the Hash's own key semantics — `hash` then `eql?`, never `==` — not by
+       identity, so a separately allocated but `eql?` key (an Array key, say)
+       still hits. The VALUES then compare with whichever send this call is
+       (`eql_i`'s `data->eql ? rb_eql : rb_equal`, `hash.c:3724`). */
+    return entriesA.every(([key, value]) => {
+      const found = entriesB.find(([otherKey]) => rbEql(key, otherKey));
+      return found !== undefined && equalOrEql(value, found[1], eql);
+    });
   }
   return false;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && value.constructor === Object;
+/** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3746`) over both JS seats. */
+function hashEntries(value: unknown): [unknown, unknown][] | null {
+  if (value instanceof Map) return [...value.entries()];
+  if (typeof value === "object" && value !== null && value.constructor === Object) {
+    return Object.entries(value as Record<string, unknown>);
+  }
+  return null;
 }

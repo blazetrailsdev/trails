@@ -1,4 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch, rbInspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
@@ -18,7 +18,6 @@ import {
 import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
 import { modelRegistry, autoloadModel } from "./associations.js";
 import {
@@ -713,7 +712,7 @@ export class AssociationReflection extends MacroReflection {
     throw new ArgumentError(
       `Active Record couldn't correctly interpret the query constraints ` +
         `for the \`${this.activeRecord.name}\` model. The query constraints on \`${this.activeRecord.name}\` are ` +
-        `\`${rubyInspectArray(primaryQueryConstraints)}\` and the foreign key is \`${foreignKey}\`. ` +
+        `\`${rbInspect(primaryQueryConstraints)}\` and the foreign key is \`${foreignKey}\`. ` +
         `You need to explicitly set the query constraints for this association.`,
     );
   }
@@ -1415,7 +1414,7 @@ export class ThroughReflection extends AbstractReflection {
       ?.primaryKey;
     if (primaryKey != null && primaryKey !== false) {
       return (this._associationPrimaryKey ??= Array.isArray(primaryKey)
-        ? rubyInspectArray(primaryKey)
+        ? rbInspect(primaryKey)
         : String(primaryKey));
     } else {
       return this.primaryKey(klass || this.klass);

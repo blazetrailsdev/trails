@@ -13,9 +13,9 @@ import {
 } from "../support/mysql-server-version.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertRaises } from "@blazetrails/activesupport";
-import { rubyInspect } from "../relation/ruby-inspect.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
@@ -545,7 +545,7 @@ describe("Migration", () => {
         } as unknown as boolean),
       );
       expect(e.message).toBe(
-        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rubyInspect({ from: true, to: false })}`,
+        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rbInspect({ from: true, to: false })}`,
       );
     });
 

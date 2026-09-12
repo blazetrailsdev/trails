@@ -97,7 +97,7 @@ export {
   GzipWriter,
 } from "./zlib-adapter.js";
 export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
-export { pack } from "./array.js";
+export { compact, pack, uniq } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
 export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
@@ -154,7 +154,7 @@ export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { RUBY_PLATFORM } from "./ruby-platform.js";
-export { rbEqual } from "./rb-equal.js";
+export { rbEql, rbEqual } from "./rb-equal.js";
 export { rbHash } from "./rb-hash.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";

@@ -5,7 +5,6 @@ import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { associationRelationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
-import { rebaseNewOwnerSeed } from "./associations/new-owner-seed-rebase.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 export class AssociationRelation<T extends Base> extends Relation<T> {
@@ -36,33 +35,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const rel = new Ctor(this.model, this._association) as Relation<T>;
     rel.initializeCopy(this);
     return wrapWithScopeProxy(rel);
-  }
-
-  override isNullRelation(): boolean {
-    this._maybeRebaseAssociationSeed();
-    return super.isNullRelation();
-  }
-
-  /** @internal */
-  _maybeRebaseAssociationSeed(): void {
-    if (!this._seededNoneNewOwner) return;
-    const assoc = this._association as unknown as {
-      scope?: () => { _isNone: boolean };
-      resetScope?: () => void;
-    };
-    if (typeof assoc.scope !== "function") return;
-    this._seededNoneNewOwner = false;
-    assoc.resetScope?.();
-    const fresh = assoc.scope();
-    if (fresh._isNone) {
-      this._seededNoneNewOwner = true;
-      return;
-    }
-    rebaseNewOwnerSeed(
-      this as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
-      fresh as unknown,
-      this._seedWherePredicates,
-    );
   }
 
   protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {

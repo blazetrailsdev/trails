@@ -3,7 +3,6 @@ import { Thread } from "@blazetrails/ruby-compat";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
 import { buildExplainClause, renderBind } from "./explain.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import { rubyInspect } from "./relation/ruby-inspect.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "./support/supports.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -11,6 +10,7 @@ import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 registerModel(Car);
 registerModel(Bulb);
@@ -236,7 +236,7 @@ describe("ExplainTest", () => {
   });
 
   it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
-    const rendered = rubyInspect(
+    const rendered = rbInspect(
       [BigInt(42), "str", 7, null, true, false].map((b) => renderBind(Base.connection, b)),
     );
     expect(rendered.startsWith('[[nil, 42], [nil, "str"], [nil, 7], [nil, nil], ')).toBe(true);
@@ -257,7 +257,7 @@ describe("ExplainTest", () => {
     const stub = { typeCast: (v: unknown) => v } as unknown as DatabaseAdapter;
     const buf = Buffer.from("hello world");
     const u8 = new Uint8Array([1, 2, 3, 4, 5]);
-    const rendered = rubyInspect([buf, u8].map((b) => renderBind(stub, b)));
+    const rendered = rbInspect([buf, u8].map((b) => renderBind(stub, b)));
     expect(rendered).toBe(
       '[[nil, "<11 bytes of binary data>"], [nil, "<5 bytes of binary data>"]]',
     );
@@ -267,7 +267,7 @@ describe("ExplainTest", () => {
     const stub = {
       typeCast: (v: unknown) => v,
     } as unknown as DatabaseAdapter;
-    const rendered = rubyInspect(
+    const rendered = rbInspect(
       [
         { value: "raw", format: 1 },
         { value: 42, format: 0 },

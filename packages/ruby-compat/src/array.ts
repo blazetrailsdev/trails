@@ -1,3 +1,5 @@
+import { rbEql } from "./rb-equal.js";
+import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 
 /** `toofew` (`vendor/ruby/pack.c:120`). */
@@ -118,4 +120,37 @@ export function pack(ary: ReadonlyArray<string>, fmt: string): string {
   }
 
   return res.join("");
+}
+
+/**
+ * Ruby `Array#compact` (`vendor/ruby/array.c:6240` `rb_ary_compact`): a new
+ * array with every `nil` element removed.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#compact`
+ *   (`vendor/ruby/array.c:6240`).
+ */
+export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
+  return ary.filter((element) => element != null);
+}
+
+/**
+ * Ruby `Array#uniq` (`vendor/ruby/array.c:6177` `rb_ary_uniq`): the elements in
+ * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
+ * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
+ * Ruby's `1` and `1` do, a tuple is `eql?` by its elements, and a value whose
+ * class defines only `==` stays distinct.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#uniq`
+ *   (`vendor/ruby/array.c:6177`).
+ */
+export function uniq<T>(ary: readonly T[]): T[] {
+  const hash = new Map<number, T[]>();
+  const result: T[] = [];
+  for (const element of ary) {
+    const key = rbHash(element);
+    const bucket = hash.get(key) ?? [];
+    if (bucket.some((seen) => rbEql(seen, element))) continue;
+    bucket.push(element);
+    hash.set(key, bucket);
+    result.push(element);
+  }
+  return result;
 }

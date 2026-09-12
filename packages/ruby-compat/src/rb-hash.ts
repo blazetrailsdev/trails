@@ -51,14 +51,17 @@ export function rbHash(value: unknown): number {
   /* boundary: a JS Date reaches a ported `hash` the same way it reaches
      `rbEqual`, and Ruby hashes it by value. */
   if (value instanceof Date) return stringHash(`Date(${value.toISOString()})`);
-  /* A plain object stands in for a Ruby Hash, whose `hash`
-     (`vendor/ruby/hash.c:3865` `rb_hash_hash`) folds every key and value; the
-     sort keeps it insertion-order independent, as Ruby's is. */
-  if ((value as object).constructor === Object) {
-    const plain = value as Record<string, unknown>;
+  /* A Ruby Hash, whose `hash` (`vendor/ruby/hash.c:3865` `rb_hash_hash`) folds
+     every key and value; the sort keeps it insertion-order independent, as
+     Ruby's is. It has two JS seats — a plain object and a `Map` — and `rbEqual`
+     answers true across them, so both must hash alike or the `hash`/`eql?`
+     contract breaks. */
+  if ((value as object).constructor === Object || value instanceof Map) {
+    const pairs: [unknown, unknown][] =
+      value instanceof Map ? [...value.entries()] : Object.entries(value as object);
     let h = 0x811c9dc5;
-    for (const key of Object.keys(plain).sort()) {
-      h ^= stringHash(key) ^ rbHash(plain[key]);
+    for (const pair of pairs.map(([key, val]) => rbHash(key) ^ rbHash(val)).sort((l, r) => l - r)) {
+      h ^= pair;
       h = Math.imul(h, 0x01000193);
     }
     return h >>> 0;

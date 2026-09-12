@@ -1,9 +1,8 @@
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, symbolToS, rbInspect } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { compactBlank, first, singularize, wrap } from "@blazetrails/activesupport";
 import { OpenSSL, stringDelete, valuesAt } from "@blazetrails/ruby-compat";
-import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
@@ -1037,7 +1036,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const result = await this.exclusionConstraintFor(tableName, { expression, ...options });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rubyInspectHash(options)}`,
+        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     return result;
   }
@@ -1161,7 +1160,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (!result) {
       const columnToS =
         column == null
-          ? rubyInspectHash(options)
+          ? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))
           : Array.isArray(column)
             ? `[${(column as string[])
                 .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))

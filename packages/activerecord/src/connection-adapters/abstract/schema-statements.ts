@@ -1,4 +1,4 @@
-import { block, fetch, KeyError, OpenSSL, slice } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError, OpenSSL, slice, rbInspect } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -48,7 +48,6 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
-import { rubyInspect, rubyInspectHash } from "../../relation/ruby-inspect.js";
 import {
   globalPluralizeTableNames,
   globalTableNamePrefix,
@@ -1418,7 +1417,7 @@ export class SchemaStatements {
   validateChangeColumnNullArgumentBang(value: unknown): void {
     if (value !== true && value !== false) {
       throw new ArgumentError(
-        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rubyInspect(value)}`,
+        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rbInspect(value)}`,
       );
     }
   }
@@ -1667,7 +1666,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? rubyInspectHash(options)}`,
+        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     }
     return fk;
@@ -1740,7 +1739,7 @@ export class SchemaStatements {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? rubyInspectHash(options)}`,
+        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     }
     return chk;

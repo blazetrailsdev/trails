@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbEqual } from "./rb-equal.js";
+import { rbEql, rbEqual } from "./rb-equal.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
   it("compares Uint8Array byte strings by value", () => {
@@ -28,5 +28,52 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(at("Temporal.PlainDate", 1), at("Temporal.PlainDate", 2))).toBe(false);
     expect(rbEqual(at("Temporal.PlainDate", 1), at("Temporal.Instant", 1))).toBe(false);
     expect(rbEqual(at("Temporal.PlainDate", 1), { value: 1 })).toBe(false);
+  });
+});
+
+describe("rbEqual over the two JS seats of a Ruby Hash", () => {
+  it("compares a Map against a plain object key for key", () => {
+    expect(rbEqual(new Map([["a", 1]]), { a: 1 })).toBe(true);
+    expect(rbEqual({ a: 1 }, new Map([["a", 1]]))).toBe(true);
+    expect(rbEqual(new Map([["a", 1]]), new Map([["a", 2]]))).toBe(false);
+    expect(rbEqual(new Map([["a", 1]]), { a: 1, b: 2 })).toBe(false);
+    expect(rbEqual(new Map([[[1], "v"]]), new Map([[[1], "v"]]))).toBe(true);
+  });
+
+  it("recurses into nested values", () => {
+    expect(rbEqual({ a: new Map([["b", [1n]]]) }, { a: { b: [1] } })).toBe(true);
+  });
+
+  it("compares the two JS seats of a Ruby Integer by value", () => {
+    expect(rbEqual(1, 1n)).toBe(true);
+    expect(rbEqual(1n, 1)).toBe(true);
+    expect(rbEqual(2n, 1)).toBe(false);
+    expect(rbEqual(1.5, 1n)).toBe(false);
+    expect(rbEqual(1n, "1")).toBe(false);
+  });
+});
+
+describe("rbEql is rb_equal without the `==` arm", () => {
+  class OnlyEquals {
+    equals(): boolean {
+      return true;
+    }
+  }
+
+  it("answers identity for a class that defines == and no eql?", () => {
+    expect(rbEqual(new OnlyEquals(), new OnlyEquals())).toBe(true);
+    expect(rbEql(new OnlyEquals(), new OnlyEquals())).toBe(false);
+  });
+
+  it("shares every value-class arm with rb_equal", () => {
+    expect(rbEql([1n, { a: [2] }], [1, new Map([["a", [2]]])])).toBe(true);
+    expect(rbEql("x", "x")).toBe(true);
+    expect(rbEql([1], [2])).toBe(false);
+  });
+
+  it("finds a Hash key by eql?, never by the key's ==", () => {
+    const key = new OnlyEquals();
+    expect(rbEqual(new Map([[key, 1]]), new Map([[key, 1]]))).toBe(true);
+    expect(rbEqual(new Map([[key, 1]]), new Map([[new OnlyEquals(), 1]]))).toBe(false);
   });
 });
