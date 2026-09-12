@@ -1,25 +1,23 @@
-import { ref } from "../../fixtures.js";
-
 export const companyFixtureData = {
   first_firm: {
     id: 1,
     type: "Firm",
     name: "37signals",
-    firm_id: ref("companies", "first_firm"),
+    firm_id: 1,
   },
   first_client: {
     id: 2,
     type: "Client",
-    firm_id: ref("companies", "first_firm"),
-    client_of: ref("companies", "first_client"),
+    firm_id: 1,
+    client_of: 2,
     name: "Summit",
     firm_name: "37signals",
   },
   second_client: {
     id: 3,
     type: "Client",
-    firm_id: ref("companies", "first_firm"),
-    client_of: ref("companies", "first_firm"),
+    firm_id: 1,
+    client_of: 1,
     name: "Microsoft",
   },
   another_firm: {
@@ -30,15 +28,15 @@ export const companyFixtureData = {
   another_client: {
     id: 5,
     type: "Client",
-    firm_id: ref("companies", "another_firm"),
-    client_of: ref("companies", "another_firm"),
+    firm_id: 4,
+    client_of: 4,
     name: "Ex Nihilo",
   },
   a_third_client: {
     id: 10,
     type: "Client",
-    firm_id: ref("companies", "another_firm"),
-    client_of: ref("companies", "another_firm"),
+    firm_id: 4,
+    client_of: 4,
     name: "Ex Nihilo Part Deux",
   },
   rails_core: {
@@ -49,12 +47,12 @@ export const companyFixtureData = {
   leetsoft: {
     id: 7,
     name: "Leetsoft",
-    client_of: ref("companies", "rails_core"),
+    client_of: 6,
   },
   jadedpixel: {
     id: 8,
     name: "Jadedpixel",
-    client_of: ref("companies", "rails_core"),
+    client_of: 6,
   },
   odegy: {
     id: 9,
@@ -64,8 +62,8 @@ export const companyFixtureData = {
   another_first_firm_client: {
     id: 11,
     type: "Client",
-    firm_id: ref("companies", "first_firm"),
-    client_of: ref("companies", "first_firm"),
+    firm_id: 1,
+    client_of: 1,
     name: "Apex",
     firm_name: "37signals",
   },

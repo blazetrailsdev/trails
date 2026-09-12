@@ -7,7 +7,6 @@ import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
-import { ActiveRecord } from "../ar-config.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
 import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
 import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
@@ -27,9 +26,9 @@ I18n.setEnforceAvailableLocales(false);
 
 Base.automaticallyInvertPluralAssociations = true;
 
-ActiveRecord.raiseOnAssignToAttrReadonly = true;
+Base.raiseOnAssignToAttrReadonly = true;
 
-ActiveRecord.belongsToRequiredValidatesForeignKey = false;
+Base.belongsToRequiredValidatesForeignKey = false;
 
 export const TEST_PRIMARY_KEY = "test master key";
 export const TEST_DETERMINISTIC_KEY = "test deterministic key";

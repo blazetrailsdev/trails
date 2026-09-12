@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
-import { ActiveRecord } from "../ar-config.js";
 import { AsynchronousQueriesTracker } from "../asynchronous-queries-tracker.js";
 import { Post } from "../test-helpers/models/post.js";
 import { fixtures } from "../test-fixtures.js";
@@ -13,11 +12,11 @@ describe("LoadAsyncTest", () => {
   let tracker: AsynchronousQueriesTracker | undefined;
 
   beforeEach(async () => {
-    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    Base.asyncQueryExecutor = "global_thread_pool";
     tracker = AsynchronousQueriesTracker.run();
     const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
     const previous = pool.asyncExecutor;
-    pool.asyncExecutor = ActiveRecord.globalThreadPoolAsyncQueryExecutor();
+    pool.asyncExecutor = Base.globalThreadPoolAsyncQueryExecutor();
     restoreExecutor = () => {
       pool.asyncExecutor = previous;
     };
@@ -28,7 +27,7 @@ describe("LoadAsyncTest", () => {
     tracker = undefined;
     restoreExecutor?.();
     restoreExecutor = undefined;
-    ActiveRecord.asyncQueryExecutor = null;
+    Base.asyncQueryExecutor = null;
   });
 
   it.skip("scheduled?", () => {});

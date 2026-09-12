@@ -63,7 +63,6 @@ import {
   CpkPost,
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
-import { ActiveRecord } from "../ar-config.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport";
 
@@ -2074,8 +2073,8 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("runs parent presence check if parent has not changed and belongs_to_required_validates_foreign_key is set", async () => {
-    const original = ActiveRecord.belongsToRequiredValidatesForeignKey;
-    ActiveRecord.belongsToRequiredValidatesForeignKey = true;
+    const original = Base.belongsToRequiredValidatesForeignKey;
+    Base.belongsToRequiredValidatesForeignKey = true;
 
     try {
       class TempShip extends Base {
@@ -2098,7 +2097,7 @@ describe("BelongsToAssociationsTest", () => {
       });
       expect(ship.name).toBe("Leviathan");
     } finally {
-      ActiveRecord.belongsToRequiredValidatesForeignKey = original;
+      Base.belongsToRequiredValidatesForeignKey = original;
     }
   });
 

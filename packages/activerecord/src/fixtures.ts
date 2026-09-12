@@ -1,90 +1,20 @@
 import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./ar-config.js";
 import { StatementInvalid } from "./errors.js";
-import { findStiClass } from "./inheritance.js";
-import { currentTimeFromProperTimezone } from "./timestamp.js";
 import {
   camelize,
   isPresent,
   OID_NAMESPACE,
   runLoadHooks,
   singularize,
-  underscore,
   uuidV5,
 } from "@blazetrails/activesupport";
 import { Zlib, prepend } from "@blazetrails/ruby-compat";
 import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { Configurable } from "./encryption/configurable.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
- */
-export class FixtureSetPrimaryKeyError extends Error {
-  constructor(
-    label: string,
-    associationName: string,
-    value: unknown,
-    joinPrimaryKey: string,
-    klassPrimaryKey: string,
-    foreignKey: string,
-    klassName: string,
-  ) {
-    super(
-      `Unable to set ${associationName} to ${String(value)} because the association has a\n` +
-        `custom primary key (${joinPrimaryKey}) that does not match the\n` +
-        `associated table's primary key (${klassPrimaryKey}).\n\n` +
-        `To fix this, change your fixture from\n\n` +
-        `${label}:\n  ${associationName}: ${String(value)}\n\n` +
-        `to\n\n` +
-        `${label}:\n  ${foreignKey}: **value**\n\n` +
-        `where **value** is the ${joinPrimaryKey} value for the\n` +
-        `associated ${klassName} record.`,
-    );
-    this.name = "FixtureSetPrimaryKeyError";
-  }
-}
-
-const TIMESTAMP_COLUMN_NAMES = ["created_at", "created_on", "updated_at", "updated_on"];
-
-function resolveDeclaredPk(
-  tableName: string,
-  pkCol: string,
-  label: string,
-  declared: unknown,
-): number | string {
-  if (declared === undefined) return FixtureSet.identify(label);
-  if (typeof declared === "number" && Number.isInteger(declared)) return declared;
-  if (typeof declared === "string") return declared;
-  throw new Error(
-    `defineFixtures: ${tableName}.${label} declares an invalid primary key (${typeof declared}: ${String(declared)}); use an integer or string literal (e.g. \`${pkCol}: 1\` or \`${pkCol}: "foo"\`) or omit the column.`,
-  );
-}
-
-/**
- * The primary-key value a fixture row will land on, as a stable string usable for
- * collision detection across sets that share a table — computed exactly the way
- * {@link prepareModelFixtures} derives it, so an explicit pin and a label-derived
- * CRC32 id share ONE keyspace (a row pinning `id: 42` collides with an unpinned
- * row whose label hashes to 42). Uses the model's declared `primaryKey`, so a
- * custom-PK model (e.g. Subscriber's `nick`, Dashboard's `dashboard_id`) is keyed
- * on its real column, not a hardcoded `id`. Composite-PK models fold their key
- * columns (present values, else `FixtureSet.compositeIdentify`) into the string.
- * @internal
- * @noRailsEquivalent CONVERGEABLE the primary-key derivation Ruby performs inline in FixtureSet#table_rows (fixtures.rb:742).
- */
-export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
-  const pk = model.primaryKey;
-  if (Array.isArray(pk)) {
-    const generated = FixtureSet.compositeIdentify(label, pk);
-    return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
-  }
-  if (typeof pk !== "string") return "l:" + label;
-  return "s:" + String(resolveDeclaredPk(model.tableName, pk, label, row[pk]));
-}
+import { TableRows } from "./fixture-set/table-rows.js";
 
 const REF_TAG = Symbol("fixture-ref");
 
@@ -104,86 +34,6 @@ export function ref(tableName: string, fixtureName: string): FixtureRef {
  */
 export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
-}
-
-type DeclaredKey = number | string | Record<string, number | string>;
-
-const declaredIds = new WeakMap<object, Map<string, Map<string, DeclaredKey>>>();
-
-function declaredIdsFor(adapter: object): Map<string, Map<string, DeclaredKey>> {
-  let m = declaredIds.get(adapter);
-  if (!m) {
-    m = new Map();
-    declaredIds.set(adapter, m);
-  }
-  return m;
-}
-
-let staticDeclaredIds: Map<string, Map<string, number | string>> | null = null;
-
-async function ensureStaticDeclaredIds(): Promise<void> {
-  if (staticDeclaredIds) return;
-  const { fixtureRegistry, isJoinTableEntry } = await import("./test-helpers/fixtures-registry.js");
-  const map = new Map<string, Map<string, number | string>>();
-  const ambiguous = new Set<string>();
-  for (const [key, entry] of Object.entries(fixtureRegistry)) {
-    if (isJoinTableEntry(entry)) continue;
-    const table = underscore(key.split("/").pop() ?? key);
-    let labelIds = map.get(table);
-    if (!labelIds) {
-      labelIds = new Map<string, number | string>();
-      map.set(table, labelIds);
-    }
-    for (const [label, attrs] of Object.entries(entry.data)) {
-      const id = (attrs as FixtureAttrs).id;
-      if (!((typeof id === "number" && Number.isInteger(id)) || typeof id === "string")) continue;
-      const prior = labelIds.get(label);
-      if (prior !== undefined && prior !== id) {
-        ambiguous.add(`${table}\0${label}`);
-        labelIds.delete(label);
-      } else if (!ambiguous.has(`${table}\0${label}`)) {
-        labelIds.set(label, id);
-      }
-    }
-  }
-  staticDeclaredIds = map;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-fixture-row-building-onto-table-rows
- */
-export function resolveFixtureId(
-  adapter: DatabaseAdapter,
-  tableName: string,
-  fixtureName: string,
-): number | string {
-  const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
-  if (declared !== undefined && typeof declared !== "object") return declared;
-  const pinned = staticDeclaredIds?.get(tableName)?.get(fixtureName);
-  return pinned ?? FixtureSet.identify(fixtureName);
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-fixture-row-building-onto-table-rows
- */
-export function resolveCompositeRefColumn(
-  adapter: DatabaseAdapter,
-  tableName: string,
-  fixtureName: string,
-  targetColumn: string,
-  targetPkCols: readonly string[],
-): number | string {
-  const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
-  if (declared !== undefined && typeof declared === "object") {
-    const v = declared[targetColumn];
-    if (v !== undefined) return v;
-  }
-  return (
-    FixtureSet.compositeIdentify(fixtureName, targetPkCols)[targetColumn] ??
-    FixtureSet.identify(fixtureName)
-  );
 }
 
 const tableRegistries = new WeakMap<object, Map<string, BaseClass>>();
@@ -208,70 +58,6 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-function detectHabtmParts(
-  registry: Map<string, BaseClass>,
-  tableName: string,
-): [string, string] | null {
-  const parts = tableName.split("_");
-  for (let i = 1; i < parts.length; i++) {
-    const left = parts.slice(0, i).join("_");
-    const right = parts.slice(i).join("_");
-    if (registry.has(left) && registry.has(right)) {
-      return [left, right];
-    }
-  }
-  return null;
-}
-
-interface ThroughLabelAssoc {
-  joinTable: string;
-  lhsKey: string;
-  rhsKey: string;
-  targetTable: string | undefined;
-  throughModel: BaseClass | undefined;
-  isHabtm: boolean;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-export function throughLabelAssociations(ModelClass: BaseClass): Map<string, ThroughLabelAssoc> {
-  const out = new Map<string, ThroughLabelAssoc>();
-  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
-  for (const [name, refl] of Object.entries(reflections)) {
-    const r = refl as {
-      parentReflection?: { macro?: string } | null;
-      isThroughReflection?: () => boolean;
-      foreignKey?: string | string[];
-      klass?: { tableName?: string };
-      throughReflection?: { foreignKey?: string | string[]; klass?: BaseClass; tableName?: string };
-    };
-    if (!r.isThroughReflection?.()) continue;
-    try {
-      const throughModel = r.throughReflection?.klass;
-      const joinTable = r.throughReflection?.tableName;
-      const lhsKey = r.throughReflection?.foreignKey;
-      const rhsKey = r.foreignKey;
-      if (
-        typeof joinTable !== "string" ||
-        typeof lhsKey !== "string" ||
-        typeof rhsKey !== "string"
-      ) {
-        continue;
-      }
-      out.set(name, {
-        joinTable,
-        lhsKey,
-        rhsKey,
-        targetTable: r.klass?.tableName,
-        throughModel,
-        isHabtm: r.parentReflection?.macro === "hasAndBelongsToMany",
-      });
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
-
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -290,19 +76,6 @@ export function throughJoinTableNames(ModelClass: BaseClass): string[] {
     }
   }
   return names;
-}
-
-function normalizeHabtmTargets(
-  tableName: string,
-  label: string,
-  col: string,
-  val: unknown,
-): string[] {
-  if (Array.isArray(val)) return val.map(String);
-  if (typeof val === "string") return val.split(/\s*,\s*/).filter((s) => s.length > 0);
-  throw new Error(
-    `defineFixtures: ${tableName}.${label} HABTM association "${col}" expects a label string or array of labels, got ${typeof val}`,
-  );
 }
 
 interface PolymorphicBelongsTo {
@@ -329,37 +102,6 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
     );
   }
   return { typeColumn, idColumn: rawFk };
-}
-
-function reflectionClassFor(
-  ModelClass: BaseClass,
-  inheritanceCol: string | null,
-  row: FixtureAttrs,
-): BaseClass {
-  if (!inheritanceCol) return ModelClass;
-  const typeName = row[inheritanceCol];
-  if (typeof typeName !== "string" || !typeName.trim()) return ModelClass;
-  try {
-    return findStiClass(ModelClass, typeName);
-  } catch {
-    return ModelClass;
-  }
-}
-
-function resolveEnums(reflectionClass: BaseClass, row: FixtureAttrs): void {
-  const enums = (
-    reflectionClass as {
-      _enums?: Map<string, Record<string, number | string | boolean | null>>;
-    }
-  )._enums;
-  if (!enums || enums.size === 0) return;
-  for (const [name, mapping] of enums) {
-    if (!(name in row)) continue;
-    const value = row[name];
-    if (typeof value === "string" && Object.prototype.hasOwnProperty.call(mapping, value)) {
-      row[name] = mapping[value];
-    }
-  }
 }
 
 type BaseClass = typeof Base;
@@ -447,7 +189,7 @@ export async function insertPreparedFixtureSets(
 }
 
 async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
-  if (!ActiveRecord.verifyForeignKeysForFixtures) return;
+  if (!Base.verifyForeignKeysForFixtures) return;
 
   try {
     await conn.checkAllForeignKeysValidBang();
@@ -477,7 +219,6 @@ export async function prepareModelFixtures(
   ModelClass: BaseClass,
   fixtures: Record<string, FixtureAttrs>,
 ): Promise<PreparedFixtureSet> {
-  await ensureStaticDeclaredIds();
   const tableName = ModelClass.tableName;
   const declaredPk = ModelClass.primaryKey;
 
@@ -505,20 +246,6 @@ export async function prepareModelFixtures(
   const registry = getRegistry(adapter);
   registry.set(tableName, ModelClass);
 
-  const habtmParts = detectHabtmParts(registry, tableName);
-  const habtmFkColToTable: Map<string, string> | null = habtmParts
-    ? new Map([
-        [`${singularize(habtmParts[0])}_id`, habtmParts[0]],
-        [`${singularize(habtmParts[1])}_id`, habtmParts[1]],
-      ])
-    : null;
-
-  const throughLabelAssocs = throughLabelAssociations(ModelClass);
-  const joinTableRows = new Map<
-    string,
-    { rows: FixtureAttrs[]; throughModel: BaseClass | undefined; isHabtm: boolean }
-  >();
-
   const base = (fixtures["_fixture"] as { ignore?: unknown } | undefined)?.ignore;
   const ignoredFixtures: string[] = Array.isArray(base)
     ? [...base]
@@ -530,17 +257,10 @@ export async function prepareModelFixtures(
     (label) => label !== "_fixture" && !ignoredFixtures.includes(label),
   );
 
-  const tableIds = new Map<string, DeclaredKey>();
-  if (typeof pkCol === "string") {
-    for (const label of labels) {
-      const id = resolveDeclaredPk(tableName, pkCol, label, fixtures[label][pkCol]);
-      tableIds.set(label, id);
-    }
-  }
-  const adapterIds = declaredIdsFor(adapter);
-  const priorTableIds = adapterIds.get(tableName);
-  adapterIds.set(tableName, tableIds);
+  await ModelClass.loadSchema();
 
+  const encryptFixtures =
+    Configurable.config.encryptFixtures && isPresent(ModelClass.encryptedAttributes);
   const fkColToCompositeRef = new Map<string, { column: string; pkCols: string[] }>();
   {
     const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -554,14 +274,15 @@ export async function prepareModelFixtures(
       if (refl.macro !== "belongsTo" || refl.isPolymorphic?.()) continue;
       let targetPk: unknown;
       let jpk: string | string[] | undefined;
+      let fk: string | string[] | undefined;
       try {
         targetPk = refl.klass?.primaryKey;
         jpk = refl.joinPrimaryKey?.();
+        fk = refl.foreignKey;
       } catch {
         continue;
       }
       if (!Array.isArray(targetPk)) continue;
-      const fk = refl.foreignKey;
       const fkStr = Array.isArray(fk) ? (fk.length === 1 ? fk[0] : undefined) : fk;
       const jpkStr = Array.isArray(jpk) ? (jpk.length === 1 ? jpk[0] : undefined) : jpk;
       if (typeof fkStr === "string" && typeof jpkStr === "string") {
@@ -570,101 +291,11 @@ export async function prepareModelFixtures(
     }
   }
 
-  const tableColumns: { name: string; isVirtual(): boolean }[] | null =
-    typeof (adapter as any).columns === "function"
-      ? await (adapter as any).columns(tableName)
-      : null;
-  const tableColumnNames = tableColumns ? new Set(tableColumns.map((c) => c.name)) : null;
-
-  const inheritanceCol = ModelClass.inheritanceColumn;
-
-  const rows: FixtureAttrs[] = [];
+  const modelFixtures: Record<string, Fixture> = {};
   for (const label of labels) {
-    const attrs = fixtures[label];
-    const row: FixtureAttrs =
-      typeof pkCol === "string"
-        ? { [pkCol]: resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]) }
-        : {};
-
-    for (const [col, val] of Object.entries(attrs)) {
-      if (typeof pkCol === "string" && col === pkCol) continue;
-
-      const labelAssoc = throughLabelAssocs.get(col);
-      if (labelAssoc) {
-        if (typeof pkCol !== "string") {
-          throw new Error(
-            `defineFixtures: ${tableName}.${label} declares through association "${col}" but the owner table has no single primary key to join on`,
-          );
-        }
-        const ownerId = row[pkCol];
-        const targets = normalizeHabtmTargets(tableName, label, col, val);
-        if (targets.length > 0) {
-          const accum = joinTableRows.get(labelAssoc.joinTable) ?? {
-            rows: [],
-            throughModel: labelAssoc.throughModel,
-            isHabtm: labelAssoc.isHabtm,
-          };
-          for (const target of targets) {
-            accum.rows.push({
-              [labelAssoc.lhsKey]: ownerId,
-              [labelAssoc.rhsKey]: labelAssoc.targetTable
-                ? resolveFixtureId(adapter, labelAssoc.targetTable, target)
-                : FixtureSet.identify(target),
-            });
-          }
-          joinTableRows.set(labelAssoc.joinTable, accum);
-        }
-        continue;
-      }
-
+    const row: FixtureAttrs = {};
+    for (const [col, val] of Object.entries(fixtures[label])) {
       const poly = findPolymorphicRef(ModelClass, col);
-
-      if (!poly) {
-        const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
-        const refl = reflections[col] as
-          | {
-              macro?: string;
-              isPolymorphic?: () => boolean;
-              joinPrimaryKey?: () => unknown;
-              klass?: { primaryKey?: unknown; name?: string };
-              foreignKey?: string | string[];
-            }
-          | undefined;
-        if (refl && refl.macro === "belongsTo" && !refl.isPolymorphic?.()) {
-          const fkName = refl.foreignKey;
-          const fkStr = Array.isArray(fkName) ? fkName[0] : fkName;
-          if (col !== fkStr) {
-            const jpk = refl.joinPrimaryKey?.();
-            const klasspk = refl.klass?.primaryKey;
-            if (typeof jpk === "string" && typeof klasspk === "string" && jpk !== klasspk) {
-              throw new FixtureSetPrimaryKeyError(
-                label,
-                col,
-                val,
-                jpk,
-                klasspk,
-                typeof fkStr === "string" ? fkStr : col,
-                refl.klass?.name ?? "Unknown",
-              );
-            }
-            if (Array.isArray(fkName) && typeof val === "string") {
-              const compositeKey = FixtureSet.compositeIdentify(val, fkName);
-              for (const [column, value] of Object.entries(compositeKey)) {
-                if (
-                  (tableColumnNames !== null && !tableColumnNames.has(column)) ||
-                  column in row ||
-                  column in attrs
-                ) {
-                  continue;
-                }
-
-                row[column] = value;
-              }
-              continue;
-            }
-          }
-        }
-      }
 
       if (isFixtureRef(val)) {
         if (poly) {
@@ -675,164 +306,42 @@ export async function prepareModelFixtures(
         }
         const compRef = fkColToCompositeRef.get(col);
         row[col] = compRef
-          ? resolveCompositeRefColumn(
-              adapter,
-              val.tableName,
-              val.fixtureName,
-              compRef.column,
-              compRef.pkCols,
-            )
-          : resolveFixtureId(adapter, val.tableName, val.fixtureName);
+          ? (FixtureSet.compositeIdentify(val.fixtureName, compRef.pkCols)[compRef.column] ??
+            FixtureSet.identify(val.fixtureName))
+          : FixtureSet.identify(val.fixtureName);
         continue;
       }
 
-      if (poly) {
-        const hasType = poly.typeColumn in attrs;
-        const hasId = poly.idColumn in attrs;
-        if (hasType !== hasId) {
+      if (poly && val instanceof Base) {
+        const instanceClass = (val as any).constructor as BaseClass;
+        const instancePk = instanceClass.primaryKey;
+        if (Array.isArray(instancePk)) {
           throw new Error(
-            `defineFixtures: "${col}" — provide both ${poly.typeColumn} and ${poly.idColumn} explicitly, or neither (use the association key instead)`,
+            `defineFixtures: polymorphic target "${col}" has a composite primary key — pass explicit ${poly.typeColumn} and ${poly.idColumn} instead`,
           );
         }
-        if (hasType) continue;
-
-        if (val === null) {
-          row[poly.idColumn] = null;
-          row[poly.typeColumn] = null;
-          continue;
-        }
-
-        if (val instanceof Base) {
-          const instance = val as unknown as FixtureAttrs;
-          const instanceClass = (instance as any).constructor as BaseClass | undefined;
-          const instancePk = (instanceClass as any)?.primaryKey;
-          if (Array.isArray(instancePk)) {
-            throw new Error(
-              `defineFixtures: polymorphic target "${col}" has a composite primary key — pass explicit ${poly.typeColumn} and ${poly.idColumn} instead`,
-            );
-          }
-          const instancePkCol = typeof instancePk === "string" ? instancePk : "id";
-          const pkValue = instance[instancePkCol];
-          if (pkValue === undefined) {
-            throw new Error(
-              `defineFixtures: polymorphic target "${col}" has no value for PK column "${instancePkCol}" — ensure the instance exposes its primary key`,
-            );
-          }
-          const typeName: string =
-            (instanceClass as any)?.polymorphicName?.() ?? instanceClass?.name ?? "Unknown";
-          row[poly.idColumn] = pkValue;
-          row[poly.typeColumn] = typeName;
-          continue;
-        }
-
-        throw new Error(
-          `defineFixtures: "${col}" is a polymorphic association — pass a model instance, null, or explicit ${poly.typeColumn}/${poly.idColumn} columns`,
-        );
+        row[poly.idColumn] = (val as unknown as FixtureAttrs)[instancePk];
+        row[poly.typeColumn] = (instanceClass as any).polymorphicName?.() ?? instanceClass.name;
+        continue;
       }
 
-      if (habtmFkColToTable && typeof val === "string") {
-        const targetTable = habtmFkColToTable.get(col);
-        if (targetTable !== undefined) {
-          row[col] = resolveFixtureId(adapter, targetTable, val);
-          continue;
-        }
-      }
-
-      if (val !== null && typeof val === "object" && typeof pkCol === "string" && pkCol in val) {
-        row[col] = (val as FixtureAttrs)[pkCol];
-      } else {
-        row[col] = val;
-      }
+      row[col] = val;
     }
-
-    if (Array.isArray(pkCol)) {
-      const generated = FixtureSet.compositeIdentify(label, pkCol);
-      for (const keyCol of pkCol) {
-        if (keyCol in row) continue;
-        if (tableColumnNames !== null && !tableColumnNames.has(keyCol)) continue;
-        row[keyCol] = generated[keyCol]!;
-      }
-      const keyMap: Record<string, number | string> = {};
-      for (const keyCol of pkCol) {
-        const v = row[keyCol];
-        if (typeof v === "number" || typeof v === "string") keyMap[keyCol] = v;
-      }
-      tableIds.set(label, keyMap);
-    }
-
-    resolveEnums(reflectionClassFor(ModelClass, inheritanceCol, row), row);
-
-    rows.push(row);
+    modelFixtures[label] = new Fixture(row, encryptFixtures ? ModelClass : null);
   }
 
-  if (tableColumns !== null) {
-    const cols = tableColumns;
+  const tables = new TableRows(tableName, {
+    modelClass: ModelClass,
+    fixtures: modelFixtures,
+  }).toHash();
+  const rows = tables[tableName];
 
-    const virtualNames = new Set(cols.filter((c) => c.isVirtual()).map((c) => c.name));
-    if (virtualNames.size > 0) {
-      for (const row of rows) {
-        for (const name of virtualNames) delete row[name];
-      }
-    }
-
-    if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
-      const colNames = tableColumnNames!;
-      const aliases: Record<string, string> =
-        (ModelClass as { attributeAliases?: Record<string, string> }).attributeAliases ?? {};
-      const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
-        colNames.has(c),
-      );
-      if (stampCols.length > 0) {
-        const now = currentTimeFromProperTimezone();
-        for (const row of rows) {
-          for (const c of stampCols) if (!(c in row)) row[c] = now;
-        }
-      }
-    }
+  const virtualNames = ModelClass.columns()
+    .filter((c: { isVirtual(): boolean }) => c.isVirtual())
+    .map((c: { name: string }) => c.name);
+  for (const row of rows) {
+    for (const name of virtualNames) delete row[name];
   }
-
-  if (Configurable.config.encryptFixtures && isPresent(ModelClass.encryptedAttributes)) {
-    for (const row of rows) new Fixture(row, ModelClass);
-  }
-
-  const tables: Record<string, FixtureAttrs[]> = { [tableName]: rows };
-
-  if (joinTableRows.size > 0) {
-    const now = currentTimeFromProperTimezone();
-    for (const [joinTable, { rows: jrows, throughModel, isHabtm }] of joinTableRows) {
-      if (jrows.length === 0) continue;
-      if (!isHabtm && typeof (adapter as any).tableExists === "function") {
-        const exists: boolean = await (adapter as any).tableExists(joinTable);
-        if (!exists) {
-          throw new Error(
-            `defineFixtures: ${tableName} fixtures expand a plain has_many :through ` +
-              `association whose join table "${joinTable}" is not loaded — the ` +
-              `requesting test must also load the "${joinTable}" fixture set by name ` +
-              `(plain-through join tables are not sliced in automatically; HABTM ones are)`,
-          );
-        }
-      }
-      if (throughModel && typeof (adapter as any).columns === "function") {
-        const cols: { name: string }[] = await (adapter as any).columns(joinTable);
-        const colNames = new Set(cols.map((c) => c.name));
-        const aliases: Record<string, string> =
-          (throughModel as { attributeAliases?: Record<string, string> }).attributeAliases ?? {};
-        const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
-          colNames.has(c),
-        );
-        for (const jr of jrows) for (const c of stampCols) if (!(c in jr)) jr[c] = now;
-      }
-      (tables[joinTable] ??= []).push(...jrows);
-    }
-  }
-
-  const rollback = () => {
-    if (priorTableIds === undefined) {
-      adapterIds.delete(tableName);
-    } else {
-      adapterIds.set(tableName, priorTableIds);
-    }
-  };
 
   const finalize = async (): Promise<Record<string, unknown>> => {
     const result: Record<string, unknown> = {};
@@ -865,7 +374,7 @@ export async function prepareModelFixtures(
 
   const serialReset = serialResetCol !== null ? { table: tableName, column: serialResetCol } : null;
 
-  return { tables, serialReset, rollback, finalize };
+  return { tables, serialReset, rollback: () => {}, finalize };
 }
 
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
@@ -885,7 +394,6 @@ export async function prepareJoinTableFixtures(
   tableName: string,
   fixtures: Record<string, FixtureAttrs>,
 ): Promise<PreparedFixtureSet> {
-  await ensureStaticDeclaredIds();
   let columnNames: Set<string> | null = null;
   if (typeof (adapter as any).columns === "function") {
     const cols: { name: string }[] = await (adapter as any).columns(tableName);
@@ -905,9 +413,7 @@ export async function prepareJoinTableFixtures(
       }
     }
     for (const [col, val] of Object.entries(attrs)) {
-      row[col] = isFixtureRef(val)
-        ? resolveFixtureId(adapter, val.tableName, val.fixtureName)
-        : val;
+      row[col] = isFixtureRef(val) ? FixtureSet.identify(val.fixtureName) : val;
     }
     rows.push(row);
     resolved[label] = row;
@@ -985,6 +491,10 @@ export class Fixture {
 
   get className(): string | undefined {
     return this.modelClass ? this.modelClass.name : undefined;
+  }
+
+  toHash(): FixtureAttrs {
+    return this.fixture;
   }
 }
 

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vites
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal, Logger } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
-import { ActiveRecord } from "./ar-config.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
@@ -1997,9 +1996,9 @@ describe("MigrationTest", () => {
       });
 
       it("migration raises if timestamp is future date", () => {
-        const savedValidate = ActiveRecord.validateMigrationTimestamps;
+        const savedValidate = Base.validateMigrationTimestamps;
         try {
-          ActiveRecord.validateMigrationTimestamps = true;
+          Base.validateMigrationTimestamps = true;
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
           expect(
@@ -2010,7 +2009,7 @@ describe("MigrationTest", () => {
             /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
           );
         } finally {
-          ActiveRecord.validateMigrationTimestamps = savedValidate;
+          Base.validateMigrationTimestamps = savedValidate;
         }
       });
 

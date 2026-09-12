@@ -1,28 +1,26 @@
-import { ref } from "../../fixtures.js";
-
 export const categorizationFixtureData = {
   david_welcome_general: {
     id: 1,
-    author_id: ref("authors", "david"),
-    post_id: ref("posts", "welcome"),
-    category_id: ref("categories", "general"),
+    author_id: 1,
+    post_id: 1,
+    category_id: 1,
   },
   mary_thinking_sti: {
     id: 2,
-    author_id: ref("authors", "mary"),
-    post_id: ref("posts", "thinking"),
-    category_id: ref("categories", "sti_test"),
+    author_id: 2,
+    post_id: 2,
+    category_id: 3,
   },
   mary_thinking_general: {
     id: 3,
-    author_id: ref("authors", "mary"),
-    post_id: ref("posts", "thinking"),
-    category_id: ref("categories", "general"),
+    author_id: 2,
+    post_id: 2,
+    category_id: 1,
   },
   bob_misc_by_bob_technology: {
     id: 4,
-    author_id: ref("authors", "bob"),
-    post_id: ref("posts", "misc_by_bob"),
-    category_id: ref("categories", "technology"),
+    author_id: 3,
+    post_id: 8,
+    category_id: 2,
   },
 };

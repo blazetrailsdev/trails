@@ -14,7 +14,6 @@ import {
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
 import { UniquenessValidator } from "@blazetrails/activerecord";
 import { deprecator } from "@blazetrails/activerecord";
-import { ActiveRecord } from "@blazetrails/activerecord";
 import { Deprecators, Executor } from "@blazetrails/activesupport";
 
 const blogApp = (): {
@@ -50,7 +49,7 @@ describe("RailtieTest", () => {
     savedAddToFilterParameters = EncryptionConfigurable.config.addToFilterParameters;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
-    savedRaiseOnAssignToAttrReadonly = ActiveRecord.raiseOnAssignToAttrReadonly;
+    savedRaiseOnAssignToAttrReadonly = Base.raiseOnAssignToAttrReadonly;
     savedExtendQueries = EncryptionConfigurable.config.extendQueries;
 
     resetLoadHooks();
@@ -69,7 +68,7 @@ describe("RailtieTest", () => {
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
-    ActiveRecord.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
+    Base.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
     EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
     if (savedExtendQueries) {

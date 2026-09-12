@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
 import { IntegerType } from "@blazetrails/activemodel";
@@ -134,12 +134,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("do not raise when raise int wider than 64bit is false", () => {
-      const saved = ActiveRecord.raiseIntWiderThan64bit;
-      ActiveRecord.raiseIntWiderThan64bit = false;
+      const saved = Base.raiseIntWiderThan64bit;
+      Base.raiseIntWiderThan64bit = false;
       try {
         expect(adapter.quote(BigInt("9223372036854775808"))).toBe("9223372036854775808");
       } finally {
-        ActiveRecord.raiseIntWiderThan64bit = saved;
+        Base.raiseIntWiderThan64bit = saved;
       }
     });
   });

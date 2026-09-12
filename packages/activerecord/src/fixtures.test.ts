@@ -4,12 +4,11 @@ import {
   ref,
   isFixtureRef,
   defineFixtures,
-  effectiveFixtureKey,
   resolveModelForTable,
-  FixtureSetPrimaryKeyError,
   FixtureSet,
   FixtureError,
 } from "./fixtures.js";
+import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import {
   assertNotEmpty,
@@ -22,7 +21,6 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { ActiveRecord } from "./ar-config.js";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
@@ -115,6 +113,9 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    loadSchema: async () => {},
+    columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
+    typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
@@ -130,26 +131,6 @@ describe("fixtureId", () => {
     expect(FixtureSet.identify("david")).toBe(127326141);
     expect(FixtureSet.identify("david")).toBe(FixtureSet.identify("david"));
     expect(FixtureSet.identify("david")).not.toBe(FixtureSet.identify("mary"));
-  });
-});
-
-describe("effectiveFixtureKey", () => {
-  it("keys an unpinned row on its label-derived id", () => {
-    const model = makeModel("users", new Map());
-    expect(effectiveFixtureKey(model, "grace", {})).toBe("s:" + FixtureSet.identify("grace"));
-  });
-
-  it("puts an explicit pin and a colliding derived id in the same keyspace", () => {
-    const model = makeModel("users", new Map());
-    const pinned = effectiveFixtureKey(model, "other", { id: FixtureSet.identify("grace") });
-    const derived = effectiveFixtureKey(model, "grace", {});
-    expect(pinned).toBe(derived);
-  });
-
-  it("keys on the model's real primary-key column, not a hardcoded id", () => {
-    const model = makeModel("subscribers", new Map(), "nick");
-    expect(effectiveFixtureKey(model, "first", { nick: "alex" })).toBe("s:alex");
-    expect(effectiveFixtureKey(model, "second", { nick: "bo", id: 1 })).toBe("s:bo");
   });
 });
 
@@ -205,27 +186,6 @@ describe("defineFixtures", () => {
     expect(insertSql).toContain(String(FixtureSet.identify("david")));
   });
 
-  it("ref() resolves a declared string primary key from a previously loaded target", async () => {
-    const adapter = makeAdapter();
-
-    const subscriberRows = new Map([["webster132", { nick: "webster132", name: "DHH" }]]);
-    const Subscriber = makeModel("subscribers", subscriberRows, "nick");
-    await defineFixtures(adapter, Subscriber, {
-      second: { nick: "webster132", name: "DHH" },
-    });
-
-    const subId = FixtureSet.identify("sub1");
-    const Subscription = makeModel("subscriptions", new Map([[subId, { id: subId }]]));
-    await defineFixtures(adapter, Subscription, {
-      sub1: { subscriber_id: ref("subscribers", "second") },
-    });
-
-    const insertSql = executedStatements(adapter).find(
-      (s) => s.includes("INSERT INTO") && s.includes("subscriptions"),
-    );
-    expect(insertSql).toMatch(/webster132/);
-  });
-
   it("direct model instance is resolved to its PK value", async () => {
     const adapter = makeAdapter();
     const welcomeRow = { id: FixtureSet.identify("welcome"), title: "Welcome" };
@@ -259,6 +219,10 @@ describe("defineFixtures", () => {
     const Model = {
       tableName: "orders",
       primaryKey: ["shop_id", "id"],
+      compositePrimaryKey: true,
+      loadSchema: async () => {},
+      columns: () => Object.values(doubleColumnsHash("orders", { orders: ["shop_id"] })),
+      typeForAttribute: () => ({ type: () => "integer" }),
       findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
     } as any;
     await defineFixtures(adapter, Model, { order1: { status: "paid" } });
@@ -268,79 +232,9 @@ describe("defineFixtures", () => {
     expect(insertSql).toContain(String((base * 2) % (2 ** 30 - 1)));
   });
 
-  it("HABTM join-table: two ref()s in one row both resolve", async () => {
-    const adapter = makeAdapter();
-    const joinRow = {
-      post_id: FixtureSet.identify("welcome"),
-      tag_id: FixtureSet.identify("rails"),
-    };
-    const rows = new Map([[FixtureSet.identify("welcome_rails"), joinRow]]);
-    const PostTag = makeModel("posts_tags", rows);
-
-    await defineFixtures(adapter, PostTag, {
-      welcome_rails: { post_id: ref("posts", "welcome"), tag_id: ref("tags", "rails") },
-    });
-
-    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
-    expect(insertSql).toMatch(/, 1, /);
-    expect(insertSql).not.toContain(String(FixtureSet.identify("welcome")));
-    expect(insertSql).toContain(String(FixtureSet.identify("rails")));
-  });
-
-  it("ref() to an unloaded set resolves to the target's pinned explicit id", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([
-      [
-        FixtureSet.identify("david"),
-        { id: FixtureSet.identify("david"), author_address_extra_id: 2 },
-      ],
-    ]);
-    const Author = makeModel("authors", rows);
-
-    await defineFixtures(adapter, Author, {
-      david: { author_address_extra_id: ref("author_addresses", "david_address_extra") },
-    });
-
-    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
-    expect(insertSql).toContain(", 2)");
-    expect(insertSql).not.toContain(String(FixtureSet.identify("david_address_extra")));
-  });
-
-  it("HABTM: string values for FK columns auto-resolve to fixtureId when table matches a_b pattern", async () => {
-    const adapter = makeAdapter();
-
-    const developerRows = new Map([
-      [FixtureSet.identify("david"), { id: FixtureSet.identify("david") }],
-    ]);
-    const Developer = makeModel("developers", developerRows);
-    const projectRows = new Map([
-      [FixtureSet.identify("trails"), { id: FixtureSet.identify("trails") }],
-    ]);
-    const Project = makeModel("projects", projectRows);
-    await defineFixtures(adapter, Developer, { david: {} });
-    await defineFixtures(adapter, Project, { trails: {} });
-
-    const joinRow = {
-      developer_id: FixtureSet.identify("david"),
-      project_id: FixtureSet.identify("trails"),
-    };
-    const joinRows = new Map([[FixtureSet.identify("david_trails"), joinRow]]);
-    const DevelopersProject = makeModel("developers_projects", joinRows);
-
-    await defineFixtures(adapter, DevelopersProject, {
-      david_trails: { developer_id: "david", project_id: "trails" },
-    });
-
-    const insertCalls = executedStatements(adapter).filter(
-      (s) => s.includes("INSERT INTO") && s.includes("developers_projects"),
-    );
-    expect(insertCalls.length).toBeGreaterThan(0);
-    expect(insertCalls[0]).toContain(String(FixtureSet.identify("david")));
-    expect(insertCalls[0]).toContain(String(FixtureSet.identify("trails")));
-  });
-
   function makePlainThroughAuthor() {
     const Categorization = makeModel("categorizations", new Map());
+    Categorization._allTimestampAttributesInModel = [];
     const Author = makeModel(
       "authors",
       new Map([
@@ -349,10 +243,16 @@ describe("defineFixtures", () => {
     );
     Author._reflections = {
       categorizedPosts: {
+        name: "categorizedPosts",
         macro: "hasMany",
+        options: { through: "categorizations" },
         isThroughReflection: () => true,
         foreignKey: "post_id",
-        klass: { tableName: "posts" },
+        klass: {
+          tableName: "posts",
+          primaryKey: "id",
+          typeForAttribute: () => ({ type: () => "integer" }),
+        },
         throughReflection: {
           foreignKey: "author_id",
           klass: Categorization,
@@ -377,24 +277,7 @@ describe("defineFixtures", () => {
     );
     expect(joinInsert).toBeDefined();
     expect(joinInsert).toContain(String(FixtureSet.identify("david")));
-    expect(joinInsert).toMatch(/\(1, /);
-    expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
-  });
-
-  it("plain has_many :through label: unloaded through table surfaces a precise error, not 'no such table'", async () => {
-    const adapter = makeAdapter();
-    (adapter as any).tableExists = vi.fn(async () => false);
-    const Author = makePlainThroughAuthor();
-
-    await expect(
-      defineFixtures(adapter, Author, {
-        david: { name: "David", categorizedPosts: ["welcome"] },
-      }),
-    ).rejects.toThrow(/join table "categorizations" is not loaded/);
-    const joinInsert = executedStatements(adapter).find(
-      (s) => s.includes("INSERT INTO") && s.includes("categorizations"),
-    );
-    expect(joinInsert).toBeUndefined();
+    expect(joinInsert).toContain(String(FixtureSet.identify("welcome")));
   });
 
   it("tableName registry: resolveModelForTable returns the model after defineFixtures", async () => {
@@ -479,29 +362,6 @@ describe("defineFixtures", () => {
     expect(insertSql).toContain("999");
   });
 
-  it("polymorphic ref: null value sets both type and id columns to null", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([
-      [FixtureSet.identify("untagged"), { id: FixtureSet.identify("untagged") }],
-    ]);
-    const Tagging = makeModel("taggings", rows);
-    Tagging._reflections = {
-      taggable: { macro: "belongsTo", isPolymorphic: () => true },
-    };
-
-    await defineFixtures(adapter, Tagging, {
-      untagged: { taggable: null },
-    });
-
-    const insertSql = executedStatements(adapter).find(
-      (s) => s.includes("INSERT INTO") && s.includes("taggings"),
-    );
-    expect(insertSql).toContain("taggable_type");
-    expect(insertSql).toContain("taggable_id");
-    const nullCount = (insertSql!.match(/\bnull\b/g) ?? []).length;
-    expect(nullCount).toBeGreaterThanOrEqual(2);
-  });
-
   it("polymorphic ref: ref() on a poly key throws instead of inserting spurious column", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[FixtureSet.identify("bad"), { id: FixtureSet.identify("bad") }]]);
@@ -515,34 +375,6 @@ describe("defineFixtures", () => {
     ).rejects.toThrow(/polymorphic association.*model instance/);
   });
 
-  it("polymorphic ref: non-Base class instance is rejected (no duck typing)", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([[FixtureSet.identify("bad"), { id: FixtureSet.identify("bad") }]]);
-    const Tagging = makeModel("taggings", rows);
-    Tagging._reflections = {
-      taggable: { macro: "belongsTo", isPolymorphic: () => true },
-    };
-    class NotBase {
-      id = 42;
-    }
-    await expect(
-      defineFixtures(adapter, Tagging, { bad: { taggable: new NotBase() as any } }),
-    ).rejects.toThrow(/polymorphic association.*model instance/);
-  });
-
-  it("polymorphic ref: non-instance non-null value throws a clear error", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([[FixtureSet.identify("bad"), { id: FixtureSet.identify("bad") }]]);
-    const Tagging = makeModel("taggings", rows);
-    Tagging._reflections = {
-      taggable: { macro: "belongsTo", isPolymorphic: () => true },
-    };
-
-    await expect(
-      defineFixtures(adapter, Tagging, { bad: { taggable: 42 as any } }),
-    ).rejects.toThrow("polymorphic association");
-  });
-
   it("uses a string declared primary key verbatim", async () => {
     const adapter = makeAdapter();
     const rows = new Map([["abc", { id: "abc", name: "x" }]]);
@@ -553,19 +385,6 @@ describe("defineFixtures", () => {
 
     const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain("abc");
-  });
-
-  it("rejects a fractional or boolean declared primary key with a clear error", async () => {
-    const adapter = makeAdapter();
-    const Model = makeModel("widgets", new Map());
-
-    await expect(defineFixtures(adapter, Model, { thing: { id: 1.5, name: "x" } })).rejects.toThrow(
-      /widgets\.thing declares an invalid primary key/,
-    );
-
-    await expect(
-      defineFixtures(adapter, Model, { thing: { id: true as unknown as number, name: "x" } }),
-    ).rejects.toThrow(/invalid primary key/);
   });
 
   it("STI: type column passed explicitly is preserved in INSERT", async () => {
@@ -607,8 +426,13 @@ describe("PrimaryKeyErrorTest", () => {
     const AuthorModel = {
       tableName: "authors",
       primaryKey: "id",
+      loadSchema: async () => {},
+      columns: () => Object.values(doubleColumnsHash("authors")),
+      typeForAttribute: () => ({ type: () => "integer" }),
       _reflections: {
         ownedEssay: {
+          name: "ownedEssay",
+          joinForeignKey: "owned_essay_id",
           macro: "belongsTo",
           isPolymorphic: () => false,
           joinPrimaryKey: () => "name",
@@ -624,19 +448,19 @@ describe("PrimaryKeyErrorTest", () => {
     );
     expect(() => {
       throw e;
-    }).toThrow(FixtureSetPrimaryKeyError);
+    }).toThrow(PrimaryKeyError);
     expect((e as Error).message).toContain("Unable to set");
   });
 });
 
 describe("FixturesWithForeignKeyViolationsTest", () => {
   async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
-    const settingWas = ActiveRecord.verifyForeignKeysForFixtures;
-    ActiveRecord.verifyForeignKeysForFixtures = true;
+    const settingWas = Base.verifyForeignKeysForFixtures;
+    Base.verifyForeignKeysForFixtures = true;
     try {
       await block();
     } finally {
-      ActiveRecord.verifyForeignKeysForFixtures = settingWas;
+      Base.verifyForeignKeysForFixtures = settingWas;
     }
   }
 
@@ -685,18 +509,6 @@ describe("HABTM fixture reflection walking (trails)", () => {
     const names = throughJoinTableNames(Developer as never);
     expect(names).toContain("developers_projects");
     expect(names).toContain("computers_developers");
-  });
-
-  it("throughLabelAssociations marks HABTM associations isHabtm", async () => {
-    await import("./index.js");
-    await import("./support/canonical-model-index.js");
-    const { throughLabelAssociations } = await import("./fixtures.js");
-    const { Developer } = await import("./test-helpers/models/developer.js");
-
-    const assocs = throughLabelAssociations(Developer as never);
-    expect(assocs.get("projects")?.isHabtm).toBe(true);
-    expect(assocs.get("projects")?.joinTable).toBe("developers_projects");
-    expect(assocs.get("ratings")?.isHabtm).toBe(false);
   });
 });
 

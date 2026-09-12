@@ -14,7 +14,7 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { isInMemoryDatabase, isRemoteLibsqlUrl } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
@@ -754,7 +754,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
     args.push(File.expandPath(config.database!, trailsRoot() ?? undefined));
-    return this.findCmdAndExec(ActiveRecord.databaseCli["sqlite"], ...args);
+    return this.findCmdAndExec(_Base!.databaseCli["sqlite"], ...args);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {

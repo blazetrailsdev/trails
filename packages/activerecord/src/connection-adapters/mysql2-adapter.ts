@@ -34,7 +34,7 @@ import {
   performQuery as mysql2PerformQuery,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
@@ -671,7 +671,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    this._databaseTimezone = ActiveRecord.defaultTimezone;
+    this._databaseTimezone = _Base!.defaultTimezone;
     if (this._connectionConfigured || !this._rawConnection) return;
     this._connectionConfigured = true;
     await super.configureConnection();

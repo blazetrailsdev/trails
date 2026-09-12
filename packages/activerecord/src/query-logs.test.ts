@@ -5,7 +5,6 @@ import { Base } from "./base.js";
 import { QueryLogs, escapeComment, GetKeyHandler } from "./query-logs.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { queryLogs } from "./query-logs-instance.js";
-import { ActiveRecord } from "./ar-config.js";
 import type { QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
@@ -24,9 +23,9 @@ describe("QueryLogsTest", () => {
 
   beforeEach(() => {
     ExecutionContext.clear();
-    originalTransformers = [...ActiveRecord.queryTransformers];
-    ActiveRecord.queryTransformers.length = 0;
-    ActiveRecord.queryTransformers.push(queryLogs);
+    originalTransformers = [...Base.queryTransformers];
+    Base.queryTransformers.length = 0;
+    Base.queryTransformers.push(queryLogs);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.clearCache();
@@ -37,8 +36,8 @@ describe("QueryLogsTest", () => {
   });
 
   afterEach(() => {
-    ActiveRecord.queryTransformers.length = 0;
-    ActiveRecord.queryTransformers.push(...originalTransformers);
+    Base.queryTransformers.length = 0;
+    Base.queryTransformers.push(...originalTransformers);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.tags = [];

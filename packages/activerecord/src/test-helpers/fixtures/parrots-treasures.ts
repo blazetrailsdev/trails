@@ -18,11 +18,11 @@ export const parrotsTreasuresFixtureData = {
     treasure_id: ref("treasures", "sapphire"),
   },
   polly_sapphire: {
-    parrot_id: ref("parrots", "polly"),
+    parrot_id: 4,
     treasure_id: ref("treasures", "sapphire"),
   },
   polly_ruby: {
-    parrot_id: ref("parrots", "polly"),
+    parrot_id: 4,
     treasure_id: ref("treasures", "ruby"),
   },
   defaults_sapphire: {

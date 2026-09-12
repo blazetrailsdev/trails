@@ -69,6 +69,9 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    loadSchema: async () => {},
+    columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
+    typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
@@ -330,8 +333,9 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
     const row = peoplesTreasures("michael_diamond");
-    expect(Number(row.rich_person_id)).toBe(Number(people("michael").readAttribute("id")));
+    expect(Number(row.rich_person_id)).toBe(Number(FixtureSet.identify("michael")));
     expect(Number(row.treasure_id)).toBe(Number(treasures("diamond").readAttribute("id")));
+    expect(Number(people("michael").readAttribute("id"))).toBe(1);
   });
 });
 

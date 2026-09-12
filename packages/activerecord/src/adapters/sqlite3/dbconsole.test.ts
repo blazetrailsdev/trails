@@ -2,7 +2,7 @@ import { it, expect, vi } from "vitest";
 import { File } from "@blazetrails/ruby-compat";
 import { setTrailsRoot, trailsRoot } from "@blazetrails/activesupport";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "../../database-configurations/database-config.js";
@@ -70,7 +70,7 @@ describeIfSqlite("SQLite3DbConsoleTest", () => {
   });
 
   it("sqlite3 can use alternative cli", () => {
-    ActiveRecord.databaseCli["sqlite"] = "sqlitecli";
+    Base.databaseCli["sqlite"] = "sqlitecli";
     try {
       const config = makeDbConfig({
         adapter: "sqlite3",
@@ -82,7 +82,7 @@ describeIfSqlite("SQLite3DbConsoleTest", () => {
         SQLite3Adapter.dbconsole(config),
       );
     } finally {
-      ActiveRecord.databaseCli["sqlite"] = "sqlite3";
+      Base.databaseCli["sqlite"] = "sqlite3";
     }
   });
 });

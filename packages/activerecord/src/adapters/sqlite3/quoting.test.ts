@@ -3,7 +3,6 @@ import { Temporal } from "@blazetrails/date";
 import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/activesupport";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { ActiveRecord } from "../../ar-config.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import * as Type from "../../type.js";
@@ -78,8 +77,8 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quoted time dst utc", () => {
-    const previous = ActiveRecord.defaultTimezone;
-    ActiveRecord.defaultTimezone = "utc";
+    const previous = Base.defaultTimezone;
+    Base.defaultTimezone = "utc";
     try {
       const t = new TimeWithZone(
         Temporal.ZonedDateTime.from("2000-07-01T00:00:00+04:30[+04:30]").toInstant(),
@@ -93,13 +92,13 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
       expect(conn.quotedTime(t)).toBe(expected);
     } finally {
-      ActiveRecord.defaultTimezone = previous;
+      Base.defaultTimezone = previous;
     }
   });
 
   it("quoted time dst local", () => {
-    const previous = ActiveRecord.defaultTimezone;
-    ActiveRecord.defaultTimezone = "local";
+    const previous = Base.defaultTimezone;
+    Base.defaultTimezone = "local";
     try {
       const t = new TimeWithZone(
         Temporal.ZonedDateTime.from("2000-07-01T00:00:00+04:30[+04:30]").toInstant(),
@@ -113,7 +112,7 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
       expect(conn.quotedTime(t)).toBe(expected);
     } finally {
-      ActiveRecord.defaultTimezone = previous;
+      Base.defaultTimezone = previous;
     }
   });
 

@@ -3,7 +3,6 @@ import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
-import { ActiveRecord } from "../../ar-config.js";
 import { Base } from "../../base.js";
 import {
   describeIfPg,
@@ -853,14 +852,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
+    let savedWarningsAction: typeof Base.dbWarningsAction;
     let savedWarningsIgnore: typeof Base.dbWarningsIgnore;
     beforeEach(() => {
-      savedWarningsAction = ActiveRecord.dbWarningsAction;
+      savedWarningsAction = Base.dbWarningsAction;
       savedWarningsIgnore = Base.dbWarningsIgnore;
     });
     afterEach(() => {
-      ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
+      Base.dbWarningsAction = savedWarningsAction ?? "ignore";
       Base.dbWarningsIgnore = savedWarningsIgnore;
       vi.restoreAllMocks();
     });

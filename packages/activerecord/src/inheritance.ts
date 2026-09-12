@@ -11,7 +11,6 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { ActiveRecord } from "./ar-config.js";
 
 function castInheritanceColumnValue(
   modelClass: typeof Base,
@@ -368,7 +367,7 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
 }
 
 export function __resetPrimaryAbstractClass(): void {
-  ActiveRecord.applicationRecordClass = null;
+  _Base!.applicationRecordClass = null;
 }
 
 /**
@@ -376,7 +375,7 @@ export function __resetPrimaryAbstractClass(): void {
  * @noRailsEquivalent CONVERGEABLE resolves the ApplicationRecord constant Ruby names directly (core.rb:121).
  */
 export function getApplicationRecordClass(): typeof Base | null {
-  return ActiveRecord.applicationRecordClass as typeof Base | null;
+  return _Base!.applicationRecordClass as typeof Base | null;
 }
 
 /**
@@ -390,21 +389,21 @@ export function getApplicationRecordClass(): typeof Base | null {
  * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) as a free function; it also exists on Base, and one of the two should go.
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
-  if (ActiveRecord.applicationRecordClass) {
-    return modelClass === ActiveRecord.applicationRecordClass;
+  if (_Base!.applicationRecordClass) {
+    return modelClass === _Base!.applicationRecordClass;
   }
   return modelClass === (globalThis as Record<string, unknown>)["ApplicationRecord"];
 }
 
 export function primaryAbstractClass(modelClass: typeof Base): void {
-  if (ActiveRecord.applicationRecordClass && ActiveRecord.applicationRecordClass !== modelClass) {
+  if (_Base!.applicationRecordClass && _Base!.applicationRecordClass !== modelClass) {
     throw new ArgumentError(
-      `The \`primary_abstract_class\` is already set to ${ActiveRecord.applicationRecordClass.name}. ` +
+      `The \`primary_abstract_class\` is already set to ${_Base!.applicationRecordClass.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
     );
   }
   (modelClass as any).abstractClass = true;
-  ActiveRecord.applicationRecordClass = modelClass;
+  _Base!.applicationRecordClass = modelClass;
 }
 
 export function stiClassFor(modelClass: typeof Base, typeName: string): typeof Base {

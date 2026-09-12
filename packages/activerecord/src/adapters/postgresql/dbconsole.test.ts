@@ -1,7 +1,7 @@
 import { it, expect, vi, beforeEach, afterEach } from "vitest";
 import { env as ENV, setEnv } from "@blazetrails/ruby-compat";
 import { describeIfPg } from "../../support/describe-if-pg.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
 import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "../../database-configurations/database-config.js";
@@ -117,13 +117,13 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
   });
 
   it("postgresql can use alternative cli", () => {
-    ActiveRecord.databaseCli["postgresql"] = "pgcli";
+    Base.databaseCli["postgresql"] = "pgcli";
     try {
       const config = makeDbConfig({ adapter: "postgresql", database: "db" });
 
       assertFindCmdAndExecCalledWith(["pgcli", "db"], () => PostgreSQLAdapter.dbconsole(config));
     } finally {
-      ActiveRecord.databaseCli["postgresql"] = "psql";
+      Base.databaseCli["postgresql"] = "psql";
     }
   });
 });

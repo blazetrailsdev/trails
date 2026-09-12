@@ -422,28 +422,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "CONVERGEABLE binaries-fixture-data-from-flowers-asset.",
   },
   {
-    pattern: "fixture_set/model_metadata.rb",
-    reason:
-      "Supporting machinery for YAML fixtures: the per-model column/timestamp metadata " +
-      "FixtureSet::TableRows consults. Excluded along with fixtures.rb; file.rb and " +
-      "render_context.rb are ported (fixture-set/file.ts, fixture-set/render-context.ts) " +
-      "since story port-fixture-set-file-and-test-fixtures-cases.",
-  },
-  {
-    pattern: "fixture_set/table_row.rb",
-    reason:
-      "Supporting machinery for YAML fixtures: one row's association/enum/timestamp " +
-      "resolution. trails resolves those inline in fixtures.ts (prepareModelFixtures, " +
-      "resolveRefs) rather than as a row object. Excluded along with fixtures.rb.",
-  },
-  {
-    pattern: "fixture_set/table_rows.rb",
-    reason:
-      "Supporting machinery for YAML fixtures: the per-table row collection built from " +
-      "a FixtureSet. trails builds the same rows inline in fixtures.ts. Excluded along " +
-      "with fixtures.rb.",
-  },
-  {
     testFile: "fixture_set/file_test.rb",
     tests: ["render context lookup scope"],
     reason:

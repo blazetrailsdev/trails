@@ -2,10 +2,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { Time, Value } from "./time.js";
-import { ActiveRecord } from "../ar-config.js";
+import { Base } from "../base.js";
 
 afterEach(() => {
-  ActiveRecord.defaultTimezone = "utc";
+  Base.defaultTimezone = "utc";
   setZone(null);
 });
 
@@ -22,7 +22,7 @@ describe("ActiveRecord::Type::Time serialize_cast_value normalization", () => {
   });
 
   it("getlocal's a time zone-aware value when default_timezone is :local", () => {
-    ActiveRecord.defaultTimezone = "local";
+    Base.defaultTimezone = "local";
     const type = new Time();
     const value = new TimeWithZone(Temporal.Instant.from("2000-01-01T10:30:00Z"), pacific());
     const obj = (type.serializeCastValue(value) as Value).getobj() as RubyTime;

@@ -1,9 +1,7 @@
-import { ref } from "../../fixtures.js";
-
 export const accountFixtureData = {
   signals37: {
     id: 1,
-    firm_id: ref("companies", "first_firm"),
+    firm_id: 1,
     credit_limit: 50,
     firm_name: "37signals",
     status: "active",
@@ -14,25 +12,25 @@ export const accountFixtureData = {
   },
   rails_core_account: {
     id: 3,
-    firm_id: ref("companies", "rails_core"),
+    firm_id: 6,
     credit_limit: 50,
     status: "suspended",
   },
   last_account: {
     id: 4,
-    firm_id: ref("companies", "first_client"),
+    firm_id: 2,
     credit_limit: 60,
     status: "trial",
   },
   rails_core_account_2: {
     id: 5,
-    firm_id: ref("companies", "rails_core"),
+    firm_id: 6,
     credit_limit: 55,
     status: "active",
   },
   odegy_account: {
     id: 6,
-    firm_id: ref("companies", "odegy"),
+    firm_id: 9,
     credit_limit: 53,
     status: "trial",
   },

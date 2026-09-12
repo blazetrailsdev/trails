@@ -1,36 +1,34 @@
-import { ref } from "../../fixtures.js";
-
 export const categoriesPostsFixtureData = {
   general_welcome: {
-    category_id: ref("categories", "general"),
-    post_id: ref("posts", "welcome"),
+    category_id: 1,
+    post_id: 1,
   },
   technology_welcome: {
-    category_id: ref("categories", "technology"),
-    post_id: ref("posts", "welcome"),
+    category_id: 2,
+    post_id: 1,
   },
   general_thinking: {
-    category_id: ref("categories", "general"),
-    post_id: ref("posts", "thinking"),
+    category_id: 1,
+    post_id: 2,
   },
   general_sti_habtm: {
-    category_id: ref("categories", "general"),
-    post_id: ref("posts", "sti_habtm"),
+    category_id: 1,
+    post_id: 6,
   },
   sti_test_sti_habtm: {
-    category_id: ref("categories", "sti_test"),
-    post_id: ref("posts", "sti_habtm"),
+    category_id: 3,
+    post_id: 6,
   },
   general_hello: {
-    category_id: ref("categories", "general"),
-    post_id: ref("posts", "sti_comments"),
+    category_id: 1,
+    post_id: 4,
   },
   general_misc_by_bob: {
-    category_id: ref("categories", "general"),
-    post_id: ref("posts", "misc_by_bob"),
+    category_id: 1,
+    post_id: 8,
   },
   cooking_misc_by_bob: {
-    category_id: ref("categories", "cooking"),
-    post_id: ref("posts", "misc_by_bob"),
+    category_id: 4,
+    post_id: 8,
   },
 };

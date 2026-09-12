@@ -2,7 +2,6 @@ import "./active-model.js";
 import "./action-controller.js";
 import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
 import {
-  ActiveRecord,
   AsynchronousQueriesTracker,
   Base,
   ConnectionPool,
@@ -143,11 +142,11 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.set_configs", () => {
       const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
-      ActiveRecord.maintainTestSchema = cfg.maintainTestSchema;
-      ActiveRecord.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
-      ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
-      ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
-      ActiveRecord.queues = cfg.queues;
+      Base.maintainTestSchema = cfg.maintainTestSchema;
+      Base.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
+      Base.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
+      Base.generateSecureTokenOn = cfg.generateSecureTokenOn;
+      Base.queues = cfg.queues;
       const partialInserts = cfg.partialInserts;
       if (partialInserts !== undefined) {
         onLoad("active_record", (base: typeof Base) => {

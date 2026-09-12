@@ -1,5 +1,3 @@
-import { ref } from "../../fixtures.js";
-
 const sets = Object.fromEntries(
   Array.from({ length: 10 }, (_, i) => [`set_${i + 1}`, { id: i + 3001 }]),
 );
@@ -22,7 +20,7 @@ const trees = Object.fromEntries(
     `tree_${id}`,
     {
       id,
-      parent_id: parentId === 0 ? 0 : ref("mixins", `tree_${parentId}`),
+      parent_id: parentId,
       type: "NestedSetWithStringScope",
       lft,
       rgt,

@@ -1,6 +1,7 @@
 import { Mutex, synchronize } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
-import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
+import { AsyncExecutor } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import {
   Executor,
   include,
@@ -898,11 +899,11 @@ export class ConnectionPool implements ReapablePool {
 
   /** @missingRailsArgs new — PERMANENT */
   private buildAsyncExecutor(): AsyncExecutor | null {
-    switch (ActiveRecord.asyncQueryExecutor) {
+    switch (_Base?.asyncQueryExecutor ?? null) {
       case "multi_thread_pool":
         return this.dbConfig.maxThreads > 0 ? new AsyncExecutor() : null;
       case "global_thread_pool":
-        return ActiveRecord.globalThreadPoolAsyncQueryExecutor();
+        return _Base!.globalThreadPoolAsyncQueryExecutor();
       default:
         return null;
     }

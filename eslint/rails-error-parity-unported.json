@@ -18,12 +18,6 @@
     "reason": "active_record/fixtures.rb (fixtures subsystem) is unported."
   },
   {
-    "package": "activerecord",
-    "name": "PrimaryKeyError",
-    "rubyFile": "active_record/fixture_set/table_row.rb",
-    "reason": "active_record/fixture_set/table_row.rb (fixtures subsystem) is unported."
-  },
-  {
     "package": "activesupport",
     "name": "DeprecationException",
     "rubyFile": "active_support/deprecation/behaviors.rb",

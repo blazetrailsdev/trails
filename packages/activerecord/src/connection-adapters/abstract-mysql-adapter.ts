@@ -91,7 +91,7 @@ import {
   parameterize,
   presence,
 } from "@blazetrails/activesupport";
-import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -969,7 +969,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     args.push(config.database as string);
 
-    return this.findCmdAndExec(ActiveRecord.databaseCli["mysql"], ...args);
+    return this.findCmdAndExec(_Base!.databaseCli["mysql"], ...args);
   }
 
   private _emulateBooleans = true;
@@ -1191,7 +1191,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
     } | null;
-    const action = ActiveRecord.dbWarningsAction;
+    const action = _Base!.dbWarningsAction;
     if (action == null || rawConnection == null) return;
     const warningCount = await this.warningCount(rawConnection);
     if (warningCount === 0) return;

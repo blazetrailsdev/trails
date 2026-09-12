@@ -5,7 +5,6 @@ import { Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Current, Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
-import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -188,17 +187,17 @@ describe("Migration#createTable id option type", () => {
       expect(migration.executionStrategy).toBe(migration.executionStrategy);
     });
 
-    it("uses the class configured on ActiveRecord.migrationStrategy", () => {
+    it("uses the class configured on Base.migrationStrategy", () => {
       class CustomStrategy extends DefaultStrategy {}
-      const previous = ActiveRecord.migrationStrategy;
-      ActiveRecord.migrationStrategy = CustomStrategy;
+      const previous = Base.migrationStrategy;
+      Base.migrationStrategy = CustomStrategy;
       try {
         const migration = new StrategyMigration();
         const strategy = migration.executionStrategy as CustomStrategy;
         expect(strategy).toBeInstanceOf(CustomStrategy);
         expect(strategy.methodMissing("createTable")).toBe("hi mom!");
       } finally {
-        ActiveRecord.migrationStrategy = previous;
+        Base.migrationStrategy = previous;
       }
     });
 

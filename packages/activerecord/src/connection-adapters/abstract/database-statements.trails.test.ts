@@ -50,7 +50,7 @@ import {
 } from "./database-statements.js";
 import { Transaction, TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
 import type { QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -644,14 +644,14 @@ describe("preprocessQuery", () => {
 
   describe("queryTransformers loop", () => {
     function withTransformers(transformers: QueryTransformer[], fn: () => void): void {
-      const saved = ActiveRecord.queryTransformers.slice();
-      ActiveRecord.queryTransformers.length = 0;
-      ActiveRecord.queryTransformers.push(...transformers);
+      const saved = Base.queryTransformers.slice();
+      Base.queryTransformers.length = 0;
+      Base.queryTransformers.push(...transformers);
       try {
         fn();
       } finally {
-        ActiveRecord.queryTransformers.length = 0;
-        ActiveRecord.queryTransformers.push(...saved);
+        Base.queryTransformers.length = 0;
+        Base.queryTransformers.push(...saved);
       }
     }
 

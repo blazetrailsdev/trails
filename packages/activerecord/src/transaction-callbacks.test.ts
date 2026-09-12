@@ -1,14 +1,7 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
-import {
-  ActiveRecord,
-  Base,
-  transaction,
-  currentTransaction,
-  Rollback,
-  registerModel,
-} from "./index.js";
+import { Base, transaction, currentTransaction, Rollback, registerModel } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { fixtures } from "./test-fixtures.js";
@@ -947,7 +940,7 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
-      ActiveRecord.runAfterTransactionCallbacksInOrderDefined = false;
+      Base.runAfterTransactionCallbacksInOrderDefined = false;
       const Topic = defineBehaviourTopic();
 
       const topic = new Topic() as any;
@@ -1113,11 +1106,11 @@ describe("TransactionCallbacksTest", () => {
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
       let Topic: ReturnType<typeof defineBehaviourTopic>;
-      ActiveRecord.runAfterTransactionCallbacksInOrderDefined = true;
+      Base.runAfterTransactionCallbacksInOrderDefined = true;
       try {
         Topic = defineBehaviourTopic();
       } finally {
-        ActiveRecord.runAfterTransactionCallbacksInOrderDefined = false;
+        Base.runAfterTransactionCallbacksInOrderDefined = false;
       }
 
       const topic = new Topic() as any;

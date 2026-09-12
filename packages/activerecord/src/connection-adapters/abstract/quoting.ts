@@ -19,7 +19,7 @@ import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { _Base } from "../../base-slot.js";
 import {
   defaultSqlTimezone,
   formatPlainDateTimeForSql,
@@ -312,7 +312,7 @@ function toFsDb(value: TemporalDateLike): string {
 
 export function quotedDate(value: TemporalDateLike): string {
   if (actsLikeTime(value)) {
-    if (ActiveRecord.defaultTimezone === "utc") {
+    if (_Base!.defaultTimezone === "utc") {
       if (!utcQ(value)) value = getutc(value);
     } else {
       value = getlocal(value);

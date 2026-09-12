@@ -71,7 +71,9 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError, StaleObjectError } from "./errors.js";
+import { NotImplementedError, StaleObjectError, type SQLWarning } from "./errors.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+import type { QueryTransformer } from "./query-transformers.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -150,7 +152,8 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
-import { ActiveRecord } from "./ar-config.js";
+import { ActiveRecord, AsyncExecutor } from "./ar-config.js";
+import { ActiveSupport } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -655,7 +658,45 @@ interface _ConstructorAssociationWriter {
   syncIdsWrite?: (v: unknown[]) => void;
 }
 
+type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
+
+type AnyClass = abstract new (...args: never[]) => object;
+
+let _disablePreparedStatements = false;
+let _databaseCli: Record<string, string | string[]> = {
+  postgresql: "psql",
+  mysql: ["mysql", "mysql5"],
+  sqlite: "sqlite3",
+};
+let _defaultTimezone: "utc" | "local" = "utc";
+let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _dbWarningsIgnore: (string | RegExp)[] = [];
+let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
+let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
+let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+let _queues: Record<string, unknown> = {};
+let _maintainTestSchema: boolean | null = null;
+let _raiseOnAssignToAttrReadonly = false;
+let _belongsToRequiredValidatesForeignKey = true;
+let _beforeCommittedOnAllRecords = false;
+let _runAfterTransactionCallbacksInOrderDefined = false;
+let _applicationRecordClass: AnyClass | null = null;
+let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
+let _errorOnIgnoredOrder = false;
+let _timestampedMigrations = true;
+let _validateMigrationTimestamps = false;
+let _migrationStrategy: AnyClass = DefaultStrategy;
+let _verifyForeignKeysForFixtures = false;
+let _queryTransformers: QueryTransformer[] = [];
+let _useYamlUnsafeLoad = false;
+let _raiseIntWiderThan64bit = true;
+let _yamlColumnPermittedClasses: unknown[] = [Symbol];
+let _generateSecureTokenOn: "create" | "initialize" = "create";
+let _protocolAdapters: Record<string, string> = {
+  sqlite: "sqlite3",
+  mysql: "mysql2",
+  postgres: "postgresql",
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
@@ -694,12 +735,256 @@ export class Base extends Model {
   /** @internal */
   declare static _registryKeys: string[];
 
+  static get disablePreparedStatements(): boolean {
+    return _disablePreparedStatements;
+  }
+
+  static set disablePreparedStatements(value: boolean) {
+    _disablePreparedStatements = value;
+  }
+
+  static get databaseCli(): Record<string, string | string[]> {
+    return _databaseCli;
+  }
+
+  static set databaseCli(value: Record<string, string | string[]>) {
+    _databaseCli = value;
+  }
+
+  static get defaultTimezone(): "utc" | "local" {
+    return _defaultTimezone;
+  }
+
+  static set defaultTimezone(defaultTimezone: "utc" | "local") {
+    if (defaultTimezone !== "local" && defaultTimezone !== "utc") {
+      throw new ArgumentError("default_timezone must be either :utc (default) or :local.");
+    }
+    _defaultTimezone = defaultTimezone;
+  }
+
+  static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
+    return _dbWarningsAction;
+  }
+
+  static set dbWarningsAction(action: DbWarningsAction) {
+    switch (action) {
+      case "ignore":
+        _dbWarningsAction = null;
+        break;
+      case "log":
+        _dbWarningsAction = (warning) => {
+          let warningMessage = `[${warning.name}] ${warning.message}`;
+          if (warning.code) warningMessage += ` (${warning.code})`;
+          (Base.logger as { warn: (msg: string) => void }).warn(warningMessage);
+        };
+        break;
+      case "raise":
+        _dbWarningsAction = (warning) => {
+          throw warning;
+        };
+        break;
+      case "report":
+        _dbWarningsAction = (warning) => {
+          ActiveSupport.errorReporter.report(warning, { handled: true });
+        };
+        break;
+      default:
+        if (typeof action === "function") {
+          _dbWarningsAction = action;
+          break;
+        }
+        throw new ArgumentError(
+          "db_warnings_action must be one of :ignore, :log, :raise, :report, or a custom proc.",
+        );
+    }
+  }
+
   static get dbWarningsIgnore(): (string | RegExp)[] {
     return _dbWarningsIgnore;
   }
 
   static set dbWarningsIgnore(value: (string | RegExp)[]) {
     _dbWarningsIgnore = value;
+  }
+
+  static get asyncQueryExecutor(): "global_thread_pool" | "multi_thread_pool" | null {
+    return _asyncQueryExecutor;
+  }
+
+  static set asyncQueryExecutor(value: "global_thread_pool" | "multi_thread_pool" | null) {
+    _asyncQueryExecutor = value;
+  }
+
+  /**
+   * @missingRailsArgs new — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+   */
+  static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
+    return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
+  }
+  static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
+    return _permanentConnectionCheckout;
+  }
+
+  static set permanentConnectionCheckout(value: true | "deprecated" | "disallowed") {
+    if (value !== true && value !== "deprecated" && value !== "disallowed") {
+      throw new ArgumentError(
+        "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
+      );
+    }
+    _permanentConnectionCheckout = value;
+  }
+
+  static get queues(): Record<string, unknown> {
+    return _queues;
+  }
+
+  static set queues(value: Record<string, unknown>) {
+    _queues = value;
+  }
+
+  static get maintainTestSchema(): boolean | null {
+    return _maintainTestSchema;
+  }
+
+  static set maintainTestSchema(value: boolean | null) {
+    _maintainTestSchema = value;
+  }
+
+  static get raiseOnAssignToAttrReadonly(): boolean {
+    return _raiseOnAssignToAttrReadonly;
+  }
+
+  static set raiseOnAssignToAttrReadonly(value: boolean) {
+    _raiseOnAssignToAttrReadonly = value;
+  }
+
+  static get belongsToRequiredValidatesForeignKey(): boolean {
+    return _belongsToRequiredValidatesForeignKey;
+  }
+
+  static set belongsToRequiredValidatesForeignKey(value: boolean) {
+    _belongsToRequiredValidatesForeignKey = value;
+  }
+
+  static get beforeCommittedOnAllRecords(): boolean {
+    return _beforeCommittedOnAllRecords;
+  }
+
+  static set beforeCommittedOnAllRecords(value: boolean) {
+    _beforeCommittedOnAllRecords = value;
+  }
+
+  static get runAfterTransactionCallbacksInOrderDefined(): boolean {
+    return _runAfterTransactionCallbacksInOrderDefined;
+  }
+
+  static set runAfterTransactionCallbacksInOrderDefined(value: boolean) {
+    _runAfterTransactionCallbacksInOrderDefined = value;
+  }
+
+  static get applicationRecordClass(): AnyClass | null {
+    return _applicationRecordClass;
+  }
+
+  static set applicationRecordClass(value: AnyClass | null) {
+    _applicationRecordClass = value;
+  }
+
+  static get actionOnStrictLoadingViolation(): "raise" | "log" {
+    return _actionOnStrictLoadingViolation;
+  }
+
+  static set actionOnStrictLoadingViolation(value: "raise" | "log") {
+    _actionOnStrictLoadingViolation = value;
+  }
+
+  static get errorOnIgnoredOrder(): boolean {
+    return _errorOnIgnoredOrder;
+  }
+
+  static set errorOnIgnoredOrder(value: boolean) {
+    _errorOnIgnoredOrder = value;
+  }
+
+  static get timestampedMigrations(): boolean {
+    return _timestampedMigrations;
+  }
+
+  static set timestampedMigrations(value: boolean) {
+    _timestampedMigrations = value;
+  }
+
+  static get validateMigrationTimestamps(): boolean {
+    return _validateMigrationTimestamps;
+  }
+
+  static set validateMigrationTimestamps(value: boolean) {
+    _validateMigrationTimestamps = value;
+  }
+
+  static get migrationStrategy(): AnyClass {
+    return _migrationStrategy;
+  }
+
+  static set migrationStrategy(value: AnyClass) {
+    _migrationStrategy = value;
+  }
+
+  static get verifyForeignKeysForFixtures(): boolean {
+    return _verifyForeignKeysForFixtures;
+  }
+
+  static set verifyForeignKeysForFixtures(value: boolean) {
+    _verifyForeignKeysForFixtures = value;
+  }
+
+  static get queryTransformers(): QueryTransformer[] {
+    return _queryTransformers;
+  }
+
+  static set queryTransformers(value: QueryTransformer[]) {
+    _queryTransformers = value;
+  }
+
+  static get useYamlUnsafeLoad(): boolean {
+    return _useYamlUnsafeLoad;
+  }
+
+  static set useYamlUnsafeLoad(value: boolean) {
+    _useYamlUnsafeLoad = value;
+  }
+
+  static get raiseIntWiderThan64bit(): boolean {
+    return _raiseIntWiderThan64bit;
+  }
+
+  static set raiseIntWiderThan64bit(value: boolean) {
+    _raiseIntWiderThan64bit = value;
+  }
+
+  static get yamlColumnPermittedClasses(): unknown[] {
+    return _yamlColumnPermittedClasses;
+  }
+
+  static set yamlColumnPermittedClasses(value: unknown[]) {
+    _yamlColumnPermittedClasses = value;
+  }
+
+  static get generateSecureTokenOn(): "create" | "initialize" {
+    return _generateSecureTokenOn;
+  }
+
+  static set generateSecureTokenOn(value: "create" | "initialize") {
+    _generateSecureTokenOn = value;
+  }
+
+  static get protocolAdapters(): Record<string, string> {
+    return _protocolAdapters;
+  }
+
+  static set protocolAdapters(value: Record<string, string>) {
+    _protocolAdapters = value;
   }
 
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];

@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
-import { ActiveRecord } from "./ar-config.js";
+import { _Base } from "./base-slot.js";
 import { include } from "@blazetrails/activesupport";
 import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
 
@@ -17,7 +17,7 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   (this as any)._attrReadonly = [
     ...new Set([...((this as any)._attrReadonly as string[]), ...attributes.map(String)]),
   ];
-  if (ActiveRecord.raiseOnAssignToAttrReadonly) {
+  if (_Base!.raiseOnAssignToAttrReadonly) {
     include(this as unknown as new (...args: any[]) => any, HasReadonlyAttributes);
   }
 }

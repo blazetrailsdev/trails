@@ -6,7 +6,6 @@ import {
   UnknownMigrationVersionError,
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
-import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
@@ -17,7 +16,7 @@ const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pa
 
 describe("MigrationContext", () => {
   afterEach(() => {
-    ActiveRecord.validateMigrationTimestamps = false;
+    Base.validateMigrationTimestamps = false;
   });
 
   it("migrations reads this context's migrationsPaths", () => {
@@ -65,7 +64,7 @@ describe("MigrationContext", () => {
   });
 
   it("migrations raises for a migration timestamp in the future", () => {
-    ActiveRecord.validateMigrationTimestamps = true;
+    Base.validateMigrationTimestamps = true;
     const context = new MigrationContext(
       [`${MIGRATIONS_ROOT}/future_timestamp`],
       new NullSchemaMigration(),
@@ -97,9 +96,9 @@ describe("MigrationContext", () => {
   });
 
   it("migrations ignores the timestamp check when timestampedMigrations is off", () => {
-    ActiveRecord.validateMigrationTimestamps = true;
-    const previous = ActiveRecord.timestampedMigrations;
-    ActiveRecord.timestampedMigrations = false;
+    Base.validateMigrationTimestamps = true;
+    const previous = Base.timestampedMigrations;
+    Base.timestampedMigrations = false;
     try {
       const context = new MigrationContext(
         [`${MIGRATIONS_ROOT}/future_timestamp`],
@@ -108,7 +107,7 @@ describe("MigrationContext", () => {
       );
       expect(context.migrations).toHaveLength(1);
     } finally {
-      ActiveRecord.timestampedMigrations = previous;
+      Base.timestampedMigrations = previous;
     }
   });
 });

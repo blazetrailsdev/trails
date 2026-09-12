@@ -11,7 +11,7 @@ import {
   DateNegativeInfinity,
 } from "./temporal-wire.js";
 import { quotedDate } from "./quoting.js";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
 
 describe("parsePostgresInstant", () => {
   it("parses a timestamptz with space separator and two-digit offset", () => {
@@ -185,26 +185,26 @@ describe("naive parsers honor ActiveRecord.default_timezone", () => {
   let saved: "utc" | "local";
 
   beforeEach(() => {
-    saved = ActiveRecord.defaultTimezone;
+    saved = Base.defaultTimezone;
   });
   afterEach(() => {
-    ActiveRecord.defaultTimezone = saved;
+    Base.defaultTimezone = saved;
   });
 
   it("Postgres timestamp parses as UTC when default_timezone=utc", () => {
-    ActiveRecord.defaultTimezone = "utc";
+    Base.defaultTimezone = "utc";
     const result = parsePostgresTimestampAsInstant("2026-04-26 14:23:55") as Temporal.Instant;
     expect(result.toString()).toBe("2026-04-26T14:23:55Z");
   });
 
   it("MySQL DATETIME parses as UTC when default_timezone=utc", () => {
-    ActiveRecord.defaultTimezone = "utc";
+    Base.defaultTimezone = "utc";
     const result = parseMysqlDatetimeAsInstant("2026-04-26 14:23:55") as Temporal.Instant;
     expect(result.toString()).toBe("2026-04-26T14:23:55Z");
   });
 
   it("naive parsers + formatInstantForSql round-trip symmetrically under default_timezone=local", () => {
-    ActiveRecord.defaultTimezone = "local";
+    Base.defaultTimezone = "local";
     const wireString = "2026-06-15 12:00:00";
     const parsed = parsePostgresTimestampAsInstant(wireString) as Temporal.Instant;
     expect(parsed).toBeInstanceOf(Temporal.Instant);
@@ -212,7 +212,7 @@ describe("naive parsers honor ActiveRecord.default_timezone", () => {
   });
 
   it("MySQL DATETIME round-trips symmetrically with formatInstantForSql under local", () => {
-    ActiveRecord.defaultTimezone = "local";
+    Base.defaultTimezone = "local";
     const wireString = "2026-06-15 12:00:00";
     const parsed = parseMysqlDatetimeAsInstant(wireString) as Temporal.Instant;
     expect(quotedDate(parsed)).toBe(wireString);
