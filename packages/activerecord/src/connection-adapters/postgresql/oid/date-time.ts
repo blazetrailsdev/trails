@@ -25,13 +25,6 @@ export class DateTime extends ArDateTime {
     return super.castValue(value);
   }
 
-  override serialize(value: unknown): unknown {
-    const cast = this.cast(value);
-    if (cast === DateInfinity) return "infinity";
-    if (cast === DateNegativeInfinity) return "-infinity";
-    return super.serializeCastValue(cast);
-  }
-
   override typeCastForSchema(value: unknown): string {
     if (value === DateInfinity) return "::Float::INFINITY";
     if (value === DateNegativeInfinity) return "-::Float::INFINITY";

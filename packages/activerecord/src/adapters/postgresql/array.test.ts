@@ -465,8 +465,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const strings = ["hello,", "world;"];
       const commaDelim = new OidArray(stringSubtype, ",");
       const semicolonDelim = new OidArray(stringSubtype, ";");
-      expect(String(commaDelim.serialize(strings))).toBe('{"hello,",world;}');
-      expect(String(semicolonDelim.serialize(strings))).toBe('{hello,;"world;"}');
+      expect(adapter.typeCast(commaDelim.serialize(strings))).toBe('{"hello,",world;}');
+      expect(adapter.typeCast(semicolonDelim.serialize(strings))).toBe('{hello,;"world;"}');
     });
 
     it("mutate array", async () => {

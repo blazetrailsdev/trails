@@ -11,10 +11,6 @@ export class Uuid extends ValueType<string> {
     return "uuid";
   }
 
-  override deserialize(value: unknown): string | null {
-    return this.cast(value);
-  }
-
   override serialize(value: unknown): string | null {
     return this.cast(value);
   }

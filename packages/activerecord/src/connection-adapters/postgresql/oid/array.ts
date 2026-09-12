@@ -19,6 +19,7 @@ function encodeArrayElement(text: string | null, delimiter: string): string {
 
 /** @noRailsEquivalent PERMANENT */
 export class PgTextEncoderArray {
+  /** @noRailsEquivalent PERMANENT */
   readonly name: string;
   readonly delimiter: string;
 
@@ -27,6 +28,7 @@ export class PgTextEncoderArray {
     this.delimiter = delimiter;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   encode(values: readonly unknown[]): string {
     const items = values.map((value) => {
       if (value == null) return encodeArrayElement(null, this.delimiter);
@@ -39,6 +41,7 @@ export class PgTextEncoderArray {
 
 /** @noRailsEquivalent PERMANENT */
 export class PgTextDecoderArray {
+  /** @noRailsEquivalent PERMANENT */
   readonly name: string;
   readonly delimiter: string;
 
@@ -47,6 +50,7 @@ export class PgTextDecoderArray {
     this.delimiter = delimiter;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   decode(str: string): unknown[] {
     const trimmed = str.trim();
     if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
@@ -244,9 +248,5 @@ export class Data {
   constructor(encoder: PgTextEncoderArray, values: unknown[]) {
     this.encoder = encoder;
     this.values = values;
-  }
-
-  toString(): string {
-    return this.encoder.encode(this.values);
   }
 }

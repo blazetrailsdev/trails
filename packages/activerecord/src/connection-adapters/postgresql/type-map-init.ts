@@ -58,6 +58,7 @@ ArType.register("uuid", Uuid, { adapter: "postgresql" });
 ArType.register("vector", Vector, { adapter: "postgresql" });
 ArType.register("xml", Xml, { adapter: "postgresql" });
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function extractLimit(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
   const match = /\((.*)\)/.exec(sqlType);
@@ -66,18 +67,21 @@ export function extractLimit(sqlType: string | undefined): number | undefined {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function extractPrecision(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
   const match = /\(\s*(\d+)\s*(?:,\s*\d+\s*)?\)/.exec(sqlType);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function extractScale(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
   const match = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function registerClassWithLimit(
   mapping: HashLookupTypeMap,
   key: string,
@@ -89,6 +93,7 @@ export function registerClassWithLimit(
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function registerClassWithPrecision(
   mapping: HashLookupTypeMap,
   key: string,
@@ -115,6 +120,7 @@ class PgInteger8 extends BigIntegerType {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-pg-type-map-init-onto-adapter-class-methods */
 export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.registerType("int2", new IntegerType({ limit: 2 }));
   m.registerType("int4", new IntegerType({ limit: 4 }));

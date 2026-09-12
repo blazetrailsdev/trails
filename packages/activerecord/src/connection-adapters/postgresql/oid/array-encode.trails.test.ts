@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { PgTextEncoderArray, Data as ArrayData } from "./array.js";
+import { PgTextEncoderArray } from "./array.js";
 
 describe("PostgreSQL array literal encoding", () => {
   const encoder = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
-  const encode = (values: unknown[]): string => new ArrayData(encoder, values).toString();
+  const encode = (values: unknown[]): string => encoder.encode(values);
 
   it("emits unambiguous elements bare", () => {
     expect(encode(["a", "b"])).toBe("{a,b}");

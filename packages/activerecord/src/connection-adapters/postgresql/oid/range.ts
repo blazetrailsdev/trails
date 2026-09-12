@@ -51,14 +51,6 @@ export class RangeType extends ValueType<Range<unknown>> {
     return new Range(begin, end, extracted.excludeEnd);
   }
 
-  cast(value: unknown): Range<unknown> | null {
-    return this.castValue(value);
-  }
-
-  override deserialize(value: unknown): Range<unknown> | null {
-    return this.castValue(value);
-  }
-
   override serialize(value: unknown): unknown {
     if (!(value instanceof Range)) return value;
     const from = this.typeCastSingleForDatabase(value.begin);

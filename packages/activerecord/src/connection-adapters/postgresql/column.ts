@@ -45,10 +45,6 @@ export class Column extends BaseColumn {
     return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
   }
 
-  override get type(): string | null {
-    return super.type;
-  }
-
   isSerial(): boolean {
     return this._serial;
   }

@@ -2,10 +2,6 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {
-  constructor(options?: { precision?: number; limit?: number }) {
-    super(options);
-  }
-
   override type(): string {
     return "money";
   }

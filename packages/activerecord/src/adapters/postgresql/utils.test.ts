@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { PgName, extractSchemaQualifiedName } from "./utils.js";
+import { Name, Utils } from "../../connection-adapters/postgresql/utils.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         "database.schema.table": ["database", "schema"],
       };
       for (const [given, [expectedSchema, expectedName]] of Object.entries(cases)) {
-        const result = extractSchemaQualifiedName(given);
+        const result = Utils.extractSchemaQualifiedName(given);
         expect(result.schema).toBe(expectedSchema);
         expect(result.identifier).toBe(expectedName);
       }
@@ -58,40 +58,40 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLNameTest", () => {
     it("represents itself as schema.name", () => {
-      const obj = new PgName("public", "articles");
+      const obj = new Name("public", "articles");
       expect(obj.toString()).toBe("public.articles");
     });
 
     it("without schema, represents itself as name only", () => {
-      const obj = new PgName(null, "articles");
+      const obj = new Name(null, "articles");
       expect(obj.toString()).toBe("articles");
     });
 
     it("quoted returns a string representation usable in a query", () => {
-      expect(new PgName(null, "articles").quoted()).toBe('"articles"');
-      expect(new PgName("public", "articles").quoted()).toBe('"public"."articles"');
+      expect(new Name(null, "articles").quoted()).toBe('"articles"');
+      expect(new Name("public", "articles").quoted()).toBe('"public"."articles"');
     });
 
     it("prevents double quoting", () => {
-      const name = new PgName('"quoted_schema"', '"quoted_table"');
+      const name = new Name('"quoted_schema"', '"quoted_table"');
       expect(name.toString()).toBe("quoted_schema.quoted_table");
       expect(name.quoted()).toBe('"quoted_schema"."quoted_table"');
     });
 
     it("equality based on state", () => {
-      expect(new PgName("access", "users").equals(new PgName("access", "users"))).toBe(true);
-      expect(new PgName(null, "users").equals(new PgName(null, "users"))).toBe(true);
-      expect(new PgName(null, "users").equals(new PgName("access", "users"))).toBe(false);
-      expect(new PgName("access", "users").equals(new PgName("public", "users"))).toBe(false);
-      expect(new PgName("public", "users").equals(new PgName("public", "articles"))).toBe(false);
+      expect(new Name("access", "users").equals(new Name("access", "users"))).toBe(true);
+      expect(new Name(null, "users").equals(new Name(null, "users"))).toBe(true);
+      expect(new Name(null, "users").equals(new Name("access", "users"))).toBe(false);
+      expect(new Name("access", "users").equals(new Name("public", "users"))).toBe(false);
+      expect(new Name("public", "users").equals(new Name("public", "articles"))).toBe(false);
     });
 
     it("can be used as hash key", () => {
       const map = new Map<string, string>();
-      map.set(new PgName("schema", "article_seq").hashKey(), "success");
-      expect(map.get(new PgName("schema", "article_seq").hashKey())).toBe("success");
-      expect(map.get(new PgName("schema", "articles").hashKey())).toBeUndefined();
-      expect(map.get(new PgName("public", "article_seq").hashKey())).toBeUndefined();
+      map.set(new Name("schema", "article_seq").hashKey(), "success");
+      expect(map.get(new Name("schema", "article_seq").hashKey())).toBe("success");
+      expect(map.get(new Name("schema", "articles").hashKey())).toBeUndefined();
+      expect(map.get(new Name("public", "article_seq").hashKey())).toBeUndefined();
     });
   });
 });

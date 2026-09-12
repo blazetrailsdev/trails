@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import { DateTime } from "./date-time.js";
 import { Timestamp } from "./timestamp.js";
 import { TimestampWithTimeZone } from "./timestamp-with-time-zone.js";
-import { quotedDate } from "../quoting.js";
+import { quotedDate, typeCast } from "../quoting.js";
+import type { QuotingDispatchHost } from "../../abstract/quoting.js";
 
 describe("PostgreSQL::OID::DateTime", () => {
   const type = new DateTime();
@@ -61,13 +62,17 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("serialize returns 'infinity' / '-infinity' for sentinels", () => {
-    expect(type.serialize(DateInfinity)).toBe("infinity");
-    expect(type.serialize(DateNegativeInfinity)).toBe("-infinity");
+    expect(type.serialize(DateInfinity)).toBe(DateInfinity);
+    expect(type.serialize(DateNegativeInfinity)).toBe(DateNegativeInfinity);
+    const host = {} as QuotingDispatchHost;
+    expect(typeCast.call(host, type.serialize(DateInfinity))).toBe("infinity");
+    expect(typeCast.call(host, type.serialize(DateNegativeInfinity))).toBe("-infinity");
   });
 
   it("serialize round-trips the 'infinity' / '-infinity' wire strings", () => {
-    expect(type.serialize("infinity")).toBe("infinity");
-    expect(type.serialize("-infinity")).toBe("-infinity");
+    const host = {} as QuotingDispatchHost;
+    expect(typeCast.call(host, type.serialize("infinity"))).toBe("infinity");
+    expect(typeCast.call(host, type.serialize("-infinity"))).toBe("-infinity");
   });
 
   it("type_cast_for_schema renders infinity sentinels", () => {

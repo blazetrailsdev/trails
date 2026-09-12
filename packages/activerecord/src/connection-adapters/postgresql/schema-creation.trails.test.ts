@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { SchemaCreation } from "./schema-creation.js";
+import { SchemaCreation, type PgSchemaCreationHost } from "./schema-creation.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
@@ -41,7 +41,7 @@ const s = () =>
       }
       return type;
     },
-  }) as any;
+  } as PgSchemaCreationHost) as any;
 
 describe("PostgreSQL SchemaCreation", () => {
   it("visitForeignKeyDefinition: NOT VALID + DEFERRABLE", () => {

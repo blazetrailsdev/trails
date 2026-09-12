@@ -98,12 +98,6 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return null;
   }
 
-  override isChanged(oldValue: unknown, newValue: unknown, _rawValue?: unknown): boolean {
-    if (oldValue == null && newValue == null) return false;
-    if (oldValue == null || newValue == null) return true;
-    return !hashesEqual(oldValue as Record<string, unknown>, newValue as Record<string, unknown>);
-  }
-
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldHash = this.deserialize(rawOldValue);
     if (oldHash == null && newValue == null) return false;

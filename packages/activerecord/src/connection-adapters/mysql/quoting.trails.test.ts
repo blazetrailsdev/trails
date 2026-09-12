@@ -11,7 +11,6 @@ import {
   castBoundValue,
   columnNameMatcher,
   columnNameWithOrderMatcher,
-  quoteString,
 } from "./quoting.js";
 import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
@@ -272,6 +271,11 @@ describe("MySQL quoting — columnNameWithOrderMatcher", () => {
 });
 
 describe("MySQL quoteString escapes per the connection's escaping state", () => {
+  const quoteString = (value: string, state?: { noBackslashEscapes: boolean }): string =>
+    Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: state,
+    }).quoteString(value);
+
   it("doubles the quote and leaves backslash inert under NO_BACKSLASH_ESCAPES", () => {
     const state = { noBackslashEscapes: true };
     expect(quoteString("O'Reilly", state)).toBe("O''Reilly");
