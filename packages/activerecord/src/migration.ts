@@ -59,7 +59,6 @@ export type {
 export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-export { type Compatibility } from "./migration/compatibility.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { _Base } from "./base-slot.js";

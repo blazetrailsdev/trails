@@ -10,7 +10,7 @@ describe("EnvelopeEncryptionKeyProvider trails extensions", () => {
     Configurable.config.primaryKey = originalPrimaryKey;
   });
 
-  it("activePrimaryKey memoizes the key it derives from config.primaryKey", () => {
+  it("active_primary_key returns and memoizes the primary key", () => {
     Configurable.config.primaryKey = crypto.randomBytes(32).toString("base64");
     const provider = new EnvelopeEncryptionKeyProvider();
     expect(provider.activePrimaryKey).toBe(provider.activePrimaryKey);
