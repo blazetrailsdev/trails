@@ -445,7 +445,7 @@ describe("ConnectionPool schema cache", () => {
       );
       expect(cache).toBeInstanceOf(SchemaCache);
       expect(cache).not.toBe(pool.schemaCache);
-      expect(pool.poolConfig.schemaCache).toBe(cache);
+      expect(pool.poolConfig.schemaReflection.loadedCache).toBe(cache);
     } finally {
       await closePoolConnections(pool);
     }
@@ -506,8 +506,10 @@ describe("ConnectionPool schema cache", () => {
         pool.releaseConnection();
         await pool._lazyLoadPromise;
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
-        expect(pool.poolConfig.schemaCache).not.toBeNull();
-        expect(await pool.poolConfig.schemaCache!.isCached("more_testings")).toBe(true);
+        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
+        expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
+          true,
+        );
       } finally {
         Base.lazilyLoadSchemaCache = prevLazy;
         await closePoolConnections(pool);
@@ -569,8 +571,10 @@ describe("ConnectionPool schema cache", () => {
         expect(pool._eagerWarmPromise).not.toBeNull();
         await pool._eagerWarmPromise;
         expect(await pool.schemaCache.isCached("posts")).toBe(true);
-        expect(pool.poolConfig.schemaCache).not.toBeNull();
-        expect(await pool.poolConfig.schemaCache!.isColumnsHash(null, "posts")).toBe(true);
+        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
+        expect(
+          await pool.poolConfig.schemaReflection.loadedCache!.isColumnsHash(null, "posts"),
+        ).toBe(true);
       } finally {
         SchemaReflection.eagerLoadSchemaCache = prevEager;
         await closePoolConnections(pool);

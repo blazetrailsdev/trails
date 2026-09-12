@@ -199,7 +199,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.setSchemaSearchPath(defaultSearchPath);
-    adapter.internalSchemaCache?.clear();
+    adapter.schemaCache.clearBang();
   });
 
   describe("SchemaTest", () => {

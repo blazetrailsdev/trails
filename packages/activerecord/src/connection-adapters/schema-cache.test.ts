@@ -220,9 +220,10 @@ describe("SchemaCacheTest", () => {
     await warm(cache, "users", "id", [makeColumn("id", "integer")]);
     expect(cache.size).toBeGreaterThan(0);
 
-    cache.clear();
-    expect(cache.size).toBe(0);
-    expect(cache.isCached("users")).toBe(false);
+    const reflection = new SchemaReflection(null, cache);
+    reflection.clearBang();
+    expect(reflection.loadedCache!.size).toBe(0);
+    expect(reflection.loadedCache!.isCached("users")).toBe(false);
   });
 
   it("marshal dump and load", async () => {

@@ -80,7 +80,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.changeTable("virtual_columns", async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
       });
-      adapter.internalSchemaCache?.clear();
+      adapter.schemaCache.clearBang();
       void VirtualColumn.resetColumnInformation();
       await VirtualColumn.loadSchema();
       const column = await findColumn("lower_name");

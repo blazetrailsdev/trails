@@ -449,10 +449,10 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
     table = (host as unknown as { tableName?: string }).tableName;
     const pool = (
       host as unknown as {
-        connectionPool?: () => { poolConfig?: { schemaCache?: Cache | null } };
+        connectionPool?: () => { poolConfig?: { schemaReflection: { loadedCache: Cache | null } } };
       }
     ).connectionPool?.();
-    cache = pool?.poolConfig?.schemaCache;
+    cache = pool?.poolConfig?.schemaReflection.loadedCache;
   } catch {
     return;
   }

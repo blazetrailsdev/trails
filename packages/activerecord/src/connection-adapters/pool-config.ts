@@ -1,6 +1,5 @@
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
-import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
@@ -171,15 +170,6 @@ export class PoolConfig {
       drains.push(config.disconnectBang({ automaticReconnect: true }));
     }
     await Promise.all(drains);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  get schemaCache(): SchemaCache | null {
-    return this.schemaReflection.loadedCache;
-  }
-
-  set schemaCache(cache: SchemaCache | null) {
-    this.schemaReflection.loadedCache = cache;
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */

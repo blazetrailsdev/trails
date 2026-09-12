@@ -33,7 +33,7 @@ async function withTestSchema(
   } finally {
     if (drop) await adapter.dropSchema(name, {});
     await adapter.setSchemaSearchPath(oldSearchPath);
-    adapter.internalSchemaCache.clear();
+    adapter.schemaCache.clearBang();
   }
 }
 
@@ -68,7 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.execute(`DROP TYPE IF EXISTS "unused" CASCADE`);
     await adapter.execute(`DROP TYPE IF EXISTS "color" CASCADE`);
     await adapter.setSchemaSearchPath(defaultSearchPath);
-    adapter.internalSchemaCache?.clear();
+    adapter.schemaCache.clearBang();
     void PostgresqlEnum.resetColumnInformation();
     vi.restoreAllMocks();
   });

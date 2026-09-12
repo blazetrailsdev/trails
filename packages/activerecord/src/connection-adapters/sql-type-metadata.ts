@@ -40,7 +40,7 @@ export class SqlTypeMetadata implements Deduplicable {
     return JSON.stringify(this.toJSON());
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
+  /** @noRailsEquivalent PERMANENT */
   toJSON(): SqlTypeMetadataJSON {
     return {
       sqlType: this.sqlType,

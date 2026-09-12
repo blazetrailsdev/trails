@@ -796,7 +796,7 @@ export class ConnectionPool implements ReapablePool {
       (_Base?.lazilyLoadSchemaCache ?? false) &&
       !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
-      !this.poolConfig.schemaCache
+      !this.poolConfig.schemaReflection.loadedCache
     ) {
       this._lazyLoadTriggered = true;
       const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
@@ -805,7 +805,7 @@ export class ConnectionPool implements ReapablePool {
         .then(() => {
           const loaded = this.schemaReflection.loadedCache;
           if (loaded) {
-            this.poolConfig.schemaCache = loaded;
+            this.poolConfig.schemaReflection.loadedCache = loaded;
           }
         })
         .catch((err) => {
@@ -819,7 +819,7 @@ export class ConnectionPool implements ReapablePool {
     if (
       SchemaReflection.eagerLoadSchemaCache &&
       !this._eagerWarmTriggered &&
-      !this.poolConfig.schemaCache
+      !this.poolConfig.schemaReflection.loadedCache
     ) {
       this._eagerWarmTriggered = true;
       const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
@@ -828,7 +828,7 @@ export class ConnectionPool implements ReapablePool {
         .then(() => {
           const loaded = this.schemaReflection.loadedCache;
           if (loaded) {
-            this.poolConfig.schemaCache = loaded;
+            this.poolConfig.schemaReflection.loadedCache = loaded;
           }
         })
         .catch((err) => {

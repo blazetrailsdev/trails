@@ -1508,11 +1508,12 @@ describe("BasicsTest", () => {
 
   it("clear cache!", async () => {
     const conn = Base.connection;
-    const cache = conn.internalSchemaCache;
+    let cache = conn.internalSchemaCache;
     const c1 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
 
-    cache.clear();
+    Base.clearCacheBang();
+    cache = conn.internalSchemaCache;
     expect(cache.size).toBe(0);
 
     const c2 = await cache.columns(conn.pool, "posts");

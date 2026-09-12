@@ -35,7 +35,7 @@ describe("templateSchemaCache", () => {
     const installed = conn.pool.schemaReflection.loadedCache;
     expect(installed).not.toBeNull();
     expect(conn.internalSchemaCache).toBe(installed);
-    expect(Base.connectionPool().poolConfig.schemaCache).toBe(installed);
+    expect(Base.connectionPool().poolConfig.schemaReflection.loadedCache).toBe(installed);
     expect(installed).not.toBe(await templateSchemaCache());
   });
 
