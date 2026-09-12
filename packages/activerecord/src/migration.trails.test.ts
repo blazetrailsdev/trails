@@ -225,6 +225,7 @@ describe("Migration#createTable id option type", () => {
           createTable: record("createTable"),
           renameTable: record("renameTable"),
           removeForeignKey: record("removeForeignKey"),
+          removeColumn: record("removeColumn"),
           execute: record("execute"),
         };
         if (this.revertable) conn["revert"] = () => undefined;
@@ -291,6 +292,22 @@ describe("Migration#createTable id option type", () => {
       }
       expect(migration.lines[0]).toBe('-- createTable("widgets")');
       expect(migration.calls[0]).toEqual(["createTable", ["widgets"]]);
+    });
+
+    it("does not announce the positional placeholder an options-only overload expands", async () => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        await migration.removeColumn("widgets", "name", { ifExists: true });
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      expect(migration.lines[0]).toBe('-- removeColumn("widgets", "name", {:ifExists=>true})');
+      expect(migration.calls[0]).toEqual([
+        "removeColumn",
+        ["widgets", "name", undefined, { ifExists: true }],
+      ]);
     });
 
     it("announces a non-Hash object last argument through inspect", async () => {

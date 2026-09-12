@@ -1221,7 +1221,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
     const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
-    return await this.sayWithTime(`${name}(${this.formatArguments(args)})`, async () => {
+    const announced = args.filter((a) => a !== undefined);
+    return await this.sayWithTime(`${name}(${this.formatArguments(announced)})`, async () => {
       const conn = this.connection as unknown as Record<string, unknown>;
       if (typeof conn["revert"] !== "function") {
         if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
