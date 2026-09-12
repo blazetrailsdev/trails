@@ -156,6 +156,19 @@ describe("manifest emitters", () => {
     }
   });
 
+  // The privates builder also emits a TS module (the runtime half of the
+  // private-method set), which writeJsonManifest cannot carry: it stages its
+  // temp with a `.json` extension so prettier picks the JSON parser. The churn
+  // trap is the same, so the direct write has to be prettier-formatted too.
+  it("formats the emitted rails-private runtime module with prettier", () => {
+    const src = fs.readFileSync(
+      path.join(REPO_ROOT, "scripts/build-rails-privates-manifest.ts"),
+      "utf8",
+    );
+    expect(src).toMatch(/"--stdin-filepath", RUNTIME_MODULE_PATH/);
+    expect(src).toMatch(/fs\.writeFileSync\(RUNTIME_MODULE_PATH, formatted\)/);
+  });
+
   it("ratchet/exclude generators emit via writeJsonManifest", () => {
     const generators = [
       "generate-no-explicit-any-allowlist.ts",

@@ -71,6 +71,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
 import { libPathsManifest } from "../vendor/sources.js";
@@ -92,6 +93,47 @@ const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.jso
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
 
 const DEPRECATED_OUT = path.join(ROOT, "eslint/rails-deprecated-methods.json");
+
+// The `files` half of OUT, re-emitted as a committed TS module so a runtime
+// package can read the Ruby-side private set. `eslint/rails-private-methods.json`
+// is gitignored and only exists in the one CI job that has Ruby, and a runtime
+// package may not reach it: `node:*` imports and `process.*` are banned under
+// `packages/`, and fs there must be async. Emitted ONLY when rails-api.json is
+// present — a `--allow-missing` prelint run must not clobber the committed
+// bytes with an empty map. `scripts/parity/write-json-manifest.ts` stages its
+// temp with a `.json` extension so prettier picks the JSON parser, which is
+// wrong for a `.ts` target; hence the direct spawn below.
+const RUNTIME_MODULE_PATH = path.join(
+  ROOT,
+  "packages/activesupport/src/support/rails-private-methods.generated.ts",
+);
+
+function emitRuntimePrivateMethods(files: Record<string, string[]>): void {
+  const source =
+    `const DATA =\n  ${JSON.stringify(JSON.stringify(files))};\n\n` +
+    `let parsed: Record<string, readonly string[]> | undefined;\n\n` +
+    `export function railsPrivateMethods(): Readonly<Record<string, readonly string[]>> {\n` +
+    `  parsed ??= JSON.parse(DATA) as Record<string, readonly string[]>;\n` +
+    `  return parsed;\n` +
+    `}\n`;
+  const formatted = execFileSync(
+    path.join(ROOT, "node_modules/.bin/prettier"),
+    ["--stdin-filepath", RUNTIME_MODULE_PATH],
+    { input: source, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  // Unchanged bytes must not be rewritten, and no temp may be staged beside the
+  // target: the file lives under packages/*/src, where `manifestIsStale`
+  // (api-compare/build-freshness.ts) compares output/ts-api.json's mtime
+  // against the newest source AND directory mtime. A `pnpm parity:api` run
+  // regenerates this manifest AFTER writing ts-api.json, so either write would
+  // leave every subsequent `parity:api:extra` measuring a "stale" checkout.
+  const current = fs.existsSync(RUNTIME_MODULE_PATH)
+    ? fs.readFileSync(RUNTIME_MODULE_PATH, "utf8")
+    : null;
+  if (formatted === current) return;
+  fs.mkdirSync(path.dirname(RUNTIME_MODULE_PATH), { recursive: true });
+  fs.writeFileSync(RUNTIME_MODULE_PATH, formatted);
+}
 
 // `--check-deprecated` (CI): recompute the deprecation-parity manifest from the
 // vendored Ruby and fail if the committed file has drifted — in particular if
@@ -382,6 +424,7 @@ const final: Manifest = {
 
 writeJsonManifest(OUT, final);
 flushManifestBatch();
+emitRuntimePrivateMethods(final.files);
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);

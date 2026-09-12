@@ -1,6 +1,5 @@
 import { it, expect, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { NoMethodError } from "@blazetrails/activemodel";
 import { Visitors } from "@blazetrails/arel";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -536,54 +535,4 @@ it("inspect does not show secrets", async () => {
   const pool2 = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
   expect(pool2.inspect()).toMatch(/role="reading"/);
-});
-
-it("adapter proxy treats a probe name as the send it is, with no carve-out set", async () => {
-  const pool = makePool();
-  const proxy = (
-    pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
-  )._getAdapterProxy();
-
-  for (const key of [
-    "then",
-    "toJSON",
-    "asymmetricMatch",
-    "$$typeof",
-    "nodeType",
-    "getMockName",
-    "_isMockFunction",
-  ]) {
-    expect(() => proxy[key]).toThrow(NoMethodError);
-  }
-  expect(typeof proxy.hasOwnProperty).toBe("function");
-  expect(proxy.constructor).toBe(AbstractAdapter);
-  expect(proxy[Symbol.iterator]).toBeUndefined();
-
-  expect(() => expect({ adapter: proxy, n: 1 }).toEqual({ adapter: proxy, n: 2 })).toThrow(
-    /expected/i,
-  );
-});
-
-it("adapter proxy still dispatches genuine adapter methods to the connection", async () => {
-  const pool = makePool();
-  const proxy = (
-    pool as unknown as {
-      _getAdapterProxy(): {
-        quoteTableName(name: string): Promise<string>;
-      };
-    }
-  )._getAdapterProxy();
-
-  const quoted = await proxy.quoteTableName("people");
-  expect(quoted).toContain("people");
-});
-
-it("adapter proxy does not fabricate a method for an unknown probe key once a connection exists", async () => {
-  const pool = makePool();
-  await pool.checkout();
-  const proxy = (
-    pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
-  )._getAdapterProxy();
-  expect(() => proxy.someMatcherProbeKey).toThrow(NoMethodError);
-  await pool.disconnect();
 });

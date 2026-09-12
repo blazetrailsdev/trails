@@ -325,34 +325,6 @@ export class ConnectionPool implements ReapablePool {
     return this.poolConfig.connectionDescriptor;
   }
 
-  private _adapterProxy?: DatabaseAdapter;
-
-  private _getAdapterProxy(): DatabaseAdapter {
-    if (!this._adapterProxy) {
-      const pool = this;
-      this._adapterProxy = new Proxy({} as DatabaseAdapter, {
-        get(_target, prop) {
-          if (prop === "pool") return pool;
-          if (typeof prop === "symbol") return undefined;
-          const sample: object =
-            pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
-          if (prop === "constructor") return (sample as any).constructor;
-          if (prop in _target) return Reflect.get(_target, prop);
-          if (typeof (sample as any)[prop] !== "function") {
-            throw new NoMethodError(
-              `undefined method '${prop}' for an instance of ` +
-                `ActiveRecord::ConnectionAdapters::${(sample as any).constructor.name}`,
-            );
-          }
-          return (...args: unknown[]) => {
-            return pool.withConnection((conn) => (conn as any)[prop](...args));
-          };
-        },
-      });
-    }
-    return this._adapterProxy;
-  }
-
   get migrationsPaths(): string[] {
     const paths = (this.dbConfig as any).migrationsPaths ?? Migrator.migrationsPaths;
     return Array.isArray(paths) ? paths : [paths];

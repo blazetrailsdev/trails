@@ -1816,6 +1816,23 @@ jobs:
         run: |
           pnpm exec tsx scripts/build-rails-privates-manifest.ts
           pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
+      - name: Rails-private runtime artifact up to date
+        # The step above regenerated everything the privates builder emits,
+        # including the committed TS module a runtime package imports (the JSON
+        # manifest beside it stays gitignored and job-local). Ruby lives only in
+        # this job, so this is the only place the committed bytes can be checked
+        # against a fresh regeneration. Regenerate with
+        # `pnpm rails-privates:manifest` and commit the result.
+        run: |
+          set -euo pipefail
+          artifact=packages/activesupport/src/support/rails-private-methods.generated.ts
+          if git diff --quiet -- "$artifact"; then
+            echo "$artifact is in sync with a fresh regeneration."
+            exit 0
+          fi
+          echo "::error title=Rails-private runtime artifact drift::${artifact} differs from what \`pnpm rails-privates:manifest\` regenerates from the vendored Rails source. Run it and commit the result."
+          git --no-pager diff --stat -- "$artifact"
+          exit 1
       - name: Rails file-structure method-order lint
         # Needs rails-api.json (extracted above) to build the per-class
         # method-order manifest, then enforce
