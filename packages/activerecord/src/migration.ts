@@ -398,14 +398,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeColumn(
-    tableName: string,
-    columnName: string,
-    typeOrOptions?: ColumnType | { ifExists?: boolean },
-    options?: { ifExists?: boolean },
+    ...args: [
+      tableName: string,
+      columnName: string,
+      type?: ColumnType | { ifExists?: boolean },
+      options?: { ifExists?: boolean },
+    ]
   ): Promise<void> {
-    const type = typeof typeOrOptions === "string" ? typeOrOptions : undefined;
-    const opts = typeof typeOrOptions === "object" ? typeOrOptions : (options ?? {});
-    await this.methodMissing("removeColumn", tableName, columnName, type, opts);
+    await this.methodMissing("removeColumn", ...args);
   }
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
@@ -606,19 +606,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async validateForeignKey(
-    fromTable: string,
-    toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    ...args: [
+      fromTable: string,
+      toTable?: string | Omit<ForeignKeyLookupOptions, "toTable">,
+      options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    ]
   ): Promise<void> {
-    const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
-    const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
-    if (opts !== undefined) {
-      await this.methodMissing("validateForeignKey", fromTable, toTable, opts);
-    } else if (toTable !== undefined) {
-      await this.methodMissing("validateForeignKey", fromTable, toTable);
-    } else {
-      await this.methodMissing("validateForeignKey", fromTable);
-    }
+    await this.methodMissing("validateForeignKey", ...args);
   }
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
@@ -668,23 +662,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async dropEnum(
-    name: string,
-    valuesOrOptions?: string[] | { ifExists?: boolean },
-    options?: { ifExists?: boolean },
+    ...args: [
+      name: string,
+      values?: string[] | { ifExists?: boolean },
+      options?: { ifExists?: boolean },
+    ]
   ): Promise<void> {
-    const isOptsObj =
-      valuesOrOptions !== null &&
-      typeof valuesOrOptions === "object" &&
-      !Array.isArray(valuesOrOptions);
-    const values = isOptsObj ? undefined : valuesOrOptions;
-    const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
-    if (opts !== undefined) {
-      await this.methodMissing("dropEnum", name, values, opts);
-    } else if (values !== undefined) {
-      await this.methodMissing("dropEnum", name, values);
-    } else {
-      await this.methodMissing("dropEnum", name);
-    }
+    await this.methodMissing("dropEnum", ...args);
   }
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
@@ -709,23 +693,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeUniqueConstraint(
-    tableName: string,
-    columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
-    options?: UniqueConstraintOptions,
+    ...args: [
+      tableName: string,
+      columnName?: string | string[] | UniqueConstraintOptions,
+      options?: UniqueConstraintOptions,
+    ]
   ): Promise<void> {
-    const isOptsObj =
-      columnNameOrOptions !== null &&
-      typeof columnNameOrOptions === "object" &&
-      !Array.isArray(columnNameOrOptions);
-    const columnName = isOptsObj ? undefined : columnNameOrOptions;
-    const opts = isOptsObj ? columnNameOrOptions : (options ?? undefined);
-    if (opts !== undefined) {
-      await this.methodMissing("removeUniqueConstraint", tableName, columnName, opts);
-    } else if (columnName !== undefined) {
-      await this.methodMissing("removeUniqueConstraint", tableName, columnName);
-    } else {
-      await this.methodMissing("removeUniqueConstraint", tableName);
-    }
+    await this.methodMissing("removeUniqueConstraint", ...args);
   }
 
   /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
