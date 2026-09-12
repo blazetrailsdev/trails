@@ -31,6 +31,16 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * class's own prototype, between the subclass and `superclass`, which is the
  * ancestor position — and therefore the precedence — they hold in Ruby.
  *
+ * Extending also forces a `super()` call, which JS requires before `this` in a
+ * derived constructor. Ruby never runs `superclass#initialize`: its class is
+ * `Class.new(Delegator)` and `Delegator#initialize` only stores the delegate
+ * (`:75-77,394-411`). So `superclass`'s constructor runs here, on a wrapper
+ * that will forward every read anyway, and a `superclass` whose constructor
+ * requires an argument or has side effects is out of range — see
+ * `delegate-class-must-not-construct-the-delegated-superclass`. `super()` is
+ * passed no arguments for that reason, and `ValueType`'s constructor
+ * (`activemodel/lib/active_model/type/value.rb:17`) takes only optional kwargs.
+ *
  * Ruby reads `superclass.public_instance_methods` and
  * `protected_instance_methods` (`delegate.rb:397-400`), whose `all` default is
  * true, so both sets include what `superclass` INHERITS. The JS walk therefore
