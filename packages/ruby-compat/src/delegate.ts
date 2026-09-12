@@ -4,6 +4,11 @@ import { methodMissingProxy } from "./method-missing-proxy.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
 type MixinBase = new (...args: any[]) => object;
 
+type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
+  __getobj__(): unknown;
+  __setobj__(obj: unknown): void;
+};
+
 /**
  * `DelegateClass(superclass)` (`vendor/ruby/lib/delegate.rb:394-443`) — builds a
  * class that forwards to a wrapped object, the way
@@ -42,6 +47,19 @@ type MixinBase = new (...args: any[]) => object;
  * `protected` member carries no prefix and is an ordinary prototype property,
  * so it is walked and forwarded, as Ruby's protected set is.
  *
+ * A Ruby `attr_accessor` is two methods, `foo` and `foo=`, so both land in
+ * `public_instance_methods` and both get a forwarder. A JS accessor carries
+ * both halves in ONE descriptor, so a descriptor with a `set` gets a
+ * forwarding setter beside its getter — dropping it would drop the `foo=`
+ * forwarder Ruby generates.
+ *
+ * `block` is Ruby's `&block`, `module_eval`'d on the generated class
+ * (`:394,442`); `call` supplies the class as `this`, which is the `self`
+ * `module_eval` binds. The five `define_singleton_method` reflection overrides
+ * that union the superclass's method lists into the generated class's
+ * (`:421-440`) need no port: this class extends `superclass`, so JS reflection
+ * already walks through to those members.
+ *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
@@ -51,7 +69,8 @@ type MixinBase = new (...args: any[]) => object;
  */
 export function DelegateClass<T extends MixinBase>(
   superclass: T,
-): new (obj: unknown) => InstanceType<T> {
+  block?: (this: Delegating<T>) => void,
+): Delegating<T> {
   const klass = class extends superclass {
     declare _delegateDcObj: unknown;
 
@@ -82,12 +101,19 @@ export function DelegateClass<T extends MixinBase>(
       if (ignores.has(method) || method.startsWith("_")) continue;
       if (Object.hasOwn(klass.prototype, method)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(proto, method)!;
-      if (descriptor.get) {
+      if (descriptor.get || descriptor.set) {
         Object.defineProperty(klass.prototype, method, {
           configurable: true,
-          get(this: InstanceType<typeof klass>): unknown {
-            return (this.__getobj__() as Record<string, unknown>)[method];
-          },
+          ...(descriptor.get && {
+            get(this: InstanceType<typeof klass>): unknown {
+              return (this.__getobj__() as Record<string, unknown>)[method];
+            },
+          }),
+          ...(descriptor.set && {
+            set(this: InstanceType<typeof klass>, value: unknown): void {
+              (this.__getobj__() as Record<string, unknown>)[method] = value;
+            },
+          }),
         });
       } else if (typeof descriptor.value === "function") {
         Object.defineProperty(klass.prototype, method, {
@@ -102,5 +128,7 @@ export function DelegateClass<T extends MixinBase>(
     }
   }
 
-  return klass as unknown as new (obj: unknown) => InstanceType<T>;
+  block?.call(klass as unknown as Delegating<T>);
+
+  return klass as unknown as Delegating<T>;
 }
