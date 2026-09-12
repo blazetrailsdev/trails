@@ -117,7 +117,7 @@ export class PoolConfig {
     });
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-config-disconnect-lock-order */
   async disconnect(): Promise<void> {
     if (this._pool) {
       await this._pool.disconnect();
