@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
+import { Thread } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Bulb } from "../../test-helpers/models/bulb.js";
@@ -17,8 +17,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Bulb.unscoped().deleteAll();
       await Bulb.createBang({ name: "Jimmy", color: "blue" });
 
-      const deleteThread = withExecutionContext(async () => Bulb.unscoped().deleteAll());
-      const createThread = withExecutionContext(async () => Author.createBang({ name: "Tommy" }));
+      const deleteThread = new Thread(async () => Bulb.unscoped().deleteAll()).value();
+      const createThread = new Thread(async () => Author.createBang({ name: "Tommy" })).value();
 
       const [deleteValue] = await Promise.all([deleteThread, createThread]);
 

@@ -1,4 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +11,6 @@ import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
-import { withExecutionContext } from "./abstract/connection-pool/execution-context.js";
 
 const UUID_OID = 2950;
 
@@ -378,7 +378,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
     }
 
     const insert = (title: string) =>
-      withExecutionContext(() =>
+      new Thread(() =>
         pool.withConnection((conn) =>
           conn.execInsert(
             `INSERT INTO posts (title) VALUES ('${title}')`,
@@ -388,7 +388,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
             "posts_id_seq",
           ),
         ),
-      );
+      ).value();
     const p1 = insert("a");
     await inFirstInsert;
     const p2 = insert("b");

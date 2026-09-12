@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { TypeMap } from "../type/type-map.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { withExecutionContext } from "./abstract/connection-pool/execution-context.js";
 
 import {
   ConnectionNotEstablished,
@@ -73,7 +73,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const p1 = withExecutionContext(() =>
+    const p1 = new Thread(() =>
       pool.withConnection((conn) =>
         conn.withRawConnection({}, async () => {
           order.push(1);
@@ -82,15 +82,15 @@ describe("AbstractAdapter connection lifecycle privates", () => {
           return "a";
         }),
       ),
-    );
-    const p2 = withExecutionContext(() =>
+    ).value();
+    const p2 = new Thread(() =>
       pool.withConnection((conn) =>
         conn.withRawConnection({}, async () => {
           order.push(3);
           return "b";
         }),
       ),
-    );
+    ).value();
     await new Promise((r) => setTimeout(r, 0));
     release();
     expect(await Promise.all([p1, p2])).toEqual(["a", "b"]);
@@ -150,8 +150,8 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
     (a as any).attemptConfigureConnection = async () => {};
     (a as any).active = async () => true;
 
-    const p1 = withExecutionContext(() => pool.withConnection((conn) => conn.reconnectBang()));
-    const p2 = withExecutionContext(() => pool.withConnection((conn) => conn.reconnectBang()));
+    const p1 = new Thread(() => pool.withConnection((conn) => conn.reconnectBang())).value();
+    const p2 = new Thread(() => pool.withConnection((conn) => conn.reconnectBang())).value();
     await Promise.resolve();
     release();
     await Promise.all([p1, p2]);
@@ -175,8 +175,8 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
     };
 
     await Promise.all([
-      withExecutionContext(() => pool.withConnection(() => undefined)),
-      withExecutionContext(() => pool.withConnection(() => undefined)),
+      new Thread(() => pool.withConnection(() => undefined)).value(),
+      new Thread(() => pool.withConnection(() => undefined)).value(),
     ]);
 
     expect(events).toEqual([

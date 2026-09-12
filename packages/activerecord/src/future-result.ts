@@ -188,9 +188,8 @@ export class FutureResult {
         if (this.#executing) return;
         if (this.pending()) {
           this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
-          await IsolatedExecutionState.scope(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer, () =>
-            this.executeQuery(connection, { async: true }),
-          );
+          IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer);
+          await this.executeQuery(connection, { async: true });
         }
       });
     }));

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 
 import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "./test-adapter.js";
-import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
 describe("createPooledTestAdapter (Phase B smoke)", () => {
@@ -40,7 +40,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
       await setupAdapter.execute(`DROP TABLE IF EXISTS ${tableName}`);
       await setupAdapter.execute(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
       try {
-        await withExecutionContext(async () => {
+        await new Thread(async () => {
           await pool.pinConnectionBang(false);
           try {
             const pinned = await pool.checkout();
@@ -53,7 +53,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
             const clean = await pool.unpinConnectionBang();
             expect(clean).toBe(true);
           }
-        });
+        }).value();
 
         const after = (
           await setupAdapter.selectAll(`SELECT count(*) AS c FROM ${tableName}`)

@@ -4,7 +4,7 @@ import { ConnectionPool } from "../connection-pool.js";
 import { PoolConfig } from "../../pool-config.js";
 import { ConnectionDescriptor } from "../connection-handler.js";
 import { HashConfig } from "../../../database-configurations/hash-config.js";
-import { executionContext, withExecutionContext } from "./execution-context.js";
+import { Thread } from "@blazetrails/ruby-compat";
 
 describe("execution context per IsolatedExecutionState.run", () => {
   it("gives concurrent runs distinct leases and leaves top-level code on the root context", async () => {
@@ -21,15 +21,18 @@ describe("execution context per IsolatedExecutionState.run", () => {
     ]);
 
     expect(a).not.toBe(b);
-    expect(executionContext().id).toBe(0);
+    expect(IsolatedExecutionState.context().id).toBe(0);
     expect(lease()).not.toBe(a);
     expect(lease()).toBe(lease());
   });
 
   it("carries the caller's scoped state into the new thread", () => {
-    const seen = IsolatedExecutionState.scope("scoped_key", "scoped", () =>
-      withExecutionContext(() => IsolatedExecutionState.get("scoped_key")),
-    );
+    IsolatedExecutionState.set("scoped_key", "scoped");
+    const other = Thread.current();
+    const seen = new Thread(() => {
+      IsolatedExecutionState.shareWith(other);
+      return IsolatedExecutionState.get("scoped_key");
+    }).value();
     expect(seen).toBe("scoped");
   });
 });

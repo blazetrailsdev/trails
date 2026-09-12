@@ -403,10 +403,22 @@ export async function transaction<T>(
       const tmCurrent = this.currentTransaction();
       internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(this as never);
     }
-    return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
+    const prevTx = IsolatedExecutionState.get<Transaction>(CURRENT_TRANSACTION_KEY);
+    IsolatedExecutionState.set(CURRENT_TRANSACTION_KEY, internalTx);
+    const restore = () => IsolatedExecutionState.set(CURRENT_TRANSACTION_KEY, prevTx);
+    let result: Promise<T> | T;
+    try {
       const publicTx = userTx instanceof UserTransaction ? userTx : internalTx.userTransaction;
-      return block(publicTx);
-    });
+      result = block(publicTx);
+    } catch (error) {
+      restore();
+      throw error;
+    }
+    if (result != null && typeof (result as PromiseLike<T>).then === "function") {
+      return Promise.resolve(result).finally(restore);
+    }
+    restore();
+    return result;
   };
 
   try {

@@ -37,20 +37,6 @@ export class ExplainRegistry {
     slot.collect = false;
     slot.queries = [];
   }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  static async collectingQueries<T>(
-    fn: () => Promise<T>,
-  ): Promise<{ value: T; queries: [string, unknown[]][] }> {
-    const slot: Slot = { collect: true, queries: [] };
-    try {
-      const value = await IsolatedExecutionState.scope(SLOT_KEY, slot, fn);
-      return { value, queries: [...slot.queries] };
-    } finally {
-      slot.collect = false;
-      slot.queries = [];
-    }
-  }
 }
 
 /** @internal */

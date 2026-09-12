@@ -19,6 +19,12 @@ export class ThreadLocalVar<T> {
   }
 
   bind<R>(value: T, block: () => R): R {
-    return IsolatedExecutionState.scope(this, value, block);
+    const oldValue = this.value;
+    try {
+      this.value = value;
+      return block();
+    } finally {
+      this.value = oldValue;
+    }
   }
 }

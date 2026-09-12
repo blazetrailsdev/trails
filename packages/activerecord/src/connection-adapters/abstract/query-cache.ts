@@ -1,5 +1,5 @@
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { initialize, Notifications } from "@blazetrails/activesupport";
+import { initialize, IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import {
   toSqlAndBinds,
   arelFromRelation,
@@ -7,11 +7,8 @@ import {
 } from "./database-statements.js";
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
-import {
-  executionContextId,
-  registerContextExitHook,
-} from "./connection-pool/execution-context.js";
-import { ExecutorHooks } from "./connection-pool.js";
+import { ExecutorHooks, WeakThreadKeyMap } from "./connection-pool.js";
+import { Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -98,43 +95,21 @@ export class Store {
 }
 
 export class QueryCacheRegistry {
-  private _caches = new Map<string, Store>();
+  private _map = new WeakThreadKeyMap<Store>();
 
-  computeIfAbsent(key: string, create: () => Store): Store {
-    let cache = this._caches.get(key);
+  computeIfAbsent(context: Thread, create: () => Store): Store {
+    let cache = this._map.get(context);
     if (!cache) {
       cache = create();
-      this._caches.set(key, cache);
+      this._map.set(context, cache);
     }
     return cache;
   }
 
   clear(): void {
-    for (const cache of this._caches.values()) {
-      cache.clear();
-    }
-    this._caches.clear();
-  }
-
-  deleteStore(key: string): void {
-    this._caches.delete(key);
+    this._map.clear();
   }
 }
-
-const ACTIVE_CACHE_CONFIGS = new Set<WeakRef<ConnectionPoolConfiguration>>();
-
-function evictQueryCacheStoresForContext(contextId: string): void {
-  for (const ref of ACTIVE_CACHE_CONFIGS) {
-    const cfg = ref.deref();
-    if (!cfg) {
-      ACTIVE_CACHE_CONFIGS.delete(ref);
-      continue;
-    }
-    cfg.deleteStore(contextId);
-  }
-}
-
-registerContextExitHook(evictQueryCacheStoresForContext);
 
 export interface QueryCachePool {
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
@@ -182,14 +157,6 @@ export class ConnectionPoolConfiguration {
   declare _queryCacheMaxSize: number | null;
   declare _queryCacheVersion: { value: number };
   declare _pinnedConnection: unknown;
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  deleteStore(contextId: string): void {
-    this._threadQueryCaches.deleteStore(contextId);
-  }
 
   checkoutAndVerify(
     super_: (connection: QueryCacheHost) => unknown,
@@ -276,7 +243,7 @@ export class ConnectionPoolConfiguration {
   }
 
   get queryCache(): Store {
-    return this._threadQueryCaches.computeIfAbsent(String(executionContextId()), () => {
+    return this._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
       return new Store(this._queryCacheVersion, this._queryCacheMaxSize);
     });
   }
@@ -297,7 +264,6 @@ export class ConnectionPoolConfiguration {
   } else {
     this._queryCacheMaxSize = null;
   }
-  ACTIVE_CACHE_CONFIGS.add(new WeakRef(this));
 };
 
 export function queryCache(this: QueryCacheHost): Store | null {
