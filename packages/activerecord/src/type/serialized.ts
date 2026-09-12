@@ -1,6 +1,6 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { methodMissingProxy, rbEqual } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -11,47 +11,15 @@ export interface Coder {
   assertValidValue?(value: unknown, options: { action: string }): void;
 }
 
-/** @noRailsEquivalent PERMANENT */
-function delegateClass<T extends new (...args: any[]) => any>(superclass: T): T {
-  const klass = class extends superclass {} as T;
-  const ignores = new Set(["constructor", "toString", "inspect"]);
-  for (const method of Object.getOwnPropertyNames(superclass.prototype)) {
-    if (ignores.has(method) || method.startsWith("_")) continue;
-    const descriptor = Object.getOwnPropertyDescriptor(superclass.prototype, method)!;
-    if (descriptor.get) {
-      Object.defineProperty(klass.prototype, method, {
-        configurable: true,
-        get(this: { __getobj__(): any }): unknown {
-          return this.__getobj__()[method];
-        },
-      });
-    } else if (typeof descriptor.value === "function") {
-      Object.defineProperty(klass.prototype, method, {
-        configurable: true,
-        writable: true,
-        value(this: { __getobj__(): any }, ...args: unknown[]): unknown {
-          return this.__getobj__()[method](...args);
-        },
-      });
-    }
-  }
-  return klass;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export class Serialized extends delegateClass(ValueType) {
+export class Serialized extends DelegateClass(ValueType) {
   readonly subtype: ValueType | null;
   readonly coder: Coder;
 
   constructor(subtype: ValueType | null, coder: Coder) {
-    super();
+    super(subtype);
     this.subtype = subtype;
     this.coder = coder;
-    return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
-  }
-
-  __getobj__(): ValueType {
-    return this.subtype!;
   }
 
   accessor(): unknown {
