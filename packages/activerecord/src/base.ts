@@ -279,6 +279,7 @@ import {
 import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
+import * as _DirtyModule from "./attribute-methods/dirty.js";
 import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
@@ -3194,7 +3195,6 @@ include(Base, {
   updateBang: _Persistence.updateBang,
   delete: _Persistence.deleteRow,
   destroyRow: _Persistence.destroyRow,
-  _touchRow: _Persistence._touchRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,
   slice: Access.prototype.slice,
@@ -3400,6 +3400,24 @@ for (const [name, fn] of [
       return Timestamp._createRecord.call(this as any, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
+    },
+  ],
+  [
+    "_touchRow",
+    function (this: Base, attributeNames: string[], time: unknown): Promise<number> {
+      return _DirtyModule._touchRow.call(
+        this as any,
+        attributeNames,
+        time,
+        (dirtyNames: string[], dirtyTime: unknown) =>
+          LockingOptimistic._touchRow.call(
+            this as any,
+            dirtyNames,
+            dirtyTime,
+            (lockNames: string[], lockTime: unknown) =>
+              _Persistence._touchRow.call(this as any, lockNames, lockTime as any),
+          ) as Promise<number>,
+      );
     },
   ],
   [

@@ -25,7 +25,6 @@ import {
   RecordNotDestroyed,
   RecordNotSaved,
   UnknownAttributeError,
-  StaleObjectError,
 } from "./errors.js";
 import { connectionPool, withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -1029,11 +1028,15 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
     verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   }
 
-  const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
-  const touchCols = Array.from(touchColSet);
+  const attributeNames = Array.from(new Set([...updateTimestampAttrs, ...resolvedNames]));
 
   return withTransactionReturningStatus.call(this, async () => {
-    return touchRow.call(this, touchCols, now);
+    if (attributeNames.length > 0) {
+      const affectedRows = await (this as any)._touchRow(attributeNames, now);
+      (this as any)._triggerUpdateCallback = affectedRows === 1;
+    }
+    await runCallbacks(this, "touch");
+    return true;
   }) as Promise<boolean>;
 }
 
@@ -1042,92 +1045,6 @@ function raiseRecordNotTouchedError(): never {
     "Cannot touch on a new or destroyed record object. Consider using " +
       "persisted?, new_record?, or destroyed? before touching.",
   );
-}
-
-async function touchRow(this: Base, touchCols: string[], now: RubyTime): Promise<boolean> {
-  const ctor = this.constructor as typeof Base;
-
-  if (touchCols.length === 0) {
-    await runCallbacks(this, "touch");
-    return true;
-  }
-
-  for (const col of touchCols) {
-    this.writeAttribute(col, now);
-  }
-
-  const dbValues = (this as any)._attributes.valuesForDatabase();
-  const table = ctor.arelTable;
-  const setPairs: [InstanceType<typeof Nodes.Node>, unknown][] = touchCols.map((col) => [
-    table.get(col) as InstanceType<typeof Nodes.Node>,
-    new Nodes.Quoted(dbValues[col]),
-  ]);
-
-  const lockCol = ctor.lockingColumn;
-  let rawDbVersion: unknown;
-  let lockAttributeWas: import("@blazetrails/activemodel").Attribute | null = null;
-  if (ctor.lockingEnabled) {
-    const rawVersion = this.readAttribute(lockCol);
-    rawDbVersion = this.readAttributeBeforeTypeCast(lockCol);
-    lockAttributeWas = (this as any)._attributes.getAttribute(lockCol);
-    const current = rawVersion == null ? 0 : Number(rawVersion) || 0;
-    const next = current + 1;
-    setPairs.push([table.get(lockCol) as InstanceType<typeof Nodes.Node>, new Nodes.Quoted(next)]);
-    this.writeAttribute(lockCol, next);
-  }
-
-  const um = new UpdateManager()
-    .table(table)
-    .set(setPairs)
-    .where((ctor as any)._buildPkWhereNode((this as any).idInDatabase));
-
-  if (ctor.lockingEnabled) {
-    if (rawDbVersion == null) {
-      um.where(table.get(lockCol).eq(null));
-    } else {
-      um.where(table.get(lockCol).eq(Number(rawDbVersion) || 0));
-    }
-  }
-
-  const adapter = ctor.connection as any;
-  const affected: number = await adapter.update(um, `${ctor.name} Touch`);
-  if (ctor.lockingEnabled && affected === 0) {
-    if (lockAttributeWas !== null) {
-      (this as any)._attributes.set(lockCol, lockAttributeWas);
-    }
-    throw new StaleObjectError(this, "touch");
-  }
-
-  (this as any)._triggerUpdateCallback = affected === 1;
-
-  const touched = new Set(touchCols);
-  if (ctor.lockingEnabled) touched.add(lockCol);
-
-  const self = this as any;
-  try {
-    if (self._skipDirtyTracking) {
-      self.clearAttributeChanges(touched);
-    } else {
-      const restores: Array<[string, unknown]> = [];
-      for (const attrName of self._attributes.keys()) {
-        if (touched.has(attrName)) continue;
-        if (self.attributeChanged(attrName)) {
-          restores.push([attrName, self._readAttribute(attrName)]);
-          self._writeAttribute(attrName, self.attributeWas(attrName));
-          self.clearAttributeChange(attrName);
-        }
-      }
-      self.changesApplied();
-      for (const [attrName, value] of restores) {
-        self._writeAttribute(attrName, value);
-      }
-    }
-  } finally {
-    self._skipDirtyTracking = null;
-  }
-
-  await runCallbacks(this, "touch");
-  return true;
 }
 
 /** @internal */

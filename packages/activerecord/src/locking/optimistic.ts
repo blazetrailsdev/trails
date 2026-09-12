@@ -180,7 +180,7 @@ export function _touchRow(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    touchAttrNames = [...touchAttrNames, ctor.lockingColumn];
+    (this as unknown as { _touchAttrNames: Set<string> })._touchAttrNames.add(ctor.lockingColumn);
   }
   return superFn(touchAttrNames, time);
 }
