@@ -224,6 +224,7 @@ describe("MySQL::SchemaDumper", () => {
 
     it("returns empty object when connection is absent", async () => {
       const d = make();
+      d.connection = undefined;
       expect(await (d as any).tableOptions("users")).toEqual({});
     });
   });

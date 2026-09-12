@@ -29,12 +29,10 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   override createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
-    const dumper = MysqlSchemaDumper.create(
+    return MysqlSchemaDumper.create(
       this as unknown as Parameters<typeof MysqlSchemaDumper.create>[0],
       options,
     );
-    dumper.connection = this as unknown as NonNullable<MysqlSchemaDumper["connection"]>;
-    return dumper;
   }
 
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
