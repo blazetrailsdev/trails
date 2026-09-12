@@ -13,7 +13,6 @@ import {
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
 } from "./relation/delegation.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
@@ -37,6 +36,7 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 export async function eagerLoadBang(): Promise<void> {}
 
@@ -634,7 +634,7 @@ export function _inlinePolymorphicKeys(
       throw new ArgumentError(
         `Active Record couldn't correctly interpret the query constraints ` +
           `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
-          `\`${rubyInspectArray(qc)}\` and the foreign key is \`${scalarFk}\`. ` +
+          `\`${rbInspect(qc)}\` and the foreign key is \`${scalarFk}\`. ` +
           `You need to explicitly set the query constraints for this association.`,
       );
     }

@@ -1,4 +1,4 @@
-import { rubyInspect } from "./relation/ruby-inspect.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 export interface PrettyPrinter {
   text(str: string): void;
@@ -78,7 +78,7 @@ class PrettyPrint implements PrettyPrinter {
       );
       return;
     }
-    this.text(rubyInspect(obj));
+    this.text(rbInspect(obj));
   }
 
   flush(): string {

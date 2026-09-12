@@ -993,30 +993,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await (developer as any).projects.first()).id).toBe(project.id);
   });
 
-  it("mutated finder on new-owner seed resolves the join after save", async () => {
-    const developer = await Developer.create({ name: "Zed" });
-    const project = new Project({ name: "Rails Testing" });
-    const scoped = (project as any).developers.where({ name: "Zed" });
-    await (project as any).developers.push(developer);
-    await (project as any).saveBang();
-
-    expect((await scoped.first()).id).toBe(developer.id);
-  });
-
-  it("mutated count/exists/pluck on new-owner seed resolves the join after save", async () => {
-    const developer = await Developer.create({ name: "Yara" });
-    const project = new Project({ name: "Rails Counting" });
-    const scoped = (project as any).developers.where({ name: "Yara" });
-    await (project as any).developers.push(developer);
-    await (project as any).saveBang();
-
-    expect(await scoped.count()).toBe(1);
-    expect(await scoped.exists()).toBe(true);
-    expect(await scoped.pluck("developers.name", "developers.id")).toEqual([
-      ["Yara", developer.id],
-    ]);
-  });
-
   it("dynamic find should respect association include", async () => {
     const category = await Category.find(1);
     const post = await (category.postsWithAuthorsSortedByAuthorId as any).findBy({

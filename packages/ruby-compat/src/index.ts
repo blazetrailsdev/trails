@@ -97,7 +97,7 @@ export {
   GzipWriter,
 } from "./zlib-adapter.js";
 export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
-export { pack } from "./array.js";
+export { compact, pack, uniq } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
 export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";

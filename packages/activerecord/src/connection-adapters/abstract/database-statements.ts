@@ -18,7 +18,7 @@ import {
   InsertManager,
 } from "@blazetrails/arel";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { kernelInteger } from "@blazetrails/ruby-compat";
+import { kernelInteger, rbInspect } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -50,7 +50,6 @@ import {
 } from "../../future-result.js";
 import type { Base } from "../../base.js";
 import { _Base } from "../../base-slot.js";
-import { rubyInspect } from "../../relation/ruby-inspect.js";
 
 /** @internal */
 let _base: typeof Base | undefined;
@@ -1184,7 +1183,7 @@ export async function buildFixtureSql(
     const unknownColumns = Object.keys(fixture).filter((name) => !columnNames.includes(name));
     if (unknownColumns.length > 0) {
       throw new _FixtureError!(
-        `table "${tableName}" has no columns named ${unknownColumns.map((name) => rubyInspect(name)).join(", ")}.`,
+        `table "${tableName}" has no columns named ${unknownColumns.map((name) => rbInspect(name)).join(", ")}.`,
       );
     }
 

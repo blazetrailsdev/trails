@@ -3,8 +3,8 @@ import { ArgumentError } from "@blazetrails/activemodel";
 
 import { NotImplementedError } from "../../errors.js";
 
-import { rubyInspectArray } from "../ruby-inspect.js";
 import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 export class RelationHandler {
   /** @missingRailsCall empty? — PERMANENT */
@@ -17,7 +17,7 @@ export class RelationHandler {
       const model = value.model;
       if (model.compositePrimaryKey) {
         throw new ArgumentError(
-          `Cannot map composite primary key ${rubyInspectArray(model.primaryKey)} to ${attribute.name}`,
+          `Cannot map composite primary key ${rbInspect(model.primaryKey)} to ${attribute.name}`,
         );
       } else {
         value = value.select(value.table.get(model.primaryKey));

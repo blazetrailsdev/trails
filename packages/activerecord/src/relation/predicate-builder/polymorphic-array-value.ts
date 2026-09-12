@@ -1,6 +1,6 @@
 import type { Base } from "../../base.js";
-import { rubyInspectArray } from "../ruby-inspect.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbInspect } from "@blazetrails/ruby-compat";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
     joinForeignKey: string | string[];
@@ -46,7 +46,7 @@ export class PolymorphicArrayValue {
         for (const tuple of ids) {
           if (!Array.isArray(tuple)) {
             throw new ArgumentError(
-              `Expected corresponding value for ${rubyInspectArray(fk)} to be an Array`,
+              `Expected corresponding value for ${rbInspect(fk)} to be an Array`,
             );
           }
           const q: Record<string, unknown> = {};

@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass, rbInspect, compact, uniq } from "@blazetrails/ruby-compat";
 import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
@@ -10,9 +10,7 @@ import {
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
-import { compactUniqTuples } from "./compact-uniq-ids.js";
 import { _Base } from "../base-slot.js";
-import { rubyInspectArray } from "./ruby-inspect.js";
 
 const ONE_AS_ONE = "1 AS one";
 
@@ -362,8 +360,8 @@ export function raiseRecordNotFoundExceptionBang(
 
   const name = this.model.name;
   key ??= this.model.primaryKey;
-  const keyToS = Array.isArray(key) ? rubyInspectArray(key) : key;
-  const idsToS = Array.isArray(ids) ? rubyInspectArray(ids) : ids;
+  const keyToS = Array.isArray(key) ? rbInspect(key) : key;
+  const idsToS = Array.isArray(ids) ? rbInspect(ids) : ids;
 
   if (ids === undefined || ids === null) {
     throw new RecordNotFound(
@@ -485,6 +483,7 @@ export function usingLimitableReflections(
 /**
  * @internal
  * @missingRailsCall first — PERMANENT
+ * @missingRailsArgs uniq — PERMANENT
  */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
@@ -504,7 +503,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
 
   if (expectsArray) ids = ids[0] as unknown[];
 
-  ids = compactUniqTuples(ids);
+  ids = uniq(compact(ids));
 
   const modelName = this.model.name;
 

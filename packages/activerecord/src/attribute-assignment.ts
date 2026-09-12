@@ -2,8 +2,8 @@ import {
   extractMultiparameterCallstack,
   assignMultiparameterValues,
 } from "./multiparameter-attribute-assignment.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -105,7 +105,7 @@ export function executeCallstackForMultiparameterAttributes(
     } catch (ex) {
       errors.push(
         new AttributeAssignmentError(
-          `error on assignment ${rubyInspectArray(Object.values(valuesWithEmptyParameters))} to ${name} (${(ex as Error).message})`,
+          `error on assignment ${rbInspect(Object.values(valuesWithEmptyParameters))} to ${name} (${(ex as Error).message})`,
           ex as Error,
           name,
         ),

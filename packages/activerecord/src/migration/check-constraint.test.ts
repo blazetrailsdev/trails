@@ -4,7 +4,6 @@ import { Base } from "../base.js";
 import { NotImplementedError, StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
-import { rubyInspectHash } from "../relation/ruby-inspect.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
@@ -12,6 +11,7 @@ import { adapterType } from "../test-adapter.js";
 import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
 
@@ -416,7 +416,7 @@ describe("Migration", () => {
       ).rejects.toThrow(ArgumentError);
 
       expect(error?.message).toBe(
-        `Table 'trades' has no check constraint for ${rubyInspectHash({ name: "quantity_check" })}`,
+        `Table 'trades' has no check constraint for ${rbInspect({ name: "quantity_check" })}`,
       );
 
       await assertNothingRaised(() =>

@@ -502,14 +502,9 @@ export abstract class CollectionAssociation extends Association {
   }
 
   override scope(): any {
-    const s = super.scope();
-    if (this.isNullScope() && s && typeof s.none === "function") {
-      const nulled = s.none();
-      nulled._seededNoneNewOwner = true;
-      nulled._seedWherePredicates = [...nulled.whereClause.predicates];
-      return nulled;
-    }
-    return s;
+    const scope = super.scope();
+    if (this.isNullScope()) scope.noneBang();
+    return scope;
   }
 
   isNullScope(): boolean {

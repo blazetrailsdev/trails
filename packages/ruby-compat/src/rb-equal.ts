@@ -14,6 +14,14 @@ import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 export function rbEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* `rb_int_equal` (`vendor/ruby/numeric.c:4634`) compares by value, and Ruby
+     has one Integer for every magnitude. JS splits that seat across `number`
+     and `bigint`, so `===` answers false for two seats of the same Ruby
+     Integer. */
+  if (typeof a === "bigint" || typeof b === "bigint") {
+    if (typeof a === "number") return Number.isInteger(a) && BigInt(a) === b;
+    if (typeof b === "number") return Number.isInteger(b) && a === BigInt(b);
+  }
   /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
      `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
      answers `false` for an operand of another class instead of raising, and a
@@ -65,20 +73,29 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
   if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
-  /* A plain object stands in for a Ruby Hash, whose `==`
-     (`vendor/ruby/hash.c:3808` `rb_hash_equal`) compares keys and values
-     rather than identity. */
-  if (isPlainObject(a)) {
-    if (!isPlainObject(b)) return false;
-    const keys = Object.keys(a);
-    return (
-      keys.length === Object.keys(b).length &&
-      keys.every((key) => key in b && rbEqual(a[key], b[key]))
-    );
+  /* `rb_hash_equal` (`vendor/ruby/hash.c:3807`), which `hash_equal`
+     (`hash.c:3762`) answers by size and then by `rb_equal` per key. A Ruby
+     Hash has two JS seats — a plain object and a `Map` (ruby-compat's `Hash`,
+     and `HashWithIndifferentAccess` under it) — and both stand for the same
+     Ruby value, so the arm reads whichever the operand is. */
+  const entriesA = hashEntries(a);
+  if (entriesA !== null) {
+    const entriesB = hashEntries(b);
+    if (entriesB === null || entriesA.size !== entriesB.size) return false;
+    for (const [key, value] of entriesA) {
+      if (!entriesB.has(key)) return false;
+      if (!rbEqual(value, entriesB.get(key))) return false;
+    }
+    return true;
   }
   return false;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && value.constructor === Object;
+/** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3762`) over both JS seats. */
+function hashEntries(value: unknown): Map<unknown, unknown> | null {
+  if (value instanceof Map) return new Map(value);
+  if (typeof value === "object" && value !== null && value.constructor === Object) {
+    return new Map(Object.entries(value as Record<string, unknown>));
+  }
+  return null;
 }

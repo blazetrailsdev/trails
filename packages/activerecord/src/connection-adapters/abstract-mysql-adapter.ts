@@ -10,11 +10,10 @@ import {
   buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, rbInspect } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
-import { rubyInspect } from "../relation/ruby-inspect.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
@@ -1333,7 +1332,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       return matches[1];
     } else {
       throw new DatabaseVersionError(
-        `Unable to parse MySQL version from ${rubyInspect(fullVersionString)}`,
+        `Unable to parse MySQL version from ${rbInspect(fullVersionString)}`,
       );
     }
   }

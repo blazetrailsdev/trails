@@ -1,102 +1,7 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
-
-/** @internal */
-function isValueComparable(value: unknown): boolean {
-  if (Array.isArray(value)) return true;
-  if (value instanceof Hash) return true;
-  if (value !== null && typeof value === "object") {
-    const proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
-  }
-  return false;
-}
-
-/** @internal */
-/** @internal */
-function hasEquals(value: unknown): value is { equals(other: unknown): boolean } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as { equals?: unknown }).equals === "function"
-  );
-}
-
-function hasValueEquality(value: unknown): boolean {
-  if (value === null || typeof value !== "object") return false;
-  const valueOf = (value as { valueOf?: unknown }).valueOf;
-  if (typeof valueOf !== "function") return false;
-  const primitive = valueOf.call(value);
-  return primitive !== value && (primitive === null || typeof primitive !== "object");
-}
-
-/** @internal */
-function unwrapHash(value: unknown): unknown {
-  while (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as { toHash?: unknown }).toHash === "function"
-  ) {
-    value = (value as { toHash(): unknown }).toHash();
-  }
-  if (value instanceof Hash) value = Object.fromEntries(value as Hash<string, unknown>);
-  return value;
-}
-
-/** @internal */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
-/** @internal */
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (isValueComparable(a) && isValueComparable(b)) return collectionsEqual(a, b);
-  if (hasEquals(a)) {
-    try {
-      return a.equals(b);
-    } catch {
-      return false;
-    }
-  }
-  if (
-    hasValueEquality(a) &&
-    hasValueEquality(b) &&
-    (a as object).constructor === (b as object).constructor
-  ) {
-    return Object.is(
-      (a as { valueOf(): unknown }).valueOf(),
-      (b as { valueOf(): unknown }).valueOf(),
-    );
-  }
-  return false;
-}
-
-/** @internal */
-function collectionsEqual(aRaw: unknown, bRaw: unknown): boolean {
-  const a = unwrapHash(aRaw);
-  const b = unwrapHash(bRaw);
-  const aArr = Array.isArray(a);
-  const bArr = Array.isArray(b);
-  if (aArr || bArr) {
-    if (!aArr || !bArr || a.length !== b.length) return false;
-    return a.every((v, i) => valuesEqual(v, b[i]));
-  }
-  const aObj = isPlainObject(a);
-  const bObj = isPlainObject(b);
-  if (aObj || bObj) {
-    if (!aObj || !bObj) return false;
-    const ak = Object.keys(a).sort();
-    const bk = Object.keys(b).sort();
-    if (ak.length !== bk.length || ak.some((k, i) => k !== bk[i])) return false;
-    return ak.every((k) => valuesEqual(a[k], b[k]));
-  }
-  return valuesEqual(a, b);
-}
 
 /** @noRailsEquivalent PERMANENT */
 export interface Coder {
@@ -151,11 +56,7 @@ export class Serialized extends ValueType {
     newValue: unknown,
     _newValueBeforeTypeCast?: unknown,
   ): boolean {
-    try {
-      return !valuesEqual(oldValue, newValue);
-    } catch {
-      return true;
-    }
+    return !rbEqual(oldValue, newValue);
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
@@ -187,7 +88,7 @@ export class Serialized extends ValueType {
   }
 
   private isDefaultValue(value: unknown): boolean {
-    return valuesEqual(value ?? null, this.coder.load(null) ?? null);
+    return rbEqual(value, this.coder.load(null));
   }
 
   private encoded(value: unknown): unknown {

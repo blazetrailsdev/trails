@@ -308,10 +308,6 @@ export class Relation<T extends Base> {
   _values: ValuesHash = {};
   _withIsRecursive = false;
   private _isNone = false;
-  /** @internal */
-  _seededNoneNewOwner = false;
-  /** @internal */
-  _seedWherePredicates: readonly unknown[] = [];
   skipPreloadingValue = false;
   /** @internal */
   _arel?: SelectManager;
@@ -1734,8 +1730,6 @@ export class Relation<T extends Base> {
       }
     }
     this.skipPreloadingValue = source.skipPreloadingValue;
-    this._seededNoneNewOwner = source._seededNoneNewOwner;
-    this._seedWherePredicates = [...source._seedWherePredicates];
   }
 
   clone(): Relation<T> {
