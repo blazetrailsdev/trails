@@ -261,6 +261,12 @@ describe("Migrator trails extensions", () => {
     expect(Migration.currentVersion()).toBe(8.0);
   });
 
+  it("findVersion raises for a version above the highest registered one", () => {
+    expect(() => Migration.forVersion(8.5)).toThrow(
+      /Unknown migration version "8\.5"; expected one of "8\.0"/,
+    );
+  });
+
   it("registerVersion allows custom versions", () => {
     class V0_9 extends Migration {
       async up(): Promise<void> {}
