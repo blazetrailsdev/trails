@@ -143,6 +143,26 @@ export class NullPool implements AbstractPool {
   disconnect(): void {}
 }
 
+export class WeakThreadKeyMap<V> {
+  private _map = new Map<Thread, V>();
+
+  clear(): void {
+    this._map.clear();
+  }
+
+  get(key: Thread): V | undefined {
+    return this._map.get(key);
+  }
+
+  /** @missingRailsCall select! — PERMANENT */
+  set(key: Thread, value: V): void {
+    for (const c of [...this._map.keys()]) {
+      if (c.status === "dead") this._map.delete(c);
+    }
+    this._map.set(key, value);
+  }
+}
+
 export class Lease {
   connection: DatabaseAdapter | null = null;
   sticky: boolean | null = null;
@@ -161,26 +181,6 @@ export class Lease {
       return true;
     }
     return false;
-  }
-}
-
-export class WeakThreadKeyMap<V> {
-  private _map = new Map<Thread, V>();
-
-  clear(): void {
-    this._map.clear();
-  }
-
-  get(key: Thread): V | undefined {
-    return this._map.get(key);
-  }
-
-  /** @missingRailsCall select! — PERMANENT */
-  set(key: Thread, value: V): void {
-    for (const c of [...this._map.keys()]) {
-      if (c.status === "dead") this._map.delete(c);
-    }
-    this._map.set(key, value);
   }
 }
 

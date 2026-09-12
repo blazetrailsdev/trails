@@ -97,6 +97,7 @@ export class Store {
 export class QueryCacheRegistry {
   private _map = new WeakThreadKeyMap<Store>();
 
+  /** @missingRailsCall synchronize — PERMANENT */
   computeIfAbsent(context: Thread, create: () => Store): Store {
     let cache = this._map.get(context);
     if (!cache) {
