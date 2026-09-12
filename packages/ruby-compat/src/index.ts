@@ -1,5 +1,6 @@
 export { ArgumentError } from "./argument-error.js";
 export { ConverterNotFoundError } from "./converter-not-found-error.js";
+export { DelegateClass } from "./delegate.js";
 export { Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
 export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";

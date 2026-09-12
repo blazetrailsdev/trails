@@ -3,9 +3,6 @@
 export interface EncryptionHooks {
   encrypts(klass: any, ...args: any[]): void;
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  applyPendingEncryptions(klass: any): void;
-
   requireOriginalColumnsAfterReflection?(klass: any, columnNames: string[]): void;
 
   encryptedAttribute(record: any, name: string): boolean;
@@ -27,7 +24,6 @@ function notLoaded(method: string): never {
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export const encryptionHooks: EncryptionHooks = {
   encrypts: (klass: any) => notLoaded(`${klass?.name ?? "Model"}.encrypts()`),
-  applyPendingEncryptions: () => {},
   encryptedAttribute: () => false,
   ciphertextFor: () => undefined,
   encrypt: async () => {},

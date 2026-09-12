@@ -1,3 +1,4 @@
+import { basicObjRespondTo } from "@blazetrails/ruby-compat";
 import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { type AttributeOptions, type ValueType, ArgumentError } from "@blazetrails/activemodel";
@@ -75,8 +76,7 @@ export function isTypeIncompatibleWithSerialize(
   const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
   const jsonish = isJsonType ?? (castType as any)?.name === "json";
   if (jsonish && resolvedCoder === CodersJSON) return true;
-  if (castType != null && typeof (castType as any).typeCastArray === "function" && type === Array)
-    return true;
+  if (basicObjRespondTo(castType, "typeCastArray", false) && type === Array) return true;
   return false;
 }
 

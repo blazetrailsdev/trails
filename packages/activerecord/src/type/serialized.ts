@@ -1,6 +1,6 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -12,19 +12,14 @@ export interface Coder {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export class Serialized extends ValueType {
+export class Serialized extends DelegateClass(ValueType) {
   readonly subtype: ValueType | null;
   readonly coder: Coder;
 
   constructor(subtype: ValueType | null, coder: Coder) {
-    super();
+    super(subtype);
     this.subtype = subtype;
     this.coder = coder;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE api-compare-nulls-a-delegateclass-superclass */
-  override type(): string | undefined {
-    return this.subtype!.type();
   }
 
   accessor(): unknown {
@@ -73,10 +68,6 @@ export class Serialized extends ValueType {
 
   override isSerialized(): boolean {
     return true;
-  }
-
-  override isBinary(): boolean {
-    return this.subtype!.isBinary();
   }
 
   private isDefaultValue(value: unknown): boolean {

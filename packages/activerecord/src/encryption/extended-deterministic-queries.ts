@@ -1,6 +1,5 @@
 import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { encryptedTypeOf } from "./encryptable-record.js";
 
 export interface SerializableType {
   serialize(data: unknown): unknown;
@@ -91,9 +90,8 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      const fullType = model.typeForAttribute(attrName) as SerializableType | undefined;
-      const type = encryptedTypeOf(fullType);
-      if (!fullType || !type) continue;
+      const type = model.typeForAttribute(attrName) as EncryptedAttributeType | undefined;
+      if (!type) continue;
       if (!type.deterministic) continue;
       if (!type.previousTypes.length) continue;
       const value = result[attrName];
@@ -166,8 +164,8 @@ export class RelationQueries {
     const scopeAttrs = originalScopeForCreate.call(this) as Record<string, unknown>;
     const wheres = this.whereValuesHash();
     for (const attrName of encryptedAttrs) {
-      const type = encryptedTypeOf(model.typeForAttribute(attrName));
-      if (!type?.deterministic) continue;
+      const type = model.typeForAttribute(attrName) as EncryptedAttributeType;
+      if (!type.deterministic) continue;
       const values = wheres[attrName];
       if (
         Array.isArray(values) &&

@@ -14,10 +14,6 @@ describe("encryptionHooks — unregistered default behavior", () => {
     expect(() => encryptionHooks.encrypts(MyModel, "ssn")).toThrowError(/MyModel\.encrypts\(\)/);
   });
 
-  it("applyPendingEncryptions is a no-op (not a throw) — called on every attribute() definition", () => {
-    expect(() => encryptionHooks.applyPendingEncryptions(Base)).not.toThrow();
-  });
-
   describe("registerEncryptionHooks", () => {
     const originalEncrypts = encryptionHooks.encrypts;
 
