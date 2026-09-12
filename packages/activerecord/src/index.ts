@@ -121,7 +121,6 @@ export {
   BindMap,
 } from "./statement-cache.js";
 export * as RuntimeRegistry from "./runtime-registry.js";
-export { Stats as RuntimeStats } from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type { SchemaSource, IndexInfo } from "./schema-dumper.js";

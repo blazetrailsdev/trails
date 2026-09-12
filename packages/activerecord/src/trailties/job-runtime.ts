@@ -8,9 +8,9 @@ export function instrument(
   block?: () => unknown,
 ): unknown {
   if (operation === "perform" && block) {
-    const runtimeBefore = RuntimeRegistry.stats().sqlRuntime;
+    const runtimeBefore = RuntimeRegistry.sqlRuntime();
     const result = block();
-    payload["dbRuntime"] = RuntimeRegistry.stats().sqlRuntime - runtimeBefore;
+    payload["dbRuntime"] = RuntimeRegistry.sqlRuntime() - runtimeBefore;
     return result;
   }
   return block ? block() : undefined;

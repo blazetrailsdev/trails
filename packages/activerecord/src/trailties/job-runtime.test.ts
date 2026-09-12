@@ -8,8 +8,8 @@ describe("JobRuntimeTest", () => {
   it("sets dbRuntime in payload for perform operations", () => {
     const payload: Record<string, unknown> = {};
     instrument.call({}, "perform", payload, () => {
-      RuntimeRegistry.stats().sqlRuntime += 5.0;
-      RuntimeRegistry.stats().queriesCount++;
+      RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 5.0);
+      RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
     });
     expect(payload["dbRuntime"]).toBe(5.0);
   });
