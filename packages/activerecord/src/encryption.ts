@@ -1,5 +1,6 @@
 import { registerEncryptionHooks } from "./encryption-hooks.js";
-import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
+import { Base } from "./base.js";
+import { type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorOptionLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
@@ -10,6 +11,7 @@ import {
   encrypt,
   encryptedAttribute,
   encrypts,
+  hasEncryptedAttributes,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -32,36 +34,8 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
   encryptor?: Encryptor;
 }
 
-interface PendingEncryption {
-  name: string;
-  scheme: Scheme;
-}
-
-/** @noRailsEquivalent CONVERGEABLE encryption-converge-pending-encryptions-to-decorate-attributes */
-export function applyPendingEncryptions(klass: any): void {
-  const pending: PendingEncryption[] | undefined = klass._pendingEncryptions;
-  if (!pending || pending.length === 0) return;
-
-  if (
-    !Object.prototype.hasOwnProperty.call(klass, "_frozenEncryptionValidatorInstalled") &&
-    typeof klass.validate === "function"
-  ) {
-    klass._frozenEncryptionValidatorInstalled = true;
-    klass.validate((record: any) => {
-      if (!Contexts.context.frozenEncryption) return;
-      EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record);
-    });
-  }
-}
-
 export function isEncryptedAttribute(klass: any, attr: string): boolean {
-  let current = klass;
-  while (current) {
-    const pending: PendingEncryption[] | undefined = current._pendingEncryptions;
-    if (pending?.some((p) => p.name === attr)) return true;
-    current = Object.getPrototypeOf(current);
-  }
-  return false;
+  return (klass.encryptedAttributes as Set<string> | undefined)?.has(attr) ?? false;
 }
 
 export function keyLength(): number {
@@ -132,9 +106,12 @@ export function resetDefaultContext(): void {
   Contexts.resetDefaultContext();
 }
 
+Base.validate((record: any) => EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record), {
+  if: (record: any) => hasEncryptedAttributes.call(record) && Contexts.context.frozenEncryption,
+});
+
 registerEncryptionHooks({
   encrypts: (klass: any, ...args: unknown[]) => encrypts.call(klass, ...args),
-  applyPendingEncryptions,
   requireOriginalColumnsAfterReflection: (klass: any, columnNames: string[]) =>
     EncryptableRecord.requireOriginalColumnsAfterReflection(klass, columnNames),
   encryptedAttribute: (record: any, name: string) => encryptedAttribute.call(record, name),

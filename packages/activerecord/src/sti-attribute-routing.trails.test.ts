@@ -85,8 +85,7 @@ describe("STI subclass attribute() registration", () => {
     }
     class Cat extends Animal {}
 
-    expect(Object.prototype.hasOwnProperty.call(Dog, "_pendingEncryptions")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(Animal, "_pendingEncryptions")).toBe(false);
+    expect(Dog.encryptedAttributes).not.toBe(Animal.encryptedAttributes);
 
     expect(isEncryptedAttribute(Dog, "name")).toBe(true);
     expect(isEncryptedAttribute(Animal, "name")).toBe(false);

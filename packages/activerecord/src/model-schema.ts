@@ -595,8 +595,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   };
   methodHost._attributeMethodsGenerated = false;
 
-  encryptionHooks.applyPendingEncryptions(host);
-
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
 

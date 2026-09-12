@@ -16,7 +16,6 @@ import {
 } from "../test-helpers/models/book-encrypted.js";
 import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
 import { Base } from "../base.js";
 import { LengthValidator } from "@blazetrails/activemodel";
@@ -108,7 +107,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
     for (let i = 0; i < 3; i++) {
       model._cachedDefaultAttributes = null;
-      applyPendingEncryptions(model);
       const type = model.typeForAttribute("logo");
       expect(type).toBeInstanceOf(Serialized);
       expect((type as Serialized).subtype).toBeInstanceOf(EncryptedAttributeType);

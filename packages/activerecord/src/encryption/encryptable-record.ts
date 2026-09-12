@@ -4,7 +4,6 @@ import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
-import { encryptionHooks } from "../encryption-hooks.js";
 import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
 
 /**
@@ -30,11 +29,6 @@ function schemeFor(options: SchemeOptions): Scheme {
   return scheme;
 }
 
-interface PendingEncryption {
-  name: string;
-  readonly scheme: Scheme;
-}
-
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
 export class EncryptableRecord {
@@ -42,46 +36,6 @@ export class EncryptableRecord {
     return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
       ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
       : undefined;
-  }
-
-  /**
-   * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
-   * re-runs its bookkeeping on every `_defaultAttributes` rebuild. The `scheme`
-   * is kept in each entry for the encrypted-attribute type rebuild.
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE bookkeeping for the decorate_attributes block Ruby replays lazily (encryption/encryptable_record.rb:87-92).
-   */
-  static registerPendingEncryption(modelClass: any, pending: PendingEncryption): void {
-    if (!Object.prototype.hasOwnProperty.call(modelClass, "_pendingEncryptions")) {
-      modelClass._pendingEncryptions = [...(modelClass._pendingEncryptions ?? [])];
-    }
-    modelClass._pendingEncryptions.push(pending);
-  }
-
-  /**
-   * Push the durable encryption PendingDecorator, exactly once per `encrypts`
-   * declaration — mirroring Rails' `decorate_attributes([name]) { ... }` in
-   * encryptable_record.rb:87-92. Pushing at declaration time (not on the first
-   * post-reflection rebuild, as before) keeps the decorator's queue position —
-   * and therefore the resolved nesting relative to `serialize` — in declaration
-   * order, and bounds the queue: repeated `_defaultAttributes` rebuilds never
-   * re-push.
-   *
-   * The column default is resolved inside the decorator at replay time
-   * (mirrors Rails' `default: columns_hash[name.to_s]&.default`, evaluated in
-   * the block), so a replay after schema reflection picks up the authoritative
-   * DB default without any re-push.
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the decorate_attributes([name]) push of encrypts (encryption/encryptable_record.rb:87-92), made explicit so queue position is stable.
-   */
-  static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
-    modelClass.decorateAttributes([name], (attrName: string, castType: ValueType) => {
-      return new EncryptedAttributeType({
-        scheme: pending.scheme,
-        castType,
-        default: modelClass.columnsHash()[attrName]?.default ?? undefined,
-      });
-    });
   }
 
   /**
@@ -336,16 +290,15 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   modelClass.encryptedAttributes.add(name);
   delete modelClass._deterministicEncryptedAttributes;
 
-  const pending: PendingEncryption = {
-    name,
-    get scheme(): Scheme {
-      return schemeFor(options);
-    },
-  };
+  modelClass.decorateAttributes([name], (name: string, castType: ValueType) => {
+    const scheme = schemeFor(options);
 
-  EncryptableRecord.registerPendingEncryption(this, pending);
-  EncryptableRecord.pushEncryptionDecorator(this, name, pending);
-  encryptionHooks.applyPendingEncryptions(modelClass);
+    return new EncryptedAttributeType({
+      scheme,
+      castType,
+      default: modelClass.columnsHash()[name]?.default ?? undefined,
+    });
+  });
 
   if (options.ignoreCase) {
     preserveOriginalEncrypted.call(this, name);
@@ -380,7 +333,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
 }
 
-/** @noRailsEquivalent CONVERGEABLE encryption-converge-pending-encryptions-to-decorate-attributes */
+/** @noRailsEquivalent CONVERGEABLE port-type-serialized-as-a-delegate-class */
 export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefined {
   let current: any = type;
   while (current) {
