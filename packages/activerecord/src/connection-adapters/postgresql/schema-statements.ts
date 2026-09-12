@@ -1036,7 +1036,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const result = await this.exclusionConstraintFor(tableName, { expression, ...options });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rbInspect(options)}`,
+        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     return result;
   }
@@ -1160,7 +1160,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (!result) {
       const columnToS =
         column == null
-          ? rbInspect(options)
+          ? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))
           : Array.isArray(column)
             ? `[${(column as string[])
                 .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))

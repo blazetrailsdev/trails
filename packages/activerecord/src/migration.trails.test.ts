@@ -259,7 +259,7 @@ describe("Migration#createTable id option type", () => {
       } finally {
         Migration.verbose = verboseWas;
       }
-      expect(migration.lines[0]).toBe('-- createTable("widgets", {"id"=>false})');
+      expect(migration.lines[0]).toBe('-- createTable("widgets", {:id=>false})');
       expect(migration.lines[1]).toMatch(/^ {3}-> \d+\.\d{4}s$/);
     });
 
@@ -290,7 +290,7 @@ describe("Migration#createTable id option type", () => {
         '-- createTable("widgets")',
       );
       expect(await announce("createTable", "widgets", { id: false, force: "cascade" })).toBe(
-        '-- createTable("widgets", {"id"=>false, "force"=>"cascade"})',
+        '-- createTable("widgets", {:id=>false, :force=>"cascade"})',
       );
     });
 

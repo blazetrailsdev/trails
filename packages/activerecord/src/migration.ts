@@ -1263,7 +1263,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const last = arguments_[arguments_.length - 1];
     if (isPlainObject(last)) {
       const filtered = Object.fromEntries(
-        Object.entries(last).filter(([k]) => !this.isInternalOption(k)),
+        Object.entries(last)
+          .filter(([k]) => !this.isInternalOption(k))
+          .map(([k, v]) => [`:${k}`, v]),
       );
       if (Object.keys(filtered).length > 0) argList.push(rbInspect(filtered));
     } else {

@@ -1666,7 +1666,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(options)}`,
+        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     }
     return fk;
@@ -1739,7 +1739,7 @@ export class SchemaStatements {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(options)}`,
+        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
       );
     }
     return chk;
