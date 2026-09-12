@@ -60,13 +60,12 @@ export function processAction(
 /** @internal */
 export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => T): T {
   if (this.logger?.["info?"]) {
-    const s = RuntimeRegistry.stats();
-    const dbRtBeforeRender = s.resetRuntimes();
+    const dbRtBeforeRender = RuntimeRegistry.resetRuntimes();
     this.dbRuntime = (this.dbRuntime ?? 0) + dbRtBeforeRender;
     const runtime = superOf(this).cleanupViewRuntime.call(this, block);
     const subtractQueries = (elapsed: number): number => {
-      const queriesRt = s.sqlRuntime - s.asyncSqlRuntime;
-      const dbRtAfterRender = s.resetRuntimes();
+      const queriesRt = RuntimeRegistry.sqlRuntime() - RuntimeRegistry.asyncSqlRuntime();
+      const dbRtAfterRender = RuntimeRegistry.resetRuntimes();
       this.dbRuntime = (this.dbRuntime ?? 0) + dbRtAfterRender;
       return elapsed - queriesRt;
     };
@@ -86,7 +85,7 @@ export function appendInfoToPayload(
 ): void {
   superOf(this).appendInfoToPayload.call(this, payload);
 
-  payload["db_runtime"] = (this.dbRuntime ?? 0) + RuntimeRegistry.stats().resetRuntimes();
+  payload["db_runtime"] = (this.dbRuntime ?? 0) + RuntimeRegistry.resetRuntimes();
   payload["queries_count"] = RuntimeRegistry.resetQueriesCount();
   payload["cached_queries_count"] = RuntimeRegistry.resetCachedQueriesCount();
 }

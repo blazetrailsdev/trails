@@ -6,7 +6,7 @@ describe("QueryLogs ExecutionContext wiring", () => {
   beforeEach(() => {
     ExecutionContext.clear();
     queryLogs.tags = [];
-    queryLogs.clearContext();
+    ExecutionContext.clear();
     queryLogs.cacheQueryLogTags = false;
   });
 
@@ -20,12 +20,13 @@ describe("QueryLogs ExecutionContext wiring", () => {
   it("recomputes the cached comment after the execution context changes", () => {
     queryLogs.cacheQueryLogTags = true;
     queryLogs.tags = ["application"];
-    queryLogs.updateContext({ application: "active_record" });
+    ExecutionContext.setKey("application", "active_record");
 
     expect(queryLogs.comment()).toBe("/*application:active_record*/");
 
-    (queryLogs as unknown as { _context: Record<string, unknown> })._context.application =
-      "after_record";
+    const suppressed = vi.spyOn(queryLogs, "clearCache").mockImplementation(() => {});
+    ExecutionContext.setKey("application", "after_record");
+    suppressed.mockRestore();
 
     expect(queryLogs.comment()).toBe("/*application:active_record*/");
 

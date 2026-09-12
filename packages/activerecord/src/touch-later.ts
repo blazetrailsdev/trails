@@ -1,12 +1,7 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
-import {
-  touch as timestampTouch,
-  timestampAttributesForUpdateInModel,
-  currentTimeFromProperTimezone,
-} from "./timestamp.js";
+import { timestampAttributesForUpdateInModel, currentTimeFromProperTimezone } from "./timestamp.js";
 import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
-import type { Time as RubyTime } from "@blazetrails/date";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { beforeCommittedBang as transactionsBeforeCommittedBang } from "./transactions.js";
@@ -75,24 +70,21 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   }
 }
 
-export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
+export async function touch(
+  this: Base,
+  args: TouchArgs,
+  superFn: (args: TouchArgs) => Promise<boolean>,
+): Promise<boolean> {
   const self = this as any;
-  if (self._deferTouchAttrs?.length) {
-    const deferredAttrs = self._deferTouchAttrs as string[];
-    const deferredTime = self._touchTime as RubyTime | null;
+  if (hasDeferTouchAttrs(this)) {
     const { names, time } = parseTouchArgs(args);
-    const merged: string[] = [...new Set([...names, ...deferredAttrs])];
+    const merged: string[] = [...new Set([...names, ...(self._deferTouchAttrs as string[])])];
+    const result = await superFn([...merged, { time }] as TouchArgs);
     self._deferTouchAttrs = null;
     self._touchTime = null;
-    try {
-      return await timestampTouch.call(this, ...merged, { time });
-    } catch (error) {
-      self._deferTouchAttrs = deferredAttrs;
-      self._touchTime = deferredTime;
-      throw error;
-    }
+    return result;
   }
-  return timestampTouch.call(this, ...args);
+  return superFn(args);
 }
 
 export async function beforeCommittedBang(this: Base): Promise<void> {
@@ -119,22 +111,11 @@ export function surreptitiouslyTouch(this: Base, attrNames: string[]): void {
 /** @internal */
 export async function touchDeferredAttributes(this: Base): Promise<void> {
   const self = this as any;
-  const deferredAttrs = (self._deferTouchAttrs as string[]) ?? [];
-  const time = (self._touchTime as RubyTime | null) ?? currentTimeFromProperTimezone();
-  self._deferTouchAttrs = null;
-  self._touchTime = null;
   self._skipDirtyTracking = true;
-  try {
-    await timestampTouch.call(this, ...deferredAttrs, { time });
-  } catch (error) {
-    self._deferTouchAttrs = deferredAttrs;
-    self._touchTime = time;
-    throw error;
-  } finally {
-    self._skipDirtyTracking = null;
-  }
+  await self.touch({ time: self._touchTime });
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   touchLater,
   touch,

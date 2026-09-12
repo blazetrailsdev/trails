@@ -1,5 +1,12 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { currentTimeFromProperTimezone } from "./timestamp.js";
+import {
+  currentTimeFromProperTimezone,
+  parseTouchArgs,
+  timestampAttributesForUpdateInModel,
+  type TimestampHost,
+  type TouchArgs,
+} from "./timestamp.js";
+import { Rational } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
@@ -9,7 +16,7 @@ import {
   UpdateManager,
   DeleteManager,
   Table as ArelTable,
-  type Nodes,
+  Nodes,
 } from "@blazetrails/arel";
 import {
   ActiveRecordError,
@@ -559,18 +566,6 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
   return result as T;
 }
 
-export function slice(this: AttributeIO, ...keys: string[]): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const key of keys) {
-    result[key] = this.readAttribute(key);
-  }
-  return result;
-}
-
-export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
-  return keys.map((key) => this.readAttribute(key));
-}
-
 interface AttributeSingleSave {
   writeAttribute(name: string, value: unknown): void;
   save(options?: { validate?: boolean }): Promise<boolean | undefined>;
@@ -806,21 +801,6 @@ export async function reload<T extends ReloadRecord>(
   return this;
 }
 
-interface CloneRecord {
-  _attributes: unknown;
-  _previouslyNewRecord: boolean;
-  errors: { constructor: new (base: unknown) => unknown };
-}
-
-export function clone<T extends CloneRecord>(this: T): T {
-  const copy = Object.create(Object.getPrototypeOf(this)) as T;
-  Object.assign(copy, this);
-  (copy as unknown as CloneRecord)._attributes = this._attributes;
-  (copy as unknown as CloneRecord)._previouslyNewRecord = false;
-  (copy as unknown as { errors: unknown }).errors = new this.errors.constructor(copy);
-  return copy;
-}
-
 interface BecomesRecord {
   _attributes: { reverseMergeBang(target: unknown): unknown };
   _newRecord: boolean;
@@ -1019,6 +999,46 @@ export function destroyRow(this: PersistencePrivateHost): Promise<number> {
 /** @internal */
 export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
+}
+
+export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
+  const ctor = this.constructor as typeof Base;
+  if (!this.isPersisted()) raiseRecordNotTouchedError();
+  if (this.isReadonly()) {
+    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+  }
+
+  const { names, time: t } = parseTouchArgs(args);
+  const now =
+    t == null
+      ? currentTimeFromProperTimezone()
+      : t instanceof RubyTime
+        ? t
+        : RubyTime.at(new Rational(t.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
+  const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
+  const resolvedNames = names.map((name) => aliases[name] ?? name);
+
+  const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
+    ctor as unknown as TimestampHost,
+  );
+  for (const name of new Set([...updateTimestampAttrs, ...resolvedNames])) {
+    verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
+  }
+
+  const attributeNames = Array.from(new Set([...updateTimestampAttrs, ...resolvedNames]));
+
+  if (attributeNames.length > 0) {
+    const affectedRows = await (this as any)._touchRow(attributeNames, now);
+    (this as any)._triggerUpdateCallback = affectedRows === 1;
+  }
+  return true;
+}
+
+function raiseRecordNotTouchedError(): never {
+  throw new ActiveRecordError(
+    "Cannot touch on a new or destroyed record object. Consider using " +
+      "persisted?, new_record?, or destroyed? before touching.",
+  );
 }
 
 /** @internal */
@@ -1232,6 +1252,7 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   _updateRecord: instanceUpdateRecord,
 };

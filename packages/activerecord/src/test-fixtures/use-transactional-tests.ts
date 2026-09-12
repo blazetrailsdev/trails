@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: useTransactionalTests. */
 import { leaseFixtureConnection } from "./fixture-connection.js";
 import {
   withTransactionalFixtures,

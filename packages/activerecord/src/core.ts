@@ -629,6 +629,22 @@ export function initializeDup(
   this._startTransactionState = null;
 }
 
+interface CloneRecord {
+  _attributes: unknown;
+  _previouslyNewRecord: boolean;
+  errors: { constructor: new (base: unknown) => unknown };
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function clone<T extends CloneRecord>(this: T): T {
+  const copy = Object.create(Object.getPrototypeOf(this)) as T;
+  Object.assign(copy, this);
+  (copy as unknown as CloneRecord)._attributes = this._attributes;
+  (copy as unknown as CloneRecord)._previouslyNewRecord = false;
+  (copy as unknown as { errors: unknown }).errors = new this.errors.constructor(copy);
+  return copy;
+}
+
 /** @internal */
 export function initializeInternalsCallback(this: unknown): void {}
 

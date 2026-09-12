@@ -1,78 +1,89 @@
-import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  Notifications,
+  type NotificationEvent,
+} from "@blazetrails/activesupport";
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-export class Stats {
-  sqlRuntime = 0.0;
-  asyncSqlRuntime = 0.0;
-  queriesCount = 0;
-  cachedQueriesCount = 0;
-
-  resetRuntimes(): number {
-    const was = this.sqlRuntime;
-    this.sqlRuntime = 0.0;
-    this.asyncSqlRuntime = 0.0;
-    return was;
-  }
-
-  reset(): void {
-    this.sqlRuntime = 0.0;
-    this.asyncSqlRuntime = 0.0;
-    this.queriesCount = 0;
-    this.cachedQueriesCount = 0;
-  }
+export function sqlRuntime(): number {
+  return (
+    IsolatedExecutionState.get<number>("active_record_sql_runtime") ??
+    IsolatedExecutionState.set("active_record_sql_runtime", 0.0)
+  );
 }
 
-let _stats: Stats | null = null;
-
-function getStats(): Stats {
-  if (!_stats) _stats = new Stats();
-  return _stats;
+export function setSqlRuntime(runtime: number): void {
+  IsolatedExecutionState.set("active_record_sql_runtime", runtime);
 }
 
-export function record(
-  queryName: string | undefined,
-  runtime: number,
-  options: { cached?: boolean; async?: boolean; lockWait?: number } = {},
-): void {
-  const s = getStats();
-
-  if (queryName !== "TRANSACTION" && queryName !== "SCHEMA") {
-    s.queriesCount += 1;
-    if (options.cached) s.cachedQueriesCount += 1;
-  }
-
-  if (options.async) {
-    s.asyncSqlRuntime += runtime - (options.lockWait ?? 0);
-  }
-  s.sqlRuntime += runtime;
+export function asyncSqlRuntime(): number {
+  return (
+    IsolatedExecutionState.get<number>("active_record_async_sql_runtime") ??
+    IsolatedExecutionState.set("active_record_async_sql_runtime", 0.0)
+  );
 }
 
-export function stats(): Stats {
-  return getStats();
+export function setAsyncSqlRuntime(runtime: number): void {
+  IsolatedExecutionState.set("active_record_async_sql_runtime", runtime);
+}
+
+export function queriesCount(): number {
+  return (
+    IsolatedExecutionState.get<number>("active_record_queries_count") ??
+    IsolatedExecutionState.set("active_record_queries_count", 0)
+  );
+}
+
+export function setQueriesCount(count: number): void {
+  IsolatedExecutionState.set("active_record_queries_count", count);
+}
+
+export function cachedQueriesCount(): number {
+  return (
+    IsolatedExecutionState.get<number>("active_record_cached_queries_count") ??
+    IsolatedExecutionState.set("active_record_cached_queries_count", 0)
+  );
+}
+
+export function setCachedQueriesCount(count: number): void {
+  IsolatedExecutionState.set("active_record_cached_queries_count", count);
 }
 
 export function reset(): void {
-  getStats().reset();
+  resetRuntimes();
+  resetQueriesCount();
+  resetCachedQueriesCount();
+}
+
+export function resetRuntimes(): number {
+  const rt = sqlRuntime();
+  setSqlRuntime(0.0);
+  setAsyncSqlRuntime(0.0);
+  return rt;
 }
 
 export function resetQueriesCount(): number {
-  const s = getStats();
-  const was = s.queriesCount;
-  s.queriesCount = 0;
-  return was;
+  const qc = queriesCount();
+  setQueriesCount(0);
+  return qc;
 }
 
 export function resetCachedQueriesCount(): number {
-  const s = getStats();
-  const was = s.cachedQueriesCount;
-  s.cachedQueriesCount = 0;
-  return was;
+  const qc = cachedQueriesCount();
+  setCachedQueriesCount(0);
+  return qc;
 }
 
-Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-  record(event.payload.name as string | undefined, event.duration, {
-    cached: event.payload.cached as boolean | undefined,
-    async: event.payload.async as boolean | undefined,
-    lockWait: event.payload.lockWait as number | undefined,
-  });
+Notifications.monotonicSubscribe("sql.active_record", (event: NotificationEvent) => {
+  const payload = event.payload;
+  if (!["SCHEMA", "TRANSACTION"].includes(payload.name as string)) {
+    setQueriesCount(queriesCount() + 1);
+    if (payload.cached) setCachedQueriesCount(cachedQueriesCount() + 1);
+  }
+
+  const runtime = event.duration;
+
+  if (payload.async) {
+    setAsyncSqlRuntime(asyncSqlRuntime() + (runtime - (payload.lockWait as number)));
+  }
+  setSqlRuntime(sqlRuntime() + runtime);
 });

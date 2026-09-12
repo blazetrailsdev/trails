@@ -65,6 +65,7 @@ export function normalizeChangedInPlaceAttributes(
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   normalizeAttribute,
   normalizeChangedInPlaceAttributes,

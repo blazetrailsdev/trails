@@ -1,4 +1,5 @@
 import { hasKey } from "@blazetrails/ruby-compat";
+import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { connectionPool } from "./connection-handling.js";
@@ -267,6 +268,13 @@ export function upsertAll<T extends typeof Base>(
   options?: Parameters<Relation<InstanceType<T>>["upsertAll"]>[1],
 ): Promise<Result> {
   return this.all().upsertAll(records, options);
+}
+
+export async function touchAll<T extends typeof Base>(
+  this: T,
+  ...args: TouchAllArgs
+): Promise<number> {
+  return this.all().touchAll(...args);
 }
 
 export async function updateAll<T extends typeof Base>(
@@ -546,10 +554,6 @@ export function isNone<T extends typeof Base>(
   ...args: Parameters<ReturnType<T["all"]>["isNone"]>
 ): Promise<boolean> {
   return this.all().isNone(...args);
-}
-
-export async function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
-  return this.all().isEmpty();
 }
 
 export function firstOrCreate<T extends typeof Base>(

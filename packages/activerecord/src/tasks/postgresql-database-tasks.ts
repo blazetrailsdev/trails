@@ -69,7 +69,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const dumpSchemas = DatabaseTasks.dumpSchemas;
+    const dumpSchemas = Base.dumpSchemas;
     let searchPath: string | undefined;
     if (dumpSchemas === "schema_search_path") {
       const raw = this.configurationHash.schemaSearchPath;
@@ -132,10 +132,6 @@ export class PostgreSQLDatabaseTasks {
     }
     args.push(this.dbConfig.database as string);
     await this.runCmd("psql", args, "loading");
-  }
-
-  static register(): void {
-    DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);
   }
 
   private encoding(): string {
@@ -240,3 +236,5 @@ export function runCmdError(cmd: string, args: string[], _action: string): strin
     `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
+
+DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);

@@ -847,6 +847,7 @@ export const ClassMethods = {
   loadSchemaFromAdapter,
 };
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   typeForAttribute(
     this: { constructor: unknown },

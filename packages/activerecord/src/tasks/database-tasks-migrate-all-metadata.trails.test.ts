@@ -69,12 +69,12 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
 
   it("prepare_all does not create ar_internal_metadata when use_metadata_table is false", async () => {
     await setupConfigs();
-    const dumpWas = DatabaseTasks.dumpSchemaAfterMigration;
-    DatabaseTasks.dumpSchemaAfterMigration = false;
+    const dumpWas = Base.dumpSchemaAfterMigration;
+    Base.dumpSchemaAfterMigration = false;
     try {
       await DatabaseTasks.prepareAll();
     } finally {
-      DatabaseTasks.dumpSchemaAfterMigration = dumpWas;
+      Base.dumpSchemaAfterMigration = dumpWas;
     }
     expect(await metadataTablesExist()).toEqual([false, false]);
   });

@@ -1,6 +1,23 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Stats, record, stats, reset } from "./runtime-registry.js";
-import { Notifications } from "@blazetrails/activesupport";
+import {
+  sqlRuntime,
+  asyncSqlRuntime,
+  queriesCount,
+  cachedQueriesCount,
+  resetRuntimes,
+  reset,
+} from "./runtime-registry.js";
+import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+
+function instrumentSql(
+  name: string,
+  runtime: number,
+  payload: { cached?: boolean; async?: boolean; lockWait?: number } = {},
+): void {
+  Notifications.publishEvent(
+    new NotificationEvent("sql.active_record", 0, runtime / 1_000.0, "", { name, ...payload }),
+  );
+}
 
 describe("RuntimeRegistryTest", () => {
   beforeEach(() => {
@@ -8,73 +25,65 @@ describe("RuntimeRegistryTest", () => {
   });
 
   it("sql runtime defaults to zero", () => {
-    expect(stats().sqlRuntime).toBe(0);
+    expect(sqlRuntime()).toBe(0);
   });
 
   it("record increments sql runtime", () => {
-    record("User Load", 5.0);
-    expect(stats().sqlRuntime).toBe(5.0);
+    instrumentSql("User Load", 5.0);
+    expect(sqlRuntime()).toBe(5.0);
   });
 
   it("record increments queries count", () => {
-    record("User Load", 1.0);
-    record("Post Load", 2.0);
-    expect(stats().queriesCount).toBe(2);
+    instrumentSql("User Load", 1.0);
+    instrumentSql("Post Load", 2.0);
+    expect(queriesCount()).toBe(2);
   });
 
   it("record does not count TRANSACTION queries", () => {
-    record("TRANSACTION", 1.0);
-    expect(stats().queriesCount).toBe(0);
-    expect(stats().sqlRuntime).toBe(1.0);
+    instrumentSql("TRANSACTION", 1.0);
+    expect(queriesCount()).toBe(0);
+    expect(sqlRuntime()).toBe(1.0);
   });
 
   it("record does not count SCHEMA queries", () => {
-    record("SCHEMA", 1.0);
-    expect(stats().queriesCount).toBe(0);
+    instrumentSql("SCHEMA", 1.0);
+    expect(queriesCount()).toBe(0);
   });
 
   it("record increments cached queries count when cached", () => {
-    record("User Load", 0.1, { cached: true });
-    expect(stats().cachedQueriesCount).toBe(1);
-    expect(stats().queriesCount).toBe(1);
+    instrumentSql("User Load", 0.1, { cached: true });
+    expect(cachedQueriesCount()).toBe(1);
+    expect(queriesCount()).toBe(1);
   });
 
   it("record tracks async sql runtime separately", () => {
-    record("User Load", 10.0, { async: true, lockWait: 3.0 });
-    expect(stats().asyncSqlRuntime).toBe(7.0);
-    expect(stats().sqlRuntime).toBe(10.0);
+    instrumentSql("User Load", 10.0, { async: true, lockWait: 3.0 });
+    expect(asyncSqlRuntime()).toBe(7.0);
+    expect(sqlRuntime()).toBe(10.0);
   });
 
   it("resetRuntimes returns previous sql runtime and resets", () => {
-    record("User Load", 5.0);
-    record("Post Load", 3.0, { async: true });
-    const was = stats().resetRuntimes();
+    instrumentSql("User Load", 5.0);
+    instrumentSql("Post Load", 3.0, { async: true });
+    const was = resetRuntimes();
     expect(was).toBe(8.0);
-    expect(stats().sqlRuntime).toBe(0);
-    expect(stats().asyncSqlRuntime).toBe(0);
-    expect(stats().queriesCount).toBe(2);
+    expect(sqlRuntime()).toBe(0);
+    expect(asyncSqlRuntime()).toBe(0);
+    expect(queriesCount()).toBe(2);
   });
 
   it("reset clears all stats", () => {
-    record("User Load", 5.0);
-    record("Post Load", 1.0, { cached: true });
+    instrumentSql("User Load", 5.0);
+    instrumentSql("Post Load", 1.0, { cached: true });
     reset();
-    expect(stats().sqlRuntime).toBe(0);
-    expect(stats().queriesCount).toBe(0);
-    expect(stats().cachedQueriesCount).toBe(0);
-  });
-
-  it("Stats class initializes with zeros", () => {
-    const s = new Stats();
-    expect(s.sqlRuntime).toBe(0);
-    expect(s.asyncSqlRuntime).toBe(0);
-    expect(s.queriesCount).toBe(0);
-    expect(s.cachedQueriesCount).toBe(0);
+    expect(sqlRuntime()).toBe(0);
+    expect(queriesCount()).toBe(0);
+    expect(cachedQueriesCount()).toBe(0);
   });
 
   it("notification subscription records sql.active_record events", () => {
     Notifications.instrument("sql.active_record", { name: "User Load" }, () => {});
-    expect(stats().queriesCount).toBe(1);
-    expect(stats().sqlRuntime).toBeGreaterThanOrEqual(0);
+    expect(queriesCount()).toBe(1);
+    expect(sqlRuntime()).toBeGreaterThanOrEqual(0);
   });
 });

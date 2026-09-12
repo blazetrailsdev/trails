@@ -984,24 +984,31 @@ export function extractFromProgram(
         const ownCtor = ctorDeclFile === relPath ? ctorDecl : undefined;
         const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
-        const ctorNode = homeDecl ?? node;
-        mixinMethods.push({
-          name: "constructor",
-          visibility: ctorVisibility,
-          ...declarationArity(ctorDecl, checker),
-          isStatic: false,
-          line:
-            ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
-          file: relPath,
-          ...(ctorDeclFile !== undefined && ctorDeclFile !== relPath
-            ? { declaredIn: ctorDeclFile }
-            : {}),
-          ...(ctorVisibility !== "public" ||
-          (ctorDecl !== undefined && internalJsDocTagApplies(ctorDecl))
-            ? { internal: true }
-            : {}),
-          ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
-        });
+        // No home at all — neither a `constructor` declaration nor a class the
+        // return type resolves to (a factory typed `new (...) => any`). There
+        // is no source constructor anywhere for this to stand for, and no
+        // declaration a `@noRailsEquivalent` receipt could sit on, so scoring
+        // it against THIS file invents surface the file does not spell.
+        if (homeDecl !== undefined) {
+          const ctorNode = homeDecl;
+          mixinMethods.push({
+            name: "constructor",
+            visibility: ctorVisibility,
+            ...declarationArity(ctorDecl, checker),
+            isStatic: false,
+            line:
+              ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
+            file: relPath,
+            ...(ctorDeclFile !== undefined && ctorDeclFile !== relPath
+              ? { declaredIn: ctorDeclFile }
+              : {}),
+            ...(ctorVisibility !== "public" ||
+            (ctorDecl !== undefined && internalJsDocTagApplies(ctorDecl))
+              ? { internal: true }
+              : {}),
+            ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
+          });
+        }
       }
 
       for (const own of factoryClassMembers(node, checker, relPath, srcDir)) {

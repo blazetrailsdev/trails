@@ -311,6 +311,14 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
   }
 }
 
+export function touch(
+  this: Base,
+  args: unknown[],
+  superFn: () => Promise<boolean>,
+): Promise<boolean> {
+  return withTransactionReturningStatus.call(this, superFn) as Promise<boolean>;
+}
+
 export async function withTransactionReturningStatus<T>(
   this: Base,
   fn: () => Promise<T>,

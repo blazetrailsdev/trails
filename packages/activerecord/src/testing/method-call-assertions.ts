@@ -1,5 +1,7 @@
 /* eslint-disable blazetrails/rails-error-parity */
 
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: assertCalledOnInstanceOf, assertNotCalledOnInstanceOf. */
+
 type ClassLike = { prototype: object; name: string };
 
 export interface CallAssertionOptions {

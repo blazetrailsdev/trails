@@ -1,3 +1,4 @@
+export { Access } from "./access.js";
 export { Model } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";

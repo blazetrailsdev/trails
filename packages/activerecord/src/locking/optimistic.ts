@@ -19,10 +19,12 @@ export class LockingType extends ValueType<number> {
     this._subtype = subtype;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override type(): string | undefined {
     return this._subtype.type();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override cast(value: unknown): number {
     return (this._subtype.cast(value) as number | null) ?? 0;
   }
@@ -178,7 +180,7 @@ export function _touchRow(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    touchAttrNames = [...touchAttrNames, ctor.lockingColumn];
+    (this as unknown as { _touchAttrNames: Set<string> })._touchAttrNames.add(ctor.lockingColumn);
   }
   return superFn(touchAttrNames, time);
 }
@@ -278,6 +280,7 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Val
   return castType;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   lockingEnabled,
   incrementBang,

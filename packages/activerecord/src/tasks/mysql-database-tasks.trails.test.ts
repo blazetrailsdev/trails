@@ -17,8 +17,7 @@ describe("MySQLDatabaseTasks", () => {
   });
 
   it("test_registers_mysql_and_trilogy_patterns", () => {
-    DatabaseTasks.clearRegisteredTasks();
-    MySQLDatabaseTasks.register();
     expect(DatabaseTasks["classForAdapter"]("mysql2")).toBeDefined();
+    expect(DatabaseTasks["classForAdapter"]("trilogy")).toBeDefined();
   });
 });

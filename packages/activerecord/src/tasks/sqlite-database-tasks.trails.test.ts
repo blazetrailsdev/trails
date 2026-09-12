@@ -64,8 +64,6 @@ describe("SQLiteDatabaseTasks", () => {
   });
 
   it("test_registers_with_database_tasks", () => {
-    DatabaseTasks.clearRegisteredTasks();
-    SQLiteDatabaseTasks.register();
     expect(DatabaseTasks["classForAdapter"]("sqlite3")).toBeDefined();
   });
 

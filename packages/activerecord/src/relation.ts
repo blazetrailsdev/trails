@@ -535,10 +535,12 @@ export class Relation<T extends Base> {
     return this.isEmpty();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async isPresent(): Promise<boolean> {
     return this.isAny();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async presence(): Promise<LoadedRelation<Relation<T>> | null> {
     return (await this.isPresent()) ? stripThenable(this as Relation<T>) : null;
   }

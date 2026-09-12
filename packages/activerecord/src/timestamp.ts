@@ -1,12 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "@blazetrails/activesupport";
-import type { Base } from "./base.js";
-import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";
-import { UpdateManager, Nodes } from "@blazetrails/arel";
-import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
-import { runCallbacks } from "@blazetrails/activesupport";
-import { withTransactionReturningStatus } from "./transactions.js";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { isUtc } from "./type/internal/timezone.js";
 
@@ -15,42 +9,6 @@ export interface TouchOptions {
 }
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
-
-export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
-  const ctor = this.constructor as typeof Base;
-  if (isNoTouchingApplied(ctor)) return false;
-
-  if (!this.isPersisted()) raiseRecordNotTouchedError();
-  if (this.isReadonly()) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-
-  const { names, time: t } = parseTouchArgs(args);
-  const now =
-    t == null
-      ? currentTimeFromProperTimezone()
-      : t instanceof RubyTime
-        ? t
-        : RubyTime.at(new Rational(t.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
-  const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
-  const resolvedNames = names.map((name) => aliases[name] ?? name);
-
-  const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
-    ctor as unknown as TimestampHost,
-  );
-  for (const name of new Set([...updateTimestampAttrs, ...resolvedNames])) {
-    if (ctor.readonlyAttributeQ(name)) {
-      throw new ActiveRecordError(`${name} is marked as readonly`);
-    }
-  }
-
-  const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
-  const touchCols = Array.from(touchColSet);
-
-  return withTransactionReturningStatus.call(this, async () => {
-    return touchRow.call(this, touchCols, now);
-  }) as Promise<boolean>;
-}
 
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function parseTouchArgs(args: TouchArgs): {
@@ -64,107 +22,10 @@ export function parseTouchArgs(args: TouchArgs): {
   return { names: args as string[], time: undefined };
 }
 
-function raiseRecordNotTouchedError(): never {
-  throw new ActiveRecordError(
-    "Cannot touch on a new or destroyed record object. Consider using " +
-      "persisted?, new_record?, or destroyed? before touching.",
-  );
-}
-
-async function touchRow(this: Base, touchCols: string[], now: RubyTime): Promise<boolean> {
-  const ctor = this.constructor as typeof Base;
-
-  if (touchCols.length === 0) {
-    await runCallbacks(this, "touch");
-    return true;
-  }
-
-  for (const col of touchCols) {
-    this.writeAttribute(col, now);
-  }
-
-  const dbValues = (this as any)._attributes.valuesForDatabase();
-  const table = ctor.arelTable;
-  const setPairs: [InstanceType<typeof Nodes.Node>, unknown][] = touchCols.map((col) => [
-    table.get(col) as InstanceType<typeof Nodes.Node>,
-    new Nodes.Quoted(dbValues[col]),
-  ]);
-
-  const lockCol = ctor.lockingColumn;
-  let rawDbVersion: unknown;
-  let lockAttributeWas: import("@blazetrails/activemodel").Attribute | null = null;
-  if (ctor.lockingEnabled) {
-    const rawVersion = this.readAttribute(lockCol);
-    rawDbVersion = this.readAttributeBeforeTypeCast(lockCol);
-    lockAttributeWas = (this as any)._attributes.getAttribute(lockCol);
-    const current = rawVersion == null ? 0 : Number(rawVersion) || 0;
-    const next = current + 1;
-    setPairs.push([table.get(lockCol) as InstanceType<typeof Nodes.Node>, new Nodes.Quoted(next)]);
-    this.writeAttribute(lockCol, next);
-  }
-
-  const um = new UpdateManager()
-    .table(table)
-    .set(setPairs)
-    .where((ctor as any)._buildPkWhereNode((this as any).idInDatabase));
-
-  if (ctor.lockingEnabled) {
-    if (rawDbVersion == null) {
-      um.where(table.get(lockCol).eq(null));
-    } else {
-      um.where(table.get(lockCol).eq(Number(rawDbVersion) || 0));
-    }
-  }
-
-  const adapter = ctor.connection as any;
-  const affected: number = await adapter.update(um, `${ctor.name} Touch`);
-  if (ctor.lockingEnabled && affected === 0) {
-    if (lockAttributeWas !== null) {
-      (this as any)._attributes.set(lockCol, lockAttributeWas);
-    }
-    throw new StaleObjectError(this, "touch");
-  }
-
-  (this as any)._triggerUpdateCallback = affected === 1;
-
-  const touched = new Set(touchCols);
-  if (ctor.lockingEnabled) touched.add(lockCol);
-
-  const self = this as any;
-  try {
-    if (self._skipDirtyTracking) {
-      self.clearAttributeChanges(touched);
-    } else {
-      const restores: Array<[string, unknown]> = [];
-      for (const attrName of self._attributes.keys()) {
-        if (touched.has(attrName)) continue;
-        if (self.attributeChanged(attrName)) {
-          restores.push([attrName, self._readAttribute(attrName)]);
-          self._writeAttribute(attrName, self.attributeWas(attrName));
-          self.clearAttributeChange(attrName);
-        }
-      }
-      self.changesApplied();
-      for (const [attrName, value] of restores) {
-        self._writeAttribute(attrName, value);
-      }
-    }
-  } finally {
-    self._skipDirtyTracking = null;
-  }
-
-  await runCallbacks(this, "touch");
-  return true;
-}
-
-export async function touchAll(this: typeof Base, ...args: TouchAllArgs): Promise<number> {
-  return this.all().touchAll(...args);
-}
-
 const CREATED_ATTRS = ["created_at", "created_on"];
 const UPDATED_ATTRS = ["updated_at", "updated_on"];
 
-interface TimestampHost {
+export interface TimestampHost {
   attributeAliases?: Record<string, string>;
   columnNames?: string[] | (() => string[]);
   _timestampAttributesForCreateInModel?: string[];
@@ -396,12 +257,8 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-export const ClassMethods = {
-  touchAll,
-};
-
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
-  touch,
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {

@@ -2,6 +2,7 @@ import { base58 } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 export class MinimumLengthError extends Error {
+  /** @noRailsEquivalent PERMANENT */
   constructor(message?: string) {
     super(message);
     this.name = "ActiveRecord::SecureToken::MinimumLengthError";

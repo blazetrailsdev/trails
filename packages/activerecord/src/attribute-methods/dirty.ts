@@ -1,6 +1,5 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
 import type {
   AttributeMutationTracker,
   DirtyOptions,
@@ -136,43 +135,44 @@ export function initInternals(this: DirtyPrivateHost, super_: () => void): void 
 }
 
 /** @internal */
-export function _touchRow(
+export async function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
-  time?: Temporal.Instant | null,
+  time: unknown,
+  superFn: (attributeNames: string[], time: unknown) => Promise<number>,
 ): Promise<number> {
   this._touchAttrNames = new Set(attributeNames);
-  const t = time ?? Temporal.Now.instant();
-  for (const attr of this._touchAttrNames) {
-    this._writeAttribute(attr, t);
-  }
-  const affectedRows = (this as any)._updateRow
-    ? (this as any)._updateRow(attributeNames, "touch")
-    : Promise.resolve(1);
 
-  return affectedRows.then((rows: number) => {
+  try {
+    const affectedRows = await superFn(attributeNames, time);
+
+    this._skipDirtyTracking ??= false;
     if (this._skipDirtyTracking) {
-      this.clearAttributeChanges(this._touchAttrNames!);
-    } else {
-      const restores: Array<[string, unknown]> = [];
-      for (const attrName of this._attributes.keys()) {
-        if (this._touchAttrNames!.has(attrName)) continue;
-        if (this.attributeChanged(attrName)) {
-          const current = this._readAttribute(attrName);
-          this._writeAttribute(attrName, this.attributeWas(attrName));
-          this.clearAttributeChange(attrName);
-          restores.push([attrName, current]);
-        }
-      }
-      this.changesApplied();
-      for (const [attrName, value] of restores) {
-        this._writeAttribute(attrName, value);
+      this.clearAttributeChanges(this._touchAttrNames);
+      return affectedRows;
+    }
+
+    const changes: Array<[string, unknown]> = [];
+    for (const attrName of this._attributes.keys()) {
+      if (this._touchAttrNames.has(attrName)) continue;
+
+      if (this.attributeChanged(attrName)) {
+        changes.push([attrName, this._readAttribute(attrName)]);
+        this._writeAttribute(attrName, this.attributeWas(attrName));
+        this.clearAttributeChange(attrName);
       }
     }
+
+    this.changesApplied();
+    for (const [attrName, value] of changes) {
+      this._writeAttribute(attrName, value);
+    }
+
+    return affectedRows;
+  } finally {
     this._touchAttrNames = null;
     this._skipDirtyTracking = null;
-    return rows;
-  });
+  }
 }
 
 /** @internal */

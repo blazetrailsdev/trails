@@ -57,6 +57,14 @@ export function createOrUpdate(this: any, block?: (record: any) => void): Promis
   );
 }
 
+export function touch(
+  this: any,
+  args: unknown[],
+  superFn: () => Promise<boolean>,
+): Promise<boolean> {
+  return runCallbacks(this, "touch", superFn) as Promise<boolean>;
+}
+
 /** @internal */
 export async function _createRecord(
   this: any,

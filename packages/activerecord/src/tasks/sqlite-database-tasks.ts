@@ -121,10 +121,6 @@ export class SQLiteDatabaseTasks {
     await Base.establishConnection(config);
     await (await this.connection()).connectBang();
   }
-
-  static register(): void {
-    DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);
-  }
 }
 
 /** @internal */
@@ -150,3 +146,5 @@ export function runCmdError(cmd: string, args: string[]): string {
     `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
+
+DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);

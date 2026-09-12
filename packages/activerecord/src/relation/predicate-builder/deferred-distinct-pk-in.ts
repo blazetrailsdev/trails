@@ -4,6 +4,7 @@ type DeferredIds = { ids(): Promise<unknown[]> };
 
 /** @noRailsEquivalent PERMANENT */
 export class DeferredIdsIn extends Nodes.In {
+  /** @noRailsEquivalent PERMANENT */
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
@@ -13,6 +14,7 @@ export class DeferredIdsIn extends Nodes.In {
     super(attribute, inlineSubquery);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsNotIn {
     return new DeferredIdsNotIn(
       this.left as Nodes.Attribute,
@@ -24,6 +26,7 @@ export class DeferredIdsIn extends Nodes.In {
 
 /** @noRailsEquivalent PERMANENT */
 export class DeferredIdsNotIn extends Nodes.NotIn {
+  /** @noRailsEquivalent PERMANENT */
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
@@ -33,6 +36,7 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
     super(attribute, inlineSubquery);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
       this.left as Nodes.Attribute,

@@ -46,7 +46,6 @@ import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
-import { _registerBase as _registerBaseWithNamedScoping } from "./scoping/named.js";
 import { _registerBase as _registerBaseWithAsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { _registerBase as _registerBaseWithDatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import {
@@ -123,12 +122,14 @@ import {
   InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
+  Access,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   assertAssignedSynchronously,
   type DirtyOptions,
   dirtyInitAttributes,
 } from "@blazetrails/activemodel";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -264,6 +265,9 @@ import {
   rawTimestampToCacheVersion as _rawTimestampToCacheVersion,
 } from "./integration.js";
 import { noTouching as _noTouchingBlock, isNoTouching as _isNoTouching } from "./no-touching.js";
+import * as _NoTouching from "./no-touching.js";
+import * as _Transactions from "./transactions.js";
+import * as _Callbacks from "./callbacks.js";
 import { suppress as _suppressBlock, registry as _suppressorRegistry } from "./suppressor.js";
 import {
   inspect as _inspect,
@@ -278,6 +282,7 @@ import {
 import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
+import * as _DirtyModule from "./attribute-methods/dirty.js";
 import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
@@ -686,6 +691,9 @@ let _errorOnIgnoredOrder = false;
 let _timestampedMigrations = true;
 let _validateMigrationTimestamps = false;
 let _migrationStrategy: AnyClass = DefaultStrategy;
+let _schemaFormat: SchemaFormat = "ts";
+let _dumpSchemaAfterMigration = true;
+let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 let _verifyForeignKeysForFixtures = false;
 let _queryTransformers: QueryTransformer[] = [];
 let _useYamlUnsafeLoad = false;
@@ -929,6 +937,30 @@ export class Base extends Model {
 
   static set migrationStrategy(value: AnyClass) {
     _migrationStrategy = value;
+  }
+
+  static get schemaFormat(): SchemaFormat {
+    return _schemaFormat;
+  }
+
+  static set schemaFormat(value: SchemaFormat) {
+    _schemaFormat = value;
+  }
+
+  static get dumpSchemaAfterMigration(): boolean {
+    return _dumpSchemaAfterMigration;
+  }
+
+  static set dumpSchemaAfterMigration(value: boolean) {
+    _dumpSchemaAfterMigration = value;
+  }
+
+  static get dumpSchemas(): "schema_search_path" | "all" | (string & {}) {
+    return _dumpSchemas;
+  }
+
+  static set dumpSchemas(value: "schema_search_path" | "all" | (string & {})) {
+    _dumpSchemas = value;
   }
 
   static get verifyForeignKeysForFixtures(): boolean {
@@ -1821,8 +1853,6 @@ export class Base extends Model {
     >;
   }
 
-  declare static touchAll: typeof Timestamp.touchAll;
-
   static createOrFindBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
@@ -1956,6 +1986,7 @@ export class Base extends Model {
   declare static insertAllBang: typeof Querying.insertAllBang;
   declare static upsert: typeof Querying.upsert;
   declare static upsertAll: typeof Querying.upsertAll;
+  declare static touchAll: typeof Querying.touchAll;
   declare static updateAll: typeof Querying.updateAll;
   declare static deleteAll: typeof Querying.deleteAll;
   declare static destroy: typeof Querying.destroy;
@@ -2000,7 +2031,6 @@ export class Base extends Model {
   declare static isMany: typeof Querying.isMany;
   declare static isOne: typeof Querying.isOne;
   declare static isNone: typeof Querying.isNone;
-  declare static isEmpty: typeof Querying.isEmpty;
   declare static firstOrCreate: typeof Querying.firstOrCreate;
   declare static firstOrCreateBang: typeof Querying.firstOrCreateBang;
   declare static firstOrInitialize: typeof Querying.firstOrInitialize;
@@ -2490,7 +2520,7 @@ export class Base extends Model {
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
-  declare touch: typeof TouchLater.touch;
+  declare touch: typeof _Persistence.touch;
   declare touchLater: typeof TouchLater.touchLater;
   declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
 
@@ -3042,7 +3072,6 @@ extend(Base, CounterCache.ClassMethods);
     },
   });
 }
-extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
 Object.assign(Base, {
@@ -3169,16 +3198,15 @@ include(Base, {
   updateBang: _Persistence.updateBang,
   delete: _Persistence.deleteRow,
   destroyRow: _Persistence.destroyRow,
-  _touchRow: _Persistence._touchRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,
-  slice: _Persistence.slice,
-  valuesAt: _Persistence.valuesAt,
+  slice: Access.prototype.slice,
+  valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
   updateAttributeBang: _Persistence.updateAttributeBang,
   updateColumn: _Persistence.updateColumn,
   updateColumns: _Persistence.updateColumns,
-  clone: _Persistence.clone,
+  clone: _Core.clone,
   becomes: _Persistence.becomes,
   becomesBang: _Persistence.becomesBang,
   inspect: _inspect,
@@ -3378,6 +3406,38 @@ for (const [name, fn] of [
     },
   ],
   [
+    "touch",
+    function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
+      return _NoTouching.touch.call(this, args, () =>
+        TouchLater.touch.call(this, args as any, (laterArgs: unknown[]) =>
+          _Transactions.touch.call(this, laterArgs, () =>
+            _Callbacks.touch.call(this, laterArgs, () =>
+              _Persistence.touch.call(this, ...(laterArgs as any)),
+            ),
+          ),
+        ),
+      );
+    },
+  ],
+  [
+    "_touchRow",
+    function (this: Base, attributeNames: string[], time: unknown): Promise<number> {
+      return _DirtyModule._touchRow.call(
+        this as any,
+        attributeNames,
+        time,
+        (dirtyNames: string[], dirtyTime: unknown) =>
+          LockingOptimistic._touchRow.call(
+            this as any,
+            dirtyNames,
+            dirtyTime,
+            (lockNames: string[], lockTime: unknown) =>
+              _Persistence._touchRow.call(this as any, lockNames, lockTime as any),
+          ) as Promise<number>,
+      );
+    },
+  ],
+  [
     "_updateRow",
     function (this: Base, attributeNames: string[], attemptedAction = "update"): Promise<number> {
       return LockingOptimistic._updateRow.call(
@@ -3474,7 +3534,6 @@ _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
-_registerBaseWithNamedScoping(Base);
 _registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);

@@ -24,6 +24,7 @@ export interface FixtureRef {
   readonly fixtureName: string;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function ref(tableName: string, fixtureName: string): FixtureRef {
   return { [REF_TAG]: true, tableName, fixtureName };
 }
