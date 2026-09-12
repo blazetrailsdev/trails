@@ -65,8 +65,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import {
-  DeferredDistinctPkIn,
-  DeferredDistinctPkNotIn,
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
@@ -1035,27 +1033,16 @@ export class Relation<T extends Base> {
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
     const predicates = this.whereClause.predicates;
     if (
-      !predicates.some(
-        (node) =>
-          node instanceof DeferredDistinctPkIn ||
-          node instanceof DeferredDistinctPkNotIn ||
-          node instanceof DeferredIdsNotIn ||
-          node instanceof DeferredIdsIn,
-      )
+      !predicates.some((node) => node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn)
     ) {
       return;
     }
     return (async () => {
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
-        if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
+        if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
           const attribute = node.left as Nodes.Attribute;
-          const ids = await node.innerRelation._materializeDistinctPkIds();
-          predicates[i] =
-            node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
-        } else if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
-          const attribute = node.left as Nodes.Attribute;
-          const ids = [...node.literalIds];
+          const ids: unknown[] = [];
           for (const rel of node.innerRelations) {
             ids.push(...(await rel.ids()));
           }

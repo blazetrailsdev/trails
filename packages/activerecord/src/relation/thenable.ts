@@ -1,8 +1,7 @@
-/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
-
 const thenlessViews = new WeakMap<object, object>();
 const thenlessViewSet = new WeakSet<object>();
 
+/** @noRailsEquivalent PERMANENT */
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   if (thenlessViewSet.has(obj)) return obj as Omit<T, "then">;
 
@@ -30,6 +29,7 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   return view as Omit<T, "then">;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function applyThenable(prototype: object, evaluationMethod: string = "toArray"): void {
   if (typeof (prototype as any)[evaluationMethod] !== "function") {
     const name = (prototype as any).constructor?.name ?? "unknown";

@@ -120,7 +120,6 @@ export class JoinDependency {
     this._joinType = joinType ?? Nodes.OuterJoin;
     const tree = JoinDependency.makeTree(associations ?? []);
     this._joinRoot = new JoinBase(base, table as ArelTable, this.build(tree, base));
-    this._assignPaths(this._joinRoot, null);
   }
 
   /** @internal */
@@ -140,52 +139,19 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _tableIndexCounter = 1;
-
-  /** @internal */
-  private _nextTableIndex(): number {
-    return this._tableIndexCounter++;
-  }
-
-  /** @internal */
-  private _assignPaths(node: JoinPart, parentPath: string | null): void {
-    if (node !== this._joinRoot) {
-      node.parentPath = parentPath;
-      node.assocName = parentPath
-        ? `${parentPath}.${node.immediateAssocName}`
-        : node.immediateAssocName;
-    }
-    for (const child of node.children) {
-      this._assignPaths(child, node === this._joinRoot ? null : node.assocName);
-    }
-  }
-
-  /** @internal */
   get joinRoot(): JoinBase {
     return this._joinRoot;
   }
 
   /** @internal */
   private addAssociation(reflection: any): JoinPart {
-    const assocName: string = reflection.name;
-
-    const assocType: "hasMany" | "hasOne" | "belongsTo" =
-      reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
     const targetModel: typeof Base = reflection.klass;
     const targetTable: string = (targetModel as any).tableName;
-
-    const tableIndex = this._nextTableIndex();
-    const tableAlias = `t${tableIndex}`;
 
     const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable);
 
     const treePart = new JoinAssociation(reflection);
-    treePart.tableIndex = tableIndex;
     treePart.table = targetArelTable;
-    treePart.tableAlias = tableAlias;
-    treePart.effectiveSqlName = targetTable;
-    treePart.immediateAssocName = assocName;
-    treePart.assocType = assocType;
     return treePart;
   }
 
@@ -280,7 +246,6 @@ export class JoinDependency {
     const joins = intersection.flatMap(([l, r]) => {
       if (r instanceof JoinAssociation) {
         r.table = l.table;
-        if (l.effectiveSqlName) r.effectiveSqlName = l.effectiveSqlName;
       }
       return this.walk(l, r, joinType);
     });
@@ -348,7 +313,6 @@ export class JoinDependency {
 
       if (resolvedRoot) {
         child.table = resolvedRoot.aliased;
-        child.effectiveSqlName = resolvedRoot.effectiveName;
       }
       joins.push(...(built as Nodes.Join[]));
       this._aliasesCache = undefined;
@@ -498,16 +462,16 @@ export class JoinDependency {
     if (arParent == null) return;
     const aliases = this.aliases();
     for (const node of parent.children) {
-      if (node.tableIndex < 0) continue;
+      if (!(node instanceof JoinAssociation)) continue;
 
-      const isCollection = node.assocType === "hasMany";
+      const isCollection = node.reflection.isCollection();
       if (isCollection) {
         this._markCollectionLoaded(arParent, node);
       } else if (
         arParent._associationInstances &&
-        isAssociationCached(arParent, node.immediateAssocName)
+        isAssociationCached(arParent, (node.reflection as any).name)
       ) {
-        const model = arParent.association?.(node.immediateAssocName)?.target;
+        const model = arParent.association?.((node.reflection as any).name)?.target;
         this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;
       }
@@ -519,9 +483,7 @@ export class JoinDependency {
           (column) => aliases.columnAlias(node, String(column))!,
         );
       } else {
-        const jpk = ((node as JoinAssociation).reflection as any).joinPrimaryKey() as
-          | string
-          | string[];
+        const jpk = (node.reflection as any).joinPrimaryKey() as string | string[];
         keys = (Array.isArray(jpk) ? jpk : [jpk]).map(
           (column) => aliases.columnAlias(node, String(column))!,
         );
@@ -611,7 +573,7 @@ export class JoinDependency {
 
   private constructModel(
     record: any,
-    node: JoinPart,
+    node: JoinAssociation,
     row: Record<string, unknown>,
     modelCache: Map<JoinPart, Map<unknown, any>>,
     id: unknown,
@@ -643,10 +605,10 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _setInverseBeforeCallbacks(parent: any, node: JoinPart, child: any): void {
+  private _setInverseBeforeCallbacks(parent: any, node: JoinAssociation, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(node.immediateAssocName);
+      const proxy = parent.association((node.reflection as any).name);
       if (proxy && typeof proxy.setInverseInstance === "function") {
         proxy.setInverseInstance(child);
       }
@@ -656,12 +618,12 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _wireAssociationProxy(parent: any, node: JoinPart, child: any): void {
+  private _wireAssociationProxy(parent: any, node: JoinAssociation, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(node.immediateAssocName);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy) return;
-      const isCollection = node.assocType === "hasMany";
+      const isCollection = node.reflection.isCollection();
       if (isCollection) {
         if (!proxy.loaded) {
           proxy.target = [];
@@ -682,10 +644,10 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _markCollectionLoaded(parent: any, node: JoinPart): void {
+  private _markCollectionLoaded(parent: any, node: JoinAssociation): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(node.immediateAssocName);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy || proxy.loaded) return;
       proxy.target = [];
     } catch (e) {
@@ -694,12 +656,12 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _markAssociationLoaded(parent: any, node: JoinPart): void {
+  private _markAssociationLoaded(parent: any, node: JoinAssociation): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(node.immediateAssocName);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy || proxy.loaded) return;
-      const isCollection = node.assocType === "hasMany";
+      const isCollection = node.reflection.isCollection();
       proxy._setTargetFromLoader(isCollection ? [] : null);
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;

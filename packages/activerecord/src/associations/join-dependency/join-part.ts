@@ -5,20 +5,6 @@ export abstract class JoinPart {
   readonly baseKlass: typeof Base;
   readonly children: JoinPart[] = [];
 
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  tableIndex = -1;
-  tableAlias = "";
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  assocName = "";
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  immediateAssocName = "";
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  parentPath: string | null = null;
-  /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
-  effectiveSqlName = "";
-
   constructor(baseKlass: typeof Base, children?: JoinPart[]) {
     this.baseKlass = baseKlass;
     if (children) this.children.push(...children);

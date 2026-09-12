@@ -11,7 +11,9 @@ function findNodeByPath(root: JoinPart, path: string | null): JoinPart | null {
   if (!path) return root;
   let node: JoinPart = root;
   for (const segment of path.split(".")) {
-    const child: JoinPart | undefined = node.children.find((c) => c.immediateAssocName === segment);
+    const child: JoinPart | undefined = node.children.find(
+      (c) => (c as { reflection?: { name?: string } }).reflection?.name === segment,
+    );
     if (!child) return null;
     node = child;
   }

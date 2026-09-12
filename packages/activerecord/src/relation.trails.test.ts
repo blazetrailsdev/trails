@@ -635,9 +635,13 @@ describe("RelationTest", () => {
     const mainQuery = queries.find((sql) => /\bIN\b/i.test(sql) && /author_id/i.test(sql));
     expect(mainQuery).toBeDefined();
     expect(/IN\s*\(\s*SELECT/i.test(mainQuery!)).toBe(false);
-    for (const id of limitedAuthorIds) {
-      expect(mainQuery!).toContain(String(id));
-    }
+
+    const literalQueries = await captureSql(async () => {
+      await CanonPost.where({ author_id: limitedAuthorIds }).order("id");
+    });
+    expect(mainQuery).toBe(
+      literalQueries.find((sql) => /\bIN\b/i.test(sql) && /author_id/i.test(sql)),
+    );
   });
 
   it("where with eager-loading limited collection relation subquery yielding no ids is empty", async () => {

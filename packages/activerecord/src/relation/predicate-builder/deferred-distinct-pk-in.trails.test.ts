@@ -9,8 +9,9 @@ describe("DeferredIdsNotIn inversion (trails)", () => {
   function marker(): DeferredIdsNotIn {
     const attribute = t.get("id");
     const inlineSubquery = new Nodes.SqlLiteral("SELECT id FROM posts");
+    const literalIds = { ids: () => Promise.resolve([1, 2]) };
     const innerRelation = { ids: () => Promise.resolve([3, 4]) };
-    return new DeferredIdsNotIn(attribute, inlineSubquery, [1, 2], [innerRelation]);
+    return new DeferredIdsNotIn(attribute, inlineSubquery, [literalIds, innerRelation]);
   }
 
   it("inverting a WhereClause containing the marker preserves the deferred ids", () => {
@@ -18,7 +19,6 @@ describe("DeferredIdsNotIn inversion (trails)", () => {
     const inverted = new WhereClause([original]).invert().predicates[0];
     expect(inverted).toBeInstanceOf(DeferredIdsIn);
     const invertedMarker = inverted as DeferredIdsIn;
-    expect(invertedMarker.literalIds).toBe(original.literalIds);
     expect(invertedMarker.innerRelations).toBe(original.innerRelations);
     expect(invertedMarker.left).toBe(original.left);
     expect(invertedMarker.right).toBe(original.right);
@@ -28,7 +28,6 @@ describe("DeferredIdsNotIn inversion (trails)", () => {
     const original = marker();
     const roundTripped = original.invert().invert();
     expect(roundTripped).toBeInstanceOf(DeferredIdsNotIn);
-    expect(roundTripped.literalIds).toBe(original.literalIds);
     expect(roundTripped.innerRelations).toBe(original.innerRelations);
   });
 });
