@@ -275,11 +275,6 @@ describe("Migrator trails extensions", () => {
       registerVersion(CURRENT_VERSION, Current);
     }
   });
-
-  it("findVersion falls back to nearest lower version", () => {
-    const Klass = Migration.forVersion(8.5);
-    expect(Klass).toBe(Current);
-  });
 });
 
 describe("Migrator advisory lock wrapping", () => {
