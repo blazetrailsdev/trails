@@ -10,7 +10,7 @@ import {
   Monitor,
   NameError,
 } from "@blazetrails/activesupport";
-import { stdout, rbInspect } from "@blazetrails/ruby-compat";
+import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -270,12 +270,6 @@ function isCommandRecorder(connection: unknown): connection is CommandRecorder {
   return connection instanceof CommandRecorder;
 }
 
-type ChangeMigration = { change(): Promise<void> };
-
-function respondToChange<T extends object>(migration: T): migration is T & ChangeMigration {
-  return typeof (migration as Partial<ChangeMigration>).change === "function";
-}
-
 export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   /** @internal */
   protected _connectionOverride?: DatabaseAdapter | CommandRecorder;
@@ -318,32 +312,17 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async up(): Promise<void> {
-    const legacy = this._legacyClassDirection("up");
-    if (legacy) return legacy();
-    if (respondToChange(this)) await this.change();
+    const klass = this.constructor as typeof Migration & { up?: () => Promise<void> };
+    klass.delegate = this;
+    if (!rbObjRespondTo(klass, "up")) return;
+    await klass.up!();
   }
 
   async down(): Promise<void> {
-    const legacy = this._legacyClassDirection("down");
-    if (legacy) return legacy();
-    if (respondToChange(this)) await this.revert(() => this.change());
-  }
-
-  private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
-    const ctor = this.constructor as typeof Migration;
-    const owns = (d: "up" | "down"): boolean => Object.prototype.hasOwnProperty.call(ctor, d);
-    if (!owns("up") && !owns("down")) return null;
-    if (!owns(direction)) return async (): Promise<void> => {};
-    const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
-    return async (): Promise<void> => {
-      const prev = Migration.delegate;
-      Migration.delegate = this;
-      try {
-        await fn.call(ctor);
-      } finally {
-        Migration.delegate = prev;
-      }
-    };
+    const klass = this.constructor as typeof Migration & { down?: () => Promise<void> };
+    klass.delegate = this;
+    if (!rbObjRespondTo(klass, "down")) return;
+    await klass.down!();
   }
 
   /** @internal */
@@ -1077,16 +1056,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
     this._connectionOverride = conn;
     try {
-      if (respondToChange(this)) {
+      const self = this as unknown as { change?: () => Promise<void> };
+      if (rbObjRespondTo(this, "change")) {
         if (direction === "down") {
-          await this.revert(() => this.change());
+          await this.revert(() => self.change!());
         } else {
-          await this.change();
+          await self.change!();
         }
-      } else if (direction === "up") {
-        await this.up();
       } else {
-        await this.down();
+        await this[direction]();
       }
     } finally {
       this._connectionOverride = undefined;
