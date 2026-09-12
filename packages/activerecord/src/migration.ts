@@ -399,14 +399,20 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeColumn(
-    ...args: [
-      tableName: string,
-      columnName: string,
-      type?: ColumnType | { ifExists?: boolean },
-      options?: { ifExists?: boolean },
-    ]
+    tableName: string,
+    columnName: string,
+    typeOrOptions?: ColumnType | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
   ): Promise<void> {
-    await this.methodMissing("removeColumn", ...args);
+    const type = typeof typeOrOptions === "string" ? typeOrOptions : undefined;
+    const opts = typeof typeOrOptions === "object" ? typeOrOptions : options;
+    if (opts !== undefined) {
+      await this.methodMissing("removeColumn", tableName, columnName, type, opts);
+    } else if (type !== undefined) {
+      await this.methodMissing("removeColumn", tableName, columnName, type);
+    } else {
+      await this.methodMissing("removeColumn", tableName, columnName);
+    }
   }
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
@@ -607,13 +613,19 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async validateForeignKey(
-    ...args: [
-      fromTable: string,
-      toTable?: string | Omit<ForeignKeyLookupOptions, "toTable">,
-      options?: Omit<ForeignKeyLookupOptions, "toTable">,
-    ]
+    fromTable: string,
+    toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void> {
-    await this.methodMissing("validateForeignKey", ...args);
+    const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
+    const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : options;
+    if (opts !== undefined) {
+      await this.methodMissing("validateForeignKey", fromTable, toTable, opts);
+    } else if (toTable !== undefined) {
+      await this.methodMissing("validateForeignKey", fromTable, toTable);
+    } else {
+      await this.methodMissing("validateForeignKey", fromTable);
+    }
   }
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
@@ -663,13 +675,23 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async dropEnum(
-    ...args: [
-      name: string,
-      values?: string[] | { ifExists?: boolean },
-      options?: { ifExists?: boolean },
-    ]
+    name: string,
+    valuesOrOptions?: string[] | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
   ): Promise<void> {
-    await this.methodMissing("dropEnum", ...args);
+    const isOptsObj =
+      valuesOrOptions !== null &&
+      typeof valuesOrOptions === "object" &&
+      !Array.isArray(valuesOrOptions);
+    const values = isOptsObj ? undefined : valuesOrOptions;
+    const opts = isOptsObj ? valuesOrOptions : options;
+    if (opts !== undefined) {
+      await this.methodMissing("dropEnum", name, values, opts);
+    } else if (values !== undefined) {
+      await this.methodMissing("dropEnum", name, values);
+    } else {
+      await this.methodMissing("dropEnum", name);
+    }
   }
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
@@ -694,13 +716,23 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeUniqueConstraint(
-    ...args: [
-      tableName: string,
-      columnName?: string | string[] | UniqueConstraintOptions,
-      options?: UniqueConstraintOptions,
-    ]
+    tableName: string,
+    columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
+    options?: UniqueConstraintOptions,
   ): Promise<void> {
-    await this.methodMissing("removeUniqueConstraint", ...args);
+    const isOptsObj =
+      columnNameOrOptions !== null &&
+      typeof columnNameOrOptions === "object" &&
+      !Array.isArray(columnNameOrOptions);
+    const columnName = isOptsObj ? undefined : columnNameOrOptions;
+    const opts = isOptsObj ? columnNameOrOptions : options;
+    if (opts !== undefined) {
+      await this.methodMissing("removeUniqueConstraint", tableName, columnName, opts);
+    } else if (columnName !== undefined) {
+      await this.methodMissing("removeUniqueConstraint", tableName, columnName);
+    } else {
+      await this.methodMissing("removeUniqueConstraint", tableName);
+    }
   }
 
   /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */

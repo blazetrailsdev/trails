@@ -1804,12 +1804,12 @@ describe("MigrationTest", () => {
         }
       }
       const m = makeRvMig(new BulkMig());
-      await m.up();
+      await m.execMigration(rvAdapter, "up");
       await rvAdapter.executeMutation(`INSERT INTO rv_bulk (name, extra) VALUES ('test', 'val')`);
       const rows = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].extra).toBe("val");
-      await m.down();
+      await m.execMigration(rvAdapter, "down");
       try {
         const after = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
         expect(after.length).toBe(0);
