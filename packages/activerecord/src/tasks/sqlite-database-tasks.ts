@@ -122,6 +122,7 @@ export class SQLiteDatabaseTasks {
     await (await this.connection()).connectBang();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static register(): void {
     DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);
   }

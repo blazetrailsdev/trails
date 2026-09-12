@@ -4,6 +4,7 @@ import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
 export class Scoping {
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static scopeFor(modelClass: any): any | null {
     return ScopeRegistry.currentScope(modelClass);
   }

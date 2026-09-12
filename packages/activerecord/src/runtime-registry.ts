@@ -29,6 +29,7 @@ function getStats(): Stats {
   return _stats;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function record(
   queryName: string | undefined,
   runtime: number,
@@ -47,6 +48,7 @@ export function record(
   s.sqlRuntime += runtime;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function stats(): Stats {
   return getStats();
 }

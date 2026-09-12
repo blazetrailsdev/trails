@@ -64,14 +64,6 @@ export class WhereClause {
     return new WhereClause(this.exceptPredicates(columns));
   }
 
-  clear(): void {
-    this.predicates.length = 0;
-  }
-
-  clone(): WhereClause {
-    return new WhereClause([...this.predicates]);
-  }
-
   or(other: WhereClause): WhereClause {
     const leftClause = this.minus(other);
     const common = this.minus(leftClause);

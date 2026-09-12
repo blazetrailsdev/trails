@@ -135,6 +135,7 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   touchLater,
   touch,

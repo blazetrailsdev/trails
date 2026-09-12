@@ -76,6 +76,7 @@ export async function withLock<T extends Base>(
   }, txOptions);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   lockBang,
   withLock,

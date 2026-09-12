@@ -119,6 +119,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return (this._storedIds as unknown[]).slice();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async count(column?: string): Promise<number | Map<unknown, number>> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
@@ -137,6 +138,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return baseCount.call(this, column);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override async calculate(
     operation: "count",
     column?: string,
@@ -173,6 +175,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     ).calculate.call(this, operation, columnName);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override async pluck(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {

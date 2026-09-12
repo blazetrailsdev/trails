@@ -37,6 +37,7 @@ function baseClass(): typeof Base {
 }
 
 export class DatabaseNotSupported extends Error {
+  /** @noRailsEquivalent PERMANENT */
   constructor(message: string) {
     super(message);
     this.name = "ActiveRecord::Tasks::DatabaseNotSupported";
@@ -106,10 +107,13 @@ export class DatabaseTasks {
   }
 
   static seedLoader: { loadSeed(): void | Promise<void> } | null = null;
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static schemaFormat: SchemaFormat = "ts";
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static dumpSchemaAfterMigration: boolean = true;
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 
   private static _registeredTasks: Array<{

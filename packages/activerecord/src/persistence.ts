@@ -559,18 +559,6 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
   return result as T;
 }
 
-export function slice(this: AttributeIO, ...keys: string[]): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const key of keys) {
-    result[key] = this.readAttribute(key);
-  }
-  return result;
-}
-
-export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
-  return keys.map((key) => this.readAttribute(key));
-}
-
 interface AttributeSingleSave {
   writeAttribute(name: string, value: unknown): void;
   save(options?: { validate?: boolean }): Promise<boolean | undefined>;
@@ -812,6 +800,7 @@ interface CloneRecord {
   errors: { constructor: new (base: unknown) => unknown };
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function clone<T extends CloneRecord>(this: T): T {
   const copy = Object.create(Object.getPrototypeOf(this)) as T;
   Object.assign(copy, this);
@@ -1232,6 +1221,7 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   _updateRecord: instanceUpdateRecord,
 };

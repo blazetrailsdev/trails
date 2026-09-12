@@ -143,6 +143,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // attribute_methods.rb:415 `def [](attr_name)` / :428 `def []=(attr_name, value)`
   // → attribute-methods.ts `get` / `set`.
   "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
+  // internal_metadata.rb:47 `def [](key)` / :39 `def []=(key, value)` →
+  // internal-metadata.ts `InternalMetadata#get` / `set`.
+  "ActiveRecord::InternalMetadata": { "[]": ["get"], "[]=": ["set"] },
+  // statement_cache.rb:72 `def <<(str)` →
+  // statement-cache.ts `PartialQueryCollector#append`.
+  "ActiveRecord::StatementCache::PartialQueryCollector": { "<<": ["append"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },

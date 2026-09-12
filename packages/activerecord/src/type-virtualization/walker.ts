@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: walk. */
 import ts from "typescript";
 
 export type AssociationKind = "hasMany" | "hasAndBelongsToMany" | "belongsTo" | "hasOne";

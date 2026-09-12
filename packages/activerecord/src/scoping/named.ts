@@ -31,6 +31,7 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function isDangerousClassMethod(name: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(name)) return true;
   if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;

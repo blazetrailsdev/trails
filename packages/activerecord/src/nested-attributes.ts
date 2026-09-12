@@ -8,6 +8,7 @@ import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {
+  /** @noRailsEquivalent PERMANENT */
   constructor(message?: string) {
     super(message);
     this.name = "ActiveRecord::NestedAttributes::TooManyRecords";
@@ -447,6 +448,7 @@ function resolveCollectionTargetModel(
   return modelRegistry.get(assocDef.className);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   _destroy,
   hasDestroyFlag,

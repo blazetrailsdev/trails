@@ -5,11 +5,10 @@ import { include } from "@blazetrails/activesupport";
 import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
 
 export class ReadonlyAttributeError extends ActiveRecordError {
-  readonly attribute: string;
+  /** @noRailsEquivalent PERMANENT */
   constructor(attribute: string) {
     super(attribute);
     this.name = "ActiveRecord::ReadonlyAttributeError";
-    this.attribute = attribute;
   }
 }
 

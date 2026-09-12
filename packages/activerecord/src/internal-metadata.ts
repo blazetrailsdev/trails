@@ -152,10 +152,6 @@ export class InternalMetadata {
     return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
   }
 
-  async deleteAll(): Promise<void> {
-    return this.deleteAllEntries();
-  }
-
   private currentTime(connection: DatabaseAdapter): string {
     const opts = { smallestUnit: "millisecond", roundingMode: "trunc" } as const;
     if (connection.defaultTimezone === "utc") {

@@ -140,6 +140,7 @@ export class EnumType extends ValueType<string> {
       | null;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   serializeCastValue(value: unknown): number | string | boolean | null {
     return this.serialize(value);
   }

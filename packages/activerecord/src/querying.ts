@@ -548,10 +548,6 @@ export function isNone<T extends typeof Base>(
   return this.all().isNone(...args);
 }
 
-export async function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
-  return this.all().isEmpty();
-}
-
 export function firstOrCreate<T extends typeof Base>(
   this: T,
   extra?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],

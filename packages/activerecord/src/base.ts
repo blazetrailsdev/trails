@@ -123,6 +123,7 @@ import {
   InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
+  Access,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   assertAssignedSynchronously,
@@ -2000,7 +2001,6 @@ export class Base extends Model {
   declare static isMany: typeof Querying.isMany;
   declare static isOne: typeof Querying.isOne;
   declare static isNone: typeof Querying.isNone;
-  declare static isEmpty: typeof Querying.isEmpty;
   declare static firstOrCreate: typeof Querying.firstOrCreate;
   declare static firstOrCreateBang: typeof Querying.firstOrCreateBang;
   declare static firstOrInitialize: typeof Querying.firstOrInitialize;
@@ -3172,8 +3172,8 @@ include(Base, {
   _touchRow: _Persistence._touchRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,
-  slice: _Persistence.slice,
-  valuesAt: _Persistence.valuesAt,
+  slice: Access.prototype.slice,
+  valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
   updateAttributeBang: _Persistence.updateAttributeBang,
   updateColumn: _Persistence.updateColumn,

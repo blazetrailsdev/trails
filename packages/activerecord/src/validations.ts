@@ -122,6 +122,7 @@ export function performValidations(
   return this.isValid(options?.context);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
   const proxy = this._collectionProxies?.get?.(attribute) as
     | { loaded?: boolean; target?: unknown[] }
@@ -175,6 +176,7 @@ export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: un
   this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const ClassMethods = {
   validatesAssociated,
   validatesUniquenessOf,

@@ -19,10 +19,12 @@ export class LockingType extends ValueType<number> {
     this._subtype = subtype;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override type(): string | undefined {
     return this._subtype.type();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override cast(value: unknown): number {
     return (this._subtype.cast(value) as number | null) ?? 0;
   }
@@ -278,6 +280,7 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Val
   return castType;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   lockingEnabled,
   incrementBang,

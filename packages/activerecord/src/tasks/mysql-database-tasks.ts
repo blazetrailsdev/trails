@@ -88,6 +88,7 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysql", args, "loading");
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static register(): void {
     DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
   }

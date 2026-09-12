@@ -134,6 +134,7 @@ export class PostgreSQLDatabaseTasks {
     await this.runCmd("psql", args, "loading");
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
   static register(): void {
     DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);
   }

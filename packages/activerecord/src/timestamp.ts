@@ -16,6 +16,7 @@ export interface TouchOptions {
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
   if (isNoTouchingApplied(ctor)) return false;
@@ -157,6 +158,7 @@ async function touchRow(this: Base, touchCols: string[], now: RubyTime): Promise
   return true;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export async function touchAll(this: typeof Base, ...args: TouchAllArgs): Promise<number> {
   return this.all().touchAll(...args);
 }
@@ -400,6 +402,7 @@ export const ClassMethods = {
   touchAll,
 };
 
+/** @noRailsEquivalent PERMANENT */
 export const InstanceMethods = {
   touch,
   recordUpdateTimestamps,
