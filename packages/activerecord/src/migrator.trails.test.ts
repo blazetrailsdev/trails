@@ -17,7 +17,11 @@ import {
   Migration,
   Current,
 } from "./migration.js";
-import { registerVersion, resetVersionRegistry } from "./migration/compatibility.js";
+import {
+  registerVersion,
+  resetVersionRegistry,
+  CURRENT_VERSION,
+} from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -240,12 +244,12 @@ describe("Migrator trails extensions", () => {
   });
 
   it("Migration.version returns Current for the current version", () => {
-    const Klass = Migration.forVersion(1.0);
+    const Klass = Migration.forVersion(8.0);
     expect(Klass).toBe(Current);
   });
 
   it("Migration.version returns Current for string version", () => {
-    const Klass = Migration.forVersion("1.0");
+    const Klass = Migration.forVersion("8.0");
     expect(Klass).toBe(Current);
   });
 
@@ -254,7 +258,7 @@ describe("Migrator trails extensions", () => {
   });
 
   it("currentVersion returns the current version string", () => {
-    expect(Migration.currentVersion()).toBe("1.0");
+    expect(Migration.currentVersion()).toBe(8.0);
   });
 
   it("registerVersion allows custom versions", () => {
@@ -268,12 +272,12 @@ describe("Migrator trails extensions", () => {
       expect(Klass).toBe(V0_9);
     } finally {
       resetVersionRegistry();
-      registerVersion("1.0", Current);
+      registerVersion(CURRENT_VERSION, Current);
     }
   });
 
   it("findVersion falls back to nearest lower version", () => {
-    const Klass = Migration.forVersion(1.5);
+    const Klass = Migration.forVersion(8.5);
     expect(Klass).toBe(Current);
   });
 });

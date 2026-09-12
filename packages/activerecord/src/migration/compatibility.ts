@@ -1,11 +1,12 @@
 import { MigrationError } from "../migration.js";
+import { VERSION } from "../gem-version.js";
 import type { Migration } from "../migration.js";
 
 export type MigrationClass =
   | (abstract new (...args: any[]) => Migration)
   | (new (...args: any[]) => Migration);
 
-const CURRENT_VERSION = "1.0";
+const CURRENT_VERSION = `${VERSION.MAJOR}.${VERSION.MINOR}`;
 
 const versionRegistry = new Map<string, MigrationClass>();
 

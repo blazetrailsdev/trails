@@ -45,6 +45,7 @@ import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
+import { VERSION } from "./gem-version.js";
 
 export type {
   ReferentialAction,
@@ -925,8 +926,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return null;
   }
 
-  static currentVersion(): string {
-    return CURRENT_VERSION;
+  static currentVersion(): number {
+    return parseFloat(VERSION.STRING);
   }
 
   get version(): number | undefined {
