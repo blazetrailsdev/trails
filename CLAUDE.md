@@ -943,6 +943,45 @@ That is the whole constraint, and it splits Rails' sections in two:
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.
 
+## `Migration`'s schema statements are declared because JS has no `method_missing`
+
+Ruby's `Migration` declares no schema statement at all. `add_column`,
+`add_index`, `change_table_comment` and the other forty-odd names reach the
+connection through `Migration#method_missing`
+(`activerecord/lib/active_record/migration.rb:1044-1057`), which wraps the call
+in `say_with_time`, rewrites the table-name arguments, and sends to
+`execution_strategy`. The method not existing IS the mechanism.
+
+JS has no `method_missing`. A `Proxy` can intercept an unknown property, but a
+`Proxy`'s `get` is invisible to the type system, so `migration.addColumn(...)`
+would not compile, would not autocomplete, and every schema statement would
+become `any` — for a class whose entire purpose is to be subclassed by user
+code. So each statement is declared explicitly, which is the settled trails
+idiom for `method_missing` (see "Ruby kwargs, blocks, and `method_missing` each
+have a settled trails idiom" above).
+
+Two consequences are ratified here, repo-wide, so no port re-derives them:
+
+- **The declarations are `@noRailsEquivalent PERMANENT`, not CONVERGEABLE.**
+  There is no end state in which they go away. `Migration::Current` is declared
+  in `migration.rb` itself (`:579`), so moving the block onto `Current` —
+  the shape `migration-delegators-belong-on-current-not-migration` proposes —
+  leaves every name on the same TS file and scores exactly the same extra
+  surface. What that story can change is which class carries them, not whether
+  they exist.
+- **Their bodies route through `Migration#methodMissing`**, not through
+  `this.connection.*` directly, so `say_with_time`, the `proper_table_name`
+  rewriting with its `execute` / `enable_extension` / `disable_extension`
+  exemption and its `rename_table` / `remove_foreign_key` second-argument
+  guard, and the `execution_strategy` dispatch all happen where Rails has
+  them. A body that reaches the connection itself is a divergence, not a
+  shortcut: it is the one thing about these methods that CAN match Rails.
+
+The single exception is `indexName`. Ruby's `index_name` returns a String
+synchronously, and trails' `methodMissing` is `async` because `sayWithTime`
+awaits the block, so routing it would change a synchronous reader into a
+`Promise`. It applies `_pt` and calls the connection directly.
+
 ## Method visibility is not a runtime fact in JS (`basic_obj_respond_to`'s `pub`)
 
 Ruby's `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864-2879`) takes a
