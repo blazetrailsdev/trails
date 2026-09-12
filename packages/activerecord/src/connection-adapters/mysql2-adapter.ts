@@ -1,7 +1,6 @@
 import mysql from "mysql2/promise";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
-import type { ExplainOption } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -24,7 +23,6 @@ import {
   NoDatabaseError,
 } from "../errors.js";
 import { Result } from "../result.js";
-import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
   executeBatch as mysql2ExecuteBatch,
@@ -36,7 +34,6 @@ import {
 } from "./mysql2/database-statements.js";
 import { _Base } from "../base-slot.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
-import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 
 let mysql2TypeMap: TypeMap | null = null;
@@ -144,7 +141,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (pool.get(sql)) return;
     void pool.set(sql, {
       sql,
-      key: pool.nextKey(),
       close(): void {
         try {
           (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
@@ -159,22 +155,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private _database: string | undefined;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  static async databaseExists(
-    config: string | (mysql.PoolOptions & MysqlAdapterOptions),
-  ): Promise<boolean> {
-    const adapter = new Mysql2Adapter(config);
-    try {
-      await adapter._ensureClient();
-      return true;
-    } catch (e) {
-      if (e instanceof NoDatabaseError) return false;
-      throw e;
-    } finally {
-      await adapter.close();
-    }
-  }
 
   constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
   /** @deprecated */
@@ -491,27 +471,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async explain(
-    sql: string,
-    binds: unknown[] = [],
-    options: ExplainOption[] = [],
-  ): Promise<string> {
-    const clause = await this.buildExplainClause(options);
-    const start = Date.now();
-    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
-    const elapsed = (Date.now() - start) / 1000;
-    const printer = new ExplainPrettyPrinter();
-    return printer.pp(result, elapsed);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
-    const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
-    dumper.connection = this;
-    return dumper;
   }
 
   /** @internal */

@@ -8,6 +8,7 @@ import {
   maxAllowedPacket as mysqlMaxAllowedPacket,
   returningColumnValues as mysqlReturningColumnValues,
   buildExplainClause as mysqlBuildExplainClause,
+  explain as mysqlExplain,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import { fetch, rbInspect } from "@blazetrails/ruby-compat";
@@ -160,23 +161,6 @@ export interface AbstractMysqlAdapter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async columns(tableName: string): Promise<Column[]> {
-    const fields = await this.columnDefinitions(tableName);
-    const columns: Column[] = [];
-    for (const field of fields) {
-      columns.push(
-        await newColumnFromField.call(
-          this,
-          tableName,
-          field as Record<string, string | null>,
-          fields,
-        ),
-      );
-    }
-    return columns;
-  }
-
   override async removeForeignKey(
     fromTable: string,
     toTable?: string | RemoveForeignKeyOptions,
@@ -731,6 +715,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   declare foreignKeys: typeof mysqlForeignKeys;
+
+  /** @internal */
+  declare newColumnFromField: typeof newColumnFromField;
+
+  declare explain: typeof mysqlExplain;
 
   /** @internal */
   declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
@@ -1500,18 +1489,10 @@ export function parseTableOptions(
 
 export interface MysqlPreparedStatement {
   sql: string;
-  key: string;
   close(): void | Promise<void>;
 }
 
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
-  private _counter = 0;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  nextKey(): string {
-    return `a${++this._counter}`;
-  }
-
   /** @internal */
   protected override dealloc(stmt: MysqlPreparedStatement): void | Promise<void> {
     return stmt.close();
@@ -1562,4 +1543,6 @@ export interface AbstractMysqlAdapter {
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
 AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
+AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;
+AbstractMysqlAdapter.prototype.explain = mysqlExplain;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

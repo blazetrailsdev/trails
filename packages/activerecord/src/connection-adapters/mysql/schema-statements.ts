@@ -15,6 +15,7 @@ import { Column } from "./column.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
+import { SchemaDumper as MysqlSchemaDumper } from "./schema-dumper.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
@@ -27,6 +28,15 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
+  override createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
+    const dumper = MysqlSchemaDumper.create(
+      this as unknown as Parameters<typeof MysqlSchemaDumper.create>[0],
+      options,
+    );
+    dumper.connection = this as unknown as NonNullable<MysqlSchemaDumper["connection"]>;
+    return dumper;
+  }
+
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     const limit = options.limit;
     const unsigned = options.unsigned;

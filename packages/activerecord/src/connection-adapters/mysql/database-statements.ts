@@ -5,11 +5,8 @@ import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
-import {
-  defaultInsertValue as abstractDefaultInsertValue,
-  internalExecQuery,
-  toSql as abstractToSql,
-} from "../abstract/database-statements.js";
+import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
+import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
 export interface DatabaseStatements {
@@ -157,19 +154,18 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 }
 
 export async function explain(
-  this: BuildExplainClauseHost & {
-    explainPrettyPrinter?(): { pp(result: Result, elapsed: number): string };
+  this: {
+    buildExplainClause(options?: ExplainOption[]): Promise<string>;
+    toSql(arel: unknown, binds?: unknown[]): string;
+    internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   },
   arel: unknown,
   binds: unknown[] = [],
   options: ExplainOption[] = [],
 ): Promise<string> {
-  const sql =
-    (await buildExplainClause.call(this, options)) +
-    " " +
-    abstractToSql.call(this as any, arel, binds);
+  const sql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
   const start = Date.now();
-  const result = await internalExecQuery.call(this as any, String(sql), "EXPLAIN", binds);
+  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
   const elapsed = (Date.now() - start) / 1000;
-  return this.explainPrettyPrinter?.().pp(result, elapsed) ?? JSON.stringify(result.rows);
+  return new ExplainPrettyPrinter().pp(result, elapsed);
 }
