@@ -12,10 +12,12 @@ const stubSource: SchemaSource = {
   indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
 };
-const make = () => SchemaDumper.create(stubSource);
-const setConnection = (d: SchemaDumper, connection: object | undefined): void => {
-  Reflect.set(d, "connection", connection);
-};
+class TestSchemaDumper extends SchemaDumper {
+  setConnection(connection: TestSchemaDumper["connection"]): void {
+    this.connection = connection;
+  }
+}
+const make = () => TestSchemaDumper.create(stubSource);
 const col = (
   o: {
     name?: string;
@@ -215,7 +217,7 @@ describe("MySQL::SchemaDumper", () => {
   describe("tableOptions", () => {
     it("returns the adapter's options and writes no collation cache", async () => {
       const d = make();
-      setConnection(d, {
+      d.setConnection({
         tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       });
       expect(await (d as any).tableOptions("users")).toEqual({
@@ -227,7 +229,7 @@ describe("MySQL::SchemaDumper", () => {
 
     it("returns empty object when connection is absent", async () => {
       const d = make();
-      setConnection(d, undefined);
+      d.setConnection(undefined);
       expect(await (d as any).tableOptions("users")).toEqual({});
     });
   });
@@ -235,7 +237,7 @@ describe("MySQL::SchemaDumper", () => {
   describe("populateTableCollationFromStatus", () => {
     it("reads the collation from SHOW TABLE STATUS", async () => {
       const d = make();
-      setConnection(d, {
+      d.setConnection({
         tableOptions: async () => ({ charset: "utf8mb4" }),
         internalExecQuery: async () => Result.fromRowHashes([{ Collation: "utf8mb4_general_ci" }]),
         quote: (v: unknown) => `'${String(v)}'`,
@@ -248,7 +250,7 @@ describe("MySQL::SchemaDumper", () => {
   describe("populateVirtualExpressionCache", () => {
     it("caches the inspect-ready generation expression per column", async () => {
       const d = make();
-      setConnection(d, {
+      d.setConnection({
         tableOptions: async () => ({}),
         internalExecQuery: async () =>
           Result.fromRowHashes([
@@ -266,7 +268,7 @@ describe("MySQL::SchemaDumper", () => {
 
     it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
       const d = make();
-      setConnection(d, {
+      d.setConnection({
         tableOptions: async () => ({}),
         internalExecQuery: async () =>
           Result.fromRowHashes([
@@ -283,7 +285,7 @@ describe("MySQL::SchemaDumper", () => {
     it("does not re-query when the table is already cached", async () => {
       const d = make();
       let calls = 0;
-      setConnection(d, {
+      d.setConnection({
         tableOptions: async () => ({}),
         internalExecQuery: async () => {
           calls++;
@@ -299,7 +301,7 @@ describe("MySQL::SchemaDumper", () => {
 
     it("no-ops when the connection cannot run schema queries", async () => {
       const d = make();
-      setConnection(d, { tableOptions: async () => ({}) });
+      d.setConnection({ tableOptions: async () => ({}) });
       await (d as any).populateVirtualExpressionCache("t");
       expect(Object.hasOwn(d.virtualExpressionCache, "t")).toBe(false);
     });
