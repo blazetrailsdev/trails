@@ -5,8 +5,6 @@ export abstract class JoinPart {
   readonly baseKlass: typeof Base;
   readonly children: JoinPart[] = [];
 
-  tableAlias = "";
-
   constructor(baseKlass: typeof Base, children?: JoinPart[]) {
     this.baseKlass = baseKlass;
     if (children) this.children.push(...children);

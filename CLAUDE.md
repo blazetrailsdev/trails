@@ -677,8 +677,8 @@ them `Promise`.
 ## `Relation` is evaluated by an async query (`records`, and the predicates it carries)
 
 Ruby's `Relation` is an Enumerable: every terminal call funnels through
-`records` (`activerecord/lib/active_record/relation.rb:293-296`), which calls
-`load` and runs the query **synchronously**. Nothing in Rails' relation surface
+`records` (`activerecord/lib/active_record/relation.rb:342-345`), which calls
+`load` (`:1179-1186`) and runs the query **synchronously**. Nothing in Rails' relation surface
 is a promise, so a `Relation` is both the query and its result, and a predicate
 that needs a second query to build itself can just run it in place.
 

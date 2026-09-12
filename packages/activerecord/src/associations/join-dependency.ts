@@ -139,14 +139,6 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _tableIndexCounter = 1;
-
-  /** @internal */
-  private _nextTableIndex(): number {
-    return this._tableIndexCounter++;
-  }
-
-  /** @internal */
   get joinRoot(): JoinBase {
     return this._joinRoot;
   }
@@ -156,13 +148,10 @@ export class JoinDependency {
     const targetModel: typeof Base = reflection.klass;
     const targetTable: string = (targetModel as any).tableName;
 
-    const tableAlias = `t${this._nextTableIndex()}`;
-
     const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable);
 
     const treePart = new JoinAssociation(reflection);
     treePart.table = targetArelTable;
-    treePart.tableAlias = tableAlias;
     return treePart;
   }
 
