@@ -73,8 +73,8 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
   if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
-  /* `rb_hash_equal` (`vendor/ruby/hash.c:3807`), which `hash_equal`
-     (`hash.c:3762`) answers by size and then by `rb_equal` per key. A Ruby
+  /* `rb_hash_equal` (`vendor/ruby/hash.c:3808`), which `hash_equal`
+     (`hash.c:3746`) answers by size and then by `rb_equal` per key. A Ruby
      Hash has two JS seats — a plain object and a `Map` (ruby-compat's `Hash`,
      and `HashWithIndifferentAccess` under it) — and both stand for the same
      Ruby value, so the arm reads whichever the operand is. */
@@ -91,7 +91,7 @@ export function rbEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3762`) over both JS seats. */
+/** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3746`) over both JS seats. */
 function hashEntries(value: unknown): Map<unknown, unknown> | null {
   if (value instanceof Map) return new Map(value);
   if (typeof value === "object" && value !== null && value.constructor === Object) {

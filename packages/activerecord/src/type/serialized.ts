@@ -51,14 +51,6 @@ export class Serialized extends ValueType {
     return dumped;
   }
 
-  override isChanged(
-    oldValue: unknown,
-    newValue: unknown,
-    _newValueBeforeTypeCast?: unknown,
-  ): boolean {
-    return !rbEqual(oldValue, newValue);
-  }
-
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
     if (value === null || value === undefined) return false;
     const rawNewValue = this.encoded(value);
