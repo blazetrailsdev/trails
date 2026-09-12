@@ -13,6 +13,7 @@ export class EnvelopeEncryptionKeyProvider {
   private _primaryKeyProviderCache?: KeyProvider;
   private _activePrimaryKey?: Key;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
   constructor(primaryKeyProvider?: KeyProvider) {
     this._primaryKeyProviderOverride = primaryKeyProvider;
   }

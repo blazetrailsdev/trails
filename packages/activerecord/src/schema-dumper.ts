@@ -256,6 +256,7 @@ export abstract class SchemaDumper {
     return this.create(pool, options).dump(stream);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-migration-area-moved-residue */
   static dumpTableSchema(adapter: DatabaseAdapter, tableName: string): Promise<string>;
   static dumpTableSchema(source: SchemaSource, tableName: string): Promise<string>;
   static async dumpTableSchema(

@@ -16,7 +16,6 @@ import {
   UnknownMigrationVersionError,
   Migration,
   Current,
-  currentVersion,
 } from "./migration.js";
 import { registerVersion, resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
@@ -255,7 +254,7 @@ describe("Migrator trails extensions", () => {
   });
 
   it("currentVersion returns the current version string", () => {
-    expect(currentVersion()).toBe("1.0");
+    expect(Migration.currentVersion()).toBe("1.0");
   });
 
   it("registerVersion allows custom versions", () => {

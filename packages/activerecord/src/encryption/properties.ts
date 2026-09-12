@@ -54,29 +54,21 @@ export class Properties {
   }
 
   add(otherProperties: Record<string, unknown> | Properties): void {
-    const entries =
-      otherProperties instanceof Properties
-        ? otherProperties.entries()
-        : Object.entries(otherProperties);
-    for (const [key, value] of entries) {
+    if (otherProperties instanceof Properties) {
+      otherProperties.each((key, value) => this.set(key, value));
+      return;
+    }
+    for (const [key, value] of Object.entries(otherProperties)) {
       this.set(key, value);
     }
   }
 
-  toJSON(): Record<string, unknown> {
+  toH(): Record<string, unknown> {
     const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, value] of this.data) {
       result[key] = value;
     }
     return result;
-  }
-
-  get size(): number {
-    return this._data.size;
-  }
-
-  entries(): IterableIterator<[string, unknown]> {
-    return this._data.entries();
   }
 
   validateValueType(value: unknown): void {
@@ -133,7 +125,11 @@ for (const [name, key] of Object.entries(Properties.DEFAULT_PROPERTIES)) {
 
 /** @internal */
 function hashEntriesOf(value: unknown): [string, unknown][] | null {
-  if (value instanceof Properties) return [...value.entries()];
+  if (value instanceof Properties) {
+    const out: [string, unknown][] = [];
+    value.each((key, v) => out.push([key, v]));
+    return out;
+  }
   if (value instanceof Map) return [...(value as Map<string, unknown>).entries()];
   if (typeof value !== "object" || value === null) return null;
   const proto = Object.getPrototypeOf(value) as object | null;

@@ -63,11 +63,8 @@ export function findVersion(version: string | number): MigrationClass {
   throw new MigrationError(`Unknown migration version: ${version}. Registered versions: ${sorted}`);
 }
 
-export function currentVersion(): string {
-  return CURRENT_VERSION;
-}
-
 export interface Compatibility {
+  /** @noRailsEquivalent CONVERGEABLE converge-migration-area-moved-residue */
   version: string;
 }
 

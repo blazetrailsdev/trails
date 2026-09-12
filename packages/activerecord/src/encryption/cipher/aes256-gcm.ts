@@ -20,8 +20,8 @@ export class Aes256Gcm {
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 
-  declare readonly secret: Bytes;
-  readonly deterministic: boolean;
+  declare private readonly secret: Bytes;
+  private readonly deterministic: boolean;
 
   constructor(secret: string, options?: { deterministic?: boolean }) {
     Object.defineProperty(this, "secret", {
@@ -36,10 +36,6 @@ export class Aes256Gcm {
   /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return `Cipher {}`;
-  }
-
-  toJSON(): Record<string, unknown> {
-    return { deterministic: this.deterministic };
   }
 
   encrypt(clearText: string | Bytes): Message {

@@ -48,6 +48,7 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
     });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-migration-area-moved-residue */
   constructor(adapter?: A) {
     super();
     this.connection = adapter;

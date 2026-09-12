@@ -419,6 +419,13 @@ class ApiExtractor
     # umbrella module's junk-drawer entity file. Everything else in the umbrella
     # (requires, autoloads, `def self.` helpers) is skipped. See scan_umbrella_file.
     @scanning_umbrella = false
+    # `CONST.each` codegen loops whose constant was not yet known when the
+    # reader was walked. The extractor is single-pass over a package's files
+    # sorted by path, so `encryption/configurable.rb:16`'s loop over
+    # `Context::PROPERTIES` (declared at `encryption/context.rb:13`) sees an
+    # empty member list — "configurable" sorts before "context". Replayed by
+    # resolve_pending_const_loops! once every file has been seen.
+    @pending_const_loops = []
   end
 
   # Options-hash reads where only the FIRST symbol arg is the key
@@ -869,9 +876,15 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
-  # Update module file to where its first method is defined (not where it was first opened)
+  # Update a module's or class's file to where its first method is defined, not
+  # where it was first opened. Rails reopens an entity in a file that carries no
+  # methods of its own whenever it hangs nested autoloads off it —
+  # `encryption.rb:39`'s `class Cipher; eager_autoload { autoload :Aes256Gcm }`
+  # reopens `Cipher`, and "encryption.rb" sorts before "encryption/cipher.rb",
+  # so without this the whole class is attributed to the umbrella file and every
+  # faithfully-placed TS member scores as a `moved` extra.
   def maybe_update_module_file(fqn, target)
-    return unless @modules[fqn]
+    return unless @modules[fqn] || @classes[fqn]
     return if target[:first_method_file]
     target[:first_method_file] = @current_file
     target[:file] = @current_file
@@ -1887,7 +1900,10 @@ class ApiExtractor
     return false unless call.is_a?(Array) && call[0] == :call
     return false unless ident_name(call[3]) == "each"
     members = each_loop_members(call[1])
-    return false unless members && !members.empty?
+    if members.nil? || members.empty?
+      defer_const_loop(node) if const_name(call[1])
+      return false
+    end
 
     block = node[2]
     return false unless block.is_a?(Array) &&
@@ -1926,6 +1942,42 @@ class ApiExtractor
     end
     maybe_update_module_file(fqn, target) if emitted
     emitted
+  end
+
+  # Park a `CONST.each` codegen loop whose constant is still unknown, together
+  # with enough walker state to replay it verbatim later.
+  def defer_const_loop(node)
+    return if @scanning_umbrella
+    @pending_const_loops << {
+      node: node,
+      file: @current_file,
+      line: @current_line,
+      namespace_stack: @namespace_stack.dup,
+      visibility_stack: @visibility_stack.dup,
+      in_sclass: @in_sclass,
+      module_function_stack: @module_function_stack.dup,
+    }
+  end
+
+  # Replay the deferred `CONST.each` loops now that every file in the package
+  # has been seen, so the constant store is complete. Called from the driver
+  # beside dedupe_define_methods! / resolve_aliases!.
+  public def resolve_pending_const_loops!
+    pending = @pending_const_loops
+    @pending_const_loops = []
+    saved = [@current_file, @current_line, @namespace_stack, @visibility_stack,
+             @in_sclass, @module_function_stack]
+    pending.each do |entry|
+      @current_file = entry[:file]
+      @current_line = entry[:line]
+      @namespace_stack = entry[:namespace_stack]
+      @visibility_stack = entry[:visibility_stack]
+      @in_sclass = entry[:in_sclass]
+      @module_function_stack = entry[:module_function_stack]
+      process_each_metaprogramming(entry[:node])
+    end
+    @current_file, @current_line, @namespace_stack, @visibility_stack,
+      @in_sclass, @module_function_stack = saved
   end
 
   def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil, body: nil, params_node: nil)
@@ -4096,6 +4148,10 @@ def run
       umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
       extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
     end
+
+    # Replay `CONST.each` codegen loops whose constant lives in a file that
+    # sorts after the reader — now that every file in the package is recorded.
+    extractor.resolve_pending_const_loops!
 
     # Drop define_method entries a literal `def` in the same bucket supersedes.
     extractor.dedupe_define_methods!

@@ -1,4 +1,5 @@
 export class Base extends Error {
+  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
   constructor(message?: string) {
     super(message);
     this.name = this.constructor.name;

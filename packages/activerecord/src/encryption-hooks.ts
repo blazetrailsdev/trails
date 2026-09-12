@@ -1,16 +1,21 @@
 /** @internal */
 
 export interface EncryptionHooks {
+  /** @noRailsEquivalent PERMANENT */
   encrypts(klass: any, ...args: any[]): void;
 
   requireOriginalColumnsAfterReflection?(klass: any, columnNames: string[]): void;
 
+  /** @noRailsEquivalent PERMANENT */
   encryptedAttribute(record: any, name: string): boolean;
 
+  /** @noRailsEquivalent PERMANENT */
   ciphertextFor(record: any, name: string): unknown;
 
+  /** @noRailsEquivalent PERMANENT */
   encrypt(record: any): Promise<void>;
 
+  /** @noRailsEquivalent PERMANENT */
   decrypt(record: any): Promise<void>;
 }
 
