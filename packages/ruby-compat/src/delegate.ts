@@ -1,6 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
 import { methodMissingProxy } from "./method-missing-proxy.js";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
+type MixinBase = new (...args: any[]) => object;
+
 /**
  * `DelegateClass(superclass)` (`vendor/ruby/lib/delegate.rb:394-443`) — builds a
  * class that forwards to a wrapped object, the way
@@ -23,6 +26,22 @@ import { methodMissingProxy } from "./method-missing-proxy.js";
  * class's own prototype, between the subclass and `superclass`, which is the
  * ancestor position — and therefore the precedence — they hold in Ruby.
  *
+ * Ruby reads `superclass.public_instance_methods` and
+ * `protected_instance_methods` (`delegate.rb:397-400`), whose `all` default is
+ * true, so both sets include what `superclass` INHERITS. The JS walk therefore
+ * climbs the prototype chain, not just `superclass.prototype`, and the first
+ * definition it meets wins — the same nearest-ancestor lookup Ruby's method
+ * resolution performs.
+ *
+ * It stops at `Object.prototype` because `ignores` (`:396`) subtracts
+ * `Delegator.public_api`, which is every `::Object` public method
+ * (`:242-245`); what is left of that list is `to_s` / `inspect`, and its
+ * `=~`, `!~` and `===` have no JS spelling. Ruby takes public and protected
+ * but never private, and a `_`-prefixed name is how trails spells private —
+ * the same reading `methodMissingProxy` takes of `respond_to?`. A TS
+ * `protected` member carries no prefix and is an ordinary prototype property,
+ * so it is walked and forwarded, as Ruby's protected set is.
+ *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
@@ -30,21 +49,20 @@ import { methodMissingProxy } from "./method-missing-proxy.js";
  *
  * @noRailsEquivalent PERMANENT
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
-export function DelegateClass<T extends new (...args: any[]) => object>(
+export function DelegateClass<T extends MixinBase>(
   superclass: T,
 ): new (obj: unknown) => InstanceType<T> {
   const klass = class extends superclass {
-    _delegateDcObj: unknown;
+    declare _delegateDcObj: unknown;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545, as above.
-    constructor(...args: any[]) {
+    constructor(...args: ConstructorParameters<MixinBase>) {
       super();
       this.__setobj__(args[0] as unknown);
       return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
     }
 
     __getobj__(): unknown {
+      if (!("_delegateDcObj" in this)) throw new ArgumentError("not delegated");
       return this._delegateDcObj;
     }
 
@@ -55,25 +73,32 @@ export function DelegateClass<T extends new (...args: any[]) => object>(
   };
 
   const ignores = new Set(["constructor", "toString", "inspect"]);
-  for (const method of Object.getOwnPropertyNames(superclass.prototype)) {
-    if (ignores.has(method) || method.startsWith("_")) continue;
-    const descriptor = Object.getOwnPropertyDescriptor(superclass.prototype, method)!;
-    if (descriptor.get) {
-      Object.defineProperty(klass.prototype, method, {
-        configurable: true,
-        get(this: InstanceType<typeof klass>): unknown {
-          return (this.__getobj__() as Record<string, unknown>)[method];
-        },
-      });
-    } else if (typeof descriptor.value === "function") {
-      Object.defineProperty(klass.prototype, method, {
-        configurable: true,
-        writable: true,
-        value(this: InstanceType<typeof klass>, ...args: unknown[]): unknown {
-          const target = this.__getobj__() as Record<string, (...a: unknown[]) => unknown>;
-          return target[method](...args);
-        },
-      });
+  for (
+    let proto: object | null = superclass.prototype as object;
+    proto !== null && proto !== Object.prototype;
+    proto = Object.getPrototypeOf(proto) as object | null
+  ) {
+    for (const method of Object.getOwnPropertyNames(proto)) {
+      if (ignores.has(method) || method.startsWith("_")) continue;
+      if (Object.hasOwn(klass.prototype, method)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(proto, method)!;
+      if (descriptor.get) {
+        Object.defineProperty(klass.prototype, method, {
+          configurable: true,
+          get(this: InstanceType<typeof klass>): unknown {
+            return (this.__getobj__() as Record<string, unknown>)[method];
+          },
+        });
+      } else if (typeof descriptor.value === "function") {
+        Object.defineProperty(klass.prototype, method, {
+          configurable: true,
+          writable: true,
+          value(this: InstanceType<typeof klass>, ...args: unknown[]): unknown {
+            const target = this.__getobj__() as Record<string, (...a: unknown[]) => unknown>;
+            return target[method](...args);
+          },
+        });
+      }
     }
   }
 
