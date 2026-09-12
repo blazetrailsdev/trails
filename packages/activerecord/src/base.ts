@@ -1849,8 +1849,6 @@ export class Base extends Model {
     >;
   }
 
-  declare static touchAll: typeof Timestamp.touchAll;
-
   static createOrFindBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
@@ -1984,6 +1982,7 @@ export class Base extends Model {
   declare static insertAllBang: typeof Querying.insertAllBang;
   declare static upsert: typeof Querying.upsert;
   declare static upsertAll: typeof Querying.upsertAll;
+  declare static touchAll: typeof Querying.touchAll;
   declare static updateAll: typeof Querying.updateAll;
   declare static deleteAll: typeof Querying.deleteAll;
   declare static destroy: typeof Querying.destroy;
@@ -3069,7 +3068,6 @@ extend(Base, CounterCache.ClassMethods);
     },
   });
 }
-extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
 Object.assign(Base, {

@@ -1,3 +1,4 @@
+import { ExecutionContext } from "@blazetrails/activesupport";
 import { ConfigurationError } from "./errors.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
@@ -24,7 +25,6 @@ export class QueryLogs implements QueryTransformer {
   private _prependComment = false;
   private _cacheEnabled = false;
   private _cachedComment: string | null | undefined = undefined;
-  private _context: Record<string, TagValue> = {};
   private _keyHandlers: Map<string, GetKeyHandler> = new Map();
 
   get tags(): TagDefinition[] {
@@ -106,18 +106,6 @@ export class QueryLogs implements QueryTransformer {
     this._cachedComment = undefined;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  updateContext(ctx: Record<string, TagValue>): void {
-    this._context = { ...this._context, ...ctx };
-    this._cachedComment = undefined;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  clearContext(): void {
-    this._context = {};
-    this._cachedComment = undefined;
-  }
-
   call(sql: string, connection?: unknown): string {
     const comment = this.comment(connection);
     if (!comment) return sql;
@@ -148,7 +136,7 @@ export class QueryLogs implements QueryTransformer {
 
   /** @internal */
   tagContent(connection?: unknown): string | null {
-    const context: Record<string, TagValue> = { ...this._context };
+    const context: Record<string, TagValue> = ExecutionContext.toH() as Record<string, TagValue>;
     if (connection !== undefined && context.connection == null) {
       (context as Record<string, unknown>).connection = connection;
     }

@@ -1,10 +1,7 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
-import {
-  touch as timestampTouch,
-  timestampAttributesForUpdateInModel,
-  currentTimeFromProperTimezone,
-} from "./timestamp.js";
+import { timestampAttributesForUpdateInModel, currentTimeFromProperTimezone } from "./timestamp.js";
+import { touch as timestampTouch } from "./persistence.js";
 import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
 import type { Time as RubyTime } from "@blazetrails/date";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
