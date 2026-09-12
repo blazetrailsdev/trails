@@ -173,6 +173,7 @@ export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";
 export { Monitor, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
+export { Thread } from "./thread.js";
 export { ThreadError } from "./thread-error.js";
 export type { MonitorMixin } from "./monitor.js";
 

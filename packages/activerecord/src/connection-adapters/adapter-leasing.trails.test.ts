@@ -14,7 +14,7 @@ describe("AdapterLeasingTest", () => {
     await withExecutionContext(async () => {
       expect(() => adapter.expire()).toThrow(ActiveRecordError);
       expect(() => adapter.expire()).toThrow(
-        /^Cannot expire connection, it is owned by a different thread: #<Thread:0 run>\. Current thread: #<Thread:\d+ run>\.$/,
+        /^Cannot expire connection, it is owned by a different thread: #<Thread:0x0{16} run>\. Current thread: #<Thread:0x[0-9a-f]{16} \S+:\d+ run>\.$/,
       );
     });
     expect(adapter.inUse).toBeTruthy();
@@ -27,7 +27,7 @@ describe("AdapterLeasingTest", () => {
     adapter.lease();
     await withExecutionContext(async () => {
       expect(() => adapter.lease()).toThrow(
-        /^Cannot lease connection, it is already in use by a different thread: #<Thread:0 run>\. Current thread: #<Thread:\d+ run>\.$/,
+        /^Cannot lease connection, it is already in use by a different thread: #<Thread:0x0{16} run>\. Current thread: #<Thread:0x[0-9a-f]{16} \S+:\d+ run>\.$/,
       );
     });
   });

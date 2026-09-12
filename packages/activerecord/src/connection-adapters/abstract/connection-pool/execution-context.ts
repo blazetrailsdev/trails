@@ -1,6 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { Thread } from "@blazetrails/ruby-compat";
 
-const CONTEXT_ID_KEY = Symbol.for("ar_execution_context_id");
 const _exitHooks: ((contextId: string) => void)[] = [];
 
 /**
@@ -29,13 +29,14 @@ export function executionContext(): { readonly id: number } {
 
 /** @noRailsEquivalent PERMANENT */
 export function withExecutionContext<T>(fn: () => T): T {
-  const context = IsolatedExecutionState.run(() => IsolatedExecutionState.context());
-  const id = context.id;
-  const runHooks = () => {
-    const key = String(id);
-    for (const hook of _exitHooks) hook(key);
-  };
-  return IsolatedExecutionState.scope(CONTEXT_ID_KEY, context, () => {
+  const other = Thread.current();
+  return IsolatedExecutionState.run(() => {
+    IsolatedExecutionState.shareWith(other);
+    const id = IsolatedExecutionState.context().id;
+    const runHooks = () => {
+      const key = String(id);
+      for (const hook of _exitHooks) hook(key);
+    };
     let result: T;
     try {
       result = fn();
