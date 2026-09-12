@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Deprecation, DeprecationException } from "./deprecation.js";
 
 describe("Deprecation#allow (trails)", () => {
@@ -12,10 +13,12 @@ describe("Deprecation#allow (trails)", () => {
       release = resolve;
     });
 
-    const inside = dep.allow(":all", {}, async () => {
-      await held;
-      dep.warn("allowed inside the block");
-    });
+    const inside = new Thread(() =>
+      dep.allow(":all", {}, async () => {
+        await held;
+        dep.warn("allowed inside the block");
+      }),
+    ).value();
 
     expect(() => dep.warn("disallowed outside the block")).toThrow(DeprecationException);
 

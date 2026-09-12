@@ -20,11 +20,21 @@ export class ThreadLocalVar<T> {
 
   bind<R>(value: T, block: () => R): R {
     const oldValue = this.value;
-    try {
-      this.value = value;
-      return block();
-    } finally {
+    this.value = value;
+    const restore = () => {
       this.value = oldValue;
+    };
+    let result: R;
+    try {
+      result = block();
+    } catch (error) {
+      restore();
+      throw error;
     }
+    if (result != null && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+      return Promise.resolve(result as unknown).finally(restore) as R;
+    }
+    restore();
+    return result;
   }
 }
