@@ -46,7 +46,6 @@ import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
-import { _registerBase as _registerBaseWithNamedScoping } from "./scoping/named.js";
 import { _registerBase as _registerBaseWithAsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { _registerBase as _registerBaseWithDatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import {
@@ -130,6 +129,7 @@ import {
   type DirtyOptions,
   dirtyInitAttributes,
 } from "@blazetrails/activemodel";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -687,6 +687,9 @@ let _errorOnIgnoredOrder = false;
 let _timestampedMigrations = true;
 let _validateMigrationTimestamps = false;
 let _migrationStrategy: AnyClass = DefaultStrategy;
+let _schemaFormat: SchemaFormat = "ts";
+let _dumpSchemaAfterMigration = true;
+let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 let _verifyForeignKeysForFixtures = false;
 let _queryTransformers: QueryTransformer[] = [];
 let _useYamlUnsafeLoad = false;
@@ -930,6 +933,30 @@ export class Base extends Model {
 
   static set migrationStrategy(value: AnyClass) {
     _migrationStrategy = value;
+  }
+
+  static get schemaFormat(): SchemaFormat {
+    return _schemaFormat;
+  }
+
+  static set schemaFormat(value: SchemaFormat) {
+    _schemaFormat = value;
+  }
+
+  static get dumpSchemaAfterMigration(): boolean {
+    return _dumpSchemaAfterMigration;
+  }
+
+  static set dumpSchemaAfterMigration(value: boolean) {
+    _dumpSchemaAfterMigration = value;
+  }
+
+  static get dumpSchemas(): "schema_search_path" | "all" | (string & {}) {
+    return _dumpSchemas;
+  }
+
+  static set dumpSchemas(value: "schema_search_path" | "all" | (string & {})) {
+    _dumpSchemas = value;
   }
 
   static get verifyForeignKeysForFixtures(): boolean {
@@ -3474,7 +3501,6 @@ _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
-_registerBaseWithNamedScoping(Base);
 _registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);

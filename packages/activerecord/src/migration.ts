@@ -1290,7 +1290,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const databaseTasks = migrationArConfig()!.databaseTasks();
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
-      if (!(await databaseTasks.schemaUpToDate(dbConfig, databaseTasks.schemaFormat))) return true;
+      if (!(await databaseTasks.schemaUpToDate(dbConfig, _Base!.schemaFormat))) return true;
     }
     return false;
   }
@@ -1337,7 +1337,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
       const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
+      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? _Base!.schemaFormat) as SchemaFormat;
       await databaseTasks.loadSchema(dbConfig, schemaFormat);
     });
   }

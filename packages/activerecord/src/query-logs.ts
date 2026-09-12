@@ -67,8 +67,7 @@ export class QueryLogs implements QueryTransformer {
     if (!value) this._cachedComment = undefined;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  set formatter(format: "legacy" | "sqlcommenter" | QueryLogsFormatter) {
+  set tagsFormatter(format: "legacy" | "sqlcommenter" | QueryLogsFormatter) {
     if (format === "legacy") {
       this._tagsFormatter = "legacy";
       this._formatter = LegacyFormatter;

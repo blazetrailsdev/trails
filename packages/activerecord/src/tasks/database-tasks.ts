@@ -107,14 +107,8 @@ export class DatabaseTasks {
   }
 
   static seedLoader: { loadSeed(): void | Promise<void> } | null = null;
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  static schemaFormat: SchemaFormat = "ts";
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  static dumpSchemaAfterMigration: boolean = true;
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  static dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 
   private static _registeredTasks: Array<{
     pattern: RegExp | string;
@@ -384,7 +378,7 @@ export class DatabaseTasks {
   static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
-    const fmt = format ?? this.schemaFormat;
+    const fmt = format ?? baseClass().schemaFormat;
     const ext = fmt === "sql" ? "sql" : fmt;
     const base = fmt === "sql" ? "structure" : "schema";
     if (dbConfig && dbConfig.name !== "primary") {
@@ -604,7 +598,8 @@ export class DatabaseTasks {
     if (typeof cfgWithDump?.schemaDump !== "function") {
       return this.dumpSchemaFilename(dbConfig, format);
     }
-    const fmt = (format ?? this.schemaFormat) === "js" ? "ts" : (format ?? this.schemaFormat);
+    const fmt =
+      (format ?? baseClass().schemaFormat) === "js" ? "ts" : (format ?? baseClass().schemaFormat);
     const filename = cfgWithDump.schemaDump(fmt);
     if (filename == null) return null;
 
@@ -619,7 +614,7 @@ export class DatabaseTasks {
 
   static async dumpSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = DatabaseTasks.schemaFormat,
+    format: SchemaFormat = baseClass().schemaFormat,
   ): Promise<void> {
     const rawFilename = this.schemaDumpPath(dbConfig, format);
     if (rawFilename == null) return;
@@ -651,7 +646,7 @@ export class DatabaseTasks {
   /** @missingRailsCall load — PERMANENT */
   static async loadSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = DatabaseTasks.schemaFormat,
+    format: SchemaFormat = baseClass().schemaFormat,
     file?: string,
   ): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
@@ -712,7 +707,7 @@ export class DatabaseTasks {
   }
 
   static async loadSchemaCurrent(
-    format: SchemaFormat = DatabaseTasks.schemaFormat,
+    format: SchemaFormat = baseClass().schemaFormat,
     file?: string,
     environment?: string,
   ): Promise<void> {
@@ -803,7 +798,7 @@ export class DatabaseTasks {
       }
     }
 
-    if (this.dumpSchemaAfterMigration) {
+    if (baseClass().dumpSchemaAfterMigration) {
       for (const dbConfig of dumpDbConfigs) {
         await this.withTemporaryPool(dbConfig, async () => {
           await this.dumpSchema(dbConfig);
@@ -902,7 +897,7 @@ export class DatabaseTasks {
 
   static async schemaUpToDate(
     configuration: unknown,
-    format: SchemaFormat = DatabaseTasks.schemaFormat,
+    format: SchemaFormat = baseClass().schemaFormat,
     file?: string,
   ): Promise<boolean> {
     void format;
@@ -968,7 +963,7 @@ export class DatabaseTasks {
 
   static async reconstructFromSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = DatabaseTasks.schemaFormat,
+    format: SchemaFormat = baseClass().schemaFormat,
     file?: string,
   ): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
@@ -1094,7 +1089,7 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
       if (rawPath) {
         const resolved = DatabaseTasks._resolveSchemaPath(rawPath);
         if (File.isExist(resolved)) {
-          await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
+          await DatabaseTasks.loadSchema(dbConfig, baseClass().schemaFormat, undefined);
         }
       }
     }

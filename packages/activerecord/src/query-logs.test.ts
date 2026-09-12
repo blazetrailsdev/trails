@@ -31,7 +31,7 @@ describe("QueryLogsTest", () => {
     queryLogs.clearCache();
     queryLogs.clearContext();
     queryLogs.tags = [];
-    queryLogs.formatter = "legacy";
+    queryLogs.tagsFormatter = "legacy";
     queryLogs.updateContext({ application: "active_record" });
   });
 
@@ -43,7 +43,7 @@ describe("QueryLogsTest", () => {
     queryLogs.tags = [];
     queryLogs.clearContext();
     queryLogs.clearCache();
-    queryLogs.formatter = "legacy";
+    queryLogs.tagsFormatter = "legacy";
     ExecutionContext.clear();
   });
 
@@ -52,7 +52,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("escaping good comment with custom separator", () => {
-    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tagsFormatter = "sqlcommenter";
 
     expect(escapeComment("app='foo'")).toBe("app='foo'");
   });
@@ -226,7 +226,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("sql commenter format", async () => {
-    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tagsFormatter = "sqlcommenter";
     queryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application='active_record'\*\//, undefined, false, async () => {
       await Dashboard.first();
@@ -273,7 +273,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format value", async () => {
-    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tagsFormatter = "sqlcommenter";
     queryLogs.tags = [
       "application",
       { tracestate: "congo=t61rcWkgMzE,rojo=00f067aa0ba902b7", custom_proc: () => "Joe's Shack" },
@@ -289,7 +289,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format allows string keys", async () => {
-    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tagsFormatter = "sqlcommenter";
     queryLogs.tags = [
       "application",
       {
@@ -309,7 +309,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format value string coercible", async () => {
-    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tagsFormatter = "sqlcommenter";
     queryLogs.tags = ["application", { custom_proc: () => 1234 }];
     await assertQueriesMatch(/custom_proc='1234'\*\//, undefined, false, async () => {
       await Dashboard.first();
@@ -377,8 +377,8 @@ describe("LegacyFormatter", () => {
 describe("QueryLogs.formatter =", () => {
   it("accepts a static-method class (LegacyFormatter / SQLCommenter) directly", () => {
     const logs = new QueryLogs();
-    expect(() => (logs.formatter = SQLCommenter)).not.toThrow();
-    expect(() => (logs.formatter = LegacyFormatter)).not.toThrow();
+    expect(() => (logs.tagsFormatter = SQLCommenter)).not.toThrow();
+    expect(() => (logs.tagsFormatter = LegacyFormatter)).not.toThrow();
   });
 
   it("still accepts instance-shaped formatters", () => {
@@ -387,12 +387,12 @@ describe("QueryLogs.formatter =", () => {
       format: (k: string, v: unknown) => `${k}=${v}`,
       join: (pairs: string[]) => pairs.join(";"),
     };
-    expect(() => (logs.formatter = custom)).not.toThrow();
+    expect(() => (logs.tagsFormatter = custom)).not.toThrow();
   });
 
   it("rejects values missing format/join methods", () => {
     const logs = new QueryLogs();
-    expect(() => (logs.formatter = { foo: 1 } as any)).toThrow(/unsupported/i);
+    expect(() => (logs.tagsFormatter = { foo: 1 } as any)).toThrow(/unsupported/i);
   });
 });
 
@@ -403,34 +403,34 @@ describe("QueryLogs.tagsFormatter", () => {
 
   it("tracks formatter = 'sqlcommenter'", () => {
     const logs = new QueryLogs();
-    logs.formatter = "sqlcommenter";
+    logs.tagsFormatter = "sqlcommenter";
     expect(logs.tagsFormatter).toBe("sqlcommenter");
   });
 
   it("tracks formatter = 'legacy'", () => {
     const logs = new QueryLogs();
-    logs.formatter = "sqlcommenter";
-    logs.formatter = "legacy";
+    logs.tagsFormatter = "sqlcommenter";
+    logs.tagsFormatter = "legacy";
     expect(logs.tagsFormatter).toBe("legacy");
   });
 
   it("tracks formatter = SQLCommenter (class value)", () => {
     const logs = new QueryLogs();
-    logs.formatter = SQLCommenter;
+    logs.tagsFormatter = SQLCommenter;
     expect(logs.tagsFormatter).toBe("sqlcommenter");
   });
 
   it("tracks formatter = LegacyFormatter (class value)", () => {
     const logs = new QueryLogs();
-    logs.formatter = SQLCommenter;
-    logs.formatter = LegacyFormatter;
+    logs.tagsFormatter = SQLCommenter;
+    logs.tagsFormatter = LegacyFormatter;
     expect(logs.tagsFormatter).toBe("legacy");
   });
 
   it("falls back to 'legacy' for unknown custom formatters", () => {
     const logs = new QueryLogs();
-    logs.formatter = SQLCommenter;
-    logs.formatter = {
+    logs.tagsFormatter = SQLCommenter;
+    logs.tagsFormatter = {
       format: (k: string, v: unknown) => `${k}=${v}`,
       join: (pairs: string[]) => pairs.join(";"),
     };

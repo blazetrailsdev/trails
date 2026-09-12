@@ -6,9 +6,13 @@ import {
   pluralize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { dangerousAttributeMethods, isDangerousAttributeMethod } from "./attribute-methods.js";
+import {
+  dangerousAttributeMethods,
+  isDangerousAttributeMethod,
+  isDangerousClassMethod,
+} from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
-import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
+import { isRelationInstanceMethod } from "./scoping/named.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 type EnumValue = number | string | boolean | null;
@@ -138,11 +142,6 @@ export class EnumType extends ValueType<string> {
       | string
       | boolean
       | null;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  serializeCastValue(value: unknown): number | string | boolean | null {
-    return this.serialize(value);
   }
 
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
@@ -467,7 +466,7 @@ export function detectEnumConflictBang(
   _klassMethod = false,
 ): void {
   if (_klassMethod) {
-    if (isDangerousClassMethod(methodName)) {
+    if (isDangerousClassMethod.call(this, methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
     if (isRelationInstanceMethod(methodName)) {

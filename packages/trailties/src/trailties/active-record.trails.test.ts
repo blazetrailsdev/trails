@@ -30,7 +30,8 @@ describe("RailtieTest (trails-only)", () => {
     class WidgetsController extends LogRuntimeController {
       static actions = ["index"];
       index(): void {
-        RuntimeRegistry.record("SELECT 1", 12.0);
+        RuntimeRegistry.stats().sqlRuntime += 12.0;
+        RuntimeRegistry.stats().queriesCount++;
         this.head(204);
       }
     }

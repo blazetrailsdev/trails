@@ -37,7 +37,8 @@ describe("ControllerRuntimeTest", () => {
 
   describe("processAction", () => {
     it("resets the SQL runtime registry before action", () => {
-      RuntimeRegistry.record("SELECT", 10.0);
+      RuntimeRegistry.stats().sqlRuntime += 10.0;
+      RuntimeRegistry.stats().queriesCount++;
       expect(RuntimeRegistry.stats().sqlRuntime).toBe(10.0);
 
       const controller = new FakeController();
@@ -56,7 +57,8 @@ describe("ControllerRuntimeTest", () => {
 
   describe("appendInfoToPayload", () => {
     it("appends db_runtime from registry to payload, over super's view_runtime", () => {
-      RuntimeRegistry.record("SELECT", 7.5);
+      RuntimeRegistry.stats().sqlRuntime += 7.5;
+      RuntimeRegistry.stats().queriesCount++;
       const payload: Record<string, unknown> = {};
       const controller = new FakeController();
       controller.viewRuntime = 2.0;
@@ -69,7 +71,8 @@ describe("ControllerRuntimeTest", () => {
     });
 
     it("sums controller db_runtime with registry runtime", () => {
-      RuntimeRegistry.record("SELECT", 3.0);
+      RuntimeRegistry.stats().sqlRuntime += 3.0;
+      RuntimeRegistry.stats().queriesCount++;
       const payload: Record<string, unknown> = {};
       const controller = new FakeController();
       controller.dbRuntime = 4.0;
@@ -80,7 +83,8 @@ describe("ControllerRuntimeTest", () => {
     });
 
     it("treats null db_runtime as 0", () => {
-      RuntimeRegistry.record("SELECT", 2.0);
+      RuntimeRegistry.stats().sqlRuntime += 2.0;
+      RuntimeRegistry.stats().queriesCount++;
       const payload: Record<string, unknown> = {};
 
       new FakeController().appendInfoToPayload(payload);
@@ -89,8 +93,10 @@ describe("ControllerRuntimeTest", () => {
     });
 
     it("appends queries_count to payload", () => {
-      RuntimeRegistry.record("SELECT 1", 1.0);
-      RuntimeRegistry.record("SELECT 2", 1.0);
+      RuntimeRegistry.stats().sqlRuntime += 1.0;
+      RuntimeRegistry.stats().queriesCount++;
+      RuntimeRegistry.stats().sqlRuntime += 1.0;
+      RuntimeRegistry.stats().queriesCount++;
       const payload: Record<string, unknown> = {};
 
       new FakeController().appendInfoToPayload(payload);
@@ -99,7 +105,8 @@ describe("ControllerRuntimeTest", () => {
     });
 
     it("resets counts after appending", () => {
-      RuntimeRegistry.record("SELECT", 1.0);
+      RuntimeRegistry.stats().sqlRuntime += 1.0;
+      RuntimeRegistry.stats().queriesCount++;
       const payload: Record<string, unknown> = {};
 
       new FakeController().appendInfoToPayload(payload);
@@ -108,8 +115,12 @@ describe("ControllerRuntimeTest", () => {
     });
 
     it("appends cached_queries_count and resets it", () => {
-      RuntimeRegistry.record("SELECT", 1.0, { cached: true });
-      RuntimeRegistry.record("SELECT", 1.0, { cached: true });
+      RuntimeRegistry.stats().sqlRuntime += 1.0;
+      RuntimeRegistry.stats().queriesCount++;
+      RuntimeRegistry.stats().cachedQueriesCount++;
+      RuntimeRegistry.stats().sqlRuntime += 1.0;
+      RuntimeRegistry.stats().queriesCount++;
+      RuntimeRegistry.stats().cachedQueriesCount++;
       const payload: Record<string, unknown> = {};
 
       new FakeController().appendInfoToPayload(payload);
@@ -121,19 +132,22 @@ describe("ControllerRuntimeTest", () => {
 
   describe("cleanupViewRuntime", () => {
     it("yields to super when logger is absent", () => {
-      RuntimeRegistry.record("SELECT", 5.0);
+      RuntimeRegistry.stats().sqlRuntime += 5.0;
+      RuntimeRegistry.stats().queriesCount++;
       expect(new FakeController().cleanupViewRuntime(() => 3.0)).toBe(3.0);
     });
 
     it("yields to super when logger.info returns false", () => {
-      RuntimeRegistry.record("SELECT", 5.0);
+      RuntimeRegistry.stats().sqlRuntime += 5.0;
+      RuntimeRegistry.stats().queriesCount++;
       const controller = new FakeController();
       controller.logger = { "info?": false };
       expect(controller.cleanupViewRuntime(() => 3.0)).toBe(3.0);
     });
 
     it("accumulates pre-render db_runtime when logger.info returns true", () => {
-      RuntimeRegistry.record("SELECT", 6.0);
+      RuntimeRegistry.stats().sqlRuntime += 6.0;
+      RuntimeRegistry.stats().queriesCount++;
       const controller = new FakeController();
       controller.dbRuntime = 1.0;
       controller.logger = { "info?": true };
@@ -149,7 +163,8 @@ describe("ControllerRuntimeTest", () => {
       controller.logger = { "info?": true };
 
       const result = controller.cleanupViewRuntime(() => {
-        RuntimeRegistry.record("SELECT", 4.0);
+        RuntimeRegistry.stats().sqlRuntime += 4.0;
+        RuntimeRegistry.stats().queriesCount++;
         return 10.0;
       });
 
@@ -163,7 +178,8 @@ describe("ControllerRuntimeTest", () => {
 
       const result = await controller.cleanupViewRuntime(async () => {
         await Promise.resolve();
-        RuntimeRegistry.record("SELECT", 4.0);
+        RuntimeRegistry.stats().sqlRuntime += 4.0;
+        RuntimeRegistry.stats().queriesCount++;
         return 10.0;
       });
 

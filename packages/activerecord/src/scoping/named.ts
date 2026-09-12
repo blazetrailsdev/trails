@@ -1,47 +1,10 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { ActiveRecordError } from "../errors.js";
 import type { Base } from "../base.js";
 
-let _base: typeof Base | undefined;
-
-/** @internal */
-export function _registerBase(base: typeof Base): void {
-  _base = base;
-}
-
-function baseClass(): typeof Base {
-  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
-  return _base;
-}
-
 import { Relation } from "../relation.js";
+import { isDangerousClassMethod } from "../attribute-methods.js";
 import { Default } from "./default.js";
-
-const RESTRICTED_CLASS_METHODS = new Set([
-  "private",
-  "public",
-  "protected",
-  "allocate",
-  "new",
-  "name",
-  "superclass",
-  "relation",
-]);
-
-const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
-
-/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-export function isDangerousClassMethod(name: string): boolean {
-  if (RESTRICTED_CLASS_METHODS.has(name)) return true;
-  if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
-  let klass: any = baseClass();
-  while (klass && klass !== Function.prototype && klass !== Object.prototype) {
-    if (Object.prototype.hasOwnProperty.call(klass, name)) return true;
-    klass = Object.getPrototypeOf(klass);
-  }
-  return false;
-}
 
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
 export function isRelationInstanceMethod(name: string): boolean {
@@ -73,7 +36,7 @@ export function scope<T extends typeof Base>(
     throw new ArgumentError("The scope body needs to be callable.");
   }
 
-  if (isDangerousClassMethod(name)) {
+  if (isDangerousClassMethod.call(modelClass, name)) {
     throw new ArgumentError(
       `You tried to define a scope named "${name}" on the model ` +
         `"${modelClass.name}", but Active Record already defined a class ` +

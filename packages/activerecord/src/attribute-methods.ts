@@ -8,6 +8,7 @@ import {
   type DirtyOptions,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
+import { _Base } from "./base-slot.js";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import {
   attributeForInspect as _attrForInspect,
@@ -148,7 +149,17 @@ export interface AttributeMethodsHost {
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
 
-const RESTRICTED_CLASS_METHODS = new Set(["allocate", "new", "name", "parent", "superclass"]);
+const RESTRICTED_CLASS_METHODS = new Set([
+  "private",
+  "public",
+  "protected",
+  "allocate",
+  "new",
+  "name",
+  "superclass",
+]);
+
+const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
@@ -423,7 +434,14 @@ export function isMethodDefinedWithin(
 
 export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(methodName)) return true;
-  return typeof (this as any)[methodName] === "function";
+  if (INTRINSIC_FUNCTION_PROPS.has(methodName)) return false;
+
+  let klass: any = _Base;
+  while (klass && klass !== Function.prototype && klass !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(klass, methodName)) return true;
+    klass = Object.getPrototypeOf(klass);
+  }
+  return false;
 }
 
 export function isAttributeMethod(

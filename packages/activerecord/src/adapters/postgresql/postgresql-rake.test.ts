@@ -352,7 +352,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   let spawnSync: MockInstance<ChildProcessAdapter["spawnSync"]>;
   let filename: string;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
-  let previousDumpSchemas: typeof DatabaseTasks.dumpSchemas;
+  let previousDumpSchemas: typeof Base.dumpSchemas;
 
   const expectedArgs = ["--schema-only", "--no-privileges", "--no-owner", "--file"];
 
@@ -361,7 +361,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     filename = File.join(os.tmpdir(), "awesome-file.sql");
     File.write(filename, "");
     previousFlags = DatabaseTasks.structureDumpFlags;
-    previousDumpSchemas = DatabaseTasks.dumpSchemas;
+    previousDumpSchemas = Base.dumpSchemas;
     PostgreSQLDatabaseTasks.register();
     const childProcess = await getChildProcessAsync();
     spawnSync = vi
@@ -372,7 +372,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.structureDumpFlags = previousFlags;
-    DatabaseTasks.dumpSchemas = previousDumpSchemas;
+    Base.dumpSchemas = previousDumpSchemas;
     SchemaDumper.ignoreTables = [];
     FileUtils.rmF(filename);
   });
@@ -533,7 +533,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it("structure dump with schema search path and dump schemas all", async () => {
-    DatabaseTasks.dumpSchemas = "all";
+    Base.dumpSchemas = "all";
 
     await DatabaseTasks.structureDump(
       new HashConfig("default_env", "primary", {
@@ -552,7 +552,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it("structure dump with dump schemas string", async () => {
-    DatabaseTasks.dumpSchemas = "foo,bar";
+    Base.dumpSchemas = "foo,bar";
 
     await DatabaseTasks.structureDump(configuration(), filename);
 

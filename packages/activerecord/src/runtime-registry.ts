@@ -30,25 +30,6 @@ function getStats(): Stats {
 }
 
 /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-export function record(
-  queryName: string | undefined,
-  runtime: number,
-  options: { cached?: boolean; async?: boolean; lockWait?: number } = {},
-): void {
-  const s = getStats();
-
-  if (queryName !== "TRANSACTION" && queryName !== "SCHEMA") {
-    s.queriesCount += 1;
-    if (options.cached) s.cachedQueriesCount += 1;
-  }
-
-  if (options.async) {
-    s.asyncSqlRuntime += runtime - (options.lockWait ?? 0);
-  }
-  s.sqlRuntime += runtime;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
 export function stats(): Stats {
   return getStats();
 }
@@ -71,10 +52,17 @@ export function resetCachedQueriesCount(): number {
   return was;
 }
 
-Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-  record(event.payload.name as string | undefined, event.duration, {
-    cached: event.payload.cached as boolean | undefined,
-    async: event.payload.async as boolean | undefined,
-    lockWait: event.payload.lockWait as number | undefined,
-  });
+Notifications.monotonicSubscribe("sql.active_record", (event: NotificationEvent) => {
+  const payload = event.payload;
+  if (!["SCHEMA", "TRANSACTION"].includes(payload.name as string)) {
+    getStats().queriesCount += 1;
+    if (payload.cached) getStats().cachedQueriesCount += 1;
+  }
+
+  const runtime = event.duration;
+
+  if (payload.async) {
+    getStats().asyncSqlRuntime += runtime - (payload.lockWait as number);
+  }
+  getStats().sqlRuntime += runtime;
 });

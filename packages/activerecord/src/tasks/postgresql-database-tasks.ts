@@ -69,7 +69,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const dumpSchemas = DatabaseTasks.dumpSchemas;
+    const dumpSchemas = Base.dumpSchemas;
     let searchPath: string | undefined;
     if (dumpSchemas === "schema_search_path") {
       const raw = this.configurationHash.schemaSearchPath;

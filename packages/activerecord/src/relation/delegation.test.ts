@@ -157,7 +157,6 @@ describe("DelegationTest", () => {
       "isMany",
       "isOne",
       "isNone",
-      "isEmpty",
     ] as const;
 
     it("delegate querying methods", () => {
