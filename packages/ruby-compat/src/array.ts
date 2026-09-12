@@ -1,4 +1,4 @@
-import { rbEqual } from "./rb-equal.js";
+import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 
@@ -134,9 +134,10 @@ export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
 
 /**
  * Ruby `Array#uniq` (`vendor/ruby/array.c:6177` `rb_ary_uniq`): the elements in
- * order, deduplicated through `ary_make_hash` (`array.c:5342`) — which keys on
- * `hash`/`eql?`, not identity, so `1` and `1n` collapse the way Ruby's `1` and
- * `1` do and a tuple is equal by its elements.
+ * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
+ * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
+ * Ruby's `1` and `1` do, a tuple is `eql?` by its elements, and a value whose
+ * class defines only `==` stays distinct.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#uniq`
  *   (`vendor/ruby/array.c:6177`).
  */
@@ -146,7 +147,7 @@ export function uniq<T>(ary: readonly T[]): T[] {
   for (const element of ary) {
     const key = rbHash(element);
     const bucket = hash.get(key) ?? [];
-    if (bucket.some((seen) => rbEqual(seen, element))) continue;
+    if (bucket.some((seen) => rbEql(seen, element))) continue;
     bucket.push(element);
     hash.set(key, bucket);
     result.push(element);
