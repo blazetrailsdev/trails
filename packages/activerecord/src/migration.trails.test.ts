@@ -279,6 +279,20 @@ describe("Migration#createTable id option type", () => {
       expect(await announce("createTable")).toBe("-- createTable(nil)");
     });
 
+    it("forwards only the arguments the caller passed", async () => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        // eslint-disable-next-line blazetrails/require-table-teardown -- RecordingMigration's connection is a fake recorder; no table is created.
+        await migration.createTable("widgets");
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      expect(migration.lines[0]).toBe('-- createTable("widgets")');
+      expect(migration.calls[0]).toEqual(["createTable", ["widgets"]]);
+    });
+
     it("announces a non-Hash object last argument through inspect", async () => {
       expect(await announce("execute", "SELECT 1", Temporal.PlainDate.from("2024-01-01"))).toBe(
         '-- execute("SELECT 1", 2024-01-01)',

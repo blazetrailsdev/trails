@@ -1,4 +1,3 @@
-/** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue MOVED-BY-SHORT-NAME: isEncryptedAttribute. */
 export * from "./errors.js";
 export { Message } from "./message.js";
 export { Properties } from "./properties.js";
@@ -42,7 +41,6 @@ export {
 
 export { encrypts } from "./encryptable-record.js";
 export {
-  isEncryptedAttribute,
   eagerLoadBang,
   withEncryptionContext,
   withoutEncryption,

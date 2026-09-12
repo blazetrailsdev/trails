@@ -330,24 +330,26 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
    * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async createTable(
-    tableName: string,
-    options?:
-      | {
-          id?: boolean | ColumnType | IdHashOptions;
-          primaryKey?: string | string[] | false;
-          force?: boolean | "cascade";
-          ifNotExists?: boolean;
-          default?: unknown;
-          options?: string;
-          comment?: string;
-          charset?: string;
-          collation?: string;
-          as?: string;
-        }
-      | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      tableName: string,
+      options?:
+        | {
+            id?: boolean | ColumnType | IdHashOptions;
+            primaryKey?: string | string[] | false;
+            force?: boolean | "cascade";
+            ifNotExists?: boolean;
+            default?: unknown;
+            options?: string;
+            comment?: string;
+            charset?: string;
+            collation?: string;
+            as?: string;
+          }
+        | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
-    await this.methodMissing("createTable", tableName, options, fn);
+    await this.methodMissing("createTable", ...args);
   }
 
   /**
@@ -382,17 +384,19 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions & { ifNotExists?: boolean } = {},
+    ...args: [
+      tableName: string,
+      columnName: string,
+      type: ColumnType,
+      options?: ColumnOptions & { ifNotExists?: boolean },
+    ]
   ): Promise<void> {
-    await this.methodMissing("addColumn", tableName, columnName, type, options);
+    await this.methodMissing("addColumn", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeColumn(
     tableName: string,
     columnName: string,
@@ -404,53 +408,50 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("removeColumn", tableName, columnName, type, opts);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameColumn", tableName, oldName, newName);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addIndex(
-    tableName: string,
-    columns: string | string[],
-    options: AddIndexOptions = {},
+    ...args: [tableName: string, columns: string | string[], options?: AddIndexOptions]
   ): Promise<void> {
-    await this.methodMissing("addIndex", tableName, columns, options);
+    await this.methodMissing("addIndex", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeIndex(
-    tableName: string,
-    columnOrOptions:
-      | string
-      | string[]
-      | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
-    options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
+    ...args: [
+      tableName: string,
+      columnOrOptions?:
+        | string
+        | string[]
+        | { column?: string | string[]; name?: string; ifExists?: boolean },
+      options?: { column?: string | string[]; name?: string; ifExists?: boolean },
+    ]
   ): Promise<void> {
-    await this.methodMissing("removeIndex", tableName, columnOrOptions, options);
+    await this.methodMissing("removeIndex", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async changeColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions = {},
+    ...args: [tableName: string, columnName: string, type: ColumnType, options?: ColumnOptions]
   ): Promise<void> {
-    await this.methodMissing("changeColumn", tableName, columnName, type, options);
+    await this.methodMissing("changeColumn", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async renameTable(oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameTable", oldName, newName);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async tableExists(tableName: string): Promise<boolean | null> {
     return (await this.methodMissing("tableExists", tableName)) as boolean | null;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async columnExists(
     tableName: string,
     columnName: string,
@@ -471,7 +472,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("columnExists", tableName, columnName)) as boolean;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
@@ -480,7 +481,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeColumnDefault", tableName, columnName, defaultOrChanges);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async changeColumnNull(
     tableName: string,
     columnName: string,
@@ -494,62 +495,60 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addReference(
-    tableName: string,
-    refName: string,
-    options: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean;
-      type?: ColumnType;
-      index?: boolean;
-    } = {},
+    ...args: [
+      tableName: string,
+      refName: string,
+      options?: ColumnOptions & {
+        polymorphic?: boolean;
+        foreignKey?: boolean;
+        type?: ColumnType;
+        index?: boolean;
+      },
+    ]
   ): Promise<void> {
-    await this.methodMissing("addReference", tableName, refName, options);
+    await this.methodMissing("addReference", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addBelongsTo(
-    tableName: string,
-    refName: string,
-    options: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean;
-      type?: ColumnType;
-      index?: boolean;
-    } = {},
+    ...args: [
+      tableName: string,
+      refName: string,
+      options?: ColumnOptions & {
+        polymorphic?: boolean;
+        foreignKey?: boolean;
+        type?: ColumnType;
+        index?: boolean;
+      },
+    ]
   ): Promise<void> {
-    await this.methodMissing("addBelongsTo", tableName, refName, options);
+    await this.methodMissing("addBelongsTo", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeReference(
-    tableName: string,
-    refName: string,
-    options: { polymorphic?: boolean } = {},
+    ...args: [tableName: string, refName: string, options?: { polymorphic?: boolean }]
   ): Promise<void> {
-    await this.methodMissing("removeReference", tableName, refName, options);
+    await this.methodMissing("removeReference", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeBelongsTo(
-    tableName: string,
-    refName: string,
-    options: { polymorphic?: boolean } = {},
+    ...args: [tableName: string, refName: string, options?: { polymorphic?: boolean }]
   ): Promise<void> {
-    await this.methodMissing("removeBelongsTo", tableName, refName, options);
+    await this.methodMissing("removeBelongsTo", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
+    ...args: [fromTable: string, toTable: string, options?: AddForeignKeyOptions]
   ): Promise<void> {
-    await this.methodMissing("addForeignKey", fromTable, toTable, options);
+    await this.methodMissing("addForeignKey", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeForeignKey(
     fromTable: string,
     toTableOrOptions?:
@@ -566,21 +565,23 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addCheckConstraint(
-    tableName: string,
-    expression: string,
-    options: {
-      name?: string;
-      validate?: boolean;
-      ifNotExists?: boolean;
-      [key: string]: unknown;
-    } = {},
+    ...args: [
+      tableName: string,
+      expression: string,
+      options?: {
+        name?: string;
+        validate?: boolean;
+        ifNotExists?: boolean;
+        [key: string]: unknown;
+      },
+    ]
   ): Promise<void> {
-    await this.methodMissing("addCheckConstraint", tableName, expression, options);
+    await this.methodMissing("addCheckConstraint", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
@@ -595,7 +596,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
@@ -603,7 +604,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("validateCheckConstraint", tableName, nameOrOptions);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async validateForeignKey(
     fromTable: string,
     toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
@@ -620,7 +621,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async changeColumnComment(
     tableName: string,
     columnName: string,
@@ -629,12 +630,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeColumnComment", tableName, columnName, commentOrChanges);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     await this.methodMissing("changeTableComment", tableName, commentOrChanges);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
     if (options !== undefined) {
       await this.methodMissing("enableExtension", name, options);
@@ -643,7 +644,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
     if (options !== undefined) {
       await this.methodMissing("disableExtension", name, options);
@@ -652,7 +653,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async createEnum(
     name: string,
     values: string[],
@@ -665,7 +666,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async dropEnum(
     name: string,
     valuesOrOptions?: string[] | { ifExists?: boolean },
@@ -686,12 +687,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
     await this.methodMissing("renameEnumValue", name, options);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addUniqueConstraint(
     tableName: string,
     columnName?: string | string[],
@@ -706,7 +707,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeUniqueConstraint(
     tableName: string,
     columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
@@ -727,12 +728,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    await this.methodMissing("addTimestamps", tableName, options);
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
+  async addTimestamps(...args: [tableName: string, options?: ColumnOptions]): Promise<void> {
+    await this.methodMissing("addTimestamps", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeTimestamps(tableName: string): Promise<void> {
     await this.methodMissing("removeTimestamps", tableName);
   }
@@ -742,15 +743,17 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
    * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      table1: string,
+      table2: string,
+      options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
-    await this.methodMissing("createJoinTable", table1, table2, options, fn);
+    await this.methodMissing("createJoinTable", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async dropJoinTable(
     table1: string,
     table2: string,
@@ -768,19 +771,21 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
    * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async changeTable(
-    tableName: string,
-    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<A>) => void | Promise<void>,
+    ...args: [
+      tableName: string,
+      options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+      fn?: (t: TableOf<A>) => void | Promise<void>,
+    ]
   ): Promise<void> {
-    await this.methodMissing("changeTable", tableName, options, fn);
+    await this.methodMissing("changeTable", ...args);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameIndex", tableName, oldName, newName);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   indexName(
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
@@ -788,7 +793,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return this.connection.indexName(this._pt(tableName), options);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
   async removeColumns(
     tableName: string,
@@ -801,7 +806,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("removeColumns", tableName, ...columnsOrOptions);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async addColumns(
     tableName: string,
     ...args: [...string[], { type: ColumnType } & ColumnOptions]
@@ -813,7 +818,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addColumns", tableName, ...columnsAndOptions);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
     return (await this.methodMissing(
       "columns",
@@ -821,27 +826,27 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     )) as import("./connection-adapters/column.js").Column[];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     return (await this.methodMissing("indexes", tableName)) as IndexDefinition[];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     return (await this.methodMissing("primaryKey", tableName)) as string | string[] | null;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     return (await this.methodMissing("foreignKeys", tableName)) as ForeignKeyDefinition[];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async tables(): Promise<string[]> {
     return (await this.methodMissing("tables")) as string[];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async views(): Promise<string[]> {
     return (await this.methodMissing("views")) as string[];
   }
@@ -924,12 +929,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return isCommandRecorder(connection) && connection.reverting;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async viewExists(viewName: string): Promise<boolean | null> {
     return (await this.methodMissing("viewExists", viewName)) as boolean;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration */
   async indexExists(
     tableName: string,
     columnName: string | string[],

@@ -33,11 +33,6 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
   encryptor?: Encryptor;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
-export function isEncryptedAttribute(klass: any, attr: string): boolean {
-  return (klass.encryptedAttributes as Set<string> | undefined)?.has(attr) ?? false;
-}
-
 export function eagerLoadBang(): void {}
 
 export function config(): Config {

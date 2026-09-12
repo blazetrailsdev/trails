@@ -46,7 +46,6 @@ import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,
 } from "../test-helpers/models/book-encrypted.js";
-import { isEncryptedAttribute } from "../encryption.js";
 import { RecordInvalid } from "../index.js";
 
 await freshAdapter();
@@ -380,9 +379,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Post = makeEncryptedPost();
     new Post();
-    expect(isEncryptedAttribute(Post, "title")).toBe(true);
-    expect(isEncryptedAttribute(Post, "body")).toBe(true);
-    expect(isEncryptedAttribute(Post, "id")).toBe(false);
+    expect(Post.encryptedAttributes?.has("title") ?? false).toBe(true);
+    expect(Post.encryptedAttributes?.has("body") ?? false).toBe(true);
+    expect(Post.encryptedAttributes?.has("id") ?? false).toBe(false);
   });
 
   it("encrypts serialized attributes", async () => {
