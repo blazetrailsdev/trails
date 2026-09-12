@@ -424,8 +424,11 @@ class ApiExtractor
     # sorted by path, so `encryption/configurable.rb:16`'s loop over
     # `Context::PROPERTIES` (declared at `encryption/context.rb:13`) sees an
     # empty member list — "configurable" sorts before "context". Replayed by
-    # resolve_pending_const_loops! once every file has been seen.
+    # resolve_pending_const_loops! once every file has been seen. >0 while
+    # that pass is running, so a loop whose constant is STILL unresolvable is
+    # dropped rather than parked again for nobody to replay.
     @pending_const_loops = []
+    @replaying_const_loops = false
   end
 
   # Options-hash reads where only the FIRST symbol arg is the key
@@ -1947,7 +1950,7 @@ class ApiExtractor
   # Park a `CONST.each` codegen loop whose constant is still unknown, together
   # with enough walker state to replay it verbatim later.
   def defer_const_loop(node)
-    return if @scanning_umbrella
+    return if @scanning_umbrella || @replaying_const_loops
     @pending_const_loops << {
       node: node,
       file: @current_file,
@@ -1965,6 +1968,7 @@ class ApiExtractor
   public def resolve_pending_const_loops!
     pending = @pending_const_loops
     @pending_const_loops = []
+    @replaying_const_loops = true
     saved = [@current_file, @current_line, @namespace_stack, @visibility_stack,
              @in_sclass, @module_function_stack]
     pending.each do |entry|
@@ -1978,6 +1982,8 @@ class ApiExtractor
     end
     @current_file, @current_line, @namespace_stack, @visibility_stack,
       @in_sclass, @module_function_stack = saved
+  ensure
+    @replaying_const_loops = false
   end
 
   def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil, body: nil, params_node: nil)

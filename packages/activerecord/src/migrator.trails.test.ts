@@ -597,7 +597,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
 
   it("announces the identity the proxy constructed the migration with", async () => {
     class SomeOtherClassName extends Migration {
-      override async change(): Promise<void> {}
+      async change(): Promise<void> {}
     }
     const migrator = new Migrator(
       "up",
@@ -622,7 +622,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
       override announce(message: string): void {
         this.write(`!! ${message} !!`);
       }
-      override async change(): Promise<void> {}
+      async change(): Promise<void> {}
     }
     const migrator = new Migrator(
       "up",

@@ -9,14 +9,8 @@ import { headerString } from "./encoding-helpers.js";
 import type { Message } from "./message.js";
 
 export class EnvelopeEncryptionKeyProvider {
-  private _primaryKeyProviderOverride?: KeyProvider;
-  private _primaryKeyProviderCache?: KeyProvider;
+  private _primaryKeyProvider?: KeyProvider;
   private _activePrimaryKey?: Key;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
-  constructor(primaryKeyProvider?: KeyProvider) {
-    this._primaryKeyProviderOverride = primaryKeyProvider;
-  }
 
   encryptionKey(): Key {
     const randomSecret = this.generateRandomSecret();
@@ -63,11 +57,10 @@ export class EnvelopeEncryptionKeyProvider {
 
   /** @internal */
   private primaryKeyProvider(): KeyProvider {
-    if (this._primaryKeyProviderOverride) return this._primaryKeyProviderOverride;
-    this._primaryKeyProviderCache ??= new DerivedSecretKeyProvider(
+    this._primaryKeyProvider ??= new DerivedSecretKeyProvider(
       Configurable.config.primaryKey as string,
     );
-    return this._primaryKeyProviderCache;
+    return this._primaryKeyProvider;
   }
 
   /** @internal */

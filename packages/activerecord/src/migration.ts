@@ -270,6 +270,12 @@ function isCommandRecorder(connection: unknown): connection is CommandRecorder {
   return connection instanceof CommandRecorder;
 }
 
+type ChangeMigration = { change(): Promise<void> };
+
+function respondToChange<T extends object>(migration: T): migration is T & ChangeMigration {
+  return typeof (migration as Partial<ChangeMigration>).change === "function";
+}
+
 export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   /** @internal */
   protected _connectionOverride?: DatabaseAdapter | CommandRecorder;
@@ -314,13 +320,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   async up(): Promise<void> {
     const legacy = this._legacyClassDirection("up");
     if (legacy) return legacy();
-    await this.change();
+    if (respondToChange(this)) await this.change();
   }
 
   async down(): Promise<void> {
     const legacy = this._legacyClassDirection("down");
     if (legacy) return legacy();
-    await this.revert(() => this.change());
+    if (respondToChange(this)) await this.revert(() => this.change());
   }
 
   private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
@@ -339,9 +345,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       }
     };
   }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-migration-area-moved-residue */
-  async change(): Promise<void> {}
 
   /** @internal */
   protected _pt(name: string): string {
@@ -1074,7 +1077,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
     this._connectionOverride = conn;
     try {
-      if (direction === "up") {
+      if (respondToChange(this)) {
+        if (direction === "down") {
+          await this.revert(() => this.change());
+        } else {
+          await this.change();
+        }
+      } else if (direction === "up") {
         await this.up();
       } else {
         await this.down();

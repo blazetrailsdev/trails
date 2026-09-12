@@ -63,12 +63,8 @@ export class Properties {
     }
   }
 
-  toH(): Record<string, unknown> {
-    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    for (const [key, value] of this.data) {
-      result[key] = value;
-    }
-    return result;
+  toH(): Map<string, unknown> {
+    return this.data;
   }
 
   validateValueType(value: unknown): void {

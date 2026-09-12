@@ -13,8 +13,6 @@ import {
 } from "./encoding-helpers.js";
 
 export class EncryptedAttributeType extends ValueType {
-  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
-  readonly name = "encrypted";
   readonly scheme: Scheme;
   readonly castType: ValueType;
   private _previousType: boolean;

@@ -3423,3 +3423,176 @@ describe(
     });
   },
 );
+
+describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Walks `fixtures` in the order given, then runs the deferred-loop pass,
+  // and returns "<fqn>" -> { members, file, pending } for every recorded
+  // module and class. `pending` is the count of loops still parked, so a
+  // fixture can assert that an unresolvable loop leaves nothing behind.
+  function rubyEntities(
+    order: string[],
+    fixtures: Record<string, string>,
+  ): Record<string, { members: string[]; file: string }> & { __pending?: number } {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "order-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(JSON.stringify(order))}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        ex.resolve_pending_const_loops!
+        out = {}
+        [ex.modules, ex.classes].each do |store|
+          store.each do |fqn, info|
+            out[fqn] = {
+              members: (info[:instanceMethods] + info[:classMethods]).map { |m| m[:name] },
+              file: info[:file],
+            }
+          end
+        end
+        out["__pending"] = ex.instance_variable_get(:@pending_const_loops).length
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // encryption/configurable.rb:16-18 loops over `Context::PROPERTIES`, which
+  // encryption/context.rb:13 declares — and "configurable" sorts BEFORE
+  // "context", so the single-pass walk sees an empty member list. The
+  // generated readers must be credited whichever order the files arrive in.
+  const CONTEXT = `
+      module ActiveRecord
+        module Encryption
+          class Context
+            PROPERTIES = %i[ key_provider cipher ]
+          end
+        end
+      end
+    `;
+  const CONFIGURABLE = `
+      module ActiveRecord
+        module Encryption
+          module Configurable
+            extend ActiveSupport::Concern
+            class_methods do
+              Context::PROPERTIES.each do |name|
+                delegate name, to: :context
+              end
+            end
+          end
+        end
+      end
+    `;
+
+  it("credits a CONST.each delegate loop when the constant's file is walked first", () => {
+    const out = rubyEntities(["context.rb", "configurable.rb"], {
+      "context.rb": CONTEXT,
+      "configurable.rb": CONFIGURABLE,
+    });
+    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([
+      "key_provider",
+      "cipher",
+    ]);
+  });
+
+  it("credits a CONST.each delegate loop when the constant's file is walked last", () => {
+    const out = rubyEntities(["configurable.rb", "context.rb"], {
+      "context.rb": CONTEXT,
+      "configurable.rb": CONFIGURABLE,
+    });
+    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([
+      "key_provider",
+      "cipher",
+    ]);
+  });
+
+  // A loop over a constant no file declares must not be credited, and must
+  // not leave a parked entry behind for a later pass to replay.
+  it("credits nothing and parks nothing for a CONST.each over an unknown constant", () => {
+    const out = rubyEntities(["configurable.rb"], { "configurable.rb": CONFIGURABLE });
+    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([]);
+    expect(out["__pending"]).toBe(0);
+  });
+
+  // An empty constant is resolvable but unrollable; same contract.
+  it("credits nothing and parks nothing for a CONST.each over an empty constant", () => {
+    const out = rubyEntities(["configurable.rb", "context.rb"], {
+      "context.rb": CONTEXT.replace("%i[ key_provider cipher ]", "[]"),
+      "configurable.rb": CONFIGURABLE,
+    });
+    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([]);
+    expect(out["__pending"]).toBe(0);
+  });
+
+  // encryption.rb:39 reopens `class Cipher` purely to hang a nested autoload
+  // off it, and "encryption.rb" sorts before "encryption/cipher.rb". The
+  // entity belongs to the file its first METHOD is defined in, so that a
+  // faithfully-placed TS member is not scored as a `moved` extra.
+  it("attributes a reopened class to the file its first method is defined in", () => {
+    const out = rubyEntities(["encryption.rb", "encryption/cipher.rb"], {
+      "encryption.rb": `
+          module ActiveRecord
+            module Encryption
+              class Cipher
+                extend ActiveSupport::Autoload
+                eager_autoload do
+                  autoload :Aes256Gcm
+                end
+              end
+            end
+          end
+        `,
+      "encryption/cipher.rb": `
+          module ActiveRecord
+            module Encryption
+              class Cipher
+                def encrypt(clean_text, key:, deterministic: false)
+                end
+              end
+            end
+          end
+        `,
+    });
+    expect(out["ActiveRecord::Encryption::Cipher"].file).toBe("encryption/cipher.rb");
+    expect(out["ActiveRecord::Encryption::Cipher"].members).toEqual(["encrypt"]);
+  });
+
+  // The rule is first-method-wins, not last-file-wins: a class reopened AFTER
+  // its real definition keeps the file it already earned.
+  it("keeps a class's file when a later file reopens it without methods", () => {
+    const out = rubyEntities(["encryption/cipher.rb", "zz-reopen.rb"], {
+      "encryption/cipher.rb": `
+          module ActiveRecord
+            module Encryption
+              class Cipher
+                def encrypt(clean_text)
+                end
+              end
+            end
+          end
+        `,
+      "zz-reopen.rb": `
+          module ActiveRecord
+            module Encryption
+              class Cipher
+                EXTRA = 1
+              end
+            end
+          end
+        `,
+    });
+    expect(out["ActiveRecord::Encryption::Cipher"].file).toBe("encryption/cipher.rb");
+  });
+});

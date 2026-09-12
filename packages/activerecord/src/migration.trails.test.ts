@@ -23,7 +23,7 @@ describe("MigrationTest", () => {
     class ChangeOnly extends Migration {
       directions: string[] = [];
       override write(): void {}
-      override async change(): Promise<void> {
+      async change(): Promise<void> {
         this.directions.push(this.isReverting() ? "down" : "up");
       }
     }
