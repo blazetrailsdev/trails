@@ -1283,9 +1283,8 @@ export function select(
       { prepare: options?.prepare },
     );
     if (this.supportsConcurrentConnections?.() && !this.currentTransaction().joinable) {
-      return Promise.resolve(
-        futureResult.scheduleBang(baseClass().asynchronousQueriesSession()),
-      ).then(() => futureResult);
+      futureResult.scheduleBang(baseClass().asynchronousQueriesSession());
+      return futureResult;
     } else {
       return futureResult.executeBang(this as FutureResultConnection).then(() => futureResult);
     }

@@ -39,13 +39,6 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.pass` (`vendor/ruby/thread.c:1904`).
-   */
-  static pass(): Promise<null> {
-    return new Promise((resolve) => setTimeout(() => resolve(null), 0));
-  }
-
-  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread` object identity (`vendor/ruby/thread.c:3473`).
    */
   readonly id: number;

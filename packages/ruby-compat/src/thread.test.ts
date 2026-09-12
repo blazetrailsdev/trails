@@ -11,7 +11,7 @@ describe("Thread", () => {
   it("runs its block as the current thread and keeps it across awaits", async () => {
     let inside: Thread | undefined;
     const thread = new Thread(async () => {
-      await Thread.pass();
+      await Promise.resolve();
       inside = Thread.current();
       return 42;
     });
