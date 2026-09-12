@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { nodePaths } from "../test-helpers/join-dependency-paths.js";
 import { Nodes } from "@blazetrails/arel";
 import type { AssociationSpec } from "../relation/query-methods.js";
 
@@ -46,11 +47,7 @@ describe("JoinDependency#build", () => {
     Comment.hasMany("tags", { className: "Tag" });
   });
 
-  const paths = (jd: JoinDependency) =>
-    jd.joinRoot
-      .drop(1)
-      .map((n) => n.assocName)
-      .sort();
+  const paths = (jd: JoinDependency) => nodePaths(jd).sort();
 
   const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
     new JoinDependency(Post, null, spec, Nodes.OuterJoin);

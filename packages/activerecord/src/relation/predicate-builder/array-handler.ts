@@ -1,7 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 import type { PredicateBuilder } from "../predicate-builder.js";
 
-import { isBaseInstance } from "./is-base-instance.js";
+import { _Base } from "../../base-slot.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 export class NullPredicate {}
@@ -27,8 +27,8 @@ export class ArrayHandler {
         hasNull = true;
       } else if (item instanceof Range) {
         ranges.push(item);
-      } else if (isBaseInstance(item)) {
-        values.push(item.id);
+      } else if (item instanceof _Base!) {
+        values.push((item as { id: unknown }).id);
       } else {
         values.push(item);
       }

@@ -3,6 +3,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
+import { nodeAt, nodePaths } from "../test-helpers/join-dependency-paths.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import "../associations/collection-proxy.js";
@@ -31,8 +32,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       "chapters",
       Nodes.OuterJoin,
     );
-    const nodes = jd.joinRoot.drop(1);
-    expect(nodes.map((n) => n.assocName)).toEqual(["chapters"]);
+    expect(nodePaths(jd)).toEqual(["chapters"]);
   });
 
   it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
@@ -43,7 +43,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       Nodes.OuterJoin,
     );
     const joins = jd.joinConstraints([]);
-    const node = jd.joinRoot.drop(1).find((n) => n.assocName === "order");
+    const node = nodeAt(jd, "order");
     expect(node).not.toBeNull();
     const outerJoin = joins[0] as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
@@ -104,8 +104,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       { chapters: "book" },
       Nodes.OuterJoin,
     );
-    const nodes = jd.joinRoot.drop(1);
-    expect(nodes.map((n) => n.assocName)).toEqual(["chapters", "chapters.book"]);
+    expect(nodePaths(jd)).toEqual(["chapters", "chapters.book"]);
 
     const titles = await CpkBook.eagerLoad({ ":chapters": ":book" })
       .order("cpk_books.author_id", "cpk_books.id")

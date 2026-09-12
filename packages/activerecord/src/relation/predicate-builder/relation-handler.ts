@@ -4,7 +4,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 
 import { rubyInspectArray } from "../ruby-inspect.js";
-import { DeferredDistinctPkIn } from "./deferred-distinct-pk-in.js";
+import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
 
 export class RelationHandler {
   /** @missingRailsCall empty? — PERMANENT */
@@ -34,7 +34,9 @@ export class RelationHandler {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
-    return new DeferredDistinctPkIn(attribute, inlineSubquery, value);
+    return new DeferredIdsIn(attribute, inlineSubquery, [
+      { ids: () => value._materializeDistinctPkIds() },
+    ]);
   }
 
   private applyJoinDependency(value: any): any {

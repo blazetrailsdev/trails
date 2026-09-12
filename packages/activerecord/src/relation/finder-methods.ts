@@ -11,7 +11,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqTuples } from "./compact-uniq-ids.js";
-import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
+import { _Base } from "../base-slot.js";
 import { rubyInspectArray } from "./ruby-inspect.js";
 
 const ONE_AS_ONE = "1 AS one";
@@ -283,7 +283,7 @@ export async function exists(
   conditions?: Record<string, unknown> | unknown,
 ): Promise<boolean> {
   if (this.isNullRelation()) return false;
-  if (isBaseInstance(conditions)) {
+  if (conditions instanceof _Base!) {
     throw new ArgumentError(
       "You are passing an instance of ActiveRecord::Base to `exists?`. " +
         "Please pass the id of the object by calling `.id`.",
@@ -524,7 +524,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
 
 /** @internal */
 export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
-  if (isBaseInstance(id)) {
+  if (id instanceof _Base!) {
     throw new ArgumentError(
       "You are passing an instance of ActiveRecord::Base to `find`. " +
         "Please pass the id of the object by calling `.id`.",

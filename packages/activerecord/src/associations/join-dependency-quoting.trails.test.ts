@@ -6,16 +6,13 @@ import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes, Table } from "@blazetrails/arel";
+import { nodeAt, nodePaths, sqlNameOf } from "../test-helpers/join-dependency-paths.js";
 import "../test-helpers/models/company.js";
-
-function nodeAt(jd: JoinDependency, path: string): JoinPart {
-  return jd.joinRoot.drop(1).find((n) => n.assocName === path)!;
-}
 
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
   return joins.find((join) => {
     const rel = join.left as Table | Nodes.TableAlias;
-    return String(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
+    return String(rel.tableAlias ?? rel.name) === sqlNameOf(node);
   })!;
 }
 
@@ -185,8 +182,7 @@ describe("JoinDependency Arel node construction", () => {
 
     expect(jd.joinRoot.baseKlass).toBe(Owner);
     expect(jd.joinRoot.children).toHaveLength(1);
-    expect(jd.joinRoot.children[0].tableIndex).toBeGreaterThanOrEqual(0);
-    expect(jd.joinRoot.children[0].immediateAssocName).toBe("assets");
+    expect(nodePaths(jd)).toEqual(["assets"]);
     expect(jd.joinRoot.children[0].baseKlass).toBe(Asset);
   });
 
@@ -208,10 +204,10 @@ describe("JoinDependency Arel node construction", () => {
 
     expect(jd.joinRoot.children).toHaveLength(1);
     const assetsNode = jd.joinRoot.children[0];
-    expect(assetsNode.immediateAssocName).toBe("assets");
+    expect(assetsNode).toBe(nodeAt(jd, "assets"));
     expect(assetsNode.children).toHaveLength(1);
     const commentsNode = assetsNode.children[0];
-    expect(commentsNode.immediateAssocName).toBe("comments");
+    expect(commentsNode).toBe(nodeAt(jd, "assets.comments"));
     expect(commentsNode.baseKlass).toBe(Comment);
   });
 
@@ -221,7 +217,7 @@ describe("JoinDependency Arel node construction", () => {
 
     const jd = new JoinDependency(Asset, null, { owner: "assets" }, Nodes.OuterJoin);
     const node1 = nodeAt(jd, "owner");
-    expect(node1.effectiveSqlName).toBe("owners");
+    expect(sqlNameOf(node1)).toBe("owners");
 
     const node2 = nodeAt(jd, "owner.assets");
 
@@ -229,7 +225,7 @@ describe("JoinDependency Arel node construction", () => {
 
     const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
     expect((table1 as any).tableAlias).toBeNull();
-    expect(node2.effectiveSqlName).toBe("assets_owners");
+    expect(sqlNameOf(node2)).toBe("assets_owners");
     const table2 = (joinFor(joins, node2) as Nodes.OuterJoin).left;
     expect((table2 as any).tableAlias).toBe("assets_owners");
   });
@@ -253,7 +249,6 @@ describe("JoinDependency Arel node construction", () => {
     const child = jd.joinRoot.children[0];
     expect(child).toBeInstanceOf(JoinAssociation);
     expect((child as JoinAssociation).reflection).toBeDefined();
-    expect(child.tableIndex).toBeGreaterThanOrEqual(0);
-    expect(child.immediateAssocName).toBe("assets");
+    expect(child).toBe(nodeAt(jd, "assets"));
   });
 });
