@@ -62,10 +62,6 @@ export class Column implements Deduplicable {
     return this.default != null || this.defaultFunction !== null;
   }
 
-  get isNullable(): boolean {
-    return this.null;
-  }
-
   isBigint(): boolean {
     return this.sqlType != null && /^bigint\b/i.test(this.sqlType);
   }
@@ -150,6 +146,7 @@ export class Column implements Deduplicable {
     return Object.freeze(this);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   toString(): string {
     return this.name;
   }

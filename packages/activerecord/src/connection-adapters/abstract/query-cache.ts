@@ -153,6 +153,7 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
 }
 
 export class ConnectionPoolConfiguration {
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   declare dbConfig: { queryCache?: unknown };
   declare _threadQueryCaches: QueryCacheRegistry;
   declare _queryCacheMaxSize: number | null;

@@ -1265,9 +1265,6 @@ export class Table {
   async virtual(...args: unknown[]): Promise<void> {
     await this.definedColumn("virtual" as ColumnType, args);
   }
-  async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, type, { ...options, array: true });
-  }
   async remove(...columnNames: string[]): Promise<void>;
   async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
   async remove(...args: unknown[]): Promise<void> {

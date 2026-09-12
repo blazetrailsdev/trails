@@ -362,6 +362,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   _previousReadUncommitted: unknown = null;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecute(
     sql: string,
     name: string = "SQL",
@@ -454,6 +455,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   async close(): Promise<void> {
     if (this._closingDriver) {
       const closing = this._closingDriver;
@@ -469,14 +471,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._closingDriver ?? Promise.resolve();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   get isOpen(): boolean {
     return this._rawConnection?.isOpen() ?? false;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   get raw(): unknown {
     return this._rawConnection?.raw;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
     const castType = this.lookupCastType(raw);
@@ -1074,6 +1079,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async tables(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -1084,6 +1090,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows.map((r) => r.name);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async views(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -1109,6 +1116,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async tableExists(name: string): Promise<boolean> {
     if (name == null) return false;
     const rows = (

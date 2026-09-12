@@ -303,6 +303,7 @@ export class ConnectionPool implements ReapablePool {
     return `#<ConnectionPool ${parts.join(" ")}>`;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   toString(): string {
     return this.inspect();
   }
@@ -935,10 +936,14 @@ export interface ConnectionPool extends Omit<
   Included<ConnectionPoolConfiguration>,
   "_pinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
 > {
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   readonly queryCache: Store;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   readonly queryCacheEnabled: boolean;
   readonly dirtiesQueryCache: boolean;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
 }
 include(ConnectionPool, ConnectionPoolConfiguration);

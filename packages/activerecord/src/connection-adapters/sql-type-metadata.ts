@@ -40,6 +40,7 @@ export class SqlTypeMetadata implements Deduplicable {
     return JSON.stringify(this.toJSON());
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   toJSON(): SqlTypeMetadataJSON {
     return {
       sqlType: this.sqlType,
@@ -63,6 +64,7 @@ export class SqlTypeMetadata implements Deduplicable {
     });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   toString(): string {
     return this.sqlType ?? "";
   }

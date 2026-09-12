@@ -56,7 +56,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     beforeEach(async () => {
       const connection = await leaseMysqlAdapter();
-      await connection.clearCache();
+      await connection.clearCacheBang();
       await connection.createTable("samples", { force: true }, (t) => {
         t.integer("value");
       });

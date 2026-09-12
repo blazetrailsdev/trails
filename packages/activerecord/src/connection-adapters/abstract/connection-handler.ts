@@ -297,11 +297,6 @@ export class ConnectionHandler {
     return pool;
   }
 
-  /** @deprecated */
-  removeConnection(owner: string, options?: { role?: string; shard?: string }): void {
-    this.removeConnectionPool(owner, options);
-  }
-
   /**
    * @deprecated
    * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
@@ -343,7 +338,7 @@ export class ConnectionHandler {
   ): HashConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
-      void poolConfig.disconnect();
+      void poolConfig.disconnectBang();
       return poolConfig.dbConfig;
     }
     return undefined;

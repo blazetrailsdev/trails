@@ -51,6 +51,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
     "[]": ["get"],
     "[]=": ["set"],
   },
+  // connection_pool.rb:179 LeaseRegistry `def [](context)` → connection-pool.ts
+  // `LeaseRegistry#get`.
+  "ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry": { "[]": ["get"] },
+  // abstract/query_cache.rb:58 Store `def [](key)` → abstract/query-cache.ts `Store#get`.
+  "ActiveRecord::ConnectionAdapters::QueryCache::Store": { "[]": ["get"] },
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47).
   "ActionView::Template::SimpleType": { "==": ["equals"] },

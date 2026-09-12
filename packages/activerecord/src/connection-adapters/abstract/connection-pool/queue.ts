@@ -139,6 +139,7 @@ export class Queue {
     this._cond = new ConditionVariable();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   get length(): number {
     return this._queue.length;
   }

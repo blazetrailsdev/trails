@@ -714,6 +714,7 @@ export interface AbstractAdapter {
   rollbackToSavepoint(name: string): Promise<void>;
   currentSavepointName(): string | null;
   changeTableComment?(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   currentDatabase?(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
@@ -1379,14 +1380,6 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   reconnect(): void | Promise<void> {}
-
-  disconnect(): void | Promise<void> {
-    return this.disconnectBang();
-  }
-
-  clearCache(): void | Promise<void> {
-    return this.clearCacheBang();
-  }
 
   get transactionManager(): TransactionManager {
     return this._transactionManager;

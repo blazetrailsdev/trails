@@ -438,6 +438,7 @@ export class SchemaCache {
     this._indexes = deepDeduplicate(this._indexes);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   clear(): void {
     this._columns.clear();
     this._columnsHash.clear();
@@ -489,6 +490,7 @@ export class SchemaCache {
 export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   static lazilyLoadSchemaCache = false;
 
   /** @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip */

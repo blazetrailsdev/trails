@@ -16,8 +16,6 @@ const registry =
     : null;
 
 export class PoolConfig {
-  synchronize = synchronize;
-
   readonly role: string;
   readonly shard: string;
   readonly dbConfig: HashConfig;
@@ -82,7 +80,7 @@ export class PoolConfig {
     return (
       this._serverVersion ??
       connection.lock.synchronize(() =>
-        this.synchronize(async () => {
+        synchronize.call(this, async () => {
           this._serverVersion ??= await connection.getDatabaseVersion?.();
           return this._serverVersion;
         }),
@@ -111,18 +109,12 @@ export class PoolConfig {
   }: { automaticReconnect?: boolean } = {}): Promise<void> {
     if (!this._pool) return;
 
-    await this.synchronize(async () => {
+    await synchronize.call(this, async () => {
       if (!this._pool) return;
 
       this._pool.automaticReconnect = automaticReconnect;
       await this._pool.disconnectBang();
     });
-  }
-
-  async disconnect(): Promise<void> {
-    if (this._pool) {
-      await this._pool.disconnect();
-    }
   }
 
   private _discardPoolBangSync(): Array<Promise<void>> {
@@ -136,11 +128,11 @@ export class PoolConfig {
   async discardPoolBang(): Promise<void> {
     if (!this._pool) return;
 
-    const drains = await this.synchronize(() => {
+    const drains = (await synchronize.call(this, () => {
       if (!this._pool) return [];
 
       return this._discardPoolBangSync();
-    });
+    })) as Array<Promise<void>>;
     await Promise.all(drains);
   }
 
@@ -153,7 +145,7 @@ export class PoolConfig {
         INSTANCES.delete(ref);
         continue;
       }
-      await config.synchronize(() => {
+      await synchronize.call(config, () => {
         drains.push(...config._discardPoolBangSync());
       });
     }
@@ -174,6 +166,7 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   get schemaCache(): SchemaCache | null {
     return this.schemaReflection.loadedCache;
   }
@@ -187,10 +180,6 @@ export class PoolConfig {
     return this.dbConfig.name;
   }
 
-  get adapter(): string | undefined {
-    return this.dbConfig.adapter;
-  }
-
   get connectionDescriptor(): ConnectionDescriptor {
     return this._connectionDescriptor;
   }
@@ -201,10 +190,6 @@ export class PoolConfig {
     } else {
       this._connectionDescriptor = new ConnectionDescriptor(value.name, value.primaryClassQ());
     }
-  }
-
-  discard(): void {
-    this.schemaCache = null;
   }
 }
 

@@ -161,6 +161,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   private _database: string | undefined;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   static async databaseExists(
     config: string | (mysql.PoolOptions & MysqlAdapterOptions),
   ): Promise<boolean> {
@@ -283,6 +284,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecQuery(
     sql: string,
     name: string | null = "SQL",
@@ -454,6 +456,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return true;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
@@ -491,6 +494,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async explain(
     sql: string,
     binds: unknown[] = [],
@@ -504,12 +508,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return printer.pp(result, elapsed);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
     const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
     dumper.connection = this;
     return dumper;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async tables(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -522,6 +528,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async views(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -534,6 +541,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async tableExists(name: string): Promise<boolean> {
     if (!name) return false;
     const { schema, table } = mysqlParseName(name);
@@ -551,6 +559,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return rows.length > 0;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = mysqlParseName(tableName);
     const rows = (
@@ -568,10 +577,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (names.length === 0) return null;
     if (names.length === 1) return names[0];
     return names;
-  }
-
-  supportsAdvisoryLocks(): boolean {
-    return true;
   }
 
   /** @internal */
@@ -627,6 +632,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._rawConnection = null;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   async close(): Promise<void> {
     this._permanentlyClosed = true;
     this._connectGeneration++;
@@ -649,15 +655,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  override emptyInsertStatementValue(): string {
-    return "VALUES ()";
-  }
-
   /** @internal */
   _testOnlyPoolFlags(): string[] | undefined {
     return this._poolConfig.flags;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   get raw(): mysql.Connection {
     if (!this._rawConnection) {
       throw new Error(

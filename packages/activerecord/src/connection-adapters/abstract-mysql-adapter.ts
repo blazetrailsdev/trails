@@ -160,6 +160,7 @@ export interface AbstractMysqlAdapter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   async columns(tableName: string): Promise<Column[]> {
     const fields = await this.columnDefinitions(tableName);
     const columns: Column[] = [];
@@ -211,10 +212,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   override arelVisitor(): Visitors.ToSql {
     return new Visitors.MySQL(this);
-  }
-
-  override quoteTableNameForAssignment(table: string, attr: string): string {
-    return this.quoteTableName(`${table}.${attr}`);
   }
 
   /**
@@ -340,10 +337,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
     return mysqlReturningColumnValues.call(this, result);
-  }
-
-  supportsDdlTransactions(): boolean {
-    return false;
   }
 
   static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
@@ -1514,6 +1507,7 @@ export interface MysqlPreparedStatement {
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
   private _counter = 0;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   nextKey(): string {
     return `a${++this._counter}`;
   }
