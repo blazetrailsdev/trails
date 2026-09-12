@@ -471,16 +471,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._closingDriver ?? Promise.resolve();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  get isOpen(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  get raw(): unknown {
-    return this._rawConnection?.raw;
-  }
-
   /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";

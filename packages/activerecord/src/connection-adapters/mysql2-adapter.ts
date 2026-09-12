@@ -595,18 +595,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._poolConfig.flags;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  get raw(): mysql.Connection {
-    if (!this._rawConnection) {
-      throw new Error(
-        this._permanentlyClosed
-          ? "Mysql2Adapter: connection is permanently closed"
-          : "Mysql2Adapter: connection not yet established — call execute() or await active() first",
-      );
-    }
-    return this._rawConnection;
-  }
-
   /** @internal */
   override async configureConnection(): Promise<void> {
     this._databaseTimezone = _Base!.defaultTimezone;

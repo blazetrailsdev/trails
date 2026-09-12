@@ -1400,17 +1400,6 @@ export class PostgreSQLAdapter
     return this.openTransactions() > 0;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  get raw(): pg.Client {
-    if (this._rawConnection) return this._rawConnection;
-    if (this._closed || this._pgClientOptions == null) {
-      throw new Error("PostgreSQLAdapter: connection is closed");
-    }
-    throw new Error(
-      "PostgreSQLAdapter: connection has not been opened yet — run a query first to lazy-connect",
-    );
-  }
-
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     let sql = `INSERT ${insert.into()} ${await insert.valuesList()}`;
 
