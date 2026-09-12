@@ -25,6 +25,14 @@ export function isNoTouching(this: Base): boolean {
   return isAppliedTo(this.constructor as typeof Base);
 }
 
+export function touch(
+  this: Base,
+  args: unknown[],
+  superFn: () => Promise<boolean>,
+): Promise<boolean> | undefined {
+  return isNoTouching.call(this) ? undefined : superFn();
+}
+
 export function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
   klasses().push(klass);
 

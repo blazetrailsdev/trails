@@ -7,7 +7,6 @@ import {
   type TouchArgs,
 } from "./timestamp.js";
 import { Rational } from "@blazetrails/ruby-compat";
-import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
@@ -1004,8 +1003,6 @@ export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
 
 export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
-  if (isNoTouchingApplied(ctor)) return false;
-
   if (!this.isPersisted()) raiseRecordNotTouchedError();
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
@@ -1030,14 +1027,11 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
 
   const attributeNames = Array.from(new Set([...updateTimestampAttrs, ...resolvedNames]));
 
-  return withTransactionReturningStatus.call(this, async () => {
-    if (attributeNames.length > 0) {
-      const affectedRows = await (this as any)._touchRow(attributeNames, now);
-      (this as any)._triggerUpdateCallback = affectedRows === 1;
-    }
-    await runCallbacks(this, "touch");
-    return true;
-  }) as Promise<boolean>;
+  if (attributeNames.length > 0) {
+    const affectedRows = await (this as any)._touchRow(attributeNames, now);
+    (this as any)._triggerUpdateCallback = affectedRows === 1;
+  }
+  return true;
 }
 
 function raiseRecordNotTouchedError(): never {

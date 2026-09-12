@@ -265,6 +265,9 @@ import {
   rawTimestampToCacheVersion as _rawTimestampToCacheVersion,
 } from "./integration.js";
 import { noTouching as _noTouchingBlock, isNoTouching as _isNoTouching } from "./no-touching.js";
+import * as _NoTouching from "./no-touching.js";
+import * as _Transactions from "./transactions.js";
+import * as _Callbacks from "./callbacks.js";
 import { suppress as _suppressBlock, registry as _suppressorRegistry } from "./suppressor.js";
 import {
   inspect as _inspect,
@@ -2517,7 +2520,7 @@ export class Base extends Model {
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
-  declare touch: typeof TouchLater.touch;
+  declare touch: typeof _Persistence.touch;
   declare touchLater: typeof TouchLater.touchLater;
   declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
 
@@ -3400,6 +3403,20 @@ for (const [name, fn] of [
       return Timestamp._createRecord.call(this as any, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
+    },
+  ],
+  [
+    "touch",
+    function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
+      return _NoTouching.touch.call(this, args, () =>
+        TouchLater.touch.call(this, args as any, (laterArgs: unknown[]) =>
+          _Transactions.touch.call(this, laterArgs, () =>
+            _Callbacks.touch.call(this, laterArgs, () =>
+              _Persistence.touch.call(this, ...(laterArgs as any)),
+            ),
+          ),
+        ),
+      );
     },
   ],
   [

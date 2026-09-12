@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { _touchRow as dirtyTouchRow } from "./attribute-methods/dirty.js";
 
 describe("Dirty restore of an in-place mutation", () => {
   fixtures(["topics"]);
@@ -43,5 +44,21 @@ describe("Dirty restore of an in-place mutation", () => {
     (topic.content as Record<string, string>)["b"] = "b";
 
     expect(topic.attributeChangedInPlace("content")).toBe(true);
+  });
+
+  it("_touchRow clears its per-call state when the row write rejects", async () => {
+    const topic = await Topic.createBang({ title: "t", content: { a: "a" } });
+    const boom = new Error("row write failed");
+
+    await expect(
+      dirtyTouchRow.call(topic as never, ["updated_at"], null, () => Promise.reject(boom)),
+    ).rejects.toBe(boom);
+
+    const internals = topic as unknown as {
+      _touchAttrNames: unknown;
+      _skipDirtyTracking: unknown;
+    };
+    expect(internals._touchAttrNames).toBe(null);
+    expect(internals._skipDirtyTracking).toBe(null);
   });
 });
