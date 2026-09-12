@@ -338,7 +338,7 @@ export class ConnectionHandler {
   ): HashConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
-      void poolConfig.disconnectBang();
+      void poolConfig.disconnect();
       return poolConfig.dbConfig;
     }
     return undefined;

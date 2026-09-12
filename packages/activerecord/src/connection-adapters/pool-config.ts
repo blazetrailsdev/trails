@@ -117,6 +117,13 @@ export class PoolConfig {
     });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
+  async disconnect(): Promise<void> {
+    if (this._pool) {
+      await this._pool.disconnect();
+    }
+  }
+
   private _discardPoolBangSync(): Array<Promise<void>> {
     const pool = this._pool;
     if (!pool) return [];
