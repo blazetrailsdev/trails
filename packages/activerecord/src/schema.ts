@@ -47,11 +47,6 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
       );
     });
   }
-
-  constructor(adapter?: A) {
-    super();
-    this.connection = adapter;
-  }
 }
 
 export interface Definition {

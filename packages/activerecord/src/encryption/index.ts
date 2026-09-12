@@ -41,9 +41,6 @@ export {
 
 export { encrypts } from "./encryptable-record.js";
 export {
-  isEncryptedAttribute,
-  keyLength,
-  ivLength,
   eagerLoadBang,
   withEncryptionContext,
   withoutEncryption,

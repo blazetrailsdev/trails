@@ -1,42 +1,19 @@
 export class Base extends Error {
+  /** @noRailsEquivalent PERMANENT */
   constructor(message?: string) {
     super(message);
     this.name = this.constructor.name;
   }
 }
 
-export class Encoding extends Base {
-  constructor(message?: string) {
-    super(message ?? "Encryption encoding error");
-  }
-}
+export class Encoding extends Base {}
 
-export class Decryption extends Base {
-  constructor(message?: string) {
-    super(message ?? "Failed to decrypt");
-  }
-}
+export class Decryption extends Base {}
 
-export class Encryption extends Base {
-  constructor(message?: string) {
-    super(message ?? "Failed to encrypt");
-  }
-}
+export class Encryption extends Base {}
 
-export class Configuration extends Base {
-  constructor(message?: string) {
-    super(message ?? "Encryption configuration error");
-  }
-}
+export class Configuration extends Base {}
 
-export class ForbiddenClass extends Base {
-  constructor(message?: string) {
-    super(message ?? "Forbidden class");
-  }
-}
+export class ForbiddenClass extends Base {}
 
-export class EncryptedContentIntegrity extends Base {
-  constructor(message?: string) {
-    super(message ?? "Encrypted content integrity violated");
-  }
-}
+export class EncryptedContentIntegrity extends Base {}

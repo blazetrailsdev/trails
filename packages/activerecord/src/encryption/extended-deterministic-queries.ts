@@ -201,10 +201,12 @@ export class AdditionalValue {
     return this.type.serialize(value);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
   get valueForDatabase(): unknown {
     return this.value;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toString(): string {
     return String(this.value);
   }

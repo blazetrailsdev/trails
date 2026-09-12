@@ -23,7 +23,7 @@ describe("MigrationTest", () => {
     class ChangeOnly extends Migration {
       directions: string[] = [];
       override write(): void {}
-      override async change(): Promise<void> {
+      async change(): Promise<void> {
         this.directions.push(this.isReverting() ? "down" : "up");
       }
     }
@@ -225,6 +225,7 @@ describe("Migration#createTable id option type", () => {
           createTable: record("createTable"),
           renameTable: record("renameTable"),
           removeForeignKey: record("removeForeignKey"),
+          removeColumn: record("removeColumn"),
           execute: record("execute"),
         };
         if (this.revertable) conn["revert"] = () => undefined;
@@ -277,6 +278,36 @@ describe("Migration#createTable id option type", () => {
 
     it("announces a no-argument call with Ruby's nil last argument", async () => {
       expect(await announce("createTable")).toBe("-- createTable(nil)");
+    });
+
+    it("forwards only the arguments the caller passed", async () => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        // eslint-disable-next-line blazetrails/require-table-teardown -- RecordingMigration's connection is a fake recorder; no table is created.
+        await migration.createTable("widgets");
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      expect(migration.lines[0]).toBe('-- createTable("widgets")');
+      expect(migration.calls[0]).toEqual(["createTable", ["widgets"]]);
+    });
+
+    it("does not announce the positional placeholder an options-only overload expands", async () => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        await migration.removeColumn("widgets", "name", { ifExists: true });
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      expect(migration.lines[0]).toBe('-- removeColumn("widgets", "name", {:ifExists=>true})');
+      expect(migration.calls[0]).toEqual([
+        "removeColumn",
+        ["widgets", "name", undefined, { ifExists: true }],
+      ]);
     });
 
     it("announces a non-Hash object last argument through inspect", async () => {

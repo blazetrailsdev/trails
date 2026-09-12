@@ -2,7 +2,6 @@ import { registerEncryptionHooks } from "./encryption-hooks.js";
 import { Base } from "./base.js";
 import { type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorOptionLike } from "./encryption/encryptor.js";
-import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
 import {
   EncryptableRecord,
@@ -32,18 +31,6 @@ export type Encryptor = EncryptorOptionLike;
 
 export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
   encryptor?: Encryptor;
-}
-
-export function isEncryptedAttribute(klass: any, attr: string): boolean {
-  return (klass.encryptedAttributes as Set<string> | undefined)?.has(attr) ?? false;
-}
-
-export function keyLength(): number {
-  return AesGcmCipher.keyLength;
-}
-
-export function ivLength(): number {
-  return AesGcmCipher.ivLength;
 }
 
 export function eagerLoadBang(): void {}

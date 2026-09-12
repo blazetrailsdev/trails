@@ -59,7 +59,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema without version is the current version schema", () => {
-    const s = new Schema(adapter);
+    const s = new Schema();
     expect(s).toBeInstanceOf(Schema);
   });
 
@@ -114,7 +114,7 @@ describe("ActiveRecordSchemaTest", () => {
 
   it("schema subclass", () => {
     class MySchema extends Schema {}
-    const s = new MySchema(adapter);
+    const s = new MySchema();
     expect(s).toBeInstanceOf(Schema);
     expect(s).toBeInstanceOf(MySchema);
   });

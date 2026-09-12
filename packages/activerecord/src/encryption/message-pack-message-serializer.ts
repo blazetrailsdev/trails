@@ -41,9 +41,9 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
   /** @internal */
   private headersToHash(headers: Properties): Record<string, unknown> {
     const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    for (const [key, value] of headers.entries()) {
+    headers.each((key, value) => {
       result[key] = value instanceof Message ? this.messageToHash(value) : value;
-    }
+    });
     return result;
   }
 

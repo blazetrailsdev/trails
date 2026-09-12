@@ -69,7 +69,7 @@ describe("STI subclass attribute() registration", () => {
   });
 
   it("STI subclass encrypts() stays on the subclass, unlike attribute()", async () => {
-    const { isEncryptedAttribute } = await import("./encryption.js");
+    await import("./encryption.js");
 
     class Animal extends Base {
       static override tableName = "animals";
@@ -87,9 +87,9 @@ describe("STI subclass attribute() registration", () => {
 
     expect(Dog.encryptedAttributes).not.toBe(Animal.encryptedAttributes);
 
-    expect(isEncryptedAttribute(Dog, "name")).toBe(true);
-    expect(isEncryptedAttribute(Animal, "name")).toBe(false);
-    expect(isEncryptedAttribute(Cat, "name")).toBe(false);
+    expect(Dog.encryptedAttributes?.has("name") ?? false).toBe(true);
+    expect(Animal.encryptedAttributes?.has("name") ?? false).toBe(false);
+    expect(Cat.encryptedAttributes?.has("name") ?? false).toBe(false);
   });
 
   it("subclass attribute survives the subclass's own schema reflection (end-to-end)", async () => {

@@ -49,7 +49,7 @@ export class Scheme {
   private _cachedKeyProviderFromKey?: DerivedSecretKeyProvider;
   private _cachedDeterministicKeyProvider?: DeterministicKeyProvider;
   private _fixed?: boolean;
-  key?: string;
+  private key?: string;
   deterministic?: boolean | { fixed?: boolean };
   private _supportUnencryptedData?: boolean;
   downcase?: boolean;

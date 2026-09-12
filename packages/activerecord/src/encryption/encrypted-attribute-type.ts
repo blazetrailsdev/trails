@@ -13,7 +13,6 @@ import {
 } from "./encoding-helpers.js";
 
 export class EncryptedAttributeType extends ValueType {
-  readonly name = "encrypted";
   readonly scheme: Scheme;
   readonly castType: ValueType;
   private _previousType: boolean;
@@ -52,6 +51,7 @@ export class EncryptedAttributeType extends ValueType {
     return this.serializeWithCurrent(value);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
   override serializeCastValue(value: unknown): unknown {
     return this.serialize(value);
   }
@@ -94,10 +94,6 @@ export class EncryptedAttributeType extends ValueType {
 
   isFixed(): boolean {
     return this.scheme.isFixed();
-  }
-
-  get ignoreCase(): boolean {
-    return this.scheme.ignoreCase ?? false;
   }
 
   override type(): string | undefined {

@@ -188,6 +188,7 @@ export async function insertPreparedFixtureSets(
   return results;
 }
 
+/** @internal */
 async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
   if (!Base.verifyForeignKeysForFixtures) return;
 
