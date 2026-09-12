@@ -3,6 +3,9 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
+import { Result } from "../result.js";
+import { Edge } from "../test-helpers/models/edge.js";
+import { CpkBook } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
@@ -50,12 +53,60 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     });
     const rows = [row, { ...row }];
 
-    const { parents } = jd.instantiateFromRows(rows);
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
 
     expect(parents).toHaveLength(1);
     const comments = parents[0].association("comments")?.target;
     expect(comments).toHaveLength(1);
     expect(comments[0]._readAttribute("id")).toBe(10);
+  });
+
+  it("collapses equal rows to one parent when the root has no primary key", () => {
+    registerModel(Edge);
+    const jd = new JoinDependency(Edge, null, [], Nodes.OuterJoin);
+
+    const row = aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } });
+    const rows = [row, { ...row }, aliasedRow(jd, { "": { source_id: 1, sink_id: 3 } })];
+
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
+
+    expect(parents.map((e) => e._readAttribute("sink_id"))).toEqual([2, 3]);
+
+    const bigRow = aliasedRow(jd, { "": { source_id: 9007199254740993n, sink_id: null } });
+    const undefinedRow = aliasedRow(jd, {
+      "": { source_id: 9007199254740993n, sink_id: undefined },
+    });
+    const distinct = jd.instantiate(Result.fromRowHashes([bigRow, { ...bigRow }, undefinedRow]));
+    expect(distinct).toHaveLength(2);
+
+    const valued = (bytes: number[], at: number) => ({
+      ...aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } }),
+      blob: new Uint8Array(bytes),
+      at: new Date(at),
+    });
+    const byValue = jd.instantiate(
+      Result.fromRowHashes([valued([1, 2], 0), valued([1, 2], 0), valued([1, 3], 0)]),
+    );
+    expect(byValue).toHaveLength(2);
+  });
+
+  it("keys composite primary keys by the value array, not a delimited string", () => {
+    registerModel(CpkBook);
+    const jd = new JoinDependency(CpkBook, null, [], Nodes.OuterJoin);
+
+    const rows = [
+      aliasedRow(jd, { "": { author_id: "a\u0000b", id: "c" } }),
+      aliasedRow(jd, { "": { author_id: "a", id: "b\u0000c" } }),
+      aliasedRow(jd, { "": { author_id: "a", id: "b\u0000c" } }),
+    ];
+
+    expect(jd.instantiate(Result.fromRowHashes(rows))).toHaveLength(2);
+
+    const binaryRows = [
+      aliasedRow(jd, { "": { author_id: new Uint8Array([1, 2]), id: 1 } }),
+      aliasedRow(jd, { "": { author_id: new Uint8Array([1, 2]), id: 1 } }),
+    ];
+    expect(jd.instantiate(Result.fromRowHashes(binaryRows))).toHaveLength(1);
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
@@ -74,7 +125,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
       }),
     ];
 
-    const { parents } = jd.instantiateFromRows(rows);
+    const parents = jd.instantiate(Result.fromRowHashes(rows));
 
     expect(parents).toHaveLength(2);
     const post0 = parents[0].association("post")?.target;

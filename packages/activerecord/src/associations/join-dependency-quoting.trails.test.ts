@@ -9,7 +9,7 @@ import { Nodes, Table } from "@blazetrails/arel";
 import "../test-helpers/models/company.js";
 
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
-  return jd.nodes.find((n) => n.assocName === path)!;
+  return jd.joinRoot.drop(1).find((n) => n.assocName === path)!;
 }
 
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {

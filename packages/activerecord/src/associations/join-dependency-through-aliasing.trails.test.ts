@@ -7,7 +7,7 @@ import type { JoinPart } from "./join-dependency/join-part.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
-  return jd.nodes.find((n) => n.assocName === path)!;
+  return jd.joinRoot.drop(1).find((n) => n.assocName === path)!;
 }
 
 function joinedTableNames(joins: Nodes.Join[]): string[] {
@@ -107,7 +107,9 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
 
   it("aliases a referenced through-target table to the reference name when free", () => {
     const jd = new JoinDependency(Author, null, "commentsWithForeignKey", Nodes.OuterJoin);
-    const target = jd.nodes.find((n) => n.immediateAssocName === "commentsWithForeignKey")!;
+    const target = jd.joinRoot
+      .drop(1)
+      .find((n) => n.immediateAssocName === "commentsWithForeignKey")!;
     expect(target.effectiveSqlName).toBe("comments");
 
     jd.joinConstraints([], (jd as any)._aliasTracker, [

@@ -1027,7 +1027,7 @@ export class Relation<T extends Base> {
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
     );
-    if (jd.nodes.length === 0) return [];
+    if (jd.reflections.length === 0) return [];
     return this.withConnection(() => this._materializeLimitedIds(jd, basePk));
   }
 
@@ -1222,7 +1222,7 @@ export class Relation<T extends Base> {
       allEager as any,
       Nodes.OuterJoin,
     );
-    if (jd.nodes.length === 0) return null;
+    if (jd.reflections.length === 0) return null;
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);

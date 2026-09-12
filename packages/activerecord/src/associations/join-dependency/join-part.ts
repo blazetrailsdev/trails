@@ -8,7 +8,6 @@ export abstract class JoinPart {
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
   tableIndex = -1;
   tableAlias = "";
-  columns: string[] = [];
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
   assocName = "";
   /** @noRailsEquivalent CONVERGEABLE converge-join-part-onto-rails-join-part-surface */
@@ -83,43 +82,28 @@ export abstract class JoinPart {
 
   extractRecord(
     row: Record<string, unknown>,
-    columnNamesWithAlias: string,
+    columnNamesWithAlias: readonly { name: string; alias: string }[],
   ): Record<string, unknown> {
-    const record: Record<string, unknown> = {};
+    const hash: Record<string, unknown> = {};
 
-    const indexMatch = columnNamesWithAlias.match(/^t(\d+)$/);
-    if (indexMatch) {
-      const pattern = new RegExp(`^t${indexMatch[1]}_r(\\d+)$`);
-      const baseColumns = this.baseKlass.columnNames();
-      const pk = this.baseKlass.primaryKey as string;
-      const columns = pk && !baseColumns.includes(pk) ? [pk, ...baseColumns] : baseColumns;
-      let matched = false;
-      for (const [key, value] of Object.entries(row)) {
-        const m = key.match(pattern);
-        if (m) {
-          const colIndex = Number(m[1]);
-          const colName = columns[colIndex] ?? `r${m[1]}`;
-          record[colName] = value;
-          matched = true;
-        }
-      }
-      if (matched) return record;
+    let index = 0;
+    const length = columnNamesWithAlias.length;
+
+    while (index < length) {
+      const column = columnNamesWithAlias[index];
+      hash[column.name] = row[column.alias];
+      index += 1;
     }
 
-    const prefix = `${columnNamesWithAlias}_`;
-    for (const [key, value] of Object.entries(row)) {
-      if (key.startsWith(prefix)) {
-        record[key.slice(prefix.length)] = value;
-      }
-    }
-
-    return record;
+    return hash;
   }
 
-  instantiate(row: Record<string, unknown>, aliases: string): Base | null {
-    const attrs = this.extractRecord(row, aliases);
-    const hasData = Object.values(attrs).some((v) => v !== null && v !== undefined);
-    if (!hasData) return null;
-    return this.baseKlass._instantiate(attrs);
+  instantiate(
+    row: Record<string, unknown>,
+    aliases: readonly { name: string; alias: string }[],
+    columnTypes: Record<string, { deserialize(value: unknown): unknown }> = {},
+    block?: (record: any) => void,
+  ): Base {
+    return this.baseKlass.instantiate(this.extractRecord(row, aliases), columnTypes, block);
   }
 }

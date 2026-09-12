@@ -46,7 +46,11 @@ describe("JoinDependency#build", () => {
     Comment.hasMany("tags", { className: "Tag" });
   });
 
-  const paths = (jd: JoinDependency) => jd.nodes.map((n) => n.assocName).sort();
+  const paths = (jd: JoinDependency) =>
+    jd.joinRoot
+      .drop(1)
+      .map((n) => n.assocName)
+      .sort();
 
   const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
     new JoinDependency(Post, null, spec, Nodes.OuterJoin);

@@ -31,7 +31,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       "chapters",
       Nodes.OuterJoin,
     );
-    const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
+    const nodes = jd.joinRoot.drop(1);
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters"]);
   });
 
@@ -43,7 +43,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       Nodes.OuterJoin,
     );
     const joins = jd.joinConstraints([]);
-    const node = jd.nodes.find((n) => n.assocName === "order");
+    const node = jd.joinRoot.drop(1).find((n) => n.assocName === "order");
     expect(node).not.toBeNull();
     const outerJoin = joins[0] as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
@@ -104,7 +104,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       { chapters: "book" },
       Nodes.OuterJoin,
     );
-    const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
+    const nodes = jd.joinRoot.drop(1);
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters", "chapters.book"]);
 
     const titles = await CpkBook.eagerLoad({ ":chapters": ":book" })
