@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Notification } from "./test-helpers/models/notification.js";
@@ -116,16 +117,20 @@ describe("Suppressor.registry", () => {
     expect(Base.registry.User).toBeFalsy();
 
     await Promise.all([
-      Notification.suppress(async () => {
-        await Promise.resolve();
-        expect(Base.registry.Notification).toBe(true);
-        expect(Base.registry.User).toBeFalsy();
-      }),
-      User.suppress(async () => {
-        await Promise.resolve();
-        expect(Base.registry.User).toBe(true);
-        expect(Base.registry.Notification).toBeFalsy();
-      }),
+      new Thread(async () =>
+        Notification.suppress(async () => {
+          await Promise.resolve();
+          expect(Base.registry.Notification).toBe(true);
+          expect(Base.registry.User).toBeFalsy();
+        }),
+      ).value(),
+      new Thread(async () =>
+        User.suppress(async () => {
+          await Promise.resolve();
+          expect(Base.registry.User).toBe(true);
+          expect(Base.registry.Notification).toBeFalsy();
+        }),
+      ).value(),
     ]);
 
     expect(Base.registry.Notification).toBeFalsy();

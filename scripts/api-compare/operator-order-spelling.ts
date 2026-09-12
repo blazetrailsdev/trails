@@ -45,6 +45,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
     ">>": ["bitwiseShiftRight"],
     "~@": ["bitwiseNot"],
   },
+  // connection_pool.rb WeakThreadKeyMap `def [](key)` → connection-pool.ts
+  // `WeakThreadKeyMap#get`, and `def []=(key, value)` → `set`.
+  "ActiveRecord::ConnectionAdapters::ConnectionPool::WeakThreadKeyMap": {
+    "[]": ["get"],
+    "[]=": ["set"],
+  },
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47).
   "ActionView::Template::SimpleType": { "==": ["equals"] },

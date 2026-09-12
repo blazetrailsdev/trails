@@ -214,7 +214,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   private async execExplain(block: () => unknown): Promise<string> {
-    const { queries } = await this._relation.collectingQueriesForExplain(async () => block());
+    const queries = await this._relation.collectingQueriesForExplain(async () => block());
     return this._relation.execExplain(queries, this._options);
   }
 }

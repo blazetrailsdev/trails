@@ -1,14 +1,12 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
+import { Thread } from "@blazetrails/ruby-compat";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import {
-  executionContextId,
-  withExecutionContext,
-} from "./connection-adapters/abstract/connection-pool/execution-context.js";
 import { AdapterNotFound, ConnectionNotEstablished } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -287,11 +285,11 @@ it("a nested execution context shares the pool's single pinned connection", asyn
   let ctx1Conn: DatabaseAdapter | null = null;
 
   try {
-    await withExecutionContext(async () => {
+    await new Thread(async () => {
       await pool.pinConnectionBang();
       ctx1Conn = await pool.checkout();
 
-      await withExecutionContext(async () => {
+      await new Thread(async () => {
         await pool.pinConnectionBang();
         expect(await pool.checkout()).toBe(ctx1Conn);
         await pool.unpinConnectionBang();
@@ -299,7 +297,7 @@ it("a nested execution context shares the pool's single pinned connection", asyn
 
       expect(await pool.checkout()).toBe(ctx1Conn);
       await pool.unpinConnectionBang();
-    });
+    }).value();
 
     expect(ctx1Conn).toBeTruthy();
   } finally {
@@ -311,15 +309,15 @@ it("the pinned connection survives across execution contexts (vitest beforeEach/
   const pool = makeAmbientPool({ pool: 5 });
   let pinned: DatabaseAdapter | null = null;
   try {
-    await withExecutionContext(async () => {
+    await new Thread(async () => {
       await pool.pinConnectionBang();
       pinned = await pool.checkout();
-    });
-    await withExecutionContext(async () => {
+    }).value();
+    await new Thread(async () => {
       expect(await pool.checkout()).toBe(pinned);
       const clean = await pool.unpinConnectionBang();
       expect(clean).toBe(true);
-    });
+    }).value();
   } finally {
     await closePoolConnections(pool);
   }
@@ -332,11 +330,11 @@ it("the pinned connection holds a leased connection", async () => {
     pool.checkin(established);
     expect(established.inUse).toBeFalsy();
 
-    await withExecutionContext(async () => {
+    await new Thread(async () => {
       await pool.pinConnectionBang();
       expect((await pool.checkout()).inUse).toBeTruthy();
       await pool.unpinConnectionBang();
-    });
+    }).value();
   } finally {
     await closePoolConnections(pool);
   }
@@ -346,12 +344,12 @@ it("nested pinConnectionBang bumps the depth; the connection is released at dept
   const pool = makeAmbientPool({ pool: 5 });
   try {
     await pool.pinConnectionBang();
-    await withExecutionContext(async () => {
+    await new Thread(async () => {
       await pool.pinConnectionBang();
       const before = await pool.checkout();
       await pool.unpinConnectionBang();
       expect(await pool.checkout()).toBe(before);
-    });
+    }).value();
     await pool.unpinConnectionBang();
     await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
   } finally {
@@ -715,16 +713,16 @@ describe("ConnectionPoolConfiguration query cache", () => {
       let cacheB: Store | null = null;
 
       await Promise.all([
-        withExecutionContext(async () => {
+        new Thread(async () => {
           const conn = await pool.checkout();
           cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
           pool.checkin(conn);
-        }),
-        withExecutionContext(async () => {
+        }).value(),
+        new Thread(async () => {
           const conn = await pool.checkout();
           cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
           pool.checkin(conn);
-        }),
+        }).value(),
       ]);
 
       expect(cacheA).toBeInstanceOf(Store);
@@ -739,19 +737,19 @@ describe("ConnectionPoolConfiguration query cache", () => {
       let cacheA: Store | null = null;
       let cacheB: Store | null = null;
 
-      await withExecutionContext(async () => {
+      await new Thread(async () => {
         const conn = await pool.checkout();
         cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
         cacheA!.enabled = true;
         await cacheA!.computeIfAbsent(KEY, async () => [{ x: 1 }]);
         pool.checkin(conn);
-      });
+      }).value();
 
-      await withExecutionContext(async () => {
+      await new Thread(async () => {
         const conn = await pool.checkout();
         cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
         pool.checkin(conn);
-      });
+      }).value();
 
       expect(cacheA).not.toBe(cacheB);
       expect(cacheA!.get(KEY)).toBeDefined();
@@ -769,12 +767,12 @@ describe("ConnectionPoolConfiguration query cache", () => {
       try {
         expect(pinnedCount()).toBe(0);
 
-        await withExecutionContext(async () => {
+        await new Thread(async () => {
           await pool.pinConnectionBang();
           expect(pinnedCount()).toBe(1);
           await pool.unpinConnectionBang();
           expect(pinnedCount()).toBe(0);
-        });
+        }).value();
       } finally {
         await closePoolConnections(pool);
       }
@@ -787,16 +785,16 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
       try {
         await Promise.all([
-          withExecutionContext(async () => {
+          new Thread(async () => {
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
             await pool.unpinConnectionBang();
-          }),
-          withExecutionContext(async () => {
+          }).value(),
+          new Thread(async () => {
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
             await pool.unpinConnectionBang();
-          }),
+          }).value(),
         ]);
 
         expect(pinnedCount()).toBe(0);
@@ -824,10 +822,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
         const pinnedCount = (): number =>
           (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
-        await withExecutionContext(async () => {
+        await new Thread(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
           expect(pinnedCount()).toBe(1);
-        });
+        }).value();
       } finally {
         await closePoolConnections(pool);
       }
@@ -843,10 +841,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
         const pinnedCount = (): number =>
           (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
-        await withExecutionContext(async () => {
+        await new Thread(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");
           expect(pinnedCount()).toBe(1);
-        });
+        }).value();
       } finally {
         await closePoolConnections(pool);
       }
@@ -868,13 +866,13 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const seed = await pool.checkout();
       pool.checkin(seed);
 
-      await withExecutionContext(async () => {
+      await new Thread(async () => {
         const conn = await pool.checkout();
         expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
           Store,
         );
         pool.checkin(conn);
-      });
+      }).value();
     });
   });
 
@@ -922,20 +920,24 @@ describe("ConnectionPoolConfiguration query cache", () => {
     });
   });
 
-  describe("execution-context exit eviction", () => {
-    it("evicts the per-context Store from _threadQueryCaches when the context exits", async () => {
+  describe("dead-thread eviction", () => {
+    it("drops a dead thread's Store from _threadQueryCaches on the next insert", async () => {
       const pool = makePool(1);
-      const registry = (pool as unknown as { _threadQueryCaches: { _caches: Map<string, Store> } })
-        ._threadQueryCaches;
+      const registry = (
+        pool as unknown as { _threadQueryCaches: { _map: { _map: Map<unknown, Store> } } }
+      )._threadQueryCaches;
 
       let seenSize = -1;
-      await withExecutionContext(async () => {
+      await new Thread(async () => {
         const conn = await pool.checkout();
         pool.checkin(conn);
-        seenSize = registry._caches.size;
-      });
+        seenSize = registry._map._map.size;
+      }).value();
       expect(seenSize).toBeGreaterThan(0);
-      expect(registry._caches.size).toBe(0);
+
+      const conn = await pool.checkout();
+      pool.checkin(conn);
+      expect(registry._map._map.size).toBe(1);
     });
   });
 });
@@ -1078,7 +1080,7 @@ describe("ConnectionPool#newConnection", () => {
 
 describe("execution context at Rails thread-spawn sites", () => {
   it("unscoped top-level code resolves to ROOT_CONTEXT", () => {
-    expect(executionContextId()).toBe(0);
+    expect(IsolatedExecutionState.context().id).toBe(0);
   });
 
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
@@ -1086,7 +1088,7 @@ describe("execution context at Rails thread-spawn sites", () => {
     const pools = [0.01, 0.02].map((frequency) => ({
       reap: () => {
         const ids = seen.get(frequency) ?? [];
-        ids.push(executionContextId());
+        ids.push(IsolatedExecutionState.context().id);
         seen.set(frequency, ids);
       },
     }));

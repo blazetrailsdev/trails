@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
+import { Thread } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { registerModel } from "../../associations.js";
@@ -76,7 +76,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const s1 = await Sample.create({ value: 1 });
       const s2 = await Sample.create({ value: 2 });
 
-      const thread = withExecutionContext(async () =>
+      const thread = new Thread(async () =>
         Sample.transaction(async () => {
           await makeParentTransactionDirty();
           await Sample.transaction(
@@ -89,7 +89,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             { requiresNew: true },
           );
         }),
-      );
+      ).value();
 
       const main = Sample.transaction(async () => {
         await makeParentTransactionDirty();
@@ -141,7 +141,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           await updated.update({ value: 10 });
         });
 
-      const thread = withExecutionContext(async () => side(s1, s2, 4));
+      const thread = new Thread(async () => side(s1, s2, 4)).value();
       await side(s2, s1, 3);
       await thread;
 
@@ -176,7 +176,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           await updated.update({ value: 10 });
         });
 
-      const thread = withExecutionContext(async () => side(s1, s2, 4));
+      const thread = new Thread(async () => side(s1, s2, 4)).value();
       await side(s2, s1, 3);
       await thread;
 

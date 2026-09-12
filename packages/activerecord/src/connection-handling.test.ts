@@ -7,16 +7,11 @@ import { fixtures } from "./test-fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { Post } from "./test-helpers/models/post.js";
-import {
-  connectedToStack,
-  currentRole,
-  currentShard,
-  currentPreventingWrites,
-  withIsolatedConnectionState,
-} from "./core.js";
+import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 describe("ConnectionHandlingTest", () => {
   fixtures(["posts"], {
@@ -359,7 +354,7 @@ describe("ConnectionHandlingTest", () => {
     let innerRoleBeforeAwait: string | undefined;
     let innerRoleAfterAwait: string | undefined;
 
-    await withIsolatedConnectionState(async () => {
+    await IsolatedExecutionState.run(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         innerRoleBeforeAwait = currentRole.call(Base);
         await Promise.resolve();
@@ -384,7 +379,7 @@ describe("ConnectionHandlingTest", () => {
     let prohibitedAfterAwait: boolean | undefined;
     let concurrentProhibited: boolean | undefined;
 
-    const prohibitedTask = withIsolatedConnectionState(async () => {
+    const prohibitedTask = IsolatedExecutionState.run(async () => {
       await Base.prohibitShardSwapping(async () => {
         prohibitedBeforeAwait = Base.isShardSwappingProhibited();
         await Promise.resolve();
@@ -393,7 +388,7 @@ describe("ConnectionHandlingTest", () => {
       });
     });
 
-    const concurrentTask = withIsolatedConnectionState(async () => {
+    const concurrentTask = IsolatedExecutionState.run(async () => {
       await Promise.resolve();
       concurrentProhibited = Base.isShardSwappingProhibited();
       resolveOverlap();
@@ -418,7 +413,7 @@ describe("ConnectionHandlingTest", () => {
     });
     const results: string[] = [];
 
-    const task1 = withIsolatedConnectionState(async () => {
+    const task1 = IsolatedExecutionState.run(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         await Promise.resolve();
         results.push(`task1: ${currentRole.call(Base)}`);
@@ -427,7 +422,7 @@ describe("ConnectionHandlingTest", () => {
       });
     });
 
-    const task2 = withIsolatedConnectionState(async () => {
+    const task2 = IsolatedExecutionState.run(async () => {
       await task2Gate;
       await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
         await Promise.resolve();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
 import { buildExplainClause, renderBind } from "./explain.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -23,7 +24,7 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "collecting queries for explain", async () => {
-    const { queries } = await Base.collectingQueriesForExplain(async () => {
+    const queries = await Base.collectingQueriesForExplain(async () => {
       await Car.where({ name: "honda" });
     });
 
@@ -277,8 +278,8 @@ describe("ExplainTest", () => {
 
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
     const [plan1, plan2] = await Promise.all([
-      Car.where({ name: "honda" }).explain(),
-      Car.all().explain(),
+      new Thread(async () => Car.where({ name: "honda" }).explain()).value(),
+      new Thread(async () => Car.all().explain()).value(),
     ]);
     expect(plan1.length).toBeGreaterThan(0);
     expect(plan2.length).toBeGreaterThan(0);

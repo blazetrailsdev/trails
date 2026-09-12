@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
+import { Thread } from "@blazetrails/ruby-compat";
 import { describeIfPg, leasePgAdapter } from "./test-helper.js";
 import type { PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -124,7 +124,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           ),
         );
 
-      const thread = withExecutionContext(side);
+      const thread = new Thread(side).value();
       const outcomes = await Promise.allSettled([thread, side()]);
       const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
 
@@ -137,7 +137,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const finishRight = event();
       await Sample.create({ value: 1 });
 
-      const thread = withExecutionContext(async () =>
+      const thread = new Thread(async () =>
         withWarningSuppression(async () => {
           await Sample.transaction(
             async () => {
@@ -149,7 +149,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
           finishRight.set();
         }),
-      );
+      ).value();
 
       try {
         await withWarningSuppression(async () => {
@@ -209,7 +209,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         };
 
-        const thread = withExecutionContext(async () => side(s1, s2, 1));
+        const thread = new Thread(async () => side(s1, s2, 1)).value();
         const outcomes = await Promise.allSettled([thread, side(s2, s1, 2)]);
         const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
 
@@ -253,7 +253,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             { requiresNew: false },
           );
 
-        const thread = withExecutionContext(async () => side(s1, s2, 4));
+        const thread = new Thread(async () => side(s1, s2, 4)).value();
         await side(s2, s1, 3);
         await thread;
 

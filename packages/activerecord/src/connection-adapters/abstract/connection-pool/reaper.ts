@@ -1,4 +1,4 @@
-import { withExecutionContext } from "./execution-context.js";
+import { Thread } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
   reap?(): void;
@@ -57,7 +57,7 @@ export class Reaper {
 
   private static _spawnTimer(frequency: number): ReturnType<typeof setInterval> {
     let timer!: ReturnType<typeof setInterval>;
-    void withExecutionContext(
+    void new Thread(
       () =>
         new Promise<void>((running) => {
           timer = setInterval(() => {

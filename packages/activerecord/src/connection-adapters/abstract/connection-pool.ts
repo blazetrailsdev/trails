@@ -1,4 +1,5 @@
-import { Mutex, synchronize } from "@blazetrails/ruby-compat";
+import { Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
 import { _Base } from "../../base-slot.js";
@@ -29,11 +30,6 @@ import {
   type QueryCacheHost,
   type Store,
 } from "./query-cache.js";
-import {
-  executionContext,
-  executionContextId,
-  withExecutionContext,
-} from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -145,6 +141,26 @@ export class NullPool implements AbstractPool {
   }
 
   disconnect(): void {}
+}
+
+export class WeakThreadKeyMap<V> {
+  private _map = new Map<Thread, V>();
+
+  clear(): void {
+    this._map.clear();
+  }
+
+  get(key: Thread): V | undefined {
+    return this._map.get(key);
+  }
+
+  /** @missingRailsCall select! — PERMANENT */
+  set(key: Thread, value: V): void {
+    for (const c of [...this._map.keys()]) {
+      if (c.status === "dead") this._map.delete(c);
+    }
+    this._map.set(key, value);
+  }
 }
 
 export class Lease {
@@ -451,7 +467,7 @@ export class ConnectionPool implements ReapablePool {
       this._connections.push(this._pinnedConnection);
     }
 
-    if (lockThread) this._pinnedConnection.setLockThread(executionContextId());
+    if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
     const pinned = this._pinnedConnection;
     if (isTransactionAware(pinned)) {
       await pinned.verifyBang();
@@ -864,9 +880,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
-    this.asyncExecutor!.post(() => {
-      void withExecutionContext(() => futureResult.executeOrSkip());
-    });
+    this.asyncExecutor!.post(() => void futureResult.executeOrSkip());
   }
 
   /** @missingRailsArgs new — PERMANENT */
@@ -889,7 +903,7 @@ export class ConnectionPool implements ReapablePool {
     if (!this._leases) {
       this._leases = new LeaseRegistry();
     }
-    return this._leases.get(executionContext());
+    return this._leases.get(IsolatedExecutionState.context());
   }
 
   private bulkMakeNewConnections = bulkMakeNewConnections;
@@ -1116,7 +1130,7 @@ export function removeConnectionFromThreadCache(
   conn: DatabaseAdapter,
   ownerThread?: object,
 ): void {
-  const owner = ownerThread ?? executionContext();
+  const owner = ownerThread ?? IsolatedExecutionState.context();
   pool._leases?._peek(owner)?.clear(conn);
 }
 

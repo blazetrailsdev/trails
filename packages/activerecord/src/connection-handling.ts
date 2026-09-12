@@ -243,7 +243,18 @@ export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled
 }
 
 export function prohibitShardSwapping<T>(fn: () => T, enabled = true): T {
-  return IsolatedExecutionState.scope(PROHIBIT_SHARD_SWAPPING_KEY, enabled, fn);
+  const prevValue = IsolatedExecutionState.get<boolean>(PROHIBIT_SHARD_SWAPPING_KEY);
+  IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, enabled);
+  let result: T;
+  try {
+    result = fn();
+  } catch (error) {
+    IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, prevValue);
+    throw error;
+  }
+  return withCleanup(result, () =>
+    IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, prevValue),
+  );
 }
 
 export function isShardSwappingProhibited(): boolean {
@@ -271,15 +282,13 @@ export function withConnection<T>(
 ): Promise<T> {
   try {
     return Promise.resolve(
-      connectionPool
-        .call(this)
-        .withConnection(
-          (conn) =>
-            IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, () =>
-              Promise.resolve(fn(conn)),
-            ),
-          options,
-        ),
+      connectionPool.call(this).withConnection((conn) => {
+        const prevValue = IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY);
+        IsolatedExecutionState.set(QUERY_CONNECTION_KEY, conn);
+        return Promise.resolve(fn(conn)).finally(() => {
+          IsolatedExecutionState.set(QUERY_CONNECTION_KEY, prevValue);
+        });
+      }, options),
     ) as Promise<T>;
   } catch (err) {
     return Promise.reject(err);

@@ -11,7 +11,7 @@ import { SERVER_TIMING } from "../constants.js";
 /** @internal */
 export class Subscriber {
   private static _instance: Subscriber | null = null;
-  private static readonly _EVENTS_KEY = Symbol.for("ad_server_timing_events");
+  static readonly KEY = "action_dispatch_server_timing_events";
   private _subscriber: NotificationSubscriber | null = null;
 
   static instance(): Subscriber {
@@ -19,14 +19,19 @@ export class Subscriber {
   }
 
   call(event: Event): void {
-    const events = IsolatedExecutionState.get<Event[]>(Subscriber._EVENTS_KEY);
+    const events = IsolatedExecutionState.get<Event[]>(Subscriber.KEY);
     if (events) events.push(event);
   }
 
   async collectEvents(block: () => Promise<void>): Promise<Event[]> {
     const events: Event[] = [];
-    await IsolatedExecutionState.scope(Subscriber._EVENTS_KEY, events, block);
-    return events;
+    IsolatedExecutionState.set(Subscriber.KEY, events);
+    try {
+      await block();
+      return events;
+    } finally {
+      IsolatedExecutionState.delete(Subscriber.KEY);
+    }
   }
 
   ensureSubscribed(): void {

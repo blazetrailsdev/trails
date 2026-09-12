@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 /**
  * @internal
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
@@ -20,7 +21,7 @@ let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 /** @noRailsEquivalent PERMANENT */
 export class AsyncExecutor {
   post(task: () => void): void {
-    queueMicrotask(task);
+    queueMicrotask(() => void new Thread(task));
   }
 }
 let _writingRole = "writing";

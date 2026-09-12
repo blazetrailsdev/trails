@@ -15,11 +15,13 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
   if (!name) {
     return await fn();
   }
-  const parent = registry();
-  const child: Record<string, true | undefined> = Object.create(null);
-  Object.assign(child, parent);
-  child[name] = true;
-  return await IsolatedExecutionState.scope(SUPPRESSOR_REGISTRY_KEY, child, fn);
+  const previousState = registry()[name];
+  registry()[name] = true;
+  try {
+    return await fn();
+  } finally {
+    registry()[name] = previousState;
+  }
 }
 
 /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */

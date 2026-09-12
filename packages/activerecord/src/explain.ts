@@ -10,10 +10,16 @@ export interface ExplainHost {
   withConnection<T>(fn: (conn: DatabaseAdapter) => T | Promise<T>): Promise<T>;
 }
 
-export async function collectingQueriesForExplain<T>(
-  fn: () => Promise<T>,
-): Promise<{ value: T; queries: [string, unknown[]][] }> {
-  return ExplainRegistry.collectingQueries(fn);
+export async function collectingQueriesForExplain(
+  fn: () => Promise<unknown>,
+): Promise<[string, unknown[]][]> {
+  ExplainRegistry.collect = true;
+  try {
+    await fn();
+    return ExplainRegistry.queries;
+  } finally {
+    ExplainRegistry.reset();
+  }
 }
 
 export async function execExplain(
