@@ -119,7 +119,7 @@ export abstract class CollectionAssociation extends Association {
       Array.isArray(key) ? key.map(String).join(",") : String(key);
     let indexed: Record<string, Base>;
     if (klass.compositePrimaryKey) {
-      const rows: Base[] = await klass.where(primaryKey, ids).toArray();
+      const rows: Base[] = await klass.where(new Map([[primaryKey, ids]])).toArray();
       indexed = indexBy<Base, string>(rows, (record) =>
         indexKey(
           (primaryKey as string[]).map((primaryKey) => (record as any)._readAttribute(primaryKey)),

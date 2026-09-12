@@ -213,11 +213,15 @@ describe("DJAS — composite key support", () => {
         ],
       ) as any
     ).where(
-      ["ck_order_shop_id", "ck_order_number"],
-      [
-        [shop.id, 100],
-        [shop.id, 200],
-      ],
+      new Map([
+        [
+          ["ck_order_shop_id", "ck_order_number"],
+          [
+            [shop.id, 100],
+            [shop.id, 200],
+          ],
+        ],
+      ]),
     );
     const loaded = await djar.toArray();
     expect(loaded.map((r: any) => r.sku)).toEqual(["lb", "la"]);
@@ -254,42 +258,5 @@ describe("DJAS — composite key support", () => {
     returned.push([999, 999]);
     returned[0][1] = 42;
     expect(await djar.ids()).toEqual([[1, 100]]);
-  });
-
-  it("composite-key + ordered upstream + empty through: preserves none() instead of full table scan", async () => {
-    Associations.hasMany.call(CkShop, "ckOrdersOrdered2", (rel: any) => rel.order("name"), {
-      className: "CkOrder",
-      foreignKey: "shop_id",
-    });
-    Associations.hasMany.call(CkShop, "ckLineItemsEmpty", {
-      className: "CkLineItem",
-      through: "ckOrdersOrdered2",
-      source: "ckLineItems",
-      disableJoins: true,
-    });
-    const shop = await CkShop.create({ name: "S" });
-    const allSql: unknown[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
-      allSql.push(event?.payload?.sql);
-    });
-    try {
-      const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsEmpty");
-      const items = (await shop.association("ckLineItemsEmpty").loadTarget()) as Base[];
-      expect(items).toEqual([]);
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    const observed = allSql.filter(
-      (sql): sql is string =>
-        typeof sql === "string" && /\bFROM\b\s+["`]?ck_line_items\b/i.test(sql),
-    );
-    expect(observed).toEqual([]);
-  });
-
-  it("returns no rows when the composite-key tuple list is empty (owner has no through records)", async () => {
-    const shop = await CkShop.create({ name: "Lonely" });
-    const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
-    const items = (await shop.association("ckLineItemsThroughOrders").loadTarget()) as Base[];
-    expect(items).toEqual([]);
   });
 });

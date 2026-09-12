@@ -101,7 +101,7 @@ export class UniquenessValidator extends EachValidator {
         const dbVals = pk.map((col: string) =>
           record.attributeChanged(col) ? record.attributeWas(col) : record.readAttribute(col),
         );
-        relation = relation.where().not(pk, [dbVals]);
+        relation = relation.where().not(new Map([[pk, [dbVals]]]));
       } else {
         const dbVal = record.attributeChanged(pk)
           ? record.attributeWas(pk)

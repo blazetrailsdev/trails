@@ -203,7 +203,7 @@ export class HasManyAssociation extends CollectionAssociation {
     const scope =
       queryConstraints.length === 1
         ? baseScope.where({ [queryConstraints[0]]: values.map((tuple) => tuple[0]) })
-        : baseScope.where(queryConstraints, values);
+        : baseScope.where(new Map([[queryConstraints, values]]));
     method = method === "delete" ? "deleteAll" : method;
     const count = await this.deleteCount(method, scope);
     if (count > 0) await this.updateCounter(-count);

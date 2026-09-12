@@ -218,7 +218,9 @@ export class Batches {
             );
           } else {
             batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([...self.predicateBuilder.buildComposite(cursor, tuples)]),
+              new WhereClause([
+                ...self.predicateBuilder.buildFromHash(new Map([[cursor, tuples]])),
+              ]),
             );
           }
           if (load) {
