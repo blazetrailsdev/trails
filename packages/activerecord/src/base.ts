@@ -3205,7 +3205,7 @@ include(Base, {
   updateAttributeBang: _Persistence.updateAttributeBang,
   updateColumn: _Persistence.updateColumn,
   updateColumns: _Persistence.updateColumns,
-  clone: _Persistence.clone,
+  clone: _Core.clone,
   becomes: _Persistence.becomes,
   becomesBang: _Persistence.becomesBang,
   inspect: _inspect,

@@ -179,18 +179,15 @@ export async function connect(): Promise<TestDatabaseConfig> {
 
   switch (adapter) {
     case "sqlite": {
-      const { SQLiteDatabaseTasks } = await import("../tasks/sqlite-database-tasks.js");
-      SQLiteDatabaseTasks.register();
+      await import("../tasks/sqlite-database-tasks.js");
       break;
     }
     case "postgres": {
-      const { PostgreSQLDatabaseTasks } = await import("../tasks/postgresql-database-tasks.js");
-      PostgreSQLDatabaseTasks.register();
+      await import("../tasks/postgresql-database-tasks.js");
       break;
     }
     case "mysql": {
-      const { MySQLDatabaseTasks } = await import("../tasks/mysql-database-tasks.js");
-      MySQLDatabaseTasks.register();
+      await import("../tasks/mysql-database-tasks.js");
       break;
     }
   }

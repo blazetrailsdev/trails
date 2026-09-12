@@ -88,11 +88,6 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysql", args, "loading");
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  static register(): void {
-    DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
-  }
-
   /** @missingRailsCall new — PERMANENT */
   private creationOptions(): { charset?: string; collation?: string } {
     const options: { charset?: string; collation?: string } = {};
@@ -176,3 +171,6 @@ export function runCmdError(cmd: string, _args: string[], _action: string): stri
     `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
+
+DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
+DatabaseTasks.registerTask(/trilogy/, MySQLDatabaseTasks);

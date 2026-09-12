@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getChildProcessAsync, stdout, stderr } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
-import { MySQLDatabaseTasks } from "../../tasks/mysql-database-tasks.js";
+import "../../tasks/mysql-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
@@ -60,7 +60,6 @@ describeIfMysqlAdapter("MysqlDBCreateTest", () => {
 
   beforeEach(() => {
     connection = { createDatabase: vi.fn(async () => {}) };
-    MySQLDatabaseTasks.register();
     streams = captureStreams();
   });
 
@@ -136,7 +135,6 @@ describeIfMysqlAdapter("MysqlDBCreateTest", () => {
 
 describeIfMysqlAdapter("MysqlDBCreateWithInvalidPermissionsTest", () => {
   beforeEach(() => {
-    MySQLDatabaseTasks.register();
     captureStreams();
   });
 
@@ -160,7 +158,6 @@ describeIfMysqlAdapter("MySQLDBDropTest", () => {
 
   beforeEach(() => {
     connection = { dropDatabase: vi.fn(async () => {}) };
-    MySQLDatabaseTasks.register();
     streams = captureStreams();
   });
 
@@ -213,7 +210,6 @@ describeIfMysqlAdapter("MySQLPurgeTest", () => {
 
   beforeEach(() => {
     connection = { recreateDatabase: vi.fn(async () => {}) };
-    MySQLDatabaseTasks.register();
   });
 
   afterEach(() => {
@@ -257,9 +253,7 @@ describeIfMysqlAdapter("MySQLPurgeTest", () => {
 });
 
 describeIfMysqlAdapter("MysqlDBCharsetTest", () => {
-  beforeEach(() => {
-    MySQLDatabaseTasks.register();
-  });
+  beforeEach(() => {});
 
   it("db retrieves charset", async () => {
     const charset = vi.fn(async () => "utf8mb4");
@@ -273,9 +267,7 @@ describeIfMysqlAdapter("MysqlDBCharsetTest", () => {
 });
 
 describeIfMysqlAdapter("MysqlDBCollationTest", () => {
-  beforeEach(() => {
-    MySQLDatabaseTasks.register();
-  });
+  beforeEach(() => {});
 
   it("db retrieves collation", async () => {
     const collation = vi.fn(async () => "utf8mb4_general_ci");
@@ -298,7 +290,6 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
   beforeEach(async () => {
-    MySQLDatabaseTasks.register();
     previousFlags = DatabaseTasks.structureDumpFlags;
     const childProcess = await getChildProcessAsync();
     spawnSync = vi
@@ -482,7 +473,6 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
   let previousFlags: typeof DatabaseTasks.structureLoadFlags;
 
   beforeEach(async () => {
-    MySQLDatabaseTasks.register();
     previousFlags = DatabaseTasks.structureLoadFlags;
     const childProcess = await getChildProcessAsync();
     spawnSync = vi

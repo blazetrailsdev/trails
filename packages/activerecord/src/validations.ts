@@ -122,7 +122,7 @@ export function performValidations(
   return this.isValid(options?.context);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
+/** @noRailsEquivalent PERMANENT */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
   const proxy = this._collectionProxies?.get?.(attribute) as
     | { loaded?: boolean; target?: unknown[] }

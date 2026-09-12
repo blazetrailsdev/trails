@@ -7,7 +7,7 @@ import {
 import { stdout, stderr, File, FileUtils } from "@blazetrails/ruby-compat";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
-import { PostgreSQLDatabaseTasks } from "../../tasks/postgresql-database-tasks.js";
+import "../../tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ARUNIT_DATABASE } from "../../support/config.js";
@@ -78,7 +78,6 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
   beforeEach(() => {
     connection = { createDatabase: vi.fn(async () => {}) };
     stdio = captureStdio();
-    PostgreSQLDatabaseTasks.register();
   });
 
   afterEach(() => {
@@ -201,7 +200,6 @@ describeIfPostgresqlAdapter("PostgreSQLDBDropTest", () => {
   beforeEach(() => {
     connection = { dropDatabase: vi.fn(async () => {}) };
     stdio = captureStdio();
-    PostgreSQLDatabaseTasks.register();
   });
 
   afterEach(() => {
@@ -249,7 +247,6 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(
       undefined as unknown as Awaited<ReturnType<typeof Base.establishConnection>>,
     );
-    PostgreSQLDatabaseTasks.register();
   });
 
   afterEach(() => {
@@ -317,9 +314,7 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
 });
 
 describeIfPostgresqlAdapter("PostgreSQLDBCharsetTest", () => {
-  beforeEach(() => {
-    PostgreSQLDatabaseTasks.register();
-  });
+  beforeEach(() => {});
 
   it("db retrieves charset", async () => {
     const encoding = vi.fn(async () => "UTF8");
@@ -333,9 +328,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBCharsetTest", () => {
 });
 
 describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
-  beforeEach(() => {
-    PostgreSQLDatabaseTasks.register();
-  });
+  beforeEach(() => {});
 
   it("db retrieves collation", async () => {
     const collation = vi.fn(async () => "en_US.UTF-8");
@@ -362,7 +355,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     File.write(filename, "");
     previousFlags = DatabaseTasks.structureDumpFlags;
     previousDumpSchemas = Base.dumpSchemas;
-    PostgreSQLDatabaseTasks.register();
     const childProcess = await getChildProcessAsync();
     spawnSync = vi
       .spyOn(childProcess, "spawnSync")
@@ -594,7 +586,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
     const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
     expectedArgs = ["--set", "ON_ERROR_STOP=1", "--quiet", "--no-psqlrc", "--output", nullDevice];
     previousFlags = DatabaseTasks.structureLoadFlags;
-    PostgreSQLDatabaseTasks.register();
     const childProcess = await getChildProcessAsync();
     spawnSync = vi
       .spyOn(childProcess, "spawnSync")

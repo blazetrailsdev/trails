@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { randomUUID } from "crypto";
 import { DatabaseTasks } from "./database-tasks.js";
-import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
+import "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 
@@ -12,8 +12,6 @@ describe("DatabaseTasksTruncateTablesTest", () => {
   const created: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.clearRegisteredTasks();
-    SQLiteDatabaseTasks.register();
     DatabaseTasks.databaseConfiguration = null;
     try {
       Base.removeConnection();

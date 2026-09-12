@@ -134,11 +134,6 @@ export class PostgreSQLDatabaseTasks {
     await this.runCmd("psql", args, "loading");
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-  static register(): void {
-    DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);
-  }
-
   private encoding(): string {
     return String(this.configurationHash.encoding ?? defaultEncoding());
   }
@@ -241,3 +236,5 @@ export function runCmdError(cmd: string, args: string[], _action: string): strin
     `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
+
+DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);

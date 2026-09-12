@@ -794,22 +794,6 @@ export async function reload<T extends ReloadRecord>(
   return this;
 }
 
-interface CloneRecord {
-  _attributes: unknown;
-  _previouslyNewRecord: boolean;
-  errors: { constructor: new (base: unknown) => unknown };
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-activerecord-remainder-moved-relocations */
-export function clone<T extends CloneRecord>(this: T): T {
-  const copy = Object.create(Object.getPrototypeOf(this)) as T;
-  Object.assign(copy, this);
-  (copy as unknown as CloneRecord)._attributes = this._attributes;
-  (copy as unknown as CloneRecord)._previouslyNewRecord = false;
-  (copy as unknown as { errors: unknown }).errors = new this.errors.constructor(copy);
-  return copy;
-}
-
 interface BecomesRecord {
   _attributes: { reverseMergeBang(target: unknown): unknown };
   _newRecord: boolean;

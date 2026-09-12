@@ -263,12 +263,9 @@ export { eachCurrentEnvironment } from "./tasks/database-tasks.js";
 export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 export { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
 export { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
-import { SQLiteDatabaseTasks as _SQLiteTasks } from "./tasks/sqlite-database-tasks.js";
-import { PostgreSQLDatabaseTasks as _PGTasks } from "./tasks/postgresql-database-tasks.js";
-import { MySQLDatabaseTasks as _MySQLTasks } from "./tasks/mysql-database-tasks.js";
-_SQLiteTasks.register();
-_PGTasks.register();
-_MySQLTasks.register();
+import "./tasks/sqlite-database-tasks.js";
+import "./tasks/postgresql-database-tasks.js";
+import "./tasks/mysql-database-tasks.js";
 export {
   Migrator,
   UnknownMigrationVersionError,

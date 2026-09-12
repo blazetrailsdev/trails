@@ -10,7 +10,6 @@ describe("connect", () => {
 
   afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
-    DatabaseTasks.clearRegisteredTasks();
     Base.configurations(originalConfigurations);
     await Base.removeConnection();
     vi.unstubAllEnvs();

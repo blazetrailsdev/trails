@@ -14,7 +14,7 @@ import {
 import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
-import { SQLiteDatabaseTasks } from "../../tasks/sqlite-database-tasks.js";
+import "../../tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base } from "../../base.js";
@@ -56,7 +56,6 @@ describeIfSqlite("SqliteDBCreateTest", () => {
       adapter: "sqlite3",
       database,
     });
-    SQLiteDatabaseTasks.register();
     streams = captureStreams();
   });
 
@@ -145,7 +144,6 @@ describeIfSqlite("SqliteDBDropTest", () => {
       adapter: "sqlite3",
       database: databaseRoot,
     });
-    SQLiteDatabaseTasks.register();
     previousRoot = DatabaseTasks.root;
     DatabaseTasks.root = root;
     streams = captureStreams();
@@ -216,7 +214,6 @@ describeIfSqlite("SqliteDBCharsetTest", () => {
       adapter: "sqlite3",
       database,
     });
-    SQLiteDatabaseTasks.register();
   });
 
   afterEach(() => {
@@ -242,7 +239,6 @@ describeIfSqlite("SqliteDBCollationTest", () => {
       adapter: "sqlite3",
       database,
     });
-    SQLiteDatabaseTasks.register();
   });
 
   it("db retrieves collation", async () => {
@@ -270,7 +266,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     previous = Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database });
     previousFlags = DatabaseTasks.structureDumpFlags;
-    SQLiteDatabaseTasks.register();
   });
 
   afterEach(async () => {
@@ -346,9 +341,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
 describeIfSqlite("SqliteStructureLoadTest", () => {
   const created: string[] = [];
 
-  beforeEach(() => {
-    SQLiteDatabaseTasks.register();
-  });
+  beforeEach(() => {});
 
   afterEach(() => {
     for (const file of created) {

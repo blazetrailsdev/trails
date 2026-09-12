@@ -19,8 +19,6 @@ describe("PostgreSQLDatabaseTasks", () => {
   });
 
   it("test_registers_with_database_tasks", () => {
-    DatabaseTasks.clearRegisteredTasks();
-    PostgreSQLDatabaseTasks.register();
     expect(DatabaseTasks["classForAdapter"]("postgresql")).toBeDefined();
   });
 
