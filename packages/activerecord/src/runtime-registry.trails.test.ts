@@ -28,35 +28,35 @@ describe("RuntimeRegistryTest", () => {
     expect(sqlRuntime()).toBe(0);
   });
 
-  it("instrumented sql event increments sql runtime", () => {
+  it("record increments sql runtime", () => {
     instrumentSql("User Load", 5.0);
     expect(sqlRuntime()).toBe(5.0);
   });
 
-  it("instrumented sql event increments queries count", () => {
+  it("record increments queries count", () => {
     instrumentSql("User Load", 1.0);
     instrumentSql("Post Load", 2.0);
     expect(queriesCount()).toBe(2);
   });
 
-  it("instrumented sql event does not count TRANSACTION queries", () => {
+  it("record does not count TRANSACTION queries", () => {
     instrumentSql("TRANSACTION", 1.0);
     expect(queriesCount()).toBe(0);
     expect(sqlRuntime()).toBe(1.0);
   });
 
-  it("instrumented sql event does not count SCHEMA queries", () => {
+  it("record does not count SCHEMA queries", () => {
     instrumentSql("SCHEMA", 1.0);
     expect(queriesCount()).toBe(0);
   });
 
-  it("instrumented sql event increments cached queries count when cached", () => {
+  it("record increments cached queries count when cached", () => {
     instrumentSql("User Load", 0.1, { cached: true });
     expect(cachedQueriesCount()).toBe(1);
     expect(queriesCount()).toBe(1);
   });
 
-  it("instrumented sql event tracks async sql runtime separately", () => {
+  it("record tracks async sql runtime separately", () => {
     instrumentSql("User Load", 10.0, { async: true, lockWait: 3.0 });
     expect(asyncSqlRuntime()).toBe(7.0);
     expect(sqlRuntime()).toBe(10.0);
