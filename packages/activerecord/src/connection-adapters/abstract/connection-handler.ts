@@ -297,11 +297,6 @@ export class ConnectionHandler {
     return pool;
   }
 
-  /** @deprecated */
-  removeConnection(owner: string, options?: { role?: string; shard?: string }): void {
-    this.removeConnectionPool(owner, options);
-  }
-
   /**
    * @deprecated
    * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names

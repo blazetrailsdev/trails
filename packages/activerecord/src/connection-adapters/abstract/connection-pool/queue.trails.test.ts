@@ -3,6 +3,10 @@ import { Queue, ConnectionLeasingQueue, BiasedConditionVariable, BiasableQueue }
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 
+function queueSize(q: Queue): number {
+  return (q as unknown as { _queue: unknown[] })._queue.length;
+}
+
 function fakeConn(id = 1): DatabaseAdapter {
   return { id } as unknown as DatabaseAdapter;
 }
@@ -15,11 +19,11 @@ describe("ConnectionPool::Queue", () => {
 
     q.add(c1);
     q.add(c2);
-    expect(q.length).toBe(2);
+    expect(queueSize(q)).toBe(2);
 
     const out = q.poll();
     expect(out).toBe(c2);
-    expect(q.length).toBe(1);
+    expect(queueSize(q)).toBe(1);
   });
 
   it("poll returns undefined when empty and no timeout", () => {
@@ -62,12 +66,12 @@ describe("ConnectionPool::Queue", () => {
     expect(q.numWaiting()).toBe(1);
 
     q.add(c);
-    expect(q.length).toBe(1);
+    expect(queueSize(q)).toBe(1);
 
     expect(q.poll()).toBeUndefined();
 
     await promise;
-    expect(q.length).toBe(0);
+    expect(queueSize(q)).toBe(0);
   });
 
   it("delete removes and returns element", () => {
@@ -79,7 +83,7 @@ describe("ConnectionPool::Queue", () => {
     q.add(c2);
 
     expect(q.delete(c1)).toBe(c1);
-    expect(q.length).toBe(1);
+    expect(queueSize(q)).toBe(1);
     expect(q.delete(fakeConn(99))).toBeUndefined();
   });
 
@@ -93,7 +97,7 @@ describe("ConnectionPool::Queue", () => {
     q.add(c1);
 
     expect(q.delete(c1)).toBe(c1);
-    expect(q.length).toBe(1);
+    expect(queueSize(q)).toBe(1);
     expect(q.poll()).toBe(c2);
   });
 
@@ -103,7 +107,7 @@ describe("ConnectionPool::Queue", () => {
     q.add(fakeConn(2));
 
     q.clear();
-    expect(q.length).toBe(0);
+    expect(queueSize(q)).toBe(0);
   });
 
   it("isAnyWaiting and numWaiting", async () => {

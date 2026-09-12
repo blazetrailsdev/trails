@@ -1,7 +1,6 @@
 import mysql from "mysql2/promise";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
-import type { ExplainOption } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -24,7 +23,6 @@ import {
   NoDatabaseError,
 } from "../errors.js";
 import { Result } from "../result.js";
-import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
   executeBatch as mysql2ExecuteBatch,
@@ -36,9 +34,7 @@ import {
 } from "./mysql2/database-statements.js";
 import { _Base } from "../base-slot.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
-import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
-import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -145,7 +141,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (pool.get(sql)) return;
     void pool.set(sql, {
       sql,
-      key: pool.nextKey(),
       close(): void {
         try {
           (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
@@ -160,21 +155,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private _database: string | undefined;
-
-  static async databaseExists(
-    config: string | (mysql.PoolOptions & MysqlAdapterOptions),
-  ): Promise<boolean> {
-    const adapter = new Mysql2Adapter(config);
-    try {
-      await adapter._ensureClient();
-      return true;
-    } catch (e) {
-      if (e instanceof NoDatabaseError) return false;
-      throw e;
-    } finally {
-      await adapter.close();
-    }
-  }
 
   constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
   /** @deprecated */
@@ -283,6 +263,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecQuery(
     sql: string,
     name: string | null = "SQL",
@@ -454,6 +435,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return true;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
@@ -489,89 +471,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }
-  }
-
-  async explain(
-    sql: string,
-    binds: unknown[] = [],
-    options: ExplainOption[] = [],
-  ): Promise<string> {
-    const clause = await this.buildExplainClause(options);
-    const start = Date.now();
-    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
-    const elapsed = (Date.now() - start) / 1000;
-    const printer = new ExplainPrettyPrinter();
-    return printer.pp(result, elapsed);
-  }
-
-  createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
-    const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
-    dumper.connection = this;
-    return dumper;
-  }
-
-  async tables(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT table_name AS name FROM information_schema.tables
-         WHERE table_schema = database() AND table_type = 'BASE TABLE'
-         ORDER BY table_name`,
-        "SCHEMA",
-      )
-    ).toArray();
-    return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
-  }
-
-  async views(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT table_name AS name FROM information_schema.tables
-         WHERE table_schema = database() AND table_type = 'VIEW'
-         ORDER BY table_name`,
-        "SCHEMA",
-      )
-    ).toArray();
-    return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
-  }
-
-  async tableExists(name: string): Promise<boolean> {
-    if (!name) return false;
-    const { schema, table } = mysqlParseName(name);
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT 1 AS one FROM information_schema.tables
-         WHERE table_schema = COALESCE(?, database())
-         AND table_name = ?
-         AND table_type = 'BASE TABLE'
-         LIMIT 1`,
-        "SCHEMA",
-        [schema ?? null, table],
-      )
-    ).toArray();
-    return rows.length > 0;
-  }
-
-  async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, table } = mysqlParseName(tableName);
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT column_name AS name FROM information_schema.statistics
-         WHERE index_name = 'PRIMARY'
-         AND table_schema = COALESCE(?, database())
-         AND table_name = ?
-         ORDER BY seq_in_index`,
-        "SCHEMA",
-        [schema ?? null, table],
-      )
-    ).toArray() as Array<{ name?: string; NAME?: string; COLUMN_NAME?: string }>;
-    const names = rows.map((r) => (r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
-    if (names.length === 0) return null;
-    if (names.length === 1) return names[0];
-    return names;
-  }
-
-  supportsAdvisoryLocks(): boolean {
-    return true;
   }
 
   /** @internal */
@@ -627,6 +526,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._rawConnection = null;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   async close(): Promise<void> {
     this._permanentlyClosed = true;
     this._connectGeneration++;
@@ -649,24 +549,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  override emptyInsertStatementValue(): string {
-    return "VALUES ()";
-  }
-
   /** @internal */
   _testOnlyPoolFlags(): string[] | undefined {
     return this._poolConfig.flags;
-  }
-
-  get raw(): mysql.Connection {
-    if (!this._rawConnection) {
-      throw new Error(
-        this._permanentlyClosed
-          ? "Mysql2Adapter: connection is permanently closed"
-          : "Mysql2Adapter: connection not yet established — call execute() or await active() first",
-      );
-    }
-    return this._rawConnection;
   }
 
   /** @internal */

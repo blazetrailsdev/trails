@@ -139,10 +139,6 @@ export class Queue {
     this._cond = new ConditionVariable();
   }
 
-  get length(): number {
-    return this._queue.length;
-  }
-
   isAnyWaiting(): boolean {
     return synchronize(this, () => {
       return this._numWaiting > 0;

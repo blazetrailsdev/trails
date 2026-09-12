@@ -153,6 +153,7 @@ export abstract class SchemaDumper {
   static exclIgnorePattern: RegExp = /^excl_rails_[0-9a-f]{10}$/;
   static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
+  protected connection?: unknown;
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
   private _language: SchemaDumpLanguage;
@@ -162,6 +163,7 @@ export abstract class SchemaDumper {
 
   /** @internal */
   constructor(connection: SchemaSource | DatabaseAdapter, options: Record<string, unknown> = {}) {
+    this.connection = connection;
     this._source = isDatabaseAdapter(connection) ? new AdapterSchemaSource(connection) : connection;
     this._options = options;
     const lang =

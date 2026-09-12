@@ -346,7 +346,7 @@ describe("ConnectionHandlerTest", () => {
     });
     handler.establishConnection(config1, { ownerName: "primary" });
     handler.establishConnection(config2, { ownerName: "child" });
-    handler.removeConnection("child");
+    handler.removeConnectionPool("child");
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
     expect(handler.retrieveConnectionPool("child")).toBeUndefined();
   });

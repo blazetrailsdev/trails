@@ -114,7 +114,9 @@ interface PrimaryKeyHost {
   tableName?: string;
   connectionPool?(): {
     activeConnection?: CachedSchemaSource | null;
-    poolConfig?: { schemaCache?: CachedSchemaSource["internalSchemaCache"] | null };
+    poolConfig?: {
+      schemaReflection: { loadedCache: CachedSchemaSource["internalSchemaCache"] | null };
+    };
   };
 }
 
@@ -122,7 +124,11 @@ function cachedSchemaCacheFor(
   host: PrimaryKeyHost,
 ): CachedSchemaSource["internalSchemaCache"] | undefined {
   const pool = host.connectionPool?.();
-  return pool?.activeConnection?.internalSchemaCache ?? pool?.poolConfig?.schemaCache ?? undefined;
+  return (
+    pool?.activeConnection?.internalSchemaCache ??
+    pool?.poolConfig?.schemaReflection.loadedCache ??
+    undefined
+  );
 }
 
 /**

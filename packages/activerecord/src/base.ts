@@ -668,6 +668,7 @@ type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWa
 type AnyClass = abstract new (...args: never[]) => object;
 
 let _disablePreparedStatements = false;
+let _lazilyLoadSchemaCache = false;
 let _databaseCli: Record<string, string | string[]> = {
   postgresql: "psql",
   mysql: ["mysql", "mysql5"],
@@ -749,6 +750,14 @@ export class Base extends Model {
 
   static set disablePreparedStatements(value: boolean) {
     _disablePreparedStatements = value;
+  }
+
+  static get lazilyLoadSchemaCache(): boolean {
+    return _lazilyLoadSchemaCache;
+  }
+
+  static set lazilyLoadSchemaCache(value: boolean) {
+    _lazilyLoadSchemaCache = value;
   }
 
   static get databaseCli(): Record<string, string | string[]> {

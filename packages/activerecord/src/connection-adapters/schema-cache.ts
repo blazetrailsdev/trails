@@ -438,15 +438,6 @@ export class SchemaCache {
     this._indexes = deepDeduplicate(this._indexes);
   }
 
-  clear(): void {
-    this._columns.clear();
-    this._columnsHash.clear();
-    this._primaryKeys.clear();
-    this._dataSourceExists.clear();
-    this._indexes.clear();
-    this._version = null;
-  }
-
   private isIgnoredTable(tableName: string): boolean {
     return isSchemaCacheIgnoredTable(tableName);
   }
@@ -489,7 +480,6 @@ export class SchemaCache {
 export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
-  static lazilyLoadSchemaCache = false;
 
   /** @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip */
   static eagerLoadSchemaCache = false;

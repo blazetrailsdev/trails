@@ -40,6 +40,7 @@ export class SqlTypeMetadata implements Deduplicable {
     return JSON.stringify(this.toJSON());
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toJSON(): SqlTypeMetadataJSON {
     return {
       sqlType: this.sqlType,
@@ -61,10 +62,6 @@ export class SqlTypeMetadata implements Deduplicable {
       precision: data.precision,
       scale: data.scale,
     });
-  }
-
-  toString(): string {
-    return this.sqlType ?? "";
   }
 
   deduplicate(): this {

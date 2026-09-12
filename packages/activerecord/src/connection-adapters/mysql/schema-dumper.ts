@@ -10,7 +10,7 @@ interface MysqlAdapterLike {
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
-  connection?: MysqlAdapterLike;
+  declare connection?: MysqlAdapterLike;
   /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   tableCollationCache: Record<string, string | undefined> = Object.create(null);
   /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */

@@ -17,7 +17,7 @@ export class Connection {
   }
 
   typeForAttribute(attrName: unknown): ValueType {
-    const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaCache;
+    const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaReflection.loadedCache;
     const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
     const column = columnsHash?.[toS(attrName)];
     const type = column

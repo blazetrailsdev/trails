@@ -857,7 +857,7 @@ extends Association`, whose modules reach `reflection.ts` back through
   import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
   it: bare for `db_warnings_ignore` (`abstract_adapter.rb`, reached only from a
   live query), and as `_Base?.logger ?? null` in the constructor
-  (`abstract_adapter.rb:132,140`). Four reads on a standalone adapter's own
+  (`abstract_adapter.rb:132,140`). Five reads on a standalone adapter's own
   path are the only guarded slot reads, each falling back to the value Rails'
   autoloaded `active_record.rb` would hold: `_Base?.logger ?? null` and
   `_Base?.disablePreparedStatements ?? false` in the adapter constructor
@@ -865,7 +865,9 @@ extends Association`, whose modules reach `reflection.ts` back through
   `_Base?.queryTransformers ?? []` in `preprocessQuery`
   (`database_statements.rb`, default `active_record.rb:432`), and
   `_Base?.asyncQueryExecutor ?? null` in `abstract-adapter.ts` and
-  `ConnectionPool#build_async_executor` (default `active_record.rb:284`). An
+  `ConnectionPool#build_async_executor` (default `active_record.rb:284`), and
+  `_Base?.lazilyLoadSchemaCache ?? false` in `ConnectionPool#new_connection`
+  (`connection_pool.rb:932`, default `active_record.rb:190`). An
   adapter is a standalone public entry point, constructed and queried with no
   model layer loaded at all (the whole `sqlite-drivers` lane), so an unset
   slot there is not a load-order bug but a legitimate configuration. A read

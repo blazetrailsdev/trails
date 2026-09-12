@@ -1888,7 +1888,11 @@ export class Migrator {
 
   /** @internal */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
-    const dbNameHash = Zlib.crc32(await this.connection.currentDatabase!());
+    const dbNameHash = Zlib.crc32(
+      await (
+        this.connection as unknown as { currentDatabase(): Promise<string> }
+      ).currentDatabase(),
+    );
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 

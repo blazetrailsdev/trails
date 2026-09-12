@@ -387,7 +387,8 @@ describe("Migrator advisory lock wrapping", () => {
 
   function addAdvisoryLockSupport(adapter: DatabaseAdapter) {
     adapter.supportsAdvisoryLocks = () => true;
-    adapter.currentDatabase = async () => "test_db";
+    (adapter as unknown as { currentDatabase: () => Promise<string> }).currentDatabase = async () =>
+      "test_db";
   }
 
   async function lockableAdapter() {
@@ -462,7 +463,8 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
     adapter.releaseAdvisoryLock = async () => true;
-    adapter.currentDatabase = async () => "myapp_test";
+    (adapter as unknown as { currentDatabase: () => Promise<string> }).currentDatabase = async () =>
+      "myapp_test";
     const migrator = new Migrator("up", [], schemaMigration, internalMetadata);
     await migrator.migrate();
     expect(lockIds[0]).toBe(1235955690063948105n);
@@ -477,7 +479,8 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
     adapter.releaseAdvisoryLock = async () => true;
-    adapter.currentDatabase = async () => "myapp_test";
+    (adapter as unknown as { currentDatabase: () => Promise<string> }).currentDatabase = async () =>
+      "myapp_test";
     const migrator = new Migrator("up", [], schemaMigration, internalMetadata);
     await migrator.migrate();
     await migrator.migrate();

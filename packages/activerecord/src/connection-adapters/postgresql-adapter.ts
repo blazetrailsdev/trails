@@ -645,6 +645,7 @@ export class PostgreSQLAdapter
     return result;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecQuery(
     sql: string,
     name: string | null = "SQL",
@@ -1126,6 +1127,7 @@ export class PostgreSQLAdapter
   /** @internal */
   executeBatch = pgExecuteBatch;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
@@ -1286,6 +1288,7 @@ export class PostgreSQLAdapter
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   async close(): Promise<void> {
     void this._statements.reset();
     this._client = null;
@@ -1395,16 +1398,6 @@ export class PostgreSQLAdapter
   /** @internal */
   isInTransaction(): boolean {
     return this.openTransactions() > 0;
-  }
-
-  get raw(): pg.Client {
-    if (this._rawConnection) return this._rawConnection;
-    if (this._closed || this._pgClientOptions == null) {
-      throw new Error("PostgreSQLAdapter: connection is closed");
-    }
-    throw new Error(
-      "PostgreSQLAdapter: connection has not been opened yet — run a query first to lazy-connect",
-    );
   }
 
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
@@ -2350,7 +2343,10 @@ export interface PostgreSQLAdapter {
     ...constraints: (string | undefined)[]
   ): Promise<void>;
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides
+   */
   validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
 
   schemaNames(): Promise<string[]>;
@@ -2376,6 +2372,7 @@ export interface PostgreSQLAdapter {
 
   pkAndSequenceFor(table: string): Promise<[string, Name | null] | null>;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   columns(tableName: string): Promise<Column[]>;
 
   changeColumn(
@@ -2508,12 +2505,16 @@ export interface PostgreSQLAdapter {
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   tables(): Promise<string[]>;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   views(): Promise<string[]>;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   tableExists(name: string): Promise<boolean>;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   foreignKeyExists(
     fromTable: string,
     toTable?: string | ForeignKeyLookupOptions,

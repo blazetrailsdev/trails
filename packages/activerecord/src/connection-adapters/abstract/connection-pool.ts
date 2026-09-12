@@ -303,10 +303,6 @@ export class ConnectionPool implements ReapablePool {
     return `#<ConnectionPool ${parts.join(" ")}>`;
   }
 
-  toString(): string {
-    return this.inspect();
-  }
-
   /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
@@ -617,7 +613,7 @@ export class ConnectionPool implements ReapablePool {
       size: this.size,
       connections: this._connections?.length ?? 0,
       busy: this._checkedOut.size,
-      idle: this._available?.length ?? 0,
+      idle: this._connections?.filter((c) => !c.inUse).length ?? 0,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
@@ -797,10 +793,10 @@ export class ConnectionPool implements ReapablePool {
       throw ex;
     }
     if (
-      SchemaReflection.lazilyLoadSchemaCache &&
+      (_Base?.lazilyLoadSchemaCache ?? false) &&
       !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
-      !this.poolConfig.schemaCache
+      !this.poolConfig.schemaReflection.loadedCache
     ) {
       this._lazyLoadTriggered = true;
       const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
@@ -809,7 +805,7 @@ export class ConnectionPool implements ReapablePool {
         .then(() => {
           const loaded = this.schemaReflection.loadedCache;
           if (loaded) {
-            this.poolConfig.schemaCache = loaded;
+            this.poolConfig.schemaReflection.loadedCache = loaded;
           }
         })
         .catch((err) => {
@@ -823,7 +819,7 @@ export class ConnectionPool implements ReapablePool {
     if (
       SchemaReflection.eagerLoadSchemaCache &&
       !this._eagerWarmTriggered &&
-      !this.poolConfig.schemaCache
+      !this.poolConfig.schemaReflection.loadedCache
     ) {
       this._eagerWarmTriggered = true;
       const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
@@ -832,7 +828,7 @@ export class ConnectionPool implements ReapablePool {
         .then(() => {
           const loaded = this.schemaReflection.loadedCache;
           if (loaded) {
-            this.poolConfig.schemaCache = loaded;
+            this.poolConfig.schemaReflection.loadedCache = loaded;
           }
         })
         .catch((err) => {
@@ -935,10 +931,14 @@ export interface ConnectionPool extends Omit<
   Included<ConnectionPoolConfiguration>,
   "_pinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
 > {
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   readonly queryCache: Store;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   readonly queryCacheEnabled: boolean;
   readonly dirtiesQueryCache: boolean;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
   disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
 }
 include(ConnectionPool, ConnectionPoolConfiguration);

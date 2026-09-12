@@ -362,6 +362,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   _previousReadUncommitted: unknown = null;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   override async internalExecute(
     sql: string,
     name: string = "SQL",
@@ -454,6 +455,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
   async close(): Promise<void> {
     if (this._closingDriver) {
       const closing = this._closingDriver;
@@ -469,14 +471,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._closingDriver ?? Promise.resolve();
   }
 
-  get isOpen(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
-  }
-
-  get raw(): unknown {
-    return this._rawConnection?.raw;
-  }
-
+  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
     const castType = this.lookupCastType(raw);
@@ -1074,26 +1069,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
-  async tables(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.map((r) => r.name);
-  }
-
-  async views(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.map((r) => r.name);
-  }
-
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   /** @internal */
@@ -1107,17 +1082,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const name = kwargsOnly ? null : nameOrOptions;
     const opts = kwargsOnly ? nameOrOptions : options;
     return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
-  }
-
-  async tableExists(name: string): Promise<boolean> {
-    if (name == null) return false;
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.length > 0;
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
