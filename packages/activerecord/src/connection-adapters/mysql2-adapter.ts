@@ -38,7 +38,6 @@ import { _Base } from "../base-slot.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
-import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -513,70 +512,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
     dumper.connection = this;
     return dumper;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async tables(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT table_name AS name FROM information_schema.tables
-         WHERE table_schema = database() AND table_type = 'BASE TABLE'
-         ORDER BY table_name`,
-        "SCHEMA",
-      )
-    ).toArray();
-    return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async views(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT table_name AS name FROM information_schema.tables
-         WHERE table_schema = database() AND table_type = 'VIEW'
-         ORDER BY table_name`,
-        "SCHEMA",
-      )
-    ).toArray();
-    return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async tableExists(name: string): Promise<boolean> {
-    if (!name) return false;
-    const { schema, table } = mysqlParseName(name);
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT 1 AS one FROM information_schema.tables
-         WHERE table_schema = COALESCE(?, database())
-         AND table_name = ?
-         AND table_type = 'BASE TABLE'
-         LIMIT 1`,
-        "SCHEMA",
-        [schema ?? null, table],
-      )
-    ).toArray();
-    return rows.length > 0;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, table } = mysqlParseName(tableName);
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT column_name AS name FROM information_schema.statistics
-         WHERE index_name = 'PRIMARY'
-         AND table_schema = COALESCE(?, database())
-         AND table_name = ?
-         ORDER BY seq_in_index`,
-        "SCHEMA",
-        [schema ?? null, table],
-      )
-    ).toArray() as Array<{ name?: string; NAME?: string; COLUMN_NAME?: string }>;
-    const names = rows.map((r) => (r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
-    if (names.length === 0) return null;
-    if (names.length === 1) return names[0];
-    return names;
   }
 
   /** @internal */

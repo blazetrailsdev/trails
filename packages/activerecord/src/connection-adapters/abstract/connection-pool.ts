@@ -303,11 +303,6 @@ export class ConnectionPool implements ReapablePool {
     return `#<ConnectionPool ${parts.join(" ")}>`;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  toString(): string {
-    return this.inspect();
-  }
-
   /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
@@ -618,7 +613,7 @@ export class ConnectionPool implements ReapablePool {
       size: this.size,
       connections: this._connections?.length ?? 0,
       busy: this._checkedOut.size,
-      idle: this._available?.length ?? 0,
+      idle: this._connections?.filter((c) => !c.inUse).length ?? 0,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
@@ -798,7 +793,7 @@ export class ConnectionPool implements ReapablePool {
       throw ex;
     }
     if (
-      SchemaReflection.lazilyLoadSchemaCache &&
+      (_Base?.lazilyLoadSchemaCache ?? false) &&
       !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
       !this.poolConfig.schemaCache

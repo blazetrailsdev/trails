@@ -695,6 +695,7 @@ let _schemaFormat: SchemaFormat = "ts";
 let _dumpSchemaAfterMigration = true;
 let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 let _verifyForeignKeysForFixtures = false;
+let _lazilyLoadSchemaCache = false;
 let _queryTransformers: QueryTransformer[] = [];
 let _useYamlUnsafeLoad = false;
 let _raiseIntWiderThan64bit = true;
@@ -969,6 +970,14 @@ export class Base extends Model {
 
   static set verifyForeignKeysForFixtures(value: boolean) {
     _verifyForeignKeysForFixtures = value;
+  }
+
+  static get lazilyLoadSchemaCache(): boolean {
+    return _lazilyLoadSchemaCache;
+  }
+
+  static set lazilyLoadSchemaCache(value: boolean) {
+    _lazilyLoadSchemaCache = value;
   }
 
   static get queryTransformers(): QueryTransformer[] {

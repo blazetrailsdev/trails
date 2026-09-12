@@ -1079,28 +1079,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async tables(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.map((r) => r.name);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async views(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.map((r) => r.name);
-  }
-
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   /** @internal */
@@ -1114,18 +1092,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const name = kwargsOnly ? null : nameOrOptions;
     const opts = kwargsOnly ? nameOrOptions : options;
     return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  async tableExists(name: string): Promise<boolean> {
-    if (name == null) return false;
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
-        "SCHEMA",
-      )
-    ).toArray() as Array<{ name: string }>;
-    return rows.length > 0;
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {

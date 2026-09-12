@@ -64,11 +64,6 @@ export class SqlTypeMetadata implements Deduplicable {
     });
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  toString(): string {
-    return this.sqlType ?? "";
-  }
-
   deduplicate(): this {
     return deduplicate(this);
   }

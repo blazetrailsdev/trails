@@ -490,8 +490,6 @@ export class SchemaCache {
 export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  static lazilyLoadSchemaCache = false;
 
   /** @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip */
   static eagerLoadSchemaCache = false;

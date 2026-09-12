@@ -145,11 +145,6 @@ export class Column implements Deduplicable {
     }
     return Object.freeze(this);
   }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  toString(): string {
-    return this.name;
-  }
 }
 
 /** @internal */
