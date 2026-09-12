@@ -584,7 +584,7 @@ export class JoinDependency {
 
   private constructModel(
     record: any,
-    node: JoinPart,
+    node: JoinAssociation,
     row: Record<string, unknown>,
     modelCache: Map<JoinPart, Map<unknown, any>>,
     id: unknown,
@@ -616,10 +616,10 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _setInverseBeforeCallbacks(parent: any, node: JoinPart, child: any): void {
+  private _setInverseBeforeCallbacks(parent: any, node: JoinAssociation, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(((node as JoinAssociation).reflection as any).name);
+      const proxy = parent.association((node.reflection as any).name);
       if (proxy && typeof proxy.setInverseInstance === "function") {
         proxy.setInverseInstance(child);
       }
@@ -629,12 +629,12 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _wireAssociationProxy(parent: any, node: JoinPart, child: any): void {
+  private _wireAssociationProxy(parent: any, node: JoinAssociation, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(((node as JoinAssociation).reflection as any).name);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy) return;
-      const isCollection = (node as JoinAssociation).reflection.isCollection();
+      const isCollection = node.reflection.isCollection();
       if (isCollection) {
         if (!proxy.loaded) {
           proxy.target = [];
@@ -655,10 +655,10 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _markCollectionLoaded(parent: any, node: JoinPart): void {
+  private _markCollectionLoaded(parent: any, node: JoinAssociation): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(((node as JoinAssociation).reflection as any).name);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy || proxy.loaded) return;
       proxy.target = [];
     } catch (e) {
@@ -667,12 +667,12 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _markAssociationLoaded(parent: any, node: JoinPart): void {
+  private _markAssociationLoaded(parent: any, node: JoinAssociation): void {
     if (typeof parent.association !== "function") return;
     try {
-      const proxy = parent.association(((node as JoinAssociation).reflection as any).name);
+      const proxy = parent.association((node.reflection as any).name);
       if (!proxy || proxy.loaded) return;
-      const isCollection = (node as JoinAssociation).reflection.isCollection();
+      const isCollection = node.reflection.isCollection();
       proxy._setTargetFromLoader(isCollection ? [] : null);
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
