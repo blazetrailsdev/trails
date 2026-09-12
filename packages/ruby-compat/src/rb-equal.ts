@@ -81,21 +81,24 @@ export function rbEqual(a: unknown, b: unknown): boolean {
   const entriesA = hashEntries(a);
   if (entriesA !== null) {
     const entriesB = hashEntries(b);
-    if (entriesB === null || entriesA.size !== entriesB.size) return false;
-    for (const [key, value] of entriesA) {
-      if (!entriesB.has(key)) return false;
-      if (!rbEqual(value, entriesB.get(key))) return false;
-    }
-    return true;
+    if (entriesB === null || entriesA.length !== entriesB.length) return false;
+    /* `eql_i` (`vendor/ruby/hash.c:3714`) finds hash2's entry with
+       `hash_stlike_lookup` (`hash.c:3719`), by
+       the Hash's own key semantics — `hash` then `eql?` — not by identity, so a
+       separately allocated but Ruby-equal key (an Array key, say) still hits. */
+    return entriesA.every(([key, value]) => {
+      const found = entriesB.find(([otherKey]) => rbEqual(key, otherKey));
+      return found !== undefined && rbEqual(value, found[1]);
+    });
   }
   return false;
 }
 
 /** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3746`) over both JS seats. */
-function hashEntries(value: unknown): Map<unknown, unknown> | null {
-  if (value instanceof Map) return new Map(value);
+function hashEntries(value: unknown): [unknown, unknown][] | null {
+  if (value instanceof Map) return [...value.entries()];
   if (typeof value === "object" && value !== null && value.constructor === Object) {
-    return new Map(Object.entries(value as Record<string, unknown>));
+    return Object.entries(value as Record<string, unknown>);
   }
   return null;
 }

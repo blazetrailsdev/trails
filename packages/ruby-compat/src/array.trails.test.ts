@@ -75,6 +75,9 @@ describe("Array#compact and Array#uniq", () => {
       [1, 3],
     ]);
     expect(uniq([{ a: 1 }, { a: 1 }])).toEqual([{ a: 1 }]);
+    expect(uniq([new Map([["a", 1]]), new Map([["a", 1]]), { a: 1 }])).toEqual([
+      new Map([["a", 1]]),
+    ]);
   });
 
   it("collapses the two JS seats of one Ruby Integer", () => {

@@ -37,6 +37,7 @@ describe("rbEqual over the two JS seats of a Ruby Hash", () => {
     expect(rbEqual({ a: 1 }, new Map([["a", 1]]))).toBe(true);
     expect(rbEqual(new Map([["a", 1]]), new Map([["a", 2]]))).toBe(false);
     expect(rbEqual(new Map([["a", 1]]), { a: 1, b: 2 })).toBe(false);
+    expect(rbEqual(new Map([[[1], "v"]]), new Map([[[1], "v"]]))).toBe(true);
   });
 
   it("recurses into nested values", () => {
