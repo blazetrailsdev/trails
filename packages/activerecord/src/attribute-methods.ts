@@ -548,8 +548,13 @@ export const ClassMethods = {
 };
 
 export function attributeForInspect(this: InstanceMethodHost, attrName: string): string {
-  const raw = this.readAttribute(attrName);
-  return _formatForInspect.call(this as any, attrName, raw);
+  attrName = String(attrName);
+  attrName =
+    (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
+      attrName
+    ] ?? attrName;
+  const value = this._readAttribute(attrName);
+  return _formatForInspect.call(this as any, attrName, value);
 }
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {
