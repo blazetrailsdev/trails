@@ -4,7 +4,6 @@ import { Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
-  ReflectionProxy,
   type AssociationScopeable,
   unionOrderClauses,
 } from "./association-scope.js";
@@ -17,7 +16,7 @@ import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 import { setDjasScopeBuilder } from "./_scope-slots.js";
 
-type ChainEntry = AbstractReflection | ReflectionProxy;
+type ChainEntry = AbstractReflection;
 
 type JoinIds = unknown[] | unknown[][];
 

@@ -632,7 +632,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("include uses array include after loaded", async () => {
     const activeRecord = projects("active_record");
     const proxy = activeRecord.developers;
-    const loaded = await proxy.load();
+    const loaded = await proxy.loadTarget();
     const developer = loaded[0];
     await assertNoQueries(false, async () => {
       expect(proxy.loaded).toBe(true);

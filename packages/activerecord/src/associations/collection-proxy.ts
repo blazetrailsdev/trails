@@ -13,7 +13,7 @@ import type { PrettyPrinter } from "../pretty-print.js";
 import { collectionProxyClassFor, wrapWithScopeProxy } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
-import { applyThenable, stripThenable } from "../relation/thenable.js";
+import { stripThenable } from "../relation/thenable.js";
 import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
@@ -249,30 +249,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return assoc.findTarget();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
-  async toArray(): Promise<T[]> {
-    if (!this._targetLoaded && this.isNullScope()) {
-      const results = await this._execLoad();
-      return this._association.mergeTargetLists(results, this._target) as T[];
-    }
-    return this.load();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
-  // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
-  async load(): Promise<T[]> {
-    if (this._targetLoaded) {
-      const wrapper = this._staleWrapper();
-      if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
-      this._target = [];
-      this._targetLoaded = false;
-      wrapper?.resetScope?.();
-    }
-    const results = await this._execLoad();
-    this._target = this._association.mergeTargetLists(results, this._target) as T[];
-    this._targetLoaded = true;
-    this._staleWrapper()?.loadedBang?.();
-    return this._target;
+  protected override async execQueries(): Promise<T[]> {
+    return this.loadTarget();
   }
 
   private _staleWrapper(): StaleWrapper | undefined {
@@ -470,7 +448,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return (this._scope ??= assoc.scope() as any);
   }
   async loadTarget(): Promise<T[]> {
-    return this.load();
+    if (this._targetLoaded) {
+      const wrapper = this._staleWrapper();
+      if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
+      this._target = [];
+      this._targetLoaded = false;
+      wrapper?.resetScope?.();
+    }
+    const results = await this._execLoad();
+    this._target = this._association.mergeTargetLists(results, this._target) as T[];
+    this._targetLoaded = true;
+    this._staleWrapper()?.loadedBang?.();
+    return this._target;
   }
 
   /** @internal */
@@ -584,17 +573,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
-  select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<T>;
-  select(...args: any[]): Promise<T[]> | Relation<T> {
-    if (args.length === 1 && typeof args[0] === "function") {
-      const predicate = args[0] as (record: T) => boolean;
-      return this.loadTarget().then((records) => records.filter(predicate));
-    }
-    return this.scope().select(...args);
-  }
-
   /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.loadTarget();
@@ -612,7 +590,7 @@ export const MIXIN_PUBLIC_INSTANCE_METHODS = [QueryMethods, SpawnMethods].flatMa
 const ownPublicInstanceMethods = publicInstanceMethods(CollectionProxy, false);
 
 const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
-  (name) => !ownPublicInstanceMethods.includes(name) && name !== "select",
+  (name) => !ownPublicInstanceMethods.includes(name),
 ).concat([
   "scoping",
   "values",
@@ -653,8 +631,6 @@ for (const name of delegateMethods) {
     configurable: true,
   });
 }
-
-applyThenable(CollectionProxy.prototype, "load");
 
 _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],

@@ -126,7 +126,7 @@ describe("AssociationScope", () => {
   it("ReflectionProxy delegates joinPrimaryKey / joinForeignKey / klass to the reflection", () => {
     const { AsAuthor, AsPost } = makeModels();
     const reflection = (AsAuthor as any)._reflectOnAssociation("as_posts");
-    const proxy = new ReflectionProxy(reflection, null) as any;
+    const proxy = new ReflectionProxy(reflection, null) as ReflectionProxy & typeof reflection;
 
     expect(proxy.joinPrimaryKey()).toBe(reflection.joinPrimaryKey());
     expect(proxy.joinForeignKey).toBe(reflection.joinForeignKey);

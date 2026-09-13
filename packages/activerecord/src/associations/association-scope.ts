@@ -86,10 +86,7 @@ export class AssociationScope {
     return AssociationScope.INSTANCE.scope(association);
   }
 
-  static getBindValues(
-    owner: Base,
-    chain: ReadonlyArray<AbstractReflection | ReflectionProxy>,
-  ): unknown[] {
+  static getBindValues(owner: Base, chain: ReadonlyArray<AbstractReflection>): unknown[] {
     const binds: unknown[] = [];
     const last = chain[chain.length - 1];
     if (!last) return binds;
@@ -164,17 +161,13 @@ export class AssociationScope {
     return w.where({ [key]: value });
   }
 
-  private lastChainScope(
-    scope: unknown,
-    reflection: AbstractReflection | ReflectionProxy,
-    owner: Base,
-  ): unknown {
+  private lastChainScope(scope: unknown, reflection: AbstractReflection, owner: Base): unknown {
     const r = reflection as unknown as {
       joinPrimaryKey(klass?: typeof Base): string | string[];
       joinForeignKey: string | string[];
       type?: string | null;
     };
-    const aliased = (reflection as ReflectionProxy).aliasedTable as
+    const aliased = (reflection as Partial<ReflectionProxy>).aliasedTable as
       | string
       | { name?: string }
       | null
@@ -223,10 +216,8 @@ export class AssociationScope {
     reflection: AssociationReflection,
     association: AssociationScopeable,
     tracker?: AliasTracker,
-  ): Array<AbstractReflection | ReflectionProxy> {
-    const chain: Array<AbstractReflection | ReflectionProxy> = [
-      new RuntimeReflection(reflection, association),
-    ];
+  ): Array<AbstractReflection> {
+    const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
     const tail = drop(reflection.chain, 1);
     const name = reflection.name;
     for (const refl of tail) {
@@ -240,15 +231,15 @@ export class AssociationScope {
       } else {
         aliasedTable = klass?.tableName ?? "";
       }
-      chain.push(new ReflectionProxy(refl, aliasedTable));
+      chain.push(new ReflectionProxy(refl, aliasedTable) as ReflectionProxy & typeof refl);
     }
     return chain;
   }
 
   private nextChainScope(
     scope: unknown,
-    reflection: AbstractReflection | ReflectionProxy,
-    nextReflection: AbstractReflection | ReflectionProxy,
+    reflection: AbstractReflection,
+    nextReflection: AbstractReflection,
   ): unknown {
     const r = reflection as unknown as {
       joinPrimaryKey(klass?: typeof Base): string | string[];
@@ -280,7 +271,7 @@ export class AssociationScope {
         foreignKey: joinFks,
       });
     }
-    const rAliased = (reflection as ReflectionProxy).aliasedTable as
+    const rAliased = (reflection as Partial<ReflectionProxy>).aliasedTable as
       | string
       | { name?: string }
       | null
@@ -322,34 +313,26 @@ export class AssociationScope {
 
   /** @internal */
   private _arelTableFor(
-    reflection: AbstractReflection | ReflectionProxy,
+    reflection: AbstractReflection,
     name: string,
   ): ArelTable | Nodes.TableAlias {
-    const aliased = (reflection as ReflectionProxy).aliasedTable;
+    const aliased = (reflection as Partial<ReflectionProxy>).aliasedTable;
     if (aliased instanceof ArelTable || aliased instanceof Nodes.TableAlias) return aliased;
     if (typeof aliased === "string" && aliased) {
-      return aliasedArelTableForReflection(reflection as AbstractReflection, name, aliased);
+      return aliasedArelTableForReflection(reflection, name, aliased);
     }
     if (
       aliased &&
       typeof aliased === "object" &&
       typeof (aliased as { name?: unknown }).name === "string"
     ) {
-      return aliasedArelTableForReflection(
-        reflection as AbstractReflection,
-        name,
-        (aliased as { name: string }).name,
-      );
+      return aliasedArelTableForReflection(reflection, name, (aliased as { name: string }).name);
     }
-    return aliasedArelTableForReflection(reflection as AbstractReflection, name);
+    return aliasedArelTableForReflection(reflection, name);
   }
 
   /** @missingRailsCall empty? — PERMANENT */
-  private addConstraints(
-    scope: unknown,
-    owner: Base,
-    chain: Array<AbstractReflection | ReflectionProxy>,
-  ): unknown {
+  private addConstraints(scope: unknown, owner: Base, chain: Array<AbstractReflection>): unknown {
     const last = chain[chain.length - 1];
     scope = this.lastChainScope(scope, last, owner);
     for (let i = 0; i < chain.length - 1; i++) {
@@ -444,12 +427,12 @@ export class AssociationScope {
 
   /** @internal */
   protected evalScope(
-    reflection: AbstractReflection | ReflectionProxy,
+    reflection: AbstractReflection,
     scope: (...args: unknown[]) => unknown,
     owner: Base,
   ): unknown {
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
-      (reflection as ReflectionProxy).aliasedTable,
+      (reflection as Partial<ReflectionProxy>).aliasedTable,
     );
     const evaluated = invokeScopeLambda(scope as ScopeLambda<unknown>, relation, owner);
     return evaluated != null && evaluated !== false ? evaluated : relation;
