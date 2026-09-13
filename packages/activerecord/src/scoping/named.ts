@@ -6,7 +6,7 @@ import { Relation } from "../relation.js";
 import { isDangerousClassMethod } from "../attribute-methods.js";
 import { Default } from "./default.js";
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function isRelationInstanceMethod(name: string): boolean {
   let proto: any = Relation.prototype;
   while (proto && proto !== Object.prototype) {

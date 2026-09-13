@@ -19,17 +19,17 @@ function normalizeVersion(version: string | number): string {
   return version;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function registerVersion(version: string, klass: MigrationClass): void {
   versionRegistry.set(normalizeVersion(version), klass);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function resetVersionRegistry(): void {
   versionRegistry.clear();
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function findVersion(version: string | number): MigrationClass {
   const name = normalizeVersion(version);
   const klass = versionRegistry.get(name);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ExecutionContext } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
-import { QueryLogs, escapeComment, GetKeyHandler } from "./query-logs.js";
+import { QueryLogs, GetKeyHandler } from "./query-logs.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { queryLogs } from "./query-logs-instance.js";
 import type { QueryTransformer } from "./query-transformers.js";
@@ -48,19 +48,25 @@ describe("QueryLogsTest", () => {
   });
 
   it("escaping good comment", () => {
-    expect(escapeComment("app:foo")).toBe("app:foo");
+    expect((queryLogs as any).escapeSqlComment("app:foo")).toBe("app:foo");
   });
 
   it("escaping good comment with custom separator", () => {
     queryLogs.tagsFormatter = "sqlcommenter";
 
-    expect(escapeComment("app='foo'")).toBe("app='foo'");
+    expect((queryLogs as any).escapeSqlComment("app='foo'")).toBe("app='foo'");
   });
 
   it("escaping bad comments", () => {
-    expect(escapeComment("*/; DROP TABLE USERS;/*")).toBe("* /; DROP TABLE USERS;/ *");
-    expect(escapeComment("**//; DROP TABLE USERS;/*")).toBe("** //; DROP TABLE USERS;/ *");
-    expect(escapeComment("* *//; DROP TABLE USERS;//* *")).toBe("* * //; DROP TABLE USERS;// * *");
+    expect((queryLogs as any).escapeSqlComment("*/; DROP TABLE USERS;/*")).toBe(
+      "* /; DROP TABLE USERS;/ *",
+    );
+    expect((queryLogs as any).escapeSqlComment("**//; DROP TABLE USERS;/*")).toBe(
+      "** //; DROP TABLE USERS;/ *",
+    );
+    expect((queryLogs as any).escapeSqlComment("* *//; DROP TABLE USERS;//* *")).toBe(
+      "* * //; DROP TABLE USERS;// * *",
+    );
   });
 
   it("basic commenting", async () => {

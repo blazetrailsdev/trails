@@ -63,7 +63,7 @@ export class AdapterError extends ActiveRecordError {
     this._connectionPool = options?.connectionPool;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   setConnectionPool(connectionPool: unknown): this {
     if (this._connectionPool === undefined) {
       this._connectionPool = connectionPool;
@@ -171,7 +171,7 @@ export class RecordNotFound extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export class AssociationTargetReplacedDuringLoad extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
@@ -382,7 +382,7 @@ export interface MismatchedForeignKeyOptions {
 }
 
 export class MismatchedForeignKey extends StatementInvalid {
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   readonly fkDetails: Pick<
     MismatchedForeignKeyOptions,
     "table" | "foreignKey" | "targetTable" | "primaryKey" | "primaryKeyColumn"

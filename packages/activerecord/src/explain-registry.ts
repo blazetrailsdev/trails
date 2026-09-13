@@ -11,8 +11,7 @@ export class ExplainRegistry {
     instance().collect = value;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  static collectEnabled(): boolean {
+  static collectQ(): boolean {
     return instance().collectQ();
   }
 

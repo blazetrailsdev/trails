@@ -41,7 +41,7 @@ export class Column implements Deduplicable {
     return this.sqlTypeMetadata?.type ?? null;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   get baseType(): string | null {
     return this.sqlTypeMetadata?.type ?? null;
   }

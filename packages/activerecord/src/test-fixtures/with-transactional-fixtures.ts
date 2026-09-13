@@ -120,7 +120,7 @@ export interface WithTransactionalFixturesOptions {
   useTransactionalTests?: boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function withTransactionalFixtures(
   getAdapter: () => TransactionalFixturesAdapter,
   options: WithTransactionalFixturesOptions = {},

@@ -43,7 +43,7 @@ function statelessTest(pattern: RegExp, value: string): boolean {
   return stateless.test(value);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function assertSafeMysqlIdentifier(value: string, kind: string): void {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
@@ -119,7 +119,7 @@ export class ColumnDefinition {
   ];
 
   sqlType?: string;
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   datetimePhysicalType?: string;
   constructor(
     readonly name: string,
@@ -1249,7 +1249,7 @@ export class Table {
   async numeric(...args: unknown[]): Promise<void> {
     await this.definedColumn("decimal", args);
   }
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   async char(...names: string[]): Promise<void>;
   async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async char(...args: unknown[]): Promise<void> {

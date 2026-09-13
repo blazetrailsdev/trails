@@ -98,7 +98,7 @@ export class PoolConfig {
     return this._pool;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   get poolInitialized(): boolean {
     return this._pool !== null;
   }
@@ -170,11 +170,6 @@ export class PoolConfig {
       drains.push(config.disconnectBang({ automaticReconnect: true }));
     }
     await Promise.all(drains);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  get connectionSpecName(): string {
-    return this.dbConfig.name;
   }
 
   get connectionDescriptor(): ConnectionDescriptor {

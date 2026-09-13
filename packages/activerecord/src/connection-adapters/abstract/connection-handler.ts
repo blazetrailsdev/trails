@@ -297,14 +297,6 @@ export class ConnectionHandler {
     return pool;
   }
 
-  /**
-   * @deprecated
-   * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
-   */
-  async clearAllConnections(): Promise<void> {
-    await this.clearAllConnectionsBang();
-  }
-
   /** @internal */
   private connectionNameToPoolManager(): Map<string, PoolManager> {
     return this._connectionNameToPoolManager;

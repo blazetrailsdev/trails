@@ -466,7 +466,7 @@ describe("ReflectionTest", () => {
     expect(ref).toBeInstanceOf(ThroughReflection);
     expect((ref as ThroughReflection).through).toBe("subscriptions");
     expect((ref as ThroughReflection).sourceReflectionName()).toBe("subBook");
-    expect(ref!.isThrough()).toBe(true);
+    expect(ref!.isThroughReflection()).toBe(true);
   });
 
   it("has and belongs to many reflection", () => {

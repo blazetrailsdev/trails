@@ -191,16 +191,11 @@ export class QueryLogs implements QueryTransformer {
   }
 
   private escapeSqlComment(content: string): string {
-    return escapeComment(content);
+    return String(content)
+      .replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "")
+      .replace(/\*\//g, "* /")
+      .replace(/\/\*/g, "/ *");
   }
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-export function escapeComment(content: string): string {
-  return String(content)
-    .replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "")
-    .replace(/\*\//g, "* /")
-    .replace(/\/\*/g, "/ *");
 }
 
 /** @internal */

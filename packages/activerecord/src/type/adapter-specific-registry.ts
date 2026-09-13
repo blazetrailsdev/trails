@@ -71,7 +71,7 @@ export class Registration {
     return result;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   compareTo(other: Registration): number {
     if (this.isConflictsWith(other)) {
       throw new TypeConflictError(

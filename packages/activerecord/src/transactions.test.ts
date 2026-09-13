@@ -1165,12 +1165,12 @@ describe("TransactionTest", () => {
     const txn = await new TransactionManager(connection).beginTransaction();
 
     expect(txn.open).toBe(true);
-    expect(txn.state.rolledBack).toBe(false);
+    expect(txn.state.isRolledback()).toBe(false);
     expect(txn.state.committed).toBe(false);
 
     await txn.rollback();
 
-    expect(txn.state.rolledBack).toBe(true);
+    expect(txn.state.isRolledback()).toBe(true);
     expect(txn.state.committed).toBe(false);
   });
 
@@ -1180,12 +1180,12 @@ describe("TransactionTest", () => {
     const txn = await new TransactionManager(connection).beginTransaction();
 
     expect(txn.open).toBe(true);
-    expect(txn.state.rolledBack).toBe(false);
+    expect(txn.state.isRolledback()).toBe(false);
     expect(txn.state.committed).toBe(false);
 
     await txn.commit();
 
-    expect(txn.state.rolledBack).toBe(false);
+    expect(txn.state.isRolledback()).toBe(false);
     expect(txn.state.committed).toBe(true);
   });
 

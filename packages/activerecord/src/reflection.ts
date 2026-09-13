@@ -195,11 +195,6 @@ export class AbstractReflection {
     return false;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  isThrough(): boolean {
-    return this.isThroughReflection();
-  }
-
   get chain(): AbstractReflection[] {
     return this.collectJoinChain();
   }
@@ -641,7 +636,7 @@ export class AssociationReflection extends MacroReflection {
     return this.computeForeignKey();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   computeForeignKey(inferFromInverseOf = true): string | string[] {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 
