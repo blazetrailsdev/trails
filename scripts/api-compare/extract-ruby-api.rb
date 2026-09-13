@@ -2809,7 +2809,7 @@ class ApiExtractor
       target = node[1]
       if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@ivar
         key = [owner.join("::"), target[1][1]]
-        value = node[2]
+        value = node[0] == :opassign ? node[3] : node[2]
         hashy = value.is_a?(Array) && (%i[hash bare_assoc_hash].include?(value[0]) ||
           (value[0] == :call && ident_name(value[3]) == "to_hash"))
         assigned[key] = assigned.fetch(key, true) && hashy

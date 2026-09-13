@@ -3036,9 +3036,11 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             @row = fixture.to_hash
             @seen = {}
             @items = compute
+            @cache ||= {}
           end
 
           def call(name)
+            @cache.fetch(name)
             @row.delete(name)
             @seen.include?(name)
             @items.include?(name)
@@ -3050,7 +3052,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         end
       `,
     });
-    expect(c["Row#call"]).toEqual({ delete: ["hash"], "include?": ["ivar"] });
+    expect(c["Row#call"]).toEqual({ fetch: ["hash"], delete: ["hash"], "include?": ["ivar"] });
   });
 
   it("proves a Hash ivar only within the class that assigns it", () => {
