@@ -53,7 +53,7 @@ export class Preloader {
     return (await this._tree.preloadedRecords()).length === 0;
   }
 
-  async materialize(): Promise<void> {
+  private async materialize(): Promise<void> {
     if (this._materialized) return;
     this._tree.setPreloadedRecords(await (this.records as Relation<Base>));
     this._materialized = true;

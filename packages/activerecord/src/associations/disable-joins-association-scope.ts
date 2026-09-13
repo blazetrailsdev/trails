@@ -6,7 +6,6 @@ import {
   AssociationScope,
   ReflectionProxy,
   type AssociationScopeable,
-  type ValueTransformation,
   unionOrderClauses,
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
@@ -42,10 +41,6 @@ function resolveJoinPrimaryKey(reflection: unknown, klass?: typeof Base): string
 }
 
 export class DisableJoinsAssociationScope extends AssociationScope {
-  constructor(valueTransformation: ValueTransformation = (v) => v) {
-    super(valueTransformation);
-  }
-
   /** @missingRailsCall add_constraints — PERMANENT */
   override scope(association: AssociationScopeable): unknown {
     const sourceReflection = association.reflection;
@@ -85,7 +80,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     if (!firstItem) {
       throw new Error("DisableJoinsAssociationScope: empty chain");
     }
-    const firstFk = (firstItem as { joinForeignKey: string | string[] }).joinForeignKey;
+    const firstFk = (firstItem as unknown as { joinForeignKey: string | string[] }).joinForeignKey;
     const firstFkCols = keyColumns(firstFk, "joinForeignKey");
     const seedTuple = readTuple(owner, firstFkCols);
     const initialIds: JoinIds = firstFkCols.length === 1 ? [seedTuple[0]] : [seedTuple];
@@ -93,7 +88,8 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
     for (const nextReflection of work) {
       const [reflection, ordered, joinIds] = acc;
-      const foreignKey = (nextReflection as { joinForeignKey: string | string[] }).joinForeignKey;
+      const foreignKey = (nextReflection as unknown as { joinForeignKey: string | string[] })
+        .joinForeignKey;
       const foreignKeyCols = keyColumns(foreignKey, "joinForeignKey");
       if (joinIds.length === 0) {
         acc = [nextReflection, false, []];

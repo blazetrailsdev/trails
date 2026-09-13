@@ -32,6 +32,7 @@ import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
+  /** @noRailsEquivalent PERMANENT */
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
@@ -248,6 +249,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return assoc.findTarget();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
   async toArray(): Promise<T[]> {
     if (!this._targetLoaded && this.isNullScope()) {
       const results = await this._execLoad();
@@ -256,6 +258,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this.load();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
   async load(): Promise<T[]> {
     if (this._targetLoaded) {
@@ -581,6 +584,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-collection-proxy-load-select-onto-relation */
   select(fn: (record: T) => boolean): Promise<T[]>;
   select(...columns: (string | Nodes.SqlLiteral)[]): Relation<T>;
   select(...args: any[]): Promise<T[]> | Relation<T> {

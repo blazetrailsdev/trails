@@ -15,6 +15,7 @@ export class HasOne extends SingularAssociation {
     return valid;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   static override build(
     model: any,
     name: string,
@@ -36,6 +37,7 @@ export class HasOne extends SingularAssociation {
     return super.build(model, name, scope, options);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   static override defineConstructors(mixin: any, name: string): void {
     super.defineConstructors(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
@@ -53,6 +55,7 @@ export class HasOne extends SingularAssociation {
     });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);

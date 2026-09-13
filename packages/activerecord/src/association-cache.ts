@@ -1,4 +1,4 @@
-/** @internal */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: clear, constructor, delete, entries, forEach, get, keys, proxies, set, size, store, values. */
 
 export type AssociationFacetKey = "instance" | "proxy";
 

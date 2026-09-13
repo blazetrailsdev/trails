@@ -3270,7 +3270,7 @@ include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
-include(Base, _AttributeAssignment.InstanceMethods);
+include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });

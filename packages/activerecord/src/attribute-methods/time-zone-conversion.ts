@@ -6,6 +6,7 @@ import {
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
+import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 interface TimeValueSubtype extends ValueType {
@@ -39,87 +40,44 @@ export const TimeZoneConversion = {
   },
 };
 
-export class TimeZoneConverter extends ValueType<unknown> {
-  private readonly _subtype: ValueType;
-
+export class TimeZoneConverter extends DelegateClass(ValueType) {
   constructor(subtype: ValueType) {
-    super();
-    this._subtype = subtype;
+    if (subtype instanceof TimeZoneConverter) return subtype;
+    super(subtype);
   }
 
-  static wrap(subtype: ValueType): TimeZoneConverter {
-    return subtype instanceof TimeZoneConverter ? subtype : new TimeZoneConverter(subtype);
-  }
-
-  override type(): string | undefined {
-    return this._subtype.type();
+  override deserialize(value: unknown): unknown {
+    return this.convertTimeToTimeZone(super.deserialize(value));
   }
 
   override cast(value: unknown): unknown {
     if (value == null) return null;
+    const subtype = this.__getobj__() as TimeValueSubtype;
     if (isPlainObject(value)) {
-      return setTimeZoneWithoutConversion(this._subtype.cast(value));
+      return setTimeZoneWithoutConversion(super.cast(value));
     }
     if (value instanceof TimeWithZone || value instanceof RubyTime) {
-      const casted = this._subtype.cast(
-        (this._subtype as TimeValueSubtype).userInputInTimeZone(value),
-      );
-      return casted != null && casted !== false ? casted : this._subtype.cast(value);
+      const casted = super.cast(subtype.userInputInTimeZone(value));
+      return casted != null && casted !== false ? casted : super.cast(value);
     }
     if (value instanceof Temporal.ZonedDateTime) {
       return this.convertTimeToTimeZone(value.toInstant());
     }
     if (value instanceof Temporal.Instant) {
-      return this.convertTimeToTimeZone(this._subtype.cast(value));
+      return this.convertTimeToTimeZone(super.cast(value));
     }
     if (value instanceof Temporal.PlainDateTime) {
       return setTimeZoneWithoutConversion(value.toZonedDateTime("UTC").toInstant());
     }
     if (typeof value === "string") {
-      const casted = this._subtype.cast(
-        (this._subtype as TimeValueSubtype).userInputInTimeZone(value),
-      );
-      return casted != null && casted !== false ? casted : this._subtype.cast(value);
+      const casted = super.cast(subtype.userInputInTimeZone(value));
+      return casted != null && casted !== false ? casted : super.cast(value);
     }
-    return this.map(this._subtype.cast(value), (v) => this.cast(v));
-  }
-
-  override deserialize(value: unknown): unknown {
-    return this.convertTimeToTimeZone(this._subtype.deserialize(value));
-  }
-
-  override serialize(value: unknown): unknown {
-    return this._subtype.serialize(value);
-  }
-
-  override serializeCastValue(value: unknown): unknown {
-    const sub = this._subtype;
-    if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
-      return sub.itselfIfSerializeCastValueCompatible()
-        ? sub.serializeCastValue(value as any)
-        : this._subtype.serialize(value);
-    }
-    return this._subtype.serialize(value);
-  }
-
-  override assertValidValue(value: unknown): void {
-    this._subtype.assertValidValue(value);
-  }
-
-  override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return this._subtype.isValueConstructedByMassAssignment(value);
+    return this.map(super.cast(value), (v) => this.cast(v));
   }
 
   override equals(other: ValueType): boolean {
-    if (!(other instanceof TimeZoneConverter)) return false;
-    const sub = this._subtype;
-    return typeof sub.equals === "function"
-      ? sub.equals(other._subtype)
-      : this._subtype === other._subtype;
-  }
-
-  override map(value: unknown, block: (value: unknown) => unknown): unknown {
-    return this._subtype.map(value as never, block);
+    return other instanceof TimeZoneConverter && rbEqual(this.__getobj__(), other.__getobj__());
   }
 
   private convertTimeToTimeZone(value: unknown): unknown {
@@ -173,7 +131,7 @@ export function hookAttributeType(
   castType: ValueType,
 ): ValueType {
   if (isCreateTimeZoneConversionAttribute.call(this, name, castType)) {
-    return TimeZoneConverter.wrap(castType);
+    return new TimeZoneConverter(castType);
   }
   return castType;
 }

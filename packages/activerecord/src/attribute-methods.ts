@@ -17,10 +17,7 @@ import {
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, loadSchema } from "./model-schema.js";
-import {
-  serializableHash as _serializableHash,
-  attributeNamesForSerialization as _attrNamesForSerialization,
-} from "./serialization.js";
+import { attributeNamesForSerialization as _attrNamesForSerialization } from "./serialization.js";
 
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
@@ -107,6 +104,7 @@ export class GeneratedAttributeMethods extends Module {
    */
   ownerName?: string;
 
+  /** @noRailsEquivalent PERMANENT */
   inspect(): string {
     return `${this.ownerName}::GeneratedAttributeMethods`;
   }
@@ -602,13 +600,6 @@ export function id(this: InstanceMethodHost, value?: unknown): unknown {
 
 export async function reload<T>(this: T): Promise<T> {
   return _reload.call(this as any) as unknown as Promise<T>;
-}
-
-export function serializableHash(
-  this: InstanceMethodHost,
-  options?: unknown,
-): Record<string, unknown> {
-  return _serializableHash.call(this as any, options as any);
 }
 
 /** @internal */

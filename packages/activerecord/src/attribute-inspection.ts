@@ -4,17 +4,21 @@ import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conve
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 /** @internal */
+/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export class InspectionMask {
   private _value: string = ParameterFilter.FILTERED;
 
+  /** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
   toString(): string {
     return this._value;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
   inspect(): string {
     return this._value;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
   toJSON(): string {
     return this._value;
   }
@@ -34,6 +38,7 @@ function parentClass(klass: CoreHost): CoreHost | null {
   return typeof proto === "function" ? (proto as CoreHost) : null;
 }
 
+/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export function inspectionFilter(this: CoreHost): ParameterFilter {
   if (this._inspectionFilter) return this._inspectionFilter;
   if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
@@ -63,6 +68,7 @@ function inspectArray(arr: unknown[]): string {
     .join(", ")}]`;
 }
 
+/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export function formatForInspect(this: any, name: string, value: unknown): string {
   if (value === null || value === undefined) {
     return "nil";

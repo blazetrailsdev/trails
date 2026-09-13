@@ -43,6 +43,7 @@ export class AliasCounts extends Map<string, number> {
     this.defaultProc = defaultProc;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override get(key: string): number {
     return super.has(key) ? super.get(key)! : this.defaultProc(this, key);
   }

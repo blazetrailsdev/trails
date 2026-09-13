@@ -41,70 +41,28 @@ type ScopeBuilder = {
 };
 
 export class ReflectionProxy {
-  readonly reflection: AbstractReflection;
   readonly aliasedTable: unknown;
 
   constructor(reflection: AbstractReflection, aliasedTable: unknown) {
-    this.reflection = reflection;
     this.aliasedTable = aliasedTable;
+    return new Proxy(this, {
+      get(target, key, receiver) {
+        if (key in target) return Reflect.get(target, key, receiver);
+        let owner: object | null = reflection;
+        while (owner && !Object.prototype.hasOwnProperty.call(owner, key)) {
+          owner = Object.getPrototypeOf(owner);
+        }
+        const descriptor = owner ? Object.getOwnPropertyDescriptor(owner, key) : undefined;
+        const value = Reflect.get(reflection, key, reflection);
+        return descriptor && "value" in descriptor && typeof value === "function"
+          ? value.bind(reflection)
+          : value;
+      },
+    });
   }
 
   allIncludes<T>(_cb?: () => T): T | null {
     return null;
-  }
-
-  private get _r(): {
-    joinPrimaryKey(klass?: typeof Base): string | string[];
-    joinForeignKey: string | string[];
-    type?: string | null;
-    klass: typeof Base;
-    name: string;
-    scope?: ((rel: unknown) => unknown) | null;
-    scopeFor?: (rel: unknown, owner?: unknown) => unknown;
-  } {
-    return this.reflection as unknown as ReturnType<() => ReflectionProxy["_r"]>;
-  }
-
-  joinPrimaryKey(klass?: typeof Base): string | string[] {
-    return this._r.joinPrimaryKey(klass);
-  }
-
-  get joinForeignKey(): string | string[] {
-    return this._r.joinForeignKey;
-  }
-
-  get type(): string | null {
-    return this._r.type ?? null;
-  }
-
-  get klass(): typeof Base {
-    return this._r.klass;
-  }
-
-  get name(): string {
-    return this._r.name;
-  }
-
-  get scope(): ((rel: unknown) => unknown) | undefined {
-    return (this.reflection as unknown as { scope?: (rel: unknown) => unknown }).scope;
-  }
-
-  scopeFor(relation: unknown, owner?: unknown): unknown {
-    return (
-      (
-        this.reflection as unknown as {
-          scopeFor?: (rel: unknown, owner?: unknown) => unknown;
-        }
-      ).scopeFor?.(relation, owner) ?? relation
-    );
-  }
-
-  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope {
-    return (this.reflection as unknown as ScopeBuilder).buildScope(table, predicateBuilder, klass);
-  }
-
-  constraints(): Array<(...args: unknown[]) => unknown> {
-    return this.reflection.constraints() as Array<(...args: unknown[]) => unknown>;
   }
 }
 
@@ -298,7 +256,7 @@ export class AssociationScope {
       klass?: { tableName?: string };
       type?: string | null;
     };
-    const nr = nextReflection as {
+    const nr = nextReflection as unknown as {
       joinPrimaryKey(klass?: typeof Base): string | string[];
       joinForeignKey: string | string[];
       klass?: { tableName?: string };
@@ -370,16 +328,20 @@ export class AssociationScope {
     const aliased = (reflection as ReflectionProxy).aliasedTable;
     if (aliased instanceof ArelTable || aliased instanceof Nodes.TableAlias) return aliased;
     if (typeof aliased === "string" && aliased) {
-      return aliasedArelTableForReflection(reflection, name, aliased);
+      return aliasedArelTableForReflection(reflection as AbstractReflection, name, aliased);
     }
     if (
       aliased &&
       typeof aliased === "object" &&
       typeof (aliased as { name?: unknown }).name === "string"
     ) {
-      return aliasedArelTableForReflection(reflection, name, (aliased as { name: string }).name);
+      return aliasedArelTableForReflection(
+        reflection as AbstractReflection,
+        name,
+        (aliased as { name: string }).name,
+      );
     }
-    return aliasedArelTableForReflection(reflection, name);
+    return aliasedArelTableForReflection(reflection as AbstractReflection, name);
   }
 
   /** @missingRailsCall empty? — PERMANENT */
