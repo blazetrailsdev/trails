@@ -10,7 +10,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { DescendantsTracker } from "@blazetrails/activesupport";
+import { demodulize } from "@blazetrails/activesupport";
 
 function castInheritanceColumnValue(
   modelClass: typeof Base,
@@ -46,27 +46,6 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
   }
   candidates.push(typeName);
   return candidates;
-}
-
-export function subclasses(modelClass: typeof Base): (typeof Base)[] {
-  const result: (typeof Base)[] = Object.prototype.hasOwnProperty.call(modelClass, "_subclasses")
-    ? [...((modelClass as any)._subclasses as (typeof Base)[])]
-    : [];
-  for (const klass of DescendantsTracker.subclasses(
-    modelClass as never,
-  ) as unknown as (typeof Base)[]) {
-    if (klass !== modelClass && !result.includes(klass)) result.push(klass);
-  }
-  return result;
-}
-
-export function descendants(modelClass: typeof Base): (typeof Base)[] {
-  const result: (typeof Base)[] = [];
-  for (const sub of subclasses(modelClass)) {
-    result.push(sub);
-    result.push(...descendants(sub));
-  }
-  return result;
 }
 
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
@@ -202,11 +181,6 @@ export function polymorphicName(modelClass: typeof Base): string {
   const name = qualifiedName(base);
   const klass = modelClass as typeof Base & { storeFullClassName?: boolean };
   return klass.storeFullClassName ? name : demodulize(name);
-}
-
-export function demodulize(name: string): string {
-  const idx = name.lastIndexOf("::");
-  return idx === -1 ? name : name.slice(idx + 2);
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -555,7 +529,7 @@ function castStiValueFromAttrs(
 /** @internal */
 function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): typeof Base | null {
   const registered = modelRegistry.get(typeName);
-  for (const klass of [baseClass, ...descendants(baseClass)]) {
+  for (const klass of [baseClass, ...baseClass.descendants]) {
     if (stiName(klass) === typeName || klass === registered) return klass;
   }
   return null;

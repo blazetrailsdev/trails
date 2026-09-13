@@ -24,7 +24,6 @@ import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
-import { formatForInspect } from "./attribute-inspection.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
@@ -36,7 +35,6 @@ import { runCallbacks } from "@blazetrails/activesupport";
 
 export interface Core {
   inspect(): string;
-  attributeForInspect(attr: string): string;
   equals(other: unknown): boolean;
   freeze(): this;
   isFrozen(): boolean;
@@ -66,11 +64,6 @@ interface CoreRecord {
 
 export function inspect(this: CoreRecord): string {
   return inspectWithAttributes.call(this as any, attributesForInspect.call(this));
-}
-
-export function attributeForInspect(this: CoreRecord, attr: string): string {
-  const raw = this.readAttribute(attr);
-  return formatForInspect.call(this, attr, raw);
 }
 
 export async function prettyPrint(
@@ -398,6 +391,10 @@ export function currentShard(this: CoreHost): string {
     if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
 
+  return defaultShard.call(this);
+}
+
+export function defaultShard(this: CoreHost): string {
   return (connectionClassForSelf.call(this) as any)._defaultShard ?? "default";
 }
 

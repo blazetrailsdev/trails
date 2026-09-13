@@ -931,7 +931,7 @@ describe("EagerAssociationTest", () => {
     const c1 = await Comment.create({ post_id: post.id, body: "c1" });
 
     const rel = (Comment as any).all().preload({ ":post": ":comments" });
-    const found = await (Comment as any).scoping(rel, async () => {
+    const found = await rel.scoping(async () => {
       return await (Comment as any).find(c1.id);
     });
     expect(found.id).toBe(c1.id);
@@ -1505,27 +1505,23 @@ describe("EagerAssociationTest", () => {
   it("eager with has many and limit and scoped conditions on the eagers", async () => {
     const david = await Author.find(authors("david").id);
     let loaded: Post[] = [];
-    await Post.scoping(
-      Post.includes(":comments")
-        .where("comments.body like 'Normal%' OR comments.type = 'SpecialComment'")
-        .references("comments"),
-      async () => {
+    await Post.includes(":comments")
+      .where("comments.body like 'Normal%' OR comments.type = 'SpecialComment'")
+      .references("comments")
+      .scoping(async () => {
         loaded = (await (david as any).posts.limit(2).toArray()) as Post[];
         expect(loaded).toHaveLength(2);
-      },
-    );
+      });
 
-    await Post.scoping(
-      Post.includes(":comments", ":author")
-        .where(
-          "authors.name = 'David' AND (comments.body like 'Normal%' OR comments.type = 'SpecialComment')",
-        )
-        .references("authors", "comments"),
-      async () => {
+    await Post.includes(":comments", ":author")
+      .where(
+        "authors.name = 'David' AND (comments.body like 'Normal%' OR comments.type = 'SpecialComment')",
+      )
+      .references("authors", "comments")
+      .scoping(async () => {
         const count = await Post.limit(2).count();
         expect(count).toBe(loaded.length);
-      },
-    );
+      });
   });
 
   it("preload has many with association condition and default scope", async () => {
@@ -2537,7 +2533,7 @@ describe("EagerAssociationTest", () => {
 
   it("belongs_to association ignores the scoping", async () => {
     const post = await (await Comment.find(1)).loadBelongsTo("post");
-    await Post.scoping(Post.where("1=0"), async () => {
+    await Post.where("1=0").scoping(async () => {
       expect((await (await Comment.find(1)).loadBelongsTo("post"))!.id).toBe(post!.id);
       const preloaded = await Comment.preload(":post").find(1);
       expect((preloaded.association("post").target as Base).id).toBe(post!.id);
@@ -2550,7 +2546,7 @@ describe("EagerAssociationTest", () => {
     const comments = ((await ((await Post.find(1)) as any).comments.toArray()) as Base[]).map(
       (c) => c.id,
     );
-    await Comment.scoping(Comment.where("1=0"), async () => {
+    await Comment.where("1=0").scoping(async () => {
       expect(
         ((await ((await Post.find(1)) as any).comments.toArray()) as Base[]).map((c) => c.id),
       ).toEqual(comments);

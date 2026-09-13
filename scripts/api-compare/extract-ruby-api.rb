@@ -606,7 +606,12 @@ class ApiExtractor
       consumed_call = process_define_method_block(node)
       unless process_each_codegen(node)
         @in_on_load += 1 if on_load_block?(node)
+        included_target = concern_included_block?(node) ? (@modules[current_fqn]) : nil
+        included_mark = included_target && included_target[:classMethods].length
         (consumed_call ? [node[2]] : node).each { |child| walk(child) if child.is_a?(Array) }
+        if included_target
+          included_target[:classMethods][included_mark..].each { |m| m[:included] = true }
+        end
         @in_on_load -= 1 if on_load_block?(node)
       end
     when :sclass
@@ -1086,6 +1091,20 @@ class ApiExtractor
   # framework loads — NOT into the lexically enclosing Railtie. Attributing it
   # to `current_fqn` credits the module's methods to a class Rails never puts
   # them on, so `include`/`extend` inside an on_load block records nothing.
+  # A bare `included do … end` in a module body. ActiveSupport::Concern runs
+  # that block with the INCLUDER as self (concern.rb:137-138), so the singleton
+  # methods it defines — `def self.x`, `class_attribute`, `class << self;
+  # attr_accessor`, `define_model_callbacks` (callbacks.rb:412-417) — are the
+  # includer's class methods, not the module's. Walked in place and filed on the
+  # module like any other, then marked `included: true` so consumers can carry
+  # them into the host the way they already carry `M::ClassMethods`.
+  def concern_included_block?(node)
+    call = node[1]
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
+    call.is_a?(Array) && %i[fcall vcall].include?(call[0]) &&
+      call[1].is_a?(Array) && call[1][0] == :@ident && call[1][1] == "included"
+  end
+
   def on_load_block?(node)
     return false unless node.is_a?(Array) && node[0] == :method_add_block
     call = node[1]

@@ -6,12 +6,12 @@ import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
-import { ActiveRecord } from "./ar-config.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
+  defaultShard,
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
@@ -155,7 +155,7 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   }
 
   const { role, shard } = options;
-  const preventWrites = role === ActiveRecord.readingRole || !!options.preventWrites;
+  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
 
   const klasses: any[] = [...normalized];
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
@@ -214,8 +214,8 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = ActiveRecord.writingRole, shard = defaultShard.call(this) } = options;
-  const preventWrites = role === ActiveRecord.readingRole || !!options.preventWrites;
+  const { role = _Base!.writingRole, shard = defaultShard.call(this) } = options;
+  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
   appendToConnectedToStack({
     role,
     shard,
@@ -429,11 +429,6 @@ export function isSharded(this: typeof Base): boolean {
   return shardKeys.call(this).length > 0;
 }
 
-export function defaultShard(this: typeof Base): string {
-  const connClass = this.connectionClassForSelf();
-  return (connClass as any)._defaultShard ?? "default";
-}
-
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value != null && typeof (value as any).then === "function";
 }
@@ -468,7 +463,7 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  const resolvedPreventWrites = role === ActiveRecord.readingRole || preventWrites;
+  const resolvedPreventWrites = role === _Base!.readingRole || preventWrites;
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack(
     (entry = {
@@ -589,7 +584,7 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
   if (tz) _Base!.defaultTimezone = tz;
 }
 
-export const ClassMethods = {
+export const ConnectionHandling = {
   connectsTo,
   connectedTo,
   connectedToMany,
@@ -616,7 +611,6 @@ export const ClassMethods = {
   clearCacheBang,
   shardKeys,
   isSharded,
-  defaultShard,
   withRoleAndShard,
   appendToConnectedToStack,
 };

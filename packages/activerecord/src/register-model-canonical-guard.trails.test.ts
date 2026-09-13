@@ -1,7 +1,6 @@
 import "./support/canonical-model-index.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "./index.js";
-import { subclasses } from "./inheritance.js";
 import { modelRegistry } from "./associations.js";
 import { constantize, safeConstantize } from "@blazetrails/activesupport";
 import { Author } from "./test-helpers/models/author.js";
@@ -34,7 +33,7 @@ describe("registerModel canonical-name shadow guard", () => {
     const shadow = subclassNamed(RfStiParentXyz, "Author");
     expect(() => registerSubclass(shadow)).toThrow(/shadow the canonical model/);
     expect(safeConstantize("Author")).toBe(Author);
-    expect(subclasses(RfStiParentXyz)).not.toContain(shadow);
+    expect(RfStiParentXyz.subclasses).not.toContain(shadow);
   });
 
   it("throws when a bespoke class reaches the registry through a bare set", () => {

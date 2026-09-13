@@ -6,10 +6,9 @@ import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
-import { ActiveRecord } from "../ar-config.js";
 
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
-  const writingRole = ActiveRecord.writingRole;
+  const writingRole = Base.writingRole;
   const managerMap: Map<string, any> = (handlerArg as any)._connectionNameToPoolManager;
   for (const [, poolManager] of managerMap) {
     for (const shardName of poolManager.shardNames as string[]) {
@@ -125,8 +124,8 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("setting writing role while using another named role does not raise", async () => {
-    const oldRole = ActiveRecord.writingRole;
-    ActiveRecord.writingRole = "also_writing";
+    const oldRole = Base.writingRole;
+    Base.writingRole = "also_writing";
     try {
       const localHandler = new ConnectionHandler();
       const config = new HashConfig("development", "primary", {
@@ -145,7 +144,7 @@ describe("ConnectionHandlerTest", () => {
       });
       expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
     } finally {
-      ActiveRecord.writingRole = oldRole;
+      Base.writingRole = oldRole;
     }
   });
 
@@ -436,8 +435,8 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("default handlers are writing and reading", async () => {
-    expect(ActiveRecord.writingRole).toBe("writing");
-    expect(ActiveRecord.readingRole).toBe("reading");
+    expect(Base.writingRole).toBe("writing");
+    expect(Base.readingRole).toBe("reading");
   });
 
   it.skip("connection pool per pid", () => {});
