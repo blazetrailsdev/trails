@@ -112,7 +112,7 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
     ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });
   });
   afterEach(async () => {
-    await ansi?.close();
+    await ansi?.disconnectBang();
     ansi = undefined;
   });
 

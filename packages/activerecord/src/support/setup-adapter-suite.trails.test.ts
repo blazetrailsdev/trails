@@ -47,8 +47,8 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
     setupAdapterSuite({
       factory: () => {
         const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
-        const realClose = adapter.close.bind(adapter);
-        adapter.close = async () => {
+        const realClose = adapter.disconnectBang.bind(adapter);
+        adapter.disconnectBang = async () => {
           await defaultCloseSpy();
           await realClose();
         };
@@ -67,8 +67,8 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
     setupAdapterSuite({
       factory: () => {
         const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
-        optOutRealClose = adapter.close.bind(adapter);
-        adapter.close = async () => {
+        optOutRealClose = adapter.disconnectBang.bind(adapter);
+        adapter.disconnectBang = async () => {
           await optOutCloseSpy();
           await optOutRealClose!();
         };

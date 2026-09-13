@@ -101,7 +101,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _connectingPromiseGen = -1;
   private _discardedConnectGenerations = new Set<number>();
   private _endingClient: Promise<void> | null = null;
-  private _permanentlyClosed = false;
   private _isFakeConnection = false;
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _connectionConfigured = false;
@@ -322,7 +321,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       return this._connectingPromise;
     }
-    if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
     if (this._isFakeConnection) throw new Error("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
@@ -375,7 +373,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   protected override async awaitRawConnectionReady(): Promise<void> {
-    if (this._rawConnection === null && !this._permanentlyClosed && !this._isFakeConnection) {
+    if (this._rawConnection === null && !this._isFakeConnection) {
       await this.connectBang();
     }
   }
@@ -485,7 +483,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async reconnect(): Promise<void> {
-    if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
     return this.lock.synchronize(async () => {
       this._connectGeneration++;
       this._connectionConfigured = false;
@@ -524,29 +521,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._statements = null;
     abandonRawSocket(this._rawConnection);
     this._rawConnection = null;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  async close(): Promise<void> {
-    this._permanentlyClosed = true;
-    this._connectGeneration++;
-    this._connectionConfigured = false;
-    this._statements = null;
-    if (this._rawConnection) {
-      await this._rawConnection.end();
-      this._rawConnection = null;
-    }
-    if (this._endingClient) {
-      await this._endingClient;
-      this._endingClient = null;
-    }
-    if (this._connectingPromise) {
-      try {
-        const conn = await this._connectingPromise;
-        await conn.end();
-      } catch {}
-      this._connectingPromise = null;
-    }
   }
 
   /** @internal */

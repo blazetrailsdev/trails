@@ -47,7 +47,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(adapter._statements!.length).toBe(1);
       } finally {
         await adapter.rollbackDbTransaction();
-        await adapter.close();
+        await adapter.disconnectBang();
       }
     });
 
@@ -61,7 +61,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         ).rejects.toThrow();
       } finally {
         await adapter.rollbackDbTransaction();
-        await adapter.close();
+        await adapter.disconnectBang();
       }
     });
 
@@ -103,7 +103,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await closable.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
       const pool = closable._statements!;
       await closable.rollbackDbTransaction();
-      await closable.close();
+      await closable.disconnectBang();
       expect(() => pool.clear()).not.toThrow();
     });
 
@@ -111,7 +111,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
       const pool = configured.buildStatementPool();
       expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
-      await configured.close();
+      await configured.disconnectBang();
     });
 
     it("reads preparedStatements from the config hash", async () => {
@@ -120,7 +120,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         preparedStatements: false,
       });
       expect(configured.preparedStatements).toBe(false);
-      await configured.close();
+      await configured.disconnectBang();
     });
 
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
@@ -131,7 +131,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         expect(cast.preparedStatements).toBe(false);
       } finally {
-        await cast.close();
+        await cast.disconnectBang();
       }
       const zero = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
@@ -140,7 +140,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         expect(zero.preparedStatements).toBe(true);
       } finally {
-        await zero.close();
+        await zero.disconnectBang();
       }
 
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
@@ -148,7 +148,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);
       } finally {
-        await adapter2.close();
+        await adapter2.disconnectBang();
       }
     });
 

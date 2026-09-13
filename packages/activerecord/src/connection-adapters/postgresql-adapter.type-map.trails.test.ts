@@ -18,7 +18,7 @@ describe("PostgreSQLAdapter#typeMap", () => {
   });
 
   afterEach(async () => {
-    await adapter.close().catch(() => undefined);
+    await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("is a HashLookupTypeMap populated with known PG types", () => {
@@ -46,7 +46,7 @@ describe("PostgreSQLAdapter#getOidType", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close().catch(() => undefined);
+    await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("returns the registered type for a known OID", async () => {
@@ -80,7 +80,7 @@ describe("PostgreSQLAdapter#castResult", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close().catch(() => undefined);
+    await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("loads the type from pg_type on miss before falling back", async () => {
@@ -114,7 +114,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
   });
 
   afterEach(async () => {
-    await adapter.close().catch(() => undefined);
+    await adapter.disconnectBang().catch(() => undefined);
   });
 
   function warmIntegerArrayType(): void {

@@ -92,7 +92,7 @@ describe("SQLiteDatabaseTasks", () => {
           "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
           "END",
       );
-      await (seedAdapter as unknown as { close(): Promise<void> }).close();
+      await (seedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
 
       await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
         await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
@@ -127,12 +127,12 @@ describe("SQLiteDatabaseTasks", () => {
         )) as unknown[];
         expect(trigger.length).toBe(1);
       } finally {
-        await (loadedAdapter as unknown as { close(): Promise<void> }).close();
+        await (loadedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
       }
     } finally {
       const cleanupAdapter = new BetterSQLite3Adapter({ database: dbPath });
       await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
-      await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
+      await (cleanupAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
     }
   });
 });

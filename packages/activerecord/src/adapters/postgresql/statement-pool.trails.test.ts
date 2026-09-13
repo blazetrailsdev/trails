@@ -9,7 +9,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("StatementPoolTest", () => {
@@ -38,7 +38,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(limited._statements.length).toBe(1);
       } finally {
         await limited.rollbackDbTransaction();
-        await limited.close();
+        await limited.disconnectBang();
       }
     });
 
@@ -101,7 +101,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await configured.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const pool = configured._statements;
       expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
-      await configured.close();
+      await configured.disconnectBang();
     });
 
     it("reads preparedStatements from the config hash", async () => {
@@ -110,7 +110,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         preparedStatements: false,
       });
       expect(configured.preparedStatements).toBe(false);
-      await configured.close();
+      await configured.disconnectBang();
     });
 
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
@@ -121,7 +121,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         expect(cast.preparedStatements).toBe(false);
       } finally {
-        await cast.close();
+        await cast.disconnectBang();
       }
       const zero = new PostgreSQLAdapter({
         connectionString: PG_TEST_URL,
@@ -130,7 +130,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         expect(zero.preparedStatements).toBe(true);
       } finally {
-        await zero.close();
+        await zero.disconnectBang();
       }
 
       const adapter2 = new PostgreSQLAdapter(PG_TEST_URL);
@@ -138,7 +138,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);
       } finally {
-        await adapter2.close();
+        await adapter2.disconnectBang();
       }
     });
 

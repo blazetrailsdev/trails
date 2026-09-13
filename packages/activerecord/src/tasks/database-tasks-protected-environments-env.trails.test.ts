@@ -55,7 +55,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
         `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${storedEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       );
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   }
 
@@ -153,7 +153,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
         );
       }
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
     return DatabaseTasks.databaseConfiguration.configsFor({ envName: env })[0];
   }

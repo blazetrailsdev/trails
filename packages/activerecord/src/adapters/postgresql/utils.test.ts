@@ -10,7 +10,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS utils_reset_pk CASCADE");
     await adapter.execute("DROP TABLE IF EXISTS utils_reset_pk_custom CASCADE");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgreSQLUtilsTest", () => {

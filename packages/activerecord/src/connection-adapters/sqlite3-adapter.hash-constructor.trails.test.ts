@@ -11,7 +11,7 @@ describe("SQLite3Adapter hash-only constructor", () => {
   let tmpDir: string | undefined;
 
   afterEach(async () => {
-    await adapter?.close();
+    await adapter?.disconnectBang();
     adapter = undefined;
     if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = undefined;

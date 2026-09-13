@@ -177,7 +177,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
 
   afterAll(async () => {
     await adapter.executeMutation("DROP TABLE IF EXISTS items");
-    await adapter.close();
+    await adapter.disconnectBang();
     removeFiles();
   });
 
@@ -445,7 +445,7 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
   });
 
   afterAll(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("executes a SELECT through the adapter", async () => {
@@ -493,9 +493,9 @@ describe.skipIf(!hasCredentials)(
     });
 
     afterAll(async () => {
-      await replica.close();
+      await replica.disconnectBang();
       await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
-      await primary.close();
+      await primary.disconnectBang();
       removeFiles();
     });
 
@@ -551,9 +551,9 @@ describe.skipIf(!hasCredentials)(
     });
 
     afterAll(async () => {
-      await replica.close();
+      await replica.disconnectBang();
       await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
-      await primary.close();
+      await primary.disconnectBang();
       removeFiles();
     });
 

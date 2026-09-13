@@ -54,7 +54,7 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
         );
       }
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 });

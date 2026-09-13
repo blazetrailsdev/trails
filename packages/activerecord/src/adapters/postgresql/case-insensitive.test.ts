@@ -17,7 +17,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS pg_case_insensitive_defaults");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlCaseInsensitiveTest", () => {

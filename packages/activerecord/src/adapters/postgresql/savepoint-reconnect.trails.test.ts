@@ -16,7 +16,7 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
   });
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("createSavepoint dirties the current (parent) transaction frame", async () => {

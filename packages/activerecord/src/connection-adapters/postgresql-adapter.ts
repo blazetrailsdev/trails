@@ -1288,20 +1288,6 @@ export class PostgreSQLAdapter
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  async close(): Promise<void> {
-    void this._statements.reset();
-    this._client = null;
-    this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
-    this._closed = true;
-    if (this._acquiring) this._acquireGeneration++;
-    const conn = this._rawConnection;
-    this._rawConnection = null;
-    this._pgClientOptions = null;
-    if (conn) await conn.end();
-  }
-
   /** @internal */
   async connect(): Promise<void> {
     try {

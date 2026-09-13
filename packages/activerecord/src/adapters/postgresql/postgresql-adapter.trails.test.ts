@@ -84,7 +84,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
       }
     } catch {}
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgreSQLAdapterTest", () => {
@@ -322,7 +322,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.lock.synchronize(() => other.rollbackDbTransaction());
         await expect(foreign).resolves.toHaveLength(1);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -345,7 +345,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(client._activeQuery ?? null).toBeNull();
         expect(other.transactionStatus).toBe(2);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -363,7 +363,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(other._rawConnection).not.toBeNull();
         await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -380,7 +380,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         expect(other.transactionStatus).toBe(0);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -394,7 +394,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await expect(foreign).resolves.toHaveLength(1);
         await resetting;
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -413,7 +413,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
         await resetting;
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -434,7 +434,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.rollbackDbTransaction();
         await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -472,7 +472,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await sleep;
         await other.rollbackDbTransaction();
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -489,7 +489,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(status).toBe(PQTRANS_INTRANS);
         await other.rollbackDbTransaction();
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -576,7 +576,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const result = await a.execute("SELECT 1 AS n");
         expect(result[0]["n"]).toBe(1);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
     it("default prepared statements", async () => {
@@ -584,7 +584,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         expect(a.preparedStatements).toBe(true);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -826,7 +826,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const maxId = Number(rows[0]["max_id"]);
         expect(Number((result as any).rows[0][0])).toBe(maxId);
       } finally {
-        await noReturn.close();
+        await noReturn.disconnectBang();
       }
     });
 
@@ -1114,7 +1114,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         expect(a.isUseInsertReturning()).toBe(false);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -1132,7 +1132,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(result).toBe(1);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -1245,7 +1245,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(a._rawConnectionForTest()).toBe(reconnected);
       } finally {
         spy.mockRestore();
-        await a.close();
+        await a.disconnectBang();
         await orphan.end().catch(() => {});
       }
     });
@@ -1276,7 +1276,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(a._rawConnectionForTest()).toBe(reconnected);
       } finally {
         spy.mockRestore();
-        await a.close();
+        await a.disconnectBang();
         await orphan.end().catch(() => {});
       }
     });
@@ -1706,7 +1706,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
 
       expect(await adapter.active()).toBe(false);
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
   it("loadAdditionalTypes runs uncast, so it cannot re-enter getOidType", async () => {
@@ -1726,7 +1726,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
       expect(getOidTypeSpy).not.toHaveBeenCalled();
       expect(internals.typeMap.isKey(987654321)).toBe(false);
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 });

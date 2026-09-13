@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
       await adapter.execute(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
     } catch {}
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("QuotingTest", () => {

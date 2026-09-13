@@ -46,7 +46,7 @@ describe("AdapterLeasingTest", () => {
     expect(await pool.leaseConnection()).toBe(adapter);
     expect(adapter.inUse).toBeTruthy();
 
-    await adapter.close();
+    await adapter.disconnectBang();
     expect(adapter.inUse).toBeFalsy();
 
     expect(await pool.leaseConnection()).toBe(adapter);

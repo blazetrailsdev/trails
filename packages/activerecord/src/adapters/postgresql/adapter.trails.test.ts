@@ -11,7 +11,7 @@ describeIfPg("AdapterTest", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("current database", async () => {
@@ -25,7 +25,7 @@ describeIfPg("AdvisoryLocksEnabledTest", () => {
     try {
       expect(base.isAdvisoryLocksEnabled()).toBe(true);
     } finally {
-      await base.close();
+      await base.disconnectBang();
     }
 
     const disabled = new PostgreSQLAdapter({
@@ -35,7 +35,7 @@ describeIfPg("AdvisoryLocksEnabledTest", () => {
     try {
       expect(disabled.isAdvisoryLocksEnabled()).toBe(false);
     } finally {
-      await disabled.close();
+      await disabled.disconnectBang();
     }
 
     const enabled = new PostgreSQLAdapter({
@@ -45,7 +45,7 @@ describeIfPg("AdvisoryLocksEnabledTest", () => {
     try {
       expect(enabled.isAdvisoryLocksEnabled()).toBe(true);
     } finally {
-      await enabled.close();
+      await enabled.disconnectBang();
     }
   });
 });

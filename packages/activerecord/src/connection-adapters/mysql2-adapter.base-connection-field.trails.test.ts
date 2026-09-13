@@ -70,7 +70,7 @@ describe("Mysql2Adapter base _connection field", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
     await adapter.connectBang();
-    await adapter.close();
+    await adapter.disconnectBang();
     expect(connectionOf(adapter)).toBeNull();
   });
 

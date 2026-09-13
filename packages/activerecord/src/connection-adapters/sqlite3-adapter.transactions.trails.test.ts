@@ -20,7 +20,7 @@ describe("SQLite3Adapter transaction control", () => {
 
   afterEach(async () => {
     await adapter.executeMutation("DROP TABLE IF EXISTS items");
-    await adapter.close();
+    await adapter.disconnectBang();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -157,7 +157,7 @@ describe("SQLite3Adapter transaction control", () => {
         const afterCommit = (await reader.execute("SELECT name FROM items"))!;
         expect(afterCommit.map((r: any) => r.name)).toEqual(["secret"]);
       } finally {
-        await reader.close();
+        await reader.disconnectBang();
       }
     });
   });

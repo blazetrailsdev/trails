@@ -88,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);
       } catch {}
     }
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgreSQLAdapterTest", () => {
@@ -102,7 +102,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       expect(error).toBeInstanceOf(ConnectionNotEstablished);
       expect((error as ConnectionNotEstablished).connectionPool).toBeInstanceOf(NullPool);
-      await bad.close();
+      await bad.disconnectBang();
     });
 
     it("reconnection error", async () => {
@@ -127,14 +127,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((error as ConnectionNotEstablished).connectionPool).toBe(a.pool);
       } finally {
         clientSpy.mockRestore();
-        await a.close().catch(() => {});
+        await a.disconnectBang().catch(() => {});
       }
     });
 
     it("bad connection", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
-      await bad.close();
+      await bad.disconnectBang();
     });
 
     it("bad connection to postgres database", async () => {
@@ -144,7 +144,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         (e) => e,
       );
       expect((error as ConnectionNotEstablished).connectionPool).toBe(bad.pool);
-      await bad.close();
+      await bad.disconnectBang();
     });
 
     it("reconnect after bad connection on check version", async () => {
@@ -218,7 +218,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
-          await connection.close();
+          await connection.disconnectBang();
         }
       });
     });
@@ -237,7 +237,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
-          await connection.close();
+          await connection.disconnectBang();
         }
       });
     });
@@ -256,7 +256,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
-          await connection.close();
+          await connection.disconnectBang();
         }
       });
     });
@@ -275,7 +275,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
-          await connection.close();
+          await connection.disconnectBang();
         }
       });
     });
@@ -872,7 +872,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(rows[0].d).toBe("2024-01-01");
       } finally {
         await localAdapter.execute(`DROP TABLE IF EXISTS "ex_dates_off"`);
-        await localAdapter.close();
+        await localAdapter.disconnectBang();
         PostgreSQLAdapter.decodeDates = saved;
       }
     });

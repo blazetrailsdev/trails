@@ -92,7 +92,7 @@ describe("connection checkout for directly-assigned adapters", () => {
 
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS topics");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("find resolves through the assigned adapter without a pool", async () => {

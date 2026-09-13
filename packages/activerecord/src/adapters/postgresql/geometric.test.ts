@@ -11,7 +11,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgreSQLPointTest", () => {

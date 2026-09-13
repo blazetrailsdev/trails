@@ -111,7 +111,7 @@ describe("SQLite3Adapter pragmas option", () => {
   let adapter: SQLite3Adapter | undefined;
 
   afterEach(async () => {
-    await adapter?.close();
+    await adapter?.disconnectBang();
     vi.restoreAllMocks();
   });
 
@@ -195,7 +195,7 @@ describe("SQLite3Adapter pragmas option", () => {
     const seed = new BetterSQLite3Adapter({ database: dbPath });
     await seed.connectBang();
     await seed.execute("CREATE TABLE sentinel (id integer)");
-    await seed.close();
+    await seed.disconnectBang();
     try {
       adapter = new BetterSQLite3Adapter({
         database: dbPath,
@@ -213,7 +213,7 @@ describe("SQLite3Adapter pragmas option", () => {
         .get();
       expect(rows).toEqual({ c: 1 });
       await check.dropTable("sentinel", { ifExists: true });
-      await check.close();
+      await check.disconnectBang();
     } finally {
       fs.rmSync(dbPath, { force: true });
     }
@@ -233,7 +233,7 @@ describe("SQLite3 databaseExists", () => {
   it("answers true for an in-memory adapter without connecting", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     expect(await a.databaseExists()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("answers from the file the driver opens, not a cached handle", async () => {
@@ -248,7 +248,7 @@ describe("SQLite3 databaseExists", () => {
       fs.rmSync(dbPath, { force: true });
       expect(await a.databaseExists()).toBe(false);
     } finally {
-      await a.close();
+      await a.disconnectBang();
       fs.rmSync(dbPath, { force: true });
     }
   });

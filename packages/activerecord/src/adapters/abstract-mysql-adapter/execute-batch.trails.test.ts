@@ -38,7 +38,7 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
         )) as Mysql2RawResult;
         expect(result.rows!.length).toBeGreaterThan(0);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
 
@@ -54,7 +54,7 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       } finally {
         calls = rawExecute.mock.calls.slice();
         rawExecute.mockRestore();
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
 
       expect(calls.map((call) => call[0])).toEqual(["SELECT 1", "SELECT 2"]);

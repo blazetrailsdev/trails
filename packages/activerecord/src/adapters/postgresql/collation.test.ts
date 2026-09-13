@@ -15,7 +15,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     await adapter.dropTable("postgresql_collations", { ifExists: true });
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlCollationTest", () => {

@@ -42,7 +42,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("returns a Result with columnTypes resolved from the type_map", async () => {
@@ -127,7 +127,7 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close().catch(() => undefined);
+    await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("resolves the OID → Type via the type_map", () => {
@@ -176,7 +176,7 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("prepare:true tags statement_name in the sql.active_record payload", async () => {
@@ -221,7 +221,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   const sqlKey = (sql: string): string =>
@@ -292,7 +292,7 @@ describe("PostgreSQLAdapter#executeMutation", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("savepoint nesting does not re-enter withRawConnection (_lockQueue)", async () => {
@@ -338,7 +338,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("reads currval on the session that ran its own INSERT", async () => {
@@ -394,7 +394,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
     const p2 = insert("b");
     release();
     const [first, second] = await Promise.all([p1, p2]);
-    await other.close().catch(() => undefined);
+    await other.disconnectBang().catch(() => undefined);
 
     expect(first.rows[0][0]).toBe(1);
     expect(second.rows[0][0]).toBe(2);
@@ -406,7 +406,7 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   function adapterWithPrimedCache(useInsertReturning: boolean): Store {

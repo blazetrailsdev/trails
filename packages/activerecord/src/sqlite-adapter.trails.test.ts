@@ -182,7 +182,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
     expect(closed).toBe(false);
     resolveClose!();
-    await adapter.close();
+    await adapter.disconnectBang();
     expect(closed).toBe(true);
   });
 
@@ -203,7 +203,7 @@ describe("SQLite adapter driver binding", () => {
     });
     const adapter = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
     await adapter.disconnectBang();
-    await expect(adapter.close()).resolves.toBeUndefined();
+    await expect(adapter.disconnectBang()).resolves.toBeUndefined();
   });
 
   it("completes a deferred async-only open on the first query (sync checkout path)", async () => {

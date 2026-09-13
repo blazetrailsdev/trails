@@ -29,7 +29,7 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
       "There is a mismatch between the foreign key and primary key column types",
     );
     expect((translated as MismatchedForeignKey).fkDetails.targetTable).toBeUndefined();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("a sql-less MismatchedForeignKey picks up its details from the queryParser lambda", async () => {
@@ -50,7 +50,7 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     });
     expect(rebuilt.sql).toBe(FK_SQL);
     expect(rebuilt.stack).toBe(sqlLess.stack);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("translating with the sql present carries the primary key column type into the message", async () => {
@@ -70,7 +70,7 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     expect(translated.message).toContain("`t.bigint :wheelable_id`");
     expect(translated.stack).toBe(driverError.stack);
     expect(translated.cause).toBe(driverError);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("log's rescue resolves the column lookup through set_query", async () => {
@@ -88,6 +88,6 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
       "\nOriginal message: Error: Cannot add foreign key constraint",
     );
     expect((raised as MismatchedForeignKey).stack).toBe((sqlLess as Error).stack);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 });

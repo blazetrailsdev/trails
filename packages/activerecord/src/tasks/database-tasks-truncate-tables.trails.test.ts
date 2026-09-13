@@ -36,7 +36,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     await seed.executeMutation("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
     await seed.executeMutation("INSERT INTO widgets (name) VALUES ('gizmo')");
     await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
-    await seed.close();
+    await seed.disconnectBang();
 
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
@@ -49,7 +49,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     } finally {
       await reader.executeMutation("DROP TABLE IF EXISTS widgets");
       await reader.executeMutation("DROP TABLE IF EXISTS schema_migrations");
-      await reader.close();
+      await reader.disconnectBang();
     }
   });
 });

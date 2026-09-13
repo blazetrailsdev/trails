@@ -455,17 +455,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-driver-handle-members */
-  async close(): Promise<void> {
-    if (this._closingDriver) {
-      const closing = this._closingDriver;
-      this._closingDriver = null;
-      await closing;
-    } else {
-      await this._rawConnection?.close();
-    }
-  }
-
   /** @noRailsEquivalent PERMANENT */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();

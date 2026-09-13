@@ -218,7 +218,7 @@ describe("connectAdapter", () => {
 
   afterEach(async () => {
     if (adapter && typeof adapter.close === "function") {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
     adapter = undefined;
   });
@@ -667,7 +667,7 @@ describe("full migration flow", () => {
 
   afterEach(async () => {
     if (adapter && typeof adapter.close === "function") {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
     adapter = undefined;
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -916,8 +916,8 @@ describe("schema dump and load", () => {
       ))!;
       expect(tables).toHaveLength(1);
     } finally {
-      sourceAdapter.close();
-      targetAdapter.close();
+      sourceAdapter.disconnectBang();
+      targetAdapter.disconnectBang();
     }
   });
 });
@@ -978,7 +978,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
       ))!;
       return rows.length === 1;
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   }
 
@@ -1064,7 +1064,7 @@ export class CreatePosts extends Migration {
       ))!;
       expect(tables).toHaveLength(1);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -1110,7 +1110,7 @@ export class ${cls} extends Migration {
       const names = rows.map((r) => r.name).sort();
       expect(names).toEqual(["comments", "posts"]);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -1144,7 +1144,7 @@ export class CreatePosts extends Migration {
       ))!;
       expect(tables).toHaveLength(0);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -1174,7 +1174,7 @@ export class CreatePosts extends Migration {
       ))!;
       expect((rows[0] as { value: string }).value).toBe(resolveEnv());
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
     expect(logs.some((l) => l.includes("Stamped schema with environment"))).toBe(true);
   });
@@ -1205,7 +1205,7 @@ export class CreatePosts extends Migration {
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
 
     const configurations = new DatabaseConfigurations([
@@ -1243,7 +1243,7 @@ export class CreatePosts extends Migration {
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "staging");
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
 
     const configurations = new DatabaseConfigurations([
@@ -1276,7 +1276,7 @@ export class CreatePosts extends Migration {
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
 
     const configurations = new DatabaseConfigurations([
@@ -1321,7 +1321,7 @@ export class CreatePosts extends Migration {
       expect(await context.protectedEnvironment()).toBe(true);
     } finally {
       Base.protectedEnvironments = previousProtected;
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 
@@ -1352,7 +1352,7 @@ export class CreatePosts extends Migration {
         EnvironmentStorageError,
       );
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 
@@ -1403,7 +1403,7 @@ export class CreatePosts extends Migration {
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 
@@ -1429,7 +1429,7 @@ export class CreatePosts extends Migration {
       expect(await context.lastStoredEnvironment()).toBeNull();
       expect(await context.protectedEnvironment()).toBe(false);
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 
@@ -1456,7 +1456,7 @@ export class CreatePosts extends Migration {
         "INSERT INTO schema_migrations (version) VALUES ('20260101000000')",
       );
     } finally {
-      await seedAdapter.close();
+      await seedAdapter.disconnectBang();
     }
 
     const config = new HC("development", "primary", {
@@ -1488,7 +1488,7 @@ export class CreatePosts extends Migration {
       )) as Array<{ c: number }>;
       expect(Number(metaCount[0].c)).toBe(1);
     } finally {
-      await verify.close();
+      await verify.disconnectBang();
     }
   });
 
@@ -1509,7 +1509,7 @@ export class CreatePosts extends Migration {
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
       await seed.executeMutation("INSERT INTO widgets (name) VALUES ('x'), ('y')");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["truncate_all"]);
@@ -1522,7 +1522,7 @@ export class CreatePosts extends Migration {
       }>;
       expect(Number(rows[0].c)).toBe(0);
     } finally {
-      await verify.close();
+      await verify.disconnectBang();
     }
   });
 
@@ -1564,7 +1564,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
       ))!;
       expect(tables).toHaveLength(1);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -1624,7 +1624,7 @@ export class CreateDogs extends Migration {
         await primary.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'"),
       ).toHaveLength(0);
     } finally {
-      await primary.close();
+      await primary.disconnectBang();
     }
     const animals = new BetterSQLite3Adapter({ database: animalsDb });
     try {
@@ -1635,7 +1635,7 @@ export class CreateDogs extends Migration {
         await animals.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
       ).toHaveLength(0);
     } finally {
-      await animals.close();
+      await animals.disconnectBang();
     }
     const testPrimary = new BetterSQLite3Adapter({ database: testPrimaryDb });
     try {
@@ -1645,7 +1645,7 @@ export class CreateDogs extends Migration {
         ),
       ).toHaveLength(1);
     } finally {
-      await testPrimary.close();
+      await testPrimary.disconnectBang();
     }
     const testAnimals = new BetterSQLite3Adapter({ database: testAnimalsDb });
     try {
@@ -1655,7 +1655,7 @@ export class CreateDogs extends Migration {
         ),
       ).toHaveLength(1);
     } finally {
-      await testAnimals.close();
+      await testAnimals.disconnectBang();
     }
   });
 
@@ -1704,7 +1704,7 @@ export class CreateFixtures extends Migration {
         await dev.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fixtures'"),
       ).toHaveLength(0);
     } finally {
-      await dev.close();
+      await dev.disconnectBang();
     }
     const test = new BetterSQLite3Adapter({ database: testDb });
     try {
@@ -1715,7 +1715,7 @@ export class CreateFixtures extends Migration {
         await test.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
       ).toHaveLength(0);
     } finally {
-      await test.close();
+      await test.disconnectBang();
     }
   });
 
@@ -1795,7 +1795,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
       await seed.executeMutation("INSERT INTO widgets (name) VALUES ('keep-me')");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["seed:replant"]);
@@ -1808,7 +1808,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       }>;
       expect(Number(rows[0].c)).toBe(0);
     } finally {
-      await verify.close();
+      await verify.disconnectBang();
     }
   });
 
@@ -1829,7 +1829,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
       );
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["schema:cache:dump"]);
@@ -1880,7 +1880,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       );
       await seed.executeMutation("CREATE UNIQUE INDEX users_on_email ON users (email)");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["schema:cache:dump"]);
@@ -1959,7 +1959,7 @@ export class CreateDogs extends Migration {
       ))!;
       expect(noDogs).toHaveLength(0);
     } finally {
-      await pAdapter.close();
+      await pAdapter.disconnectBang();
     }
     const aAdapter = new BetterSQLite3Adapter({ database: animalsDb });
     try {
@@ -1972,7 +1972,7 @@ export class CreateDogs extends Migration {
       ))!;
       expect(noUsers).toHaveLength(0);
     } finally {
-      await aAdapter.close();
+      await aAdapter.disconnectBang();
     }
 
     const primarySchema = path.join(tmpDir, "db", "schema.ts");
@@ -2203,7 +2203,7 @@ export class CreateDogs extends Migration {
       ))!;
       expect(users).toHaveLength(0);
     } finally {
-      await pAdapter.close();
+      await pAdapter.disconnectBang();
     }
     const aAdapter = new BetterSQLite3Adapter({ database: animalsDb });
     try {
@@ -2212,7 +2212,7 @@ export class CreateDogs extends Migration {
       ))!;
       expect(dogs).toHaveLength(1);
     } finally {
-      await aAdapter.close();
+      await aAdapter.disconnectBang();
     }
   });
 
@@ -2263,7 +2263,7 @@ export class CreateCats extends Migration {
       ))!;
       expect(cats).toHaveLength(1);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -2289,13 +2289,13 @@ export class CreateCats extends Migration {
     try {
       await seedPrimary.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
     } finally {
-      await seedPrimary.close();
+      await seedPrimary.disconnectBang();
     }
     const seedAnimals = new BetterSQLite3Adapter({ database: animalsDb });
     try {
       await seedAnimals.executeMutation("CREATE TABLE dogs (id INTEGER PRIMARY KEY)");
     } finally {
-      await seedAnimals.close();
+      await seedAnimals.disconnectBang();
     }
 
     await runDb(["schema:cache:dump"]);
@@ -2325,7 +2325,7 @@ export class CreateCats extends Migration {
     try {
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["schema:dump", "--format=sql"]);
@@ -2352,7 +2352,7 @@ export class CreateCats extends Migration {
     try {
       await seed.executeMutation("CREATE TABLE items (id INTEGER PRIMARY KEY)");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["schema:dump"]);
@@ -2378,7 +2378,7 @@ export class CreateCats extends Migration {
       );
       await seed.executeMutation("CREATE INDEX gadgets_on_label ON gadgets (label)");
     } finally {
-      await seed.close();
+      await seed.disconnectBang();
     }
 
     await runDb(["schema:dump", "--format=sql"]);
@@ -2388,7 +2388,7 @@ export class CreateCats extends Migration {
     try {
       await dropper.executeMutation("DROP TABLE gadgets");
     } finally {
-      await dropper.close();
+      await dropper.disconnectBang();
     }
 
     await runDb(["schema:load", "--format=sql"]);
@@ -2404,7 +2404,7 @@ export class CreateCats extends Migration {
       )) as Array<{ name: string }>;
       expect(indexes).toHaveLength(1);
     } finally {
-      await verify.close();
+      await verify.disconnectBang();
     }
   });
 
@@ -2468,7 +2468,7 @@ export class CreatePosts extends Migration {
       await dropper.executeMutation("DROP TABLE ar_internal_metadata");
       await dropper.executeMutation("DROP TABLE posts");
     } finally {
-      await dropper.close();
+      await dropper.disconnectBang();
     }
 
     await runDb(["schema:load", "--format=sql"]);
@@ -2480,7 +2480,7 @@ export class CreatePosts extends Migration {
       )) as Array<{ version: string }>;
       expect(rows.map((r) => r.version)).toEqual(["20260101000000"]);
     } finally {
-      await verify.close();
+      await verify.disconnectBang();
     }
   });
 
@@ -2520,7 +2520,7 @@ export class CreateThings extends Migration {
     );
     new (
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
-    ).BetterSQLite3Adapter({ database: dbFile }).close();
+    ).BetterSQLite3Adapter({ database: dbFile }).disconnectBang();
 
     await runDb(["schema:load", "--format=sql"]);
 

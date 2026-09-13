@@ -90,7 +90,7 @@ describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, a
       expect(result.rows[0]?.[1]).toBe("gear");
     } finally {
       await adapter.execute('DROP TABLE IF EXISTS "widgets"');
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 
@@ -106,7 +106,7 @@ describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, a
       expect(adapter.affectedRows()).toBe(1);
     } finally {
       await adapter.execute('DROP TABLE IF EXISTS "widgets"');
-      await adapter.close();
+      await adapter.disconnectBang();
     }
   });
 });

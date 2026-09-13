@@ -45,7 +45,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     await teardown(adapter);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("SchemaTest", () => {
@@ -300,7 +300,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(after.length).toBe(0);
       } finally {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
-        await rootAdapter.close();
+        await rootAdapter.disconnectBang();
       }
     });
 
@@ -325,7 +325,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(existsAfter.length).toBe(1);
       } finally {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
-        await rootAdapter.close();
+        await rootAdapter.disconnectBang();
       }
     });
   });

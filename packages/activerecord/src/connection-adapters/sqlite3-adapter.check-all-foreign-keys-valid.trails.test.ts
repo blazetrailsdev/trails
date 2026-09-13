@@ -16,7 +16,7 @@ describe("SQLite3Adapter#check_all_foreign_keys_valid!", () => {
 
   afterEach(async () => {
     await adapter.dropTable("kids", "parents");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("passes when every foreign key resolves", async () => {

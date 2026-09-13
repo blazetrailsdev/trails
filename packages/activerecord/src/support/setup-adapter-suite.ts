@@ -44,8 +44,7 @@ export function setupAdapterSuite<A extends TransactionalFixturesAdapter>(
       if (opts.teardown) await opts.teardown(adapter);
     } finally {
       if (opts.closeOnTeardown !== false) {
-        const close = (adapter as unknown as { close?: () => Promise<void> }).close;
-        if (typeof close === "function") await close.call(adapter);
+        await (adapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
       }
       adapter = undefined;
     }

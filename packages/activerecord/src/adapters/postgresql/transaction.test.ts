@@ -10,7 +10,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgreSQLTransactionTest", () => {
@@ -38,7 +38,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -66,7 +66,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(slowError).toBeInstanceOf(QueryCanceled);
         expect(Date.now() - start).toBeLessThan(5000);
       } finally {
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -90,7 +90,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       expect((await adapter.execute("SELECT 1 AS n"))[0].n).toBe(1);
       expect((await other.execute("SELECT 1 AS n"))[0].n).toBe(1);
-      await other.close();
+      await other.disconnectBang();
     });
 
     it("raises LockWaitTimeout when lock wait timeout exceeded", async () => {
@@ -104,7 +104,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         ).rejects.toThrow(LockWaitTimeout);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
-        await other.close();
+        await other.disconnectBang();
       }
     });
 
@@ -148,11 +148,11 @@ describeIfPg("PostgreSQLAdapter", () => {
           await blocked;
           expect(blockedError).toBeInstanceOf(QueryCanceled);
         } finally {
-          await canceler.close();
+          await canceler.disconnectBang();
         }
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
-        await other.close();
+        await other.disconnectBang();
       }
     });
   });

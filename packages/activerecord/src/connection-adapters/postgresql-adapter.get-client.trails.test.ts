@@ -10,7 +10,7 @@ interface PrivatePgAdapter {
   reconnect: () => void;
   resetBang: () => void;
   lock: { synchronize: <T>(fn: () => Promise<T> | T) => Promise<T> };
-  close: () => Promise<void>;
+  disconnectBang: () => Promise<void>;
   isConnected: () => boolean;
 }
 
@@ -19,7 +19,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    if (adapter) await adapter.close().catch(() => undefined);
+    if (adapter) await adapter.disconnectBang().catch(() => undefined);
   });
 
   it("routes every concurrent caller to the same persistent client", async () => {

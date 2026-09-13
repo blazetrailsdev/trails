@@ -66,7 +66,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           await thread.catch(() => {});
         }
       } finally {
-        await adapter2.close();
+        await adapter2.disconnectBang();
       }
 
       expect(error).toBeInstanceOf(QueryAborted);
@@ -121,7 +121,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         }
         expect(firstBeginFailed).toBeTruthy();
       } finally {
-        await adapter2.close();
+        await adapter2.disconnectBang();
       }
     });
   });

@@ -41,7 +41,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error).toBeInstanceOf(ConnectionNotEstablished);
       expect(error.connectionPool).toBeInstanceOf(NullPool);
     } finally {
-      await badAdapter.close();
+      await badAdapter.disconnectBang();
     }
   });
 
@@ -55,7 +55,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error).toBeInstanceOf(ConnectionNotEstablished);
       expect(error.connectionPool).toBe(badAdapter.pool);
     } finally {
-      await badAdapter.close();
+      await badAdapter.disconnectBang();
     }
   });
 

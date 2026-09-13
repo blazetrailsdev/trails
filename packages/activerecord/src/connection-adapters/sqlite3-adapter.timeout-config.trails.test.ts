@@ -7,7 +7,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
   let adapter: SQLite3Adapter | undefined;
 
   afterEach(async () => {
-    await adapter?.close();
+    await adapter?.disconnectBang();
     adapter = undefined;
     vi.restoreAllMocks();
   });
