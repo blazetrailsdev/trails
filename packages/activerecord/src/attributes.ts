@@ -96,9 +96,9 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 }
 
 /** @internal */
-export function reloadSchemaFromCache(this: AnyClass): void {
+export function reloadSchemaFromCache(this: AnyClass, recursive = true): void {
   this.resetDefaultAttributesBang();
-  modelSchemaReloadSchemaFromCache.call(this);
+  modelSchemaReloadSchemaFromCache.call(this, recursive);
 }
 
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");

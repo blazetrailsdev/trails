@@ -295,7 +295,7 @@ export interface SchemaHost {
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: ValueType): ValueType;
   /** @internal */
-  reloadSchemaFromCache(): void;
+  reloadSchemaFromCache(recursive?: boolean): void;
 }
 
 export function deriveJoinTableName(firstTable: string, secondTable: string): string {
@@ -480,17 +480,20 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 }
 
 /** @internal */
-export function reloadSchemaFromCache(this: SchemaHost): void {
-  this._columnNamesMemo = undefined;
-  this._columnsHash = undefined;
-  this._columns = undefined;
+export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._returningColumnsForInsertCache = undefined;
+  this._columnNamesMemo = undefined;
   this._attributesBuilder = undefined;
+  this._columns = undefined;
+  this._columnsHash = undefined;
   this._schemaLoaded = false;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   (this as SchemaHost & { _attributeNamesMemo?: unknown })._attributeNamesMemo = undefined;
-  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    sub.reloadSchemaFromCache();
+  this._yamlEncoder = undefined;
+  if (recursive) {
+    for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+      sub.reloadSchemaFromCache();
+    }
   }
 }
 

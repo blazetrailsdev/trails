@@ -95,4 +95,30 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
     expect(own<boolean>(Shape, "_schemaLoaded")).toBe(shapeLoadedBefore);
   });
+
+  it("leaves descendants' schema memos intact on a non-recursive reload and drops the yaml encoder", async () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+    }
+    class Ticket extends Shape {
+      static override tableName = "tickets";
+    }
+    registerSubclass(Ticket);
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    for (const klass of [Shape, Ticket]) {
+      await establishConnectionTo(klass, makeAdapter(cols) as never);
+    }
+
+    await Shape.loadSchema();
+    await Ticket.loadSchema();
+    Shape.yamlEncoder();
+    expect(own<unknown>(Shape, "_yamlEncoder")).toBeDefined();
+
+    reloadSchemaFromCache.call(Shape as never, false);
+
+    expect(own<unknown>(Shape, "_yamlEncoder")).toBeUndefined();
+    expect(own<boolean>(Shape, "_schemaLoaded")).toBe(false);
+    expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
+  });
 });
