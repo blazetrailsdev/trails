@@ -17,7 +17,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
-import { Module, NoMethodError, include } from "@blazetrails/ruby-compat";
+import { Module, NoMethodError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { _Base } from "../base-slot.js";
 import { _CollectionProxyCtor } from "../associations/collection-proxy-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
@@ -156,8 +156,8 @@ export function generateRelationMethod(this: typeof Base, method: string): void 
 
 export function methodMissing(this: any, method: string, ...args: any[]): unknown {
   const model = this._model as typeof Base;
-  if (typeof (model as any)[method] === "function") {
-    if (!DelegateCache.delegateBaseMethods && baseRespondTo(method)) {
+  if (rbObjRespondTo(model, method)) {
+    if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(_Base, method)) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
@@ -172,17 +172,6 @@ export function methodMissing(this: any, method: string, ...args: any[]): unknow
       `undefined method '${method}' for an instance of ${this.constructor.name}`,
     );
   }
-}
-
-function baseRespondTo(method: string): boolean {
-  for (
-    let ctor: unknown = _Base;
-    typeof ctor === "function" && ctor !== Function.prototype;
-    ctor = Object.getPrototypeOf(ctor)
-  ) {
-    if (Object.prototype.hasOwnProperty.call(ctor, method)) return true;
-  }
-  return false;
 }
 
 function scoping(relation: any, block: () => unknown): unknown {
