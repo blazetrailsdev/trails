@@ -14,20 +14,6 @@ import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp("pragma");
 
-export interface DatabaseStatements {
-  execQuery(sql: string, name?: string | null): Promise<Result>;
-  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execInsert(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    pk?: string | false | null,
-  ): Promise<unknown>;
-  explain(sql: string, binds?: unknown[]): Promise<string>;
-  lastInsertedId(result: unknown): number;
-}
-
 export function isWriteQuery(sql: string | null): boolean {
   try {
     return !READ_QUERY.test(sql as string);

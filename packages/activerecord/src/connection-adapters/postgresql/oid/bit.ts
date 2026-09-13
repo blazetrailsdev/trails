@@ -26,18 +26,10 @@ export class Bit extends ValueType<string> {
     return "bit";
   }
 
-  cast(value: unknown): string | null {
-    return this.castValue(value);
-  }
-
   override serialize(value: unknown): Data | null {
     if (value == null) return null;
     if (value instanceof Data) return value;
     return new Data(typeof value === "string" ? value : String(value));
-  }
-
-  override deserialize(value: unknown): string | null {
-    return this.castValue(value);
   }
 
   castValue(value: unknown): string | null {

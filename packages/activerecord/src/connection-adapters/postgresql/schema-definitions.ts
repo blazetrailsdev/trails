@@ -13,11 +13,6 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace PostgreSQL {
-  export const ADAPTER_NAME = "postgres" as const;
-}
-
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
   bigserial(...args: [...names: string[], options: ColumnOptions]): unknown;

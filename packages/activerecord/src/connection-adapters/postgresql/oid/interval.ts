@@ -2,16 +2,8 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
 
 export class Interval extends ValueType<Duration> {
-  constructor(options?: { precision?: number }) {
-    super(options);
-  }
-
   override type(): string {
     return "interval";
-  }
-
-  cast(value: unknown): Duration | null {
-    return this.castValue(value);
   }
 
   castValue(value: unknown): Duration | null {

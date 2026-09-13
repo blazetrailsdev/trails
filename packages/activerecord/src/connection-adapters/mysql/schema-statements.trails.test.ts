@@ -31,7 +31,12 @@ import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
 
 const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
-  Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
+  Object.assign(
+    Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }),
+    overrides,
+  );
 
 function fkHost(rows: Record<string, unknown>[]) {
   return mysqlAdapterHost({

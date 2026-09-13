@@ -3,24 +3,6 @@ import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
-  constructor(
-    name: string,
-    defaultValue: unknown,
-    sqlTypeMetadata: TypeMetadata | null = null,
-    null_: boolean = true,
-    options: {
-      collation?: string | null;
-      comment?: string | null;
-      defaultFunction?: string | null;
-    } = {},
-  ) {
-    super(name, defaultValue, sqlTypeMetadata, null_, {
-      collation: options.collation,
-      comment: options.comment,
-      defaultFunction: options.defaultFunction,
-    });
-  }
-
   get extra(): string | null {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? null;
   }
@@ -45,6 +27,7 @@ export class Column extends BaseColumn {
     return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra ?? "");
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override encodeWith(coder: ColumnCoder): void {
     super.encodeWith(coder);
     coder["class"] = "MySQL::Column";

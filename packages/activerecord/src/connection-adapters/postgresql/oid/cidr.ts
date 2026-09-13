@@ -1,6 +1,8 @@
 import { ValueType } from "@blazetrails/activemodel";
 
+/** @noRailsEquivalent CONVERGEABLE move-ipaddr-into-ruby-compat */
 export class IPAddr {
+  /** @noRailsEquivalent CONVERGEABLE move-ipaddr-into-ruby-compat */
   constructor(
     /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
     readonly address: string,
@@ -8,10 +10,12 @@ export class IPAddr {
     readonly prefixLength: number,
   ) {}
 
+  /** @noRailsEquivalent CONVERGEABLE move-ipaddr-into-ruby-compat */
   get prefix(): number {
     return this.prefixLength;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE move-ipaddr-into-ruby-compat */
   toString(): string {
     return this.address;
   }
@@ -20,14 +24,6 @@ export class IPAddr {
 export class Cidr extends ValueType<IPAddr> {
   override type(): string {
     return "cidr";
-  }
-
-  cast(value: unknown): IPAddr | null {
-    return this.castValue(value);
-  }
-
-  override deserialize(value: unknown): IPAddr | null {
-    return this.castValue(value);
   }
 
   override serialize(value: unknown): string | null {

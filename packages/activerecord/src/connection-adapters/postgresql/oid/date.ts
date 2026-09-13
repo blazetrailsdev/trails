@@ -24,12 +24,6 @@ export class Date extends DateType {
     return super.castValue(value);
   }
 
-  override serialize(value: unknown): unknown {
-    if (value === DateInfinity) return "infinity";
-    if (value === DateNegativeInfinity) return "-infinity";
-    return super.serialize(value);
-  }
-
   override typeCastForSchema(value: unknown): string {
     if (value === DateInfinity) return "::Float::INFINITY";
     if (value === DateNegativeInfinity) return "-::Float::INFINITY";

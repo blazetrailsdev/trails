@@ -50,10 +50,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   declare protected conn: VisitorHostAdapter;
 
-  constructor(host: VisitorHostAdapter) {
-    super(host);
-  }
-
   /** @internal */
   protected async isMariadb(): Promise<boolean> {
     return this.conn.isMariadb();

@@ -26,21 +26,27 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
 describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
   it("returns true for auto-increment column when INSERT RETURNING not supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
   });
 
   it("returns false for non-auto-increment column when INSERT RETURNING not supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
   });
 
   it("returns true for auto-populated column (default function) when INSERT RETURNING supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
       true,
@@ -49,7 +55,9 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
 
   it("returns false for plain column when INSERT RETURNING supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);
   });
@@ -58,7 +66,9 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
 describe("AbstractMysqlAdapter#_columnMethodNames", () => {
   it("appends MySQL ColumnMethods shorthands to the abstract list", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     const names = adapter._columnMethodNames();
     for (const name of [
       "tinyblob",
@@ -83,7 +93,9 @@ describe("AbstractMysqlAdapter#_columnMethodNames", () => {
 describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
   async function makeAdapter(field: Record<string, unknown>) {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     const queries: [string, string | null | undefined][] = [];
     adapter.supportsRenameColumn = () => false;
     adapter.pool = new NullPool();
@@ -144,7 +156,9 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
 describe("AbstractMysqlAdapter#renameColumn wiring", () => {
   async function makeAdapter() {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    });
     const events: string[] = [];
     adapter.pool = new NullPool();
     adapter.lock = NullLock;
@@ -288,9 +302,9 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
 describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", () => {
   async function makeAdapter() {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    return Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
-      typeof AbstractMysqlAdapter
-    >;
+    return Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as InstanceType<typeof AbstractMysqlAdapter>;
   }
 
   it("adapter.quote(s) wraps result in single quotes", async () => {
@@ -402,7 +416,9 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
 
 async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) {
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-  const adapter = Object.create(AbstractMysqlAdapter.prototype);
+  const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+    _escapeState: { noBackslashEscapes: false },
+  });
   adapter.pool = new NullPool();
   adapter.lock = NullLock;
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
@@ -609,9 +625,9 @@ describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
 describe("AbstractMysqlAdapter#tableAliasLength", () => {
   it("table alias length", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
-      typeof AbstractMysqlAdapter
-    >;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as InstanceType<typeof AbstractMysqlAdapter>;
     expect(adapter.tableAliasLength()).toBe(256);
     const long = "a".repeat(300);
     expect(adapter.tableAliasFor(long)).toBe("a".repeat(256));
@@ -623,9 +639,9 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const { Version } = await import("./abstract-adapter.js");
     const { DatabaseVersionError } = await import("../errors.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
-      typeof AbstractMysqlAdapter
-    >;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as InstanceType<typeof AbstractMysqlAdapter>;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
     adapter.lock = NullLock;
@@ -641,9 +657,9 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
   it("does not raise when the warmed version is supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const { Version } = await import("./abstract-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
-      typeof AbstractMysqlAdapter
-    >;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as InstanceType<typeof AbstractMysqlAdapter>;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
     adapter.lock = NullLock;
@@ -657,9 +673,9 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
 describe("AbstractMysqlAdapter#foreignKeys", () => {
   async function makeAdapter(rows: Record<string, unknown>[]) {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
-      typeof AbstractMysqlAdapter
-    >;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as InstanceType<typeof AbstractMysqlAdapter>;
     Object.assign(adapter, {
       internalExecQuery: async () => Result.fromRowHashes(rows),
     });
@@ -706,7 +722,9 @@ describe("AbstractMysqlAdapter#foreignKeys", () => {
 
 describe("AbstractMysqlAdapter escaping state", () => {
   const withSqlMode = async (sqlMode: string) => {
-    const a = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter & {
+    const a = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as AbstractMysqlAdapter & {
       selectValue(sql: string, name?: string | null): Promise<unknown>;
       loadEscapeState(): Promise<void>;
     };
@@ -729,14 +747,18 @@ describe("AbstractMysqlAdapter escaping state", () => {
 
 describe("AbstractMysqlAdapter#beginIsolatedDbTransaction", () => {
   it("raises KeyError naming the Symbol key for an unknown isolation level", async () => {
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as AbstractMysqlAdapter;
     await expect(adapter.beginIsolatedDbTransaction(":bogus")).rejects.toThrow(
       "key not found: :bogus",
     );
   });
 
   it("looks the level up under its Symbol key", async () => {
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter & {
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as AbstractMysqlAdapter & {
       executeBatch(statements: string[], name: string, options: unknown): Promise<void>;
     };
     let seen: string[] = [];
@@ -751,7 +773,9 @@ describe("AbstractMysqlAdapter#beginIsolatedDbTransaction", () => {
 describe("AbstractMysqlAdapter transaction statements", () => {
   function makeAdapter() {
     const executed: { sql: string; name: string | null; opts: unknown }[] = [];
-    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter;
+    const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+      _escapeState: { noBackslashEscapes: false },
+    }) as AbstractMysqlAdapter;
     (adapter as unknown as { internalExecute: unknown }).internalExecute = async (
       sql: string,
       name: string | null,

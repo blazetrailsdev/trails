@@ -31,10 +31,6 @@ export interface PgSchemaCreationHost extends SchemaCreationConn {
 export class SchemaCreation extends AbstractSchemaCreation {
   declare protected conn: PgSchemaCreationHost;
 
-  constructor(adapter: PgSchemaCreationHost) {
-    super(adapter);
-  }
-
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);

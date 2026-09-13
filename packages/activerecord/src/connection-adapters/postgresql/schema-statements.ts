@@ -44,7 +44,6 @@ export interface CreateDatabaseOptions {
 }
 
 interface PgSchemaAdapterPrivates {
-  query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
   quoteLiteral(value: unknown): string;
   _schemaSearchPathMemo: string | null;
@@ -69,7 +68,9 @@ export interface SchemaStatements
       | "internalExecQuery"
       | "internalExecute"
       | "loadAdditionalTypes"
+      | "logger"
       | "maxIdentifierLength"
+      | "query"
       | "queryValue"
       | "queryValues"
       | "quote"
@@ -81,10 +82,7 @@ export interface SchemaStatements
       | "supportsVirtualColumns"
       | "typeMap"
       | "visitor"
-    > {
-  readonly logger: { warn?(message: string): void } | null;
-  nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
-}
+    > {}
 
 export class SchemaStatements extends AbstractSchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
@@ -229,64 +227,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       ]),
     );
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
-  }
-
-  async tables(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")
-    ).toArray();
-    return rows.map((r) => r.relname as string);
-  }
-
-  async views(): Promise<string[]> {
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT c.relname FROM pg_class c
-         LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = ANY(current_schemas(false))
-         AND c.relkind IN ('v', 'm')
-         ORDER BY c.relname`,
-        "SCHEMA",
-      )
-    ).toArray();
-    return rows.map((r) => r.relname as string);
-  }
-
-  async tableExists(name: string): Promise<boolean> {
-    return this.relkindExists(name, ["r", "p"]);
-  }
-
-  private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {
-    if (!name) return false;
-    const [schema, table] = this.extractSchemaQualifiedName(name);
-    if (schema) {
-      const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
-      const rows = (
-        await this.internalExecQuery(
-          `SELECT 1 AS one FROM pg_class c
-           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-           WHERE n.nspname = $1 AND c.relname = $2
-           AND c.relkind IN (${relPlaceholders})
-           LIMIT 1`,
-          "SCHEMA",
-          [schema, table, ...relkinds],
-        )
-      ).toArray();
-      return rows.length > 0;
-    }
-    const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT 1 AS one FROM pg_class c
-         LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = ANY(current_schemas(false))
-         AND c.relname = $1 AND c.relkind IN (${relPlaceholders})
-         LIMIT 1`,
-        "SCHEMA",
-        [table, ...relkinds],
-      )
-    ).toArray();
-    return rows.length > 0;
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
@@ -491,6 +431,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return pgQuoteColumnName(name);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-pg-columns-onto-abstract-columns */
   override async columns(tableName: string): Promise<Column[]> {
     const [schema, table] = this.extractSchemaQualifiedName(tableName);
 
@@ -1171,40 +1112,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return result;
   }
 
-  override async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const [schema, table] = this.extractSchemaQualifiedName(tableName);
-
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      binds.push(table);
-      tableCondition = `t.oid = to_regclass(quote_ident($1))`;
-    }
-
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT a.attname
-       FROM pg_index i
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       WHERE ${tableCondition}
-         AND i.indisprimary = true
-       ORDER BY array_position(i.indkey, a.attnum)`,
-        "SCHEMA",
-        binds,
-      )
-    ).toArray();
-
-    if (rows.length === 0) return null;
-    if (rows.length === 1) return rows[0].attname as string;
-    return rows.map((r) => r.attname as string);
-  }
-
   async primaryKeys(tableName: string): Promise<string[]> {
     const names = await this.queryValues(
       `SELECT a.attname
@@ -1400,7 +1307,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
       const quotedSequence = this.quoteTableName(seq);
       await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
-      this.logger?.warn?.(`${table} has primary key ${pk} with no default sequence.`);
+      (this.logger as { warn?(message: string): void } | null)?.warn?.(
+        `${table} has primary key ${pk} with no default sequence.`,
+      );
     }
   }
 
@@ -1416,7 +1325,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
 
     if (pk && !sequence) {
-      this.logger?.warn?.(`${table} has primary key ${pk} with no default sequence.`);
+      (this.logger as { warn?(message: string): void } | null)?.warn?.(
+        `${table} has primary key ${pk} with no default sequence.`,
+      );
     }
 
     if (!pk || !sequence) return;

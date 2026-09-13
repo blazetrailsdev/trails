@@ -29,6 +29,7 @@ export class TypeMetadata extends SqlTypeMetadata {
     return other instanceof TypeMetadata && super.equals(other) && this.extra === other.extra;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override toJSON(): TypeMetadataJSON {
     return { ...super.toJSON(), class: "MySQL::TypeMetadata", extra: this.extra };
   }

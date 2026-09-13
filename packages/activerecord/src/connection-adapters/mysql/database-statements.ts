@@ -9,21 +9,6 @@ import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
-export interface DatabaseStatements {
-  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execInsert(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    pk?: string | false | null,
-  ): Promise<unknown>;
-  explain(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
-  lastInsertedId(result: unknown): number;
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
-}
-
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
   "desc",
   "describe",

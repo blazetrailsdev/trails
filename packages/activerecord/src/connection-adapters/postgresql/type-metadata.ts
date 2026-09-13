@@ -37,6 +37,7 @@ export class TypeMetadata extends SqlTypeMetadata {
     );
   }
 
+  /** @noRailsEquivalent PERMANENT */
   override toJSON(): TypeMetadataJSON {
     return { ...super.toJSON(), class: "PostgreSQL::TypeMetadata", oid: this.oid, fmod: this.fmod };
   }

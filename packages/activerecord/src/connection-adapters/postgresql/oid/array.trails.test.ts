@@ -36,7 +36,7 @@ describe("PostgreSQL::OID::Array", () => {
     expect(data).toBeInstanceOf(Data);
     expect(data.encoder).toBeInstanceOf(PgTextEncoderArray);
     expect(data.values).toEqual(["a", "b"]);
-    expect(String(data)).toBe("{a,b}");
+    expect(data.encoder.encode(data.values)).toBe("{a,b}");
   });
 
   it("serialize returns non-array values unchanged", () => {

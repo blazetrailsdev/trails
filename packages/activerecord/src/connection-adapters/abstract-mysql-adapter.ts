@@ -42,7 +42,6 @@ import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
-  quoteString as mysqlQuoteString,
   type EscapeState,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
@@ -158,6 +157,18 @@ export interface AbstractMysqlAdapter {
    */
   isTextType(type: string): boolean;
 }
+
+// eslint-disable-next-line no-control-regex
+const MYSQL_ESCAPE_RE = /[\\'"\x00\n\r\x1a]/g;
+const MYSQL_ESCAPE_MAP: Record<string, string> = {
+  "\\": "\\\\",
+  "'": "\\'",
+  '"': '\\"',
+  "\0": "\\0",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\x1a": "\\Z",
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
@@ -908,7 +919,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @missingRailsCall with_raw_connection — PERMANENT */
   override quoteString(string: string): string {
-    return mysqlQuoteString(string, this._escapeState);
+    if (this._escapeState.noBackslashEscapes) {
+      return string.replace(/'/g, "''");
+    }
+    return string.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
   }
 
   protected _escapeState: EscapeState = { noBackslashEscapes: false };

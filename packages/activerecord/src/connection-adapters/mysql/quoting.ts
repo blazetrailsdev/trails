@@ -52,30 +52,8 @@ export function quoteColumnName(name: unknown): string {
   return quoted;
 }
 
-// eslint-disable-next-line no-control-regex
-const MYSQL_ESCAPE_RE = /[\\'"\x00\n\r\x1a]/g;
-const MYSQL_ESCAPE_MAP: Record<string, string> = {
-  "\\": "\\\\",
-  "'": "\\'",
-  '"': '\\"',
-  "\0": "\\0",
-  "\n": "\\n",
-  "\r": "\\r",
-  "\x1a": "\\Z",
-};
-
 export interface EscapeState {
   noBackslashEscapes: boolean;
-}
-
-export function quoteString(
-  value: string,
-  state: EscapeState = { noBackslashEscapes: false },
-): string {
-  if (state.noBackslashEscapes) {
-    return value.replace(/'/g, "''");
-  }
-  return value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
 }
 
 export function quotedBinary(
