@@ -6,7 +6,6 @@ import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
 import type { FirstPost } from "./post.js";
 import type { Post } from "./post.js";
-import type { PostThatLoadsCommentsInAnAfterSaveHook } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
@@ -20,6 +19,7 @@ const OopsExtension = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Comment extends Base {
   declare static limitBy: (l: number) => Relation<Comment>;
   declare static containingTheLetterE: () => Relation<Comment>;
@@ -30,15 +30,8 @@ export class Comment extends Base {
   declare static orderedByPostId: () => Relation<Comment>;
   declare static allAsScope: () => Relation<Comment>;
   declare static oopsComments: () => Relation<Comment>;
-  declare post: Post | null;
-  declare resource: Base | null;
-  declare origin: Base | null;
-  declare company: Company | null;
   declare ratings: AssociationProxy<Rating>;
-  declare firstPost: FirstPost | null;
-  declare specialPostWithDefaultScope: SpecialPostWithDefaultScope | null;
   declare children: AssociationProxy<Comment>;
-  declare parent: Comment | null;
   declare isDefault: () => boolean;
   declare defaultBang: () => Promise<true | undefined>;
   declare static default: () => Relation<Comment>;
@@ -47,14 +40,6 @@ export class Comment extends Base {
   declare childBang: () => Promise<true | undefined>;
   declare static child: () => Relation<Comment>;
   declare static notChild: () => Relation<Comment>;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
   declare body: string;
   declare children_count: number | null;
   declare comments: number;
@@ -73,7 +58,6 @@ export class Comment extends Base {
 
   declare author_id: number | null;
   declare author_type: string | null;
-  declare author: Base | null;
 
   static {
     this.scope("limitBy", function (this: any, l: number) {
@@ -142,21 +126,34 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Comment {
+  get specialPostWithDefaultScope():
+    | SpecialPostWithDefaultScope
+    | null
+    | Promise<SpecialPostWithDefaultScope | null>;
+  set specialPostWithDefaultScope(value: SpecialPostWithDefaultScope | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Comment {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get resource(): Base | null | Promise<Base | null>;
+  set resource(value: Base | null);
+  get origin(): Base | null | Promise<Base | null>;
+  set origin(value: Base | null);
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+  get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  set firstPost(value: FirstPost | null);
+  get parent(): Comment | null | Promise<Comment | null>;
+  set parent(value: Comment | null);
+  get author(): Base | null | Promise<Base | null>;
+  set author(value: Base | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpecialComment extends Comment {
-  declare ordinaryPost: Post | null;
-  declare author: Author | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Author | null>;
-
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
     this.hasOne("author", { through: "post" });
@@ -167,42 +164,19 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
-
-export class SubSpecialComment extends SpecialComment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Author | null>;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SpecialComment {
+  get ordinaryPost(): Post | null | Promise<Post | null>;
+  set ordinaryPost(value: Post | null);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
 }
 
-export class VerySpecialComment extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
-}
+export class SubSpecialComment extends SpecialComment {}
+
+export class VerySpecialComment extends Comment {}
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "post") => Promise<PostThatLoadsCommentsInAnAfterSaveHook | null>);
-
   static {
     this.belongsTo("post", {
       className: "PostThatLoadsCommentsInAnAfterSaveHook",
@@ -215,18 +189,8 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
-  declare developer: Developer | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "developer") => Promise<Developer | null>);
-
   static {
     this.defaultScope((q: any) =>
       q.includes(":developer").order("developers.name").references(":developer"),
@@ -234,17 +198,13 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
     this.belongsTo("developer");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CommentWithDefaultScopeReferencesAssociation {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+}
 
 export class CommentWithAfterCreateUpdate extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
-
   static {
     this.afterCreate(async function (this: any) {
       await this.update({ body: "bar" });

@@ -8,21 +8,10 @@ import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
 import { Notification } from "./notification.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class User extends Base {
   declare jobsPool: AssociationProxy<Job>;
-  declare room: Room | null;
-  declare ownedRoom: Room | null;
-  declare familyTree: FamilyTree | null;
-  declare family: Family | null;
   declare familyMembers: AssociationProxy<User>;
-  declare letRoom: Room | null;
-  declare rentedRoom: Room | null;
-  declare loadHasOne: ((name: "room") => Promise<Room | null>) &
-    ((name: "ownedRoom") => Promise<Room | null>) &
-    ((name: "familyTree") => Promise<FamilyTree | null>) &
-    ((name: "family") => Promise<Family | null>) &
-    ((name: "letRoom") => Promise<Room | null>) &
-    ((name: "rentedRoom") => Promise<Room | null>);
   declare auth_token: string;
   declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare password: string | null;
@@ -48,6 +37,21 @@ export class User extends Base {
     this.hasOne("rentedRoom", { className: "Room", foreignKey: "tenant_id", dependent: "destroy" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface User {
+  get room(): Room | null | Promise<Room | null>;
+  set room(value: Room | null);
+  get ownedRoom(): Room | null | Promise<Room | null>;
+  set ownedRoom(value: Room | null);
+  get familyTree(): FamilyTree | null | Promise<FamilyTree | null>;
+  set familyTree(value: FamilyTree | null);
+  get family(): Family | null | Promise<Family | null>;
+  set family(value: Family | null);
+  get letRoom(): Room | null | Promise<Room | null>;
+  set letRoom(value: Room | null);
+  get rentedRoom(): Room | null | Promise<Room | null>;
+  set rentedRoom(value: Room | null);
+}
 
 hasSecurePassword.call(User, "password", { validations: false });
 hasSecurePassword.call(User, "recovery_password", { validations: false });
@@ -55,13 +59,6 @@ User.hasSecureToken();
 User.hasSecureToken("auth_token", { length: 36 });
 
 export class UserWithNotification extends User {
-  declare loadHasOne: ((name: "room") => Promise<Room | null>) &
-    ((name: "ownedRoom") => Promise<Room | null>) &
-    ((name: "familyTree") => Promise<FamilyTree | null>) &
-    ((name: "family") => Promise<Family | null>) &
-    ((name: "letRoom") => Promise<Room | null>) &
-    ((name: "rentedRoom") => Promise<Room | null>);
-
   static {
     this.afterCreate(async function () {
       await Notification.create({ message: "A new user has been created." });

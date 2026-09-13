@@ -732,7 +732,7 @@ describe("TransactionCallbacksTest", () => {
     registerModel(Owner);
     registerModel(Pet);
     const pet = (await Pet.first()) as Pet;
-    const owner = (await pet.loadBelongsTo("owner")) as Owner;
+    const owner = (await pet.owner) as Owner;
     let flag = false;
 
     owner.onAfterCommit(() => {

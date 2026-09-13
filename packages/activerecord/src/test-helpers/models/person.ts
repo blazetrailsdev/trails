@@ -19,17 +19,16 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Person {
   get first_name(): string;
   set first_name(value: unknown);
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Person extends Base {
   declare readers: AssociationProxy<Reader>;
   declare secureReaders: AssociationProxy<SecureReader>;
-  declare reader: Reader | null;
   declare posts: AssociationProxy<Post>;
   declare securePosts: AssociationProxy<Post>;
   declare postsWithNoComments: AssociationProxy<Post>;
@@ -38,28 +37,19 @@ export class Person extends Base {
   declare references: AssociationProxy<Reference>;
   declare badReferences: AssociationProxy<BadReference>;
   declare fixedBadReferences: AssociationProxy<BadReference>;
-  declare favoriteReference: Reference | null;
-  declare favoriteReferenceJob: Job | null;
   declare postsWithCommentsSortedByCommentId: AssociationProxy<Post>;
   declare firstPosts: AssociationProxy<FirstPost>;
   declare jobs: AssociationProxy<Job>;
   declare jobsWithDependentDestroy: AssociationProxy<Job>;
   declare jobsWithDependentDeleteAll: AssociationProxy<Job>;
   declare jobsWithDependentNullify: AssociationProxy<Job>;
-  declare primaryContact: Person | null;
   declare agents: AssociationProxy<Person>;
   declare agentsOfAgents: AssociationProxy<Person>;
-  declare number1Fan: Person | null;
   declare personalLegacyThings: AssociationProxy<PersonalLegacyThing>;
   declare agentsPosts: AssociationProxy<Post>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
   declare essays: AssociationProxy<Essay>;
   declare static males: () => Relation<Person>;
-  declare loadBelongsTo: ((name: "primaryContact") => Promise<Person | null>) &
-    ((name: "number1Fan") => Promise<Person | null>);
-  declare loadHasOne: ((name: "reader") => Promise<Reader | null>) &
-    ((name: "favoriteReference") => Promise<Reference | null>) &
-    ((name: "favoriteReferenceJob") => Promise<Job | null>);
   declare best_friend_id: number;
   declare best_friend_of_id: number;
   declare born_at: RubyTime | Temporal.PlainDateTime;
@@ -145,6 +135,19 @@ export class Person extends Base {
     this.attrReadonly("born_at");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Person {
+  get reader(): Reader | null | Promise<Reader | null>;
+  set reader(value: Reader | null);
+  get favoriteReference(): Reference | null | Promise<Reference | null>;
+  set favoriteReference(value: Reference | null);
+  get favoriteReferenceJob(): Job | null | Promise<Job | null>;
+  set favoriteReferenceJob(value: Job | null);
+  get primaryContact(): Person | null | Promise<Person | null>;
+  set primaryContact(value: Person | null);
+  get number1Fan(): Person | null | Promise<Person | null>;
+  set number1Fan(value: Person | null);
+}
 
 export class PersonWithDependentDestroyJobs extends Base {
   declare references: AssociationProxy<Reference>;
@@ -188,12 +191,9 @@ export class PersonWithPolymorphicDependentNullifyComments extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LoosePerson extends Base {
-  declare bestFriend: LoosePerson | null;
-  declare bestFriendOf: LoosePerson | null;
   declare bestFriends: AssociationProxy<LoosePerson>;
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
 
   static {
     this._tableName = "people";
@@ -204,21 +204,22 @@ export class LoosePerson extends Base {
     this.hasMany("bestFriends", { className: "LoosePerson", foreignKey: "best_friend_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface LoosePerson {
+  get bestFriend(): LoosePerson | null | Promise<LoosePerson | null>;
+  set bestFriend(value: LoosePerson | null);
+  get bestFriendOf(): LoosePerson | null | Promise<LoosePerson | null>;
+  set bestFriendOf(value: LoosePerson | null);
+}
 acceptsNestedAttributesFor(LoosePerson, "bestFriend");
 acceptsNestedAttributesFor(LoosePerson, "bestFriendOf");
 acceptsNestedAttributesFor(LoosePerson, "bestFriends");
 
-export class LooseDescendant extends LoosePerson {
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
-}
+export class LooseDescendant extends LoosePerson {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TightPerson extends Base {
-  declare bestFriend: TightPerson | null;
-  declare bestFriendOf: TightPerson | null;
   declare bestFriends: AssociationProxy<TightPerson>;
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
 
   static {
     this._tableName = "people";
@@ -228,14 +229,18 @@ export class TightPerson extends Base {
     this.hasMany("bestFriends", { className: "TightPerson", foreignKey: "best_friend_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface TightPerson {
+  get bestFriend(): TightPerson | null | Promise<TightPerson | null>;
+  set bestFriend(value: TightPerson | null);
+  get bestFriendOf(): TightPerson | null | Promise<TightPerson | null>;
+  set bestFriendOf(value: TightPerson | null);
+}
 acceptsNestedAttributesFor(TightPerson, "bestFriend");
 acceptsNestedAttributesFor(TightPerson, "bestFriendOf");
 acceptsNestedAttributesFor(TightPerson, "bestFriends");
 
-export class TightDescendant extends TightPerson {
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
-}
+export class TightDescendant extends TightPerson {}
 
 export class RichPerson extends Base {
   declare treasures: AssociationProxy<Treasure>;
@@ -266,10 +271,8 @@ export class RichPerson extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NestedPerson extends Base {
-  declare bestFriend: NestedPerson | null;
-  declare loadHasOne: (name: "bestFriend") => Promise<NestedPerson | null>;
-
   static {
     this._tableName = "people";
 
@@ -283,6 +286,11 @@ export class NestedPerson extends Base {
   setBestFriendFirstName(newName: string): Promise<void> | void {
     return this.assignAttributes({ bestFriendAttributes: { first_name: newName } });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface NestedPerson {
+  get bestFriend(): NestedPerson | null | Promise<NestedPerson | null>;
+  set bestFriend(value: NestedPerson | null);
 }
 acceptsNestedAttributesFor(NestedPerson, "bestFriend", { updateOnly: true });
 

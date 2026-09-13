@@ -1,8 +1,6 @@
 export class Post extends Base {
-  declare author: Author | null;
   declare comments: import("@blazetrails/activerecord").AssociationProxy<Comment>;
   declare static published: () => import("@blazetrails/activerecord").Relation<Post>;
-  declare loadBelongsTo: (name: "author") => Promise<Author | null>;
 
   static {
     this.attribute("title", "string");
@@ -19,5 +17,7 @@ export interface Post {
   set title(value: unknown);
   get published(): boolean;
   set published(value: unknown);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
 }
 

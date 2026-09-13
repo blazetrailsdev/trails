@@ -3,12 +3,9 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Tree } from "./tree.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node extends Base {
-  declare tree: Tree | null;
-  declare parent: Node | null;
   declare children: AssociationProxy<Node>;
-  declare loadBelongsTo: ((name: "tree") => Promise<Tree | null>) &
-    ((name: "parent") => Promise<Node | null>);
   declare name: string;
   declare parent_id: number;
   declare tree_id: number;
@@ -19,4 +16,11 @@ export class Node extends Base {
     this.belongsTo("parent", { className: "Node", touch: true, optional: true });
     this.hasMany("children", { className: "Node", foreignKey: "parent_id", dependent: "destroy" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Node {
+  get tree(): Tree | null | Promise<Tree | null>;
+  set tree(value: Tree | null);
+  get parent(): Node | null | Promise<Node | null>;
+  set parent(value: Node | null);
 }

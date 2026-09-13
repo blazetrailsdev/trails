@@ -3,11 +3,8 @@ import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Computer extends Base {
-  declare developer: Developer | null;
-  declare firm: Firm | null;
-  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
-  declare loadHasOne: (name: "firm") => Promise<Firm | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare extendedWarranty: number;
   declare system: string;
@@ -18,4 +15,11 @@ export class Computer extends Base {
     this.belongsTo("developer", { foreignKey: "developer" });
     this.hasOne("firm", { through: "developer" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Computer {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
 }

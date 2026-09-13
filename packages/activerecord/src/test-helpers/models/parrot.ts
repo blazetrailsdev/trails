@@ -81,13 +81,16 @@ export class LiveParrot extends Parrot {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DeadParrot extends Parrot {
-  declare killer: Pirate | null;
-  declare loadBelongsTo: (name: "killer") => Promise<Pirate | null>;
-
   static {
     this.belongsTo("killer", { className: "Pirate", foreignKey: "killer_id" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DeadParrot {
+  get killer(): Pirate | null | Promise<Pirate | null>;
+  set killer(value: Pirate | null);
 }
 
 registerModel(Parrot);

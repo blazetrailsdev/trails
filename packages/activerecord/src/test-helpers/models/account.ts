@@ -4,13 +4,10 @@ import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Account extends Base {
-  declare firm: Company | null;
-  declare unautosavedFirm: Firm | null;
   declare static open: () => Relation<Account>;
   declare static available: () => Relation<Account>;
-  declare loadBelongsTo: ((name: "firm") => Promise<Company | null>) &
-    ((name: "unautosavedFirm") => Promise<Firm | null>);
   declare credit_limit: number;
   declare firm_id: number;
   declare firm_name: string;
@@ -70,6 +67,13 @@ export class Account extends Base {
   private privateMethod() {
     return "Sir, yes sir!";
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Account {
+  get firm(): Company | null | Promise<Company | null>;
+  set firm(value: Company | null);
+  get unautosavedFirm(): Firm | null | Promise<Firm | null>;
+  set unautosavedFirm(value: Firm | null);
 }
 
 export class SubAccount extends Account {}

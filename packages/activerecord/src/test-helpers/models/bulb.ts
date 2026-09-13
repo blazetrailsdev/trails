@@ -5,10 +5,9 @@ import { Base } from "../../base.js";
 import { association } from "../../associations.js";
 import { association as associationInstance } from "../../associations/instance-methods.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {
-  declare car: Car | null;
   declare static awesome: () => Relation<Bulb>;
-  declare loadBelongsTo: (name: "car") => Promise<Car | null>;
   declare car_id: number;
   declare frickinawesome: boolean | null;
   declare ID: number;
@@ -42,6 +41,11 @@ export class Bulb extends Base {
   set color(color: string) {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Bulb {
+  get car(): Car | null | Promise<Car | null>;
+  set car(value: Car | null);
 }
 
 export class CustomBulb extends Bulb {

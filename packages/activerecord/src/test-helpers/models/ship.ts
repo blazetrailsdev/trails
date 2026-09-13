@@ -10,15 +10,10 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Ship extends Base {
-  declare pirate: Pirate | null;
-  declare updateOnlyPirate: Pirate | null;
-  declare developer: Developer | null;
   declare parts: AssociationProxy<ShipPart>;
   declare treasures: AssociationProxy<Treasure>;
-  declare loadBelongsTo: ((name: "pirate") => Promise<Pirate | null>) &
-    ((name: "updateOnlyPirate") => Promise<Pirate | null>) &
-    ((name: "developer") => Promise<Developer | null>);
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare created_on: RubyTime | Temporal.PlainDateTime;
   declare developer_id: number;
@@ -53,6 +48,15 @@ export class Ship extends Base {
     throwAbort();
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Ship {
+  get pirate(): Pirate | null | Promise<Pirate | null>;
+  set pirate(value: Pirate | null);
+  get updateOnlyPirate(): Pirate | null | Promise<Pirate | null>;
+  set updateOnlyPirate(value: Pirate | null);
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+}
 
 acceptsNestedAttributesFor(Ship, "parts", { allowDestroy: true });
 acceptsNestedAttributesFor(Ship, "pirate", {
@@ -75,9 +79,8 @@ export class ShipWithoutNestedAttributes extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Prisoner extends Base {
-  declare ship: ShipWithoutNestedAttributes | null;
-  declare loadBelongsTo: (name: "ship") => Promise<ShipWithoutNestedAttributes | null>;
   declare ship_id: number;
 
   static {
@@ -88,16 +91,24 @@ export class Prisoner extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Prisoner {
+  get ship(): ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
+  set ship(value: ShipWithoutNestedAttributes | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FamousShip extends Base {
-  declare famousPirate: FamousPirate | null;
-  declare loadBelongsTo: (name: "famousPirate") => Promise<FamousPirate | null>;
-
   static {
     this.tableName = "ships";
     this.belongsTo("famousPirate", { foreignKey: "pirate_id" });
     this.validates("name", { presence: true, on: "conference" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface FamousShip {
+  get famousPirate(): FamousPirate | null | Promise<FamousPirate | null>;
+  set famousPirate(value: FamousPirate | null);
 }
 
 registerModel(Ship);

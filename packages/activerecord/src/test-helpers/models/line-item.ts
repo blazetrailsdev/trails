@@ -3,10 +3,9 @@ import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LineItem extends Base {
-  declare invoice: Invoice | null;
   declare discountApplications: AssociationProxy<LineItemDiscountApplication>;
-  declare loadBelongsTo: (name: "invoice") => Promise<Invoice | null>;
   declare amount: number;
   declare invoice_id: number;
 
@@ -15,12 +14,14 @@ export class LineItem extends Base {
     this.hasMany("discountApplications", { className: "LineItemDiscountApplication" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface LineItem {
+  get invoice(): Invoice | null | Promise<Invoice | null>;
+  set invoice(value: Invoice | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LineItemDiscountApplication extends Base {
-  declare lineItem: LineItem | null;
-  declare discount: Discount | null;
-  declare loadBelongsTo: ((name: "lineItem") => Promise<LineItem | null>) &
-    ((name: "discount") => Promise<Discount | null>);
   declare discount_id: number;
   declare line_item_id: number;
 
@@ -28,4 +29,11 @@ export class LineItemDiscountApplication extends Base {
     this.belongsTo("lineItem");
     this.belongsTo("discount");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface LineItemDiscountApplication {
+  get lineItem(): LineItem | null | Promise<LineItem | null>;
+  set lineItem(value: LineItem | null);
+  get discount(): Discount | null | Promise<Discount | null>;
+  set discount(value: Discount | null);
 }

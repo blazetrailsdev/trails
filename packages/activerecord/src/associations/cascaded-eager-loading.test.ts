@@ -255,15 +255,15 @@ describe("CascadedEagerLoadingTest", () => {
     const firstAccount = target(firms[0], "account") as Base;
     const firmAccount = target(target(firstAccount, "firm") as Base, "account") as Base;
     expect(firmAccount.id).toBe(firstAccount.id);
-    const expected = (await (companies("first_firm") as Firm).loadHasOne("account")) as Base;
+    const expected = (await (companies("first_firm") as Firm).account) as Base;
     await assertQueriesCount(0, false, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expected.id,
       );
     });
-    const ffAccount = (await (companies("first_firm") as Firm).loadHasOne("account")) as Account;
-    const ffFirm = (await ffAccount.loadBelongsTo("firm")) as Firm;
-    const expectedDeep = (await ffFirm.loadHasOne("account")) as Base;
+    const ffAccount = (await (companies("first_firm") as Firm).account) as Account;
+    const ffFirm = (await ffAccount.firm) as Firm;
+    const expectedDeep = (await ffFirm.account) as Base;
     await assertQueriesCount(0, false, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expectedDeep.id,

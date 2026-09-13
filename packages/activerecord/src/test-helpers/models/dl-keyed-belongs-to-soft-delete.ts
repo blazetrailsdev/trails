@@ -1,11 +1,8 @@
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DlKeyedBelongsToSoftDelete extends Base {
-  declare destroyAsyncParentSoftDelete: DestroyAsyncParentSoftDelete | null;
-  declare loadBelongsTo: (
-    name: "destroyAsyncParentSoftDelete",
-  ) => Promise<DestroyAsyncParentSoftDelete | null>;
   declare deleted: boolean;
   declare destroy_async_parent_soft_delete_id: number;
 
@@ -25,4 +22,12 @@ export class DlKeyedBelongsToSoftDelete extends Base {
     await (this as any).runCallbacks("destroy", () => {});
     return this;
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DlKeyedBelongsToSoftDelete {
+  get destroyAsyncParentSoftDelete():
+    | DestroyAsyncParentSoftDelete
+    | null
+    | Promise<DestroyAsyncParentSoftDelete | null>;
+  set destroyAsyncParentSoftDelete(value: DestroyAsyncParentSoftDelete | null);
 }

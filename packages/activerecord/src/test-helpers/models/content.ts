@@ -1,10 +1,8 @@
 import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Content extends Base {
-  declare contentPosition: ContentPosition | null;
-  declare loadHasOne: (name: "contentPosition") => Promise<ContentPosition | null>;
-
   static _tableName = "content";
 
   static destroyedIds: number[] = [];
@@ -16,11 +14,14 @@ export class Content extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Content {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContentWhichRequiresTwoDestroyCalls extends Base {
-  declare contentPosition: ContentPosition | null;
-  declare loadHasOne: (name: "contentPosition") => Promise<ContentPosition | null>;
-
   static _tableName = "content";
 
   private destroyCount: number = 0;
@@ -38,10 +39,14 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ContentWhichRequiresTwoDestroyCalls {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContentPosition extends Base {
-  declare content: Content | null;
-  declare loadBelongsTo: (name: "content") => Promise<Content | null>;
   declare content_id: number;
 
   static destroyedIds: number[] = [];
@@ -52,4 +57,9 @@ export class ContentPosition extends Base {
       ContentPosition.destroyedIds.push(record.id as number);
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ContentPosition {
+  get content(): Content | null | Promise<Content | null>;
+  set content(value: Content | null);
 }

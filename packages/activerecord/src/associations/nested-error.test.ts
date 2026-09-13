@@ -91,15 +91,20 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         this.validates("name", { presence: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PetOwner extends Base {
       static tableName = "owners";
-      declare pet: ValidatedPet | null;
       static {
         this._primaryKey = "owner_id";
         this.hasOne("pet", { className: "NestedErrorValidatedPet", foreignKey: "owner_id" });
         this.acceptsNestedAttributesFor("pet");
         this.validatesAssociated("pet");
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PetOwner {
+      get pet(): ValidatedPet | null | Promise<ValidatedPet | null>;
+      set pet(value: ValidatedPet | null);
     }
     registerModel("NestedErrorValidatedPet", ValidatedPet);
     registerModel("NestedErrorPetOwner", PetOwner);

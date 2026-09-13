@@ -27,14 +27,8 @@ import { registerSubclass } from "../../inheritance.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CategoryPost extends Base {
-  declare group: Category | null;
-  declare category: Category | null;
-  declare post: Post | null;
-  declare loadBelongsTo: ((name: "group") => Promise<Category | null>) &
-    ((name: "category") => Promise<Category | null>) &
-    ((name: "post") => Promise<Post | null>);
-
   static {
     this._tableName = "categories_posts";
     this.belongsTo("group", { foreignKey: "category_id", className: "Category" });
@@ -42,7 +36,17 @@ export class CategoryPost extends Base {
     this.belongsTo("post");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CategoryPost {
+  get group(): Category | null | Promise<Category | null>;
+  set group(value: Category | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Post extends Base {
   declare comments_count: number;
   declare static containingTheLetterA: () => Relation<Post>;
@@ -62,14 +66,7 @@ export class Post extends Base {
   declare static taggedWith: (id: number) => Relation<Post>;
   declare static taggedWithComment: (comment: string) => Relation<Post>;
   declare static typographicallyInteresting: () => Relation<Post>;
-  declare author: Author | null;
-  declare readonlyAuthor: Author | null;
-  declare authorWithPosts: Author | null;
-  declare authorWithAddress: Author | null;
-  declare authorWithSelect: Author | null;
-  declare authorWithTheLetterA: Author | null;
   declare firstComment: Promise<string | null>;
-  declare lastComment: Comment | null;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
   declare commentsWithExtend_2: AssociationProxy<Comment>;
@@ -78,10 +75,6 @@ export class Post extends Base {
   declare authorCategorizations: AssociationProxy<Categorization>;
   declare authorAddresses: AssociationProxy<AuthorAddress>;
   declare authorAddressExtraWithAddress: AssociationProxy<AuthorAddress>;
-  declare verySpecialComment: VerySpecialComment | null;
-  declare verySpecialCommentWithPost: VerySpecialComment | null;
-  declare verySpecialCommentWithPostWithJoins: VerySpecialComment | null;
-  declare verySpecialCommentWithStringJoins: VerySpecialComment | null;
   declare commentsWithStringJoins: AssociationProxy<Comment>;
   declare ratingsViaStringJoinComments: AssociationProxy<Rating>;
   declare specialComments: AssociationProxy<SpecialComment>;
@@ -105,7 +98,6 @@ export class Post extends Base {
   declare superTags: AssociationProxy<Tag>;
   declare orderedTags: AssociationProxy<OrderedTag>;
   declare tagsWithPrimaryKey: AssociationProxy<Tag>;
-  declare tagging: Tagging | null;
   declare firstTaggings: AssociationProxy<Tagging>;
   declare firstBlueTags: AssociationProxy<Tag>;
   declare firstBlueTags_2: AssociationProxy<Tag>;
@@ -118,7 +110,6 @@ export class Post extends Base {
   declare taggingsUsingAuthorId: AssociationProxy<Tagging>;
   declare tagsUsingAuthorId: AssociationProxy<Tag>;
   declare images: AssociationProxy<Image>;
-  declare mainImage: Image | null;
   declare standardCategorizations: AssociationProxy<Categorization>;
   declare authorUsingCustomPk: AssociationProxy<Author>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
@@ -136,20 +127,6 @@ export class Post extends Base {
   declare lazyPeople: AssociationProxy<Person>;
   declare lazyReadersUnscopeSkimmers: AssociationProxy<LazyReader>;
   declare lazyPeopleUnscopeSkimmers: AssociationProxy<Person>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
   declare author_id: number;
   declare indestructible_tags_count: number | null;
   declare legacy_comments_count: number | null;
@@ -269,7 +246,9 @@ export class Post extends Base {
 
     Object.defineProperty(this.prototype, "firstComment", {
       get(this: any): Promise<string | null> {
-        return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
+        return Promise.resolve(this.association("firstComment").reader).then(
+          (c: any) => c?.body ?? null,
+        );
       },
       configurable: false,
       enumerable: false,
@@ -561,138 +540,86 @@ export class Post extends Base {
     return this._log;
   }
 }
-
-export class SpecialPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Post {
+  get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPost(value: VerySpecialComment | null);
+  get verySpecialCommentWithPostWithJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPostWithJoins(value: VerySpecialComment | null);
+  get verySpecialCommentWithStringJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithStringJoins(value: VerySpecialComment | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Post {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get readonlyAuthor(): Author | null | Promise<Author | null>;
+  set readonlyAuthor(value: Author | null);
+  get authorWithPosts(): Author | null | Promise<Author | null>;
+  set authorWithPosts(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithSelect(): Author | null | Promise<Author | null>;
+  set authorWithSelect(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
+  get lastComment(): Comment | null | Promise<Comment | null>;
+  set lastComment(value: Comment | null);
+  get verySpecialComment(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialComment(value: VerySpecialComment | null);
+  get tagging(): Tagging | null | Promise<Tagging | null>;
+  set tagging(value: Tagging | null);
+  get mainImage(): Image | null | Promise<Image | null>;
+  set mainImage(value: Image | null);
 }
 
-export class StiPost extends Post {
-  declare specialComment: SpecialComment | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>) &
-    ((name: "specialComment") => Promise<SpecialComment | null>);
+export class SpecialPost extends Post {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class StiPost extends Post {
   static {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface StiPost {
+  get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
+  set specialComment(value: SpecialComment | null);
+}
 
 export class AbstractStiPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.abstractClass = true;
   }
 }
 
 export class SubStiPost extends StiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>) &
-    ((name: "specialComment") => Promise<SpecialComment | null>);
-
   static {
     this._tableName = "posts";
   }
 }
 
 export class SubAbstractStiPost extends AbstractStiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this._tableName = "posts";
   }
 }
 
 export class NullPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.defaultScope((q: any) => q.none());
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FirstPost extends Base {
   declare comments: AssociationProxy<Comment>;
-  declare comment: Comment | null;
-  declare commentWithInverse: Comment | null;
-  declare loadHasOne: ((name: "comment") => Promise<Comment | null>) &
-    ((name: "commentWithInverse") => Promise<Comment | null>);
 
   static {
     this.inheritanceColumn = "disabled";
@@ -707,6 +634,13 @@ export class FirstPost extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface FirstPost {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
+  get commentWithInverse(): Comment | null | Promise<Comment | null>;
+  set commentWithInverse(value: Comment | null);
+}
 
 export class PostWithDefaultSelect extends Base {
   static {
@@ -718,20 +652,6 @@ export class PostWithDefaultSelect extends Base {
 export class TaggedPost extends Post {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
 
   static {
     this.hasMany("taggings", (q: any) => q.rewhere({ taggable_type: "TaggedPost" }), {
@@ -754,20 +674,6 @@ export class PostWithDefaultInclude extends Base {
 
 export class PostWithSpecialCategorization extends Post {
   declare categorizations: AssociationProxy<Categorization>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
 
   static {
     this.hasMany("categorizations", { foreignKey: "post_id" });
@@ -857,12 +763,9 @@ export class PostWithAfterCreateCallback extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
   declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
-  declare firstComment: CommentWithDefaultScopeReferencesAssociation | null;
-  declare loadHasOne: (
-    name: "firstComment",
-  ) => Promise<CommentWithDefaultScopeReferencesAssociation | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -873,6 +776,14 @@ export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
       foreignKey: "post_id",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PostWithCommentWithDefaultScopeReferencesAssociation {
+  get firstComment():
+    | CommentWithDefaultScopeReferencesAssociation
+    | null
+    | Promise<CommentWithDefaultScopeReferencesAssociation | null>;
+  set firstComment(value: CommentWithDefaultScopeReferencesAssociation | null);
 }
 
 export class SerializedPost extends Base {
@@ -885,42 +796,12 @@ export class SerializedPost extends Base {
 }
 
 export class ConditionalStiPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.defaultScope((q: any) => q.where({ title: "Untitled" }));
   }
 }
 
-export class SubConditionalStiPost extends ConditionalStiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-}
+export class SubConditionalStiPost extends ConditionalStiPost {}
 
 export class PostWithDestroyCallback extends Base {
   static {
@@ -932,13 +813,8 @@ export class PostWithDestroyCallback extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Postesque extends Base {
-  declare author: Author | null;
-  declare authorWithAddress: Author | null;
-  declare authorWithTheLetterA: Author | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
   declare author_id: string;
   declare author_name: string;
 
@@ -957,6 +833,15 @@ export class Postesque extends Base {
       foreignKey: "author_id",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Postesque {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
 }
 
 export class PostRecord extends Base {

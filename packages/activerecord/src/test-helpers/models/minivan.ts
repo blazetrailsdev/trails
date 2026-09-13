@@ -2,11 +2,8 @@ import type { Dashboard } from "./dashboard.js";
 import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Minivan extends Base {
-  declare speedometer: Speedometer | null;
-  declare dashboard: Dashboard | null;
-  declare loadBelongsTo: (name: "speedometer") => Promise<Speedometer | null>;
-  declare loadHasOne: (name: "dashboard") => Promise<Dashboard | null>;
   declare color: string;
   declare minivan_id: string;
   declare name: string;
@@ -18,4 +15,11 @@ export class Minivan extends Base {
     this.hasOne("dashboard", { through: "speedometer" });
     this.attrReadonly("color");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Minivan {
+  get speedometer(): Speedometer | null | Promise<Speedometer | null>;
+  set speedometer(value: Speedometer | null);
+  get dashboard(): Dashboard | null | Promise<Dashboard | null>;
+  set dashboard(value: Dashboard | null);
 }

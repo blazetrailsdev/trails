@@ -1,11 +1,8 @@
 import type { Translation } from "./translation.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attachment extends Base {
-  declare record: Base | null;
-  declare translation: Translation | null;
-  declare loadBelongsTo: (name: "record") => Promise<Base | null>;
-  declare loadHasOne: (name: "translation") => Promise<Translation | null>;
   declare record_id: number;
   declare record_type: string;
 
@@ -13,4 +10,11 @@ export class Attachment extends Base {
     this.belongsTo("record", { polymorphic: true });
     this.hasOne("translation");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Attachment {
+  get record(): Base | null | Promise<Base | null>;
+  set record(value: Base | null);
+  get translation(): Translation | null | Promise<Translation | null>;
+  set translation(value: Translation | null);
 }

@@ -7,14 +7,13 @@ import type { Toy } from "./toy.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Pet extends Base {
   declare current_user: string;
-  declare owner: Owner | null;
   declare toys: AssociationProxy<Toy>;
   declare petTreasures: AssociationProxy<PetTreasure>;
   declare treasures: AssociationProxy<Treasure>;
   declare persons: AssociationProxy<Person>;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare integer: number | null;
   declare name: string;
@@ -38,12 +37,16 @@ export class Pet extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Pet {
+  get owner(): Owner | null | Promise<Owner | null>;
+  set owner(value: Owner | null);
+}
 
 export class PetTouchHappyAt extends Base {
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
 
   static {
     this._primaryKey = "pet_id";
@@ -56,7 +59,6 @@ export class PetCounterCacheTouch extends Base {
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
 
   static {
     this._primaryKey = "pet_id";

@@ -125,12 +125,11 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ScChef extends Base {
       declare department_id: number | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("department_id", "integer");
@@ -138,6 +137,11 @@ describe("ReflectionTest", () => {
         this.attribute("employable_type", "string");
         this.belongsTo("employable", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface ScChef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class ScCake extends Base {}
     class ScDrink extends Base {}
@@ -190,13 +194,12 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC2ChefList extends Base {
       declare employable_list_id: number | null;
       declare employable_list_type: string | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("employable_list_id", "integer");
@@ -205,6 +208,11 @@ describe("ReflectionTest", () => {
         this.attribute("employable_type", "string");
         this.belongsTo("employable", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SC2ChefList {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class SC2Mocktail extends Base {}
     registerModel("SC2Hotel", SC2Hotel);
@@ -253,12 +261,11 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC3Book extends Base {
       declare author_id: number | null;
       declare format_record_id: number | null;
       declare format_record_type: string | null;
-      declare formatRecord: Base | null;
-      declare loadBelongsTo: (name: "formatRecord") => Promise<Base | null>;
 
       static {
         this.attribute("author_id", "integer");
@@ -266,6 +273,11 @@ describe("ReflectionTest", () => {
         this.attribute("format_record_type", "string");
         this.belongsTo("formatRecord", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SC3Book {
+      get formatRecord(): Base | null | Promise<Base | null>;
+      set formatRecord(value: Base | null);
     }
     class SC3Hardback extends Base {}
     class SC3BestHardback extends SC3Hardback {}
@@ -332,13 +344,12 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC4Chef extends Base {
       declare department_id: number | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
       declare recipes: AssociationProxy<SC4Recipe>;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("department_id", "integer");
@@ -350,6 +361,11 @@ describe("ReflectionTest", () => {
           foreignKey: "chef_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SC4Chef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class SC4Drink extends Base {}
     class SC4Recipe extends Base {
@@ -417,11 +433,10 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfSubscription extends Base {
       declare subscriber_id: number | null;
       declare book_id: number | null;
-      declare subBook: SubBook | null;
-      declare loadBelongsTo: (name: "subBook") => Promise<SubBook | null>;
 
       static {
         this.attribute("subscriber_id", "integer");
@@ -431,6 +446,11 @@ describe("ReflectionTest", () => {
           className: "SubBook",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface RfSubscription {
+      get subBook(): SubBook | null | Promise<SubBook | null>;
+      set subBook(value: SubBook | null);
     }
     class SubBook extends Base {
       declare title: string | null;
@@ -565,15 +585,19 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfAdminUser extends Base {
       declare name: string | null;
-      declare user: RfNestedUser | null;
-      declare loadHasOne: (name: "user") => Promise<RfNestedUser | null>;
 
       static {
         this.attribute("name", "string");
         this.hasOne("user", { className: "RfNested::User" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface RfAdminUser {
+      get user(): RfNestedUser | null | Promise<RfNestedUser | null>;
+      set user(value: RfNestedUser | null);
     }
     registerModel("RfNested::User", RfNestedUser);
     registerModel("RfAdmin::User", RfAdminUser);
@@ -1338,16 +1362,20 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfComment extends Base {
       declare blog_post_id: number | null;
-      declare blogPost: BlogPost | null;
-      declare loadBelongsTo: (name: "blogPost") => Promise<BlogPost | null>;
 
       static {
         this.attribute("id", "integer");
         this.attribute("blog_post_id", "integer");
         this.belongsTo("blogPost", { className: "BlogPost" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface RfComment {
+      get blogPost(): BlogPost | null | Promise<BlogPost | null>;
+      set blogPost(value: BlogPost | null);
     }
     registerModel(BlogPost);
     registerModel(RfComment);

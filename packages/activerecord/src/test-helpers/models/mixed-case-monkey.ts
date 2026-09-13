@@ -1,9 +1,8 @@
 import type { Human } from "./human.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MixedCaseMonkey extends Base {
-  declare human: Human | null;
-  declare loadBelongsTo: (name: "human") => Promise<Human | null>;
   declare fleaCount: number;
   declare monkeyID: number;
 
@@ -12,4 +11,9 @@ export class MixedCaseMonkey extends Base {
   static {
     this.belongsTo("human");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MixedCaseMonkey {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
 }

@@ -3,14 +3,13 @@ import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tag extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggables: AssociationProxy<Base>;
-  declare tagging: Tagging | null;
   declare taggedPosts: AssociationProxy<Post>;
   declare nullTaggings: AssociationProxy<Tagging>;
   declare nullTaggedPosts: AssociationProxy<Post>;
-  declare loadHasOne: (name: "tagging") => Promise<Tagging | null>;
   declare name: string;
   declare taggings_count: number | null;
 
@@ -28,11 +27,15 @@ export class Tag extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Tag {
+  get tagging(): Tagging | null | Promise<Tagging | null>;
+  set tagging(value: Tagging | null);
+}
 
 export class OrderedTag extends Tag {
   declare orderedTaggings: AssociationProxy<Tagging>;
   declare taggedPosts: AssociationProxy<Post>;
-  declare loadHasOne: (name: "tagging") => Promise<Tagging | null>;
 
   static {
     this._tableName = "tags";

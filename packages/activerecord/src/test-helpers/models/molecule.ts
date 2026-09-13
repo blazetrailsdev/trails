@@ -3,10 +3,9 @@ import type { Electron } from "./electron.js";
 import type { Liquid } from "./liquid.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Molecule extends Base {
-  declare liquid: Liquid | null;
   declare electrons: AssociationProxy<Electron>;
-  declare loadBelongsTo: (name: "liquid") => Promise<Liquid | null>;
   declare liquid_id: number;
   declare name: string;
 
@@ -14,4 +13,9 @@ export class Molecule extends Base {
     this.belongsTo("liquid");
     this.hasMany("electrons");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Molecule {
+  get liquid(): Liquid | null | Promise<Liquid | null>;
+  set liquid(value: Liquid | null);
 }

@@ -19,9 +19,8 @@ export class ShardedBlog extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPost extends Base {
-  declare parent: Base | null;
-  declare blog: ShardedBlog | null;
   declare comments: AssociationProxy<ShardedComment>;
   declare deleteComments: AssociationProxy<ShardedComment>;
   declare children: AssociationProxy<ShardedBlogPost>;
@@ -29,8 +28,6 @@ export class ShardedBlogPost extends Base {
   declare tags: AssociationProxy<ShardedTag>;
   declare commentsWithCompositePk: AssociationProxy<ShardedComment>;
   declare commentsWithInverse: AssociationProxy<ShardedComment>;
-  declare loadBelongsTo: ((name: "parent") => Promise<Base | null>) &
-    ((name: "blog") => Promise<ShardedBlog | null>);
   declare blog_id: number;
   declare parent_id: number;
   declare parent_type: string;
@@ -74,6 +71,13 @@ export class ShardedBlogPost extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShardedBlogPost {
+  get parent(): Base | null | Promise<Base | null>;
+  set parent(value: Base | null);
+  get blog(): ShardedBlog | null | Promise<ShardedBlog | null>;
+  set blog(value: ShardedBlog | null);
+}
 
 export class ShardedBlogPostWithRevision extends Base {
   declare comments: AssociationProxy<ShardedComment>;
@@ -91,15 +95,8 @@ export class ShardedBlogPostWithRevision extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedComment extends Base {
-  declare blogPost: ShardedBlogPost | null;
-  declare blogPostById: ShardedBlogPost | null;
-  declare blogPostWithInverse: ShardedBlogPost | null;
-  declare blog: ShardedBlog | null;
-  declare loadBelongsTo: ((name: "blogPost") => Promise<ShardedBlogPost | null>) &
-    ((name: "blogPostById") => Promise<ShardedBlogPost | null>) &
-    ((name: "blogPostWithInverse") => Promise<ShardedBlogPost | null>) &
-    ((name: "blog") => Promise<ShardedBlog | null>);
   declare blog_id: number;
   declare blog_post_id: number;
   declare body: string;
@@ -124,6 +121,17 @@ export class ShardedComment extends Base {
     this.belongsTo("blog", { className: "ShardedBlog" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShardedComment {
+  get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPost(value: ShardedBlogPost | null);
+  get blogPostById(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPostById(value: ShardedBlogPost | null);
+  get blogPostWithInverse(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPostWithInverse(value: ShardedBlogPost | null);
+  get blog(): ShardedBlog | null | Promise<ShardedBlog | null>;
+  set blog(value: ShardedBlog | null);
+}
 
 export class ShardedTag extends Base {
   declare blogPostTags: AssociationProxy<ShardedBlogPostTag>;
@@ -144,12 +152,8 @@ export class ShardedTag extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPostTag extends Base {
-  declare blogPost: ShardedBlogPost | null;
-  declare tag: ShardedTag | null;
-  declare loadBelongsTo: ((name: "blogPost") => Promise<ShardedBlogPost | null>) &
-    ((name: "tag") => Promise<ShardedTag | null>);
-
   static _tableName = "sharded_blog_posts_tags";
 
   static {
@@ -158,4 +162,11 @@ export class ShardedBlogPostTag extends Base {
     this.belongsTo("blogPost", { className: "ShardedBlogPost" });
     this.belongsTo("tag", { className: "ShardedTag" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShardedBlogPostTag {
+  get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPost(value: ShardedBlogPost | null);
+  get tag(): ShardedTag | null | Promise<ShardedTag | null>;
+  set tag(value: ShardedTag | null);
 }

@@ -2,11 +2,8 @@ import type { DestroyAsyncParent } from "./destroy-async-parent.js";
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DlKeyedBelongsTo extends Base {
-  declare destroyAsyncParent: DestroyAsyncParent | null;
-  declare destroyAsyncParentSoftDelete: DestroyAsyncParentSoftDelete | null;
-  declare loadBelongsTo: ((name: "destroyAsyncParent") => Promise<DestroyAsyncParent | null>) &
-    ((name: "destroyAsyncParentSoftDelete") => Promise<DestroyAsyncParentSoftDelete | null>);
   declare belongs_key: number;
   declare destroy_async_parent_id: number;
 
@@ -24,4 +21,17 @@ export class DlKeyedBelongsTo extends Base {
       className: "DestroyAsyncParentSoftDelete",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DlKeyedBelongsTo {
+  get destroyAsyncParentSoftDelete():
+    | DestroyAsyncParentSoftDelete
+    | null
+    | Promise<DestroyAsyncParentSoftDelete | null>;
+  set destroyAsyncParentSoftDelete(value: DestroyAsyncParentSoftDelete | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DlKeyedBelongsTo {
+  get destroyAsyncParent(): DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
+  set destroyAsyncParent(value: DestroyAsyncParent | null);
 }

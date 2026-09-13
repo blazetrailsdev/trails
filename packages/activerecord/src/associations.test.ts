@@ -619,7 +619,7 @@ describe("PreloaderTest", () => {
       .sort();
 
     await member.reload();
-    await member.loadHasOne("organization");
+    await member.organization;
 
     const sqls = await captureSql(async () => {
       await new Preloader({
@@ -1389,8 +1389,8 @@ describe("GeneratedMethodsTest", () => {
   it("association methods override attribute methods of same name", async () => {
     const computer = await Computer.find(computers("workstation").id);
     const developer = await Developer.find(developers("david").id);
-    expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
-    expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
+    expect((await computer.developer)?.id).toBe(developer.id);
+    expect((await computer.developer)?.id).toBe(developer.id);
     expect(computer.readAttribute("developer")).toBe(Number(developer.id));
   });
 
@@ -1464,10 +1464,10 @@ describe("WithAnnotationsTest", () => {
 
   it("belongs to with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(() => (pirate as any).loadBelongsTo("parrot"));
+    const plain = await captureSql(() => (pirate as any).parrot);
     expect(plain.length).toBeGreaterThan(0);
     expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(() => (pirate as any).loadBelongsTo("parrotWithAnnotation"));
+    const sqls = await captureSql(() => (pirate as any).parrotWithAnnotation);
     expect(sqls.some((s) => s.includes("that tells jokes"))).toBe(true);
   });
 
@@ -1486,10 +1486,10 @@ describe("WithAnnotationsTest", () => {
 
   it("has one with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(() => (pirate as any).loadHasOne("ship"));
+    const plain = await captureSql(() => (pirate as any).ship);
     expect(plain.length).toBeGreaterThan(0);
     expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(() => (pirate as any).loadHasOne("shipWithAnnotation"));
+    const sqls = await captureSql(() => (pirate as any).shipWithAnnotation);
     expect(sqls.some((s) => s.includes("that is a rocket"))).toBe(true);
   });
 
@@ -1786,7 +1786,7 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one");
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
-    const loaded = await (comment as any).loadBelongsTo("blogPost");
+    const loaded = await (comment as any).blogPost;
     expect(loaded.id).toBe((blogPost as any).id);
     expect(loaded.blog_id).toBe((blogPost as any).blog_id);
   });
@@ -1795,7 +1795,7 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one");
 
     const sqls = await captureSql(async () => {
-      await (comment as any).loadBelongsTo("blogPost");
+      await (comment as any).blogPost;
     });
     const sql = sqls.find((s) => /sharded_blog_posts/.test(s))!;
 
@@ -1911,7 +1911,7 @@ describe("AssociationsTest", () => {
     const loaded = comments[0];
     const preloaded = (loaded as any).association("blogPostById").target;
     expect(preloaded).toBeDefined();
-    const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
+    const byCompositeKey = await (loaded as any).blogPost;
     expect(preloaded.id).toBe(byCompositeKey.id);
   });
 
@@ -2004,7 +2004,7 @@ describe("AssociationsTest", () => {
     await blogPost.save();
     await (comment.association("blogPost") as SingularAssociation).writer(blogPost);
 
-    const loaded = await (comment as any).loadBelongsTo("blogPost");
+    const loaded = await (comment as any).blogPost;
     expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
     expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
@@ -2013,16 +2013,16 @@ describe("AssociationsTest", () => {
 
   it("nullify composite foreign key belongs to association", async () => {
     const comment = shardedComments("great_comment_blog_post_one");
-    expect(await (comment as any).loadBelongsTo("blogPost")).not.toBeNull();
+    expect(await (comment as any).blogPost).not.toBeNull();
 
     await (comment.association("blogPost") as SingularAssociation).writer(null);
     expect((comment as any).blog_id).toBeNull();
     expect((comment as any).blog_post_id).toBeNull();
 
     await comment.save();
-    expect(await (comment as any).loadBelongsTo("blogPost")).toBeNull();
+    expect(await (comment as any).blogPost).toBeNull();
     const reloaded = await ShardedComment.find((comment as any).id);
-    expect(await (reloaded as any).loadBelongsTo("blogPost")).toBeNull();
+    expect(await (reloaded as any).blogPost).toBeNull();
   });
 
   it("assign composite foreign key belongs to association", async () => {
@@ -2049,7 +2049,7 @@ describe("AssociationsTest", () => {
     await comment.save();
 
     expect(blogPost.isPersisted()).toBe(true);
-    const loaded = await (comment as any).loadBelongsTo("blogPost");
+    const loaded = await (comment as any).blogPost;
     expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
     expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
@@ -2067,7 +2067,7 @@ describe("AssociationsTest", () => {
     await comment.save();
 
     expect(blogPost.isPersisted()).toBe(true);
-    const loaded = await (comment as any).loadBelongsTo("blogPostById");
+    const loaded = await (comment as any).blogPostById;
     expect(loaded.id).toBe((blogPost as any).id);
   });
 
@@ -2081,7 +2081,7 @@ describe("AssociationsTest", () => {
     await childPost.save();
 
     const reloaded = await ShardedBlogPost.find((childPost as any).id);
-    const loaded = await (reloaded as any).loadBelongsTo("parent");
+    const loaded = await (reloaded as any).parent;
     expect(loaded.id).toBe((parentPost as any).id);
   });
 
@@ -2090,7 +2090,7 @@ describe("AssociationsTest", () => {
     const orderId = (order as any).id[1];
     const agreement = await CpkOrderAgreement.create({ order_id: orderId, signature: "signed" });
 
-    const loaded = await (agreement as any).loadBelongsTo("order");
+    const loaded = await (agreement as any).order;
     expect(loaded.id).toEqual((order as any).id);
   });
 
@@ -2102,7 +2102,7 @@ describe("AssociationsTest", () => {
 
     let loaded: any;
     const sqls = await captureSql(async () => {
-      loaded = await (review as any).loadBelongsTo("car");
+      loaded = await (review as any).car;
     });
     expect(loaded.id).toEqual((car as any).id);
 
@@ -2131,7 +2131,7 @@ describe("AssociationsTest", () => {
     await agreement.save();
 
     await agreement.reload();
-    const loaded = await (agreement as any).loadBelongsTo("order");
+    const loaded = await (agreement as any).order;
     expect(loaded).not.toBeNull();
     expect((agreement as any).order_id).not.toBeNull();
 
@@ -2260,14 +2260,14 @@ describe("AssociationsTest", () => {
     const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
     const [shopId, orderId] = order.id as [number, number];
     await CpkBook.create({ id: [1, 90001], shop_id: shopId, order_id: orderId, title: "Only" });
-    expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
+    expect((await (order as any).book)?.title).toBe("Only");
   });
 
   it("has one loads through a declared reflection with a scalar foreign key on a composite primary key owner", async () => {
     const order = await CpkOrderWithPrimaryKeyAssociatedBook.create({ shop_id: 1 });
     const [, orderId] = order.id as [number, number];
     await CpkBook.create({ id: [1, 90002], order_id: orderId, title: "Only" });
-    expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
+    expect((await (order as any).book)?.title).toBe("Only");
   });
 
   it("has many loads via inline fallback ignoring enclosing current_scope", async () => {

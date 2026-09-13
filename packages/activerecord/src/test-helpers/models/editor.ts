@@ -3,10 +3,9 @@ import type { Editorship } from "./editorship.js";
 import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Editor extends Base {
-  declare publication: Publication | null;
   declare editorships: AssociationProxy<Editorship>;
-  declare loadHasOne: (name: "publication") => Promise<Publication | null>;
   declare name: string;
 
   static {
@@ -15,4 +14,9 @@ export class Editor extends Base {
     this.hasOne("publication", { foreignKey: "editor_in_chief_id", inverseOf: "editorInChief" });
     this.hasMany("editorships");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Editor {
+  get publication(): Publication | null | Promise<Publication | null>;
+  set publication(value: Publication | null);
 }

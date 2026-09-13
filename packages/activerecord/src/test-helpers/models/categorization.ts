@@ -5,19 +5,10 @@ import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Categorization extends Base {
-  declare post: Post | null;
-  declare category: Category | null;
-  declare namedCategory: Category | null;
-  declare author: Author | null;
   declare postTaggings: AssociationProxy<Tagging>;
-  declare authorUsingCustomPk: Author | null;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "category") => Promise<Category | null>) &
-    ((name: "namedCategory") => Promise<Category | null>) &
-    ((name: "author") => Promise<Author | null>) &
-    ((name: "authorUsingCustomPk") => Promise<Author | null>);
   declare author_id: number;
   declare category_id: number;
   declare named_category_name: string;
@@ -46,17 +37,33 @@ export class Categorization extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Categorization {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get namedCategory(): Category | null | Promise<Category | null>;
+  set namedCategory(value: Category | null);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorUsingCustomPk(): Author | null | Promise<Author | null>;
+  set authorUsingCustomPk(value: Author | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpecialCategorization extends Base {
-  declare author: Author | null;
-  declare category: Category | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "category") => Promise<Category | null>);
-
   static {
     this._tableName = "categorizations";
     this.defaultScope((q: any) => q.where({ special: true }));
     this.belongsTo("author");
     this.belongsTo("category");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SpecialCategorization {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
 }

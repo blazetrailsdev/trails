@@ -5,9 +5,9 @@ import type { Firm } from "./company.js";
 import type { Mentor } from "./mentor.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Project extends Base {
   declare developersRequiredByDefault: any;
-  declare mentor: Mentor | null;
   declare developers: AssociationProxy<Developer>;
   declare readonlyDevelopers: AssociationProxy<Developer>;
   declare nonUniqueDevelopers: AssociationProxy<Developer>;
@@ -17,14 +17,7 @@ export class Project extends Base {
   declare salariedDevelopers: AssociationProxy<Developer>;
   declare developersWithCallbacks: AssociationProxy<Developer>;
   declare wellPaidSalaryGroups: AssociationProxy<Developer>;
-  declare firm: Firm | null;
-  declare leadDeveloper: Developer | null;
-  declare leadDeveloperDisableJoins: Developer | null;
   declare static allAsScope: () => Relation<Project>;
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
-    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
   declare firm_id: number;
   declare mentor_id: number;
   declare name: string;
@@ -108,10 +101,16 @@ export class Project extends Base {
     return this.all();
   }
 }
-
-export class SpecialProject extends Project {
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
-    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Project {
+  get mentor(): Mentor | null | Promise<Mentor | null>;
+  set mentor(value: Mentor | null);
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+  get leadDeveloper(): Developer | null | Promise<Developer | null>;
+  set leadDeveloper(value: Developer | null);
+  get leadDeveloperDisableJoins(): Developer | null | Promise<Developer | null>;
+  set leadDeveloperDisableJoins(value: Developer | null);
 }
+
+export class SpecialProject extends Project {}

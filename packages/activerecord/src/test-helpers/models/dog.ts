@@ -1,13 +1,8 @@
 import type { DogLover } from "./dog-lover.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Dog extends Base {
-  declare breeder: DogLover | null;
-  declare trainer: DogLover | null;
-  declare doglover: DogLover | null;
-  declare loadBelongsTo: ((name: "breeder") => Promise<DogLover | null>) &
-    ((name: "trainer") => Promise<DogLover | null>) &
-    ((name: "doglover") => Promise<DogLover | null>);
   declare alias: string;
   declare breeder_id: number;
   declare dog_lover_id: number;
@@ -22,4 +17,13 @@ export class Dog extends Base {
       counterCache: true,
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Dog {
+  get breeder(): DogLover | null | Promise<DogLover | null>;
+  set breeder(value: DogLover | null);
+  get trainer(): DogLover | null | Promise<DogLover | null>;
+  set trainer(value: DogLover | null);
+  get doglover(): DogLover | null | Promise<DogLover | null>;
+  set doglover(value: DogLover | null);
 }

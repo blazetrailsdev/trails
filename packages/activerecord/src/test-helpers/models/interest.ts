@@ -2,17 +2,8 @@ import type { Human } from "./human.js";
 import type { Zine } from "./zine.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Interest extends Base {
-  declare human: Human | null;
-  declare humanWithCallbacks: Human | null;
-  declare polymorphicHuman: Base | null;
-  declare polymorphicHumanWithCallbacks: Base | null;
-  declare zine: Zine | null;
-  declare loadBelongsTo: ((name: "human") => Promise<Human | null>) &
-    ((name: "humanWithCallbacks") => Promise<Human | null>) &
-    ((name: "polymorphicHuman") => Promise<Base | null>) &
-    ((name: "polymorphicHumanWithCallbacks") => Promise<Base | null>) &
-    ((name: "zine") => Promise<Zine | null>);
   declare human_id: number;
   declare polymorphic_human_id: number;
   declare polymorphic_human_type: string;
@@ -35,4 +26,17 @@ export class Interest extends Base {
     });
     this.belongsTo("zine", { inverseOf: "interests" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Interest {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
+  get humanWithCallbacks(): Human | null | Promise<Human | null>;
+  set humanWithCallbacks(value: Human | null);
+  get polymorphicHuman(): Base | null | Promise<Base | null>;
+  set polymorphicHuman(value: Base | null);
+  get polymorphicHumanWithCallbacks(): Base | null | Promise<Base | null>;
+  set polymorphicHumanWithCallbacks(value: Base | null);
+  get zine(): Zine | null | Promise<Zine | null>;
+  set zine(value: Zine | null);
 }

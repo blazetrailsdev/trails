@@ -65,10 +65,10 @@ describe("EagerSingularizationTest", () => {
     );
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Virus extends Base {
     declare octopus_id: number | null;
     declare species: string | null;
-    declare octopus: Octopus | null;
 
     static {
       this.attribute("octopus_id", "integer");
@@ -76,25 +76,40 @@ describe("EagerSingularizationTest", () => {
       this.belongsTo("octopus");
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Virus {
+    get octopus(): Octopus | null | Promise<Octopus | null>;
+    set octopus(value: Octopus | null);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Octopus extends Base {
     declare species: string | null;
-    declare virus: Virus | null;
 
     static {
       this.attribute("species", "string");
       this.hasOne("virus");
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Octopus {
+    get virus(): Virus | null | Promise<Virus | null>;
+    set virus(value: Virus | null);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Pass extends Base {
     declare bus_id: number | null;
     declare rides: number | null;
-    declare bus: Bus | null;
 
     static {
       this.attribute("bus_id", "integer");
       this.attribute("rides", "integer");
       this.belongsTo("bus");
     }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Pass {
+    get bus(): Bus | null | Promise<Bus | null>;
+    set bus(value: Bus | null);
   }
   class Bus extends Base {
     declare name: string | null;
@@ -131,11 +146,10 @@ describe("EagerSingularizationTest", () => {
       this.hasMany("compresses", { through: "dresses" });
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Analysis extends Base {
     declare crisis_id: number | null;
     declare success_id: number | null;
-    declare crisis: Crisis | null;
-    declare success: Success | null;
 
     static {
       this.attribute("crisis_id", "integer");
@@ -143,6 +157,13 @@ describe("EagerSingularizationTest", () => {
       this.belongsTo("crisis");
       this.belongsTo("success");
     }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Analysis {
+    get crisis(): Crisis | null | Promise<Crisis | null>;
+    set crisis(value: Crisis | null);
+    get success(): Success | null | Promise<Success | null>;
+    set success(value: Success | null);
   }
   class Success extends Base {
     declare name: string | null;
@@ -155,9 +176,9 @@ describe("EagerSingularizationTest", () => {
       this.hasMany("crises", { through: "analyses" });
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Dress extends Base {
     declare crisis_id: number | null;
-    declare crisis: Crisis | null;
     declare compresses: AssociationProxy<Compress>;
 
     static {
@@ -166,14 +187,24 @@ describe("EagerSingularizationTest", () => {
       this.hasMany("compresses");
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Dress {
+    get crisis(): Crisis | null | Promise<Crisis | null>;
+    set crisis(value: Crisis | null);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class Compress extends Base {
     declare dress_id: number | null;
-    declare dress: Dress | null;
 
     static {
       this.attribute("dress_id", "integer");
       this.belongsTo("dress");
     }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface Compress {
+    get dress(): Dress | null | Promise<Dress | null>;
+    set dress(value: Dress | null);
   }
 
   registerModel("Virus", Virus);

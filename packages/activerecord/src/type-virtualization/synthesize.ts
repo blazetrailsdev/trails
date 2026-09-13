@@ -53,7 +53,7 @@ export function synthesizeDeclares(
     if (mergeAttributeInterface && l.attribute) {
       interfaceLines.push(
         `${INDENT}get ${l.attribute.memberName}(): ${l.attribute.readerType};`,
-        `${INDENT}set ${l.attribute.memberName}(value: unknown);`,
+        `${INDENT}set ${l.attribute.memberName}(value: ${l.attribute.writerType ?? "unknown"});`,
       );
     } else {
       out.push(l.text);
@@ -90,12 +90,6 @@ export function synthesizeDeclares(
         emit(line);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
-    }
-  }
-  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors, isKnownTarget)) {
-    if (!info.existingMembers.has(l.declaredName)) {
-      out.push(l.text);
-      synthesizedInstanceNames.add(l.declaredName);
     }
   }
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
@@ -169,41 +163,6 @@ function isValidIdentifier(name: string): boolean {
   return token === ts.SyntaxKind.Identifier && identifierScanner.getTextPos() === name.length;
 }
 
-function renderLoaderOverloads(
-  info: ClassInfo,
-  aliases: ReadonlyMap<string, string> | undefined,
-  targets: ReadonlyMap<string, string> | undefined,
-  ancestors: readonly ClassInfo[] | undefined,
-  isKnownTarget: ((name: string) => boolean) | undefined,
-): RenderedLine[] {
-  const belongsToOverloads: string[] = [];
-  const hasOneOverloads: string[] = [];
-  const sources: ClassInfo[] = [...(ancestors ?? [])].reverse();
-  sources.push(info);
-  for (const source of sources) {
-    for (const call of source.calls) {
-      if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
-      const target =
-        call.options["polymorphic"] === "true"
-          ? "Base"
-          : resolveTarget(source, call, aliases, targets, isKnownTarget);
-      const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
-      const bucket = call.kind === "belongsTo" ? belongsToOverloads : hasOneOverloads;
-      if (!bucket.includes(overload)) bucket.push(overload);
-    }
-  }
-  const out: RenderedLine[] = [];
-  if (belongsToOverloads.length > 0) {
-    out.push(
-      line(`declare loadBelongsTo: ${joinOverloads(belongsToOverloads)};`, "loadBelongsTo", false),
-    );
-  }
-  if (hasOneOverloads.length > 0) {
-    out.push(line(`declare loadHasOne: ${joinOverloads(hasOneOverloads)};`, "loadHasOne", false));
-  }
-  return out;
-}
-
 function collectConflictingCollections(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
   const out = new Set<string>();
   const ancestors = opts.ancestors;
@@ -275,16 +234,12 @@ function classExtends(
   return false;
 }
 
-function joinOverloads(overloads: string[]): string {
-  return overloads.length === 1 ? overloads[0].slice(1, -1) : overloads.join(" & ");
-}
-
 interface RenderedLine {
   text: string;
   declaredName: string;
   isStatic: boolean;
   skipIfPresent: boolean;
-  attribute?: { memberName: string; readerType: string };
+  attribute?: { memberName: string; readerType: string; writerType?: string };
 }
 
 function renderCall(
@@ -354,7 +309,13 @@ function renderSingularAssoc(
       ? "Base"
       : resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
-  return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
+  const readerType = `${target} | null | Promise<${target} | null>`;
+  return [
+    {
+      ...line(`declare ${memberName}: ${readerType};`, call.name, false),
+      attribute: { memberName, readerType, writerType: `${target} | null` },
+    },
+  ];
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {

@@ -766,7 +766,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(await newFirm.save()).toBe(true);
     expect(newFirm.isPersisted()).toBe(true);
     expect(c.isPersisted()).toBe(true);
-    expect(await c.loadBelongsTo("firm")).toEqual(newFirm);
+    expect(await c.firm).toEqual(newFirm);
     expect(Number(await Firm.count())).toBe(noOfFirms + 1);
     expect(Number(await Client.count())).toBe(noOfClients + 2);
 
@@ -807,11 +807,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AiCpkOrderAgreement extends Base {
       declare order_id: number | null;
       declare signature: string | null;
-      declare order: AiCpkOrder | null;
-      declare loadBelongsTo: (name: "order") => Promise<AiCpkOrder | null>;
 
       static {
         this._tableName = "cpk_order_agreements";
@@ -822,6 +821,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           primaryKey: "id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AiCpkOrderAgreement {
+      get order(): AiCpkOrder | null | Promise<AiCpkOrder | null>;
+      set order(value: AiCpkOrder | null);
     }
     registerModel("AiCpkOrder", AiCpkOrder);
     registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
@@ -862,13 +866,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AiCpkTwoBook extends Base {
       declare author_id: number | null;
       declare title: string | null;
       declare order_id: number | null;
       declare shop_id: number | null;
-      declare order: AiCpkTwoOrder | null;
-      declare loadBelongsTo: (name: "order") => Promise<AiCpkTwoOrder | null>;
 
       static {
         this._tableName = "cpk_books";
@@ -884,6 +887,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           primaryKey: ["shop_id", "id"],
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AiCpkTwoBook {
+      get order(): AiCpkTwoOrder | null | Promise<AiCpkTwoOrder | null>;
+      set order(value: AiCpkTwoOrder | null);
     }
     registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
     registerModel("AiCpkTwoBook", AiCpkTwoBook);
@@ -918,11 +926,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(loadedTitles).toContain("Second");
   });
   it("has one cpk has one autosave with id", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CpkOrderPk extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBookFk: CpkBookFk | null;
-      declare loadHasOne: (name: "cpkBookFk") => Promise<CpkBookFk | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -936,6 +943,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           autosave: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface CpkOrderPk {
+      get cpkBookFk(): CpkBookFk | null | Promise<CpkBookFk | null>;
+      set cpkBookFk(value: CpkBookFk | null);
     }
     class CpkBookFk extends Base {
       declare order_id: number | null;
@@ -1078,16 +1090,20 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
 
   it("should save parent but not invalid child", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PFirm extends Base {
       declare name: string | null;
-      declare pAccount: PAccount | null;
-      declare loadHasOne: (name: "pAccount") => Promise<PAccount | null>;
 
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
         this.hasOne("pAccount", { foreignKey: "firm_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PFirm {
+      get pAccount(): PAccount | null | Promise<PAccount | null>;
+      set pAccount(value: PAccount | null);
     }
     class PAccount extends Base {
       declare credit_limit: number | null;
@@ -1223,7 +1239,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("callbacks on child when parent autosaves child", async () => {
     const eye = await Eye.createBang({ iris: new Iris() });
-    const iris = eye.iris;
+    const iris = await eye.iris;
     expect(iris?.beforeValidationCallbacksCounter).toBe(1);
     expect(iris?.beforeCreateCallbacksCounter).toBe(1);
     expect(iris?.beforeSaveCallbacksCounter).toBe(1);
@@ -1247,10 +1263,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
     const log: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyParent extends Base {
       declare name: string | null;
-      declare polyChild: PolyChild | null;
-      declare loadHasOne: (name: "polyChild") => Promise<PolyChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1263,11 +1278,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolyParent {
+      get polyChild(): PolyChild | null | Promise<PolyChild | null>;
+      set polyChild(value: PolyChild | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1290,6 +1309,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "polyChild",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolyChild {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     registerModel("PolyParent", PolyParent);
     registerModel("PolyChild", PolyChild);
@@ -1319,11 +1343,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CbPet extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare cbOwner: CbOwner | null;
-      declare loadBelongsTo: (name: "cbOwner") => Promise<CbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -1335,6 +1358,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           foreignKey: "author_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface CbPet {
+      get cbOwner(): CbOwner | null | Promise<CbOwner | null>;
+      set cbOwner(value: CbOwner | null);
     }
     registerModel("CbOwner", CbOwner);
     registerModel("CbPet", CbPet);
@@ -1361,10 +1389,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
     const log: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyAsParent extends Base {
       declare name: string | null;
-      declare polyAsChild: PolyAsChild | null;
-      declare loadHasOne: (name: "polyAsChild") => Promise<PolyAsChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1388,11 +1415,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolyAsParent {
+      get polyAsChild(): PolyAsChild | null | Promise<PolyAsChild | null>;
+      set polyAsChild(value: PolyAsChild | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyAsChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1404,6 +1435,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "polyAsChild",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolyAsChild {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     registerModel("PolyAsParent", PolyAsParent);
     registerModel("PolyAsChild", PolyAsChild);
@@ -1533,16 +1569,20 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("name", { format: { with: /\w/ } });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class DualPirate extends Base {
       declare catchphrase: string | null;
-      declare dualValidShip: DualValidShip | null;
-      declare loadHasOne: (name: "dualValidShip") => Promise<DualValidShip | null>;
 
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
         this.hasOne("dualValidShip", { autosave: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface DualPirate {
+      get dualValidShip(): DualValidShip | null | Promise<DualValidShip | null>;
+      set dualValidShip(value: DualValidShip | null);
     }
     registerModel("DualPirate", DualPirate);
     registerModel("DualValidShip", DualValidShip);
@@ -1598,10 +1638,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.hasMany("deepParts", { autosave: true, foreignKey: "ship_id" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class DeepPirate extends Base {
       declare catchphrase: string | null;
-      declare deepShip: DeepShip | null;
-      declare loadHasOne: (name: "deepShip") => Promise<DeepShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -1609,6 +1648,11 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("catchphrase", { presence: true });
         this.hasOne("deepShip", { autosave: true, foreignKey: "pirate_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface DeepPirate {
+      get deepShip(): DeepShip | null | Promise<DeepShip | null>;
+      set deepShip(value: DeepShip | null);
     }
     registerModel("DeepPirate", DeepPirate);
     registerModel("DeepShip", DeepShip);
@@ -1690,11 +1734,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("recognises inverse polymorphic association changes with same foreign key", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SwapChef extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1706,10 +1749,14 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SwapChef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SwapCakeDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null;
-      declare loadHasOne: (name: "chef") => Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1722,10 +1769,14 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SwapCakeDesigner {
+      get chef(): SwapChef | null | Promise<SwapChef | null>;
+      set chef(value: SwapChef | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SwapDrinkDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null;
-      declare loadHasOne: (name: "chef") => Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1737,6 +1788,11 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "employable",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface SwapDrinkDesigner {
+      get chef(): SwapChef | null | Promise<SwapChef | null>;
+      set chef(value: SwapChef | null);
     }
     registerModel("SwapChef", SwapChef);
     registerModel("SwapCakeDesigner", SwapCakeDesigner);
@@ -1835,11 +1891,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       }
     }
     registerModel("FlexAuthor", FlexAuthor);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class FlexPost extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare flexAuthor: FlexAuthor | null;
-      declare loadBelongsTo: (name: "flexAuthor") => Promise<FlexAuthor | null>;
 
       static {
         this._tableName = "books";
@@ -1847,6 +1902,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("author_id", "integer");
         this.belongsTo("flexAuthor", { autosave: true, foreignKey: "author_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface FlexPost {
+      get flexAuthor(): FlexAuthor | null | Promise<FlexAuthor | null>;
+      set flexAuthor(value: FlexAuthor | null);
     }
     registerModel("FlexPost", FlexPost);
     const author = new FlexAuthor({ name: "" });
@@ -1953,11 +2013,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolySponsor extends Base {
       declare sponsorable_id: number | null;
       declare sponsorable_type: string | null;
-      declare sponsorable: Base | null;
-      declare loadBelongsTo: (name: "sponsorable") => Promise<Base | null>;
 
       static {
         this._tableName = "sponsors";
@@ -1965,6 +2024,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("sponsorable_type", "string");
         this.belongsTo("sponsorable", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolySponsor {
+      get sponsorable(): Base | null | Promise<Base | null>;
+      set sponsorable(value: Base | null);
     }
     registerModel(PolyMember);
     registerModel(PolySponsor);
@@ -2004,11 +2068,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("composite primary key autosave", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CpkOrder2 extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBook2: CpkBook2 | null;
-      declare loadHasOne: (name: "cpkBook2") => Promise<CpkBook2 | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -2022,6 +2085,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
           foreignKey: ["shop_id", "order_id"],
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface CpkOrder2 {
+      get cpkBook2(): CpkBook2 | null | Promise<CpkBook2 | null>;
+      set cpkBook2(value: CpkBook2 | null);
     }
     class CpkBook2 extends Base {
       declare author_id: number | null;
@@ -2444,10 +2512,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
           this.validates("job_id", { presence: true });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class BaseErrorsPerson extends Base {
         declare name: string | null;
-        declare reference: BaseErrorsReference | null;
-        declare loadHasOne: (name: "reference") => Promise<BaseErrorsReference | null>;
 
         static {
           this._tableName = "people";
@@ -2459,6 +2526,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
             foreignKey: "person_id",
           });
         }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+      interface BaseErrorsPerson {
+        get reference(): BaseErrorsReference | null | Promise<BaseErrorsReference | null>;
+        set reference(value: BaseErrorsReference | null);
       }
       registerModel("BaseErrorsPerson", BaseErrorsPerson);
       registerModel("BaseErrorsReference", BaseErrorsReference);
@@ -2498,9 +2570,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 describe("TestAutosaveAssociationsInGeneral", () => {
   fixtures([]);
   it("autosave works even when other callbacks update the parent model", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CallbackPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null;
 
       static {
         this._tableName = "pirates";
@@ -2510,6 +2582,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
         this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface CallbackPirate {
+      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
+      set ship(value: CanonicalShip | null);
     }
     registerModel("CallbackPirate", CallbackPirate);
 
@@ -2540,10 +2617,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         );
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ContextReference extends Base {
       declare person_id: number | null;
-      declare person: ContextPerson | null;
-      declare loadBelongsTo: (name: "person") => Promise<ContextPerson | null>;
 
       static {
         this._tableName = "references";
@@ -2554,6 +2630,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           foreignKey: "person_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface ContextReference {
+      get person(): ContextPerson | null | Promise<ContextPerson | null>;
+      set person(value: ContextPerson | null);
     }
     registerModel("ContextPerson", ContextPerson);
     registerModel("ContextReference", ContextReference);
@@ -2624,10 +2705,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AutosaveProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
-      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2638,6 +2718,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           className: "Profile",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AutosaveProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("AutosaveProfileUser", AutosaveProfileUser);
@@ -2708,10 +2793,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class DuplicateCallbackProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
-      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2722,6 +2806,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           className: "Profile",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface DuplicateCallbackProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
@@ -2878,10 +2967,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.hasMany("prisoners", { className: "PrisonerCyclic", foreignKey: "ship_id" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PrisonerCyclic extends Base {
       declare ship_id: number | null;
-      declare ship: ShipCyclic | null;
-      declare loadBelongsTo: (name: "ship") => Promise<ShipCyclic | null>;
 
       static {
         this._tableName = "prisoners";
@@ -2892,6 +2980,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           inverseOf: "prisoners",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PrisonerCyclic {
+      get ship(): ShipCyclic | null | Promise<ShipCyclic | null>;
+      set ship(value: ShipCyclic | null);
     }
     registerModel("ShipCyclic", ShipCyclic);
     registerModel("PrisonerCyclic", PrisonerCyclic);
@@ -2929,10 +3022,10 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class GcShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare pirate: GcPirate | null;
       declare parts: AssociationProxy<GcPart>;
 
       static {
@@ -2946,6 +3039,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
           foreignKey: "ship_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface GcShip {
+      get pirate(): GcPirate | null | Promise<GcPirate | null>;
+      set pirate(value: GcPirate | null);
     }
     class GcPart extends Base {
       declare name: string | null;
@@ -3073,10 +3171,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   });
 
   it("should generate validation methods for has_one associations with :validate => true", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class VoParent extends Base {
       declare name: string | null;
-      declare voChild: VoChild | null;
-      declare loadHasOne: (name: "voChild") => Promise<VoChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3087,6 +3184,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface VoParent {
+      get voChild(): VoChild | null | Promise<VoChild | null>;
+      set voChild(value: VoChild | null);
     }
     class VoChild extends Base {
       declare name: string | null;
@@ -3108,10 +3210,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   });
 
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class NvParent extends Base {
       declare name: string | null;
-      declare nvChild: NvChild | null;
-      declare loadHasOne: (name: "nvChild") => Promise<NvChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3122,6 +3223,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: false,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface NvParent {
+      get nvChild(): NvChild | null | Promise<NvChild | null>;
+      set nvChild(value: NvChild | null);
     }
     class NvChild extends Base {
       declare name: string | null;
@@ -3152,11 +3258,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this.validates("name", { presence: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class BvChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare bvOwner: BvOwner | null;
-      declare loadBelongsTo: (name: "bvOwner") => Promise<BvOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3168,6 +3273,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface BvChild {
+      get bvOwner(): BvOwner | null | Promise<BvOwner | null>;
+      set bvOwner(value: BvOwner | null);
     }
     registerModel("BvOwner", BvOwner);
     registerModel("BvChild", BvChild);
@@ -3187,11 +3297,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this.validates("name", { presence: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class NbChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare nbOwner: NbOwner | null;
-      declare loadBelongsTo: (name: "nbOwner") => Promise<NbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3203,6 +3312,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: false,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface NbChild {
+      get nbOwner(): NbOwner | null | Promise<NbOwner | null>;
+      set nbOwner(value: NbOwner | null);
     }
     registerModel("NbOwner", NbOwner);
     registerModel("NbChild", NbChild);
@@ -3254,9 +3368,9 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   fixtures([]);
 
   function makeModels() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class GgPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: GgShip | null;
 
       static {
         this._tableName = "pirates";
@@ -3264,10 +3378,15 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.hasOne("ship", { autosave: true, className: "GgShip", foreignKey: "pirate_id" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface GgPirate {
+      get ship(): GgShip | null | Promise<GgShip | null>;
+      set ship(value: GgShip | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class GgShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare part: GgPart | null;
 
       static {
         this._tableName = "ships";
@@ -3275,6 +3394,11 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.attribute("pirate_id", "integer");
         this.hasOne("part", { autosave: true, className: "GgPart", foreignKey: "ship_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface GgShip {
+      get part(): GgPart | null | Promise<GgPart | null>;
+      set part(value: GgPart | null);
     }
     class GgPart extends Base {
       declare name: string | null;
@@ -3383,10 +3507,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("author_id", "integer");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class DisabledProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
-      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -3397,6 +3520,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
           className: "Profile",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface DisabledProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("DisabledProfileUser", DisabledProfileUser);
@@ -3448,9 +3576,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record with after create callback", async () => {
     const log: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AcPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null;
 
       static {
         this._tableName = "pirates";
@@ -3460,6 +3588,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         });
         this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AcPirate {
+      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
+      set ship(value: CanonicalShip | null);
     }
     registerModel("AcPirate", AcPirate);
 
@@ -3657,12 +3790,9 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotMember extends Base {
       declare name: string | null;
-      declare hotDetail: HotDetail | null;
-      declare hotOrg: Base | null;
-      declare loadHasOne: ((name: "hotDetail") => Promise<HotDetail | null>) &
-        ((name: "hotOrg") => Promise<Base | null>);
 
       static {
         this._tableName = "authors";
@@ -3678,13 +3808,17 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface HotMember {
+      get hotDetail(): HotDetail | null | Promise<HotDetail | null>;
+      set hotDetail(value: HotDetail | null);
+      get hotOrg(): Base | null | Promise<Base | null>;
+      set hotOrg(value: Base | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare hotOrg: HotOrg | null;
-      declare hotMember: HotMember | null;
-      declare loadBelongsTo: ((name: "hotOrg") => Promise<HotOrg | null>) &
-        ((name: "hotMember") => Promise<HotMember | null>);
 
       static {
         this._tableName = "contracts";
@@ -3699,6 +3833,13 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
           foreignKey: "developer_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface HotDetail {
+      get hotOrg(): HotOrg | null | Promise<HotOrg | null>;
+      set hotOrg(value: HotOrg | null);
+      get hotMember(): HotMember | null | Promise<HotMember | null>;
+      set hotMember(value: HotMember | null);
     }
     registerModel("HotOrg", HotOrg);
     registerModel("HotMember", HotMember);
@@ -3715,12 +3856,9 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     expect(reloadedOrg.name).toBe("Org");
   });
   it("should not reversed has one through model", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RevOrg extends Base {
       declare name: string | null;
-      declare revDetail: RevDetail | null;
-      declare revMember: Base | null;
-      declare loadHasOne: ((name: "revDetail") => Promise<RevDetail | null>) &
-        ((name: "revMember") => Promise<Base | null>);
 
       static {
         this._tableName = "companies";
@@ -3736,6 +3874,13 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface RevOrg {
+      get revDetail(): RevDetail | null | Promise<RevDetail | null>;
+      set revDetail(value: RevDetail | null);
+      get revMember(): Base | null | Promise<Base | null>;
+      set revMember(value: Base | null);
+    }
     class RevMember extends Base {
       declare name: string | null;
 
@@ -3744,13 +3889,10 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RevDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare revOrg: RevOrg | null;
-      declare revMember: RevMember | null;
-      declare loadBelongsTo: ((name: "revOrg") => Promise<RevOrg | null>) &
-        ((name: "revMember") => Promise<RevMember | null>);
 
       static {
         this._tableName = "contracts";
@@ -3765,6 +3907,13 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
           foreignKey: "developer_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface RevDetail {
+      get revOrg(): RevOrg | null | Promise<RevOrg | null>;
+      set revOrg(value: RevOrg | null);
+      get revMember(): RevMember | null | Promise<RevMember | null>;
+      set revMember(value: RevMember | null);
     }
     registerModel("RevOrg", RevOrg);
     registerModel("RevMember", RevMember);
@@ -3827,11 +3976,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
         this.hasMany("comments", { className: "AscbPostComment", inverseOf: "post" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class Comment extends Base {
       declare body: string | null;
       declare post_id: number | null;
-      declare post: Post | null;
-      declare loadBelongsTo: (name: "post") => Promise<Post | null>;
 
       postCommentsCount?: number;
       static {
@@ -3843,6 +3991,11 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
           record.postCommentsCount = await (record as any).post.comments.count();
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface Comment {
+      get post(): Post | null | Promise<Post | null>;
+      set post(value: Post | null);
     }
     registerModel("AscbInversePost", Post);
     registerModel("AscbPostComment", Comment);
@@ -3871,11 +4024,10 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class BtRecord extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare btOwner: BtOwner | null;
-      declare loadBelongsTo: (name: "btOwner") => Promise<BtOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3887,6 +4039,11 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
           autosave: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface BtRecord {
+      get btOwner(): BtOwner | null | Promise<BtOwner | null>;
+      set btOwner(value: BtOwner | null);
     }
     registerModel("BtOwner", BtOwner);
     registerModel("BtRecord", BtRecord);
@@ -4547,11 +4704,10 @@ describe("ChangedForAutosaveTest", () => {
 describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   fixtures([]);
   it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class QcOwner extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcChild: QcChild | null;
-      declare loadHasOne: (name: "qcChild") => Promise<QcChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4566,6 +4722,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface QcOwner {
+      get qcChild(): QcChild | null | Promise<QcChild | null>;
+      set qcChild(value: QcChild | null);
     }
     class QcChild extends Base {
       declare tree_id: number | null;
@@ -4592,11 +4753,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   });
 
   it("does not collapse QC-derived PK array via the 'id' rule for scalar FK", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class QcNoCollapse extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcNoCollapseChild: QcNoCollapseChild | null;
-      declare loadHasOne: (name: "qcNoCollapseChild") => Promise<QcNoCollapseChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4611,6 +4771,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface QcNoCollapse {
+      get qcNoCollapseChild(): QcNoCollapseChild | null | Promise<QcNoCollapseChild | null>;
+      set qcNoCollapseChild(value: QcNoCollapseChild | null);
     }
     class QcNoCollapseChild extends Base {
       declare tree_id: number | null;
@@ -4637,11 +4802,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   });
 
   it("uses queryConstraintsList as PK when class has_query_constraints? and scalar FK", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class QcTenant extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcTenantRecord: QcTenantRecord | null;
-      declare loadHasOne: (name: "qcTenantRecord") => Promise<QcTenantRecord | null>;
 
       static {
         this._tableName = "nodes";
@@ -4656,6 +4820,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface QcTenant {
+      get qcTenantRecord(): QcTenantRecord | null | Promise<QcTenantRecord | null>;
+      set qcTenantRecord(value: QcTenantRecord | null);
     }
     class QcTenantRecord extends Base {
       declare tree_id: number | null;

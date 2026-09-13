@@ -15,14 +15,9 @@ export class CpkAuthor extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBook extends Base {
-  declare order: CpkOrder | null;
-  declare orderExplicitFkPk: CpkOrder | null;
-  declare author: CpkAuthor | null;
   declare chapters: AssociationProxy<CpkChapter>;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
   declare author_id: number;
   declare order_id: number;
   declare revision: number;
@@ -54,38 +49,38 @@ export class CpkBook extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBook {
+  get order(): CpkOrder | null | Promise<CpkOrder | null>;
+  set order(value: CpkOrder | null);
+  get orderExplicitFkPk(): CpkOrder | null | Promise<CpkOrder | null>;
+  set orderExplicitFkPk(value: CpkOrder | null);
+  get author(): CpkAuthor | null | Promise<CpkAuthor | null>;
+  set author(value: CpkAuthor | null);
+}
 
 acceptsNestedAttributesFor(CpkBook, "chapters");
 CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-
   static _demodulizedName = "BestSeller";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBook extends CpkBook {
-  declare order: CpkOrderWithSpecialPrimaryKey | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "order") => Promise<CpkOrderWithSpecialPrimaryKey | null>);
-
   static _demodulizedName = "BrokenBook";
   static {
     this.belongsTo("order", { className: "CpkOrderWithSpecialPrimaryKey" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBrokenBook {
+  get order(): CpkOrderWithSpecialPrimaryKey | null | Promise<CpkOrderWithSpecialPrimaryKey | null>;
+  set order(value: CpkOrderWithSpecialPrimaryKey | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
-  declare order: CpkNonCpkOrder | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "order") => Promise<CpkNonCpkOrder | null>);
-
   static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
     this.belongsTo("order", {
@@ -94,28 +89,28 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBrokenBookWithNonCpkOrder {
+  get order(): CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
+  set order(value: CpkNonCpkOrder | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNonCpkBook extends CpkBook {
-  declare nonCpkOrder: CpkNonCpkOrder | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "nonCpkOrder") => Promise<CpkNonCpkOrder | null>);
-
   static _demodulizedName = "NonCpkBook";
   static {
     this._primaryKey = "id";
     this.belongsTo("nonCpkOrder", { className: "CpkNonCpkOrder", foreignKey: ["order_id"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkNonCpkBook {
+  get nonCpkOrder(): CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
+  set nonCpkOrder(value: CpkNonCpkOrder | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNullifiedBook extends CpkBook {
-  declare chapter: CpkChapter | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-  declare loadHasOne: (name: "chapter") => Promise<CpkChapter | null>;
-
   static _demodulizedName = "NullifiedBook";
   static {
     this.hasOne("chapter", {
@@ -125,20 +120,26 @@ export class CpkNullifiedBook extends CpkBook {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkNullifiedBook {
+  get chapter(): CpkChapter | null | Promise<CpkChapter | null>;
+  set chapter(value: CpkChapter | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
-  declare orderAgreement: CpkOrderAgreement | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-  declare loadHasOne: (name: "orderAgreement") => Promise<CpkOrderAgreement | null>;
 
   static _demodulizedName = "BookWithOrderAgreements";
   static {
     this.hasMany("orderAgreements", { through: "order" });
     this.hasOne("orderAgreement", { through: "order", source: "orderAgreements" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBookWithOrderAgreements {
+  get orderAgreement(): CpkOrderAgreement | null | Promise<CpkOrderAgreement | null>;
+  set orderAgreement(value: CpkOrderAgreement | null);
 }
 
 export class CpkBookDestroyAsync extends Base {
@@ -156,9 +157,8 @@ export class CpkBookDestroyAsync extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapter extends Base {
-  declare book: CpkBook | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
   declare author_id: number;
   declare book_id: number;
   declare title: string;
@@ -171,11 +171,14 @@ export class CpkChapter extends Base {
     this.belongsTo("book", { className: "CpkBook", foreignKey: ["author_id", "book_id"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkChapter {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapterDestroyAsync extends Base {
-  declare book: CpkBookDestroyAsync | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBookDestroyAsync | null>;
-
   static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
 
@@ -187,14 +190,18 @@ export class CpkChapterDestroyAsync extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkChapterDestroyAsync {
+  get book(): CpkBookDestroyAsync | null | Promise<CpkBookDestroyAsync | null>;
+  set book(value: CpkBookDestroyAsync | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrder extends Base {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
   declare books: AssociationProxy<CpkBook>;
-  declare book: CpkBook | null;
   declare orderTags: AssociationProxy<CpkOrderTag>;
   declare tags: AssociationProxy<CpkTag>;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
   declare books_count: number | null;
   declare shop_id: number;
   declare status: string;
@@ -218,11 +225,14 @@ export class CpkOrder extends Base {
     this.hasMany("tags", { className: "CpkTag", through: "orderTags" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrder {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrder extends CpkOrder {
-  declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "BrokenOrder";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -230,11 +240,14 @@ export class CpkBrokenOrder extends CpkOrder {
     this.hasOne("book", { className: "CpkBook" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBrokenOrder {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
-  declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -242,12 +255,14 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
     this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrderWithSpecialPrimaryKey {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
-  declare book: CpkNonCpkBook | null;
-  declare loadHasOne: ((name: "book") => Promise<CpkBook | null>) &
-    ((name: "book") => Promise<CpkNonCpkBook | null>);
-
   static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -255,30 +270,34 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
     this.hasOne("book", { className: "CpkNonCpkBook" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkBrokenOrderWithNonCpkBooks {
+  get book(): CpkNonCpkBook | null | Promise<CpkNonCpkBook | null>;
+  set book(value: CpkNonCpkBook | null);
+}
 
 export class CpkNonCpkOrder extends CpkOrder {
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "NonCpkOrder";
   static {
     this._primaryKey = "id";
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
-  declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
     this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrderWithPrimaryKeyAssociatedBook {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithNullifiedBook extends CpkOrder {
-  declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "OrderWithNullifiedBook";
   static {
     this.hasOne("book", {
@@ -288,10 +307,14 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrderWithNullifiedBook {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
+}
 
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
   declare chapters: AssociationProxy<CpkChapter>;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithSingularBookChapters";
   static {
@@ -299,9 +322,8 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderAgreement extends Base {
-  declare order: CpkOrder | null;
-  declare loadBelongsTo: (name: "order") => Promise<CpkOrder | null>;
   declare order_id: number;
   declare signature: string;
 
@@ -312,12 +334,14 @@ export class CpkOrderAgreement extends Base {
     this.belongsTo("order", { className: "CpkOrder" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrderAgreement {
+  get order(): CpkOrder | null | Promise<CpkOrder | null>;
+  set order(value: CpkOrder | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderTag extends Base {
-  declare tag: CpkTag | null;
-  declare order: CpkOrder | null;
-  declare loadBelongsTo: ((name: "tag") => Promise<CpkTag | null>) &
-    ((name: "order") => Promise<CpkOrder | null>);
   declare attached_by: string;
   declare attached_reason: string;
   declare order_id: number;
@@ -331,6 +355,13 @@ export class CpkOrderTag extends Base {
     this.belongsTo("tag", { className: "CpkTag" });
     this.belongsTo("order", { className: "CpkOrder" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkOrderTag {
+  get tag(): CpkTag | null | Promise<CpkTag | null>;
+  set tag(value: CpkTag | null);
+  get order(): CpkOrder | null | Promise<CpkOrder | null>;
+  set order(value: CpkOrder | null);
 }
 
 export class CpkTag extends Base {
@@ -364,11 +395,8 @@ export class CpkPost extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkComment extends Base {
-  declare commentable: Base | null;
-  declare post: CpkPost | null;
-  declare loadBelongsTo: ((name: "commentable") => Promise<Base | null>) &
-    ((name: "post") => Promise<CpkPost | null>);
   declare commentable_author: string;
   declare commentable_title: string;
   declare commentable_type: string;
@@ -389,10 +417,16 @@ export class CpkComment extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkComment {
+  get commentable(): Base | null | Promise<Base | null>;
+  set commentable(value: Base | null);
+  get post(): CpkPost | null | Promise<CpkPost | null>;
+  set post(value: CpkPost | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkReview extends Base {
-  declare book: CpkBook | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
   declare author_id: number;
   declare comment: string;
   declare "number": number;
@@ -407,6 +441,11 @@ export class CpkReview extends Base {
       foreignKey: ["author_id", "number"],
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkReview {
+  get book(): CpkBook | null | Promise<CpkBook | null>;
+  set book(value: CpkBook | null);
 }
 
 export class CpkCar extends Base {
@@ -425,9 +464,8 @@ export class CpkCar extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkCarReview extends Base {
-  declare car: CpkCar | null;
-  declare loadBelongsTo: (name: "car") => Promise<CpkCar | null>;
   declare car_make: string;
   declare car_model: string;
   declare comment: string;
@@ -439,4 +477,9 @@ export class CpkCarReview extends Base {
   static {
     this.belongsTo("car", { className: "CpkCar", foreignKey: ["car_make", "car_model"] });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkCarReview {
+  get car(): CpkCar | null | Promise<CpkCar | null>;
+  set car(value: CpkCar | null);
 }

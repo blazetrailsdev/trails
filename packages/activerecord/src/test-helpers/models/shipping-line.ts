@@ -3,10 +3,9 @@ import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShippingLine extends Base {
-  declare invoice: Invoice | null;
   declare discountApplications: AssociationProxy<ShippingLineDiscountApplication>;
-  declare loadBelongsTo: (name: "invoice") => Promise<Invoice | null>;
   declare amount: number;
   declare invoice_id: number;
 
@@ -15,12 +14,14 @@ export class ShippingLine extends Base {
     this.hasMany("discountApplications", { className: "ShippingLineDiscountApplication" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShippingLine {
+  get invoice(): Invoice | null | Promise<Invoice | null>;
+  set invoice(value: Invoice | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShippingLineDiscountApplication extends Base {
-  declare shippingLine: ShippingLine | null;
-  declare discount: Discount | null;
-  declare loadBelongsTo: ((name: "shippingLine") => Promise<ShippingLine | null>) &
-    ((name: "discount") => Promise<Discount | null>);
   declare discount_id: number;
   declare shipping_line_id: number;
 
@@ -28,4 +29,11 @@ export class ShippingLineDiscountApplication extends Base {
     this.belongsTo("shippingLine");
     this.belongsTo("discount");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShippingLineDiscountApplication {
+  get shippingLine(): ShippingLine | null | Promise<ShippingLine | null>;
+  set shippingLine(value: ShippingLine | null);
+  get discount(): Discount | null | Promise<Discount | null>;
+  set discount(value: Discount | null);
 }

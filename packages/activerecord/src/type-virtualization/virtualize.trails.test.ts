@@ -142,12 +142,11 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "thing.ts", {
       isKnownTarget: (name) => name === "Base" || name === "Owner",
     });
-    expect(text).toMatch(/declare otherThing: Base \| null;/);
+    expect(text).toMatch(/get otherThing\(\): Base \| null \| Promise<Base \| null>;/);
     expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
-    expect(text).toMatch(/declare owner: Owner \| null;/);
+    expect(text).toMatch(/get owner\(\): Owner \| null \| Promise<Owner \| null>;/);
     expect(text).not.toMatch(/OtherThing/);
     expect(text).not.toMatch(/Gadget/);
-    expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
   });
 
   test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
@@ -165,8 +164,10 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "ab.ts", {
       isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
     });
-    expect(text).toMatch(/class A extends Base \{\s*declare widget: Widget \| null;/);
-    expect(text).toMatch(/class B extends Base \{\s*declare widget: Base \| null;/);
+    expect(text).toMatch(
+      /interface A \{\s*get widget\(\): Widget \| null \| Promise<Widget \| null>;/,
+    );
+    expect(text).toMatch(/interface B \{\s*get widget\(\): Base \| null \| Promise<Base \| null>;/);
   });
 
   test("integer FK attribute() declare widens to PrimaryKeyValue", () => {
@@ -192,7 +193,7 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "thing.ts");
-    expect(text).toMatch(/declare otherThing: OtherThing \| null;/);
+    expect(text).toMatch(/get otherThing\(\): OtherThing \| null \| Promise<OtherThing \| null>;/);
   });
 
   test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
@@ -209,7 +210,7 @@ describe("virtualize — deltas", () => {
       },
     });
     expect(text.match(/declare comments:/g)?.length).toBe(1);
-    expect(text.match(/declare author:/g)?.length).toBe(1);
+    expect(text.match(/get author\(\):/g)?.length).toBe(1);
     expect(text).toMatch(/get body\(\): string;/);
   });
 
@@ -590,8 +591,7 @@ describe("virtualize — materializing-generator gaps", () => {
       "}\n";
     const aliases = new Map([["EsOctopus", "Octopus"]]);
     const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
-    expect(text).toContain("declare octopus: Octopus | null;");
-    expect(text).toContain('declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;');
+    expect(text).toContain("get octopus(): Octopus | null | Promise<Octopus | null>;");
     expect(text).not.toMatch(/declare octopus: EsOctopus/);
   });
 
@@ -608,20 +608,6 @@ describe("virtualize — materializing-generator gaps", () => {
     expect(text).not.toMatch(/CommentsWithOrder/);
   });
 
-  test("subclass loader overloads include inherited base overloads", () => {
-    const src =
-      "class Comment extends Base {\n" +
-      '  static { this.belongsTo("post"); }\n' +
-      "}\n" +
-      "class SpecialComment extends Comment {\n" +
-      '  static { this.belongsTo("ordinaryPost", { className: "Post" }); }\n' +
-      "}\n";
-    const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
-    expect(text).toContain(
-      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "ordinaryPost") => Promise<Post | null>);',
-    );
-  });
-
   test("cross-file subtype: narrowed declare is kept when superclass chain lives in another file", () => {
     const src =
       "class Comment extends Base {\n" +
@@ -636,7 +622,7 @@ describe("virtualize — materializing-generator gaps", () => {
       globalSuperNameOf,
     });
     expect(text.slice(text.indexOf("class SpecialComment"))).toContain(
-      "declare post: SpecialPost | null;",
+      "get post(): SpecialPost | null | Promise<SpecialPost | null>;",
     );
   });
 
@@ -657,10 +643,9 @@ describe("virtualize — materializing-generator gaps", () => {
     const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
     const midBody = text.slice(text.indexOf("class Mid"), text.indexOf("class Leaf"));
     expect(midBody).not.toMatch(/declare post:/);
-    expect(midBody).toContain(
-      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "post") => Promise<Sibling | null>);',
+    expect(text.slice(text.indexOf("class Leaf"))).toContain(
+      "get post(): SpecialPost | null | Promise<SpecialPost | null>;",
     );
-    expect(text.slice(text.indexOf("class Leaf"))).toContain("declare post: SpecialPost | null;");
   });
 });
 

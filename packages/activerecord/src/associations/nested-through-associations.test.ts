@@ -440,7 +440,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has one through has one with has one through source reflection", async () => {
     const founding = memberTypes("founding");
     const groucho = members("groucho");
-    const result = await groucho.loadHasOne("nestedMemberType");
+    const result = await groucho.nestedMemberType;
     expect(result?.id).toBe(founding.id);
   });
 
@@ -463,7 +463,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has one through has one through with belongs to source reflection", async () => {
     const general = categories("general");
     const groucho = members("groucho");
-    const result = await groucho.loadHasOne("clubCategory");
+    const result = await groucho.clubCategory;
     expect(result?.id).toBe(general.id);
   });
 
@@ -475,7 +475,7 @@ describe("NestedThroughAssociationsTest", () => {
       (Club as any).defaultScopes = [];
       (Club as any).defaultScope((rel: any) => rel[q]("category"));
       try {
-        const result = await groucho.loadHasOne("clubCategory");
+        const result = await groucho.clubCategory;
         expect(result?.id).toBe(general.id);
       } finally {
         (Club as any).defaultScopes = prevDefaultScopes;
@@ -731,7 +731,7 @@ describe("NestedThroughAssociationsTest", () => {
     });
     expect(orgsResult.map((o) => o.id)).toContain(nsa.id);
 
-    const ownedEssayCategory = await nsa.loadHasOne("authorOwnedEssayCategory");
+    const ownedEssayCategory = await nsa.authorOwnedEssayCategory;
     expect(ownedEssayCategory?.id).toBe(general.id);
 
     const orgsResult2 = await Organization.joins(":authorOwnedEssayCategory").where({

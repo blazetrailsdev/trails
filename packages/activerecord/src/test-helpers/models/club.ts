@@ -8,21 +8,14 @@ import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Club extends Base {
-  declare membership: Membership | null;
   declare memberships: AssociationProxy<Membership>;
   declare members: AssociationProxy<Member>;
-  declare sponsor: Sponsor | null;
-  declare sponsoredMember: Member | null;
-  declare category: Category | null;
   declare favorites: AssociationProxy<Member>;
   declare customMemberships: AssociationProxy<Membership>;
   declare customFavorites: AssociationProxy<Member>;
   declare static general: () => Relation<Club>;
-  declare loadBelongsTo: (name: "category") => Promise<Category | null>;
-  declare loadHasOne: ((name: "membership") => Promise<Membership | null>) &
-    ((name: "sponsor") => Promise<Sponsor | null>) &
-    ((name: "sponsoredMember") => Promise<Member | null>);
   declare category_id: number;
   declare name: string;
 
@@ -55,6 +48,17 @@ export class Club extends Base {
         .unscope("limit");
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Club {
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get sponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set sponsor(value: Sponsor | null);
+  get sponsoredMember(): Member | null | Promise<Member | null>;
+  set sponsoredMember(value: Member | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
 }
 
 acceptsNestedAttributesFor(Club, "membership");

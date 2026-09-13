@@ -7,13 +7,12 @@ import type { Toy } from "./toy.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Owner extends Base {
   declare pets: AssociationProxy<Pet>;
   declare toys: AssociationProxy<Toy>;
   declare persons: AssociationProxy<Person>;
-  declare lastPet: Pet | null;
   declare static includingLastPet: () => Relation<Owner>;
-  declare loadBelongsTo: (name: "lastPet") => Promise<Pet | null>;
   declare essay_id: string;
   declare happy_at: RubyTime | Temporal.PlainDateTime;
   declare name: string;
@@ -60,6 +59,11 @@ export class Owner extends Base {
       await block(this);
     }
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Owner {
+  get lastPet(): Pet | null | Promise<Pet | null>;
+  set lastPet(value: Pet | null);
 }
 
 acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });

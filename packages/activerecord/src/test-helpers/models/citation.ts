@@ -2,12 +2,9 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Citation extends Base {
-  declare book: Book | null;
-  declare referenceOf: Book | null;
   declare citations: AssociationProxy<Citation>;
-  declare loadBelongsTo: ((name: "book") => Promise<Book | null>) &
-    ((name: "referenceOf") => Promise<Book | null>);
   declare book1_id: bigint;
   declare book2_id: bigint;
   declare citation_id: bigint;
@@ -17,4 +14,11 @@ export class Citation extends Base {
     this.belongsTo("referenceOf", { className: "Book", foreignKey: "book2_id" });
     this.hasMany("citations");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Citation {
+  get book(): Book | null | Promise<Book | null>;
+  set book(value: Book | null);
+  get referenceOf(): Book | null | Promise<Book | null>;
+  set referenceOf(value: Book | null);
 }

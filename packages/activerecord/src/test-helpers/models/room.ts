@@ -1,15 +1,8 @@
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Room extends Base {
-  declare user: User | null;
-  declare owner: User | null;
-  declare landlord: User | null;
-  declare tenant: User | null;
-  declare loadBelongsTo: ((name: "user") => Promise<User | null>) &
-    ((name: "owner") => Promise<User | null>) &
-    ((name: "landlord") => Promise<User | null>) &
-    ((name: "tenant") => Promise<User | null>);
   declare landlord_id: number;
   declare owner_id: number;
   declare tenant_id: number;
@@ -30,4 +23,15 @@ export class Room extends Base {
       inverseOf: "rentedRoom",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Room {
+  get user(): User | null | Promise<User | null>;
+  set user(value: User | null);
+  get owner(): User | null | Promise<User | null>;
+  set owner(value: User | null);
+  get landlord(): User | null | Promise<User | null>;
+  set landlord(value: User | null);
+  get tenant(): User | null | Promise<User | null>;
+  set tenant(value: User | null);
 }

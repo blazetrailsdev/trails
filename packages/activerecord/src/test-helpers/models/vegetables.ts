@@ -25,13 +25,16 @@ export class GreenCabbage extends Cabbage {}
 
 export class KingCole extends GreenCabbage {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RedCabbage extends Cabbage {
-  declare seller: Company | null;
-  declare loadBelongsTo: (name: "seller") => Promise<Company | null>;
-
   static {
     this.belongsTo("seller", { className: "Company" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface RedCabbage {
+  get seller(): Company | null | Promise<Company | null>;
+  set seller(value: Company | null);
 }
 
 registerModel([Vegetable, Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]);

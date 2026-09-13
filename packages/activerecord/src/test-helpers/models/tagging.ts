@@ -4,21 +4,9 @@ import type { Tag } from "./tag.js";
 import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tagging extends Base {
-  declare tag: Tag | null;
-  declare superTag: Tag | null;
-  declare invalidTag: Tag | null;
-  declare orderedTag: OrderedTag | null;
-  declare blueTag: Tag | null;
-  declare tagWithPrimaryKey: Tag | null;
   declare things: AssociationProxy<Base>;
-  declare loadBelongsTo: ((name: "tag") => Promise<Tag | null>) &
-    ((name: "superTag") => Promise<Tag | null>) &
-    ((name: "invalidTag") => Promise<Tag | null>) &
-    ((name: "orderedTag") => Promise<OrderedTag | null>) &
-    ((name: "blueTag") => Promise<Tag | null>) &
-    ((name: "tagWithPrimaryKey") => Promise<Tag | null>) &
-    ((name: "taggable") => Promise<Base | null>);
   declare comment: string;
   declare super_tag_id: number;
   declare "type": string;
@@ -26,7 +14,6 @@ export class Tagging extends Base {
   declare tag_id: number;
   declare taggable_id: number;
   declare taggable_type: string;
-  declare taggable: Base | null;
 
   static {
     this.belongsTo("tag", (q: any) => q.includes(":tagging"));
@@ -46,16 +33,25 @@ export class Tagging extends Base {
     this.hasMany("things", { through: "taggable" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Tagging {
+  get tag(): Tag | null | Promise<Tag | null>;
+  set tag(value: Tag | null);
+  get superTag(): Tag | null | Promise<Tag | null>;
+  set superTag(value: Tag | null);
+  get invalidTag(): Tag | null | Promise<Tag | null>;
+  set invalidTag(value: Tag | null);
+  get orderedTag(): OrderedTag | null | Promise<OrderedTag | null>;
+  set orderedTag(value: OrderedTag | null);
+  get blueTag(): Tag | null | Promise<Tag | null>;
+  set blueTag(value: Tag | null);
+  get tagWithPrimaryKey(): Tag | null | Promise<Tag | null>;
+  set tagWithPrimaryKey(value: Tag | null);
+  get taggable(): Base | null | Promise<Base | null>;
+  set taggable(value: Base | null);
+}
 
 export class IndestructibleTagging extends Tagging {
-  declare loadBelongsTo: ((name: "tag") => Promise<Tag | null>) &
-    ((name: "superTag") => Promise<Tag | null>) &
-    ((name: "invalidTag") => Promise<Tag | null>) &
-    ((name: "orderedTag") => Promise<OrderedTag | null>) &
-    ((name: "blueTag") => Promise<Tag | null>) &
-    ((name: "tagWithPrimaryKey") => Promise<Tag | null>) &
-    ((name: "taggable") => Promise<Base | null>);
-
   static {
     this.beforeDestroy(() => throwAbort());
   }

@@ -22,6 +22,7 @@ export class AbstractCompany extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Company extends AbstractCompany {
   declare isActive: () => boolean;
   declare activeBang: () => Promise<true>;
@@ -31,8 +32,6 @@ export class Company extends AbstractCompany {
   declare suspendedBang: () => Promise<true>;
   declare static suspended: () => Relation<Company>;
   declare static notSuspended: () => Relation<Company>;
-  declare account: Account | null;
-  declare dummyAccount: Account | null;
   declare contracts: AssociationProxy<Contract>;
   declare developers: AssociationProxy<Developer>;
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -40,8 +39,6 @@ export class Company extends AbstractCompany {
   declare comments: AssociationProxy<Comment>;
   declare metadata: unknown | null;
   declare static ofFirstFirm: () => Relation<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
   declare account_id: number;
   declare client_of: bigint;
   declare description: string | null;
@@ -85,24 +82,23 @@ export class Company extends AbstractCompany {
     return "I am Jack's innermost fears and aspirations";
   }
 }
-
-export class SpecialCo extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Company {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get dummyAccount(): Account | null | Promise<Account | null>;
+  set dummyAccount(value: Account | null);
 }
 
-export class NamespacedCompany extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
+export class SpecialCo extends Company {}
 
+export class NamespacedCompany extends Company {
   static moduleName = "Namespaced";
   static _demodulizedName = "Company";
 }
 
 export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static moduleName = "Namespaced";
   static _demodulizedName = "Firm";
@@ -113,13 +109,11 @@ export class NamespacedFirm extends Company {
 }
 
 export class NamespacedClient extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-
   static moduleName = "Namespaced";
   static _demodulizedName = "Client";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Firm extends Company {
   declare unsortedClients: AssociationProxy<Client>;
   declare unsortedClientsWithSymbol: AssociationProxy<Client>;
@@ -138,36 +132,11 @@ export class Firm extends Company {
   declare clientsUsingPrimaryKeyWithDeleteAll: AssociationProxy<Client>;
   declare clientsGroupedByFirmId: AssociationProxy<Client>;
   declare clientsGroupedByName: AssociationProxy<Client>;
-  declare account: Account | null;
-  declare unvalidatedAccount: Account | null;
-  declare accountWithSelect: Account | null;
-  declare readonlyAccount: Account | null;
-  declare accountUsingPrimaryKey: Account | null;
-  declare accountUsingForeignAndPrimaryKeys: Account | null;
-  declare accountWithInexistentForeignKey: Account | null;
-  declare deletableAccount: Account | null;
-  declare client: Client | null;
-  declare accountLimit500WithHashConditions: Account | null;
-  declare unautosavedAccount: Account | null;
   declare accounts: AssociationProxy<Account>;
   declare unautosavedAccounts: AssociationProxy<Account>;
   declare associationWithReferences: AssociationProxy<Client>;
   declare developersWithSelect: AssociationProxy<Developer>;
-  declare leadDeveloper: Developer | null;
   declare projects: AssociationProxy<Project>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "unvalidatedAccount") => Promise<Account | null>) &
-    ((name: "accountWithSelect") => Promise<Account | null>) &
-    ((name: "readonlyAccount") => Promise<Account | null>) &
-    ((name: "accountUsingPrimaryKey") => Promise<Account | null>) &
-    ((name: "accountUsingForeignAndPrimaryKeys") => Promise<Account | null>) &
-    ((name: "accountWithInexistentForeignKey") => Promise<Account | null>) &
-    ((name: "deletableAccount") => Promise<Account | null>) &
-    ((name: "client") => Promise<Client | null>) &
-    ((name: "accountLimit500WithHashConditions") => Promise<Account | null>) &
-    ((name: "unautosavedAccount") => Promise<Account | null>) &
-    ((name: "leadDeveloper") => Promise<Developer | null>);
 
   _log: string[] = [];
   declare clients: CollectionProxy<Client>;
@@ -312,14 +281,37 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Firm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get unvalidatedAccount(): Account | null | Promise<Account | null>;
+  set unvalidatedAccount(value: Account | null);
+  get accountWithSelect(): Account | null | Promise<Account | null>;
+  set accountWithSelect(value: Account | null);
+  get readonlyAccount(): Account | null | Promise<Account | null>;
+  set readonlyAccount(value: Account | null);
+  get accountUsingPrimaryKey(): Account | null | Promise<Account | null>;
+  set accountUsingPrimaryKey(value: Account | null);
+  get accountUsingForeignAndPrimaryKeys(): Account | null | Promise<Account | null>;
+  set accountUsingForeignAndPrimaryKeys(value: Account | null);
+  get accountWithInexistentForeignKey(): Account | null | Promise<Account | null>;
+  set accountWithInexistentForeignKey(value: Account | null);
+  get deletableAccount(): Account | null | Promise<Account | null>;
+  set deletableAccount(value: Account | null);
+  get client(): Client | null | Promise<Client | null>;
+  set client(value: Client | null);
+  get accountLimit500WithHashConditions(): Account | null | Promise<Account | null>;
+  set accountLimit500WithHashConditions(value: Account | null);
+  get unautosavedAccount(): Account | null | Promise<Account | null>;
+  set unautosavedAccount(value: Account | null);
+  get leadDeveloper(): Developer | null | Promise<Developer | null>;
+  set leadDeveloper(value: Developer | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DependentFirm extends Company {
-  declare account: Account | null;
   declare companies: AssociationProxy<Company>;
-  declare company: Company | null;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "company") => Promise<Company | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -330,12 +322,17 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DependentFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RestrictedWithExceptionFirm extends Company {
-  declare account: Account | null;
   declare companies: AssociationProxy<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -348,12 +345,15 @@ export class RestrictedWithExceptionFirm extends Company {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface RestrictedWithExceptionFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RestrictedWithErrorFirm extends Company {
-  declare account: Account | null;
   declare companies: AssociationProxy<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -365,53 +365,23 @@ export class RestrictedWithErrorFirm extends Company {
       dependent: "restrictWithError",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface RestrictedWithErrorFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
 }
 
 export class Agency extends Firm {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "unvalidatedAccount") => Promise<Account | null>) &
-    ((name: "accountWithSelect") => Promise<Account | null>) &
-    ((name: "readonlyAccount") => Promise<Account | null>) &
-    ((name: "accountUsingPrimaryKey") => Promise<Account | null>) &
-    ((name: "accountUsingForeignAndPrimaryKeys") => Promise<Account | null>) &
-    ((name: "accountWithInexistentForeignKey") => Promise<Account | null>) &
-    ((name: "deletableAccount") => Promise<Account | null>) &
-    ((name: "client") => Promise<Client | null>) &
-    ((name: "accountLimit500WithHashConditions") => Promise<Account | null>) &
-    ((name: "unautosavedAccount") => Promise<Account | null>) &
-    ((name: "leadDeveloper") => Promise<Developer | null>);
-
   static {
     this.hasMany("projects", { foreignKey: "firm_id" });
   }
 }
 acceptsNestedAttributesFor(Agency, "projects");
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
-  declare firm: Firm | null;
-  declare firmWithBasicId: Firm | null;
-  declare firmWithSelect: Firm | null;
-  declare firmWithOtherName: Firm | null;
-  declare firmWithCondition: Firm | null;
-  declare firmWithPrimaryKey: Firm | null;
-  declare firmWithPrimaryKeySymbols: Firm | null;
-  declare readonlyFirm: Firm | null;
-  declare bobFirm: Firm | null;
   declare accounts: AssociationProxy<Account>;
-  declare account: Account | null;
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   raiseOnSave = false;
   throwOnSave = false;
@@ -499,14 +469,35 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Client {
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+  get firmWithBasicId(): Firm | null | Promise<Firm | null>;
+  set firmWithBasicId(value: Firm | null);
+  get firmWithSelect(): Firm | null | Promise<Firm | null>;
+  set firmWithSelect(value: Firm | null);
+  get firmWithOtherName(): Firm | null | Promise<Firm | null>;
+  set firmWithOtherName(value: Firm | null);
+  get firmWithCondition(): Firm | null | Promise<Firm | null>;
+  set firmWithCondition(value: Firm | null);
+  get firmWithPrimaryKey(): Firm | null | Promise<Firm | null>;
+  set firmWithPrimaryKey(value: Firm | null);
+  get firmWithPrimaryKeySymbols(): Firm | null | Promise<Firm | null>;
+  set firmWithPrimaryKeySymbols(value: Firm | null);
+  get readonlyFirm(): Firm | null | Promise<Firm | null>;
+  set readonlyFirm(value: Firm | null);
+  get bobFirm(): Firm | null | Promise<Firm | null>;
+  set bobFirm(value: Firm | null);
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExclusivelyDependentFirm extends Company {
-  declare account: Account | null;
   declare dependentSanitizedConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentHashConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentConditionalClientsOfFirm: AssociationProxy<Client>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", { foreignKey: "firm_id", dependent: "delete" });
@@ -527,21 +518,14 @@ export class ExclusivelyDependentFirm extends Company {
     );
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ExclusivelyDependentFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+}
 
 export class LargeClient extends Client {
   declare extraSize: number | null;
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.attribute("extraSize", "integer");
@@ -555,40 +539,12 @@ export class LargeClient extends Client {
   }
 }
 
-export class SpecialClient extends Client {
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-}
+export class SpecialClient extends Client {}
 
-export class VerySpecialClient extends SpecialClient {
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-}
+export class VerySpecialClient extends SpecialClient {}
 
 export class NewlyContractedCompany extends Company {
   declare newContracts: AssociationProxy<NewContract>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasMany("newContracts", { foreignKey: "company_id" });

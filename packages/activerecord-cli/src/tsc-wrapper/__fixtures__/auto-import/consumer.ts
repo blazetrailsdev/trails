@@ -3,6 +3,6 @@ import { Author } from "./author.js";
 
 const post = new Post();
 export const title: string = post.title;
-// post.author is typed as `Author | null` via the auto-imported
+// post.author is typed as `Author | null | Promise<Author | null>` via the auto-imported
 // declare in post.ts — this just verifies it resolves.
-export const author: Author | null = post.author;
+export const author: Author | null | Promise<Author | null> = post.author;

@@ -4,10 +4,9 @@ import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Chef extends Base {
-  declare employable: Base | null;
   declare recipes: AssociationProxy<Recipe>;
-  declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare department_id: number;
   declare employable_id: number;
@@ -21,21 +20,26 @@ export class Chef extends Base {
     this.hasMany("recipes");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Chef {
+  get employable(): Base | null | Promise<Base | null>;
+  set employable(value: Base | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ChefList extends Chef {
-  declare employableList: Base | null;
-  declare loadBelongsTo: ((name: "employable") => Promise<Base | null>) &
-    ((name: "employableList") => Promise<Base | null>);
-
   static {
     this.belongsTo("employableList", { polymorphic: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ChefList {
+  get employableList(): Base | null | Promise<Base | null>;
+  set employableList(value: Base | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ChefWithPolymorphicInverseOf extends Chef {
-  declare employable: Base | null;
-  declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
-
   beforeValidationCallbacksCounter: number = 0;
   beforeCreateCallbacksCounter: number = 0;
   beforeSaveCallbacksCounter: number = 0;
@@ -65,6 +69,11 @@ export class ChefWithPolymorphicInverseOf extends Chef {
       this.afterSaveCallbacksCounter++;
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ChefWithPolymorphicInverseOf {
+  get employable(): Base | null | Promise<Base | null>;
+  set employable(value: Base | null);
 }
 
 acceptsNestedAttributesFor(ChefWithPolymorphicInverseOf, "employable");

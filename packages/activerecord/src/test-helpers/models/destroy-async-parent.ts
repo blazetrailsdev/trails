@@ -5,12 +5,11 @@ import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { DlKeyedJoin } from "./dl-keyed-join.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestroyAsyncParent extends Base {
-  declare dlKeyedHasOne: DlKeyedHasOne | null;
   declare dlKeyedHasMany: AssociationProxy<DlKeyedHasMany>;
   declare dlKeyedJoin: AssociationProxy<DlKeyedJoin>;
   declare dlKeyedHasManyThrough: AssociationProxy<DlKeyedHasManyThrough>;
-  declare loadHasOne: (name: "dlKeyedHasOne") => Promise<DlKeyedHasOne | null>;
   declare name: string;
   declare parent_id: number;
   declare tags_count: number | null;
@@ -40,4 +39,9 @@ export class DestroyAsyncParent extends Base {
       primaryKey: "through_key",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DestroyAsyncParent {
+  get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
+  set dlKeyedHasOne(value: DlKeyedHasOne | null);
 }

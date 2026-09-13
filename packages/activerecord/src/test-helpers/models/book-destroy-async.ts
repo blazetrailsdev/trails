@@ -6,11 +6,11 @@ import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BookDestroyAsync extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
   declare essays: AssociationProxy<EssayDestroyAsync>;
-  declare content: Content | null;
   declare isProposed: () => boolean;
   declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<BookDestroyAsync>;
@@ -23,7 +23,6 @@ export class BookDestroyAsync extends Base {
   declare publishedBang: () => Promise<true | undefined>;
   declare static published: () => Relation<BookDestroyAsync>;
   declare static notPublished: () => Relation<BookDestroyAsync>;
-  declare loadHasOne: (name: "content") => Promise<Content | null>;
 
   static _tableName = "books";
 
@@ -38,6 +37,11 @@ export class BookDestroyAsync extends Base {
     this.hasOne("content", { dependent: "destroy" });
     this.enum("status", ["proposed", "written", "published"]);
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface BookDestroyAsync {
+  get content(): Content | null | Promise<Content | null>;
+  set content(value: Content | null);
 }
 
 export class BookDestroyAsyncWithScopedTags extends Base {

@@ -373,11 +373,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.hasMany("students", { through: "lessonStudents", className: "NoPkStudent" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class NoPkLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkStudent | null;
-      declare loadBelongsTo: (name: "student") => Promise<NoPkStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -385,6 +384,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("student_id", "big_integer");
         this.belongsTo("student", { className: "NoPkStudent", foreignKey: "student_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface NoPkLessonStudent {
+      get student(): NoPkStudent | null | Promise<NoPkStudent | null>;
+      set student(value: NoPkStudent | null);
     }
     class NoPkStudent extends Base {
       declare name: string | null;
@@ -421,11 +425,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.hasMany("students", { through: "lessonStudents", className: "NoPkDelStudent" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class NoPkDelLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkDelStudent | null;
-      declare loadBelongsTo: (name: "student") => Promise<NoPkDelStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -433,6 +436,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("student_id", "big_integer");
         this.belongsTo("student", { className: "NoPkDelStudent", foreignKey: "student_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface NoPkDelLessonStudent {
+      get student(): NoPkDelStudent | null | Promise<NoPkDelStudent | null>;
+      set student(value: NoPkDelStudent | null);
     }
     class NoPkDelStudent extends Base {
       declare name: string | null;
@@ -479,11 +487,10 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     let afterDestroyCalled = false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class NoPkCbLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkCbStudent | null;
-      declare loadBelongsTo: (name: "student") => Promise<NoPkCbStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -494,6 +501,11 @@ describe("HasManyThroughAssociationsTest", () => {
           afterDestroyCalled = true;
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface NoPkCbLessonStudent {
+      get student(): NoPkCbStudent | null | Promise<NoPkCbStudent | null>;
+      set student(value: NoPkCbStudent | null);
     }
     class NoPkCbStudent extends Base {
       declare name: string | null;
@@ -2458,12 +2470,11 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("insertRecord with validate false still raises on invalid join record", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class IrpvTagging extends Base {
       declare taggable_id: number | null;
       declare taggable_type: string | null;
       declare tag_id: number | null;
-      declare tag: Tag | null;
-      declare loadBelongsTo: (name: "tag") => Promise<Tag | null>;
 
       static {
         this._tableName = "taggings";
@@ -2475,6 +2486,11 @@ describe("HasManyThroughAssociationsTest", () => {
         });
         this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface IrpvTagging {
+      get tag(): Tag | null | Promise<Tag | null>;
+      set tag(value: Tag | null);
     }
     registerModel("IrpvTagging", IrpvTagging);
 

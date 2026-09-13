@@ -11,9 +11,9 @@ import {
 } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {
   static _tableName = "accounts";
-  declare firm: Company | null;
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;
@@ -32,10 +32,15 @@ class ArrowFieldAccount extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ArrowFieldAccount {
+  get firm(): Company | null | Promise<Company | null>;
+  set firm(value: Company | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ProtoHelperAccount extends Base {
   static _tableName = "accounts";
-  declare firm: Company | null;
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;
@@ -53,6 +58,11 @@ class ProtoHelperAccount extends Base {
       (record ?? this).recordFirm();
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ProtoHelperAccount {
+  get firm(): Company | null | Promise<Company | null>;
+  set firm(value: Company | null);
 }
 
 describe("destroy belongs_to preload through arrow-field helper", () => {

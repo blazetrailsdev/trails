@@ -1,8 +1,7 @@
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Wheel extends Base {
-  declare wheelable: Base | null;
-  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
   declare size: number;
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -15,15 +14,24 @@ export class Wheel extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Wheel {
+  get wheelable(): Base | null | Promise<Base | null>;
+  set wheelable(value: Base | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class WheelPolymorphicTouch extends Base {
-  declare wheelable: Base | null;
   declare wheelable_id: number;
   declare wheelable_type: string;
-  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
 
   static {
     this.tableName = "wheels";
     this.belongsTo("wheelable", { polymorphic: true, touch: true });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface WheelPolymorphicTouch {
+  get wheelable(): Base | null | Promise<Base | null>;
+  set wheelable(value: Base | null);
 }

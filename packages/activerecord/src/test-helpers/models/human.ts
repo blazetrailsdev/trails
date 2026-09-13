@@ -4,25 +4,14 @@ import type { Interest } from "./interest.js";
 import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Human extends Base {
   declare name: string;
-  declare face: Face | null;
-  declare autosaveFace: Face | null;
-  declare polymorphicFace: Face | null;
-  declare polymorphicFaceWithoutInverse: Face | null;
   declare interests: AssociationProxy<Interest>;
   declare interestsWithCallbacks: AssociationProxy<Interest>;
   declare polymorphicInterests: AssociationProxy<Interest>;
   declare polymorphicInterestsWithCallbacks: AssociationProxy<Interest>;
-  declare confusedFace: Face | null;
   declare secretInterests: AssociationProxy<Interest>;
-  declare mixedCaseMonkey: MixedCaseMonkey | null;
-  declare loadHasOne: ((name: "face") => Promise<Face | null>) &
-    ((name: "autosaveFace") => Promise<Face | null>) &
-    ((name: "polymorphicFace") => Promise<Face | null>) &
-    ((name: "polymorphicFaceWithoutInverse") => Promise<Face | null>) &
-    ((name: "confusedFace") => Promise<Face | null>) &
-    ((name: "mixedCaseMonkey") => Promise<MixedCaseMonkey | null>);
 
   static _tableName = "humans";
 
@@ -69,6 +58,21 @@ export class Human extends Base {
   addCalled(_interest: unknown) {
     this.addCallbackCalled = true;
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Human {
+  get face(): Face | null | Promise<Face | null>;
+  set face(value: Face | null);
+  get autosaveFace(): Face | null | Promise<Face | null>;
+  set autosaveFace(value: Face | null);
+  get polymorphicFace(): Face | null | Promise<Face | null>;
+  set polymorphicFace(value: Face | null);
+  get polymorphicFaceWithoutInverse(): Face | null | Promise<Face | null>;
+  set polymorphicFaceWithoutInverse(value: Face | null);
+  get confusedFace(): Face | null | Promise<Face | null>;
+  set confusedFace(value: Face | null);
+  get mixedCaseMonkey(): MixedCaseMonkey | null | Promise<MixedCaseMonkey | null>;
+  set mixedCaseMonkey(value: MixedCaseMonkey | null);
 }
 
 export class SuperHuman extends Human {}

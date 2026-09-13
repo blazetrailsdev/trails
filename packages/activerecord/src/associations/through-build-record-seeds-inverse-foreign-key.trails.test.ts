@@ -17,7 +17,7 @@ describe("ThroughAssociation#build_record seeds the source inverse foreign key",
 
   it("assigns the through target's id under the source inverse foreign key", async () => {
     const memberDetail = await MemberDetail.find(memberDetails("groucho").id);
-    await memberDetail.loadBelongsTo("organization");
+    await memberDetail.organization;
 
     const attributes: Record<string, unknown> = {};
     throughBuildRecord(memberDetail.association("organizationMemberDetails") as never, attributes);

@@ -47,11 +47,10 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AsPost extends Base {
       declare as_author_id: number | null;
       declare title: string | null;
-      declare as_author: AsAuthor | null;
-      declare loadBelongsTo: (name: "as_author") => Promise<AsAuthor | null>;
 
       static {
         this.attribute("id", "integer");
@@ -62,6 +61,11 @@ describe("AssociationScope", () => {
           foreignKey: "as_author_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AsPost {
+      get as_author(): AsAuthor | null | Promise<AsAuthor | null>;
+      set as_author(value: AsAuthor | null);
     }
     registerModel(AsAuthor);
     registerModel(AsPost);
@@ -358,10 +362,8 @@ describe("AssociationScope", () => {
   });
 
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AsOneOwner extends Base {
-      declare as_one_image: AsOneImage | null;
-      declare loadHasOne: (name: "as_one_image") => Promise<AsOneImage | null>;
-
       static {
         this.attribute("id", "integer");
         this.hasOne("as_one_image", {
@@ -369,6 +371,11 @@ describe("AssociationScope", () => {
           as: "imageable",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface AsOneOwner {
+      get as_one_image(): AsOneImage | null | Promise<AsOneImage | null>;
+      set as_one_image(value: AsOneImage | null);
     }
     class AsOneImage extends Base {
       declare imageable_id: number | null;
@@ -397,17 +404,21 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyComment extends Base {
       declare commentable_id: number | null;
       declare commentable_type: string | null;
-      declare commentable: Base | null;
-      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
         this.belongsTo("commentable", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PolyComment {
+      get commentable(): Base | null | Promise<Base | null>;
+      set commentable(value: Base | null);
     }
     registerModel(PolyTarget);
     registerModel(PolyComment);
@@ -467,17 +478,21 @@ describe("AssociationScope", () => {
         this.primaryKey = "uuid";
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class UuidComment extends Base {
       declare commentable_id: string | null;
       declare commentable_type: string | null;
-      declare commentable: Base | null;
-      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "string");
         this.attribute("commentable_type", "string");
         this.belongsTo("commentable", { polymorphic: true });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface UuidComment {
+      get commentable(): Base | null | Promise<Base | null>;
+      set commentable(value: Base | null);
     }
     registerModel(UuidTarget);
     registerModel(UuidComment);
@@ -511,12 +526,11 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CcMembership extends Base {
       declare cc_author_id: number | null;
       declare cc_tag_id: number | null;
       declare active: boolean | null;
-      declare cc_tag: CcTag | null;
-      declare loadBelongsTo: (name: "cc_tag") => Promise<CcTag | null>;
 
       static {
         this.attribute("cc_author_id", "integer");
@@ -527,6 +541,11 @@ describe("AssociationScope", () => {
           foreignKey: "cc_tag_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface CcMembership {
+      get cc_tag(): CcTag | null | Promise<CcTag | null>;
+      set cc_tag(value: CcTag | null);
     }
     class CcTag extends Base {
       static {
@@ -568,7 +587,7 @@ describe("AssociationScope", () => {
 
   it.skip("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {});
 
-  it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
+  it("hasOne reader through with hasOne source routes via AssociationScope and returns one record", async () => {
     const member = await Member.create({ name: "Alice" });
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
@@ -592,7 +611,7 @@ describe("AssociationScope", () => {
     expect(comments.map((c) => c.body).sort()).toEqual(["first", "second"]);
   });
 
-  it("loadHasOne through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
+  it("hasOne reader through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
     const member = await Member.create({ name: "Alice" });
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
@@ -638,12 +657,8 @@ describe("AssociationScope", () => {
   });
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotUser extends Base {
-      declare hot_account: HotAccount | null;
-      declare hot_settings: HotSettings | null;
-      declare loadHasOne: ((name: "hot_account") => Promise<HotAccount | null>) &
-        ((name: "hot_settings") => Promise<HotSettings | null>);
-
       static {
         this.attribute("id", "integer");
         this.hasOne("hot_account", {
@@ -656,10 +671,16 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface HotUser {
+      get hot_account(): HotAccount | null | Promise<HotAccount | null>;
+      set hot_account(value: HotAccount | null);
+      get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
+      set hot_settings(value: HotSettings | null);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotAccount extends Base {
       declare hot_user_id: number | null;
-      declare hot_settings: HotSettings | null;
-      declare loadHasOne: (name: "hot_settings") => Promise<HotSettings | null>;
 
       static {
         this.attribute("id", "integer");
@@ -669,6 +690,11 @@ describe("AssociationScope", () => {
           foreignKey: "hot_account_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface HotAccount {
+      get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
+      set hot_settings(value: HotSettings | null);
     }
     class HotSettings extends Base {
       declare hot_account_id: number | null;
@@ -716,11 +742,10 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ThroughMembership extends Base {
       declare through_author_id: number | null;
       declare through_post_id: number | null;
-      declare through_post: ThroughPost | null;
-      declare loadBelongsTo: (name: "through_post") => Promise<ThroughPost | null>;
 
       static {
         this.attribute("through_author_id", "integer");
@@ -730,6 +755,11 @@ describe("AssociationScope", () => {
           foreignKey: "through_post_id",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface ThroughMembership {
+      get through_post(): ThroughPost | null | Promise<ThroughPost | null>;
+      set through_post(value: ThroughPost | null);
     }
     class ThroughPost extends Base {
       static {
@@ -758,14 +788,13 @@ describe("AssociationScope", () => {
   });
 
   it("through chain with a polymorphic sourceType that repeats a table aliases the join and keeps the _type WHERE qualified", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PstGallery extends Base {
       declare pst_gallery_id: number | null;
       declare imageable_id: number | null;
       declare imageable_type: string | null;
       declare children: AssociationProxy<PstGallery>;
-      declare imageable: Base | null;
       declare imageables: AssociationProxy<PstGallery>;
-      declare loadBelongsTo: (name: "imageable") => Promise<Base | null>;
 
       static {
         this._tableName = "pst_galleries";
@@ -785,6 +814,11 @@ describe("AssociationScope", () => {
           sourceType: "PstGallery",
         });
       }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface PstGallery {
+      get imageable(): Base | null | Promise<Base | null>;
+      set imageable(value: Base | null);
     }
     registerModel("PstGallery", PstGallery);
 

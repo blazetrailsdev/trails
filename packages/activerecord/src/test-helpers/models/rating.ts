@@ -3,12 +3,11 @@ import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Rating extends Base {
-  declare comment: Comment | null;
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithoutTag: AssociationProxy<Tagging>;
   declare taggingsWithNoTag: AssociationProxy<Tagging>;
-  declare loadBelongsTo: (name: "comment") => Promise<Comment | null>;
   declare comment_id: number;
   declare value: number;
 
@@ -27,4 +26,9 @@ export class Rating extends Base {
       { as: "taggable", className: "Tagging" },
     );
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Rating {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
 }

@@ -2,21 +2,8 @@ import type { Human } from "./human.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Face extends Base {
-  declare human: Human | null;
-  declare autosaveHuman: Human | null;
-  declare superHuman: Base | null;
-  declare polymorphicHuman: Base | null;
-  declare polyHumanWithoutInverse: Base | null;
-  declare confusedHuman: Human | null;
-  declare puzzledPolymorphicHuman: Base | null;
-  declare loadBelongsTo: ((name: "human") => Promise<Human | null>) &
-    ((name: "autosaveHuman") => Promise<Human | null>) &
-    ((name: "superHuman") => Promise<Base | null>) &
-    ((name: "polymorphicHuman") => Promise<Base | null>) &
-    ((name: "polyHumanWithoutInverse") => Promise<Base | null>) &
-    ((name: "confusedHuman") => Promise<Human | null>) &
-    ((name: "puzzledPolymorphicHuman") => Promise<Base | null>);
   declare description: string;
   declare human_id: number;
   declare poly_human_without_inverse_id: number;
@@ -48,5 +35,22 @@ export class Face extends Base {
       void (face as any).human;
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Face {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
+  get autosaveHuman(): Human | null | Promise<Human | null>;
+  set autosaveHuman(value: Human | null);
+  get superHuman(): Base | null | Promise<Base | null>;
+  set superHuman(value: Base | null);
+  get polymorphicHuman(): Base | null | Promise<Base | null>;
+  set polymorphicHuman(value: Base | null);
+  get polyHumanWithoutInverse(): Base | null | Promise<Base | null>;
+  set polyHumanWithoutInverse(value: Base | null);
+  get confusedHuman(): Human | null | Promise<Human | null>;
+  set confusedHuman(value: Human | null);
+  get puzzledPolymorphicHuman(): Base | null | Promise<Base | null>;
+  set puzzledPolymorphicHuman(value: Base | null);
 }
 registerModel(Face);

@@ -9,14 +9,12 @@ import type { Subscriber } from "./subscriber.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Book extends Base {
-  declare author: Author | null;
-  declare formatRecord: Base | null;
   declare citations: AssociationProxy<Citation>;
   declare references: AssociationProxy<Reference>;
   declare subscriptions: AssociationProxy<Subscription>;
   declare subscribers: AssociationProxy<Subscriber>;
-  declare essay: Essay | null;
   declare isProposed: () => boolean;
   declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<Book>;
@@ -120,9 +118,6 @@ export class Book extends Base {
   declare disabledBang: () => Promise<true | undefined>;
   declare static disabled: () => Relation<Book>;
   declare static notDisabled: () => Relation<Book>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "formatRecord") => Promise<Base | null>);
-  declare loadHasOne: (name: "essay") => Promise<Essay | null>;
   declare author_id: number;
   declare author_visibility: "visible" | "invisible" | null;
   declare boolean_status: "enabled" | "disabled" | null;
@@ -173,6 +168,15 @@ export class Book extends Base {
     this.enum("cover", { hard: "hard", soft: "soft" });
     this.enum("boolean_status", { enabled: true, disabled: false });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Book {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get formatRecord(): Base | null | Promise<Base | null>;
+  set formatRecord(value: Base | null);
+  get essay(): Essay | null | Promise<Essay | null>;
+  set essay(value: Essay | null);
 }
 
 export class PublishedBook extends Base {

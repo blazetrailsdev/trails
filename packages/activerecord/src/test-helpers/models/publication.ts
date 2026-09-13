@@ -3,11 +3,10 @@ import type { Editor } from "./editor.js";
 import type { Editorship } from "./editorship.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Publication extends Base {
-  declare editorInChief: Editor | null;
   declare editorships: AssociationProxy<Editorship>;
   declare editors: AssociationProxy<Editor>;
-  declare loadBelongsTo: (name: "editorInChief") => Promise<Editor | null>;
   declare editor_in_chief_id: number;
   declare name: string;
 
@@ -32,4 +31,9 @@ export class Publication extends Base {
   touchName() {
     this.writeAttribute("name", `${this.readAttribute("name")} (touched)`);
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Publication {
+  get editorInChief(): Editor | null | Promise<Editor | null>;
+  set editorInChief(value: Editor | null);
 }

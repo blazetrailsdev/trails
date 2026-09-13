@@ -13,60 +13,19 @@ import type { SuperMembership } from "./membership.js";
 import type { TenantMembership } from "./membership.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Member extends Base {
-  declare currentMembership: CurrentMembership | null;
-  declare selectedMembership: SelectedMembership | null;
-  declare membership: Membership | null;
-  declare club: Club | null;
-  declare clubWithoutJoins: Club | null;
-  declare selectedClub: Club | null;
-  declare favoriteClub: Club | null;
-  declare hairyClub: Club | null;
-  declare sponsor: Sponsor | null;
-  declare sponsorClub: Club | null;
-  declare memberDetail: MemberDetail | null;
-  declare organization: Organization | null;
-  declare organizationWithoutJoins: Organization | null;
-  declare memberType: MemberType | null;
   declare nestedMemberTypes: AssociationProxy<MemberType>;
-  declare nestedMemberType: MemberType | null;
   declare nestedSponsors: AssociationProxy<Sponsor>;
-  declare nestedSponsor: Sponsor | null;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
   declare organizationMemberDetails_2: AssociationProxy<MemberDetail>;
-  declare clubCategory: Category | null;
-  declare generalClub: Club | null;
   declare superMemberships: AssociationProxy<SuperMembership>;
   declare favoriteMemberships: AssociationProxy<Membership>;
   declare clubs: AssociationProxy<Club>;
   declare tenantMemberships: AssociationProxy<TenantMembership>;
   declare tenantClubs: AssociationProxy<Club>;
-  declare clubThroughMany: Club | null;
-  declare admittable: Base | null;
-  declare premiumClub: Base | null;
   declare static unnamed: () => Relation<Member>;
   declare static withMemberTypeId: (id: number) => Relation<Member>;
-  declare loadBelongsTo: ((name: "memberType") => Promise<MemberType | null>) &
-    ((name: "admittable") => Promise<Base | null>);
-  declare loadHasOne: ((name: "currentMembership") => Promise<CurrentMembership | null>) &
-    ((name: "selectedMembership") => Promise<SelectedMembership | null>) &
-    ((name: "membership") => Promise<Membership | null>) &
-    ((name: "club") => Promise<Club | null>) &
-    ((name: "clubWithoutJoins") => Promise<Club | null>) &
-    ((name: "selectedClub") => Promise<Club | null>) &
-    ((name: "favoriteClub") => Promise<Club | null>) &
-    ((name: "hairyClub") => Promise<Club | null>) &
-    ((name: "sponsor") => Promise<Sponsor | null>) &
-    ((name: "sponsorClub") => Promise<Club | null>) &
-    ((name: "memberDetail") => Promise<MemberDetail | null>) &
-    ((name: "organization") => Promise<Organization | null>) &
-    ((name: "organizationWithoutJoins") => Promise<Organization | null>) &
-    ((name: "nestedMemberType") => Promise<MemberType | null>) &
-    ((name: "nestedSponsor") => Promise<Sponsor | null>) &
-    ((name: "clubCategory") => Promise<Category | null>) &
-    ((name: "generalClub") => Promise<Club | null>) &
-    ((name: "clubThroughMany") => Promise<Club | null>) &
-    ((name: "premiumClub") => Promise<Base | null>);
   declare admittable_id: number;
   declare admittable_type: string;
   declare member_type_id: number;
@@ -146,6 +105,51 @@ export class Member extends Base {
       return this.where({ member_type_id: id });
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Member {
+  get currentMembership(): CurrentMembership | null | Promise<CurrentMembership | null>;
+  set currentMembership(value: CurrentMembership | null);
+  get selectedMembership(): SelectedMembership | null | Promise<SelectedMembership | null>;
+  set selectedMembership(value: SelectedMembership | null);
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
+  get clubWithoutJoins(): Club | null | Promise<Club | null>;
+  set clubWithoutJoins(value: Club | null);
+  get selectedClub(): Club | null | Promise<Club | null>;
+  set selectedClub(value: Club | null);
+  get favoriteClub(): Club | null | Promise<Club | null>;
+  set favoriteClub(value: Club | null);
+  get hairyClub(): Club | null | Promise<Club | null>;
+  set hairyClub(value: Club | null);
+  get sponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set sponsor(value: Sponsor | null);
+  get sponsorClub(): Club | null | Promise<Club | null>;
+  set sponsorClub(value: Club | null);
+  get memberDetail(): MemberDetail | null | Promise<MemberDetail | null>;
+  set memberDetail(value: MemberDetail | null);
+  get organization(): Organization | null | Promise<Organization | null>;
+  set organization(value: Organization | null);
+  get organizationWithoutJoins(): Organization | null | Promise<Organization | null>;
+  set organizationWithoutJoins(value: Organization | null);
+  get memberType(): MemberType | null | Promise<MemberType | null>;
+  set memberType(value: MemberType | null);
+  get nestedMemberType(): MemberType | null | Promise<MemberType | null>;
+  set nestedMemberType(value: MemberType | null);
+  get nestedSponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set nestedSponsor(value: Sponsor | null);
+  get clubCategory(): Category | null | Promise<Category | null>;
+  set clubCategory(value: Category | null);
+  get generalClub(): Club | null | Promise<Club | null>;
+  set generalClub(value: Club | null);
+  get clubThroughMany(): Club | null | Promise<Club | null>;
+  set clubThroughMany(value: Club | null);
+  get admittable(): Base | null | Promise<Base | null>;
+  set admittable(value: Base | null);
+  get premiumClub(): Base | null | Promise<Base | null>;
+  set premiumClub(value: Base | null);
 }
 
 export class SelfMember extends Base {

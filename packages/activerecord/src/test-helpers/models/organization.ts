@@ -7,17 +7,14 @@ import type { MemberDetail } from "./member-detail.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Organization extends Base {
   declare memberDetails: AssociationProxy<MemberDetail>;
   declare members: AssociationProxy<Member>;
   declare authors: AssociationProxy<Author>;
   declare authorEssayCategories: AssociationProxy<Category>;
-  declare author: Author | null;
-  declare authorOwnedEssayCategory: Category | null;
   declare posts: AssociationProxy<Post>;
   declare static clubs: () => Relation<Organization>;
-  declare loadHasOne: ((name: "author") => Promise<Author | null>) &
-    ((name: "authorOwnedEssayCategory") => Promise<Category | null>);
   declare name: string;
 
   static {
@@ -36,4 +33,11 @@ export class Organization extends Base {
       return this.from("clubs");
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Organization {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorOwnedEssayCategory(): Category | null | Promise<Category | null>;
+  set authorOwnedEssayCategory(value: Category | null);
 }

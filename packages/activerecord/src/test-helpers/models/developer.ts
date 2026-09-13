@@ -18,12 +18,10 @@ import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Range } from "@blazetrails/ruby-compat";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
   declare updated_at: any;
   declare projects: AssociationProxy<Project>;
-  declare mentor: Mentor | null;
-  declare strictLoadingMentor: Mentor | null;
-  declare strictLoadingOffMentor: Mentor | null;
   declare sharedComputers: AssociationProxy<Computer>;
   declare computers: AssociationProxy<Computer>;
   declare projectsExtendedByName: AssociationProxy<Project>;
@@ -40,18 +38,9 @@ export class Developer extends Base {
   declare firms: AssociationProxy<Firm>;
   declare comments: AssociationProxy<Comment>;
   declare ratings: AssociationProxy<Rating>;
-  declare ship: Ship | null;
-  declare strictLoadingShip: Ship | null;
-  declare firm: Firm | null;
   declare contractedProjects: AssociationProxy<Project>;
   declare static jamises: () => Relation<Developer>;
   declare lastName: string;
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "strictLoadingMentor") => Promise<Mentor | null>) &
-    ((name: "strictLoadingOffMentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
-    ((name: "strictLoadingShip") => Promise<Ship | null>);
   declare firm_id: number;
   declare first_name: string;
   declare legacy_created_at: RubyTime | Temporal.PlainDateTime;
@@ -200,6 +189,21 @@ export class Developer extends Base {
     (this as any).auditLogs.build({ message });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Developer {
+  get mentor(): Mentor | null | Promise<Mentor | null>;
+  set mentor(value: Mentor | null);
+  get strictLoadingMentor(): Mentor | null | Promise<Mentor | null>;
+  set strictLoadingMentor(value: Mentor | null);
+  get strictLoadingOffMentor(): Mentor | null | Promise<Mentor | null>;
+  set strictLoadingOffMentor(value: Mentor | null);
+  get ship(): Ship | null | Promise<Ship | null>;
+  set ship(value: Ship | null);
+  get strictLoadingShip(): Ship | null | Promise<Ship | null>;
+  set strictLoadingShip(value: Ship | null);
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+}
 
 acceptsNestedAttributesFor(Developer, "projects");
 
@@ -224,11 +228,8 @@ export class SymbolIgnoredDeveloper extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLog extends Base {
-  declare developer: Developer | null;
-  declare unvalidatedDeveloper: Developer | null;
-  declare loadBelongsTo: ((name: "developer") => Promise<Developer | null>) &
-    ((name: "unvalidatedDeveloper") => Promise<Developer | null>);
   declare developer_id: number;
   declare message: string;
   declare unvalidated_developer_id: number;
@@ -238,15 +239,25 @@ export class AuditLog extends Base {
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface AuditLog {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+  get unvalidatedDeveloper(): Developer | null | Promise<Developer | null>;
+  set unvalidatedDeveloper(value: Developer | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLogRequired extends Base {
-  declare developer: Developer | null;
-  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
-
   static {
     this.tableName = "audit_logs";
     this.belongsTo("developer", { required: true });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface AuditLogRequired {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
 }
 
 export class DeveloperWithBeforeDestroyRaise extends Base {

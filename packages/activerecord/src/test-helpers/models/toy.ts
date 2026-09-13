@@ -5,11 +5,10 @@ import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Toy extends Base {
-  declare pet: Pet | null;
   declare sponsors: AssociationProxy<Sponsor>;
   declare static withPet: () => Relation<Toy>;
-  declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare name: string;
   declare pet_id: number;
@@ -26,12 +25,16 @@ export class Toy extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Toy {
+  get pet(): Pet | null | Promise<Pet | null>;
+  set pet(value: Pet | null);
+}
 
 export class ToyTouchPet extends Base {
   declare name: string;
   declare pet_id: number;
   declare toy_id: number;
-  declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
 
   static {
     this._primaryKey = "toy_id";

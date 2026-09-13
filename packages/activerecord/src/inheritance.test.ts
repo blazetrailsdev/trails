@@ -620,14 +620,18 @@ describe("InheritanceAttributeMappingTest", () => {
   registerSubclass(IamtStartup);
   registerSubclass(IamtEmpire);
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class IamtSponsor extends Base {
-    declare sponsorable: Base | null;
-
     static {
       this.tableName = "sponsors";
       this.attribute("sponsorable_type", "omg_sti");
       this.belongsTo("sponsorable", { polymorphic: true });
     }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface IamtSponsor {
+    get sponsorable(): Base | null | Promise<Base | null>;
+    set sponsorable(value: Base | null);
   }
   registerModel(IamtSponsor);
 

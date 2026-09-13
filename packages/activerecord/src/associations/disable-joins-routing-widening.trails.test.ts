@@ -162,7 +162,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     });
     let loaded: any;
     try {
-      loaded = await (author as any).loadHasOne("noJoinsOneRwMember");
+      loaded = await (author as any).noJoinsOneRwMember;
     } finally {
       Notifications.unsubscribe(sub);
     }

@@ -2,38 +2,48 @@ import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesigner extends Base {
-  declare chef: Chef | null;
-  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
   declare name: string;
 
   static {
     this.hasOne("chef", { as: "employable" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DrinkDesigner {
+  get chef(): Chef | null | Promise<Chef | null>;
+  set chef(value: Chef | null);
+}
 
 acceptsNestedAttributesFor(DrinkDesigner, "chef");
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {
-  declare chef: Chef | null;
-  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
-
   static {
     this.tableName = "drink_designers";
 
     this.hasOne("chef", { as: "employable", dependent: "nullify" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DrinkDesignerWithPolymorphicDependentNullifyChef {
+  get chef(): Chef | null | Promise<Chef | null>;
+  set chef(value: Chef | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesignerWithPolymorphicTouchChef extends Base {
-  declare chef: Chef | null;
-  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
-
   static {
     this.tableName = "drink_designers";
 
     this.hasOne("chef", { as: "employable", touch: true });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DrinkDesignerWithPolymorphicTouchChef {
+  get chef(): Chef | null | Promise<Chef | null>;
+  set chef(value: Chef | null);
 }
 
 export class MocktailDesigner extends DrinkDesigner {}

@@ -5,18 +5,9 @@ import type { MemberType } from "./member-type.js";
 import type { Organization } from "./organization.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MemberDetail extends Base {
-  declare member: Member | null;
-  declare organization: Organization | null;
-  declare memberType: MemberType | null;
-  declare membership: Membership | null;
-  declare admittable: Member | null;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "organization") => Promise<Organization | null>);
-  declare loadHasOne: ((name: "memberType") => Promise<MemberType | null>) &
-    ((name: "membership") => Promise<Membership | null>) &
-    ((name: "admittable") => Promise<Member | null>);
   declare extra_data: string;
   declare member_id: number;
   declare organization_id: number;
@@ -32,4 +23,17 @@ export class MemberDetail extends Base {
       source: "memberDetails",
     });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MemberDetail {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get organization(): Organization | null | Promise<Organization | null>;
+  set organization(value: Organization | null);
+  get memberType(): MemberType | null | Promise<MemberType | null>;
+  set memberType(value: MemberType | null);
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get admittable(): Member | null | Promise<Member | null>;
+  set admittable(value: Member | null);
 }

@@ -1,9 +1,8 @@
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PersonalLegacyThing extends Base {
-  declare person: Person | null;
-  declare loadBelongsTo: (name: "person") => Promise<Person | null>;
   declare person_id: number;
   declare tps_report_number: number;
   declare version: number;
@@ -12,4 +11,9 @@ export class PersonalLegacyThing extends Base {
     this.lockingColumn = "version";
     this.belongsTo("person", { counterCache: true });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PersonalLegacyThing {
+  get person(): Person | null | Promise<Person | null>;
+  set person(value: Person | null);
 }

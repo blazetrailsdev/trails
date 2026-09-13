@@ -22,7 +22,7 @@
  *
  * Covered macros (the standalone forms that have a clean `this.<x>(...)`
  * in-class equivalent): hasMany, belongsTo, hasOne, hasAndBelongsToMany.
- * The runtime loaders (`loadHasMany`, `loadBelongsTo`, `loadHasOne`, …) are
+ * The runtime loaders (`loadHasMany`, …) are
  * NOT declaration macros — they read an association at runtime and have no
  * in-class declaration form — so they are intentionally out of scope.
  *
