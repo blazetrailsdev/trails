@@ -606,6 +606,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else {
       this._disconnect();
     }
+    await this._closingDriver;
   }
 
   /** @internal */

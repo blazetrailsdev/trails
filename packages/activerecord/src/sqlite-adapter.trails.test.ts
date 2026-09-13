@@ -179,10 +179,10 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
-    await adapter.disconnectBang();
+    const disconnecting = adapter.disconnectBang();
     expect(closed).toBe(false);
     resolveClose!();
-    await adapter.whenClosed();
+    await disconnecting;
     expect(closed).toBe(true);
   });
 
@@ -202,8 +202,7 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
-    await adapter.disconnectBang();
-    await expect(adapter.whenClosed()).resolves.toBeUndefined();
+    await expect(adapter.disconnectBang()).resolves.toBeUndefined();
   });
 
   it("completes a deferred async-only open on the first query (sync checkout path)", async () => {
@@ -433,11 +432,12 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
-    await conn.disconnectBang();
+    const disconnecting = conn.disconnectBang();
 
     const draining = pool.discardBang();
     expect(isClosed()).toBe(false);
     release();
+    await disconnecting;
     await draining;
     expect(isClosed()).toBe(true);
   });
