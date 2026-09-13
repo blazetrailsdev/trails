@@ -859,7 +859,7 @@ export class Base extends Model {
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
   static set globalExecutorConcurrency(globalExecutorConcurrency: number | null) {
     if (this.asyncQueryExecutor == null || this.asyncQueryExecutor === "multi_thread_pool") {
       throw new ArgumentError(
@@ -870,7 +870,7 @@ export class Base extends Model {
     _globalExecutorConcurrency = globalExecutorConcurrency;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
   static get globalExecutorConcurrency(): number | null {
     return (_globalExecutorConcurrency ??= null);
   }

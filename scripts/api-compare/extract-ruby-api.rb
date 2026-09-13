@@ -368,6 +368,7 @@ class ApiExtractor
     # half of @file_collection_constants, which conflates the two (see
     # receiver_kind: `MIME_TYPES.fetch` is provably `Hash#fetch`).
     @file_hash_constants = {}
+    @hash_ivars = Set.new
     # rel_path → Set of Ruby Hash KEY names declared in that file: the literal
     # keys of a Hash-constant assignment (`PARSING`, xml_mini.rb:67-88) and the
     # Symbol keys an options hash is read by in a method body (`@options.fetch(
@@ -457,6 +458,7 @@ class ApiExtractor
 
     @current_file = rel_path
     @current_line = 0
+    @hash_ivars = hash_typed_ivars(sexp).select { |_name, hashy| hashy }.keys.to_set
     walk(sexp)
 
     # Handle dynamic class creation via const_set:
@@ -2716,7 +2718,7 @@ class ApiExtractor
 
     case inner[0]
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
-    when :@ivar then "ivar"
+    when :@ivar then @hash_ivars.include?(inner[1]) ? "hash" : "ivar"
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
     when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
@@ -2785,6 +2787,26 @@ class ApiExtractor
       each_massign_target(node[1]) { |name| assigned[name] = false }
     end
     node.each { |child| note_hash_assignments(child, assigned) if child.is_a?(Array) }
+  end
+
+  # The file's ivars that are provably a Hash: every `@x = …` / `@x ||= …` in
+  # the file assigns a hash literal or a `to_hash` call, whose result Ruby's
+  # implicit-conversion contract requires to be a Hash — `@row =
+  # fixture.to_hash` (`fixture_set/table_row.rb:69`). One other assignment
+  # anywhere in the file leaves the ivar an `ivar`.
+  def hash_typed_ivars(node, assigned = {})
+    if node.is_a?(Array)
+      if %i[assign opassign].include?(node[0]) && node[1].is_a?(Array) && node[1][0] == :var_field &&
+          node[1][1].is_a?(Array) && node[1][1][0] == :@ivar
+        name = node[1][1][1]
+        value = node[2]
+        hashy = value.is_a?(Array) && (%i[hash bare_assoc_hash].include?(value[0]) ||
+          (value[0] == :call && ident_name(value[3]) == "to_hash"))
+        assigned[name] = assigned.fetch(name, true) && hashy
+      end
+      node.each { |child| hash_typed_ivars(child, assigned) if child.is_a?(Array) }
+    end
+    assigned
   end
 
   # The local a `:var_field` assignment target names, or nil for an ivar,

@@ -83,25 +83,21 @@ export type ReceiverKind =
  * name in the body had a proving kind. A `cache.fetch` records `local`, which
  * proves nothing and so credits nothing.
  *
- * Each row's Ruby receiver is a single class, so each takes a single kind —
- * plus, where `ivar: true`, the `ivar` shape: `@row.include?` in
- * `fixture_set/table_row.rb:113` is a Hash the extractor cannot prove, and a
- * row admits it only where no other ruby-compat row and no JS spelling of the
- * same bare name would read it differently;
+ * Each row's Ruby receiver is a single class, so each takes a single kind;
  * `RECEIVER_KEYED_RUBY_COMPAT_EXPORTS` is a separate map from
  * {@link RUBY_COMPAT_EXPORTS} rather than an optional field on it because the
  * two are read differently — an unconditional row credits from the name alone.
  */
 export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
-  { tsExport: string; receiver: ReceiverKind; ivar?: true }
+  { tsExport: string; receiver: ReceiverKind }
 >([
-  ["Hash#delete", { tsExport: "hashDelete", receiver: "hash", ivar: true }],
+  ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
   // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/hash.c:7255`),
   // the same body `key?` and `has_key?` get, so its port is `hasKey` too.
-  ["Hash#include?", { tsExport: "hasKey", receiver: "hash", ivar: true }],
+  ["Hash#include?", { tsExport: "hasKey", receiver: "hash" }],
   ["Hash#merge", { tsExport: "merge", receiver: "hash" }],
   ["Hash#merge!", { tsExport: "mergeBang", receiver: "hash" }],
   ["Hash#reject", { tsExport: "reject", receiver: "hash" }],
@@ -143,7 +139,7 @@ function byBareName(): Map<string, Set<Claim>> {
 
 /** One row as {@link rubyCompatExport} reads it: `receiver` absent on an
  *  unconditional row, which credits from the bare name alone. */
-type Claim = { tsExport: string; receiver?: ReceiverKind; ivar?: true };
+type Claim = { tsExport: string; receiver?: ReceiverKind };
 
 const BY_BARE_NAME = byBareName();
 
@@ -157,7 +153,7 @@ const BY_BARE_NAME = byBareName();
  *  and the reason a body mixing `options.fetch` with `cache.fetch` credits
  *  neither. Two rows claiming one bare name for DIFFERENT exports resolve only
  *  where the recorded kinds admit exactly one of them — `delete` on a `hash`
- *  or `ivar` is `Hash#delete`, never `String#delete` — and otherwise nothing,
+ *  is `Hash#delete`, never `String#delete` — and otherwise nothing,
  *  the unresolvable-receiver case an {@link AMBIGUOUS_RUBY_CALLS} member is. */
 export function rubyCompatExport(
   rubyCall: string,
@@ -172,10 +168,7 @@ export function rubyCompatExport(
   if (receiverKinds === undefined || receiverKinds.length === 0) return undefined;
   const admitted = [...claims].filter(
     (claim) =>
-      claim.receiver !== undefined &&
-      receiverKinds.every(
-        (kind) => kind === claim.receiver || (claim.ivar === true && kind === "ivar"),
-      ),
+      claim.receiver !== undefined && receiverKinds.every((kind) => kind === claim.receiver),
   );
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
