@@ -217,8 +217,7 @@ export class EnumMethods {
       const carrier = this.carrier();
       Object.defineProperty(carrier, predicateName, {
         value: function (this: EnumInstanceHost) {
-          const recordClass = (this as unknown as { constructor: typeof Base }).constructor;
-          return castEnumValue(recordClass, name, this.readAttribute(name)) === value;
+          return (this as unknown as Record<string, unknown>)[`${name}ForDatabase`] === value;
         },
         writable: true,
         configurable: true,
@@ -523,15 +522,6 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   const resolved = host.attributeAliases?.[attribute] ?? attribute;
   const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-export function castEnumValue(
-  modelClass: typeof Base,
-  attribute: string,
-  value: unknown,
-): number | string | boolean | null {
-  return enumTypeOf(modelClass, attribute)?.serialize(value) ?? null;
 }
 
 /** @internal */
