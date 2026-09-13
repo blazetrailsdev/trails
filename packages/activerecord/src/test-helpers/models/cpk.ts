@@ -16,9 +16,9 @@ export class CpkAuthor extends Base {
 }
 
 export class CpkBook extends Base {
-  declare order: CpkOrder | null;
-  declare orderExplicitFkPk: CpkOrder | null;
-  declare author: CpkAuthor | null;
+  declare order: CpkOrder | null | Promise<CpkOrder | null>;
+  declare orderExplicitFkPk: CpkOrder | null | Promise<CpkOrder | null>;
+  declare author: CpkAuthor | null | Promise<CpkAuthor | null>;
   declare chapters: AssociationProxy<CpkChapter>;
   declare author_id: number;
   declare order_id: number;
@@ -60,7 +60,10 @@ export class CpkBestSeller extends CpkBook {
 }
 
 export class CpkBrokenBook extends CpkBook {
-  declare order: CpkOrderWithSpecialPrimaryKey | null;
+  declare order:
+    | CpkOrderWithSpecialPrimaryKey
+    | null
+    | Promise<CpkOrderWithSpecialPrimaryKey | null>;
 
   static _demodulizedName = "BrokenBook";
   static {
@@ -69,7 +72,7 @@ export class CpkBrokenBook extends CpkBook {
 }
 
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
-  declare order: CpkNonCpkOrder | null;
+  declare order: CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
 
   static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
@@ -81,7 +84,7 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
 }
 
 export class CpkNonCpkBook extends CpkBook {
-  declare nonCpkOrder: CpkNonCpkOrder | null;
+  declare nonCpkOrder: CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
 
   static _demodulizedName = "NonCpkBook";
   static {
@@ -91,7 +94,7 @@ export class CpkNonCpkBook extends CpkBook {
 }
 
 export class CpkNullifiedBook extends CpkBook {
-  declare chapter: CpkChapter | null;
+  declare chapter: CpkChapter | null | Promise<CpkChapter | null>;
 
   static _demodulizedName = "NullifiedBook";
   static {
@@ -105,7 +108,7 @@ export class CpkNullifiedBook extends CpkBook {
 
 export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
-  declare orderAgreement: CpkOrderAgreement | null;
+  declare orderAgreement: CpkOrderAgreement | null | Promise<CpkOrderAgreement | null>;
 
   static _demodulizedName = "BookWithOrderAgreements";
   static {
@@ -130,7 +133,7 @@ export class CpkBookDestroyAsync extends Base {
 }
 
 export class CpkChapter extends Base {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
   declare author_id: number;
   declare book_id: number;
   declare title: string;
@@ -145,7 +148,7 @@ export class CpkChapter extends Base {
 }
 
 export class CpkChapterDestroyAsync extends Base {
-  declare book: CpkBookDestroyAsync | null;
+  declare book: CpkBookDestroyAsync | null | Promise<CpkBookDestroyAsync | null>;
 
   static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
@@ -162,7 +165,7 @@ export class CpkChapterDestroyAsync extends Base {
 export class CpkOrder extends Base {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
   declare books: AssociationProxy<CpkBook>;
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
   declare orderTags: AssociationProxy<CpkOrderTag>;
   declare tags: AssociationProxy<CpkTag>;
   declare books_count: number | null;
@@ -190,7 +193,7 @@ export class CpkOrder extends Base {
 }
 
 export class CpkBrokenOrder extends CpkOrder {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
 
   static _demodulizedName = "BrokenOrder";
   static {
@@ -201,7 +204,7 @@ export class CpkBrokenOrder extends CpkOrder {
 }
 
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
@@ -212,7 +215,7 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
 }
 
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
-  declare book: CpkNonCpkBook | null;
+  declare book: CpkNonCpkBook | null | Promise<CpkNonCpkBook | null>;
 
   static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
@@ -230,7 +233,7 @@ export class CpkNonCpkOrder extends CpkOrder {
 }
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
@@ -239,7 +242,7 @@ export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
 }
 
 export class CpkOrderWithNullifiedBook extends CpkOrder {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithNullifiedBook";
   static {
@@ -261,7 +264,7 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
 }
 
 export class CpkOrderAgreement extends Base {
-  declare order: CpkOrder | null;
+  declare order: CpkOrder | null | Promise<CpkOrder | null>;
   declare order_id: number;
   declare signature: string;
 
@@ -274,8 +277,8 @@ export class CpkOrderAgreement extends Base {
 }
 
 export class CpkOrderTag extends Base {
-  declare tag: CpkTag | null;
-  declare order: CpkOrder | null;
+  declare tag: CpkTag | null | Promise<CpkTag | null>;
+  declare order: CpkOrder | null | Promise<CpkOrder | null>;
   declare attached_by: string;
   declare attached_reason: string;
   declare order_id: number;
@@ -323,8 +326,8 @@ export class CpkPost extends Base {
 }
 
 export class CpkComment extends Base {
-  declare commentable: Base | null;
-  declare post: CpkPost | null;
+  declare commentable: Base | null | Promise<Base | null>;
+  declare post: CpkPost | null | Promise<CpkPost | null>;
   declare commentable_author: string;
   declare commentable_title: string;
   declare commentable_type: string;
@@ -347,7 +350,7 @@ export class CpkComment extends Base {
 }
 
 export class CpkReview extends Base {
-  declare book: CpkBook | null;
+  declare book: CpkBook | null | Promise<CpkBook | null>;
   declare author_id: number;
   declare comment: string;
   declare "number": number;
@@ -381,7 +384,7 @@ export class CpkCar extends Base {
 }
 
 export class CpkCarReview extends Base {
-  declare car: CpkCar | null;
+  declare car: CpkCar | null | Promise<CpkCar | null>;
   declare car_make: string;
   declare car_model: string;
   declare comment: string;

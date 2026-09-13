@@ -3,8 +3,8 @@ import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
 
 export class Minivan extends Base {
-  declare speedometer: Speedometer | null;
-  declare dashboard: Dashboard | null;
+  declare speedometer: Speedometer | null | Promise<Speedometer | null>;
+  declare dashboard: Dashboard | null | Promise<Dashboard | null>;
   declare color: string;
   declare minivan_id: string;
   declare name: string;

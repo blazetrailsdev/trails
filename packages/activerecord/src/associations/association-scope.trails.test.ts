@@ -50,7 +50,7 @@ describe("AssociationScope", () => {
     class AsPost extends Base {
       declare as_author_id: number | null;
       declare title: string | null;
-      declare as_author: AsAuthor | null;
+      declare as_author: AsAuthor | null | Promise<AsAuthor | null>;
 
       static {
         this.attribute("id", "integer");
@@ -358,7 +358,7 @@ describe("AssociationScope", () => {
 
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
     class AsOneOwner extends Base {
-      declare as_one_image: AsOneImage | null;
+      declare as_one_image: AsOneImage | null | Promise<AsOneImage | null>;
 
       static {
         this.attribute("id", "integer");
@@ -398,7 +398,7 @@ describe("AssociationScope", () => {
     class PolyComment extends Base {
       declare commentable_id: number | null;
       declare commentable_type: string | null;
-      declare commentable: Base | null;
+      declare commentable: Base | null | Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "integer");
@@ -467,7 +467,7 @@ describe("AssociationScope", () => {
     class UuidComment extends Base {
       declare commentable_id: string | null;
       declare commentable_type: string | null;
-      declare commentable: Base | null;
+      declare commentable: Base | null | Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "string");
@@ -511,7 +511,7 @@ describe("AssociationScope", () => {
       declare cc_author_id: number | null;
       declare cc_tag_id: number | null;
       declare active: boolean | null;
-      declare cc_tag: CcTag | null;
+      declare cc_tag: CcTag | null | Promise<CcTag | null>;
 
       static {
         this.attribute("cc_author_id", "integer");
@@ -634,8 +634,8 @@ describe("AssociationScope", () => {
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
     class HotUser extends Base {
-      declare hot_account: HotAccount | null;
-      declare hot_settings: HotSettings | null;
+      declare hot_account: HotAccount | null | Promise<HotAccount | null>;
+      declare hot_settings: HotSettings | null | Promise<HotSettings | null>;
 
       static {
         this.attribute("id", "integer");
@@ -651,7 +651,7 @@ describe("AssociationScope", () => {
     }
     class HotAccount extends Base {
       declare hot_user_id: number | null;
-      declare hot_settings: HotSettings | null;
+      declare hot_settings: HotSettings | null | Promise<HotSettings | null>;
 
       static {
         this.attribute("id", "integer");
@@ -711,7 +711,7 @@ describe("AssociationScope", () => {
     class ThroughMembership extends Base {
       declare through_author_id: number | null;
       declare through_post_id: number | null;
-      declare through_post: ThroughPost | null;
+      declare through_post: ThroughPost | null | Promise<ThroughPost | null>;
 
       static {
         this.attribute("through_author_id", "integer");
@@ -754,7 +754,7 @@ describe("AssociationScope", () => {
       declare imageable_id: number | null;
       declare imageable_type: string | null;
       declare children: AssociationProxy<PstGallery>;
-      declare imageable: Base | null;
+      declare imageable: Base | null | Promise<Base | null>;
       declare imageables: AssociationProxy<PstGallery>;
 
       static {

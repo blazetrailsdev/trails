@@ -9,7 +9,7 @@ import { Base } from "../../base.js";
 
 export class Pet extends Base {
   declare current_user: string;
-  declare owner: Owner | null;
+  declare owner: Owner | null | Promise<Owner | null>;
   declare toys: AssociationProxy<Toy>;
   declare petTreasures: AssociationProxy<PetTreasure>;
   declare treasures: AssociationProxy<Treasure>;

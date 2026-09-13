@@ -6,7 +6,7 @@ import { association } from "../../associations.js";
 import { association as associationInstance } from "../../associations/instance-methods.js";
 
 export class Bulb extends Base {
-  declare car: Car | null;
+  declare car: Car | null | Promise<Car | null>;
   declare static awesome: () => Relation<Bulb>;
   declare car_id: number;
   declare frickinawesome: boolean | null;

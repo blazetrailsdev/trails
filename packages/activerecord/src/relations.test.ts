@@ -934,7 +934,7 @@ describe("RelationTest", () => {
     const post = postsEager.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
     const directLastComment = await freshPost.lastComment;
-    expect(post.lastComment!.equals(directLastComment)).toBe(true);
+    expect((await post.lastComment)!.equals(directLastComment)).toBe(true);
   });
 
   it("dynamic find by attributes", async () => {

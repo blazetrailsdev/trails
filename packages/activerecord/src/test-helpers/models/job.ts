@@ -6,7 +6,7 @@ import { Base } from "../../base.js";
 export class Job extends Base {
   declare references: AssociationProxy<Reference>;
   declare people: AssociationProxy<Person>;
-  declare idealReference: Reference | null;
+  declare idealReference: Reference | null | Promise<Reference | null>;
   declare agents: AssociationProxy<Person>;
   declare ideal_reference_id: number;
 

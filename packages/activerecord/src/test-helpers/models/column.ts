@@ -2,7 +2,7 @@ import type { Record } from "./record.js";
 import { Base } from "../../base.js";
 
 export class Column extends Base {
-  declare record: Record | null;
+  declare record: Record | null | Promise<Record | null>;
   declare record_id: number;
 
   static {

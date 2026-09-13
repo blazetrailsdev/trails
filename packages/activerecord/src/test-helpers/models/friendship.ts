@@ -3,11 +3,11 @@ import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
 export class Friendship extends Base {
-  declare friend: Person | null;
-  declare friendToo: Person | null;
-  declare follower: Person | null;
-  declare friendFavoriteReferenceJob: Job | null;
-  declare followerFavoriteReferenceJob: Job | null;
+  declare friend: Person | null | Promise<Person | null>;
+  declare friendToo: Person | null | Promise<Person | null>;
+  declare follower: Person | null | Promise<Person | null>;
+  declare friendFavoriteReferenceJob: Job | null | Promise<Job | null>;
+  declare followerFavoriteReferenceJob: Job | null | Promise<Job | null>;
   declare follower_id: number;
   declare friend_id: number;
 

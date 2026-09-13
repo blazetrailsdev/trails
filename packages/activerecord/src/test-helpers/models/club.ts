@@ -9,12 +9,12 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Club extends Base {
-  declare membership: Membership | null;
+  declare membership: Membership | null | Promise<Membership | null>;
   declare memberships: AssociationProxy<Membership>;
   declare members: AssociationProxy<Member>;
-  declare sponsor: Sponsor | null;
-  declare sponsoredMember: Member | null;
-  declare category: Category | null;
+  declare sponsor: Sponsor | null | Promise<Sponsor | null>;
+  declare sponsoredMember: Member | null | Promise<Member | null>;
+  declare category: Category | null | Promise<Category | null>;
   declare favorites: AssociationProxy<Member>;
   declare customMemberships: AssociationProxy<Membership>;
   declare customFavorites: AssociationProxy<Member>;

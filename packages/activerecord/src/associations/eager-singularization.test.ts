@@ -68,7 +68,7 @@ describe("EagerSingularizationTest", () => {
   class Virus extends Base {
     declare octopus_id: number | null;
     declare species: string | null;
-    declare octopus: Octopus | null;
+    declare octopus: Octopus | null | Promise<Octopus | null>;
 
     static {
       this.attribute("octopus_id", "integer");
@@ -78,7 +78,7 @@ describe("EagerSingularizationTest", () => {
   }
   class Octopus extends Base {
     declare species: string | null;
-    declare virus: Virus | null;
+    declare virus: Virus | null | Promise<Virus | null>;
 
     static {
       this.attribute("species", "string");
@@ -88,7 +88,7 @@ describe("EagerSingularizationTest", () => {
   class Pass extends Base {
     declare bus_id: number | null;
     declare rides: number | null;
-    declare bus: Bus | null;
+    declare bus: Bus | null | Promise<Bus | null>;
 
     static {
       this.attribute("bus_id", "integer");
@@ -134,8 +134,8 @@ describe("EagerSingularizationTest", () => {
   class Analysis extends Base {
     declare crisis_id: number | null;
     declare success_id: number | null;
-    declare crisis: Crisis | null;
-    declare success: Success | null;
+    declare crisis: Crisis | null | Promise<Crisis | null>;
+    declare success: Success | null | Promise<Success | null>;
 
     static {
       this.attribute("crisis_id", "integer");
@@ -157,7 +157,7 @@ describe("EagerSingularizationTest", () => {
   }
   class Dress extends Base {
     declare crisis_id: number | null;
-    declare crisis: Crisis | null;
+    declare crisis: Crisis | null | Promise<Crisis | null>;
     declare compresses: AssociationProxy<Compress>;
 
     static {
@@ -168,7 +168,7 @@ describe("EagerSingularizationTest", () => {
   }
   class Compress extends Base {
     declare dress_id: number | null;
-    declare dress: Dress | null;
+    declare dress: Dress | null | Promise<Dress | null>;
 
     static {
       this.attribute("dress_id", "integer");

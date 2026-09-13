@@ -3,8 +3,11 @@ import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import { Base } from "../../base.js";
 
 export class DlKeyedJoin extends Base {
-  declare destroyAsyncParent: DestroyAsyncParent | null;
-  declare dlKeyedHasManyThrough: DlKeyedHasManyThrough | null;
+  declare destroyAsyncParent: DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
+  declare dlKeyedHasManyThrough:
+    | DlKeyedHasManyThrough
+    | null
+    | Promise<DlKeyedHasManyThrough | null>;
   declare destroy_async_parent_id: number;
   declare dl_keyed_has_many_through_id: number;
   declare joins_key: number;

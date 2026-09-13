@@ -142,9 +142,9 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "thing.ts", {
       isKnownTarget: (name) => name === "Base" || name === "Owner",
     });
-    expect(text).toMatch(/declare otherThing: Base \| null;/);
+    expect(text).toMatch(/declare otherThing: Base \| null \| Promise<Base \| null>;/);
     expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
-    expect(text).toMatch(/declare owner: Owner \| null;/);
+    expect(text).toMatch(/declare owner: Owner \| null \| Promise<Owner \| null>;/);
     expect(text).not.toMatch(/OtherThing/);
     expect(text).not.toMatch(/Gadget/);
   });
@@ -164,8 +164,12 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "ab.ts", {
       isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
     });
-    expect(text).toMatch(/class A extends Base \{\s*declare widget: Widget \| null;/);
-    expect(text).toMatch(/class B extends Base \{\s*declare widget: Base \| null;/);
+    expect(text).toMatch(
+      /class A extends Base \{\s*declare widget: Widget \| null \| Promise<Widget \| null>;/,
+    );
+    expect(text).toMatch(
+      /class B extends Base \{\s*declare widget: Base \| null \| Promise<Base \| null>;/,
+    );
   });
 
   test("integer FK attribute() declare widens to PrimaryKeyValue", () => {
@@ -191,7 +195,7 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "thing.ts");
-    expect(text).toMatch(/declare otherThing: OtherThing \| null;/);
+    expect(text).toMatch(/declare otherThing: OtherThing \| null \| Promise<OtherThing \| null>;/);
   });
 
   test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
@@ -589,7 +593,7 @@ describe("virtualize — materializing-generator gaps", () => {
       "}\n";
     const aliases = new Map([["EsOctopus", "Octopus"]]);
     const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
-    expect(text).toContain("declare octopus: Octopus | null;");
+    expect(text).toContain("declare octopus: Octopus | null | Promise<Octopus | null>;");
     expect(text).not.toMatch(/declare octopus: EsOctopus/);
   });
 
@@ -620,7 +624,7 @@ describe("virtualize — materializing-generator gaps", () => {
       globalSuperNameOf,
     });
     expect(text.slice(text.indexOf("class SpecialComment"))).toContain(
-      "declare post: SpecialPost | null;",
+      "declare post: SpecialPost | null | Promise<SpecialPost | null>;",
     );
   });
 
@@ -641,7 +645,9 @@ describe("virtualize — materializing-generator gaps", () => {
     const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
     const midBody = text.slice(text.indexOf("class Mid"), text.indexOf("class Leaf"));
     expect(midBody).not.toMatch(/declare post:/);
-    expect(text.slice(text.indexOf("class Leaf"))).toContain("declare post: SpecialPost | null;");
+    expect(text.slice(text.indexOf("class Leaf"))).toContain(
+      "declare post: SpecialPost | null | Promise<SpecialPost | null>;",
+    );
   });
 });
 

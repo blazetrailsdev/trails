@@ -21,9 +21,9 @@ import { Range } from "@blazetrails/ruby-compat";
 export class Developer extends Base {
   declare updated_at: any;
   declare projects: AssociationProxy<Project>;
-  declare mentor: Mentor | null;
-  declare strictLoadingMentor: Mentor | null;
-  declare strictLoadingOffMentor: Mentor | null;
+  declare mentor: Mentor | null | Promise<Mentor | null>;
+  declare strictLoadingMentor: Mentor | null | Promise<Mentor | null>;
+  declare strictLoadingOffMentor: Mentor | null | Promise<Mentor | null>;
   declare sharedComputers: AssociationProxy<Computer>;
   declare computers: AssociationProxy<Computer>;
   declare projectsExtendedByName: AssociationProxy<Project>;
@@ -40,9 +40,9 @@ export class Developer extends Base {
   declare firms: AssociationProxy<Firm>;
   declare comments: AssociationProxy<Comment>;
   declare ratings: AssociationProxy<Rating>;
-  declare ship: Ship | null;
-  declare strictLoadingShip: Ship | null;
-  declare firm: Firm | null;
+  declare ship: Ship | null | Promise<Ship | null>;
+  declare strictLoadingShip: Ship | null | Promise<Ship | null>;
+  declare firm: Firm | null | Promise<Firm | null>;
   declare contractedProjects: AssociationProxy<Project>;
   declare static jamises: () => Relation<Developer>;
   declare lastName: string;
@@ -219,8 +219,8 @@ export class SymbolIgnoredDeveloper extends Base {
 }
 
 export class AuditLog extends Base {
-  declare developer: Developer | null;
-  declare unvalidatedDeveloper: Developer | null;
+  declare developer: Developer | null | Promise<Developer | null>;
+  declare unvalidatedDeveloper: Developer | null | Promise<Developer | null>;
   declare developer_id: number;
   declare message: string;
   declare unvalidated_developer_id: number;
@@ -232,7 +232,7 @@ export class AuditLog extends Base {
 }
 
 export class AuditLogRequired extends Base {
-  declare developer: Developer | null;
+  declare developer: Developer | null | Promise<Developer | null>;
 
   static {
     this.tableName = "audit_logs";

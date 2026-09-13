@@ -5,8 +5,8 @@ import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
 export class Account extends Base {
-  declare firm: Company | null;
-  declare unautosavedFirm: Firm | null;
+  declare firm: Company | null | Promise<Company | null>;
+  declare unautosavedFirm: Firm | null | Promise<Firm | null>;
   declare static open: () => Relation<Account>;
   declare static available: () => Relation<Account>;
   declare credit_limit: number;

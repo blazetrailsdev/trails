@@ -2,9 +2,9 @@ import type { DogLover } from "./dog-lover.js";
 import { Base } from "../../base.js";
 
 export class Dog extends Base {
-  declare breeder: DogLover | null;
-  declare trainer: DogLover | null;
-  declare doglover: DogLover | null;
+  declare breeder: DogLover | null | Promise<DogLover | null>;
+  declare trainer: DogLover | null | Promise<DogLover | null>;
+  declare doglover: DogLover | null | Promise<DogLover | null>;
   declare alias: string;
   declare breeder_id: number;
   declare dog_lover_id: number;

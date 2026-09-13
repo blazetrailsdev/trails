@@ -810,7 +810,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class AiCpkOrderAgreement extends Base {
       declare order_id: number | null;
       declare signature: string | null;
-      declare order: AiCpkOrder | null;
+      declare order: AiCpkOrder | null | Promise<AiCpkOrder | null>;
 
       static {
         this._tableName = "cpk_order_agreements";
@@ -866,7 +866,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       declare title: string | null;
       declare order_id: number | null;
       declare shop_id: number | null;
-      declare order: AiCpkTwoOrder | null;
+      declare order: AiCpkTwoOrder | null | Promise<AiCpkTwoOrder | null>;
 
       static {
         this._tableName = "cpk_books";
@@ -919,7 +919,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class CpkOrderPk extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBookFk: CpkBookFk | null;
+      declare cpkBookFk: CpkBookFk | null | Promise<CpkBookFk | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -1077,7 +1077,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("should save parent but not invalid child", async () => {
     class PFirm extends Base {
       declare name: string | null;
-      declare pAccount: PAccount | null;
+      declare pAccount: PAccount | null | Promise<PAccount | null>;
 
       static {
         this._tableName = "companies";
@@ -1219,7 +1219,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("callbacks on child when parent autosaves child", async () => {
     const eye = await Eye.createBang({ iris: new Iris() });
-    const iris = eye.iris;
+    const iris = await eye.iris;
     expect(iris?.beforeValidationCallbacksCounter).toBe(1);
     expect(iris?.beforeCreateCallbacksCounter).toBe(1);
     expect(iris?.beforeSaveCallbacksCounter).toBe(1);
@@ -1245,7 +1245,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const log: string[] = [];
     class PolyParent extends Base {
       declare name: string | null;
-      declare polyChild: PolyChild | null;
+      declare polyChild: PolyChild | null | Promise<PolyChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1261,7 +1261,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class PolyChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
+      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1316,7 +1316,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class CbPet extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare cbOwner: CbOwner | null;
+      declare cbOwner: CbOwner | null | Promise<CbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -1356,7 +1356,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const log: string[] = [];
     class PolyAsParent extends Base {
       declare name: string | null;
-      declare polyAsChild: PolyAsChild | null;
+      declare polyAsChild: PolyAsChild | null | Promise<PolyAsChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1383,7 +1383,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class PolyAsChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
+      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1526,7 +1526,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class DualPirate extends Base {
       declare catchphrase: string | null;
-      declare dualValidShip: DualValidShip | null;
+      declare dualValidShip: DualValidShip | null | Promise<DualValidShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -1590,7 +1590,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class DeepPirate extends Base {
       declare catchphrase: string | null;
-      declare deepShip: DeepShip | null;
+      declare deepShip: DeepShip | null | Promise<DeepShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -1682,7 +1682,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     class SwapChef extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null;
+      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1696,7 +1696,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class SwapCakeDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null;
+      declare chef: SwapChef | null | Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1711,7 +1711,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class SwapDrinkDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null;
+      declare chef: SwapChef | null | Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1824,7 +1824,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class FlexPost extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare flexAuthor: FlexAuthor | null;
+      declare flexAuthor: FlexAuthor | null | Promise<FlexAuthor | null>;
 
       static {
         this._tableName = "books";
@@ -1941,7 +1941,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class PolySponsor extends Base {
       declare sponsorable_id: number | null;
       declare sponsorable_type: string | null;
-      declare sponsorable: Base | null;
+      declare sponsorable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "sponsors";
@@ -1991,7 +1991,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class CpkOrder2 extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBook2: CpkBook2 | null;
+      declare cpkBook2: CpkBook2 | null | Promise<CpkBook2 | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -2429,7 +2429,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
       class BaseErrorsPerson extends Base {
         declare name: string | null;
-        declare reference: BaseErrorsReference | null;
+        declare reference: BaseErrorsReference | null | Promise<BaseErrorsReference | null>;
 
         static {
           this._tableName = "people";
@@ -2482,7 +2482,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave works even when other callbacks update the parent model", async () => {
     class CallbackPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null;
+      declare ship: CanonicalShip | null | Promise<CanonicalShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -2524,7 +2524,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class ContextReference extends Base {
       declare person_id: number | null;
-      declare person: ContextPerson | null;
+      declare person: ContextPerson | null | Promise<ContextPerson | null>;
 
       static {
         this._tableName = "references";
@@ -2607,7 +2607,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class AutosaveProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
+      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2690,7 +2690,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class DuplicateCallbackProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
+      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2859,7 +2859,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class PrisonerCyclic extends Base {
       declare ship_id: number | null;
-      declare ship: ShipCyclic | null;
+      declare ship: ShipCyclic | null | Promise<ShipCyclic | null>;
 
       static {
         this._tableName = "prisoners";
@@ -2910,7 +2910,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     class GcShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare pirate: GcPirate | null;
+      declare pirate: GcPirate | null | Promise<GcPirate | null>;
       declare parts: AssociationProxy<GcPart>;
 
       static {
@@ -3053,7 +3053,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it("should generate validation methods for has_one associations with :validate => true", async () => {
     class VoParent extends Base {
       declare name: string | null;
-      declare voChild: VoChild | null;
+      declare voChild: VoChild | null | Promise<VoChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3087,7 +3087,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
     class NvParent extends Base {
       declare name: string | null;
-      declare nvChild: NvChild | null;
+      declare nvChild: NvChild | null | Promise<NvChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3131,7 +3131,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     class BvChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare bvOwner: BvOwner | null;
+      declare bvOwner: BvOwner | null | Promise<BvOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3165,7 +3165,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     class NbChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare nbOwner: NbOwner | null;
+      declare nbOwner: NbOwner | null | Promise<NbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3230,7 +3230,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   function makeModels() {
     class GgPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: GgShip | null;
+      declare ship: GgShip | null | Promise<GgShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -3241,7 +3241,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     class GgShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare part: GgPart | null;
+      declare part: GgPart | null | Promise<GgPart | null>;
 
       static {
         this._tableName = "ships";
@@ -3359,7 +3359,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     class DisabledProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null;
+      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -3423,7 +3423,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     const log: string[] = [];
     class AcPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null;
+      declare ship: CanonicalShip | null | Promise<CanonicalShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -3632,8 +3632,8 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     }
     class HotMember extends Base {
       declare name: string | null;
-      declare hotDetail: HotDetail | null;
-      declare hotOrg: Base | null;
+      declare hotDetail: HotDetail | null | Promise<HotDetail | null>;
+      declare hotOrg: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "authors";
@@ -3652,8 +3652,8 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     class HotDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare hotOrg: HotOrg | null;
-      declare hotMember: HotMember | null;
+      declare hotOrg: HotOrg | null | Promise<HotOrg | null>;
+      declare hotMember: HotMember | null | Promise<HotMember | null>;
 
       static {
         this._tableName = "contracts";
@@ -3686,8 +3686,8 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   it("should not reversed has one through model", async () => {
     class RevOrg extends Base {
       declare name: string | null;
-      declare revDetail: RevDetail | null;
-      declare revMember: Base | null;
+      declare revDetail: RevDetail | null | Promise<RevDetail | null>;
+      declare revMember: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "companies";
@@ -3714,8 +3714,8 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     class RevDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare revOrg: RevOrg | null;
-      declare revMember: RevMember | null;
+      declare revOrg: RevOrg | null | Promise<RevOrg | null>;
+      declare revMember: RevMember | null | Promise<RevMember | null>;
 
       static {
         this._tableName = "contracts";
@@ -3795,7 +3795,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
     class Comment extends Base {
       declare body: string | null;
       declare post_id: number | null;
-      declare post: Post | null;
+      declare post: Post | null | Promise<Post | null>;
 
       postCommentsCount?: number;
       static {
@@ -3838,7 +3838,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
     class BtRecord extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare btOwner: BtOwner | null;
+      declare btOwner: BtOwner | null | Promise<BtOwner | null>;
 
       static {
         this._tableName = "books";
@@ -4513,7 +4513,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcOwner extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcChild: QcChild | null;
+      declare qcChild: QcChild | null | Promise<QcChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4557,7 +4557,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcNoCollapse extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcNoCollapseChild: QcNoCollapseChild | null;
+      declare qcNoCollapseChild: QcNoCollapseChild | null | Promise<QcNoCollapseChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4601,7 +4601,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcTenant extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcTenantRecord: QcTenantRecord | null;
+      declare qcTenantRecord: QcTenantRecord | null | Promise<QcTenantRecord | null>;
 
       static {
         this._tableName = "nodes";

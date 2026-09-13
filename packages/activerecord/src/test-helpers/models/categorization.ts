@@ -6,12 +6,12 @@ import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
 export class Categorization extends Base {
-  declare post: Post | null;
-  declare category: Category | null;
-  declare namedCategory: Category | null;
-  declare author: Author | null;
+  declare post: Post | null | Promise<Post | null>;
+  declare category: Category | null | Promise<Category | null>;
+  declare namedCategory: Category | null | Promise<Category | null>;
+  declare author: Author | null | Promise<Author | null>;
   declare postTaggings: AssociationProxy<Tagging>;
-  declare authorUsingCustomPk: Author | null;
+  declare authorUsingCustomPk: Author | null | Promise<Author | null>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
   declare author_id: number;
   declare category_id: number;
@@ -43,8 +43,8 @@ export class Categorization extends Base {
 }
 
 export class SpecialCategorization extends Base {
-  declare author: Author | null;
-  declare category: Category | null;
+  declare author: Author | null | Promise<Author | null>;
+  declare category: Category | null | Promise<Category | null>;
 
   static {
     this._tableName = "categorizations";

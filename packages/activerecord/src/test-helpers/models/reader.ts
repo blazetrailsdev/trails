@@ -6,10 +6,10 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
 export class Reader extends Base {
-  declare post: Post | null;
-  declare person: Person | null;
-  declare singlePerson: Person | null;
-  declare firstPost: FirstPost | null;
+  declare post: Post | null | Promise<Post | null>;
+  declare person: Person | null | Promise<Person | null>;
+  declare singlePerson: Person | null | Promise<Person | null>;
+  declare firstPost: FirstPost | null | Promise<FirstPost | null>;
   declare first_post_id: number;
   declare person_id: number;
   declare post_id: number;
@@ -28,8 +28,8 @@ export class Reader extends Base {
 }
 
 export class SecureReader extends Base {
-  declare securePost: Post | null;
-  declare securePerson: Person | null;
+  declare securePost: Post | null | Promise<Post | null>;
+  declare securePerson: Person | null | Promise<Person | null>;
 
   static {
     this._tableName = "readers";
@@ -44,8 +44,8 @@ export class SecureReader extends Base {
 
 export class LazyReader extends Base {
   declare static skimmersOrNot: () => Relation<LazyReader>;
-  declare post: Post | null;
-  declare person: Person | null;
+  declare post: Post | null | Promise<Post | null>;
+  declare person: Person | null | Promise<Person | null>;
 
   static {
     this._tableName = "readers";

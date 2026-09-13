@@ -11,9 +11,9 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
 export class Ship extends Base {
-  declare pirate: Pirate | null;
-  declare updateOnlyPirate: Pirate | null;
-  declare developer: Developer | null;
+  declare pirate: Pirate | null | Promise<Pirate | null>;
+  declare updateOnlyPirate: Pirate | null | Promise<Pirate | null>;
+  declare developer: Developer | null | Promise<Developer | null>;
   declare parts: AssociationProxy<ShipPart>;
   declare treasures: AssociationProxy<Treasure>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
@@ -73,7 +73,7 @@ export class ShipWithoutNestedAttributes extends Base {
 }
 
 export class Prisoner extends Base {
-  declare ship: ShipWithoutNestedAttributes | null;
+  declare ship: ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
   declare ship_id: number;
 
   static {
@@ -86,7 +86,7 @@ export class Prisoner extends Base {
 }
 
 export class FamousShip extends Base {
-  declare famousPirate: FamousPirate | null;
+  declare famousPirate: FamousPirate | null | Promise<FamousPirate | null>;
 
   static {
     this.tableName = "ships";

@@ -411,7 +411,7 @@ class Post extends Base {
   declare featured: boolean; // attribute (backs the named scope below)
   declare status: number; // enum is stored as an integer; defineEnum
   //                        does not override the accessor (unlike Base.enum)
-  declare author: Author | null; // belongsTo reader — the loaded record,
+  declare author: Author | null | Promise<Author | null>; // belongsTo reader — the loaded record,
   //                                or a Promise that loads it
   declare comments: AssociationProxy<Comment>;
   // hasMany reader — chainable (`.where(...)`), awaitable

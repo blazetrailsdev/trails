@@ -5,12 +5,12 @@ import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
 export class Tagging extends Base {
-  declare tag: Tag | null;
-  declare superTag: Tag | null;
-  declare invalidTag: Tag | null;
-  declare orderedTag: OrderedTag | null;
-  declare blueTag: Tag | null;
-  declare tagWithPrimaryKey: Tag | null;
+  declare tag: Tag | null | Promise<Tag | null>;
+  declare superTag: Tag | null | Promise<Tag | null>;
+  declare invalidTag: Tag | null | Promise<Tag | null>;
+  declare orderedTag: OrderedTag | null | Promise<OrderedTag | null>;
+  declare blueTag: Tag | null | Promise<Tag | null>;
+  declare tagWithPrimaryKey: Tag | null | Promise<Tag | null>;
   declare things: AssociationProxy<Base>;
   declare comment: string;
   declare super_tag_id: number;
@@ -19,7 +19,7 @@ export class Tagging extends Base {
   declare tag_id: number;
   declare taggable_id: number;
   declare taggable_type: string;
-  declare taggable: Base | null;
+  declare taggable: Base | null | Promise<Base | null>;
 
   static {
     this.belongsTo("tag", (q: any) => q.includes(":tagging"));

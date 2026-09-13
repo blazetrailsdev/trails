@@ -6,17 +6,17 @@ import { Base } from "../../base.js";
 
 export class Human extends Base {
   declare name: string;
-  declare face: Face | null;
-  declare autosaveFace: Face | null;
-  declare polymorphicFace: Face | null;
-  declare polymorphicFaceWithoutInverse: Face | null;
+  declare face: Face | null | Promise<Face | null>;
+  declare autosaveFace: Face | null | Promise<Face | null>;
+  declare polymorphicFace: Face | null | Promise<Face | null>;
+  declare polymorphicFaceWithoutInverse: Face | null | Promise<Face | null>;
   declare interests: AssociationProxy<Interest>;
   declare interestsWithCallbacks: AssociationProxy<Interest>;
   declare polymorphicInterests: AssociationProxy<Interest>;
   declare polymorphicInterestsWithCallbacks: AssociationProxy<Interest>;
-  declare confusedFace: Face | null;
+  declare confusedFace: Face | null | Promise<Face | null>;
   declare secretInterests: AssociationProxy<Interest>;
-  declare mixedCaseMonkey: MixedCaseMonkey | null;
+  declare mixedCaseMonkey: MixedCaseMonkey | null | Promise<MixedCaseMonkey | null>;
 
   static _tableName = "humans";
 

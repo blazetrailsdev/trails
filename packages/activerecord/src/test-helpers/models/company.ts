@@ -31,8 +31,8 @@ export class Company extends AbstractCompany {
   declare suspendedBang: () => Promise<true>;
   declare static suspended: () => Relation<Company>;
   declare static notSuspended: () => Relation<Company>;
-  declare account: Account | null;
-  declare dummyAccount: Account | null;
+  declare account: Account | null | Promise<Account | null>;
+  declare dummyAccount: Account | null | Promise<Account | null>;
   declare contracts: AssociationProxy<Contract>;
   declare developers: AssociationProxy<Developer>;
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -125,22 +125,22 @@ export class Firm extends Company {
   declare clientsUsingPrimaryKeyWithDeleteAll: AssociationProxy<Client>;
   declare clientsGroupedByFirmId: AssociationProxy<Client>;
   declare clientsGroupedByName: AssociationProxy<Client>;
-  declare account: Account | null;
-  declare unvalidatedAccount: Account | null;
-  declare accountWithSelect: Account | null;
-  declare readonlyAccount: Account | null;
-  declare accountUsingPrimaryKey: Account | null;
-  declare accountUsingForeignAndPrimaryKeys: Account | null;
-  declare accountWithInexistentForeignKey: Account | null;
-  declare deletableAccount: Account | null;
-  declare client: Client | null;
-  declare accountLimit500WithHashConditions: Account | null;
-  declare unautosavedAccount: Account | null;
+  declare account: Account | null | Promise<Account | null>;
+  declare unvalidatedAccount: Account | null | Promise<Account | null>;
+  declare accountWithSelect: Account | null | Promise<Account | null>;
+  declare readonlyAccount: Account | null | Promise<Account | null>;
+  declare accountUsingPrimaryKey: Account | null | Promise<Account | null>;
+  declare accountUsingForeignAndPrimaryKeys: Account | null | Promise<Account | null>;
+  declare accountWithInexistentForeignKey: Account | null | Promise<Account | null>;
+  declare deletableAccount: Account | null | Promise<Account | null>;
+  declare client: Client | null | Promise<Client | null>;
+  declare accountLimit500WithHashConditions: Account | null | Promise<Account | null>;
+  declare unautosavedAccount: Account | null | Promise<Account | null>;
   declare accounts: AssociationProxy<Account>;
   declare unautosavedAccounts: AssociationProxy<Account>;
   declare associationWithReferences: AssociationProxy<Client>;
   declare developersWithSelect: AssociationProxy<Developer>;
-  declare leadDeveloper: Developer | null;
+  declare leadDeveloper: Developer | null | Promise<Developer | null>;
   declare projects: AssociationProxy<Project>;
 
   _log: string[] = [];
@@ -288,9 +288,9 @@ export class Firm extends Company {
 }
 
 export class DependentFirm extends Company {
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
-  declare company: Company | null;
+  declare company: Company | null | Promise<Company | null>;
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -303,7 +303,7 @@ export class DependentFirm extends Company {
 }
 
 export class RestrictedWithExceptionFirm extends Company {
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
 
   static {
@@ -319,7 +319,7 @@ export class RestrictedWithExceptionFirm extends Company {
 }
 
 export class RestrictedWithErrorFirm extends Company {
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
 
   static {
@@ -342,17 +342,17 @@ export class Agency extends Firm {
 acceptsNestedAttributesFor(Agency, "projects");
 
 export class Client extends Company {
-  declare firm: Firm | null;
-  declare firmWithBasicId: Firm | null;
-  declare firmWithSelect: Firm | null;
-  declare firmWithOtherName: Firm | null;
-  declare firmWithCondition: Firm | null;
-  declare firmWithPrimaryKey: Firm | null;
-  declare firmWithPrimaryKeySymbols: Firm | null;
-  declare readonlyFirm: Firm | null;
-  declare bobFirm: Firm | null;
+  declare firm: Firm | null | Promise<Firm | null>;
+  declare firmWithBasicId: Firm | null | Promise<Firm | null>;
+  declare firmWithSelect: Firm | null | Promise<Firm | null>;
+  declare firmWithOtherName: Firm | null | Promise<Firm | null>;
+  declare firmWithCondition: Firm | null | Promise<Firm | null>;
+  declare firmWithPrimaryKey: Firm | null | Promise<Firm | null>;
+  declare firmWithPrimaryKeySymbols: Firm | null | Promise<Firm | null>;
+  declare readonlyFirm: Firm | null | Promise<Firm | null>;
+  declare bobFirm: Firm | null | Promise<Firm | null>;
   declare accounts: AssociationProxy<Account>;
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
 
   raiseOnSave = false;
   throwOnSave = false;
@@ -442,7 +442,7 @@ export class Client extends Company {
 }
 
 export class ExclusivelyDependentFirm extends Company {
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
   declare dependentSanitizedConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentHashConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentConditionalClientsOfFirm: AssociationProxy<Client>;

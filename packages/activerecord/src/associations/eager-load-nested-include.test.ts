@@ -13,8 +13,8 @@ class ShapeExpression extends Base {
   declare shape_id: number;
   declare paint_type: string;
   declare paint_id: number;
-  declare shape: Base | null;
-  declare paint: Base | null;
+  declare shape: Base | null | Promise<Base | null>;
+  declare paint: Base | null | Promise<Base | null>;
 
   static {
     this._tableName = "shape_expressions";
@@ -43,7 +43,7 @@ class Triangle extends Base {
 }
 class PaintColor extends Base {
   declare non_poly_one_id: number;
-  declare nonPoly: NonPolyOne | null;
+  declare nonPoly: NonPolyOne | null | Promise<NonPolyOne | null>;
 
   static {
     this._tableName = "paint_colors";
@@ -56,7 +56,7 @@ class PaintColor extends Base {
 }
 class PaintTexture extends Base {
   declare non_poly_two_id: number;
-  declare nonPoly: NonPolyTwo | null;
+  declare nonPoly: NonPolyTwo | null | Promise<NonPolyTwo | null>;
 
   static {
     this._tableName = "paint_textures";

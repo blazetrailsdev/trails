@@ -6,7 +6,7 @@ import { Base } from "../../base.js";
 export class Tag extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggables: AssociationProxy<Base>;
-  declare tagging: Tagging | null;
+  declare tagging: Tagging | null | Promise<Tagging | null>;
   declare taggedPosts: AssociationProxy<Post>;
   declare nullTaggings: AssociationProxy<Tagging>;
   declare nullTaggedPosts: AssociationProxy<Post>;

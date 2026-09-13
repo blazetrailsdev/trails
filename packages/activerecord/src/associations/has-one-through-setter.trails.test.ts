@@ -60,7 +60,7 @@ describe("HasOneThroughSetterTrails", () => {
     await (member as unknown as AwaitableClubSetter).setClub(club);
 
     expect(member.club).toBe(club);
-    const built = member.currentMembership;
+    const built = await member.currentMembership;
     expect(built).not.toBeNull();
     expect(built!.isNewRecord()).toBe(true);
     expect(await rowCount()).toBe(before);

@@ -621,7 +621,7 @@ describe("InheritanceAttributeMappingTest", () => {
   registerSubclass(IamtEmpire);
 
   class IamtSponsor extends Base {
-    declare sponsorable: Base | null;
+    declare sponsorable: Base | null | Promise<Base | null>;
 
     static {
       this.tableName = "sponsors";

@@ -81,7 +81,7 @@ class CarPolymorphicName extends Base {
 }
 
 class WheelPolymorphicName extends Base {
-  declare wheelable: Base | null;
+  declare wheelable: Base | null | Promise<Base | null>;
   declare wheelable_id: number;
   declare wheelable_type: string;
   static {
@@ -351,7 +351,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("optional relation can be set per model", async () => {
     class FirstModel extends Base {
-      declare company: Company | null;
+      declare company: Company | null | Promise<Company | null>;
 
       static _tableName = "accounts";
       static {
@@ -360,7 +360,7 @@ describe("BelongsToAssociationsTest", () => {
       }
     }
     class SecondModel extends Base {
-      declare company: Company | null;
+      declare company: Company | null | Promise<Company | null>;
 
       static _tableName = "accounts";
       static {
@@ -380,7 +380,7 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null;
+        declare company: Company | null | Promise<Company | null>;
 
         static _tableName = "accounts";
         static {
@@ -399,7 +399,7 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null;
+        declare company: Company | null | Promise<Company | null>;
 
         static _tableName = "accounts";
         static {
@@ -419,7 +419,7 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null;
+        declare company: Company | null | Promise<Company | null>;
 
         static _tableName = "accounts";
         static {
@@ -439,7 +439,7 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = await Developer.find(developers("jamis").id);
 
     class TempDefault extends Base {
-      declare developer: Developer | null;
+      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
@@ -459,7 +459,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("default with lambda", async () => {
     class TempDefault extends Base {
-      declare developer: Developer | null;
+      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
@@ -488,7 +488,7 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = await Developer.find(developers("jamis").id);
 
     class TempDefault extends Base {
-      declare developer: Developer | null;
+      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
@@ -715,10 +715,10 @@ describe("BelongsToAssociationsTest", () => {
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
-    expect(odegyAccount.firm!.name).toBe("Odegy");
+    expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
     await (odegyAccount as any).reloadFirm();
-    expect(odegyAccount.firm!.name).toBe("ODEGY");
+    expect((await odegyAccount.firm)!.name).toBe("ODEGY");
   });
 
   it("reload the belonging object with query cache", async () => {
@@ -751,7 +751,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
-    expect(odegyAccount.firm!.name).toBe("Odegy");
+    expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
     (odegyAccount as any).resetFirm();
     expect((await odegyAccount.firm)!.name).toBe("ODEGY");
@@ -1334,11 +1334,11 @@ describe("BelongsToAssociationsTest", () => {
 
     expect(Number(david.id)).toBe(1);
     expect(Number((comment as any).author_id)).toBe(1);
-    expect((await Comment.includes(":author").first())!.author!.id).toBe(david.id);
+    expect((await (await Comment.includes(":author").first())!.author)!.id).toBe(david.id);
 
     expect(Number(groucho.id)).toBe(1);
     expect((comment as any).resource_id).toBe("1");
-    expect((await Comment.includes(":resource").first())!.resource!.id).toBe(groucho.id);
+    expect((await (await Comment.includes(":resource").first())!.resource)!.id).toBe(groucho.id);
   });
 
   it("polymorphic assignment foreign type field updating", async () => {
@@ -1839,7 +1839,7 @@ describe("BelongsToAssociationsTest", () => {
   it("polymorphic with false", async () => {
     expect(() => {
       class TempPost extends Base {
-        declare category: Category | null;
+        declare category: Category | null | Promise<Category | null>;
 
         static _tableName = "posts";
         static {
@@ -2007,7 +2007,7 @@ describe("BelongsToAssociationsTest", () => {
   it("runs parent presence check if parent changed or nil", async () => {
     class ShipRequired extends Base {
       declare name: any;
-      declare developer: Developer | null;
+      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
@@ -2037,7 +2037,7 @@ describe("BelongsToAssociationsTest", () => {
   it("skips parent presence check if parent has not changed", async () => {
     class ShipRequired extends Base {
       declare name: any;
-      declare developer: Developer | null;
+      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
@@ -2062,7 +2062,7 @@ describe("BelongsToAssociationsTest", () => {
     try {
       class TempShip extends Base {
         declare name: any;
-        declare developer: Developer | null;
+        declare developer: Developer | null | Promise<Developer | null>;
 
         static _tableName = "ships";
         static {

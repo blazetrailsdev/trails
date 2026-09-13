@@ -29,15 +29,18 @@ export class Comment extends Base {
   declare static orderedByPostId: () => Relation<Comment>;
   declare static allAsScope: () => Relation<Comment>;
   declare static oopsComments: () => Relation<Comment>;
-  declare post: Post | null;
-  declare resource: Base | null;
-  declare origin: Base | null;
-  declare company: Company | null;
+  declare post: Post | null | Promise<Post | null>;
+  declare resource: Base | null | Promise<Base | null>;
+  declare origin: Base | null | Promise<Base | null>;
+  declare company: Company | null | Promise<Company | null>;
   declare ratings: AssociationProxy<Rating>;
-  declare firstPost: FirstPost | null;
-  declare specialPostWithDefaultScope: SpecialPostWithDefaultScope | null;
+  declare firstPost: FirstPost | null | Promise<FirstPost | null>;
+  declare specialPostWithDefaultScope:
+    | SpecialPostWithDefaultScope
+    | null
+    | Promise<SpecialPostWithDefaultScope | null>;
   declare children: AssociationProxy<Comment>;
-  declare parent: Comment | null;
+  declare parent: Comment | null | Promise<Comment | null>;
   declare isDefault: () => boolean;
   declare defaultBang: () => Promise<true | undefined>;
   declare static default: () => Relation<Comment>;
@@ -64,7 +67,7 @@ export class Comment extends Base {
 
   declare author_id: number | null;
   declare author_type: string | null;
-  declare author: Base | null;
+  declare author: Base | null | Promise<Base | null>;
 
   static {
     this.scope("limitBy", function (this: any, l: number) {
@@ -135,8 +138,8 @@ export class Comment extends Base {
 }
 
 export class SpecialComment extends Comment {
-  declare ordinaryPost: Post | null;
-  declare author: Author | null;
+  declare ordinaryPost: Post | null | Promise<Post | null>;
+  declare author: Author | null | Promise<Author | null>;
 
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
@@ -167,7 +170,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
 }
 
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
-  declare developer: Developer | null;
+  declare developer: Developer | null | Promise<Developer | null>;
 
   static {
     this.defaultScope((q: any) =>

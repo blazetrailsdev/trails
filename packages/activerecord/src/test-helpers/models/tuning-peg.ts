@@ -2,7 +2,7 @@ import type { Guitar } from "./guitar.js";
 import { Base } from "../../base.js";
 
 export class TuningPeg extends Base {
-  declare guitar: Guitar | null;
+  declare guitar: Guitar | null | Promise<Guitar | null>;
   declare guitar_id: number;
   declare pitch: number;
 

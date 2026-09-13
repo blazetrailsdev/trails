@@ -3,8 +3,8 @@ import type { Subscriber } from "./subscriber.js";
 import { Base } from "../../base.js";
 
 export class Subscription extends Base {
-  declare subscriber: Subscriber | null;
-  declare book: Book | null;
+  declare subscriber: Subscriber | null | Promise<Subscriber | null>;
+  declare book: Book | null | Promise<Book | null>;
   declare book_id: number;
   declare subscriber_id: string;
 

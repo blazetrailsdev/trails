@@ -6,7 +6,7 @@ import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
 
 export class Toy extends Base {
-  declare pet: Pet | null;
+  declare pet: Pet | null | Promise<Pet | null>;
   declare sponsors: AssociationProxy<Sponsor>;
   declare static withPet: () => Relation<Toy>;
   declare created_at: RubyTime | Temporal.PlainDateTime;

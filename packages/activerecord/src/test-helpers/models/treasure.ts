@@ -8,8 +8,8 @@ import { registerModel } from "../../associations.js";
 
 export class Treasure extends Base {
   declare parrots: AssociationProxy<Parrot>;
-  declare looter: Base | null;
-  declare ship: Ship | null;
+  declare looter: Base | null | Promise<Base | null>;
+  declare ship: Ship | null | Promise<Ship | null>;
   declare priceEstimates: AssociationProxy<PriceEstimate>;
   declare richPeople: AssociationProxy<RichPerson>;
   declare looter_id: number;

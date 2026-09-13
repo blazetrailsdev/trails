@@ -26,8 +26,8 @@ export class Pirate extends Base {
   cancelSaveFromCallback: boolean = false;
   declare catchphrase: string;
 
-  declare parrot: Parrot | null;
-  declare nonValidatedParrot: Parrot | null;
+  declare parrot: Parrot | null | Promise<Parrot | null>;
+  declare nonValidatedParrot: Parrot | null | Promise<Parrot | null>;
   declare parrots: AssociationProxy<Parrot>;
   declare nonValidatedParrots: AssociationProxy<Parrot>;
   declare parrotsWithMethodCallbacks: AssociationProxy<Parrot>;
@@ -35,16 +35,16 @@ export class Pirate extends Base {
   declare autosavedParrots: AssociationProxy<Parrot>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;
-  declare ship: Ship | null;
-  declare updateOnlyShip: Ship | null;
-  declare nonValidatedShip: Ship | null;
+  declare ship: Ship | null | Promise<Ship | null>;
+  declare updateOnlyShip: Ship | null | Promise<Ship | null>;
+  declare nonValidatedShip: Ship | null | Promise<Ship | null>;
   declare birds: AssociationProxy<Bird>;
   declare birdsWithMethodCallbacks: AssociationProxy<Bird>;
   declare birdsWithProcCallbacks: AssociationProxy<Bird>;
   declare birdsWithRejectAllBlank: AssociationProxy<Bird>;
-  declare fooBulb: Bulb | null;
+  declare fooBulb: Bulb | null | Promise<Bulb | null>;
   declare mateys: AssociationProxy<Matey>;
-  declare attackerMatey: Matey | null;
+  declare attackerMatey: Matey | null | Promise<Matey | null>;
   declare created_on: RubyTime | Temporal.PlainDateTime;
   declare non_validated_parrot_id: number;
   declare updated_on: RubyTime | Temporal.PlainDateTime;
@@ -167,7 +167,7 @@ acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: tru
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
 export class DestructivePirate extends Pirate {
-  declare dependentShip: Ship | null;
+  declare dependentShip: Ship | null | Promise<Ship | null>;
 
   static {
     this.hasOne("dependentShip", {
@@ -189,9 +189,9 @@ export class FamousPirate extends Base {
 }
 
 export class SpacePirate extends Base {
-  declare parrot: Parrot | null;
+  declare parrot: Parrot | null | Promise<Parrot | null>;
   declare parrots: AssociationProxy<Parrot>;
-  declare ship: Ship | null;
+  declare ship: Ship | null | Promise<Ship | null>;
   declare birds: AssociationProxy<Bird>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;

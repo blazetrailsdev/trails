@@ -4,8 +4,8 @@ import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
 export class Computer extends Base {
-  declare developer: Developer | null;
-  declare firm: Firm | null;
+  declare developer: Developer | null | Promise<Developer | null>;
+  declare firm: Firm | null | Promise<Firm | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare extendedWarranty: number;
   declare system: string;

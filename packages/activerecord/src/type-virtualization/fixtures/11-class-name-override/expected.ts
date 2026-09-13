@@ -1,5 +1,5 @@
 export class Post extends Base {
-  declare writer: Author | null;
+  declare writer: Author | null | Promise<Author | null>;
   declare remarks: import("@blazetrails/activerecord").AssociationProxy<Comment>;
 
   static {

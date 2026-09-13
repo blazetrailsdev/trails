@@ -2,8 +2,8 @@ import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
 
 export class Matey extends Base {
-  declare pirate: Pirate | null;
-  declare target: Pirate | null;
+  declare pirate: Pirate | null | Promise<Pirate | null>;
+  declare target: Pirate | null | Promise<Pirate | null>;
   declare pirate_id: number;
   declare target_id: number;
   declare weight: number;

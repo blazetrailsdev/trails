@@ -4,7 +4,7 @@ import type { Liquid } from "./liquid.js";
 import { Base } from "../../base.js";
 
 export class Molecule extends Base {
-  declare liquid: Liquid | null;
+  declare liquid: Liquid | null | Promise<Liquid | null>;
   declare electrons: AssociationProxy<Electron>;
   declare liquid_id: number;
   declare name: string;

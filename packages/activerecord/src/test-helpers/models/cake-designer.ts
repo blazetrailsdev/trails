@@ -2,7 +2,7 @@ import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
 
 export class CakeDesigner extends Base {
-  declare chef: Chef | null;
+  declare chef: Chef | null | Promise<Chef | null>;
 
   static {
     this.hasOne("chef", { as: "employable" });

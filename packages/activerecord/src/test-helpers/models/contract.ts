@@ -5,9 +5,9 @@ import type { SpecialDeveloper } from "./developer.js";
 import { Base } from "../../base.js";
 
 export class Contract extends Base {
-  declare company: Company | null;
-  declare developer: Developer | null;
-  declare firm: Firm | null;
+  declare company: Company | null | Promise<Company | null>;
+  declare developer: Developer | null | Promise<Developer | null>;
+  declare firm: Firm | null | Promise<Firm | null>;
   declare metadata: unknown;
   declare company_id: number;
   declare count: number;
@@ -55,8 +55,8 @@ export class NewContract extends Contract {
 }
 
 export class SpecialContract extends Base {
-  declare company: Company | null;
-  declare specialDeveloper: SpecialDeveloper | null;
+  declare company: Company | null | Promise<Company | null>;
+  declare specialDeveloper: SpecialDeveloper | null | Promise<SpecialDeveloper | null>;
 
   static {
     this._tableName = "contracts";

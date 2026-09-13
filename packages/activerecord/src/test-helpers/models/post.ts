@@ -28,9 +28,9 @@ import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
 export class CategoryPost extends Base {
-  declare group: Category | null;
-  declare category: Category | null;
-  declare post: Post | null;
+  declare group: Category | null | Promise<Category | null>;
+  declare category: Category | null | Promise<Category | null>;
+  declare post: Post | null | Promise<Post | null>;
 
   static {
     this._tableName = "categories_posts";
@@ -59,14 +59,14 @@ export class Post extends Base {
   declare static taggedWith: (id: number) => Relation<Post>;
   declare static taggedWithComment: (comment: string) => Relation<Post>;
   declare static typographicallyInteresting: () => Relation<Post>;
-  declare author: Author | null;
-  declare readonlyAuthor: Author | null;
-  declare authorWithPosts: Author | null;
-  declare authorWithAddress: Author | null;
-  declare authorWithSelect: Author | null;
-  declare authorWithTheLetterA: Author | null;
+  declare author: Author | null | Promise<Author | null>;
+  declare readonlyAuthor: Author | null | Promise<Author | null>;
+  declare authorWithPosts: Author | null | Promise<Author | null>;
+  declare authorWithAddress: Author | null | Promise<Author | null>;
+  declare authorWithSelect: Author | null | Promise<Author | null>;
+  declare authorWithTheLetterA: Author | null | Promise<Author | null>;
   declare firstComment: Promise<string | null>;
-  declare lastComment: Comment | null;
+  declare lastComment: Comment | null | Promise<Comment | null>;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
   declare commentsWithExtend_2: AssociationProxy<Comment>;
@@ -75,10 +75,19 @@ export class Post extends Base {
   declare authorCategorizations: AssociationProxy<Categorization>;
   declare authorAddresses: AssociationProxy<AuthorAddress>;
   declare authorAddressExtraWithAddress: AssociationProxy<AuthorAddress>;
-  declare verySpecialComment: VerySpecialComment | null;
-  declare verySpecialCommentWithPost: VerySpecialComment | null;
-  declare verySpecialCommentWithPostWithJoins: VerySpecialComment | null;
-  declare verySpecialCommentWithStringJoins: VerySpecialComment | null;
+  declare verySpecialComment: VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  declare verySpecialCommentWithPost:
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  declare verySpecialCommentWithPostWithJoins:
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  declare verySpecialCommentWithStringJoins:
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
   declare commentsWithStringJoins: AssociationProxy<Comment>;
   declare ratingsViaStringJoinComments: AssociationProxy<Rating>;
   declare specialComments: AssociationProxy<SpecialComment>;
@@ -102,7 +111,7 @@ export class Post extends Base {
   declare superTags: AssociationProxy<Tag>;
   declare orderedTags: AssociationProxy<OrderedTag>;
   declare tagsWithPrimaryKey: AssociationProxy<Tag>;
-  declare tagging: Tagging | null;
+  declare tagging: Tagging | null | Promise<Tagging | null>;
   declare firstTaggings: AssociationProxy<Tagging>;
   declare firstBlueTags: AssociationProxy<Tag>;
   declare firstBlueTags_2: AssociationProxy<Tag>;
@@ -115,7 +124,7 @@ export class Post extends Base {
   declare taggingsUsingAuthorId: AssociationProxy<Tagging>;
   declare tagsUsingAuthorId: AssociationProxy<Tag>;
   declare images: AssociationProxy<Image>;
-  declare mainImage: Image | null;
+  declare mainImage: Image | null | Promise<Image | null>;
   declare standardCategorizations: AssociationProxy<Categorization>;
   declare authorUsingCustomPk: AssociationProxy<Author>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
@@ -550,7 +559,7 @@ export class Post extends Base {
 export class SpecialPost extends Post {}
 
 export class StiPost extends Post {
-  declare specialComment: SpecialComment | null;
+  declare specialComment: SpecialComment | null | Promise<SpecialComment | null>;
 
   static {
     this.hasOne("specialComment", { className: "SpecialComment" });
@@ -583,8 +592,8 @@ export class NullPost extends Post {
 
 export class FirstPost extends Base {
   declare comments: AssociationProxy<Comment>;
-  declare comment: Comment | null;
-  declare commentWithInverse: Comment | null;
+  declare comment: Comment | null | Promise<Comment | null>;
+  declare commentWithInverse: Comment | null | Promise<Comment | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -723,7 +732,10 @@ export class PostWithAfterCreateCallback extends Base {
 
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
   declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
-  declare firstComment: CommentWithDefaultScopeReferencesAssociation | null;
+  declare firstComment:
+    | CommentWithDefaultScopeReferencesAssociation
+    | null
+    | Promise<CommentWithDefaultScopeReferencesAssociation | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -764,9 +776,9 @@ export class PostWithDestroyCallback extends Base {
 }
 
 export class Postesque extends Base {
-  declare author: Author | null;
-  declare authorWithAddress: Author | null;
-  declare authorWithTheLetterA: Author | null;
+  declare author: Author | null | Promise<Author | null>;
+  declare authorWithAddress: Author | null | Promise<Author | null>;
+  declare authorWithTheLetterA: Author | null | Promise<Author | null>;
   declare author_id: string;
   declare author_name: string;
 

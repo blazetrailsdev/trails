@@ -10,13 +10,13 @@ import { Notification } from "./notification.js";
 
 export class User extends Base {
   declare jobsPool: AssociationProxy<Job>;
-  declare room: Room | null;
-  declare ownedRoom: Room | null;
-  declare familyTree: FamilyTree | null;
-  declare family: Family | null;
+  declare room: Room | null | Promise<Room | null>;
+  declare ownedRoom: Room | null | Promise<Room | null>;
+  declare familyTree: FamilyTree | null | Promise<FamilyTree | null>;
+  declare family: Family | null | Promise<Family | null>;
   declare familyMembers: AssociationProxy<User>;
-  declare letRoom: Room | null;
-  declare rentedRoom: Room | null;
+  declare letRoom: Room | null | Promise<Room | null>;
+  declare rentedRoom: Room | null | Promise<Room | null>;
   declare auth_token: string;
   declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare password: string | null;

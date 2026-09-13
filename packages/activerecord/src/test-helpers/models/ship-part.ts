@@ -6,7 +6,7 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class ShipPart extends Base {
-  declare ship: Ship | null;
+  declare ship: Ship | null | Promise<Ship | null>;
   declare trinkets: AssociationProxy<Treasure>;
   declare name: string;
   declare ship_id: number;

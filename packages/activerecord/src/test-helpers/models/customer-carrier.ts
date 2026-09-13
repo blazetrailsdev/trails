@@ -3,8 +3,8 @@ import type { Customer } from "./customer.js";
 import { Base } from "../../base.js";
 
 export class CustomerCarrier extends Base {
-  declare customer: Customer | null;
-  declare carrier: Carrier | null;
+  declare customer: Customer | null | Promise<Customer | null>;
+  declare carrier: Carrier | null | Promise<Carrier | null>;
   declare carrier_id: number;
   declare customer_id: number;
 

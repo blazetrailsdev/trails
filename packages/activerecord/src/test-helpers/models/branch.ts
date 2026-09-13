@@ -3,7 +3,7 @@ import { Base } from "../../base.js";
 
 export class Branch extends Base {
   declare branches: AssociationProxy<Branch>;
-  declare branch: Branch | null;
+  declare branch: Branch | null | Promise<Branch | null>;
   declare branch_id: number;
 
   static {
@@ -14,7 +14,7 @@ export class Branch extends Base {
 
 export class BrokenBranch extends Branch {
   declare branches: AssociationProxy<BrokenBranch>;
-  declare branch: BrokenBranch | null;
+  declare branch: BrokenBranch | null | Promise<BrokenBranch | null>;
 
   static {
     this.hasMany("branches", { className: "BrokenBranch", foreignKey: "branch_id" });

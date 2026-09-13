@@ -82,7 +82,7 @@ export class LiveParrot extends Parrot {
 }
 
 export class DeadParrot extends Parrot {
-  declare killer: Pirate | null;
+  declare killer: Pirate | null | Promise<Pirate | null>;
 
   static {
     this.belongsTo("killer", { className: "Pirate", foreignKey: "killer_id" });

@@ -10,13 +10,13 @@ import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
 
 export class Book extends Base {
-  declare author: Author | null;
-  declare formatRecord: Base | null;
+  declare author: Author | null | Promise<Author | null>;
+  declare formatRecord: Base | null | Promise<Base | null>;
   declare citations: AssociationProxy<Citation>;
   declare references: AssociationProxy<Reference>;
   declare subscriptions: AssociationProxy<Subscription>;
   declare subscribers: AssociationProxy<Subscriber>;
-  declare essay: Essay | null;
+  declare essay: Essay | null | Promise<Essay | null>;
   declare isProposed: () => boolean;
   declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<Book>;

@@ -3,8 +3,8 @@ import type { Session } from "./session.js";
 import { Base } from "../../base.js";
 
 export class Section extends Base {
-  declare session: Session | null;
-  declare seminar: Seminar | null;
+  declare session: Session | null | Promise<Session | null>;
+  declare seminar: Seminar | null | Promise<Seminar | null>;
   declare seminar_id: number;
   declare session_id: number;
   declare short_name: string;

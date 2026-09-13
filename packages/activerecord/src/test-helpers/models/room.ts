@@ -2,10 +2,10 @@ import type { User } from "./user.js";
 import { Base } from "../../base.js";
 
 export class Room extends Base {
-  declare user: User | null;
-  declare owner: User | null;
-  declare landlord: User | null;
-  declare tenant: User | null;
+  declare user: User | null | Promise<User | null>;
+  declare owner: User | null | Promise<User | null>;
+  declare landlord: User | null | Promise<User | null>;
+  declare tenant: User | null | Promise<User | null>;
   declare landlord_id: number;
   declare owner_id: number;
   declare tenant_id: number;

@@ -11,7 +11,7 @@ export class Owner extends Base {
   declare pets: AssociationProxy<Pet>;
   declare toys: AssociationProxy<Toy>;
   declare persons: AssociationProxy<Person>;
-  declare lastPet: Pet | null;
+  declare lastPet: Pet | null | Promise<Pet | null>;
   declare static includingLastPet: () => Relation<Owner>;
   declare essay_id: string;
   declare happy_at: RubyTime | Temporal.PlainDateTime;

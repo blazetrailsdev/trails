@@ -3,11 +3,11 @@ import type { Zine } from "./zine.js";
 import { Base } from "../../base.js";
 
 export class Interest extends Base {
-  declare human: Human | null;
-  declare humanWithCallbacks: Human | null;
-  declare polymorphicHuman: Base | null;
-  declare polymorphicHumanWithCallbacks: Base | null;
-  declare zine: Zine | null;
+  declare human: Human | null | Promise<Human | null>;
+  declare humanWithCallbacks: Human | null | Promise<Human | null>;
+  declare polymorphicHuman: Base | null | Promise<Base | null>;
+  declare polymorphicHumanWithCallbacks: Base | null | Promise<Base | null>;
+  declare zine: Zine | null | Promise<Zine | null>;
   declare human_id: number;
   declare polymorphic_human_id: number;
   declare polymorphic_human_type: string;

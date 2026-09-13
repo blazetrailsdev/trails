@@ -2,8 +2,8 @@ import type { BookDestroyAsync } from "./book-destroy-async.js";
 import { Base } from "../../base.js";
 
 export class EssayDestroyAsync extends Base {
-  declare book: BookDestroyAsync | null;
-  declare writer: Base | null;
+  declare book: BookDestroyAsync | null | Promise<BookDestroyAsync | null>;
+  declare writer: Base | null | Promise<Base | null>;
 
   static _tableName = "essays";
 

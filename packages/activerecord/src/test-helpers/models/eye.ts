@@ -11,8 +11,11 @@ function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
 }
 
 export class Eye extends Base {
-  declare iris: Iris | null;
-  declare irisWithReadOnlyForeignKey: IrisWithReadOnlyForeignKey | null;
+  declare iris: Iris | null | Promise<Iris | null>;
+  declare irisWithReadOnlyForeignKey:
+    | IrisWithReadOnlyForeignKey
+    | null
+    | Promise<IrisWithReadOnlyForeignKey | null>;
 
   afterCreateCallbacksStack: boolean[] = [];
   afterUpdateCallbacksStack: boolean[] = [];
@@ -66,7 +69,7 @@ acceptsNestedAttributesFor(Eye, "iris");
 acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
 export class Iris extends Base {
-  declare eye: Eye | null;
+  declare eye: Eye | null | Promise<Eye | null>;
   declare color: string;
   declare eye_id: number;
 

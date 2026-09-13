@@ -376,7 +376,7 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkStudent | null;
+      declare student: NoPkStudent | null | Promise<NoPkStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -423,7 +423,7 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkDelLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkDelStudent | null;
+      declare student: NoPkDelStudent | null | Promise<NoPkDelStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -480,7 +480,7 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkCbLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkCbStudent | null;
+      declare student: NoPkCbStudent | null | Promise<NoPkCbStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -2459,7 +2459,7 @@ describe("HasManyThroughAssociationsTest", () => {
       declare taggable_id: number | null;
       declare taggable_type: string | null;
       declare tag_id: number | null;
-      declare tag: Tag | null;
+      declare tag: Tag | null | Promise<Tag | null>;
 
       static {
         this._tableName = "taggings";

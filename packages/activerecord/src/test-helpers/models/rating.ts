@@ -4,7 +4,7 @@ import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
 export class Rating extends Base {
-  declare comment: Comment | null;
+  declare comment: Comment | null | Promise<Comment | null>;
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithoutTag: AssociationProxy<Tagging>;
   declare taggingsWithNoTag: AssociationProxy<Tagging>;

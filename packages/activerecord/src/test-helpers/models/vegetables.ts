@@ -26,7 +26,7 @@ export class GreenCabbage extends Cabbage {}
 export class KingCole extends GreenCabbage {}
 
 export class RedCabbage extends Cabbage {
-  declare seller: Company | null;
+  declare seller: Company | null | Promise<Company | null>;
 
   static {
     this.belongsTo("seller", { className: "Company" });

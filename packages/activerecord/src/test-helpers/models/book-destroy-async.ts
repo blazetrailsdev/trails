@@ -10,7 +10,7 @@ export class BookDestroyAsync extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
   declare essays: AssociationProxy<EssayDestroyAsync>;
-  declare content: Content | null;
+  declare content: Content | null | Promise<Content | null>;
   declare isProposed: () => boolean;
   declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<BookDestroyAsync>;

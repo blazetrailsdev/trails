@@ -50,7 +50,7 @@ export class Contact extends Base {
   declare avatar: Uint8Array | null;
   declare awesome: boolean | null;
   declare name: string;
-  declare alternative: Contact | null;
+  declare alternative: Contact | null | Promise<Contact | null>;
 
   static column = column;
 }
@@ -58,7 +58,7 @@ export class Contact extends Base {
 await extended(Contact);
 
 export class ContactSti extends Base {
-  declare alternative: Contact | null;
+  declare alternative: Contact | null | Promise<Contact | null>;
 
   static column = column;
 

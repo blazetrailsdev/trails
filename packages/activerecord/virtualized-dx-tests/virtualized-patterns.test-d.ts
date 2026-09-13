@@ -118,14 +118,20 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(author.tags).toEqualTypeOf<AssociationProxy<Tag>>();
   });
 
-  it("belongsTo resolves to Target | null (synchronous reader)", () => {
+  it("belongsTo resolves to Target | null | Promise<Target | null> (lazily loading reader)", async () => {
     const profile = new Profile({ bio: "hi", author_id: 1 });
-    expectTypeOf(profile.author).toEqualTypeOf<Author | null>();
+    expectTypeOf(profile.author).toEqualTypeOf<Author | null | Promise<Author | null>>();
+    expectTypeOf(await profile.author).toEqualTypeOf<Author | null>();
+    // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
+    void profile.author!.id;
   });
 
-  it("hasOne resolves to Target | null", () => {
+  it("hasOne resolves to Target | null | Promise<Target | null>", async () => {
     const author = new Author({ name: "dean" });
-    expectTypeOf(author.profile).toEqualTypeOf<Profile | null>();
+    expectTypeOf(author.profile).toEqualTypeOf<Profile | null | Promise<Profile | null>>();
+    expectTypeOf(await author.profile).toEqualTypeOf<Profile | null>();
+    // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
+    void author.profile!.id;
   });
 
   it("named scope becomes a typed class method", () => {

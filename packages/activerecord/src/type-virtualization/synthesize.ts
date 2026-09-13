@@ -309,7 +309,9 @@ function renderSingularAssoc(
       ? "Base"
       : resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
-  return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
+  return [
+    line(`declare ${memberName}: ${target} | null | Promise<${target} | null>;`, call.name, false),
+  ];
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {

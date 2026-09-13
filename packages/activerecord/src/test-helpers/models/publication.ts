@@ -4,7 +4,7 @@ import type { Editorship } from "./editorship.js";
 import { Base } from "../../base.js";
 
 export class Publication extends Base {
-  declare editorInChief: Editor | null;
+  declare editorInChief: Editor | null | Promise<Editor | null>;
   declare editorships: AssociationProxy<Editorship>;
   declare editors: AssociationProxy<Editor>;
   declare editor_in_chief_id: number;

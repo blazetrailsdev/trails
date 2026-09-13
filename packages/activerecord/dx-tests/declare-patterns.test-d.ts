@@ -45,7 +45,7 @@ class Author extends Base {
 
   declare tags: AssociationProxy<Tag>;
 
-  declare profile: Profile | null;
+  declare profile: Profile | null | Promise<Profile | null>;
 
   static {
     this.attribute("name", "string");
@@ -59,7 +59,7 @@ class Profile extends Base {
   declare bio: string;
   declare author_id: number;
 
-  declare author: Author | null;
+  declare author: Author | null | Promise<Author | null>;
 
   static {
     this.attribute("bio", "string");
@@ -199,14 +199,20 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(author.tags).toEqualTypeOf<AssociationProxy<Tag>>();
   });
 
-  it("belongsTo accessor: `declare author: Author | null` (synchronous reader)", () => {
+  it("belongsTo accessor: `declare author: Author | null | Promise<Author | null>` (lazily loading reader)", async () => {
     const profile = new Profile({ bio: "hi", author_id: 1 });
-    expectTypeOf(profile.author).toEqualTypeOf<Author | null>();
+    expectTypeOf(profile.author).toEqualTypeOf<Author | null | Promise<Author | null>>();
+    expectTypeOf(await profile.author).toEqualTypeOf<Author | null>();
+    // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
+    void profile.author!.id;
   });
 
-  it("hasOne accessor: `declare profile: Profile | null`", () => {
+  it("hasOne accessor: `declare profile: Profile | null | Promise<Profile | null>`", async () => {
     const author = new Author({ name: "dean" });
-    expectTypeOf(author.profile).toEqualTypeOf<Profile | null>();
+    expectTypeOf(author.profile).toEqualTypeOf<Profile | null | Promise<Profile | null>>();
+    expectTypeOf(await author.profile).toEqualTypeOf<Profile | null>();
+    // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
+    void author.profile!.id;
   });
 
   it("named scope (static): `declare static published: () => Relation<Post>`", () => {

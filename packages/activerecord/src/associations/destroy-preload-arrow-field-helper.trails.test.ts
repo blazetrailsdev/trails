@@ -13,7 +13,7 @@ import { fixtures } from "../test-fixtures.js";
 
 class ArrowFieldAccount extends Base {
   static _tableName = "accounts";
-  declare firm: Company | null;
+  declare firm: Company | null | Promise<Company | null>;
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;
@@ -35,7 +35,7 @@ class ArrowFieldAccount extends Base {
 
 class ProtoHelperAccount extends Base {
   static _tableName = "accounts";
-  declare firm: Company | null;
+  declare firm: Company | null | Promise<Company | null>;
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;

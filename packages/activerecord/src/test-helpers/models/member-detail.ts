@@ -6,11 +6,11 @@ import type { Organization } from "./organization.js";
 import { Base } from "../../base.js";
 
 export class MemberDetail extends Base {
-  declare member: Member | null;
-  declare organization: Organization | null;
-  declare memberType: MemberType | null;
-  declare membership: Membership | null;
-  declare admittable: Member | null;
+  declare member: Member | null | Promise<Member | null>;
+  declare organization: Organization | null | Promise<Organization | null>;
+  declare memberType: MemberType | null | Promise<MemberType | null>;
+  declare membership: Membership | null | Promise<Membership | null>;
+  declare admittable: Member | null | Promise<Member | null>;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
   declare extra_data: string;
   declare member_id: number;

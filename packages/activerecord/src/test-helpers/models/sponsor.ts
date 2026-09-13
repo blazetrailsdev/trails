@@ -2,11 +2,11 @@ import type { Club } from "./club.js";
 import { Base } from "../../base.js";
 
 export class Sponsor extends Base {
-  declare sponsorClub: Club | null;
-  declare sponsorable: Base | null;
-  declare sponsor: Base | null;
-  declare thing: Base | null;
-  declare sponsorableWithConditions: Base | null;
+  declare sponsorClub: Club | null | Promise<Club | null>;
+  declare sponsorable: Base | null | Promise<Base | null>;
+  declare sponsor: Base | null | Promise<Base | null>;
+  declare thing: Base | null | Promise<Base | null>;
+  declare sponsorableWithConditions: Base | null | Promise<Base | null>;
   declare club_id: number;
   declare sponsor_id: number;
   declare sponsor_type: string;

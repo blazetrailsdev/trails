@@ -139,11 +139,17 @@ export class MyAppBillingNestedFirm extends Base {
 }
 
 export class MyAppBillingAccount extends Base {
-  declare firm: MyAppBusinessFirm | null;
-  declare qualifiedBillingFirm: MyAppBillingFirm | null;
-  declare unqualifiedBillingFirm: Firm | null;
-  declare nestedQualifiedBillingFirm: MyAppBillingNestedFirm | null;
-  declare nestedUnqualifiedBillingFirm: MyAppBillingNestedFirm | null;
+  declare firm: MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  declare qualifiedBillingFirm: MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
+  declare unqualifiedBillingFirm: Firm | null | Promise<Firm | null>;
+  declare nestedQualifiedBillingFirm:
+    | MyAppBillingNestedFirm
+    | null
+    | Promise<MyAppBillingNestedFirm | null>;
+  declare nestedUnqualifiedBillingFirm:
+    | MyAppBillingNestedFirm
+    | null
+    | Promise<MyAppBillingNestedFirm | null>;
 
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Account";

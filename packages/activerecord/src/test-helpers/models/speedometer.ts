@@ -4,7 +4,7 @@ import type { Minivan } from "./minivan.js";
 import { Base } from "../../base.js";
 
 export class Speedometer extends Base {
-  declare dashboard: Dashboard | null;
+  declare dashboard: Dashboard | null | Promise<Dashboard | null>;
   declare minivans: AssociationProxy<Minivan>;
   declare dashboard_id: string;
   declare name: string;

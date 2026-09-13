@@ -4,10 +4,10 @@ import type { Owner } from "./owner.js";
 import { Base } from "../../base.js";
 
 export class Essay extends Base {
-  declare author: Author | null;
-  declare writer: Base | null;
-  declare category: Category | null;
-  declare owner: Owner | null;
+  declare author: Author | null | Promise<Author | null>;
+  declare writer: Base | null | Promise<Base | null>;
+  declare category: Category | null | Promise<Category | null>;
+  declare owner: Owner | null | Promise<Owner | null>;
   declare author_id: string;
   declare book_id: number;
   declare category_id: string;

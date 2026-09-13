@@ -2,7 +2,7 @@ import type { Molecule } from "./molecule.js";
 import { Base } from "../../base.js";
 
 export class Electron extends Base {
-  declare molecule: Molecule | null;
+  declare molecule: Molecule | null | Promise<Molecule | null>;
   declare molecule_id: number;
   declare name: string;
 

@@ -4,7 +4,7 @@ import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
 export class Editor extends Base {
-  declare publication: Publication | null;
+  declare publication: Publication | null | Promise<Publication | null>;
   declare editorships: AssociationProxy<Editorship>;
   declare name: string;
 

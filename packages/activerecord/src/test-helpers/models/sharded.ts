@@ -20,8 +20,8 @@ export class ShardedBlog extends Base {
 }
 
 export class ShardedBlogPost extends Base {
-  declare parent: Base | null;
-  declare blog: ShardedBlog | null;
+  declare parent: Base | null | Promise<Base | null>;
+  declare blog: ShardedBlog | null | Promise<ShardedBlog | null>;
   declare comments: AssociationProxy<ShardedComment>;
   declare deleteComments: AssociationProxy<ShardedComment>;
   declare children: AssociationProxy<ShardedBlogPost>;
@@ -90,10 +90,10 @@ export class ShardedBlogPostWithRevision extends Base {
 }
 
 export class ShardedComment extends Base {
-  declare blogPost: ShardedBlogPost | null;
-  declare blogPostById: ShardedBlogPost | null;
-  declare blogPostWithInverse: ShardedBlogPost | null;
-  declare blog: ShardedBlog | null;
+  declare blogPost: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  declare blogPostById: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  declare blogPostWithInverse: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  declare blog: ShardedBlog | null | Promise<ShardedBlog | null>;
   declare blog_id: number;
   declare blog_post_id: number;
   declare body: string;
@@ -139,8 +139,8 @@ export class ShardedTag extends Base {
 }
 
 export class ShardedBlogPostTag extends Base {
-  declare blogPost: ShardedBlogPost | null;
-  declare tag: ShardedTag | null;
+  declare blogPost: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  declare tag: ShardedTag | null | Promise<ShardedTag | null>;
 
   static _tableName = "sharded_blog_posts_tags";
 

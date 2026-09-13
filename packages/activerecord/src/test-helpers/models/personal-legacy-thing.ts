@@ -2,7 +2,7 @@ import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
 export class PersonalLegacyThing extends Base {
-  declare person: Person | null;
+  declare person: Person | null | Promise<Person | null>;
   declare person_id: number;
   declare tps_report_number: number;
   declare version: number;

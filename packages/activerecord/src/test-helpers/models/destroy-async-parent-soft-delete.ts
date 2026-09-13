@@ -7,7 +7,7 @@ import { Base } from "../../base.js";
 export class DestroyAsyncParentSoftDelete extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
-  declare dlKeyedHasOne: DlKeyedHasOne | null;
+  declare dlKeyedHasOne: DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   declare deleted: boolean;
   declare tags_count: number | null;
 

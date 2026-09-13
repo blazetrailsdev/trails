@@ -5,7 +5,7 @@ import { Base } from "../../base.js";
 
 export class Student extends Base {
   declare lessons: AssociationProxy<Lesson>;
-  declare college: College | null;
+  declare college: College | null | Promise<College | null>;
   declare active: boolean;
   declare college_id: number;
   declare name: string;

@@ -4,7 +4,7 @@ import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
 
 export class ShippingLine extends Base {
-  declare invoice: Invoice | null;
+  declare invoice: Invoice | null | Promise<Invoice | null>;
   declare discountApplications: AssociationProxy<ShippingLineDiscountApplication>;
   declare amount: number;
   declare invoice_id: number;
@@ -16,8 +16,8 @@ export class ShippingLine extends Base {
 }
 
 export class ShippingLineDiscountApplication extends Base {
-  declare shippingLine: ShippingLine | null;
-  declare discount: Discount | null;
+  declare shippingLine: ShippingLine | null | Promise<ShippingLine | null>;
+  declare discount: Discount | null | Promise<Discount | null>;
   declare discount_id: number;
   declare shipping_line_id: number;
 

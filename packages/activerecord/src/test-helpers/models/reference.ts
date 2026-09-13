@@ -5,8 +5,8 @@ import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
 export class Reference extends Base {
-  declare person: Person | null;
-  declare job: Job | null;
+  declare person: Person | null | Promise<Person | null>;
+  declare job: Job | null | Promise<Job | null>;
   declare idealJobs: AssociationProxy<Job>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
   declare favorite: boolean;

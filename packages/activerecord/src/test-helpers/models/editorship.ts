@@ -3,8 +3,8 @@ import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
 export class Editorship extends Base {
-  declare publication: Publication | null;
-  declare editor: Editor | null;
+  declare publication: Publication | null | Promise<Publication | null>;
+  declare editor: Editor | null | Promise<Editor | null>;
   declare editor_id: string;
   declare publication_id: string;
 

@@ -4,8 +4,8 @@ import type { Tree } from "./tree.js";
 import { Base } from "../../base.js";
 
 export class Node extends Base {
-  declare tree: Tree | null;
-  declare parent: Node | null;
+  declare tree: Tree | null | Promise<Tree | null>;
+  declare parent: Node | null | Promise<Node | null>;
   declare children: AssociationProxy<Node>;
   declare name: string;
   declare parent_id: number;

@@ -12,7 +12,7 @@ import { Base } from "../../base.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 export class Car extends Base {
-  declare person: Person | null;
+  declare person: Person | null | Promise<Person | null>;
   declare bulbs: AssociationProxy<Bulb>;
   declare allBulbs: AssociationProxy<Bulb>;
   declare allBulbs2: AssociationProxy<Bulb>;
@@ -22,7 +22,7 @@ export class Car extends Base {
   declare failedBulbs: AssociationProxy<FailedBulb>;
   declare fooBulbs: AssociationProxy<Bulb>;
   declare awesomeBulbs: AssociationProxy<Bulb>;
-  declare bulb: Bulb | null;
+  declare bulb: Bulb | null | Promise<Bulb | null>;
   declare tyres: AssociationProxy<Tyre>;
   declare engines: AssociationProxy<Engine>;
   declare wheels: AssociationProxy<Wheel>;

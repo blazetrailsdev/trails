@@ -2,7 +2,7 @@ import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
 export class Tyre extends Base {
-  declare car: Car | null;
+  declare car: Car | null | Promise<Car | null>;
   declare car_id: number;
 
   static {

@@ -29,7 +29,7 @@ export interface Person {
 export class Person extends Base {
   declare readers: AssociationProxy<Reader>;
   declare secureReaders: AssociationProxy<SecureReader>;
-  declare reader: Reader | null;
+  declare reader: Reader | null | Promise<Reader | null>;
   declare posts: AssociationProxy<Post>;
   declare securePosts: AssociationProxy<Post>;
   declare postsWithNoComments: AssociationProxy<Post>;
@@ -38,18 +38,18 @@ export class Person extends Base {
   declare references: AssociationProxy<Reference>;
   declare badReferences: AssociationProxy<BadReference>;
   declare fixedBadReferences: AssociationProxy<BadReference>;
-  declare favoriteReference: Reference | null;
-  declare favoriteReferenceJob: Job | null;
+  declare favoriteReference: Reference | null | Promise<Reference | null>;
+  declare favoriteReferenceJob: Job | null | Promise<Job | null>;
   declare postsWithCommentsSortedByCommentId: AssociationProxy<Post>;
   declare firstPosts: AssociationProxy<FirstPost>;
   declare jobs: AssociationProxy<Job>;
   declare jobsWithDependentDestroy: AssociationProxy<Job>;
   declare jobsWithDependentDeleteAll: AssociationProxy<Job>;
   declare jobsWithDependentNullify: AssociationProxy<Job>;
-  declare primaryContact: Person | null;
+  declare primaryContact: Person | null | Promise<Person | null>;
   declare agents: AssociationProxy<Person>;
   declare agentsOfAgents: AssociationProxy<Person>;
-  declare number1Fan: Person | null;
+  declare number1Fan: Person | null | Promise<Person | null>;
   declare personalLegacyThings: AssociationProxy<PersonalLegacyThing>;
   declare agentsPosts: AssociationProxy<Post>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
@@ -184,8 +184,8 @@ export class PersonWithPolymorphicDependentNullifyComments extends Base {
 }
 
 export class LoosePerson extends Base {
-  declare bestFriend: LoosePerson | null;
-  declare bestFriendOf: LoosePerson | null;
+  declare bestFriend: LoosePerson | null | Promise<LoosePerson | null>;
+  declare bestFriendOf: LoosePerson | null | Promise<LoosePerson | null>;
   declare bestFriends: AssociationProxy<LoosePerson>;
 
   static {
@@ -204,8 +204,8 @@ acceptsNestedAttributesFor(LoosePerson, "bestFriends");
 export class LooseDescendant extends LoosePerson {}
 
 export class TightPerson extends Base {
-  declare bestFriend: TightPerson | null;
-  declare bestFriendOf: TightPerson | null;
+  declare bestFriend: TightPerson | null | Promise<TightPerson | null>;
+  declare bestFriendOf: TightPerson | null | Promise<TightPerson | null>;
   declare bestFriends: AssociationProxy<TightPerson>;
 
   static {
@@ -252,7 +252,7 @@ export class RichPerson extends Base {
 }
 
 export class NestedPerson extends Base {
-  declare bestFriend: NestedPerson | null;
+  declare bestFriend: NestedPerson | null | Promise<NestedPerson | null>;
 
   static {
     this._tableName = "people";

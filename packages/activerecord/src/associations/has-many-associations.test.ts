@@ -2653,7 +2653,7 @@ describe("HasManyAssociationsTest", () => {
     class InvValPost extends Base {
       declare author_id: number | null;
       declare title: string | null;
-      declare author: InvValAuthor | null;
+      declare author: InvValAuthor | null | Promise<InvValAuthor | null>;
 
       static {
         this._tableName = "posts";

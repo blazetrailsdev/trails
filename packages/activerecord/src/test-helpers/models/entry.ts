@@ -3,7 +3,7 @@ import type { Account } from "./account.js";
 import { Base } from "../../base.js";
 
 export class Entry extends Base {
-  declare account: Account | null;
+  declare account: Account | null | Promise<Account | null>;
   declare account_id: number;
   declare entryable_id: number;
   declare entryable_type: string;

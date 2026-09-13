@@ -1,7 +1,7 @@
 import { Base } from "../../base.js";
 
 export class Wheel extends Base {
-  declare wheelable: Base | null;
+  declare wheelable: Base | null | Promise<Base | null>;
   declare size: number;
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -16,7 +16,7 @@ export class Wheel extends Base {
 }
 
 export class WheelPolymorphicTouch extends Base {
-  declare wheelable: Base | null;
+  declare wheelable: Base | null | Promise<Base | null>;
   declare wheelable_id: number;
   declare wheelable_type: string;
 

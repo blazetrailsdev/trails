@@ -2,7 +2,7 @@ import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
 
 export class AbstractDoubloon extends Base {
-  declare pirate: Pirate | null;
+  declare pirate: Pirate | null | Promise<Pirate | null>;
 
   static {
     this.abstractClass = true;
