@@ -162,6 +162,30 @@ export function update<T>(
 export const mergeBang = update;
 
 /**
+ * Ruby `Hash#delete` (`vendor/ruby/hash.c:2441` `rb_hash_delete_m`) — removes
+ * the entry and returns its stored value, or `nil` when the key is absent,
+ * where the block form yields the key instead.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/hash.c:2441`).
+ */
+export function hashDelete<T, U = null>(
+  hash: Record<string, T>,
+  key: string,
+  block?: (key: string) => U,
+): T | U | null {
+  if (Object.hasOwn(hash, key)) {
+    const val = hash[key];
+    delete hash[key];
+    return val;
+  } else {
+    if (block) {
+      return block(key);
+    } else {
+      return null;
+    }
+  }
+}
+
+/**
  * Ruby `Hash#delete_if` (`vendor/ruby/hash.c:2564` `rb_hash_delete_if`) —
  * MUTATES the receiver, dropping every pair the block answers truthily for,
  * and returns it.

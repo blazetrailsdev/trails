@@ -42,6 +42,7 @@ export {
   except,
   fetch,
   hasKey,
+  hashDelete,
   inspect,
   merge,
   mergeBang,

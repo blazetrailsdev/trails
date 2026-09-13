@@ -75,6 +75,20 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatExport("succ", ["numeric"])).toBeUndefined();
   });
 
+  it("admits an ivar receiver only on a row that opts into it", () => {
+    expect(rubyCompatExport("include?", ["ivar"])).toBe("hasKey");
+    expect(rubyCompatExport("include?", ["local"])).toBeUndefined();
+    expect(rubyCompatExport("fetch", ["ivar"])).toBeUndefined();
+  });
+
+  it("picks the one row a receiver admits among rows sharing a bare name", () => {
+    expect(rubyCompatExport("delete", ["ivar"])).toBe("hashDelete");
+    expect(rubyCompatExport("delete", ["hash"])).toBe("hashDelete");
+    expect(rubyCompatExport("delete", ["string"])).toBe("stringDelete");
+    expect(rubyCompatExport("delete", ["local"])).toBeUndefined();
+    expect(rubyCompatExport("delete")).toBeUndefined();
+  });
+
   it("ignores a receiver on a row that resolves from the bare name alone", () => {
     expect(rubyCompatExport("key?", ["local"])).toBe("hasKey");
     expect(rubyCompatExport("escape", ["const"])).toBe("regexpEscape");

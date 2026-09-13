@@ -679,6 +679,7 @@ let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
+let _globalExecutorConcurrency: number | null = null;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
@@ -853,8 +854,27 @@ export class Base extends Model {
    * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
    */
   static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
+    const concurrency = this.globalExecutorConcurrency ?? 4;
+    void concurrency;
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   }
+
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  static set globalExecutorConcurrency(globalExecutorConcurrency: number | null) {
+    if (this.asyncQueryExecutor == null || this.asyncQueryExecutor === "multi_thread_pool") {
+      throw new ArgumentError(
+        "`global_executor_concurrency` cannot be set when the executor is nil or set to `:multi_thread_pool`. For multiple thread pools, please set the concurrency in your database configuration.",
+      );
+    }
+
+    _globalExecutorConcurrency = globalExecutorConcurrency;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  static get globalExecutorConcurrency(): number | null {
+    return (_globalExecutorConcurrency ??= null);
+  }
+
   static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
     return _permanentConnectionCheckout;
   }
