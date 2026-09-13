@@ -577,9 +577,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
 
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
-
-  host._columnNamesMemo = undefined;
-  (host as SchemaHost & { _attributeNamesMemo?: unknown })._attributeNamesMemo = undefined;
 }
 
 /**
