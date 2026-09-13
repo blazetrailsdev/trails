@@ -604,19 +604,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (ahead) {
       this._chainClose(ahead.then(() => this._disconnect()));
     } else {
-      this._disconnect();
+      void this._disconnect();
     }
     await this._closingDriver;
   }
 
   /** @internal */
-  private _disconnect(): void {
+  private _disconnect(): Promise<void> | void {
     const conn = this._rawConnection;
+    this._rawConnection = null;
     if (conn?.isOpen()) {
       const closing = conn.close();
       if (closing) this._chainClose(closing);
+      return closing;
     }
-    this._rawConnection = null;
   }
 
   /** @internal */

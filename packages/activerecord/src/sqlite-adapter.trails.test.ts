@@ -159,7 +159,7 @@ describe("SQLite adapter driver binding", () => {
   it("disconnectBang fires async driver.close() and close() drains it", async () => {
     let closed = false;
     let resolveClose: () => void;
-    const closeGate = new Promise<void>((resolve) => {
+    let closeGate = new Promise<void>((resolve) => {
       resolveClose = resolve;
     });
     const driver = asyncDriver(async (config) => {
@@ -183,6 +183,26 @@ describe("SQLite adapter driver binding", () => {
     expect(closed).toBe(false);
     resolveClose!();
     await disconnecting;
+    expect(closed).toBe(true);
+
+    const queued = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
+    let releaseStatement: () => void;
+    queued._statementLock = new Promise<void>((resolve) => {
+      releaseStatement = resolve;
+    });
+    closed = false;
+    closeGate = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    let settled = false;
+    const queuedDisconnect = queued.disconnectBang().then(() => {
+      settled = true;
+    });
+    releaseStatement!();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(settled).toBe(false);
+    resolveClose!();
+    await queuedDisconnect;
     expect(closed).toBe(true);
   });
 
