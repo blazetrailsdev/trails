@@ -41,12 +41,12 @@ export class Uuid extends ValueType<string> {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function isValidUuid(value: string): boolean {
   return ACCEPTABLE_UUID_REGEX.test(value.trim());
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function normalizeUuid(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();

@@ -44,7 +44,7 @@ export interface CreateDatabaseOptions {
 }
 
 interface PgSchemaAdapterPrivates {
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   quoteLiteral(value: unknown): string;
   _schemaSearchPathMemo: string | null;
 }

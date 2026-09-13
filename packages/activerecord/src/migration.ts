@@ -297,7 +297,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._version = version;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   static forVersion(v: string | number): typeof Migration {
     return findVersion(v) as unknown as typeof Migration;
   }
@@ -953,7 +953,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("indexExists", tableName, columnName)) as boolean;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   static get(_version: string): Migration | null {
     return null;
   }

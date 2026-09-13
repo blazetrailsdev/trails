@@ -848,7 +848,7 @@ export class Base extends Model {
 
   /**
    * @missingRailsArgs new — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names
+   * @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names
    */
   static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
     const concurrency = this.globalExecutorConcurrency ?? 4;
@@ -2083,7 +2083,7 @@ export class Base extends Model {
   declare static having: typeof Querying.having;
   declare static lock: typeof Querying.lock;
   declare static readonly: typeof Querying.readonly;
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   declare static withCte: typeof Querying.withCte;
   declare static with: typeof Querying.withCte;
   declare static withRecursive: typeof Querying.withRecursive;
@@ -2535,7 +2535,7 @@ export class Base extends Model {
     return this.toSgid(options);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
     options?: import("@blazetrails/globalid").LocateOptions,
@@ -2543,7 +2543,7 @@ export class Base extends Model {
     return _Locator.locate(input, options);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,

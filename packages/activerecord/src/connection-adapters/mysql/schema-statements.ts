@@ -26,7 +26,7 @@ import type { Result } from "../../result.js";
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   override createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
     return MysqlSchemaDumper.create(
@@ -457,7 +457,7 @@ export function integerToSql(limit: number | null | undefined): string {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export function parseMysqlName(name: string): { schema?: string; table: string } {
   const input = name.trim();
   const invalid = (): never => {

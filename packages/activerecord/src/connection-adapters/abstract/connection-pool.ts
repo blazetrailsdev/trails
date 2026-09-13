@@ -811,7 +811,7 @@ export class ConnectionPool implements ReapablePool {
         .catch((err) => {
           console.warn(
             `[trails] Failed to lazily load schema cache for pool ` +
-              `${this.poolConfig.connectionSpecName}: ` +
+              `${this.poolConfig.dbConfig.name}: ` +
               `${err instanceof Error ? err.message : String(err)}`,
           );
         });
@@ -834,7 +834,7 @@ export class ConnectionPool implements ReapablePool {
         .catch((err) => {
           console.warn(
             `[trails] Failed to eagerly warm schema cache for pool ` +
-              `${this.poolConfig.connectionSpecName}: ` +
+              `${this.poolConfig.dbConfig.name}: ` +
               `${err instanceof Error ? err.message : String(err)}`,
           );
         });

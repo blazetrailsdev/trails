@@ -65,11 +65,6 @@ export class TransactionState {
     return this._state === "rolledback" || this._state === "fully_rolledback";
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
-  get rolledBack(): boolean {
-    return this.isRolledback();
-  }
-
   isFullyRolledback(): boolean {
     return this._state === "fully_rolledback";
   }
@@ -233,7 +228,7 @@ export class NullTransaction {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export class TransactionCallback {
   private _event: "before_commit" | "after_commit" | "after_rollback";
   private _callback: () => void | Promise<void>;

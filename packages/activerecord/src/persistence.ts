@@ -34,7 +34,7 @@ import {
 } from "./attribute-methods.js";
 import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
-import { isSuppressed } from "./suppressor.js";
+import { registry } from "./suppressor.js";
 import {
   performValidations,
   raiseValidationError,
@@ -434,7 +434,7 @@ interface DeleteRecord {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
@@ -471,7 +471,7 @@ export async function save<T extends SaveRecord>(
   options?: { validate?: boolean; touch?: boolean },
   block?: (record: T) => void,
 ): Promise<boolean | undefined> {
-  if (isSuppressed(this.constructor as unknown as Parameters<typeof isSuppressed>[0])) {
+  if (registry()[(this.constructor as { name: string }).name]) {
     return true;
   }
   await (
