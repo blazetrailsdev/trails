@@ -15,7 +15,9 @@ import {
 import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
-const HOST = Object.create(AbstractMysqlAdapter.prototype) as QuotingDispatchHost;
+const HOST = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
+  _escapeState: { noBackslashEscapes: false },
+}) as QuotingDispatchHost;
 const quote = (value: unknown): string => HOST.quote(value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -273,7 +275,7 @@ describe("MySQL quoting — columnNameWithOrderMatcher", () => {
 describe("MySQL quoteString escapes per the connection's escaping state", () => {
   const quoteString = (value: string, state?: { noBackslashEscapes: boolean }): string =>
     Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
-      _escapeState: state,
+      _escapeState: state ?? { noBackslashEscapes: false },
     }).quoteString(value);
 
   it("doubles the quote and leaves backslash inert under NO_BACKSLASH_ESCAPES", () => {

@@ -919,7 +919,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @missingRailsCall with_raw_connection — PERMANENT */
   override quoteString(string: string): string {
-    if (this._escapeState?.noBackslashEscapes) {
+    if (this._escapeState.noBackslashEscapes) {
       return string.replace(/'/g, "''");
     }
     return string.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
