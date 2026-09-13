@@ -4,6 +4,7 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bird extends Base {
   declare color: string;
   declare name: string;
@@ -42,6 +43,7 @@ export class Bird extends Base {
     throwAbort();
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Bird {
   get pirate(): Pirate | null | Promise<Pirate | null>;
   set pirate(value: Pirate | null);

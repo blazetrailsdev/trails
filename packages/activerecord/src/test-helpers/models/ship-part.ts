@@ -5,6 +5,7 @@ import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShipPart extends Base {
   declare trinkets: AssociationProxy<Treasure>;
   declare name: string;
@@ -18,6 +19,7 @@ export class ShipPart extends Base {
     this.validates("name", { presence: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShipPart {
   get ship(): Ship | null | Promise<Ship | null>;
   set ship(value: Ship | null);

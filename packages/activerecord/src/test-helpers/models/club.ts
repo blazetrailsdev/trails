@@ -8,6 +8,7 @@ import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Club extends Base {
   declare memberships: AssociationProxy<Membership>;
   declare members: AssociationProxy<Member>;
@@ -48,6 +49,7 @@ export class Club extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Club {
   get membership(): Membership | null | Promise<Membership | null>;
   set membership(value: Membership | null);

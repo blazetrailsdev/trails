@@ -3,6 +3,7 @@ import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Rating extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithoutTag: AssociationProxy<Tagging>;
@@ -26,6 +27,7 @@ export class Rating extends Base {
     );
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Rating {
   get comment(): Comment | null | Promise<Comment | null>;
   set comment(value: Comment | null);

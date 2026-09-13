@@ -22,6 +22,7 @@ export class AbstractCompany extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Company extends AbstractCompany {
   declare isActive: () => boolean;
   declare activeBang: () => Promise<true>;
@@ -81,6 +82,7 @@ export class Company extends AbstractCompany {
     return "I am Jack's innermost fears and aspirations";
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Company {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);
@@ -111,6 +113,7 @@ export class NamespacedClient extends Company {
   static _demodulizedName = "Client";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Firm extends Company {
   declare unsortedClients: AssociationProxy<Client>;
   declare unsortedClientsWithSymbol: AssociationProxy<Client>;
@@ -278,6 +281,7 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Firm {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);
@@ -305,6 +309,7 @@ export interface Firm {
   set leadDeveloper(value: Developer | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DependentFirm extends Company {
   declare companies: AssociationProxy<Company>;
 
@@ -317,6 +322,7 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DependentFirm {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);
@@ -324,6 +330,7 @@ export interface DependentFirm {
   set company(value: Company | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RestrictedWithExceptionFirm extends Company {
   declare companies: AssociationProxy<Company>;
 
@@ -338,11 +345,13 @@ export class RestrictedWithExceptionFirm extends Company {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithExceptionFirm {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RestrictedWithErrorFirm extends Company {
   declare companies: AssociationProxy<Company>;
 
@@ -357,6 +366,7 @@ export class RestrictedWithErrorFirm extends Company {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithErrorFirm {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);
@@ -369,6 +379,7 @@ export class Agency extends Firm {
 }
 acceptsNestedAttributesFor(Agency, "projects");
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
 
@@ -458,6 +469,7 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Client {
   get firm(): Firm | null | Promise<Firm | null>;
   set firm(value: Firm | null);
@@ -481,6 +493,7 @@ export interface Client {
   set account(value: Account | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExclusivelyDependentFirm extends Company {
   declare dependentSanitizedConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentHashConditionalClientsOfFirm: AssociationProxy<Client>;
@@ -505,6 +518,7 @@ export class ExclusivelyDependentFirm extends Company {
     );
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ExclusivelyDependentFirm {
   get account(): Account | null | Promise<Account | null>;
   set account(value: Account | null);

@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Citation extends Base {
   declare citations: AssociationProxy<Citation>;
   declare book1_id: bigint;
@@ -14,6 +15,7 @@ export class Citation extends Base {
     this.hasMany("citations");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Citation {
   get book(): Book | null | Promise<Book | null>;
   set book(value: Book | null);

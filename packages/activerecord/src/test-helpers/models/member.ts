@@ -13,6 +13,7 @@ import type { SuperMembership } from "./membership.js";
 import type { TenantMembership } from "./membership.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Member extends Base {
   declare nestedMemberTypes: AssociationProxy<MemberType>;
   declare nestedSponsors: AssociationProxy<Sponsor>;
@@ -105,6 +106,7 @@ export class Member extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Member {
   get currentMembership(): CurrentMembership | null | Promise<CurrentMembership | null>;
   set currentMembership(value: CurrentMembership | null);

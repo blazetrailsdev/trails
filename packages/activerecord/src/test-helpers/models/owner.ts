@@ -7,6 +7,7 @@ import type { Toy } from "./toy.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Owner extends Base {
   declare pets: AssociationProxy<Pet>;
   declare toys: AssociationProxy<Toy>;
@@ -59,6 +60,7 @@ export class Owner extends Base {
     }
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Owner {
   get lastPet(): Pet | null | Promise<Pet | null>;
   set lastPet(value: Pet | null);

@@ -2,6 +2,7 @@ import { NumberHelper } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PriceEstimate extends Base {
   declare currency: string;
   declare estimate_of_id: number;
@@ -17,6 +18,7 @@ export class PriceEstimate extends Base {
     return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PriceEstimate {
   get estimateOf(): Base | null | Promise<Base | null>;
   set estimateOf(value: Base | null);

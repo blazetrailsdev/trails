@@ -38,6 +38,7 @@ class Tag extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class Author extends Base {
   declare name: string;
 
@@ -52,11 +53,13 @@ class Author extends Base {
     this.hasOne("profile");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface Author {
   get profile(): Profile | null | Promise<Profile | null>;
   set profile(value: Profile | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class Profile extends Base {
   declare bio: string;
   declare author_id: number;
@@ -67,6 +70,7 @@ class Profile extends Base {
     this.belongsTo("author");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface Profile {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

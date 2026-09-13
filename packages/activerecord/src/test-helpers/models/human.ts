@@ -4,6 +4,7 @@ import type { Interest } from "./interest.js";
 import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Human extends Base {
   declare name: string;
   declare interests: AssociationProxy<Interest>;
@@ -58,6 +59,7 @@ export class Human extends Base {
     this.addCallbackCalled = true;
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Human {
   get face(): Face | null | Promise<Face | null>;
   set face(value: Face | null);

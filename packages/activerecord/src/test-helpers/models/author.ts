@@ -30,6 +30,7 @@ import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Author extends Base {
   declare posts: AssociationProxy<Post>;
   declare serializedPosts: AssociationProxy<SerializedPost>;
@@ -623,6 +624,7 @@ export class Author extends Base {
     return ["twitter", "github"];
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Author {
   get post(): Post | null | Promise<Post | null>;
   set post(value: Post | null);
@@ -664,6 +666,7 @@ export interface Author {
   set recentResponse(value: Comment | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuthorAddress extends Base {
   static destroyedAuthorAddressIds: number[] = [];
 
@@ -674,11 +677,13 @@ export class AuthorAddress extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorAddress {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuthorFavorite extends Base {
   declare author_id: number;
   declare favorite_author_id: number;
@@ -688,6 +693,7 @@ export class AuthorFavorite extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavorite {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
@@ -695,6 +701,7 @@ export interface AuthorFavorite {
   set favoriteAuthor(value: Author | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuthorFavoriteWithScope extends Base {
   static {
     this._tableName = "author_favorites";
@@ -703,6 +710,7 @@ export class AuthorFavoriteWithScope extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavoriteWithScope {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

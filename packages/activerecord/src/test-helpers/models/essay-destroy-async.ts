@@ -1,6 +1,7 @@
 import type { BookDestroyAsync } from "./book-destroy-async.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class EssayDestroyAsync extends Base {
   static _tableName = "essays";
 
@@ -9,6 +10,7 @@ export class EssayDestroyAsync extends Base {
     this.belongsTo("writer", { polymorphic: true, dependent: "destroy" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface EssayDestroyAsync {
   get book(): BookDestroyAsync | null | Promise<BookDestroyAsync | null>;
   set book(value: BookDestroyAsync | null);

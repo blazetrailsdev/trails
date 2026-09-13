@@ -4,6 +4,7 @@ import type { Job } from "./job.js";
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reference extends Base {
   declare idealJobs: AssociationProxy<Job>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
@@ -31,6 +32,7 @@ export class Reference extends Base {
     }
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reference {
   get person(): Person | null | Promise<Person | null>;
   set person(value: Person | null);

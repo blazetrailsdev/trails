@@ -27,6 +27,7 @@ import { registerSubclass } from "../../inheritance.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CategoryPost extends Base {
   static {
     this._tableName = "categories_posts";
@@ -35,6 +36,7 @@ export class CategoryPost extends Base {
     this.belongsTo("post");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CategoryPost {
   get group(): Category | null | Promise<Category | null>;
   set group(value: Category | null);
@@ -44,6 +46,7 @@ export interface CategoryPost {
   set post(value: Post | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Post extends Base {
   declare comments_count: number;
   declare static containingTheLetterA: () => Relation<Post>;
@@ -537,6 +540,7 @@ export class Post extends Base {
     return this._log;
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Post {
   get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
   set verySpecialCommentWithPost(value: VerySpecialComment | null);
@@ -551,6 +555,7 @@ export interface Post {
     | Promise<VerySpecialComment | null>;
   set verySpecialCommentWithStringJoins(value: VerySpecialComment | null);
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Post {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
@@ -576,11 +581,13 @@ export interface Post {
 
 export class SpecialPost extends Post {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class StiPost extends Post {
   static {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface StiPost {
   get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
   set specialComment(value: SpecialComment | null);
@@ -610,6 +617,7 @@ export class NullPost extends Post {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FirstPost extends Base {
   declare comments: AssociationProxy<Comment>;
 
@@ -626,6 +634,7 @@ export class FirstPost extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FirstPost {
   get comment(): Comment | null | Promise<Comment | null>;
   set comment(value: Comment | null);
@@ -754,6 +763,7 @@ export class PostWithAfterCreateCallback extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
   declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
 
@@ -767,6 +777,7 @@ export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PostWithCommentWithDefaultScopeReferencesAssociation {
   get firstComment():
     | CommentWithDefaultScopeReferencesAssociation
@@ -802,6 +813,7 @@ export class PostWithDestroyCallback extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Postesque extends Base {
   declare author_id: string;
   declare author_name: string;
@@ -822,6 +834,7 @@ export class Postesque extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Postesque {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

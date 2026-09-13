@@ -7,6 +7,7 @@ import type { MemberDetail } from "./member-detail.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Organization extends Base {
   declare memberDetails: AssociationProxy<MemberDetail>;
   declare members: AssociationProxy<Member>;
@@ -33,6 +34,7 @@ export class Organization extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Organization {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

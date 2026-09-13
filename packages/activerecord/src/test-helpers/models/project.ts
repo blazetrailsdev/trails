@@ -5,6 +5,7 @@ import type { Firm } from "./company.js";
 import type { Mentor } from "./mentor.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Project extends Base {
   declare developersRequiredByDefault: any;
   declare developers: AssociationProxy<Developer>;
@@ -100,6 +101,7 @@ export class Project extends Base {
     return this.all();
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Project {
   get mentor(): Mentor | null | Promise<Mentor | null>;
   set mentor(value: Mentor | null);

@@ -2,6 +2,7 @@ import type { Seminar } from "./seminar.js";
 import type { Session } from "./session.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Section extends Base {
   declare seminar_id: number;
   declare session_id: number;
@@ -12,6 +13,7 @@ export class Section extends Base {
     this.belongsTo("seminar", { inverseOf: "sections", autosave: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Section {
   get session(): Session | null | Promise<Session | null>;
   set session(value: Session | null);

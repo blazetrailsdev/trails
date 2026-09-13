@@ -1,6 +1,7 @@
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Room extends Base {
   declare landlord_id: number;
   declare owner_id: number;
@@ -23,6 +24,7 @@ export class Room extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Room {
   get user(): User | null | Promise<User | null>;
   set user(value: User | null);

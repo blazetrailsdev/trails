@@ -3,6 +3,7 @@ import type { Editorship } from "./editorship.js";
 import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Editor extends Base {
   declare editorships: AssociationProxy<Editorship>;
   declare name: string;
@@ -14,6 +15,7 @@ export class Editor extends Base {
     this.hasMany("editorships");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Editor {
   get publication(): Publication | null | Promise<Publication | null>;
   set publication(value: Publication | null);

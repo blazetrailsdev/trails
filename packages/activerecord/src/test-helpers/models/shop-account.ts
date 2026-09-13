@@ -3,6 +3,7 @@ import type { Customer } from "./customer.js";
 import type { CustomerCarrier } from "./customer-carrier.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShopAccount extends Base {
   declare customer_carrier_id: number;
   declare customer_id: number;
@@ -14,6 +15,7 @@ export class ShopAccount extends Base {
     this.hasOne("carrier", { through: "customerCarrier" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShopAccount {
   get customer(): Customer | null | Promise<Customer | null>;
   set customer(value: Customer | null);

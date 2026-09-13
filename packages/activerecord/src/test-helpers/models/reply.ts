@@ -1,6 +1,7 @@
 import { Topic, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reply extends Topic {
   static {
     this.belongsTo("topic", {
@@ -32,6 +33,7 @@ export class Reply extends Topic {
     return (this as any).approved();
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reply {
   get topic(): Topic | null | Promise<Topic | null>;
   set topic(value: Topic | null);

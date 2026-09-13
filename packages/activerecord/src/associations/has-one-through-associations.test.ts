@@ -760,12 +760,14 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("has one through relationship cannot have a counter cache", () => {
     expect(() => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class Thing extends Base {
         static {
           this.hasOne("otherThing");
           this.hasOne("thing", { through: "otherThing", counterCache: true });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface Thing {
         get otherThing(): Base | null | Promise<Base | null>;
         set otherThing(value: Base | null);

@@ -2,6 +2,7 @@ import type { Job } from "./job.js";
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Friendship extends Base {
   declare follower_id: number;
   declare friend_id: number;
@@ -25,6 +26,7 @@ export class Friendship extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Friendship {
   get friend(): Person | null | Promise<Person | null>;
   set friend(value: Person | null);

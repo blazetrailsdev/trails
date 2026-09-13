@@ -18,6 +18,7 @@ import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Range } from "@blazetrails/ruby-compat";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
   declare updated_at: any;
   declare projects: AssociationProxy<Project>;
@@ -188,6 +189,7 @@ export class Developer extends Base {
     (this as any).auditLogs.build({ message });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Developer {
   get mentor(): Mentor | null | Promise<Mentor | null>;
   set mentor(value: Mentor | null);
@@ -226,6 +228,7 @@ export class SymbolIgnoredDeveloper extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLog extends Base {
   declare developer_id: number;
   declare message: string;
@@ -236,6 +239,7 @@ export class AuditLog extends Base {
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLog {
   get developer(): Developer | null | Promise<Developer | null>;
   set developer(value: Developer | null);
@@ -243,12 +247,14 @@ export interface AuditLog {
   set unvalidatedDeveloper(value: Developer | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLogRequired extends Base {
   static {
     this.tableName = "audit_logs";
     this.belongsTo("developer", { required: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLogRequired {
   get developer(): Developer | null | Promise<Developer | null>;
   set developer(value: Developer | null);

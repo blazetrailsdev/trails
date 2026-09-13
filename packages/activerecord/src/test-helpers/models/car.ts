@@ -11,6 +11,7 @@ import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Car extends Base {
   declare bulbs: AssociationProxy<Bulb>;
   declare allBulbs: AssociationProxy<Bulb>;
@@ -74,6 +75,7 @@ export class Car extends Base {
     this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Car {
   get person(): Person | null | Promise<Person | null>;
   set person(value: Person | null);

@@ -6,6 +6,7 @@ import type { Ship } from "./ship.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Treasure extends Base {
   declare parrots: AssociationProxy<Parrot>;
   declare priceEstimates: AssociationProxy<PriceEstimate>;
@@ -24,6 +25,7 @@ export class Treasure extends Base {
     this.hasAndBelongsToMany("richPeople", { joinTable: "peoples_treasures", validate: false });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Treasure {
   get looter(): Base | null | Promise<Base | null>;
   set looter(value: Base | null);

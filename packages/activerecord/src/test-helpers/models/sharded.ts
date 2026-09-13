@@ -19,6 +19,7 @@ export class ShardedBlog extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPost extends Base {
   declare comments: AssociationProxy<ShardedComment>;
   declare deleteComments: AssociationProxy<ShardedComment>;
@@ -70,6 +71,7 @@ export class ShardedBlogPost extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedBlogPost {
   get parent(): Base | null | Promise<Base | null>;
   set parent(value: Base | null);
@@ -93,6 +95,7 @@ export class ShardedBlogPostWithRevision extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedComment extends Base {
   declare blog_id: number;
   declare blog_post_id: number;
@@ -118,6 +121,7 @@ export class ShardedComment extends Base {
     this.belongsTo("blog", { className: "ShardedBlog" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedComment {
   get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
   set blogPost(value: ShardedBlogPost | null);
@@ -148,6 +152,7 @@ export class ShardedTag extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPostTag extends Base {
   static _tableName = "sharded_blog_posts_tags";
 
@@ -158,6 +163,7 @@ export class ShardedBlogPostTag extends Base {
     this.belongsTo("tag", { className: "ShardedTag" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedBlogPostTag {
   get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
   set blogPost(value: ShardedBlogPost | null);

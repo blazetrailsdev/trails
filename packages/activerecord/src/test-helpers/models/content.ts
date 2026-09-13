@@ -1,6 +1,7 @@
 import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Content extends Base {
   static _tableName = "content";
 
@@ -13,11 +14,13 @@ export class Content extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Content {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
   set contentPosition(value: ContentPosition | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContentWhichRequiresTwoDestroyCalls extends Base {
   static _tableName = "content";
 
@@ -36,11 +39,13 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentWhichRequiresTwoDestroyCalls {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
   set contentPosition(value: ContentPosition | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContentPosition extends Base {
   declare content_id: number;
 
@@ -53,6 +58,7 @@ export class ContentPosition extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentPosition {
   get content(): Content | null | Promise<Content | null>;
   set content(value: Content | null);

@@ -5,6 +5,7 @@ import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { DlKeyedJoin } from "./dl-keyed-join.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestroyAsyncParent extends Base {
   declare dlKeyedHasMany: AssociationProxy<DlKeyedHasMany>;
   declare dlKeyedJoin: AssociationProxy<DlKeyedJoin>;
@@ -39,6 +40,7 @@ export class DestroyAsyncParent extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   set dlKeyedHasOne(value: DlKeyedHasOne | null);

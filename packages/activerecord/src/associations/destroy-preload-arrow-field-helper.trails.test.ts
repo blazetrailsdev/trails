@@ -11,6 +11,7 @@ import {
 } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {
   static _tableName = "accounts";
   declare firm_id: number;
@@ -31,11 +32,13 @@ class ArrowFieldAccount extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface ArrowFieldAccount {
   get firm(): Company | null | Promise<Company | null>;
   set firm(value: Company | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ProtoHelperAccount extends Base {
   static _tableName = "accounts";
   declare firm_id: number;
@@ -56,6 +59,7 @@ class ProtoHelperAccount extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface ProtoHelperAccount {
   get firm(): Company | null | Promise<Company | null>;
   set firm(value: Company | null);

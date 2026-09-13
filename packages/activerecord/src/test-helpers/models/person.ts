@@ -19,11 +19,13 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Person {
   get first_name(): string;
   set first_name(value: unknown);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Person extends Base {
   declare readers: AssociationProxy<Reader>;
   declare secureReaders: AssociationProxy<SecureReader>;
@@ -133,6 +135,7 @@ export class Person extends Base {
     this.attrReadonly("born_at");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Person {
   get reader(): Reader | null | Promise<Reader | null>;
   set reader(value: Reader | null);
@@ -188,6 +191,7 @@ export class PersonWithPolymorphicDependentNullifyComments extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LoosePerson extends Base {
   declare bestFriends: AssociationProxy<LoosePerson>;
 
@@ -200,6 +204,7 @@ export class LoosePerson extends Base {
     this.hasMany("bestFriends", { className: "LoosePerson", foreignKey: "best_friend_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LoosePerson {
   get bestFriend(): LoosePerson | null | Promise<LoosePerson | null>;
   set bestFriend(value: LoosePerson | null);
@@ -212,6 +217,7 @@ acceptsNestedAttributesFor(LoosePerson, "bestFriends");
 
 export class LooseDescendant extends LoosePerson {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TightPerson extends Base {
   declare bestFriends: AssociationProxy<TightPerson>;
 
@@ -223,6 +229,7 @@ export class TightPerson extends Base {
     this.hasMany("bestFriends", { className: "TightPerson", foreignKey: "best_friend_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TightPerson {
   get bestFriend(): TightPerson | null | Promise<TightPerson | null>;
   set bestFriend(value: TightPerson | null);
@@ -264,6 +271,7 @@ export class RichPerson extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NestedPerson extends Base {
   static {
     this._tableName = "people";
@@ -279,6 +287,7 @@ export class NestedPerson extends Base {
     return this.assignAttributes({ bestFriendAttributes: { first_name: newName } });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface NestedPerson {
   get bestFriend(): NestedPerson | null | Promise<NestedPerson | null>;
   set bestFriend(value: NestedPerson | null);

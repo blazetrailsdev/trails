@@ -2,6 +2,7 @@ import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CustomerCarrier extends Base {
   declare carrier_id: number;
   declare customer_id: number;
@@ -20,6 +21,7 @@ export class CustomerCarrier extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CustomerCarrier {
   get customer(): Customer | null | Promise<Customer | null>;
   set customer(value: Customer | null);

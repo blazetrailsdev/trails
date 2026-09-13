@@ -3,6 +3,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Tree } from "./tree.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node extends Base {
   declare children: AssociationProxy<Node>;
   declare name: string;
@@ -16,6 +17,7 @@ export class Node extends Base {
     this.hasMany("children", { className: "Node", foreignKey: "parent_id", dependent: "destroy" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Node {
   get tree(): Tree | null | Promise<Tree | null>;
   set tree(value: Tree | null);

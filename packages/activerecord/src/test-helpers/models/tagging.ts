@@ -4,6 +4,7 @@ import type { Tag } from "./tag.js";
 import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tagging extends Base {
   declare things: AssociationProxy<Base>;
   declare comment: string;
@@ -32,6 +33,7 @@ export class Tagging extends Base {
     this.hasMany("things", { through: "taggable" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tagging {
   get tag(): Tag | null | Promise<Tag | null>;
   set tag(value: Tag | null);

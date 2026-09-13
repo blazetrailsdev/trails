@@ -125,6 +125,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ScChef extends Base {
       declare department_id: number | null;
       declare employable_id: number | null;
@@ -137,6 +138,7 @@ describe("ReflectionTest", () => {
         this.belongsTo("employable", { polymorphic: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface ScChef {
       get employable(): Base | null | Promise<Base | null>;
       set employable(value: Base | null);
@@ -192,6 +194,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC2ChefList extends Base {
       declare employable_list_id: number | null;
       declare employable_list_type: string | null;
@@ -206,6 +209,7 @@ describe("ReflectionTest", () => {
         this.belongsTo("employable", { polymorphic: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface SC2ChefList {
       get employable(): Base | null | Promise<Base | null>;
       set employable(value: Base | null);
@@ -257,6 +261,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC3Book extends Base {
       declare author_id: number | null;
       declare format_record_id: number | null;
@@ -269,6 +274,7 @@ describe("ReflectionTest", () => {
         this.belongsTo("formatRecord", { polymorphic: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface SC3Book {
       get formatRecord(): Base | null | Promise<Base | null>;
       set formatRecord(value: Base | null);
@@ -338,6 +344,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SC4Chef extends Base {
       declare department_id: number | null;
       declare employable_id: number | null;
@@ -355,6 +362,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface SC4Chef {
       get employable(): Base | null | Promise<Base | null>;
       set employable(value: Base | null);
@@ -425,6 +433,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfSubscription extends Base {
       declare subscriber_id: number | null;
       declare book_id: number | null;
@@ -438,6 +447,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface RfSubscription {
       get subBook(): SubBook | null | Promise<SubBook | null>;
       set subBook(value: SubBook | null);
@@ -575,6 +585,7 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfAdminUser extends Base {
       declare name: string | null;
 
@@ -583,6 +594,7 @@ describe("ReflectionTest", () => {
         this.hasOne("user", { className: "RfNested::User" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface RfAdminUser {
       get user(): RfNestedUser | null | Promise<RfNestedUser | null>;
       set user(value: RfNestedUser | null);
@@ -1350,6 +1362,7 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class RfComment extends Base {
       declare blog_post_id: number | null;
 
@@ -1359,6 +1372,7 @@ describe("ReflectionTest", () => {
         this.belongsTo("blogPost", { className: "BlogPost" });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface RfComment {
       get blogPost(): BlogPost | null | Promise<BlogPost | null>;
       set blogPost(value: BlogPost | null);

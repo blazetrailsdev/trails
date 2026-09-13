@@ -5,6 +5,7 @@ import type { MemberType } from "./member-type.js";
 import type { Organization } from "./organization.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MemberDetail extends Base {
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
   declare extra_data: string;
@@ -23,6 +24,7 @@ export class MemberDetail extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MemberDetail {
   get member(): Member | null | Promise<Member | null>;
   set member(value: Member | null);

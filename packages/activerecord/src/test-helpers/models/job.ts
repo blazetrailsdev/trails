@@ -3,6 +3,7 @@ import type { Person } from "./person.js";
 import type { Reference } from "./reference.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Job extends Base {
   declare references: AssociationProxy<Reference>;
   declare people: AssociationProxy<Person>;
@@ -17,6 +18,7 @@ export class Job extends Base {
     this.hasMany("agents", { through: "people" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Job {
   get idealReference(): Reference | null | Promise<Reference | null>;
   set idealReference(value: Reference | null);

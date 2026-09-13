@@ -13,11 +13,13 @@ import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
   get parrot_id(): number;
   set parrot_id(value: unknown);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Pirate extends Base {
   declare parrotsLimit: number;
 
@@ -144,6 +146,7 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
   set parrot(value: Parrot | null);
@@ -173,6 +176,7 @@ acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: t
 acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestructivePirate extends Pirate {
   static {
     this.hasOne("dependentShip", {
@@ -182,6 +186,7 @@ export class DestructivePirate extends Pirate {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestructivePirate {
   get dependentShip(): Ship | null | Promise<Ship | null>;
   set dependentShip(value: Ship | null);
@@ -197,6 +202,7 @@ export class FamousPirate extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpacePirate extends Base {
   declare parrots: AssociationProxy<Parrot>;
   declare birds: AssociationProxy<Bird>;
@@ -213,6 +219,7 @@ export class SpacePirate extends Base {
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpacePirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
   set parrot(value: Parrot | null);

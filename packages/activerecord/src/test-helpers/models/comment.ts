@@ -19,6 +19,7 @@ const OopsExtension = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Comment extends Base {
   declare static limitBy: (l: number) => Relation<Comment>;
   declare static containingTheLetterE: () => Relation<Comment>;
@@ -125,6 +126,7 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Comment {
   get specialPostWithDefaultScope():
     | SpecialPostWithDefaultScope
@@ -132,6 +134,7 @@ export interface Comment {
     | Promise<SpecialPostWithDefaultScope | null>;
   set specialPostWithDefaultScope(value: SpecialPostWithDefaultScope | null);
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Comment {
   get post(): Post | null | Promise<Post | null>;
   set post(value: Post | null);
@@ -149,6 +152,7 @@ export interface Comment {
   set author(value: Base | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpecialComment extends Comment {
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
@@ -160,6 +164,7 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
   set ordinaryPost(value: Post | null);
@@ -184,6 +189,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
   static {
     this.defaultScope((q: any) =>
@@ -192,6 +198,7 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
     this.belongsTo("developer");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentWithDefaultScopeReferencesAssociation {
   get developer(): Developer | null | Promise<Developer | null>;
   set developer(value: Developer | null);

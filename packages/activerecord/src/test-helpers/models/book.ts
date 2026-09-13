@@ -9,6 +9,7 @@ import type { Subscriber } from "./subscriber.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Book extends Base {
   declare citations: AssociationProxy<Citation>;
   declare references: AssociationProxy<Reference>;
@@ -168,6 +169,7 @@ export class Book extends Base {
     this.enum("boolean_status", { enabled: true, disabled: false });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Book {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

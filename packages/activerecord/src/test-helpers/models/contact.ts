@@ -45,6 +45,7 @@ async function extended(base: ContactFakeColumnsHost): Promise<void> {
   base.belongsTo("alternative", { className: "Contact" });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Contact extends Base {
   declare age: number | null;
   declare avatar: Uint8Array | null;
@@ -53,6 +54,7 @@ export class Contact extends Base {
 
   static column = column;
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Contact {
   get alternative(): Contact | null | Promise<Contact | null>;
   set alternative(value: Contact | null);
@@ -60,6 +62,7 @@ export interface Contact {
 
 await extended(Contact);
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContactSti extends Base {
   static column = column;
 
@@ -67,6 +70,7 @@ export class ContactSti extends Base {
     return "ContactSti";
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContactSti {
   get alternative(): Contact | null | Promise<Contact | null>;
   set alternative(value: Contact | null);

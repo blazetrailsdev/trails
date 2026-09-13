@@ -5,6 +5,7 @@ import type { Post } from "./post.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reader extends Base {
   declare first_post_id: number;
   declare person_id: number;
@@ -22,6 +23,7 @@ export class Reader extends Base {
     this.belongsTo("firstPost", (q: any) => q.where({ id: [2, 3] }));
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reader {
   get post(): Post | null | Promise<Post | null>;
   set post(value: Post | null);
@@ -33,6 +35,7 @@ export interface Reader {
   set firstPost(value: FirstPost | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SecureReader extends Base {
   static {
     this._tableName = "readers";
@@ -44,6 +47,7 @@ export class SecureReader extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SecureReader {
   get securePost(): Post | null | Promise<Post | null>;
   set securePost(value: Post | null);
@@ -51,6 +55,7 @@ export interface SecureReader {
   set securePerson(value: Person | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LazyReader extends Base {
   declare static skimmersOrNot: () => Relation<LazyReader>;
 
@@ -64,6 +69,7 @@ export class LazyReader extends Base {
     this.belongsTo("person");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LazyReader {
   get post(): Post | null | Promise<Post | null>;
   set post(value: Post | null);

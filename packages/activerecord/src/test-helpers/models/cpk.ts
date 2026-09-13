@@ -15,6 +15,7 @@ export class CpkAuthor extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBook extends Base {
   declare chapters: AssociationProxy<CpkChapter>;
   declare author_id: number;
@@ -48,6 +49,7 @@ export class CpkBook extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBook {
   get order(): CpkOrder | null | Promise<CpkOrder | null>;
   set order(value: CpkOrder | null);
@@ -64,17 +66,20 @@ export class CpkBestSeller extends CpkBook {
   static _demodulizedName = "BestSeller";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBook extends CpkBook {
   static _demodulizedName = "BrokenBook";
   static {
     this.belongsTo("order", { className: "CpkOrderWithSpecialPrimaryKey" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBrokenBook {
   get order(): CpkOrderWithSpecialPrimaryKey | null | Promise<CpkOrderWithSpecialPrimaryKey | null>;
   set order(value: CpkOrderWithSpecialPrimaryKey | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
   static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
@@ -84,11 +89,13 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBrokenBookWithNonCpkOrder {
   get order(): CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
   set order(value: CpkNonCpkOrder | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNonCpkBook extends CpkBook {
   static _demodulizedName = "NonCpkBook";
   static {
@@ -96,11 +103,13 @@ export class CpkNonCpkBook extends CpkBook {
     this.belongsTo("nonCpkOrder", { className: "CpkNonCpkOrder", foreignKey: ["order_id"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkNonCpkBook {
   get nonCpkOrder(): CpkNonCpkOrder | null | Promise<CpkNonCpkOrder | null>;
   set nonCpkOrder(value: CpkNonCpkOrder | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNullifiedBook extends CpkBook {
   static _demodulizedName = "NullifiedBook";
   static {
@@ -111,11 +120,13 @@ export class CpkNullifiedBook extends CpkBook {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkNullifiedBook {
   get chapter(): CpkChapter | null | Promise<CpkChapter | null>;
   set chapter(value: CpkChapter | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
 
@@ -125,6 +136,7 @@ export class CpkBookWithOrderAgreements extends CpkBook {
     this.hasOne("orderAgreement", { through: "order", source: "orderAgreements" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBookWithOrderAgreements {
   get orderAgreement(): CpkOrderAgreement | null | Promise<CpkOrderAgreement | null>;
   set orderAgreement(value: CpkOrderAgreement | null);
@@ -145,6 +157,7 @@ export class CpkBookDestroyAsync extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapter extends Base {
   declare author_id: number;
   declare book_id: number;
@@ -158,11 +171,13 @@ export class CpkChapter extends Base {
     this.belongsTo("book", { className: "CpkBook", foreignKey: ["author_id", "book_id"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkChapter {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapterDestroyAsync extends Base {
   static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
@@ -175,11 +190,13 @@ export class CpkChapterDestroyAsync extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkChapterDestroyAsync {
   get book(): CpkBookDestroyAsync | null | Promise<CpkBookDestroyAsync | null>;
   set book(value: CpkBookDestroyAsync | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrder extends Base {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
   declare books: AssociationProxy<CpkBook>;
@@ -208,11 +225,13 @@ export class CpkOrder extends Base {
     this.hasMany("tags", { className: "CpkTag", through: "orderTags" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrder {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrder extends CpkOrder {
   static _demodulizedName = "BrokenOrder";
   static {
@@ -221,11 +240,13 @@ export class CpkBrokenOrder extends CpkOrder {
     this.hasOne("book", { className: "CpkBook" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBrokenOrder {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
   static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
@@ -234,11 +255,13 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
     this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrderWithSpecialPrimaryKey {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
   static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
@@ -247,6 +270,7 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
     this.hasOne("book", { className: "CpkNonCpkBook" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkBrokenOrderWithNonCpkBooks {
   get book(): CpkNonCpkBook | null | Promise<CpkNonCpkBook | null>;
   set book(value: CpkNonCpkBook | null);
@@ -259,17 +283,20 @@ export class CpkNonCpkOrder extends CpkOrder {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
     this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrderWithPrimaryKeyAssociatedBook {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithNullifiedBook extends CpkOrder {
   static _demodulizedName = "OrderWithNullifiedBook";
   static {
@@ -280,6 +307,7 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrderWithNullifiedBook {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
@@ -294,6 +322,7 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderAgreement extends Base {
   declare order_id: number;
   declare signature: string;
@@ -305,11 +334,13 @@ export class CpkOrderAgreement extends Base {
     this.belongsTo("order", { className: "CpkOrder" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrderAgreement {
   get order(): CpkOrder | null | Promise<CpkOrder | null>;
   set order(value: CpkOrder | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderTag extends Base {
   declare attached_by: string;
   declare attached_reason: string;
@@ -325,6 +356,7 @@ export class CpkOrderTag extends Base {
     this.belongsTo("order", { className: "CpkOrder" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkOrderTag {
   get tag(): CpkTag | null | Promise<CpkTag | null>;
   set tag(value: CpkTag | null);
@@ -363,6 +395,7 @@ export class CpkPost extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkComment extends Base {
   declare commentable_author: string;
   declare commentable_title: string;
@@ -384,6 +417,7 @@ export class CpkComment extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkComment {
   get commentable(): Base | null | Promise<Base | null>;
   set commentable(value: Base | null);
@@ -391,6 +425,7 @@ export interface CpkComment {
   set post(value: CpkPost | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkReview extends Base {
   declare author_id: number;
   declare comment: string;
@@ -407,6 +442,7 @@ export class CpkReview extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkReview {
   get book(): CpkBook | null | Promise<CpkBook | null>;
   set book(value: CpkBook | null);
@@ -428,6 +464,7 @@ export class CpkCar extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkCarReview extends Base {
   declare car_make: string;
   declare car_model: string;
@@ -441,6 +478,7 @@ export class CpkCarReview extends Base {
     this.belongsTo("car", { className: "CpkCar", foreignKey: ["car_make", "car_model"] });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CpkCarReview {
   get car(): CpkCar | null | Promise<CpkCar | null>;
   set car(value: CpkCar | null);

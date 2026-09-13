@@ -3,6 +3,7 @@ import type { Category } from "./category.js";
 import type { Owner } from "./owner.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Essay extends Base {
   declare author_id: string;
   declare book_id: number;
@@ -19,6 +20,7 @@ export class Essay extends Base {
     this.hasOne("owner", { primaryKey: "name" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Essay {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);

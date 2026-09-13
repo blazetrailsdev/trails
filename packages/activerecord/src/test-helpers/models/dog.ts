@@ -1,6 +1,7 @@
 import type { DogLover } from "./dog-lover.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Dog extends Base {
   declare alias: string;
   declare breeder_id: number;
@@ -17,6 +18,7 @@ export class Dog extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Dog {
   get breeder(): DogLover | null | Promise<DogLover | null>;
   set breeder(value: DogLover | null);

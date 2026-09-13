@@ -3,6 +3,7 @@ import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tag extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggables: AssociationProxy<Base>;
@@ -26,6 +27,7 @@ export class Tag extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tag {
   get tagging(): Tagging | null | Promise<Tagging | null>;
   set tagging(value: Tagging | null);

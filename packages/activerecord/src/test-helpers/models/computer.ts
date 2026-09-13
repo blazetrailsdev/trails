@@ -3,6 +3,7 @@ import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Computer extends Base {
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare extendedWarranty: number;
@@ -15,6 +16,7 @@ export class Computer extends Base {
     this.hasOne("firm", { through: "developer" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Computer {
   get developer(): Developer | null | Promise<Developer | null>;
   set developer(value: Developer | null);

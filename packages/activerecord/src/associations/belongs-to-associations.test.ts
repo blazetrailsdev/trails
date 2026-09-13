@@ -80,6 +80,7 @@ class CarPolymorphicName extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class WheelPolymorphicName extends Base {
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -96,6 +97,7 @@ class WheelPolymorphicName extends Base {
     return CarPolymorphicName;
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface WheelPolymorphicName {
   get wheelable(): Base | null | Promise<Base | null>;
   set wheelable(value: Base | null);
@@ -353,6 +355,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("optional relation can be set per model", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class FirstModel extends Base {
       static _tableName = "accounts";
       static {
@@ -360,10 +363,12 @@ describe("BelongsToAssociationsTest", () => {
         this.belongsTo("company", { inverseOf: false });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface FirstModel {
       get company(): Company | null | Promise<Company | null>;
       set company(value: Company | null);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SecondModel extends Base {
       static _tableName = "accounts";
       static {
@@ -371,6 +376,7 @@ describe("BelongsToAssociationsTest", () => {
         this.belongsTo("company", { inverseOf: false });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface SecondModel {
       get company(): Company | null | Promise<Company | null>;
       set company(value: Company | null);
@@ -386,12 +392,14 @@ describe("BelongsToAssociationsTest", () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: true, inverseOf: false });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface TempModel {
         get company(): Company | null | Promise<Company | null>;
         set company(value: Company | null);
@@ -407,12 +415,14 @@ describe("BelongsToAssociationsTest", () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: false, inverseOf: false });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface TempModel {
         get company(): Company | null | Promise<Company | null>;
         set company(value: Company | null);
@@ -429,12 +439,14 @@ describe("BelongsToAssociationsTest", () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { inverseOf: false });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface TempModel {
         get company(): Company | null | Promise<Company | null>;
         set company(value: Company | null);
@@ -451,12 +463,14 @@ describe("BelongsToAssociationsTest", () => {
     const david = await Developer.find(developers("david").id);
     const jamis = await Developer.find(developers("jamis").id);
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class TempDefault extends Base {
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { default: () => david, inverseOf: false });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface TempDefault {
       get developer(): Developer | null | Promise<Developer | null>;
       set developer(value: Developer | null);
@@ -473,6 +487,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("default with lambda", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class TempDefault extends Base {
       static _tableName = "ships";
       static {
@@ -485,6 +500,7 @@ describe("BelongsToAssociationsTest", () => {
         return Developer.first();
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface TempDefault {
       get developer(): Developer | null | Promise<Developer | null>;
       set developer(value: Developer | null);
@@ -504,6 +520,7 @@ describe("BelongsToAssociationsTest", () => {
     const david = await Developer.find(developers("david").id);
     const jamis = await Developer.find(developers("jamis").id);
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class TempDefault extends Base {
       static _tableName = "ships";
       static {
@@ -514,6 +531,7 @@ describe("BelongsToAssociationsTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface TempDefault {
       get developer(): Developer | null | Promise<Developer | null>;
       set developer(value: Developer | null);
@@ -1857,12 +1875,14 @@ describe("BelongsToAssociationsTest", () => {
 
   it("polymorphic with false", async () => {
     expect(() => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempPost extends Base {
         static _tableName = "posts";
         static {
           this.belongsTo("category", { polymorphic: false } as any);
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface TempPost {
         get category(): Category | null | Promise<Category | null>;
         set category(value: Category | null);
@@ -2026,6 +2046,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("runs parent presence check if parent changed or nil", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ShipRequired extends Base {
       declare name: any;
 
@@ -2034,6 +2055,7 @@ describe("BelongsToAssociationsTest", () => {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface ShipRequired {
       get developer(): Developer | null | Promise<Developer | null>;
       set developer(value: Developer | null);
@@ -2059,6 +2081,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("skips parent presence check if parent has not changed", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ShipRequired extends Base {
       declare name: any;
 
@@ -2067,6 +2090,7 @@ describe("BelongsToAssociationsTest", () => {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface ShipRequired {
       get developer(): Developer | null | Promise<Developer | null>;
       set developer(value: Developer | null);
@@ -2087,6 +2111,7 @@ describe("BelongsToAssociationsTest", () => {
     Base.belongsToRequiredValidatesForeignKey = true;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempShip extends Base {
         declare name: any;
 
@@ -2095,6 +2120,7 @@ describe("BelongsToAssociationsTest", () => {
           this.belongsTo("developer", { required: true, inverseOf: false });
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       interface TempShip {
         get developer(): Developer | null | Promise<Developer | null>;
         set developer(value: Developer | null);

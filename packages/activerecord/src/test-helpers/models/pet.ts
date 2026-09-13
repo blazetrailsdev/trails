@@ -7,6 +7,7 @@ import type { Toy } from "./toy.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Pet extends Base {
   declare current_user: string;
   declare toys: AssociationProxy<Toy>;
@@ -36,6 +37,7 @@ export class Pet extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pet {
   get owner(): Owner | null | Promise<Owner | null>;
   set owner(value: Owner | null);

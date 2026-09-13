@@ -10,6 +10,7 @@ function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Eye extends Base {
   afterCreateCallbacksStack: boolean[] = [];
   afterUpdateCallbacksStack: boolean[] = [];
@@ -58,6 +59,7 @@ export class Eye extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Eye {
   get irisWithReadOnlyForeignKey():
     | IrisWithReadOnlyForeignKey
@@ -65,6 +67,7 @@ export interface Eye {
     | Promise<IrisWithReadOnlyForeignKey | null>;
   set irisWithReadOnlyForeignKey(value: IrisWithReadOnlyForeignKey | null);
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Eye {
   get iris(): Iris | null | Promise<Iris | null>;
   set iris(value: Iris | null);
@@ -73,6 +76,7 @@ export interface Eye {
 acceptsNestedAttributesFor(Eye, "iris");
 acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Iris extends Base {
   declare color: string;
   declare eye_id: number;
@@ -107,6 +111,7 @@ export class Iris extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Iris {
   get eye(): Eye | null | Promise<Eye | null>;
   set eye(value: Eye | null);

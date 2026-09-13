@@ -4,6 +4,7 @@ import type { Firm } from "./company.js";
 import type { SpecialDeveloper } from "./developer.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Contract extends Base {
   declare metadata: unknown;
   declare company_id: number;
@@ -44,6 +45,7 @@ export class Contract extends Base {
     this.writeAttribute("metadata", { code, company_id: companyId, developer_id: developerId });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Contract {
   get company(): Company | null | Promise<Company | null>;
   set company(value: Company | null);
@@ -59,6 +61,7 @@ export class NewContract extends Contract {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpecialContract extends Base {
   static {
     this._tableName = "contracts";
@@ -66,6 +69,7 @@ export class SpecialContract extends Base {
     this.belongsTo("specialDeveloper", { foreignKey: "developer_id" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialContract {
   get company(): Company | null | Promise<Company | null>;
   set company(value: Company | null);

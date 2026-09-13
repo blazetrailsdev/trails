@@ -10,6 +10,7 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Ship extends Base {
   declare parts: AssociationProxy<ShipPart>;
   declare treasures: AssociationProxy<Treasure>;
@@ -47,6 +48,7 @@ export class Ship extends Base {
     throwAbort();
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Ship {
   get pirate(): Pirate | null | Promise<Pirate | null>;
   set pirate(value: Pirate | null);
@@ -77,6 +79,7 @@ export class ShipWithoutNestedAttributes extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Prisoner extends Base {
   declare ship_id: number;
 
@@ -88,11 +91,13 @@ export class Prisoner extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Prisoner {
   get ship(): ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
   set ship(value: ShipWithoutNestedAttributes | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FamousShip extends Base {
   static {
     this.tableName = "ships";
@@ -100,6 +105,7 @@ export class FamousShip extends Base {
     this.validates("name", { presence: true, on: "conference" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FamousShip {
   get famousPirate(): FamousPirate | null | Promise<FamousPirate | null>;
   set famousPirate(value: FamousPirate | null);

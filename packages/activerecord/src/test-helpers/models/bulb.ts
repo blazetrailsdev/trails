@@ -5,6 +5,7 @@ import { Base } from "../../base.js";
 import { association } from "../../associations.js";
 import { association as associationInstance } from "../../associations/instance-methods.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {
   declare static awesome: () => Relation<Bulb>;
   declare car_id: number;
@@ -41,6 +42,7 @@ export class Bulb extends Base {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Bulb {
   get car(): Car | null | Promise<Car | null>;
   set car(value: Car | null);

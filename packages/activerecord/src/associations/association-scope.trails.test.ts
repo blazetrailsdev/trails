@@ -47,6 +47,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AsPost extends Base {
       declare as_author_id: number | null;
       declare title: string | null;
@@ -61,6 +62,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface AsPost {
       get as_author(): AsAuthor | null | Promise<AsAuthor | null>;
       set as_author(value: AsAuthor | null);
@@ -360,6 +362,7 @@ describe("AssociationScope", () => {
   });
 
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class AsOneOwner extends Base {
       static {
         this.attribute("id", "integer");
@@ -369,6 +372,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface AsOneOwner {
       get as_one_image(): AsOneImage | null | Promise<AsOneImage | null>;
       set as_one_image(value: AsOneImage | null);
@@ -400,6 +404,7 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PolyComment extends Base {
       declare commentable_id: number | null;
       declare commentable_type: string | null;
@@ -410,6 +415,7 @@ describe("AssociationScope", () => {
         this.belongsTo("commentable", { polymorphic: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface PolyComment {
       get commentable(): Base | null | Promise<Base | null>;
       set commentable(value: Base | null);
@@ -472,6 +478,7 @@ describe("AssociationScope", () => {
         this.primaryKey = "uuid";
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class UuidComment extends Base {
       declare commentable_id: string | null;
       declare commentable_type: string | null;
@@ -482,6 +489,7 @@ describe("AssociationScope", () => {
         this.belongsTo("commentable", { polymorphic: true });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface UuidComment {
       get commentable(): Base | null | Promise<Base | null>;
       set commentable(value: Base | null);
@@ -518,6 +526,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class CcMembership extends Base {
       declare cc_author_id: number | null;
       declare cc_tag_id: number | null;
@@ -533,6 +542,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface CcMembership {
       get cc_tag(): CcTag | null | Promise<CcTag | null>;
       set cc_tag(value: CcTag | null);
@@ -647,6 +657,7 @@ describe("AssociationScope", () => {
   });
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotUser extends Base {
       static {
         this.attribute("id", "integer");
@@ -660,12 +671,14 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface HotUser {
       get hot_account(): HotAccount | null | Promise<HotAccount | null>;
       set hot_account(value: HotAccount | null);
       get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
       set hot_settings(value: HotSettings | null);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class HotAccount extends Base {
       declare hot_user_id: number | null;
 
@@ -678,6 +691,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface HotAccount {
       get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
       set hot_settings(value: HotSettings | null);
@@ -728,6 +742,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class ThroughMembership extends Base {
       declare through_author_id: number | null;
       declare through_post_id: number | null;
@@ -741,6 +756,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface ThroughMembership {
       get through_post(): ThroughPost | null | Promise<ThroughPost | null>;
       set through_post(value: ThroughPost | null);
@@ -772,6 +788,7 @@ describe("AssociationScope", () => {
   });
 
   it("through chain with a polymorphic sourceType that repeats a table aliases the join and keeps the _type WHERE qualified", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class PstGallery extends Base {
       declare pst_gallery_id: number | null;
       declare imageable_id: number | null;
@@ -798,6 +815,7 @@ describe("AssociationScope", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface PstGallery {
       get imageable(): Base | null | Promise<Base | null>;
       set imageable(value: Base | null);

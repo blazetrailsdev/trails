@@ -5,6 +5,7 @@ import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Toy extends Base {
   declare sponsors: AssociationProxy<Sponsor>;
   declare static withPet: () => Relation<Toy>;
@@ -24,6 +25,7 @@ export class Toy extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Toy {
   get pet(): Pet | null | Promise<Pet | null>;
   set pet(value: Pet | null);

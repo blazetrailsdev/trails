@@ -2,6 +2,7 @@ import type { Dashboard } from "./dashboard.js";
 import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Minivan extends Base {
   declare color: string;
   declare minivan_id: string;
@@ -15,6 +16,7 @@ export class Minivan extends Base {
     this.attrReadonly("color");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Minivan {
   get speedometer(): Speedometer | null | Promise<Speedometer | null>;
   set speedometer(value: Speedometer | null);

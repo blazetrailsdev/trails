@@ -1,6 +1,7 @@
 import type { Course } from "./course.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Entrant extends Base {
   declare course_id: number;
   declare name: string;
@@ -9,6 +10,7 @@ export class Entrant extends Base {
     this.belongsTo("course");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Entrant {
   get course(): Course | null | Promise<Course | null>;
   set course(value: Course | null);

@@ -6,6 +6,7 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Membership extends Base {
   declare isMembership: () => boolean;
   declare membershipBang: () => Promise<true | undefined>;
@@ -54,6 +55,7 @@ export class Membership extends Base {
     this.belongsTo("club");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Membership {
   get member(): Member | null | Promise<Member | null>;
   set member(value: Member | null);
@@ -61,6 +63,7 @@ export interface Membership {
   set club(value: Club | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CurrentMembership extends Membership {
   static {
     registerModel(CurrentMembership);
@@ -69,6 +72,7 @@ export class CurrentMembership extends Membership {
     this.belongsTo("club", { inverseOf: "membership" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CurrentMembership {
   get member(): Member | null | Promise<Member | null>;
   set member(value: Member | null);
@@ -76,6 +80,7 @@ export interface CurrentMembership {
   set club(value: Club | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SuperMembership extends Membership {
   static {
     registerModel(SuperMembership);
@@ -84,6 +89,7 @@ export class SuperMembership extends Membership {
     this.belongsTo("club");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SuperMembership {
   get member(): Member | null | Promise<Member | null>;
   set member(value: Member | null);
@@ -99,6 +105,7 @@ export class SelectedMembership extends Membership {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TenantMembership extends Membership {
   static currentMember: any = null;
 
@@ -115,6 +122,7 @@ export class TenantMembership extends Membership {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TenantMembership {
   get member(): Member | null | Promise<Member | null>;
   set member(value: Member | null);

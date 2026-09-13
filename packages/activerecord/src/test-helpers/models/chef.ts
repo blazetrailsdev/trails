@@ -4,6 +4,7 @@ import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Chef extends Base {
   declare recipes: AssociationProxy<Recipe>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
@@ -19,21 +20,25 @@ export class Chef extends Base {
     this.hasMany("recipes");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Chef {
   get employable(): Base | null | Promise<Base | null>;
   set employable(value: Base | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ChefList extends Chef {
   static {
     this.belongsTo("employableList", { polymorphic: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefList {
   get employableList(): Base | null | Promise<Base | null>;
   set employableList(value: Base | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ChefWithPolymorphicInverseOf extends Chef {
   beforeValidationCallbacksCounter: number = 0;
   beforeCreateCallbacksCounter: number = 0;
@@ -65,6 +70,7 @@ export class ChefWithPolymorphicInverseOf extends Chef {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefWithPolymorphicInverseOf {
   get employable(): Base | null | Promise<Base | null>;
   set employable(value: Base | null);

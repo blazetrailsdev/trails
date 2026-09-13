@@ -2650,6 +2650,7 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class InvValPost extends Base {
       declare author_id: number | null;
       declare title: string | null;
@@ -2665,6 +2666,7 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     interface InvValPost {
       get author(): InvValAuthor | null | Promise<InvValAuthor | null>;
       set author(value: InvValAuthor | null);

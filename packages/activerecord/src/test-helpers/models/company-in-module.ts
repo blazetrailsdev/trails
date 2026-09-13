@@ -138,6 +138,7 @@ export class MyAppBillingNestedFirm extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBillingAccount extends Base {
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Account";
@@ -168,6 +169,7 @@ export class MyAppBillingAccount extends Base {
     }
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MyAppBillingAccount {
   get nestedQualifiedBillingFirm():
     | MyAppBillingNestedFirm
@@ -180,6 +182,7 @@ export interface MyAppBillingAccount {
     | Promise<MyAppBillingNestedFirm | null>;
   set nestedUnqualifiedBillingFirm(value: MyAppBillingNestedFirm | null);
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MyAppBillingAccount {
   get firm(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
   set firm(value: MyAppBusinessFirm | null);

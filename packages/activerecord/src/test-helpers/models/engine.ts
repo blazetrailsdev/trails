@@ -1,6 +1,7 @@
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Engine extends Base {
   declare car_id: number;
 
@@ -12,6 +13,7 @@ export class Engine extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Engine {
   get myCar(): Car | null | Promise<Car | null>;
   set myCar(value: Car | null);

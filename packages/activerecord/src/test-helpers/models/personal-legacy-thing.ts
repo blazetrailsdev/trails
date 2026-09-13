@@ -1,6 +1,7 @@
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PersonalLegacyThing extends Base {
   declare person_id: number;
   declare tps_report_number: number;
@@ -11,6 +12,7 @@ export class PersonalLegacyThing extends Base {
     this.belongsTo("person", { counterCache: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PersonalLegacyThing {
   get person(): Person | null | Promise<Person | null>;
   set person(value: Person | null);

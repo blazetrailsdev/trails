@@ -2,6 +2,7 @@ import type { Human } from "./human.js";
 import type { Zine } from "./zine.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Interest extends Base {
   declare human_id: number;
   declare polymorphic_human_id: number;
@@ -26,6 +27,7 @@ export class Interest extends Base {
     this.belongsTo("zine", { inverseOf: "interests" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Interest {
   get human(): Human | null | Promise<Human | null>;
   set human(value: Human | null);

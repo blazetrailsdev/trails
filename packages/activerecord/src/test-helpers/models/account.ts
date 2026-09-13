@@ -4,6 +4,7 @@ import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Account extends Base {
   declare static open: () => Relation<Account>;
   declare static available: () => Relation<Account>;
@@ -67,6 +68,7 @@ export class Account extends Base {
     return "Sir, yes sir!";
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Account {
   get firm(): Company | null | Promise<Company | null>;
   set firm(value: Company | null);

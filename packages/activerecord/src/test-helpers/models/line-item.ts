@@ -3,6 +3,7 @@ import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LineItem extends Base {
   declare discountApplications: AssociationProxy<LineItemDiscountApplication>;
   declare amount: number;
@@ -13,11 +14,13 @@ export class LineItem extends Base {
     this.hasMany("discountApplications", { className: "LineItemDiscountApplication" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LineItem {
   get invoice(): Invoice | null | Promise<Invoice | null>;
   set invoice(value: Invoice | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LineItemDiscountApplication extends Base {
   declare discount_id: number;
   declare line_item_id: number;
@@ -27,6 +30,7 @@ export class LineItemDiscountApplication extends Base {
     this.belongsTo("discount");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LineItemDiscountApplication {
   get lineItem(): LineItem | null | Promise<LineItem | null>;
   set lineItem(value: LineItem | null);

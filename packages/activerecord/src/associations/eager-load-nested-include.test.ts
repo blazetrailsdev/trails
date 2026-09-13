@@ -8,6 +8,7 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ShapeExpression extends Base {
   declare shape_type: string;
   declare shape_id: number;
@@ -24,6 +25,7 @@ class ShapeExpression extends Base {
     this.belongsTo("paint", { polymorphic: true });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface ShapeExpression {
   get shape(): Base | null | Promise<Base | null>;
   set shape(value: Base | null);
@@ -45,6 +47,7 @@ class Triangle extends Base {
     this._tableName = "triangles";
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class PaintColor extends Base {
   declare non_poly_one_id: number;
 
@@ -57,10 +60,12 @@ class PaintColor extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface PaintColor {
   get nonPoly(): NonPolyOne | null | Promise<NonPolyOne | null>;
   set nonPoly(value: NonPolyOne | null);
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class PaintTexture extends Base {
   declare non_poly_two_id: number;
 
@@ -73,6 +78,7 @@ class PaintTexture extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface PaintTexture {
   get nonPoly(): NonPolyTwo | null | Promise<NonPolyTwo | null>;
   set nonPoly(value: NonPolyTwo | null);

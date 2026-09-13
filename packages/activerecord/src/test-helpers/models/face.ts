@@ -2,6 +2,7 @@ import type { Human } from "./human.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Face extends Base {
   declare description: string;
   declare human_id: number;
@@ -35,6 +36,7 @@ export class Face extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Face {
   get human(): Human | null | Promise<Human | null>;
   set human(value: Human | null);

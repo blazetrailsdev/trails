@@ -8,6 +8,7 @@ import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
 import { Notification } from "./notification.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class User extends Base {
   declare jobsPool: AssociationProxy<Job>;
   declare familyMembers: AssociationProxy<User>;
@@ -36,6 +37,7 @@ export class User extends Base {
     this.hasOne("rentedRoom", { className: "Room", foreignKey: "tenant_id", dependent: "destroy" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface User {
   get room(): Room | null | Promise<Room | null>;
   set room(value: Room | null);

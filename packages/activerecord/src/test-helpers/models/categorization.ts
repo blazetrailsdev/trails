@@ -5,6 +5,7 @@ import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Categorization extends Base {
   declare postTaggings: AssociationProxy<Tagging>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
@@ -36,6 +37,7 @@ export class Categorization extends Base {
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Categorization {
   get post(): Post | null | Promise<Post | null>;
   set post(value: Post | null);
@@ -49,6 +51,7 @@ export interface Categorization {
   set authorUsingCustomPk(value: Author | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpecialCategorization extends Base {
   static {
     this._tableName = "categorizations";
@@ -57,6 +60,7 @@ export class SpecialCategorization extends Base {
     this.belongsTo("category");
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialCategorization {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
