@@ -97,7 +97,6 @@ import {
 } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
@@ -362,27 +361,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   _previousReadUncommitted: unknown = null;
 
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  override async internalExecute(
-    sql: string,
-    name: string = "SQL",
-    binds: unknown[] = [],
-    {
-      materializeTransactions = true,
-      prepare = false,
-      async = false,
-      allowRetry = false,
-    }: {
-      materializeTransactions?: boolean;
-      prepare?: boolean;
-      async?: boolean;
-      allowRetry?: boolean;
-    } = {},
-  ): Promise<unknown> {
-    sql = this.preprocessQuery(sql);
-    return this.rawExecute(sql, name, binds, prepare, async, allowRetry, materializeTransactions);
-  }
-
   override quote(value: unknown): string {
     return sqliteQuote.call(this, value);
   }
@@ -469,19 +447,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @noRailsEquivalent PERMANENT */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
-    const raw = sqlType || "";
-    const castType = this.lookupCastType(raw);
-    return new SqlTypeMetadata({
-      sqlType: raw,
-      type: castType.type(),
-      limit: castType.limit,
-      precision: castType.precision,
-      scale: castType.scale,
-    });
   }
 
   override supportsDdlTransactions(): boolean {
@@ -780,7 +745,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
-  createSchemaDumper(options: Record<string, unknown> = {}): Sqlite3SchemaDumper {
+  createSchemaDumper(options: Record<string, unknown>): Sqlite3SchemaDumper {
     return Sqlite3SchemaDumper.create(this, options);
   }
 

@@ -28,7 +28,7 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
-  override createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
+  override createSchemaDumper(options: Record<string, unknown>): MysqlSchemaDumper {
     return MysqlSchemaDumper.create(
       this as unknown as Parameters<typeof MysqlSchemaDumper.create>[0],
       options,

@@ -128,7 +128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
       const lines = new StringIO();
-      await adapter.createSchemaDumper().dumpTable(lines, "ex_idx_both");
+      await adapter.createSchemaDumper({}).dumpTable(lines, "ex_idx_both");
       const indexLine = lines
         .string()
         .split("\n")
@@ -990,7 +990,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name TEXT
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const id = cols.find((c) => c.name === "id")!;
       expect(id.isIdentity()).toBe(true);
       expect(id.isAutoIncrementedByDb()).toBe(true);
@@ -1005,7 +1005,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           sum INT GENERATED ALWAYS AS (a + b) STORED
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const sum = cols.find((c) => c.name === "sum")!;
       expect(sum.isVirtual()).toBe(true);
       expect(sum.hasDefault).toBe(false);
@@ -1019,7 +1019,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           tags TEXT[]
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const tags = cols.find((c) => c.name === "tags")!;
       expect(tags.array).toBe(true);
       expect(tags.sqlType).toBe("text");
@@ -1035,7 +1035,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
 
       await adapter.loadAdditionalTypes();
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const mood = cols.find((c) => c.name === "mood")!;
       expect(mood.isEnum()).toBe(true);
     });

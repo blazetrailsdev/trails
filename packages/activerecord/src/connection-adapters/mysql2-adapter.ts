@@ -263,27 +263,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  override async internalExecQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
-  ): Promise<Result> {
-    sql = this.preprocessQuery(sql);
-    const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
-    return await this.log(sql, name, binds ?? [], typeCastedBinds, false, (payload) =>
-      this.withRawConnection({ allowRetry: options?.allowRetry ?? false }, async (conn) => {
-        const mysqlConn = conn as unknown as mysql.Connection;
-        const raw = await this.performQuery(mysqlConn, sql, binds ?? [], typeCastedBinds, {
-          prepare: options?.prepare ?? false,
-          notificationPayload: payload,
-        });
-        return this.castResult(raw);
-      }),
-    );
-  }
-
   async supportsJson(): Promise<boolean> {
     if (await this.isMariadb()) return false;
     return (await this.databaseVersion).compare("5.7.8") >= 0;
@@ -433,44 +412,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
     return true;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  override async internalExecute(
-    sql: string,
-    name: string | null = "SQL",
-    binds: unknown[] = [],
-    {
-      materializeTransactions = true,
-      allowRetry = false,
-      prepare: prepareOption = false,
-      async = false,
-    }: {
-      materializeTransactions?: boolean;
-      allowRetry?: boolean;
-      prepare?: boolean;
-      async?: boolean;
-    } = {},
-  ): Promise<Mysql2RawResult> {
-    sql = this.preprocessQuery(sql);
-    try {
-      if (materializeTransactions) {
-        await this.materializeTransactions();
-      }
-      const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-      return await this.log(sql, name, binds, typeCastedBinds, async, (payload) =>
-        this.withRawConnection({ materializeTransactions: false, allowRetry }, async (rawConn) => {
-          const conn = rawConn as unknown as mysql.Connection;
-          const rawResult = await this.performQuery(conn, sql, binds, typeCastedBinds, {
-            prepare: prepareOption,
-          });
-          payload.row_count = rawResult.affectedRows;
-          return rawResult;
-        }),
-      );
-    } finally {
-      if (materializeTransactions) this.dirtyCurrentTransaction();
-    }
   }
 
   /** @internal */

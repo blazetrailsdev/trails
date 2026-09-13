@@ -80,7 +80,6 @@ import type {
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import { preprocessQuery } from "./abstract/database-statements.js";
 import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
 const getTemporalTypeParser = makeGetTypeParser(pg.types);
@@ -613,7 +612,10 @@ export class PostgreSQLAdapter
     return pgLookupCastTypeFromColumn.call(this, column);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall fetch — PERMANENT
+   */
   override async canPerformCaseInsensitiveComparisonFor(column: {
     sqlType?: string | null;
   }): Promise<boolean> {
@@ -639,94 +641,13 @@ export class PostgreSQLAdapter
             AND castsource = ${this.quote(sqlType)}::regtype
         )
       ) AS can_lower`;
-    const rows = (await this.internalExecQuery(sql, "SCHEMA")).toArray();
-    const result = (rows[0]?.can_lower as boolean) === true;
+    const rawResult = (await this.internalExecute(sql, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    })) as { rows: unknown[][] };
+    const result = rawResult.rows[0][0] === true;
     this._caseInsensitiveCache.set(sqlType, result);
     return result;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  override async internalExecQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds?: unknown[],
-    options?: {
-      prepare?: boolean;
-      async?: boolean;
-      allowRetry?: boolean;
-      materializeTransactions?: boolean;
-    },
-  ): Promise<Result> {
-    sql = this.preprocessQuery(sql);
-    interface ArrayQueryResult {
-      fields: Array<{ name: string; dataTypeID: number }>;
-      rows: unknown[][];
-    }
-    const bindArray = this.typeCastedBinds(binds) ?? [];
-    const rewritten = this.rewriteBinds(sql, bindArray);
-    const pgResult: ArrayQueryResult = await this.log(
-      rewritten,
-      name,
-      binds ?? [],
-      bindArray,
-      options?.async ?? false,
-      async (payload) => {
-        try {
-          const r = await this.withRawConnection(
-            {
-              materializeTransactions: options?.materializeTransactions ?? true,
-              allowRetry: options?.allowRetry ?? false,
-            },
-            async (conn) => {
-              const client = conn as unknown as pg.Client;
-              try {
-                return await this._performQuery<ArrayQueryResult & pg.QueryResult>(
-                  client,
-                  rewritten,
-                  binds ?? [],
-                  bindArray,
-                  {
-                    prepare: options?.prepare ?? false,
-                    notificationPayload: payload,
-                    rowMode: "array",
-                  },
-                );
-              } catch (e: any) {
-                throw this.translateExceptionClass(e, rewritten, bindArray);
-              }
-            },
-          );
-          payload.row_count = r.rows?.length ?? 0;
-          return r;
-        } catch (e: any) {
-          throw this.translateExceptionClass(e, rewritten, bindArray);
-        }
-      },
-    );
-
-    const fields = pgResult.fields ?? [];
-    if (fields.length === 0) return Result.fromRowHashes([]);
-
-    const missing = new Set<number>();
-    for (const f of fields) {
-      if (!this.typeMap.isKey(f.dataTypeID)) missing.add(f.dataTypeID);
-    }
-    if (missing.size > 0) {
-      await this.loadAdditionalTypes([...missing]);
-    }
-
-    const columns = fields.map((f) => f.name);
-    const columnTypes: Record<string | number, ValueType> = {};
-    for (let i = 0; i < fields.length; i++) {
-      const f = fields[i];
-      const type = this.getOidType(f.dataTypeID, -1, f.name, "");
-      columnTypes[i] = type;
-      if (!/^\d+$/.test(f.name)) {
-        columnTypes[f.name] = type;
-      }
-    }
-    const rowArrays = pgResult.rows;
-    return new Result(columns, rowArrays, columnTypes as Record<string, ValueType>);
   }
 
   /** @internal */
@@ -1126,55 +1047,6 @@ export class PostgreSQLAdapter
 
   /** @internal */
   executeBatch = pgExecuteBatch;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  override async internalExecute(
-    sql: string,
-    name: string | null = "SQL",
-    binds: unknown[] = [],
-    {
-      materializeTransactions = true,
-      allowRetry = false,
-      prepare = false,
-      async = false,
-    }: {
-      materializeTransactions?: boolean;
-      allowRetry?: boolean;
-      prepare?: boolean;
-      async?: boolean;
-    } = {},
-  ): Promise<unknown> {
-    sql = preprocessQuery.call(this as any, sql) as string;
-    try {
-      if (materializeTransactions) await this.materializeTransactions();
-      const hasBinds = binds.length > 0;
-      const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
-      const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
-      const result = await this.log(runSql, name, binds, bindArray, async, (payload) =>
-        this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
-          const client = conn as unknown as pg.Client;
-          const runResult = await this._performQuery(client, runSql, binds, bindArray, {
-            prepare,
-            notificationPayload: payload,
-            rowMode: "array",
-          });
-          const count = runResult.rowCount ?? runResult.rows.length;
-          payload.row_count = count;
-          const pgResult = new Result(
-            (runResult.fields ?? []).map((f) => f.name),
-            (runResult.rows ?? []) as unknown[][],
-          ).toArray() as unknown as pg.QueryResult;
-          for (const [key, value] of Object.entries(runResult)) {
-            Object.defineProperty(pgResult, key, { value, writable: true, configurable: true });
-          }
-          return pgResult;
-        }),
-      );
-      return result;
-    } finally {
-      if (materializeTransactions) this.dirtyCurrentTransaction();
-    }
-  }
 
   static nativeDatabaseTypes(this: typeof PostgreSQLAdapter): NativeDatabaseTypes {
     if (this._nativeDatabaseTypes == null) {
@@ -2085,7 +1957,7 @@ export class PostgreSQLAdapter
     return new PgSchemaCreation(this);
   }
 
-  createSchemaDumper(options: Record<string, unknown> = {}): PgSchemaDumper {
+  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
     return PgSchemaDumper.create(this, options);
   }
 
@@ -2343,12 +2215,6 @@ export interface PostgreSQLAdapter {
     ...constraints: (string | undefined)[]
   ): Promise<void>;
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides
-   */
-  validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
-
   schemaNames(): Promise<string[]>;
 
   createSchema(
@@ -2371,9 +2237,6 @@ export interface PostgreSQLAdapter {
   primaryKey(tableName: string): Promise<string | string[] | null>;
 
   pkAndSequenceFor(table: string): Promise<[string, Name | null] | null>;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  columns(tableName: string): Promise<Column[]>;
 
   changeColumn(
     tableName: string,
@@ -2504,22 +2367,6 @@ export interface PostgreSQLAdapter {
 
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  tables(): Promise<string[]>;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  views(): Promise<string[]>;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  tableExists(name: string): Promise<boolean>;
-
-  /** @noRailsEquivalent CONVERGEABLE converge-concrete-adapter-schema-statement-overrides */
-  foreignKeyExists(
-    fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
-  ): Promise<boolean>;
 
   createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 

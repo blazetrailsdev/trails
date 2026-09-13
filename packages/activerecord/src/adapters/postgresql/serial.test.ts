@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   const columnNamed = async (table: string, name: string): Promise<Column> => {
-    const cols = await adapter.columns(table);
+    const cols = (await adapter.columns(table)) as Column[];
     const col = cols.find((c) => c.name === name);
     if (!col) throw new Error(`column ${name} not found on ${table}`);
     return col;
@@ -120,7 +120,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial columns", async () => {
-      const columns = await adapter.columns("foo");
+      const columns = (await adapter.columns("foo")) as Column[];
       for (const column of columns) {
         expect(column.type).toBe("integer");
         expect(column.isSerial()).toBe(true);
@@ -154,7 +154,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial columns", async () => {
-      const columns = await adapter.columns(tableName);
+      const columns = (await adapter.columns(tableName)) as Column[];
       for (const column of columns) {
         expect(column.type).toBe("integer");
         expect(column.isSerial()).toBe(true);

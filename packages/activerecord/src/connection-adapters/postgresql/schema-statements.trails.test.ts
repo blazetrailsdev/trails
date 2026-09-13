@@ -1,3 +1,4 @@
+import type { Column as PgColumn } from "./column.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
@@ -959,7 +960,7 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
       for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
     });
 
-    const [id, name] = await ss.columns("things");
+    const [id, name] = (await ss.columns("things")) as PgColumn[];
 
     expect(id.isSerial()).toBe(true);
     expect(id.null).toBe(false);

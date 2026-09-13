@@ -1,3 +1,4 @@
+import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -233,6 +234,8 @@ export interface AbstractAdapter {
         ]
   ): Promise<void>;
   renameTable(tableName: string, newName: string): Promise<void>;
+  /** @internal */
+  fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata;
   addColumn(
     tableName: string,
     columnName: string,

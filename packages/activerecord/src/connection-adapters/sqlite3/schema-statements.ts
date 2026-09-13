@@ -41,7 +41,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
     expression?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  fetchTypeMetadata(sqlType: string): SqlTypeMetadata;
+  fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata;
   alterTable(
     tableName: string,
     foreignKeys?: ForeignKeyDefinition[],
@@ -248,7 +248,7 @@ export async function virtualTableExists(
 
 export function createSchemaDumper(
   this: DatabaseAdapter,
-  options: Record<string, unknown> = {},
+  options: Record<string, unknown>,
 ): AbstractSchemaDumper {
   return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
 }
