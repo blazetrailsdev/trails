@@ -7,7 +7,7 @@ import { Firm } from "../test-helpers/models/company.js";
 type RecordInternals = {
   _readAttribute(name: string): unknown;
   clientsOfFirm: {
-    load(): Promise<Base[]>;
+    loadTarget(): Promise<Base[]>;
     find(...args: unknown[]): Promise<Base | Base[]>;
   };
 };
@@ -20,7 +20,7 @@ describe("CollectionAssociation#find not-found path", () => {
   async function loadedClientsOfFirm() {
     const firm = (await Firm.find(companies("first_firm").id)) as Base;
     const proxy = internals(firm).clientsOfFirm;
-    const clients = await proxy.load();
+    const clients = await proxy.loadTarget();
     expect(clients.length).toBeGreaterThan(0);
     return {
       proxy,

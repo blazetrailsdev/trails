@@ -21,7 +21,6 @@ interface InnerErrorLike {
 
 export class NestedError extends ActiveModelNestedError {
   private readonly _association: AssociationLike;
-  declare readonly innerError: InnerErrorLike;
 
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
     const attribute = NestedError.computeAttribute(association, innerError);
@@ -69,7 +68,7 @@ function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder
 /** @internal */
 function index(this: NestedError): number | undefined {
   const records = orderedRecords.call(this);
-  const base = this.innerError.base;
+  const base = (this.innerError as InnerErrorLike).base;
   if (!records || !base) return undefined;
   const idx = records.findIndex((r) => r === base);
   return idx >= 0 ? idx : undefined;

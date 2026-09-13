@@ -1,4 +1,3 @@
-import { ArgumentError } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
@@ -8,34 +7,14 @@ export class HasOne extends SingularAssociation {
   }
 
   static override validOptions(options: Record<string, unknown>): string[] {
-    const valid = [...super.validOptions(options), "as", "through", "counterCache"];
+    const valid = [...super.validOptions(options), "as", "through"];
     if (options.as) valid.push("foreignType");
     if (options.dependent === "destroyAsync") valid.push("ensuringOwnerWas");
     if (options.through) valid.push("source", "sourceType", "disableJoins");
     return valid;
   }
 
-  static override build(
-    model: any,
-    name: string,
-    scope: ((...args: any[]) => any) | null | Record<string, unknown>,
-    options: Record<string, unknown> = {},
-  ): any {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
-      options = scope;
-      scope = null;
-    }
-    if (options.counterCache) {
-      throw new ArgumentError("has_one associations do not support counter_cache");
-    }
-    return super.build(model, name, scope, options);
-  }
-
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   static override defineConstructors(mixin: any, name: string): void {
     super.defineConstructors(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
@@ -53,6 +32,7 @@ export class HasOne extends SingularAssociation {
     });
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);

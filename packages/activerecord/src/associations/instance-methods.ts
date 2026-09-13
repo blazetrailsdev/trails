@@ -84,6 +84,7 @@ async function bypassStrictLoading<T>(this: Base, fn: () => Promise<T>): Promise
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export function association(this: Base, name: string): AssociationInstance {
   const existing = this._associationInstances.get(name);
   if (existing) {
@@ -121,6 +122,7 @@ export async function loadHasOne(this: Base, name: string): Promise<Base | null>
   return result as Base | null;
 }
 
+/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export const InstanceMethods = {
   association,
   loadBelongsTo,

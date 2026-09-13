@@ -49,10 +49,6 @@ export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
   _queryExecutor?: () => Promise<Base[]>;
 
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-  }
-
   protected override difference(a: Base[], b: Base[]): Base[] {
     return setDifference(a, b);
   }

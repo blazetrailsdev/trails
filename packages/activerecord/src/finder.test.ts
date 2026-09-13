@@ -2356,8 +2356,8 @@ describe("FinderTest", () => {
   it("exists with loaded relation having unsaved records", async () => {
     const author = authors("david");
     const posts = await author.posts.load();
-    expect(posts.length).toBeGreaterThan(0);
-    for (const post of posts) await post.destroy();
+    expect((await posts.records()).length).toBeGreaterThan(0);
+    for (const post of await posts.records()) await post.destroy();
 
     await assertQueriesMatch(/SELECT 1 AS one/i, undefined, false, async () => {
       expect(await author.posts.exists()).toBe(false);

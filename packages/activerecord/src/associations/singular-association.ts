@@ -1,5 +1,4 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
   _ownerChainReflection,
@@ -17,16 +16,13 @@ import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 
 export class SingularAssociation extends Association {
+  /** @noRailsEquivalent PERMANENT */
   override get target(): Base | null {
     return super.target as Base | null;
   }
 
   override set target(value: Base | Base[] | null) {
     super.target = value;
-  }
-
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
   }
 
   override reset(): void {

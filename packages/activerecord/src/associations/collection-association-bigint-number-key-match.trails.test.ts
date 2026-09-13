@@ -5,7 +5,7 @@ import "../support/canonical-model-index.js";
 import { Firm } from "../test-helpers/models/company.js";
 
 type CollectionProxyLike = {
-  load(): Promise<Base[]>;
+  loadTarget(): Promise<Base[]>;
   find(...args: unknown[]): Promise<Base | Base[]>;
 };
 
@@ -27,7 +27,7 @@ describe("CollectionAssociation BigInt PK / number find(id) key match", () => {
     numberId: number;
   }> {
     const firm = (await Firm.find(companies("first_firm").id)) as Base;
-    const clients = await internals(firm).clientsOfFirm.load();
+    const clients = await internals(firm).clientsOfFirm.loadTarget();
     expect(clients.length).toBeGreaterThan(0);
 
     const target = clients[0];

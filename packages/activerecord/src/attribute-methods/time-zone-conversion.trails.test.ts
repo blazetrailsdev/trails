@@ -121,7 +121,7 @@ describe("TimeZoneConverter#isChanged", () => {
   const MS1 = 1_000_000n;
 
   function converter(precision?: number) {
-    return TimeZoneConverter.wrap(
+    return new TimeZoneConverter(
       new Types.DateTimeType(precision !== undefined ? { precision } : {}),
     );
   }
@@ -162,7 +162,7 @@ describe("TimeZoneConverter#serialize containers", () => {
   const twz = () => new TimeWithZone(instant, zone);
 
   it("forwards TimeWithZone range bounds to the subtype untouched", async () => {
-    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
     expect(serialized.begin).toBeInstanceOf(RubyTime);
     expect((serialized.begin as RubyTime).toTime().toInstant().epochNanoseconds).toBe(
@@ -171,7 +171,7 @@ describe("TimeZoneConverter#serialize containers", () => {
   });
 
   it("forwards TimeWithZone bounds through an array of ranges", async () => {
-    const converter = TimeZoneConverter.wrap(
+    const converter = new TimeZoneConverter(
       new ArrayType(new RangeType(new Types.DateTimeType({}))),
     );
     const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
@@ -183,7 +183,7 @@ describe("TimeZoneConverter#serialize containers", () => {
   });
 
   it("is_changed? compares two Times by instant when Time.zone is unset", async () => {
-    const converter = TimeZoneConverter.wrap(new Types.DateTimeType({}));
+    const converter = new TimeZoneConverter(new Types.DateTimeType({}));
     const a = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
     const b = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
 
@@ -194,13 +194,13 @@ describe("TimeZoneConverter#serialize containers", () => {
   });
 
   it("leaves an infinite range bound untouched", async () => {
-    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range<unknown>(-Infinity, twz(), false)) as Range;
     expect(serialized.begin).toBe(-Infinity);
   });
 
   it("answers respond_to?(:infinite?) for a value carrying its own infinite?", async () => {
-    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
     const deserialized = converter.deserialize(
       new Range<unknown>(BigDecimal.INFINITY, null, false),
     ) as Range;

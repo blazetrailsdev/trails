@@ -288,7 +288,7 @@ describe("AssociationProxyTest", () => {
     const expected = await david.firstPosts.pluck("title");
     const loaded = await david.firstPosts.load();
     expect(david.firstPosts.loaded).toBe(true);
-    expect(loaded.length).toBeGreaterThan(0);
+    expect((await loaded.records()).length).toBeGreaterThan(0);
     const sqls = await captureSql(async () => {
       expect(await david.firstPosts.pluck("title")).toEqual(expected);
     });
@@ -340,7 +340,7 @@ describe("AssociationProxyTest", () => {
     const post = await Post.create({ title: "original", body: "b" });
     await david.posts.push(post);
     post.title = "mutated";
-    const loaded = await david.posts.load();
+    const loaded = await (await david.posts.load()).records();
     const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
     expect(found).toBe(post);
     expect(found.title).toBe("mutated");
