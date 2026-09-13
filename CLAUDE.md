@@ -474,8 +474,15 @@ write.
    file and cannot see a cross-file relocation, and `parity:api:moves` only
    reports. So `total` stays gated in both modes.
 
+   A package that burns `total` to zero as well (`activerecord` today) is
+   **rowless**: both `novel` and `total` are the constant 0, it carries **no
+   row** in the mark file, and the gate fails if one is re-added. Every extra
+   there — novel or moved — needs a receipt at its declaration, a deletion, or
+   a relocation to the file mirroring the `.rb` that defines it.
+
    A package gets pinned as a reviewed step of its own burndown (the
-   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342,
+   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342 novel
+   and 396 moved, now rowless;
    RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
    is ever un-pinned to turn a red run green. Other packages are still measured
    and ungated; widening `GATED_PACKAGES` is a separate decision with its own

@@ -1701,9 +1701,11 @@ jobs:
         # widened row cannot clear a red run — the only remedies are a
         # `@noRailsEquivalent` receipt at the declaration or deleting the name.
         # `total` stays gated in both modes: nothing else in the repo catches a
-        # name Rails defines in a different `.rb`. Enrollment is only-grow;
-        # activerecord joins when the extra-surface receipt burndown clears its
-        # 342. activemodel stays ungated until it has a burndown of its own.
+        # name Rails defines in a different `.rb`. A package that burns `total`
+        # to zero too is ROWLESS (activerecord today): both dimensions pinned
+        # at 0, no row in the mark file, and a re-added row fails the gate.
+        # Enrollment is only-grow. activemodel stays ungated until it has a
+        # burndown of its own.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose
