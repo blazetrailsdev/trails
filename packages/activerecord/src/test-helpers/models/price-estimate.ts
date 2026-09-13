@@ -3,8 +3,6 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
 export class PriceEstimate extends Base {
-  declare estimateOf: Base | null | Promise<Base | null>;
-  declare thing: Base | null | Promise<Base | null>;
   declare currency: string;
   declare estimate_of_id: number;
   declare estimate_of_type: string;
@@ -18,6 +16,12 @@ export class PriceEstimate extends Base {
   get price(): unknown {
     return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }
+}
+export interface PriceEstimate {
+  get estimateOf(): Base | null | Promise<Base | null>;
+  set estimateOf(value: Base | null);
+  get thing(): Base | null | Promise<Base | null>;
+  set thing(value: Base | null);
 }
 
 registerModel(PriceEstimate);

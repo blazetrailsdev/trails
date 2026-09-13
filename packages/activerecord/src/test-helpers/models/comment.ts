@@ -29,18 +29,8 @@ export class Comment extends Base {
   declare static orderedByPostId: () => Relation<Comment>;
   declare static allAsScope: () => Relation<Comment>;
   declare static oopsComments: () => Relation<Comment>;
-  declare post: Post | null | Promise<Post | null>;
-  declare resource: Base | null | Promise<Base | null>;
-  declare origin: Base | null | Promise<Base | null>;
-  declare company: Company | null | Promise<Company | null>;
   declare ratings: AssociationProxy<Rating>;
-  declare firstPost: FirstPost | null | Promise<FirstPost | null>;
-  declare specialPostWithDefaultScope:
-    | SpecialPostWithDefaultScope
-    | null
-    | Promise<SpecialPostWithDefaultScope | null>;
   declare children: AssociationProxy<Comment>;
-  declare parent: Comment | null | Promise<Comment | null>;
   declare isDefault: () => boolean;
   declare defaultBang: () => Promise<true | undefined>;
   declare static default: () => Relation<Comment>;
@@ -67,7 +57,6 @@ export class Comment extends Base {
 
   declare author_id: number | null;
   declare author_type: string | null;
-  declare author: Base | null | Promise<Base | null>;
 
   static {
     this.scope("limitBy", function (this: any, l: number) {
@@ -136,11 +125,31 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
+export interface Comment {
+  get specialPostWithDefaultScope():
+    | SpecialPostWithDefaultScope
+    | null
+    | Promise<SpecialPostWithDefaultScope | null>;
+  set specialPostWithDefaultScope(value: SpecialPostWithDefaultScope | null);
+}
+export interface Comment {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get resource(): Base | null | Promise<Base | null>;
+  set resource(value: Base | null);
+  get origin(): Base | null | Promise<Base | null>;
+  set origin(value: Base | null);
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+  get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  set firstPost(value: FirstPost | null);
+  get parent(): Comment | null | Promise<Comment | null>;
+  set parent(value: Comment | null);
+  get author(): Base | null | Promise<Base | null>;
+  set author(value: Base | null);
+}
 
 export class SpecialComment extends Comment {
-  declare ordinaryPost: Post | null | Promise<Post | null>;
-  declare author: Author | null | Promise<Author | null>;
-
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
     this.hasOne("author", { through: "post" });
@@ -150,6 +159,12 @@ export class SpecialComment extends Comment {
   static whatAreYou() {
     return "a special comment...";
   }
+}
+export interface SpecialComment {
+  get ordinaryPost(): Post | null | Promise<Post | null>;
+  set ordinaryPost(value: Post | null);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
 }
 
 export class SubSpecialComment extends SpecialComment {}
@@ -170,14 +185,16 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
 }
 
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
-  declare developer: Developer | null | Promise<Developer | null>;
-
   static {
     this.defaultScope((q: any) =>
       q.includes(":developer").order("developers.name").references(":developer"),
     );
     this.belongsTo("developer");
   }
+}
+export interface CommentWithDefaultScopeReferencesAssociation {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
 }
 
 export class CommentWithAfterCreateUpdate extends Comment {

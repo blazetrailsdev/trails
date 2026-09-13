@@ -6,10 +6,6 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
 export class Reader extends Base {
-  declare post: Post | null | Promise<Post | null>;
-  declare person: Person | null | Promise<Person | null>;
-  declare singlePerson: Person | null | Promise<Person | null>;
-  declare firstPost: FirstPost | null | Promise<FirstPost | null>;
   declare first_post_id: number;
   declare person_id: number;
   declare post_id: number;
@@ -26,11 +22,18 @@ export class Reader extends Base {
     this.belongsTo("firstPost", (q: any) => q.where({ id: [2, 3] }));
   }
 }
+export interface Reader {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get person(): Person | null | Promise<Person | null>;
+  set person(value: Person | null);
+  get singlePerson(): Person | null | Promise<Person | null>;
+  set singlePerson(value: Person | null);
+  get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  set firstPost(value: FirstPost | null);
+}
 
 export class SecureReader extends Base {
-  declare securePost: Post | null | Promise<Post | null>;
-  declare securePerson: Person | null | Promise<Person | null>;
-
   static {
     this._tableName = "readers";
     this.belongsTo("securePost", { className: "Post", foreignKey: "post_id" });
@@ -41,11 +44,15 @@ export class SecureReader extends Base {
     });
   }
 }
+export interface SecureReader {
+  get securePost(): Post | null | Promise<Post | null>;
+  set securePost(value: Post | null);
+  get securePerson(): Person | null | Promise<Person | null>;
+  set securePerson(value: Person | null);
+}
 
 export class LazyReader extends Base {
   declare static skimmersOrNot: () => Relation<LazyReader>;
-  declare post: Post | null | Promise<Post | null>;
-  declare person: Person | null | Promise<Person | null>;
 
   static {
     this._tableName = "readers";
@@ -56,6 +63,12 @@ export class LazyReader extends Base {
     this.belongsTo("post");
     this.belongsTo("person");
   }
+}
+export interface LazyReader {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get person(): Person | null | Promise<Person | null>;
+  set person(value: Person | null);
 }
 
 registerModel(Reader);

@@ -4,7 +4,6 @@ import type { Minivan } from "./minivan.js";
 import { Base } from "../../base.js";
 
 export class Speedometer extends Base {
-  declare dashboard: Dashboard | null | Promise<Dashboard | null>;
   declare minivans: AssociationProxy<Minivan>;
   declare dashboard_id: string;
   declare name: string;
@@ -15,4 +14,8 @@ export class Speedometer extends Base {
     this.belongsTo("dashboard");
     this.hasMany("minivans");
   }
+}
+export interface Speedometer {
+  get dashboard(): Dashboard | null | Promise<Dashboard | null>;
+  set dashboard(value: Dashboard | null);
 }

@@ -4,7 +4,6 @@ import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
 
 export class ShippingLine extends Base {
-  declare invoice: Invoice | null | Promise<Invoice | null>;
   declare discountApplications: AssociationProxy<ShippingLineDiscountApplication>;
   declare amount: number;
   declare invoice_id: number;
@@ -14,10 +13,12 @@ export class ShippingLine extends Base {
     this.hasMany("discountApplications", { className: "ShippingLineDiscountApplication" });
   }
 }
+export interface ShippingLine {
+  get invoice(): Invoice | null | Promise<Invoice | null>;
+  set invoice(value: Invoice | null);
+}
 
 export class ShippingLineDiscountApplication extends Base {
-  declare shippingLine: ShippingLine | null | Promise<ShippingLine | null>;
-  declare discount: Discount | null | Promise<Discount | null>;
   declare discount_id: number;
   declare shipping_line_id: number;
 
@@ -25,4 +26,10 @@ export class ShippingLineDiscountApplication extends Base {
     this.belongsTo("shippingLine");
     this.belongsTo("discount");
   }
+}
+export interface ShippingLineDiscountApplication {
+  get shippingLine(): ShippingLine | null | Promise<ShippingLine | null>;
+  set shippingLine(value: ShippingLine | null);
+  get discount(): Discount | null | Promise<Discount | null>;
+  set discount(value: Discount | null);
 }

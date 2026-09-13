@@ -14,36 +14,15 @@ import type { TenantMembership } from "./membership.js";
 import { Base } from "../../base.js";
 
 export class Member extends Base {
-  declare currentMembership: CurrentMembership | null | Promise<CurrentMembership | null>;
-  declare selectedMembership: SelectedMembership | null | Promise<SelectedMembership | null>;
-  declare membership: Membership | null | Promise<Membership | null>;
-  declare club: Club | null | Promise<Club | null>;
-  declare clubWithoutJoins: Club | null | Promise<Club | null>;
-  declare selectedClub: Club | null | Promise<Club | null>;
-  declare favoriteClub: Club | null | Promise<Club | null>;
-  declare hairyClub: Club | null | Promise<Club | null>;
-  declare sponsor: Sponsor | null | Promise<Sponsor | null>;
-  declare sponsorClub: Club | null | Promise<Club | null>;
-  declare memberDetail: MemberDetail | null | Promise<MemberDetail | null>;
-  declare organization: Organization | null | Promise<Organization | null>;
-  declare organizationWithoutJoins: Organization | null | Promise<Organization | null>;
-  declare memberType: MemberType | null | Promise<MemberType | null>;
   declare nestedMemberTypes: AssociationProxy<MemberType>;
-  declare nestedMemberType: MemberType | null | Promise<MemberType | null>;
   declare nestedSponsors: AssociationProxy<Sponsor>;
-  declare nestedSponsor: Sponsor | null | Promise<Sponsor | null>;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
   declare organizationMemberDetails_2: AssociationProxy<MemberDetail>;
-  declare clubCategory: Category | null | Promise<Category | null>;
-  declare generalClub: Club | null | Promise<Club | null>;
   declare superMemberships: AssociationProxy<SuperMembership>;
   declare favoriteMemberships: AssociationProxy<Membership>;
   declare clubs: AssociationProxy<Club>;
   declare tenantMemberships: AssociationProxy<TenantMembership>;
   declare tenantClubs: AssociationProxy<Club>;
-  declare clubThroughMany: Club | null | Promise<Club | null>;
-  declare admittable: Base | null | Promise<Base | null>;
-  declare premiumClub: Base | null | Promise<Base | null>;
   declare static unnamed: () => Relation<Member>;
   declare static withMemberTypeId: (id: number) => Relation<Member>;
   declare admittable_id: number;
@@ -125,6 +104,50 @@ export class Member extends Base {
       return this.where({ member_type_id: id });
     });
   }
+}
+export interface Member {
+  get currentMembership(): CurrentMembership | null | Promise<CurrentMembership | null>;
+  set currentMembership(value: CurrentMembership | null);
+  get selectedMembership(): SelectedMembership | null | Promise<SelectedMembership | null>;
+  set selectedMembership(value: SelectedMembership | null);
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
+  get clubWithoutJoins(): Club | null | Promise<Club | null>;
+  set clubWithoutJoins(value: Club | null);
+  get selectedClub(): Club | null | Promise<Club | null>;
+  set selectedClub(value: Club | null);
+  get favoriteClub(): Club | null | Promise<Club | null>;
+  set favoriteClub(value: Club | null);
+  get hairyClub(): Club | null | Promise<Club | null>;
+  set hairyClub(value: Club | null);
+  get sponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set sponsor(value: Sponsor | null);
+  get sponsorClub(): Club | null | Promise<Club | null>;
+  set sponsorClub(value: Club | null);
+  get memberDetail(): MemberDetail | null | Promise<MemberDetail | null>;
+  set memberDetail(value: MemberDetail | null);
+  get organization(): Organization | null | Promise<Organization | null>;
+  set organization(value: Organization | null);
+  get organizationWithoutJoins(): Organization | null | Promise<Organization | null>;
+  set organizationWithoutJoins(value: Organization | null);
+  get memberType(): MemberType | null | Promise<MemberType | null>;
+  set memberType(value: MemberType | null);
+  get nestedMemberType(): MemberType | null | Promise<MemberType | null>;
+  set nestedMemberType(value: MemberType | null);
+  get nestedSponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set nestedSponsor(value: Sponsor | null);
+  get clubCategory(): Category | null | Promise<Category | null>;
+  set clubCategory(value: Category | null);
+  get generalClub(): Club | null | Promise<Club | null>;
+  set generalClub(value: Club | null);
+  get clubThroughMany(): Club | null | Promise<Club | null>;
+  set clubThroughMany(value: Club | null);
+  get admittable(): Base | null | Promise<Base | null>;
+  set admittable(value: Base | null);
+  get premiumClub(): Base | null | Promise<Base | null>;
+  set premiumClub(value: Base | null);
 }
 
 export class SelfMember extends Base {

@@ -5,7 +5,6 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Chef extends Base {
-  declare employable: Base | null | Promise<Base | null>;
   declare recipes: AssociationProxy<Recipe>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare department_id: number;
@@ -20,18 +19,22 @@ export class Chef extends Base {
     this.hasMany("recipes");
   }
 }
+export interface Chef {
+  get employable(): Base | null | Promise<Base | null>;
+  set employable(value: Base | null);
+}
 
 export class ChefList extends Chef {
-  declare employableList: Base | null | Promise<Base | null>;
-
   static {
     this.belongsTo("employableList", { polymorphic: true });
   }
 }
+export interface ChefList {
+  get employableList(): Base | null | Promise<Base | null>;
+  set employableList(value: Base | null);
+}
 
 export class ChefWithPolymorphicInverseOf extends Chef {
-  declare employable: Base | null | Promise<Base | null>;
-
   beforeValidationCallbacksCounter: number = 0;
   beforeCreateCallbacksCounter: number = 0;
   beforeSaveCallbacksCounter: number = 0;
@@ -61,6 +64,10 @@ export class ChefWithPolymorphicInverseOf extends Chef {
       this.afterSaveCallbacksCounter++;
     });
   }
+}
+export interface ChefWithPolymorphicInverseOf {
+  get employable(): Base | null | Promise<Base | null>;
+  set employable(value: Base | null);
 }
 
 acceptsNestedAttributesFor(ChefWithPolymorphicInverseOf, "employable");

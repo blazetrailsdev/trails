@@ -11,9 +11,6 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
 export class Ship extends Base {
-  declare pirate: Pirate | null | Promise<Pirate | null>;
-  declare updateOnlyPirate: Pirate | null | Promise<Pirate | null>;
-  declare developer: Developer | null | Promise<Developer | null>;
   declare parts: AssociationProxy<ShipPart>;
   declare treasures: AssociationProxy<Treasure>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
@@ -50,6 +47,14 @@ export class Ship extends Base {
     throwAbort();
   }
 }
+export interface Ship {
+  get pirate(): Pirate | null | Promise<Pirate | null>;
+  set pirate(value: Pirate | null);
+  get updateOnlyPirate(): Pirate | null | Promise<Pirate | null>;
+  set updateOnlyPirate(value: Pirate | null);
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+}
 
 acceptsNestedAttributesFor(Ship, "parts", { allowDestroy: true });
 acceptsNestedAttributesFor(Ship, "pirate", {
@@ -73,7 +78,6 @@ export class ShipWithoutNestedAttributes extends Base {
 }
 
 export class Prisoner extends Base {
-  declare ship: ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
   declare ship_id: number;
 
   static {
@@ -84,15 +88,21 @@ export class Prisoner extends Base {
     });
   }
 }
+export interface Prisoner {
+  get ship(): ShipWithoutNestedAttributes | null | Promise<ShipWithoutNestedAttributes | null>;
+  set ship(value: ShipWithoutNestedAttributes | null);
+}
 
 export class FamousShip extends Base {
-  declare famousPirate: FamousPirate | null | Promise<FamousPirate | null>;
-
   static {
     this.tableName = "ships";
     this.belongsTo("famousPirate", { foreignKey: "pirate_id" });
     this.validates("name", { presence: true, on: "conference" });
   }
+}
+export interface FamousShip {
+  get famousPirate(): FamousPirate | null | Promise<FamousPirate | null>;
+  set famousPirate(value: FamousPirate | null);
 }
 
 registerModel(Ship);

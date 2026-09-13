@@ -4,7 +4,6 @@ import type { Liquid } from "./liquid.js";
 import { Base } from "../../base.js";
 
 export class Molecule extends Base {
-  declare liquid: Liquid | null | Promise<Liquid | null>;
   declare electrons: AssociationProxy<Electron>;
   declare liquid_id: number;
   declare name: string;
@@ -13,4 +12,8 @@ export class Molecule extends Base {
     this.belongsTo("liquid");
     this.hasMany("electrons");
   }
+}
+export interface Molecule {
+  get liquid(): Liquid | null | Promise<Liquid | null>;
+  set liquid(value: Liquid | null);
 }

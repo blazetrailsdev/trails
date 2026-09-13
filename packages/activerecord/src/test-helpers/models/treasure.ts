@@ -8,8 +8,6 @@ import { registerModel } from "../../associations.js";
 
 export class Treasure extends Base {
   declare parrots: AssociationProxy<Parrot>;
-  declare looter: Base | null | Promise<Base | null>;
-  declare ship: Ship | null | Promise<Ship | null>;
   declare priceEstimates: AssociationProxy<PriceEstimate>;
   declare richPeople: AssociationProxy<RichPerson>;
   declare looter_id: number;
@@ -25,6 +23,12 @@ export class Treasure extends Base {
     this.hasMany("priceEstimates", { as: "estimateOf", autosave: true });
     this.hasAndBelongsToMany("richPeople", { joinTable: "peoples_treasures", validate: false });
   }
+}
+export interface Treasure {
+  get looter(): Base | null | Promise<Base | null>;
+  set looter(value: Base | null);
+  get ship(): Ship | null | Promise<Ship | null>;
+  set ship(value: Ship | null);
 }
 
 export class HiddenTreasure extends Treasure {}

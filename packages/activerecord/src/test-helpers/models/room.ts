@@ -2,10 +2,6 @@ import type { User } from "./user.js";
 import { Base } from "../../base.js";
 
 export class Room extends Base {
-  declare user: User | null | Promise<User | null>;
-  declare owner: User | null | Promise<User | null>;
-  declare landlord: User | null | Promise<User | null>;
-  declare tenant: User | null | Promise<User | null>;
   declare landlord_id: number;
   declare owner_id: number;
   declare tenant_id: number;
@@ -26,4 +22,14 @@ export class Room extends Base {
       inverseOf: "rentedRoom",
     });
   }
+}
+export interface Room {
+  get user(): User | null | Promise<User | null>;
+  set user(value: User | null);
+  get owner(): User | null | Promise<User | null>;
+  set owner(value: User | null);
+  get landlord(): User | null | Promise<User | null>;
+  set landlord(value: User | null);
+  get tenant(): User | null | Promise<User | null>;
+  set tenant(value: User | null);
 }

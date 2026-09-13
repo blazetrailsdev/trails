@@ -1,7 +1,10 @@
 export class Comment extends Base {
-  declare commentable: Base | null | Promise<Base | null>;
-
   static {
     this.belongsTo("commentable", { polymorphic: true });
   }
 }
+export interface Comment {
+  get commentable(): Base | null | Promise<Base | null>;
+  set commentable(value: Base | null);
+}
+

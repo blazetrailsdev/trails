@@ -13,21 +13,17 @@ import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface Pirate {
   get parrot_id(): number;
   set parrot_id(value: unknown);
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
 export class Pirate extends Base {
   declare parrotsLimit: number;
 
   cancelSaveFromCallback: boolean = false;
   declare catchphrase: string;
 
-  declare parrot: Parrot | null | Promise<Parrot | null>;
-  declare nonValidatedParrot: Parrot | null | Promise<Parrot | null>;
   declare parrots: AssociationProxy<Parrot>;
   declare nonValidatedParrots: AssociationProxy<Parrot>;
   declare parrotsWithMethodCallbacks: AssociationProxy<Parrot>;
@@ -35,16 +31,11 @@ export class Pirate extends Base {
   declare autosavedParrots: AssociationProxy<Parrot>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;
-  declare ship: Ship | null | Promise<Ship | null>;
-  declare updateOnlyShip: Ship | null | Promise<Ship | null>;
-  declare nonValidatedShip: Ship | null | Promise<Ship | null>;
   declare birds: AssociationProxy<Bird>;
   declare birdsWithMethodCallbacks: AssociationProxy<Bird>;
   declare birdsWithProcCallbacks: AssociationProxy<Bird>;
   declare birdsWithRejectAllBlank: AssociationProxy<Bird>;
-  declare fooBulb: Bulb | null | Promise<Bulb | null>;
   declare mateys: AssociationProxy<Matey>;
-  declare attackerMatey: Matey | null | Promise<Matey | null>;
   declare created_on: RubyTime | Temporal.PlainDateTime;
   declare non_validated_parrot_id: number;
   declare updated_on: RubyTime | Temporal.PlainDateTime;
@@ -153,6 +144,22 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
+export interface Pirate {
+  get parrot(): Parrot | null | Promise<Parrot | null>;
+  set parrot(value: Parrot | null);
+  get nonValidatedParrot(): Parrot | null | Promise<Parrot | null>;
+  set nonValidatedParrot(value: Parrot | null);
+  get ship(): Ship | null | Promise<Ship | null>;
+  set ship(value: Ship | null);
+  get updateOnlyShip(): Ship | null | Promise<Ship | null>;
+  set updateOnlyShip(value: Ship | null);
+  get nonValidatedShip(): Ship | null | Promise<Ship | null>;
+  set nonValidatedShip(value: Ship | null);
+  get fooBulb(): Bulb | null | Promise<Bulb | null>;
+  set fooBulb(value: Bulb | null);
+  get attackerMatey(): Matey | null | Promise<Matey | null>;
+  set attackerMatey(value: Matey | null);
+}
 
 const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
 
@@ -167,8 +174,6 @@ acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: tru
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
 export class DestructivePirate extends Pirate {
-  declare dependentShip: Ship | null | Promise<Ship | null>;
-
   static {
     this.hasOne("dependentShip", {
       className: "Ship",
@@ -176,6 +181,10 @@ export class DestructivePirate extends Pirate {
       dependent: "destroy",
     });
   }
+}
+export interface DestructivePirate {
+  get dependentShip(): Ship | null | Promise<Ship | null>;
+  set dependentShip(value: Ship | null);
 }
 
 export class FamousPirate extends Base {
@@ -189,9 +198,7 @@ export class FamousPirate extends Base {
 }
 
 export class SpacePirate extends Base {
-  declare parrot: Parrot | null | Promise<Parrot | null>;
   declare parrots: AssociationProxy<Parrot>;
-  declare ship: Ship | null | Promise<Ship | null>;
   declare birds: AssociationProxy<Bird>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;
@@ -205,4 +212,10 @@ export class SpacePirate extends Base {
     this.hasMany("treasures", { as: "looter" });
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
   }
+}
+export interface SpacePirate {
+  get parrot(): Parrot | null | Promise<Parrot | null>;
+  set parrot(value: Parrot | null);
+  get ship(): Ship | null | Promise<Ship | null>;
+  set ship(value: Ship | null);
 }

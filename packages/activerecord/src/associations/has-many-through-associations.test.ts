@@ -376,7 +376,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkStudent | null | Promise<NoPkStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -384,6 +383,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("student_id", "big_integer");
         this.belongsTo("student", { className: "NoPkStudent", foreignKey: "student_id" });
       }
+    }
+    interface NoPkLessonStudent {
+      get student(): NoPkStudent | null | Promise<NoPkStudent | null>;
+      set student(value: NoPkStudent | null);
     }
     class NoPkStudent extends Base {
       declare name: string | null;
@@ -423,7 +426,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkDelLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkDelStudent | null | Promise<NoPkDelStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -431,6 +433,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("student_id", "big_integer");
         this.belongsTo("student", { className: "NoPkDelStudent", foreignKey: "student_id" });
       }
+    }
+    interface NoPkDelLessonStudent {
+      get student(): NoPkDelStudent | null | Promise<NoPkDelStudent | null>;
+      set student(value: NoPkDelStudent | null);
     }
     class NoPkDelStudent extends Base {
       declare name: string | null;
@@ -480,7 +486,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class NoPkCbLessonStudent extends Base {
       declare lesson_id: bigint | null;
       declare student_id: bigint | null;
-      declare student: NoPkCbStudent | null | Promise<NoPkCbStudent | null>;
 
       static {
         this._tableName = "lessons_students";
@@ -491,6 +496,10 @@ describe("HasManyThroughAssociationsTest", () => {
           afterDestroyCalled = true;
         });
       }
+    }
+    interface NoPkCbLessonStudent {
+      get student(): NoPkCbStudent | null | Promise<NoPkCbStudent | null>;
+      set student(value: NoPkCbStudent | null);
     }
     class NoPkCbStudent extends Base {
       declare name: string | null;
@@ -2459,7 +2468,6 @@ describe("HasManyThroughAssociationsTest", () => {
       declare taggable_id: number | null;
       declare taggable_type: string | null;
       declare tag_id: number | null;
-      declare tag: Tag | null | Promise<Tag | null>;
 
       static {
         this._tableName = "taggings";
@@ -2471,6 +2479,10 @@ describe("HasManyThroughAssociationsTest", () => {
         });
         this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
       }
+    }
+    interface IrpvTagging {
+      get tag(): Tag | null | Promise<Tag | null>;
+      set tag(value: Tag | null);
     }
     registerModel("IrpvTagging", IrpvTagging);
 

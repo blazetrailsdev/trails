@@ -4,8 +4,6 @@ import type { Tree } from "./tree.js";
 import { Base } from "../../base.js";
 
 export class Node extends Base {
-  declare tree: Tree | null | Promise<Tree | null>;
-  declare parent: Node | null | Promise<Node | null>;
   declare children: AssociationProxy<Node>;
   declare name: string;
   declare parent_id: number;
@@ -17,4 +15,10 @@ export class Node extends Base {
     this.belongsTo("parent", { className: "Node", touch: true, optional: true });
     this.hasMany("children", { className: "Node", foreignKey: "parent_id", dependent: "destroy" });
   }
+}
+export interface Node {
+  get tree(): Tree | null | Promise<Tree | null>;
+  set tree(value: Tree | null);
+  get parent(): Node | null | Promise<Node | null>;
+  set parent(value: Node | null);
 }

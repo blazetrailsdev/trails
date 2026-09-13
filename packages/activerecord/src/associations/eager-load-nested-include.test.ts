@@ -13,8 +13,6 @@ class ShapeExpression extends Base {
   declare shape_id: number;
   declare paint_type: string;
   declare paint_id: number;
-  declare shape: Base | null | Promise<Base | null>;
-  declare paint: Base | null | Promise<Base | null>;
 
   static {
     this._tableName = "shape_expressions";
@@ -25,6 +23,12 @@ class ShapeExpression extends Base {
     this.belongsTo("shape", { polymorphic: true });
     this.belongsTo("paint", { polymorphic: true });
   }
+}
+interface ShapeExpression {
+  get shape(): Base | null | Promise<Base | null>;
+  set shape(value: Base | null);
+  get paint(): Base | null | Promise<Base | null>;
+  set paint(value: Base | null);
 }
 class Circle extends Base {
   static {
@@ -43,7 +47,6 @@ class Triangle extends Base {
 }
 class PaintColor extends Base {
   declare non_poly_one_id: number;
-  declare nonPoly: NonPolyOne | null | Promise<NonPolyOne | null>;
 
   static {
     this._tableName = "paint_colors";
@@ -54,9 +57,12 @@ class PaintColor extends Base {
     });
   }
 }
+interface PaintColor {
+  get nonPoly(): NonPolyOne | null | Promise<NonPolyOne | null>;
+  set nonPoly(value: NonPolyOne | null);
+}
 class PaintTexture extends Base {
   declare non_poly_two_id: number;
-  declare nonPoly: NonPolyTwo | null | Promise<NonPolyTwo | null>;
 
   static {
     this._tableName = "paint_textures";
@@ -66,6 +72,10 @@ class PaintTexture extends Base {
       className: "NonPolyTwo",
     });
   }
+}
+interface PaintTexture {
+  get nonPoly(): NonPolyTwo | null | Promise<NonPolyTwo | null>;
+  set nonPoly(value: NonPolyTwo | null);
 }
 class NonPolyOne extends Base {
   static {

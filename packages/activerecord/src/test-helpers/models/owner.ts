@@ -11,7 +11,6 @@ export class Owner extends Base {
   declare pets: AssociationProxy<Pet>;
   declare toys: AssociationProxy<Toy>;
   declare persons: AssociationProxy<Person>;
-  declare lastPet: Pet | null | Promise<Pet | null>;
   declare static includingLastPet: () => Relation<Owner>;
   declare essay_id: string;
   declare happy_at: RubyTime | Temporal.PlainDateTime;
@@ -59,6 +58,10 @@ export class Owner extends Base {
       await block(this);
     }
   }
+}
+export interface Owner {
+  get lastPet(): Pet | null | Promise<Pet | null>;
+  set lastPet(value: Pet | null);
 }
 
 acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });

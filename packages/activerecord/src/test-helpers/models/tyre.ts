@@ -2,7 +2,6 @@ import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
 export class Tyre extends Base {
-  declare car: Car | null | Promise<Car | null>;
   declare car_id: number;
 
   static {
@@ -16,4 +15,8 @@ export class Tyre extends Base {
   static customFindBy(args: any) {
     return this.findBy(args);
   }
+}
+export interface Tyre {
+  get car(): Car | null | Promise<Car | null>;
+  set car(value: Car | null);
 }

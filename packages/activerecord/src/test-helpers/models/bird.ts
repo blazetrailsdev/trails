@@ -5,7 +5,6 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
 export class Bird extends Base {
-  declare pirate: Pirate | null | Promise<Pirate | null>;
   declare color: string;
   declare name: string;
   declare pirate_id: number;
@@ -42,6 +41,10 @@ export class Bird extends Base {
   cancelSaveCallbackMethod() {
     throwAbort();
   }
+}
+export interface Bird {
+  get pirate(): Pirate | null | Promise<Pirate | null>;
+  set pirate(value: Pirate | null);
 }
 
 acceptsNestedAttributesFor(Bird, "pirate");

@@ -810,7 +810,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class AiCpkOrderAgreement extends Base {
       declare order_id: number | null;
       declare signature: string | null;
-      declare order: AiCpkOrder | null | Promise<AiCpkOrder | null>;
 
       static {
         this._tableName = "cpk_order_agreements";
@@ -821,6 +820,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           primaryKey: "id",
         });
       }
+    }
+    interface AiCpkOrderAgreement {
+      get order(): AiCpkOrder | null | Promise<AiCpkOrder | null>;
+      set order(value: AiCpkOrder | null);
     }
     registerModel("AiCpkOrder", AiCpkOrder);
     registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
@@ -866,7 +869,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       declare title: string | null;
       declare order_id: number | null;
       declare shop_id: number | null;
-      declare order: AiCpkTwoOrder | null | Promise<AiCpkTwoOrder | null>;
 
       static {
         this._tableName = "cpk_books";
@@ -882,6 +884,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           primaryKey: ["shop_id", "id"],
         });
       }
+    }
+    interface AiCpkTwoBook {
+      get order(): AiCpkTwoOrder | null | Promise<AiCpkTwoOrder | null>;
+      set order(value: AiCpkTwoOrder | null);
     }
     registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
     registerModel("AiCpkTwoBook", AiCpkTwoBook);
@@ -919,7 +925,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class CpkOrderPk extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBookFk: CpkBookFk | null | Promise<CpkBookFk | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -933,6 +938,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
           autosave: true,
         });
       }
+    }
+    interface CpkOrderPk {
+      get cpkBookFk(): CpkBookFk | null | Promise<CpkBookFk | null>;
+      set cpkBookFk(value: CpkBookFk | null);
     }
     class CpkBookFk extends Base {
       declare order_id: number | null;
@@ -1077,13 +1086,16 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("should save parent but not invalid child", async () => {
     class PFirm extends Base {
       declare name: string | null;
-      declare pAccount: PAccount | null | Promise<PAccount | null>;
 
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
         this.hasOne("pAccount", { foreignKey: "firm_id" });
       }
+    }
+    interface PFirm {
+      get pAccount(): PAccount | null | Promise<PAccount | null>;
+      set pAccount(value: PAccount | null);
     }
     class PAccount extends Base {
       declare credit_limit: number | null;
@@ -1245,7 +1257,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const log: string[] = [];
     class PolyParent extends Base {
       declare name: string | null;
-      declare polyChild: PolyChild | null | Promise<PolyChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1258,10 +1269,13 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    interface PolyParent {
+      get polyChild(): PolyChild | null | Promise<PolyChild | null>;
+      set polyChild(value: PolyChild | null);
+    }
     class PolyChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1284,6 +1298,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "polyChild",
         });
       }
+    }
+    interface PolyChild {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     registerModel("PolyParent", PolyParent);
     registerModel("PolyChild", PolyChild);
@@ -1316,7 +1334,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class CbPet extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare cbOwner: CbOwner | null | Promise<CbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -1328,6 +1345,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           foreignKey: "author_id",
         });
       }
+    }
+    interface CbPet {
+      get cbOwner(): CbOwner | null | Promise<CbOwner | null>;
+      set cbOwner(value: CbOwner | null);
     }
     registerModel("CbOwner", CbOwner);
     registerModel("CbPet", CbPet);
@@ -1356,7 +1377,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const log: string[] = [];
     class PolyAsParent extends Base {
       declare name: string | null;
-      declare polyAsChild: PolyAsChild | null | Promise<PolyAsChild | null>;
 
       static {
         this._tableName = "authors";
@@ -1380,10 +1400,13 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    interface PolyAsParent {
+      get polyAsChild(): PolyAsChild | null | Promise<PolyAsChild | null>;
+      set polyAsChild(value: PolyAsChild | null);
+    }
     class PolyAsChild extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1395,6 +1418,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "polyAsChild",
         });
       }
+    }
+    interface PolyAsChild {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     registerModel("PolyAsParent", PolyAsParent);
     registerModel("PolyAsChild", PolyAsChild);
@@ -1526,13 +1553,16 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class DualPirate extends Base {
       declare catchphrase: string | null;
-      declare dualValidShip: DualValidShip | null | Promise<DualValidShip | null>;
 
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
         this.hasOne("dualValidShip", { autosave: true });
       }
+    }
+    interface DualPirate {
+      get dualValidShip(): DualValidShip | null | Promise<DualValidShip | null>;
+      set dualValidShip(value: DualValidShip | null);
     }
     registerModel("DualPirate", DualPirate);
     registerModel("DualValidShip", DualValidShip);
@@ -1590,7 +1620,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     class DeepPirate extends Base {
       declare catchphrase: string | null;
-      declare deepShip: DeepShip | null | Promise<DeepShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -1598,6 +1627,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("catchphrase", { presence: true });
         this.hasOne("deepShip", { autosave: true, foreignKey: "pirate_id" });
       }
+    }
+    interface DeepPirate {
+      get deepShip(): DeepShip | null | Promise<DeepShip | null>;
+      set deepShip(value: DeepShip | null);
     }
     registerModel("DeepPirate", DeepPirate);
     registerModel("DeepShip", DeepShip);
@@ -1682,7 +1715,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     class SwapChef extends Base {
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "chefs";
@@ -1694,9 +1726,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    interface SwapChef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
+    }
     class SwapCakeDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null | Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1709,9 +1744,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
+    interface SwapCakeDesigner {
+      get chef(): SwapChef | null | Promise<SwapChef | null>;
+      set chef(value: SwapChef | null);
+    }
     class SwapDrinkDesigner extends Base {
       declare name: string | null;
-      declare chef: SwapChef | null | Promise<SwapChef | null>;
 
       static {
         this._tableName = "authors";
@@ -1723,6 +1761,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
           inverseOf: "employable",
         });
       }
+    }
+    interface SwapDrinkDesigner {
+      get chef(): SwapChef | null | Promise<SwapChef | null>;
+      set chef(value: SwapChef | null);
     }
     registerModel("SwapChef", SwapChef);
     registerModel("SwapCakeDesigner", SwapCakeDesigner);
@@ -1824,7 +1866,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class FlexPost extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare flexAuthor: FlexAuthor | null | Promise<FlexAuthor | null>;
 
       static {
         this._tableName = "books";
@@ -1832,6 +1873,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("author_id", "integer");
         this.belongsTo("flexAuthor", { autosave: true, foreignKey: "author_id" });
       }
+    }
+    interface FlexPost {
+      get flexAuthor(): FlexAuthor | null | Promise<FlexAuthor | null>;
+      set flexAuthor(value: FlexAuthor | null);
     }
     registerModel("FlexPost", FlexPost);
     const author = new FlexAuthor({ name: "" });
@@ -1941,7 +1986,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class PolySponsor extends Base {
       declare sponsorable_id: number | null;
       declare sponsorable_type: string | null;
-      declare sponsorable: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "sponsors";
@@ -1949,6 +1993,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("sponsorable_type", "string");
         this.belongsTo("sponsorable", { polymorphic: true });
       }
+    }
+    interface PolySponsor {
+      get sponsorable(): Base | null | Promise<Base | null>;
+      set sponsorable(value: Base | null);
     }
     registerModel(PolyMember);
     registerModel(PolySponsor);
@@ -1991,7 +2039,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class CpkOrder2 extends Base {
       declare shop_id: number | null;
       declare status: string | null;
-      declare cpkBook2: CpkBook2 | null | Promise<CpkBook2 | null>;
 
       static {
         this._tableName = "cpk_orders";
@@ -2005,6 +2052,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
           foreignKey: ["shop_id", "order_id"],
         });
       }
+    }
+    interface CpkOrder2 {
+      get cpkBook2(): CpkBook2 | null | Promise<CpkBook2 | null>;
+      set cpkBook2(value: CpkBook2 | null);
     }
     class CpkBook2 extends Base {
       declare author_id: number | null;
@@ -2429,7 +2480,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
       class BaseErrorsPerson extends Base {
         declare name: string | null;
-        declare reference: BaseErrorsReference | null | Promise<BaseErrorsReference | null>;
 
         static {
           this._tableName = "people";
@@ -2441,6 +2491,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
             foreignKey: "person_id",
           });
         }
+      }
+      interface BaseErrorsPerson {
+        get reference(): BaseErrorsReference | null | Promise<BaseErrorsReference | null>;
+        set reference(value: BaseErrorsReference | null);
       }
       registerModel("BaseErrorsPerson", BaseErrorsPerson);
       registerModel("BaseErrorsReference", BaseErrorsReference);
@@ -2482,7 +2536,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave works even when other callbacks update the parent model", async () => {
     class CallbackPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null | Promise<CanonicalShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -2492,6 +2545,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
         this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
+    }
+    interface CallbackPirate {
+      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
+      set ship(value: CanonicalShip | null);
     }
     registerModel("CallbackPirate", CallbackPirate);
 
@@ -2524,7 +2581,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class ContextReference extends Base {
       declare person_id: number | null;
-      declare person: ContextPerson | null | Promise<ContextPerson | null>;
 
       static {
         this._tableName = "references";
@@ -2535,6 +2591,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           foreignKey: "person_id",
         });
       }
+    }
+    interface ContextReference {
+      get person(): ContextPerson | null | Promise<ContextPerson | null>;
+      set person(value: ContextPerson | null);
     }
     registerModel("ContextPerson", ContextPerson);
     registerModel("ContextReference", ContextReference);
@@ -2607,7 +2667,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class AutosaveProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2618,6 +2677,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           className: "Profile",
         });
       }
+    }
+    interface AutosaveProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("AutosaveProfileUser", AutosaveProfileUser);
@@ -2690,7 +2753,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class DuplicateCallbackProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -2701,6 +2763,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           className: "Profile",
         });
       }
+    }
+    interface DuplicateCallbackProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
@@ -2859,7 +2925,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     class PrisonerCyclic extends Base {
       declare ship_id: number | null;
-      declare ship: ShipCyclic | null | Promise<ShipCyclic | null>;
 
       static {
         this._tableName = "prisoners";
@@ -2870,6 +2935,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
           inverseOf: "prisoners",
         });
       }
+    }
+    interface PrisonerCyclic {
+      get ship(): ShipCyclic | null | Promise<ShipCyclic | null>;
+      set ship(value: ShipCyclic | null);
     }
     registerModel("ShipCyclic", ShipCyclic);
     registerModel("PrisonerCyclic", PrisonerCyclic);
@@ -2910,7 +2979,6 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     class GcShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare pirate: GcPirate | null | Promise<GcPirate | null>;
       declare parts: AssociationProxy<GcPart>;
 
       static {
@@ -2924,6 +2992,10 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
           foreignKey: "ship_id",
         });
       }
+    }
+    interface GcShip {
+      get pirate(): GcPirate | null | Promise<GcPirate | null>;
+      set pirate(value: GcPirate | null);
     }
     class GcPart extends Base {
       declare name: string | null;
@@ -3053,7 +3125,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it("should generate validation methods for has_one associations with :validate => true", async () => {
     class VoParent extends Base {
       declare name: string | null;
-      declare voChild: VoChild | null | Promise<VoChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3064,6 +3135,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: true,
         });
       }
+    }
+    interface VoParent {
+      get voChild(): VoChild | null | Promise<VoChild | null>;
+      set voChild(value: VoChild | null);
     }
     class VoChild extends Base {
       declare name: string | null;
@@ -3087,7 +3162,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
     class NvParent extends Base {
       declare name: string | null;
-      declare nvChild: NvChild | null | Promise<NvChild | null>;
 
       static {
         this._tableName = "companies";
@@ -3098,6 +3172,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: false,
         });
       }
+    }
+    interface NvParent {
+      get nvChild(): NvChild | null | Promise<NvChild | null>;
+      set nvChild(value: NvChild | null);
     }
     class NvChild extends Base {
       declare name: string | null;
@@ -3131,7 +3209,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     class BvChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare bvOwner: BvOwner | null | Promise<BvOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3143,6 +3220,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: true,
         });
       }
+    }
+    interface BvChild {
+      get bvOwner(): BvOwner | null | Promise<BvOwner | null>;
+      set bvOwner(value: BvOwner | null);
     }
     registerModel("BvOwner", BvOwner);
     registerModel("BvChild", BvChild);
@@ -3165,7 +3246,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     class NbChild extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare nbOwner: NbOwner | null | Promise<NbOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3177,6 +3257,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
           validate: false,
         });
       }
+    }
+    interface NbChild {
+      get nbOwner(): NbOwner | null | Promise<NbOwner | null>;
+      set nbOwner(value: NbOwner | null);
     }
     registerModel("NbOwner", NbOwner);
     registerModel("NbChild", NbChild);
@@ -3230,7 +3314,6 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   function makeModels() {
     class GgPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: GgShip | null | Promise<GgShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -3238,10 +3321,13 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.hasOne("ship", { autosave: true, className: "GgShip", foreignKey: "pirate_id" });
       }
     }
+    interface GgPirate {
+      get ship(): GgShip | null | Promise<GgShip | null>;
+      set ship(value: GgShip | null);
+    }
     class GgShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
-      declare part: GgPart | null | Promise<GgPart | null>;
 
       static {
         this._tableName = "ships";
@@ -3249,6 +3335,10 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.attribute("pirate_id", "integer");
         this.hasOne("part", { autosave: true, className: "GgPart", foreignKey: "ship_id" });
       }
+    }
+    interface GgShip {
+      get part(): GgPart | null | Promise<GgPart | null>;
+      set part(value: GgPart | null);
     }
     class GgPart extends Base {
       declare name: string | null;
@@ -3359,7 +3449,6 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     class DisabledProfileUser extends Base {
       declare name: string | null;
-      declare profile: Profile | null | Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
@@ -3370,6 +3459,10 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
           className: "Profile",
         });
       }
+    }
+    interface DisabledProfileUser {
+      get profile(): Profile | null | Promise<Profile | null>;
+      set profile(value: Profile | null);
     }
     registerModel("Profile", Profile);
     registerModel("DisabledProfileUser", DisabledProfileUser);
@@ -3423,7 +3516,6 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     const log: string[] = [];
     class AcPirate extends Base {
       declare catchphrase: string | null;
-      declare ship: CanonicalShip | null | Promise<CanonicalShip | null>;
 
       static {
         this._tableName = "pirates";
@@ -3433,6 +3525,10 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         });
         this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
+    }
+    interface AcPirate {
+      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
+      set ship(value: CanonicalShip | null);
     }
     registerModel("AcPirate", AcPirate);
 
@@ -3632,8 +3728,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     }
     class HotMember extends Base {
       declare name: string | null;
-      declare hotDetail: HotDetail | null | Promise<HotDetail | null>;
-      declare hotOrg: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "authors";
@@ -3649,11 +3743,15 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         });
       }
     }
+    interface HotMember {
+      get hotDetail(): HotDetail | null | Promise<HotDetail | null>;
+      set hotDetail(value: HotDetail | null);
+      get hotOrg(): Base | null | Promise<Base | null>;
+      set hotOrg(value: Base | null);
+    }
     class HotDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare hotOrg: HotOrg | null | Promise<HotOrg | null>;
-      declare hotMember: HotMember | null | Promise<HotMember | null>;
 
       static {
         this._tableName = "contracts";
@@ -3668,6 +3766,12 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
           foreignKey: "developer_id",
         });
       }
+    }
+    interface HotDetail {
+      get hotOrg(): HotOrg | null | Promise<HotOrg | null>;
+      set hotOrg(value: HotOrg | null);
+      get hotMember(): HotMember | null | Promise<HotMember | null>;
+      set hotMember(value: HotMember | null);
     }
     registerModel("HotOrg", HotOrg);
     registerModel("HotMember", HotMember);
@@ -3686,8 +3790,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   it("should not reversed has one through model", async () => {
     class RevOrg extends Base {
       declare name: string | null;
-      declare revDetail: RevDetail | null | Promise<RevDetail | null>;
-      declare revMember: Base | null | Promise<Base | null>;
 
       static {
         this._tableName = "companies";
@@ -3703,6 +3805,12 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         });
       }
     }
+    interface RevOrg {
+      get revDetail(): RevDetail | null | Promise<RevDetail | null>;
+      set revDetail(value: RevDetail | null);
+      get revMember(): Base | null | Promise<Base | null>;
+      set revMember(value: Base | null);
+    }
     class RevMember extends Base {
       declare name: string | null;
 
@@ -3714,8 +3822,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     class RevDetail extends Base {
       declare company_id: number | null;
       declare developer_id: number | null;
-      declare revOrg: RevOrg | null | Promise<RevOrg | null>;
-      declare revMember: RevMember | null | Promise<RevMember | null>;
 
       static {
         this._tableName = "contracts";
@@ -3730,6 +3836,12 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
           foreignKey: "developer_id",
         });
       }
+    }
+    interface RevDetail {
+      get revOrg(): RevOrg | null | Promise<RevOrg | null>;
+      set revOrg(value: RevOrg | null);
+      get revMember(): RevMember | null | Promise<RevMember | null>;
+      set revMember(value: RevMember | null);
     }
     registerModel("RevOrg", RevOrg);
     registerModel("RevMember", RevMember);
@@ -3795,7 +3907,6 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
     class Comment extends Base {
       declare body: string | null;
       declare post_id: number | null;
-      declare post: Post | null | Promise<Post | null>;
 
       postCommentsCount?: number;
       static {
@@ -3807,6 +3918,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
           record.postCommentsCount = await (record as any).post.comments.count();
         });
       }
+    }
+    interface Comment {
+      get post(): Post | null | Promise<Post | null>;
+      set post(value: Post | null);
     }
     registerModel("AscbInversePost", Post);
     registerModel("AscbPostComment", Comment);
@@ -3838,7 +3953,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
     class BtRecord extends Base {
       declare name: string | null;
       declare author_id: number | null;
-      declare btOwner: BtOwner | null | Promise<BtOwner | null>;
 
       static {
         this._tableName = "books";
@@ -3850,6 +3964,10 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
           autosave: true,
         });
       }
+    }
+    interface BtRecord {
+      get btOwner(): BtOwner | null | Promise<BtOwner | null>;
+      set btOwner(value: BtOwner | null);
     }
     registerModel("BtOwner", BtOwner);
     registerModel("BtRecord", BtRecord);
@@ -4513,7 +4631,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcOwner extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcChild: QcChild | null | Promise<QcChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4528,6 +4645,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    interface QcOwner {
+      get qcChild(): QcChild | null | Promise<QcChild | null>;
+      set qcChild(value: QcChild | null);
     }
     class QcChild extends Base {
       declare tree_id: number | null;
@@ -4557,7 +4678,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcNoCollapse extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcNoCollapseChild: QcNoCollapseChild | null | Promise<QcNoCollapseChild | null>;
 
       static {
         this._tableName = "nodes";
@@ -4572,6 +4692,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    interface QcNoCollapse {
+      get qcNoCollapseChild(): QcNoCollapseChild | null | Promise<QcNoCollapseChild | null>;
+      set qcNoCollapseChild(value: QcNoCollapseChild | null);
     }
     class QcNoCollapseChild extends Base {
       declare tree_id: number | null;
@@ -4601,7 +4725,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     class QcTenant extends Base {
       declare tree_id: number | null;
       declare name: string | null;
-      declare qcTenantRecord: QcTenantRecord | null | Promise<QcTenantRecord | null>;
 
       static {
         this._tableName = "nodes";
@@ -4616,6 +4739,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
           autosave: true,
         });
       }
+    }
+    interface QcTenant {
+      get qcTenantRecord(): QcTenantRecord | null | Promise<QcTenantRecord | null>;
+      set qcTenantRecord(value: QcTenantRecord | null);
     }
     class QcTenantRecord extends Base {
       declare tree_id: number | null;

@@ -12,7 +12,6 @@ import { Base } from "../../base.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 export class Car extends Base {
-  declare person: Person | null | Promise<Person | null>;
   declare bulbs: AssociationProxy<Bulb>;
   declare allBulbs: AssociationProxy<Bulb>;
   declare allBulbs2: AssociationProxy<Bulb>;
@@ -22,7 +21,6 @@ export class Car extends Base {
   declare failedBulbs: AssociationProxy<FailedBulb>;
   declare fooBulbs: AssociationProxy<Bulb>;
   declare awesomeBulbs: AssociationProxy<Bulb>;
-  declare bulb: Bulb | null | Promise<Bulb | null>;
   declare tyres: AssociationProxy<Tyre>;
   declare engines: AssociationProxy<Engine>;
   declare wheels: AssociationProxy<Wheel>;
@@ -75,6 +73,12 @@ export class Car extends Base {
 
     this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });
   }
+}
+export interface Car {
+  get person(): Person | null | Promise<Person | null>;
+  set person(value: Person | null);
+  get bulb(): Bulb | null | Promise<Bulb | null>;
+  set bulb(value: Bulb | null);
 }
 
 export class CoolCar extends Car {

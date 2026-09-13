@@ -31,8 +31,6 @@ export class Company extends AbstractCompany {
   declare suspendedBang: () => Promise<true>;
   declare static suspended: () => Relation<Company>;
   declare static notSuspended: () => Relation<Company>;
-  declare account: Account | null | Promise<Account | null>;
-  declare dummyAccount: Account | null | Promise<Account | null>;
   declare contracts: AssociationProxy<Contract>;
   declare developers: AssociationProxy<Developer>;
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -83,6 +81,12 @@ export class Company extends AbstractCompany {
     return "I am Jack's innermost fears and aspirations";
   }
 }
+export interface Company {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get dummyAccount(): Account | null | Promise<Account | null>;
+  set dummyAccount(value: Account | null);
+}
 
 export class SpecialCo extends Company {}
 
@@ -125,22 +129,10 @@ export class Firm extends Company {
   declare clientsUsingPrimaryKeyWithDeleteAll: AssociationProxy<Client>;
   declare clientsGroupedByFirmId: AssociationProxy<Client>;
   declare clientsGroupedByName: AssociationProxy<Client>;
-  declare account: Account | null | Promise<Account | null>;
-  declare unvalidatedAccount: Account | null | Promise<Account | null>;
-  declare accountWithSelect: Account | null | Promise<Account | null>;
-  declare readonlyAccount: Account | null | Promise<Account | null>;
-  declare accountUsingPrimaryKey: Account | null | Promise<Account | null>;
-  declare accountUsingForeignAndPrimaryKeys: Account | null | Promise<Account | null>;
-  declare accountWithInexistentForeignKey: Account | null | Promise<Account | null>;
-  declare deletableAccount: Account | null | Promise<Account | null>;
-  declare client: Client | null | Promise<Client | null>;
-  declare accountLimit500WithHashConditions: Account | null | Promise<Account | null>;
-  declare unautosavedAccount: Account | null | Promise<Account | null>;
   declare accounts: AssociationProxy<Account>;
   declare unautosavedAccounts: AssociationProxy<Account>;
   declare associationWithReferences: AssociationProxy<Client>;
   declare developersWithSelect: AssociationProxy<Developer>;
-  declare leadDeveloper: Developer | null | Promise<Developer | null>;
   declare projects: AssociationProxy<Project>;
 
   _log: string[] = [];
@@ -286,11 +278,35 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
+export interface Firm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get unvalidatedAccount(): Account | null | Promise<Account | null>;
+  set unvalidatedAccount(value: Account | null);
+  get accountWithSelect(): Account | null | Promise<Account | null>;
+  set accountWithSelect(value: Account | null);
+  get readonlyAccount(): Account | null | Promise<Account | null>;
+  set readonlyAccount(value: Account | null);
+  get accountUsingPrimaryKey(): Account | null | Promise<Account | null>;
+  set accountUsingPrimaryKey(value: Account | null);
+  get accountUsingForeignAndPrimaryKeys(): Account | null | Promise<Account | null>;
+  set accountUsingForeignAndPrimaryKeys(value: Account | null);
+  get accountWithInexistentForeignKey(): Account | null | Promise<Account | null>;
+  set accountWithInexistentForeignKey(value: Account | null);
+  get deletableAccount(): Account | null | Promise<Account | null>;
+  set deletableAccount(value: Account | null);
+  get client(): Client | null | Promise<Client | null>;
+  set client(value: Client | null);
+  get accountLimit500WithHashConditions(): Account | null | Promise<Account | null>;
+  set accountLimit500WithHashConditions(value: Account | null);
+  get unautosavedAccount(): Account | null | Promise<Account | null>;
+  set unautosavedAccount(value: Account | null);
+  get leadDeveloper(): Developer | null | Promise<Developer | null>;
+  set leadDeveloper(value: Developer | null);
+}
 
 export class DependentFirm extends Company {
-  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
-  declare company: Company | null | Promise<Company | null>;
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -301,9 +317,14 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
+export interface DependentFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+}
 
 export class RestrictedWithExceptionFirm extends Company {
-  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
 
   static {
@@ -317,9 +338,12 @@ export class RestrictedWithExceptionFirm extends Company {
     });
   }
 }
+export interface RestrictedWithExceptionFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+}
 
 export class RestrictedWithErrorFirm extends Company {
-  declare account: Account | null | Promise<Account | null>;
   declare companies: AssociationProxy<Company>;
 
   static {
@@ -332,6 +356,10 @@ export class RestrictedWithErrorFirm extends Company {
       dependent: "restrictWithError",
     });
   }
+}
+export interface RestrictedWithErrorFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
 }
 
 export class Agency extends Firm {
@@ -342,17 +370,7 @@ export class Agency extends Firm {
 acceptsNestedAttributesFor(Agency, "projects");
 
 export class Client extends Company {
-  declare firm: Firm | null | Promise<Firm | null>;
-  declare firmWithBasicId: Firm | null | Promise<Firm | null>;
-  declare firmWithSelect: Firm | null | Promise<Firm | null>;
-  declare firmWithOtherName: Firm | null | Promise<Firm | null>;
-  declare firmWithCondition: Firm | null | Promise<Firm | null>;
-  declare firmWithPrimaryKey: Firm | null | Promise<Firm | null>;
-  declare firmWithPrimaryKeySymbols: Firm | null | Promise<Firm | null>;
-  declare readonlyFirm: Firm | null | Promise<Firm | null>;
-  declare bobFirm: Firm | null | Promise<Firm | null>;
   declare accounts: AssociationProxy<Account>;
-  declare account: Account | null | Promise<Account | null>;
 
   raiseOnSave = false;
   throwOnSave = false;
@@ -440,9 +458,30 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
+export interface Client {
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+  get firmWithBasicId(): Firm | null | Promise<Firm | null>;
+  set firmWithBasicId(value: Firm | null);
+  get firmWithSelect(): Firm | null | Promise<Firm | null>;
+  set firmWithSelect(value: Firm | null);
+  get firmWithOtherName(): Firm | null | Promise<Firm | null>;
+  set firmWithOtherName(value: Firm | null);
+  get firmWithCondition(): Firm | null | Promise<Firm | null>;
+  set firmWithCondition(value: Firm | null);
+  get firmWithPrimaryKey(): Firm | null | Promise<Firm | null>;
+  set firmWithPrimaryKey(value: Firm | null);
+  get firmWithPrimaryKeySymbols(): Firm | null | Promise<Firm | null>;
+  set firmWithPrimaryKeySymbols(value: Firm | null);
+  get readonlyFirm(): Firm | null | Promise<Firm | null>;
+  set readonlyFirm(value: Firm | null);
+  get bobFirm(): Firm | null | Promise<Firm | null>;
+  set bobFirm(value: Firm | null);
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
+}
 
 export class ExclusivelyDependentFirm extends Company {
-  declare account: Account | null | Promise<Account | null>;
   declare dependentSanitizedConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentHashConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentConditionalClientsOfFirm: AssociationProxy<Client>;
@@ -465,6 +504,10 @@ export class ExclusivelyDependentFirm extends Company {
       { foreignKey: "client_of", className: "Client", dependent: "delete" },
     );
   }
+}
+export interface ExclusivelyDependentFirm {
+  get account(): Account | null | Promise<Account | null>;
+  set account(value: Account | null);
 }
 
 export class LargeClient extends Client {

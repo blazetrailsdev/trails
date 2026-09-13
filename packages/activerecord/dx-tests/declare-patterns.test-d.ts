@@ -45,8 +45,6 @@ class Author extends Base {
 
   declare tags: AssociationProxy<Tag>;
 
-  declare profile: Profile | null | Promise<Profile | null>;
-
   static {
     this.attribute("name", "string");
     this.hasMany("comments");
@@ -54,18 +52,24 @@ class Author extends Base {
     this.hasOne("profile");
   }
 }
+interface Author {
+  get profile(): Profile | null | Promise<Profile | null>;
+  set profile(value: Profile | null);
+}
 
 class Profile extends Base {
   declare bio: string;
   declare author_id: number;
-
-  declare author: Author | null | Promise<Author | null>;
 
   static {
     this.attribute("bio", "string");
     this.attribute("author_id", "integer");
     this.belongsTo("author");
   }
+}
+interface Profile {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
 }
 
 class Post extends Base {
@@ -199,20 +203,26 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(author.tags).toEqualTypeOf<AssociationProxy<Tag>>();
   });
 
-  it("belongsTo accessor: `declare author: Author | null | Promise<Author | null>` (lazily loading reader)", async () => {
+  it("belongsTo accessor: `get author(): Author | null | Promise<Author | null>` / `set author(value: Author | null)` (lazily loading reader)", async () => {
     const profile = new Profile({ bio: "hi", author_id: 1 });
     expectTypeOf(profile.author).toEqualTypeOf<Author | null | Promise<Author | null>>();
     expectTypeOf(await profile.author).toEqualTypeOf<Author | null>();
     // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
     void profile.author!.id;
+    profile.author = null;
+    // @ts-expect-error the writer takes a record, not a Promise
+    profile.author = Promise.resolve(null);
   });
 
-  it("hasOne accessor: `declare profile: Profile | null | Promise<Profile | null>`", async () => {
+  it("hasOne accessor: `get profile(): Profile | null | Promise<Profile | null>` / `set profile(value: Profile | null)`", async () => {
     const author = new Author({ name: "dean" });
     expectTypeOf(author.profile).toEqualTypeOf<Profile | null | Promise<Profile | null>>();
     expectTypeOf(await author.profile).toEqualTypeOf<Profile | null>();
     // @ts-expect-error an unloaded read may be a Promise, so it must be awaited
     void author.profile!.id;
+    author.profile = null;
+    // @ts-expect-error the writer takes a record, not a Promise
+    author.profile = Promise.resolve(null);
   });
 
   it("named scope (static): `declare static published: () => Relation<Post>`", () => {

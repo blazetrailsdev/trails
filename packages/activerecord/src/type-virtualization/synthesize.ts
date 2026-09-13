@@ -53,7 +53,7 @@ export function synthesizeDeclares(
     if (mergeAttributeInterface && l.attribute) {
       interfaceLines.push(
         `${INDENT}get ${l.attribute.memberName}(): ${l.attribute.readerType};`,
-        `${INDENT}set ${l.attribute.memberName}(value: unknown);`,
+        `${INDENT}set ${l.attribute.memberName}(value: ${l.attribute.writerType ?? "unknown"});`,
       );
     } else {
       out.push(l.text);
@@ -239,7 +239,7 @@ interface RenderedLine {
   declaredName: string;
   isStatic: boolean;
   skipIfPresent: boolean;
-  attribute?: { memberName: string; readerType: string };
+  attribute?: { memberName: string; readerType: string; writerType?: string };
 }
 
 function renderCall(
@@ -309,8 +309,12 @@ function renderSingularAssoc(
       ? "Base"
       : resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
+  const readerType = `${target} | null | Promise<${target} | null>`;
   return [
-    line(`declare ${memberName}: ${target} | null | Promise<${target} | null>;`, call.name, false),
+    {
+      ...line(`declare ${memberName}: ${readerType};`, call.name, false),
+      attribute: { memberName, readerType, writerType: `${target} | null` },
+    },
   ];
 }
 

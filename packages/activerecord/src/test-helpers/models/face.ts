@@ -3,13 +3,6 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
 export class Face extends Base {
-  declare human: Human | null | Promise<Human | null>;
-  declare autosaveHuman: Human | null | Promise<Human | null>;
-  declare superHuman: Base | null | Promise<Base | null>;
-  declare polymorphicHuman: Base | null | Promise<Base | null>;
-  declare polyHumanWithoutInverse: Base | null | Promise<Base | null>;
-  declare confusedHuman: Human | null | Promise<Human | null>;
-  declare puzzledPolymorphicHuman: Base | null | Promise<Base | null>;
   declare description: string;
   declare human_id: number;
   declare poly_human_without_inverse_id: number;
@@ -41,5 +34,21 @@ export class Face extends Base {
       void (face as any).human;
     });
   }
+}
+export interface Face {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
+  get autosaveHuman(): Human | null | Promise<Human | null>;
+  set autosaveHuman(value: Human | null);
+  get superHuman(): Base | null | Promise<Base | null>;
+  set superHuman(value: Base | null);
+  get polymorphicHuman(): Base | null | Promise<Base | null>;
+  set polymorphicHuman(value: Base | null);
+  get polyHumanWithoutInverse(): Base | null | Promise<Base | null>;
+  set polyHumanWithoutInverse(value: Base | null);
+  get confusedHuman(): Human | null | Promise<Human | null>;
+  set confusedHuman(value: Human | null);
+  get puzzledPolymorphicHuman(): Base | null | Promise<Base | null>;
+  set puzzledPolymorphicHuman(value: Base | null);
 }
 registerModel(Face);

@@ -6,7 +6,6 @@ import { Base } from "../../base.js";
 export class Tag extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggables: AssociationProxy<Base>;
-  declare tagging: Tagging | null | Promise<Tagging | null>;
   declare taggedPosts: AssociationProxy<Post>;
   declare nullTaggings: AssociationProxy<Tagging>;
   declare nullTaggedPosts: AssociationProxy<Post>;
@@ -26,6 +25,10 @@ export class Tag extends Base {
       sourceType: "Post",
     });
   }
+}
+export interface Tag {
+  get tagging(): Tagging | null | Promise<Tagging | null>;
+  set tagging(value: Tagging | null);
 }
 
 export class OrderedTag extends Tag {

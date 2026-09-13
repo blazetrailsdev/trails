@@ -9,7 +9,6 @@ import { Base } from "../../base.js";
 
 export class Pet extends Base {
   declare current_user: string;
-  declare owner: Owner | null | Promise<Owner | null>;
   declare toys: AssociationProxy<Toy>;
   declare petTreasures: AssociationProxy<PetTreasure>;
   declare treasures: AssociationProxy<Treasure>;
@@ -36,6 +35,10 @@ export class Pet extends Base {
       Pet.afterDestroyOutput = record.readAttribute("current_user");
     });
   }
+}
+export interface Pet {
+  get owner(): Owner | null | Promise<Owner | null>;
+  set owner(value: Owner | null);
 }
 
 export class PetTouchHappyAt extends Base {

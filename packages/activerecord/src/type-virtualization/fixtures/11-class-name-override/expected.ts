@@ -1,5 +1,4 @@
 export class Post extends Base {
-  declare writer: Author | null | Promise<Author | null>;
   declare remarks: import("@blazetrails/activerecord").AssociationProxy<Comment>;
 
   static {
@@ -7,3 +6,8 @@ export class Post extends Base {
     this.hasMany("remarks", { className: "Comment" });
   }
 }
+export interface Post {
+  get writer(): Author | null | Promise<Author | null>;
+  set writer(value: Author | null);
+}
+

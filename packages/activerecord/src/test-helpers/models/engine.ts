@@ -2,7 +2,6 @@ import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
 export class Engine extends Base {
-  declare myCar: Car | null | Promise<Car | null>;
   declare car_id: number;
 
   static {
@@ -12,4 +11,8 @@ export class Engine extends Base {
       counterCache: "engines_count",
     });
   }
+}
+export interface Engine {
+  get myCar(): Car | null | Promise<Car | null>;
+  set myCar(value: Car | null);
 }

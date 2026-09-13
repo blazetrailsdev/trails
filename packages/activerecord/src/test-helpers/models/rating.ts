@@ -4,7 +4,6 @@ import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
 export class Rating extends Base {
-  declare comment: Comment | null | Promise<Comment | null>;
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithoutTag: AssociationProxy<Tagging>;
   declare taggingsWithNoTag: AssociationProxy<Tagging>;
@@ -26,4 +25,8 @@ export class Rating extends Base {
       { as: "taggable", className: "Tagging" },
     );
   }
+}
+export interface Rating {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
 }

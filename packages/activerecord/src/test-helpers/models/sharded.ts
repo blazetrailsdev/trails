@@ -20,8 +20,6 @@ export class ShardedBlog extends Base {
 }
 
 export class ShardedBlogPost extends Base {
-  declare parent: Base | null | Promise<Base | null>;
-  declare blog: ShardedBlog | null | Promise<ShardedBlog | null>;
   declare comments: AssociationProxy<ShardedComment>;
   declare deleteComments: AssociationProxy<ShardedComment>;
   declare children: AssociationProxy<ShardedBlogPost>;
@@ -72,6 +70,12 @@ export class ShardedBlogPost extends Base {
     });
   }
 }
+export interface ShardedBlogPost {
+  get parent(): Base | null | Promise<Base | null>;
+  set parent(value: Base | null);
+  get blog(): ShardedBlog | null | Promise<ShardedBlog | null>;
+  set blog(value: ShardedBlog | null);
+}
 
 export class ShardedBlogPostWithRevision extends Base {
   declare comments: AssociationProxy<ShardedComment>;
@@ -90,10 +94,6 @@ export class ShardedBlogPostWithRevision extends Base {
 }
 
 export class ShardedComment extends Base {
-  declare blogPost: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
-  declare blogPostById: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
-  declare blogPostWithInverse: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
-  declare blog: ShardedBlog | null | Promise<ShardedBlog | null>;
   declare blog_id: number;
   declare blog_post_id: number;
   declare body: string;
@@ -118,6 +118,16 @@ export class ShardedComment extends Base {
     this.belongsTo("blog", { className: "ShardedBlog" });
   }
 }
+export interface ShardedComment {
+  get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPost(value: ShardedBlogPost | null);
+  get blogPostById(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPostById(value: ShardedBlogPost | null);
+  get blogPostWithInverse(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPostWithInverse(value: ShardedBlogPost | null);
+  get blog(): ShardedBlog | null | Promise<ShardedBlog | null>;
+  set blog(value: ShardedBlog | null);
+}
 
 export class ShardedTag extends Base {
   declare blogPostTags: AssociationProxy<ShardedBlogPostTag>;
@@ -139,9 +149,6 @@ export class ShardedTag extends Base {
 }
 
 export class ShardedBlogPostTag extends Base {
-  declare blogPost: ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
-  declare tag: ShardedTag | null | Promise<ShardedTag | null>;
-
   static _tableName = "sharded_blog_posts_tags";
 
   static {
@@ -150,4 +157,10 @@ export class ShardedBlogPostTag extends Base {
     this.belongsTo("blogPost", { className: "ShardedBlogPost" });
     this.belongsTo("tag", { className: "ShardedTag" });
   }
+}
+export interface ShardedBlogPostTag {
+  get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPost(value: ShardedBlogPost | null);
+  get tag(): ShardedTag | null | Promise<ShardedTag | null>;
+  set tag(value: ShardedTag | null);
 }

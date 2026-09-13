@@ -82,11 +82,13 @@ export class LiveParrot extends Parrot {
 }
 
 export class DeadParrot extends Parrot {
-  declare killer: Pirate | null | Promise<Pirate | null>;
-
   static {
     this.belongsTo("killer", { className: "Pirate", foreignKey: "killer_id" });
   }
+}
+export interface DeadParrot {
+  get killer(): Pirate | null | Promise<Pirate | null>;
+  set killer(value: Pirate | null);
 }
 
 registerModel(Parrot);

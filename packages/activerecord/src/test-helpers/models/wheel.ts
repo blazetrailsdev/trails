@@ -1,7 +1,6 @@
 import { Base } from "../../base.js";
 
 export class Wheel extends Base {
-  declare wheelable: Base | null | Promise<Base | null>;
   declare size: number;
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -14,9 +13,12 @@ export class Wheel extends Base {
     });
   }
 }
+export interface Wheel {
+  get wheelable(): Base | null | Promise<Base | null>;
+  set wheelable(value: Base | null);
+}
 
 export class WheelPolymorphicTouch extends Base {
-  declare wheelable: Base | null | Promise<Base | null>;
   declare wheelable_id: number;
   declare wheelable_type: string;
 
@@ -24,4 +26,8 @@ export class WheelPolymorphicTouch extends Base {
     this.tableName = "wheels";
     this.belongsTo("wheelable", { polymorphic: true, touch: true });
   }
+}
+export interface WheelPolymorphicTouch {
+  get wheelable(): Base | null | Promise<Base | null>;
+  set wheelable(value: Base | null);
 }

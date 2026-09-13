@@ -2,7 +2,6 @@ import type { Human } from "./human.js";
 import { Base } from "../../base.js";
 
 export class MixedCaseMonkey extends Base {
-  declare human: Human | null | Promise<Human | null>;
   declare fleaCount: number;
   declare monkeyID: number;
 
@@ -11,4 +10,8 @@ export class MixedCaseMonkey extends Base {
   static {
     this.belongsTo("human");
   }
+}
+export interface MixedCaseMonkey {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
 }

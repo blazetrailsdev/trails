@@ -3,11 +3,6 @@ import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-d
 import { Base } from "../../base.js";
 
 export class DlKeyedBelongsTo extends Base {
-  declare destroyAsyncParent: DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
-  declare destroyAsyncParentSoftDelete:
-    | DestroyAsyncParentSoftDelete
-    | null
-    | Promise<DestroyAsyncParentSoftDelete | null>;
   declare belongs_key: number;
   declare destroy_async_parent_id: number;
 
@@ -25,4 +20,15 @@ export class DlKeyedBelongsTo extends Base {
       className: "DestroyAsyncParentSoftDelete",
     });
   }
+}
+export interface DlKeyedBelongsTo {
+  get destroyAsyncParentSoftDelete():
+    | DestroyAsyncParentSoftDelete
+    | null
+    | Promise<DestroyAsyncParentSoftDelete | null>;
+  set destroyAsyncParentSoftDelete(value: DestroyAsyncParentSoftDelete | null);
+}
+export interface DlKeyedBelongsTo {
+  get destroyAsyncParent(): DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
+  set destroyAsyncParent(value: DestroyAsyncParent | null);
 }

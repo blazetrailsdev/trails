@@ -5,9 +5,6 @@ import type { SpecialDeveloper } from "./developer.js";
 import { Base } from "../../base.js";
 
 export class Contract extends Base {
-  declare company: Company | null | Promise<Company | null>;
-  declare developer: Developer | null | Promise<Developer | null>;
-  declare firm: Firm | null | Promise<Firm | null>;
   declare metadata: unknown;
   declare company_id: number;
   declare count: number;
@@ -47,6 +44,14 @@ export class Contract extends Base {
     this.writeAttribute("metadata", { code, company_id: companyId, developer_id: developerId });
   }
 }
+export interface Contract {
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+}
 
 export class NewContract extends Contract {
   static {
@@ -55,12 +60,15 @@ export class NewContract extends Contract {
 }
 
 export class SpecialContract extends Base {
-  declare company: Company | null | Promise<Company | null>;
-  declare specialDeveloper: SpecialDeveloper | null | Promise<SpecialDeveloper | null>;
-
   static {
     this._tableName = "contracts";
     this.belongsTo("company");
     this.belongsTo("specialDeveloper", { foreignKey: "developer_id" });
   }
+}
+export interface SpecialContract {
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+  get specialDeveloper(): SpecialDeveloper | null | Promise<SpecialDeveloper | null>;
+  set specialDeveloper(value: SpecialDeveloper | null);
 }

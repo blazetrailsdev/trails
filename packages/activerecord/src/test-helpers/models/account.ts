@@ -5,8 +5,6 @@ import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 
 export class Account extends Base {
-  declare firm: Company | null | Promise<Company | null>;
-  declare unautosavedFirm: Firm | null | Promise<Firm | null>;
   declare static open: () => Relation<Account>;
   declare static available: () => Relation<Account>;
   declare credit_limit: number;
@@ -68,6 +66,12 @@ export class Account extends Base {
   private privateMethod() {
     return "Sir, yes sir!";
   }
+}
+export interface Account {
+  get firm(): Company | null | Promise<Company | null>;
+  set firm(value: Company | null);
+  get unautosavedFirm(): Firm | null | Promise<Firm | null>;
+  set unautosavedFirm(value: Firm | null);
 }
 
 export class SubAccount extends Account {}

@@ -2,10 +2,6 @@ import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-d
 import { Base } from "../../base.js";
 
 export class DlKeyedBelongsToSoftDelete extends Base {
-  declare destroyAsyncParentSoftDelete:
-    | DestroyAsyncParentSoftDelete
-    | null
-    | Promise<DestroyAsyncParentSoftDelete | null>;
   declare deleted: boolean;
   declare destroy_async_parent_soft_delete_id: number;
 
@@ -25,4 +21,11 @@ export class DlKeyedBelongsToSoftDelete extends Base {
     await (this as any).runCallbacks("destroy", () => {});
     return this;
   }
+}
+export interface DlKeyedBelongsToSoftDelete {
+  get destroyAsyncParentSoftDelete():
+    | DestroyAsyncParentSoftDelete
+    | null
+    | Promise<DestroyAsyncParentSoftDelete | null>;
+  set destroyAsyncParentSoftDelete(value: DestroyAsyncParentSoftDelete | null);
 }

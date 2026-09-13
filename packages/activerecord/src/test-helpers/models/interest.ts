@@ -3,11 +3,6 @@ import type { Zine } from "./zine.js";
 import { Base } from "../../base.js";
 
 export class Interest extends Base {
-  declare human: Human | null | Promise<Human | null>;
-  declare humanWithCallbacks: Human | null | Promise<Human | null>;
-  declare polymorphicHuman: Base | null | Promise<Base | null>;
-  declare polymorphicHumanWithCallbacks: Base | null | Promise<Base | null>;
-  declare zine: Zine | null | Promise<Zine | null>;
   declare human_id: number;
   declare polymorphic_human_id: number;
   declare polymorphic_human_type: string;
@@ -30,4 +25,16 @@ export class Interest extends Base {
     });
     this.belongsTo("zine", { inverseOf: "interests" });
   }
+}
+export interface Interest {
+  get human(): Human | null | Promise<Human | null>;
+  set human(value: Human | null);
+  get humanWithCallbacks(): Human | null | Promise<Human | null>;
+  set humanWithCallbacks(value: Human | null);
+  get polymorphicHuman(): Base | null | Promise<Base | null>;
+  set polymorphicHuman(value: Base | null);
+  get polymorphicHumanWithCallbacks(): Base | null | Promise<Base | null>;
+  set polymorphicHumanWithCallbacks(value: Base | null);
+  get zine(): Zine | null | Promise<Zine | null>;
+  set zine(value: Zine | null);
 }

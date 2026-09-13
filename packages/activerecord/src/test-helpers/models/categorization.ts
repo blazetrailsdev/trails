@@ -6,12 +6,7 @@ import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
 
 export class Categorization extends Base {
-  declare post: Post | null | Promise<Post | null>;
-  declare category: Category | null | Promise<Category | null>;
-  declare namedCategory: Category | null | Promise<Category | null>;
-  declare author: Author | null | Promise<Author | null>;
   declare postTaggings: AssociationProxy<Tagging>;
-  declare authorUsingCustomPk: Author | null | Promise<Author | null>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
   declare author_id: number;
   declare category_id: number;
@@ -41,15 +36,30 @@ export class Categorization extends Base {
     });
   }
 }
+export interface Categorization {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get namedCategory(): Category | null | Promise<Category | null>;
+  set namedCategory(value: Category | null);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorUsingCustomPk(): Author | null | Promise<Author | null>;
+  set authorUsingCustomPk(value: Author | null);
+}
 
 export class SpecialCategorization extends Base {
-  declare author: Author | null | Promise<Author | null>;
-  declare category: Category | null | Promise<Category | null>;
-
   static {
     this._tableName = "categorizations";
     this.defaultScope((q: any) => q.where({ special: true }));
     this.belongsTo("author");
     this.belongsTo("category");
   }
+}
+export interface SpecialCategorization {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
 }

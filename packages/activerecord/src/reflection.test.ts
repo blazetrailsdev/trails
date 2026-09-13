@@ -129,7 +129,6 @@ describe("ReflectionTest", () => {
       declare department_id: number | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this.attribute("department_id", "integer");
@@ -137,6 +136,10 @@ describe("ReflectionTest", () => {
         this.attribute("employable_type", "string");
         this.belongsTo("employable", { polymorphic: true });
       }
+    }
+    interface ScChef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class ScCake extends Base {}
     class ScDrink extends Base {}
@@ -194,7 +197,6 @@ describe("ReflectionTest", () => {
       declare employable_list_type: string | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
 
       static {
         this.attribute("employable_list_id", "integer");
@@ -203,6 +205,10 @@ describe("ReflectionTest", () => {
         this.attribute("employable_type", "string");
         this.belongsTo("employable", { polymorphic: true });
       }
+    }
+    interface SC2ChefList {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class SC2Mocktail extends Base {}
     registerModel("SC2Hotel", SC2Hotel);
@@ -255,7 +261,6 @@ describe("ReflectionTest", () => {
       declare author_id: number | null;
       declare format_record_id: number | null;
       declare format_record_type: string | null;
-      declare formatRecord: Base | null | Promise<Base | null>;
 
       static {
         this.attribute("author_id", "integer");
@@ -263,6 +268,10 @@ describe("ReflectionTest", () => {
         this.attribute("format_record_type", "string");
         this.belongsTo("formatRecord", { polymorphic: true });
       }
+    }
+    interface SC3Book {
+      get formatRecord(): Base | null | Promise<Base | null>;
+      set formatRecord(value: Base | null);
     }
     class SC3Hardback extends Base {}
     class SC3BestHardback extends SC3Hardback {}
@@ -333,7 +342,6 @@ describe("ReflectionTest", () => {
       declare department_id: number | null;
       declare employable_id: number | null;
       declare employable_type: string | null;
-      declare employable: Base | null | Promise<Base | null>;
       declare recipes: AssociationProxy<SC4Recipe>;
 
       static {
@@ -346,6 +354,10 @@ describe("ReflectionTest", () => {
           foreignKey: "chef_id",
         });
       }
+    }
+    interface SC4Chef {
+      get employable(): Base | null | Promise<Base | null>;
+      set employable(value: Base | null);
     }
     class SC4Drink extends Base {}
     class SC4Recipe extends Base {
@@ -416,7 +428,6 @@ describe("ReflectionTest", () => {
     class RfSubscription extends Base {
       declare subscriber_id: number | null;
       declare book_id: number | null;
-      declare subBook: SubBook | null | Promise<SubBook | null>;
 
       static {
         this.attribute("subscriber_id", "integer");
@@ -426,6 +437,10 @@ describe("ReflectionTest", () => {
           className: "SubBook",
         });
       }
+    }
+    interface RfSubscription {
+      get subBook(): SubBook | null | Promise<SubBook | null>;
+      set subBook(value: SubBook | null);
     }
     class SubBook extends Base {
       declare title: string | null;
@@ -562,12 +577,15 @@ describe("ReflectionTest", () => {
     }
     class RfAdminUser extends Base {
       declare name: string | null;
-      declare user: RfNestedUser | null | Promise<RfNestedUser | null>;
 
       static {
         this.attribute("name", "string");
         this.hasOne("user", { className: "RfNested::User" });
       }
+    }
+    interface RfAdminUser {
+      get user(): RfNestedUser | null | Promise<RfNestedUser | null>;
+      set user(value: RfNestedUser | null);
     }
     registerModel("RfNested::User", RfNestedUser);
     registerModel("RfAdmin::User", RfAdminUser);
@@ -1334,13 +1352,16 @@ describe("ReflectionTest", () => {
     }
     class RfComment extends Base {
       declare blog_post_id: number | null;
-      declare blogPost: BlogPost | null | Promise<BlogPost | null>;
 
       static {
         this.attribute("id", "integer");
         this.attribute("blog_post_id", "integer");
         this.belongsTo("blogPost", { className: "BlogPost" });
       }
+    }
+    interface RfComment {
+      get blogPost(): BlogPost | null | Promise<BlogPost | null>;
+      set blogPost(value: BlogPost | null);
     }
     registerModel(BlogPost);
     registerModel(RfComment);

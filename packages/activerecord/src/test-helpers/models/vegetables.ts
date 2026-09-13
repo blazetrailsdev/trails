@@ -26,11 +26,13 @@ export class GreenCabbage extends Cabbage {}
 export class KingCole extends GreenCabbage {}
 
 export class RedCabbage extends Cabbage {
-  declare seller: Company | null | Promise<Company | null>;
-
   static {
     this.belongsTo("seller", { className: "Company" });
   }
+}
+export interface RedCabbage {
+  get seller(): Company | null | Promise<Company | null>;
+  set seller(value: Company | null);
 }
 
 registerModel([Vegetable, Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]);

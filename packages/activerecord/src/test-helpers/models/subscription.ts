@@ -3,8 +3,6 @@ import type { Subscriber } from "./subscriber.js";
 import { Base } from "../../base.js";
 
 export class Subscription extends Base {
-  declare subscriber: Subscriber | null | Promise<Subscriber | null>;
-  declare book: Book | null | Promise<Book | null>;
   declare book_id: number;
   declare subscriber_id: string;
 
@@ -17,4 +15,10 @@ export class Subscription extends Base {
     );
     this.validatesPresenceOf("subscriber_id", "book_id");
   }
+}
+export interface Subscription {
+  get subscriber(): Subscriber | null | Promise<Subscriber | null>;
+  set subscriber(value: Subscriber | null);
+  get book(): Book | null | Promise<Book | null>;
+  set book(value: Book | null);
 }

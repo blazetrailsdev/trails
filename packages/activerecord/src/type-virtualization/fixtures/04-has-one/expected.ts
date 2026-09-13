@@ -1,7 +1,10 @@
 export class User extends Base {
-  declare profile: Profile | null | Promise<Profile | null>;
-
   static {
     this.hasOne("profile");
   }
 }
+export interface User {
+  get profile(): Profile | null | Promise<Profile | null>;
+  set profile(value: Profile | null);
+}
+

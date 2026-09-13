@@ -9,12 +9,8 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Club extends Base {
-  declare membership: Membership | null | Promise<Membership | null>;
   declare memberships: AssociationProxy<Membership>;
   declare members: AssociationProxy<Member>;
-  declare sponsor: Sponsor | null | Promise<Sponsor | null>;
-  declare sponsoredMember: Member | null | Promise<Member | null>;
-  declare category: Category | null | Promise<Category | null>;
   declare favorites: AssociationProxy<Member>;
   declare customMemberships: AssociationProxy<Membership>;
   declare customFavorites: AssociationProxy<Member>;
@@ -51,6 +47,16 @@ export class Club extends Base {
         .unscope("limit");
     });
   }
+}
+export interface Club {
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get sponsor(): Sponsor | null | Promise<Sponsor | null>;
+  set sponsor(value: Sponsor | null);
+  get sponsoredMember(): Member | null | Promise<Member | null>;
+  set sponsoredMember(value: Member | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
 }
 
 acceptsNestedAttributesFor(Club, "membership");

@@ -761,13 +761,16 @@ describe("HasOneThroughAssociationsTest", () => {
   it("has one through relationship cannot have a counter cache", () => {
     expect(() => {
       class Thing extends Base {
-        declare otherThing: Base | null | Promise<Base | null>;
-        declare thing: Base | null | Promise<Base | null>;
-
         static {
           this.hasOne("otherThing");
           this.hasOne("thing", { through: "otherThing", counterCache: true });
         }
+      }
+      interface Thing {
+        get otherThing(): Base | null | Promise<Base | null>;
+        set otherThing(value: Base | null);
+        get thing(): Base | null | Promise<Base | null>;
+        set thing(value: Base | null);
       }
       registerModel(Thing);
       void Thing;

@@ -6,7 +6,6 @@ import type { DlKeyedJoin } from "./dl-keyed-join.js";
 import { Base } from "../../base.js";
 
 export class DestroyAsyncParent extends Base {
-  declare dlKeyedHasOne: DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   declare dlKeyedHasMany: AssociationProxy<DlKeyedHasMany>;
   declare dlKeyedJoin: AssociationProxy<DlKeyedJoin>;
   declare dlKeyedHasManyThrough: AssociationProxy<DlKeyedHasManyThrough>;
@@ -39,4 +38,8 @@ export class DestroyAsyncParent extends Base {
       primaryKey: "through_key",
     });
   }
+}
+export interface DestroyAsyncParent {
+  get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
+  set dlKeyedHasOne(value: DlKeyedHasOne | null);
 }

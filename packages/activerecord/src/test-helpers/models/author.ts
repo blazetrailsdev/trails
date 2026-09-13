@@ -33,7 +33,6 @@ import type { FirstPost } from "./post.js";
 export class Author extends Base {
   declare posts: AssociationProxy<Post>;
   declare serializedPosts: AssociationProxy<SerializedPost>;
-  declare post: Post | null | Promise<Post | null>;
   declare verySpecialComments: AssociationProxy<VerySpecialComment>;
   declare postsWithComments: AssociationProxy<Post>;
   declare popularGroupedPosts: AssociationProxy<Post>;
@@ -43,8 +42,6 @@ export class Author extends Base {
   declare postsWithCategories: AssociationProxy<Post>;
   declare postsWithCommentsAndCategories: AssociationProxy<Post>;
   declare postsWithSpecialCategorizations: AssociationProxy<PostWithSpecialCategorization>;
-  declare postAboutThinking: Post | null | Promise<Post | null>;
-  declare postAboutThinkingWithLastComment: Post | null | Promise<Post | null>;
   declare comments: AssociationProxy<Comment>;
   declare commentsWithOrder: AssociationProxy<Comment>;
   declare noJoinsComments: AssociationProxy<Comment>;
@@ -63,8 +60,6 @@ export class Author extends Base {
   declare commentsWithInclude: AssociationProxy<Comment>;
   declare commentsForFirstAuthor: AssociationProxy<Comment>;
   declare commentsOnFirstPosts: AssociationProxy<Comment>;
-  declare firstPost: FirstPost | null | Promise<FirstPost | null>;
-  declare commentOnFirstPost: Comment | null | Promise<Comment | null>;
   declare thinkingPosts: AssociationProxy<Post>;
   declare welcomePosts: AssociationProxy<Post>;
   declare welcomePostsWithOneComment: AssociationProxy<Post>;
@@ -100,7 +95,6 @@ export class Author extends Base {
   declare namedCategories: AssociationProxy<Category>;
   declare specialCategorizations: AssociationProxy<SpecialCategorization>;
   declare specialCategories: AssociationProxy<Category>;
-  declare specialCategory: Category | null | Promise<Category | null>;
   declare generalCategorizations: AssociationProxy<Categorization>;
   declare generalPosts: AssociationProxy<Post>;
   declare specialCategoriesWithConditions: AssociationProxy<Category>;
@@ -125,25 +119,14 @@ export class Author extends Base {
   declare bestHardbacks: AssociationProxy<BestHardback>;
   declare publishedBooks: AssociationProxy<PublishedBook>;
   declare unpublishedBooks: AssociationProxy<Book>;
-  declare unreadListing: Book | null | Promise<Book | null>;
-  declare readingListing: Book | null | Promise<Book | null>;
   declare subscriptions: AssociationProxy<Subscription>;
   declare subscribers: AssociationProxy<Subscriber>;
   declare distinctSubscribers: AssociationProxy<Subscriber>;
-  declare essay: Essay | null | Promise<Essay | null>;
-  declare essayCategory: Category | null | Promise<Category | null>;
-  declare essayOwner: Owner | null | Promise<Owner | null>;
-  declare essay_2: Essay | null | Promise<Essay | null>;
-  declare essayCategory_2: Category | null | Promise<Category | null>;
   declare essays: AssociationProxy<Essay>;
   declare essayCategories: AssociationProxy<Category>;
   declare essayOwners: AssociationProxy<Owner>;
   declare essays_2: AssociationProxy<Essay>;
   declare essayCategories_2: AssociationProxy<Category>;
-  declare ownedEssay: Essay | null | Promise<Essay | null>;
-  declare ownedEssayCategory: Category | null | Promise<Category | null>;
-  declare authorAddress: AuthorAddress | null | Promise<AuthorAddress | null>;
-  declare authorAddressExtra: AuthorAddress | null | Promise<AuthorAddress | null>;
   declare categoryPostComments: AssociationProxy<Comment>;
   declare miscPosts: AssociationProxy<Post>;
   declare miscPostFirstBlueTags: AssociationProxy<Tag>;
@@ -154,8 +137,6 @@ export class Author extends Base {
   declare postsMentioningAuthor: AssociationProxy<Post>;
   declare commentsOnPostsMentioningAuthor: AssociationProxy<Comment>;
   declare commentsMentioningAuthor: AssociationProxy<Comment>;
-  declare recentPost: Post | null | Promise<Post | null>;
-  declare recentResponse: Comment | null | Promise<Comment | null>;
   declare postsWithExtension: AssociationProxy<Post>;
   declare postsWithExtensionAndInstance: AssociationProxy<Post>;
   declare topPosts: AssociationProxy<Post>;
@@ -642,10 +623,48 @@ export class Author extends Base {
     return ["twitter", "github"];
   }
 }
+export interface Author {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get postAboutThinking(): Post | null | Promise<Post | null>;
+  set postAboutThinking(value: Post | null);
+  get postAboutThinkingWithLastComment(): Post | null | Promise<Post | null>;
+  set postAboutThinkingWithLastComment(value: Post | null);
+  get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  set firstPost(value: FirstPost | null);
+  get commentOnFirstPost(): Comment | null | Promise<Comment | null>;
+  set commentOnFirstPost(value: Comment | null);
+  get specialCategory(): Category | null | Promise<Category | null>;
+  set specialCategory(value: Category | null);
+  get unreadListing(): Book | null | Promise<Book | null>;
+  set unreadListing(value: Book | null);
+  get readingListing(): Book | null | Promise<Book | null>;
+  set readingListing(value: Book | null);
+  get essay(): Essay | null | Promise<Essay | null>;
+  set essay(value: Essay | null);
+  get essayCategory(): Category | null | Promise<Category | null>;
+  set essayCategory(value: Category | null);
+  get essayOwner(): Owner | null | Promise<Owner | null>;
+  set essayOwner(value: Owner | null);
+  get essay_2(): Essay | null | Promise<Essay | null>;
+  set essay_2(value: Essay | null);
+  get essayCategory_2(): Category | null | Promise<Category | null>;
+  set essayCategory_2(value: Category | null);
+  get ownedEssay(): Essay | null | Promise<Essay | null>;
+  set ownedEssay(value: Essay | null);
+  get ownedEssayCategory(): Category | null | Promise<Category | null>;
+  set ownedEssayCategory(value: Category | null);
+  get authorAddress(): AuthorAddress | null | Promise<AuthorAddress | null>;
+  set authorAddress(value: AuthorAddress | null);
+  get authorAddressExtra(): AuthorAddress | null | Promise<AuthorAddress | null>;
+  set authorAddressExtra(value: AuthorAddress | null);
+  get recentPost(): Post | null | Promise<Post | null>;
+  set recentPost(value: Post | null);
+  get recentResponse(): Comment | null | Promise<Comment | null>;
+  set recentResponse(value: Comment | null);
+}
 
 export class AuthorAddress extends Base {
-  declare author: Author | null | Promise<Author | null>;
-
   static destroyedAuthorAddressIds: number[] = [];
 
   static {
@@ -655,10 +674,12 @@ export class AuthorAddress extends Base {
     });
   }
 }
+export interface AuthorAddress {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+}
 
 export class AuthorFavorite extends Base {
-  declare author: Author | null | Promise<Author | null>;
-  declare favoriteAuthor: Author | null | Promise<Author | null>;
   declare author_id: number;
   declare favorite_author_id: number;
 
@@ -667,15 +688,24 @@ export class AuthorFavorite extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+export interface AuthorFavorite {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get favoriteAuthor(): Author | null | Promise<Author | null>;
+  set favoriteAuthor(value: Author | null);
+}
 
 export class AuthorFavoriteWithScope extends Base {
-  declare author: Author | null | Promise<Author | null>;
-  declare favoriteAuthor: Author | null | Promise<Author | null>;
-
   static {
     this._tableName = "author_favorites";
     this.defaultScope((q: any) => q.order({ id: "asc" }));
     this.belongsTo("author");
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
+}
+export interface AuthorFavoriteWithScope {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get favoriteAuthor(): Author | null | Promise<Author | null>;
+  set favoriteAuthor(value: Author | null);
 }

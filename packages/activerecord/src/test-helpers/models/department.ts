@@ -5,11 +5,14 @@ import { Base } from "../../base.js";
 
 export class Department extends Base {
   declare chefs: AssociationProxy<Chef>;
-  declare hotel: Hotel | null | Promise<Hotel | null>;
   declare hotel_id: number;
 
   static {
     this.hasMany("chefs");
     this.belongsTo("hotel");
   }
+}
+export interface Department {
+  get hotel(): Hotel | null | Promise<Hotel | null>;
+  set hotel(value: Hotel | null);
 }

@@ -3,11 +3,6 @@ import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
 export class Friendship extends Base {
-  declare friend: Person | null | Promise<Person | null>;
-  declare friendToo: Person | null | Promise<Person | null>;
-  declare follower: Person | null | Promise<Person | null>;
-  declare friendFavoriteReferenceJob: Job | null | Promise<Job | null>;
-  declare followerFavoriteReferenceJob: Job | null | Promise<Job | null>;
   declare follower_id: number;
   declare friend_id: number;
 
@@ -29,4 +24,16 @@ export class Friendship extends Base {
       source: "favoriteReferenceJob",
     });
   }
+}
+export interface Friendship {
+  get friend(): Person | null | Promise<Person | null>;
+  set friend(value: Person | null);
+  get friendToo(): Person | null | Promise<Person | null>;
+  set friendToo(value: Person | null);
+  get follower(): Person | null | Promise<Person | null>;
+  set follower(value: Person | null);
+  get friendFavoriteReferenceJob(): Job | null | Promise<Job | null>;
+  set friendFavoriteReferenceJob(value: Job | null);
+  get followerFavoriteReferenceJob(): Job | null | Promise<Job | null>;
+  set followerFavoriteReferenceJob(value: Job | null);
 }

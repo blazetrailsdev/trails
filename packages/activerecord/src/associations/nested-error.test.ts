@@ -93,13 +93,16 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     }
     class PetOwner extends Base {
       static tableName = "owners";
-      declare pet: ValidatedPet | null | Promise<ValidatedPet | null>;
       static {
         this._primaryKey = "owner_id";
         this.hasOne("pet", { className: "NestedErrorValidatedPet", foreignKey: "owner_id" });
         this.acceptsNestedAttributesFor("pet");
         this.validatesAssociated("pet");
       }
+    }
+    interface PetOwner {
+      get pet(): ValidatedPet | null | Promise<ValidatedPet | null>;
+      set pet(value: ValidatedPet | null);
     }
     registerModel("NestedErrorValidatedPet", ValidatedPet);
     registerModel("NestedErrorPetOwner", PetOwner);

@@ -139,18 +139,6 @@ export class MyAppBillingNestedFirm extends Base {
 }
 
 export class MyAppBillingAccount extends Base {
-  declare firm: MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
-  declare qualifiedBillingFirm: MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
-  declare unqualifiedBillingFirm: Firm | null | Promise<Firm | null>;
-  declare nestedQualifiedBillingFirm:
-    | MyAppBillingNestedFirm
-    | null
-    | Promise<MyAppBillingNestedFirm | null>;
-  declare nestedUnqualifiedBillingFirm:
-    | MyAppBillingNestedFirm
-    | null
-    | Promise<MyAppBillingNestedFirm | null>;
-
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Account";
 
@@ -179,6 +167,26 @@ export class MyAppBillingAccount extends Base {
       this.errors.add("credit_card", ":blank");
     }
   }
+}
+export interface MyAppBillingAccount {
+  get nestedQualifiedBillingFirm():
+    | MyAppBillingNestedFirm
+    | null
+    | Promise<MyAppBillingNestedFirm | null>;
+  set nestedQualifiedBillingFirm(value: MyAppBillingNestedFirm | null);
+  get nestedUnqualifiedBillingFirm():
+    | MyAppBillingNestedFirm
+    | null
+    | Promise<MyAppBillingNestedFirm | null>;
+  set nestedUnqualifiedBillingFirm(value: MyAppBillingNestedFirm | null);
+}
+export interface MyAppBillingAccount {
+  get firm(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  set firm(value: MyAppBusinessFirm | null);
+  get qualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
+  set qualifiedBillingFirm(value: MyAppBillingFirm | null);
+  get unqualifiedBillingFirm(): Firm | null | Promise<Firm | null>;
+  set unqualifiedBillingFirm(value: Firm | null);
 }
 
 for (const klass of [

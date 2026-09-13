@@ -10,7 +10,6 @@ export class BookDestroyAsync extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
   declare essays: AssociationProxy<EssayDestroyAsync>;
-  declare content: Content | null | Promise<Content | null>;
   declare isProposed: () => boolean;
   declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<BookDestroyAsync>;
@@ -37,6 +36,10 @@ export class BookDestroyAsync extends Base {
     this.hasOne("content", { dependent: "destroy" });
     this.enum("status", ["proposed", "written", "published"]);
   }
+}
+export interface BookDestroyAsync {
+  get content(): Content | null | Promise<Content | null>;
+  set content(value: Content | null);
 }
 
 export class BookDestroyAsyncWithScopedTags extends Base {

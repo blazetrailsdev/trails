@@ -12,8 +12,6 @@ export class Organization extends Base {
   declare members: AssociationProxy<Member>;
   declare authors: AssociationProxy<Author>;
   declare authorEssayCategories: AssociationProxy<Category>;
-  declare author: Author | null | Promise<Author | null>;
-  declare authorOwnedEssayCategory: Category | null | Promise<Category | null>;
   declare posts: AssociationProxy<Post>;
   declare static clubs: () => Relation<Organization>;
   declare name: string;
@@ -34,4 +32,10 @@ export class Organization extends Base {
       return this.from("clubs");
     });
   }
+}
+export interface Organization {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorOwnedEssayCategory(): Category | null | Promise<Category | null>;
+  set authorOwnedEssayCategory(value: Category | null);
 }

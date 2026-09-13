@@ -27,8 +27,6 @@ export class Membership extends Base {
   declare tenantMembershipBang: () => Promise<true | undefined>;
   declare static tenantMembership: () => Relation<Membership>;
   declare static notTenantMembership: () => Relation<Membership>;
-  declare member: Member | null | Promise<Member | null>;
-  declare club: Club | null | Promise<Club | null>;
   declare club_id: number;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare favorite: boolean | null;
@@ -56,11 +54,14 @@ export class Membership extends Base {
     this.belongsTo("club");
   }
 }
+export interface Membership {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
+}
 
 export class CurrentMembership extends Membership {
-  declare member: Member | null | Promise<Member | null>;
-  declare club: Club | null | Promise<Club | null>;
-
   static {
     registerModel(CurrentMembership);
     registerSubclass(CurrentMembership);
@@ -68,17 +69,26 @@ export class CurrentMembership extends Membership {
     this.belongsTo("club", { inverseOf: "membership" });
   }
 }
+export interface CurrentMembership {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
+}
 
 export class SuperMembership extends Membership {
-  declare member: Member | null | Promise<Member | null>;
-  declare club: Club | null | Promise<Club | null>;
-
   static {
     registerModel(SuperMembership);
     registerSubclass(SuperMembership);
     this.belongsTo("member", (q: any) => q.order("members.id DESC"));
     this.belongsTo("club");
   }
+}
+export interface SuperMembership {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
 }
 
 export class SelectedMembership extends Membership {
@@ -90,9 +100,6 @@ export class SelectedMembership extends Membership {
 }
 
 export class TenantMembership extends Membership {
-  declare member: Member | null | Promise<Member | null>;
-  declare club: Club | null | Promise<Club | null>;
-
   static currentMember: any = null;
 
   static {
@@ -107,4 +114,10 @@ export class TenantMembership extends Membership {
       return q.all();
     });
   }
+}
+export interface TenantMembership {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get club(): Club | null | Promise<Club | null>;
+  set club(value: Club | null);
 }

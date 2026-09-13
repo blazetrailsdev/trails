@@ -2,7 +2,6 @@ import { Topic, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
 export class Reply extends Topic {
-  declare topic: Topic | null | Promise<Topic | null>;
   static {
     this.belongsTo("topic", {
       foreignKey: "parent_id",
@@ -32,6 +31,10 @@ export class Reply extends Topic {
   static open() {
     return (this as any).approved();
   }
+}
+export interface Reply {
+  get topic(): Topic | null | Promise<Topic | null>;
+  set topic(value: Topic | null);
 }
 
 export class SillyReply extends Topic {

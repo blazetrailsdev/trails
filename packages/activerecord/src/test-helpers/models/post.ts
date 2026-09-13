@@ -28,16 +28,20 @@ import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
 export class CategoryPost extends Base {
-  declare group: Category | null | Promise<Category | null>;
-  declare category: Category | null | Promise<Category | null>;
-  declare post: Post | null | Promise<Post | null>;
-
   static {
     this._tableName = "categories_posts";
     this.belongsTo("group", { foreignKey: "category_id", className: "Category" });
     this.belongsTo("category");
     this.belongsTo("post");
   }
+}
+export interface CategoryPost {
+  get group(): Category | null | Promise<Category | null>;
+  set group(value: Category | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
 }
 
 export class Post extends Base {
@@ -59,14 +63,7 @@ export class Post extends Base {
   declare static taggedWith: (id: number) => Relation<Post>;
   declare static taggedWithComment: (comment: string) => Relation<Post>;
   declare static typographicallyInteresting: () => Relation<Post>;
-  declare author: Author | null | Promise<Author | null>;
-  declare readonlyAuthor: Author | null | Promise<Author | null>;
-  declare authorWithPosts: Author | null | Promise<Author | null>;
-  declare authorWithAddress: Author | null | Promise<Author | null>;
-  declare authorWithSelect: Author | null | Promise<Author | null>;
-  declare authorWithTheLetterA: Author | null | Promise<Author | null>;
   declare firstComment: Promise<string | null>;
-  declare lastComment: Comment | null | Promise<Comment | null>;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
   declare commentsWithExtend_2: AssociationProxy<Comment>;
@@ -75,19 +72,6 @@ export class Post extends Base {
   declare authorCategorizations: AssociationProxy<Categorization>;
   declare authorAddresses: AssociationProxy<AuthorAddress>;
   declare authorAddressExtraWithAddress: AssociationProxy<AuthorAddress>;
-  declare verySpecialComment: VerySpecialComment | null | Promise<VerySpecialComment | null>;
-  declare verySpecialCommentWithPost:
-    | VerySpecialComment
-    | null
-    | Promise<VerySpecialComment | null>;
-  declare verySpecialCommentWithPostWithJoins:
-    | VerySpecialComment
-    | null
-    | Promise<VerySpecialComment | null>;
-  declare verySpecialCommentWithStringJoins:
-    | VerySpecialComment
-    | null
-    | Promise<VerySpecialComment | null>;
   declare commentsWithStringJoins: AssociationProxy<Comment>;
   declare ratingsViaStringJoinComments: AssociationProxy<Rating>;
   declare specialComments: AssociationProxy<SpecialComment>;
@@ -111,7 +95,6 @@ export class Post extends Base {
   declare superTags: AssociationProxy<Tag>;
   declare orderedTags: AssociationProxy<OrderedTag>;
   declare tagsWithPrimaryKey: AssociationProxy<Tag>;
-  declare tagging: Tagging | null | Promise<Tagging | null>;
   declare firstTaggings: AssociationProxy<Tagging>;
   declare firstBlueTags: AssociationProxy<Tag>;
   declare firstBlueTags_2: AssociationProxy<Tag>;
@@ -124,7 +107,6 @@ export class Post extends Base {
   declare taggingsUsingAuthorId: AssociationProxy<Tagging>;
   declare tagsUsingAuthorId: AssociationProxy<Tag>;
   declare images: AssociationProxy<Image>;
-  declare mainImage: Image | null | Promise<Image | null>;
   declare standardCategorizations: AssociationProxy<Categorization>;
   declare authorUsingCustomPk: AssociationProxy<Author>;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
@@ -555,15 +537,53 @@ export class Post extends Base {
     return this._log;
   }
 }
+export interface Post {
+  get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPost(value: VerySpecialComment | null);
+  get verySpecialCommentWithPostWithJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPostWithJoins(value: VerySpecialComment | null);
+  get verySpecialCommentWithStringJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithStringJoins(value: VerySpecialComment | null);
+}
+export interface Post {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get readonlyAuthor(): Author | null | Promise<Author | null>;
+  set readonlyAuthor(value: Author | null);
+  get authorWithPosts(): Author | null | Promise<Author | null>;
+  set authorWithPosts(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithSelect(): Author | null | Promise<Author | null>;
+  set authorWithSelect(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
+  get lastComment(): Comment | null | Promise<Comment | null>;
+  set lastComment(value: Comment | null);
+  get verySpecialComment(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialComment(value: VerySpecialComment | null);
+  get tagging(): Tagging | null | Promise<Tagging | null>;
+  set tagging(value: Tagging | null);
+  get mainImage(): Image | null | Promise<Image | null>;
+  set mainImage(value: Image | null);
+}
 
 export class SpecialPost extends Post {}
 
 export class StiPost extends Post {
-  declare specialComment: SpecialComment | null | Promise<SpecialComment | null>;
-
   static {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
+}
+export interface StiPost {
+  get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
+  set specialComment(value: SpecialComment | null);
 }
 
 export class AbstractStiPost extends Post {
@@ -592,8 +612,6 @@ export class NullPost extends Post {
 
 export class FirstPost extends Base {
   declare comments: AssociationProxy<Comment>;
-  declare comment: Comment | null | Promise<Comment | null>;
-  declare commentWithInverse: Comment | null | Promise<Comment | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -607,6 +625,12 @@ export class FirstPost extends Base {
       inverseOf: "postWithInverse",
     });
   }
+}
+export interface FirstPost {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
+  get commentWithInverse(): Comment | null | Promise<Comment | null>;
+  set commentWithInverse(value: Comment | null);
 }
 
 export class PostWithDefaultSelect extends Base {
@@ -732,10 +756,6 @@ export class PostWithAfterCreateCallback extends Base {
 
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
   declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
-  declare firstComment:
-    | CommentWithDefaultScopeReferencesAssociation
-    | null
-    | Promise<CommentWithDefaultScopeReferencesAssociation | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -746,6 +766,13 @@ export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
       foreignKey: "post_id",
     });
   }
+}
+export interface PostWithCommentWithDefaultScopeReferencesAssociation {
+  get firstComment():
+    | CommentWithDefaultScopeReferencesAssociation
+    | null
+    | Promise<CommentWithDefaultScopeReferencesAssociation | null>;
+  set firstComment(value: CommentWithDefaultScopeReferencesAssociation | null);
 }
 
 export class SerializedPost extends Base {
@@ -776,9 +803,6 @@ export class PostWithDestroyCallback extends Base {
 }
 
 export class Postesque extends Base {
-  declare author: Author | null | Promise<Author | null>;
-  declare authorWithAddress: Author | null | Promise<Author | null>;
-  declare authorWithTheLetterA: Author | null | Promise<Author | null>;
   declare author_id: string;
   declare author_name: string;
 
@@ -797,6 +821,14 @@ export class Postesque extends Base {
       foreignKey: "author_id",
     });
   }
+}
+export interface Postesque {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
 }
 
 export class PostRecord extends Base {

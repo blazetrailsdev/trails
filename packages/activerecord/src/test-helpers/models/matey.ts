@@ -2,8 +2,6 @@ import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
 
 export class Matey extends Base {
-  declare pirate: Pirate | null | Promise<Pirate | null>;
-  declare target: Pirate | null | Promise<Pirate | null>;
   declare pirate_id: number;
   declare target_id: number;
   declare weight: number;
@@ -12,4 +10,10 @@ export class Matey extends Base {
     this.belongsTo("pirate");
     this.belongsTo("target", { className: "Pirate" });
   }
+}
+export interface Matey {
+  get pirate(): Pirate | null | Promise<Pirate | null>;
+  set pirate(value: Pirate | null);
+  get target(): Pirate | null | Promise<Pirate | null>;
+  set target(value: Pirate | null);
 }

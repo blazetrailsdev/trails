@@ -5,7 +5,6 @@ import { Base } from "../../base.js";
 
 export class Student extends Base {
   declare lessons: AssociationProxy<Lesson>;
-  declare college: College | null | Promise<College | null>;
   declare active: boolean;
   declare college_id: number;
   declare name: string;
@@ -14,4 +13,8 @@ export class Student extends Base {
     this.hasAndBelongsToMany("lessons");
     this.belongsTo("college");
   }
+}
+export interface Student {
+  get college(): College | null | Promise<College | null>;
+  set college(value: College | null);
 }

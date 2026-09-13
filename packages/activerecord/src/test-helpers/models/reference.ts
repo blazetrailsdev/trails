@@ -5,8 +5,6 @@ import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
 export class Reference extends Base {
-  declare person: Person | null | Promise<Person | null>;
-  declare job: Job | null | Promise<Job | null>;
   declare idealJobs: AssociationProxy<Job>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
   declare favorite: boolean;
@@ -32,6 +30,12 @@ export class Reference extends Base {
       if (person) await person.update({ comments: "Reference destroyed" });
     }
   }
+}
+export interface Reference {
+  get person(): Person | null | Promise<Person | null>;
+  set person(value: Person | null);
+  get job(): Job | null | Promise<Job | null>;
+  set job(value: Job | null);
 }
 
 export class BadReference extends Base {

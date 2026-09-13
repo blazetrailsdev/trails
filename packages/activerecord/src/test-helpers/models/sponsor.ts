@@ -2,11 +2,6 @@ import type { Club } from "./club.js";
 import { Base } from "../../base.js";
 
 export class Sponsor extends Base {
-  declare sponsorClub: Club | null | Promise<Club | null>;
-  declare sponsorable: Base | null | Promise<Base | null>;
-  declare sponsor: Base | null | Promise<Base | null>;
-  declare thing: Base | null | Promise<Base | null>;
-  declare sponsorableWithConditions: Base | null | Promise<Base | null>;
   declare club_id: number;
   declare sponsor_id: number;
   declare sponsor_type: string;
@@ -28,4 +23,16 @@ export class Sponsor extends Base {
       foreignKey: "sponsorable_id",
     });
   }
+}
+export interface Sponsor {
+  get sponsorClub(): Club | null | Promise<Club | null>;
+  set sponsorClub(value: Club | null);
+  get sponsorable(): Base | null | Promise<Base | null>;
+  set sponsorable(value: Base | null);
+  get sponsor(): Base | null | Promise<Base | null>;
+  set sponsor(value: Base | null);
+  get thing(): Base | null | Promise<Base | null>;
+  set thing(value: Base | null);
+  get sponsorableWithConditions(): Base | null | Promise<Base | null>;
+  set sponsorableWithConditions(value: Base | null);
 }

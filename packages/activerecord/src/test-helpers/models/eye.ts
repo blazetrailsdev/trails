@@ -11,12 +11,6 @@ function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
 }
 
 export class Eye extends Base {
-  declare iris: Iris | null | Promise<Iris | null>;
-  declare irisWithReadOnlyForeignKey:
-    | IrisWithReadOnlyForeignKey
-    | null
-    | Promise<IrisWithReadOnlyForeignKey | null>;
-
   afterCreateCallbacksStack: boolean[] = [];
   afterUpdateCallbacksStack: boolean[] = [];
   afterSaveCallbacksStack: boolean[] = [];
@@ -64,12 +58,22 @@ export class Eye extends Base {
     });
   }
 }
+export interface Eye {
+  get irisWithReadOnlyForeignKey():
+    | IrisWithReadOnlyForeignKey
+    | null
+    | Promise<IrisWithReadOnlyForeignKey | null>;
+  set irisWithReadOnlyForeignKey(value: IrisWithReadOnlyForeignKey | null);
+}
+export interface Eye {
+  get iris(): Iris | null | Promise<Iris | null>;
+  set iris(value: Iris | null);
+}
 
 acceptsNestedAttributesFor(Eye, "iris");
 acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
 export class Iris extends Base {
-  declare eye: Eye | null | Promise<Eye | null>;
   declare color: string;
   declare eye_id: number;
 
@@ -102,6 +106,10 @@ export class Iris extends Base {
       this.afterSaveCallbacksCounter++;
     });
   }
+}
+export interface Iris {
+  get eye(): Eye | null | Promise<Eye | null>;
+  set eye(value: Eye | null);
 }
 
 export class IrisWithReadOnlyForeignKey extends Iris {

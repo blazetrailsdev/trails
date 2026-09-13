@@ -5,7 +5,6 @@ import type { Recipient } from "./recipient.js";
 import { Base } from "../../base.js";
 
 export class Message extends Base {
-  declare entry: Entry | null | Promise<Entry | null>;
   declare recipients: AssociationProxy<Recipient>;
   declare subject: string;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
@@ -14,4 +13,8 @@ export class Message extends Base {
     this.hasOne("entry", { as: "entryable", touch: true });
     this.hasMany("recipients");
   }
+}
+export interface Message {
+  get entry(): Entry | null | Promise<Entry | null>;
+  set entry(value: Entry | null);
 }

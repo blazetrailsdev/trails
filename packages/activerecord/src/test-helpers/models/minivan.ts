@@ -3,8 +3,6 @@ import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
 
 export class Minivan extends Base {
-  declare speedometer: Speedometer | null | Promise<Speedometer | null>;
-  declare dashboard: Dashboard | null | Promise<Dashboard | null>;
   declare color: string;
   declare minivan_id: string;
   declare name: string;
@@ -16,4 +14,10 @@ export class Minivan extends Base {
     this.hasOne("dashboard", { through: "speedometer" });
     this.attrReadonly("color");
   }
+}
+export interface Minivan {
+  get speedometer(): Speedometer | null | Promise<Speedometer | null>;
+  set speedometer(value: Speedometer | null);
+  get dashboard(): Dashboard | null | Promise<Dashboard | null>;
+  set dashboard(value: Dashboard | null);
 }

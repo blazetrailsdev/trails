@@ -7,7 +7,6 @@ import { Base } from "../../base.js";
 export class DestroyAsyncParentSoftDelete extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
-  declare dlKeyedHasOne: DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   declare deleted: boolean;
   declare tags_count: number | null;
 
@@ -31,4 +30,8 @@ export class DestroyAsyncParentSoftDelete extends Base {
     await (this as any).runCallbacks("destroy", () => {});
     return this;
   }
+}
+export interface DestroyAsyncParentSoftDelete {
+  get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
+  set dlKeyedHasOne(value: DlKeyedHasOne | null);
 }

@@ -7,7 +7,6 @@ import { Base } from "../../base.js";
 
 export class Project extends Base {
   declare developersRequiredByDefault: any;
-  declare mentor: Mentor | null | Promise<Mentor | null>;
   declare developers: AssociationProxy<Developer>;
   declare readonlyDevelopers: AssociationProxy<Developer>;
   declare nonUniqueDevelopers: AssociationProxy<Developer>;
@@ -17,9 +16,6 @@ export class Project extends Base {
   declare salariedDevelopers: AssociationProxy<Developer>;
   declare developersWithCallbacks: AssociationProxy<Developer>;
   declare wellPaidSalaryGroups: AssociationProxy<Developer>;
-  declare firm: Firm | null | Promise<Firm | null>;
-  declare leadDeveloper: Developer | null | Promise<Developer | null>;
-  declare leadDeveloperDisableJoins: Developer | null | Promise<Developer | null>;
   declare static allAsScope: () => Relation<Project>;
   declare firm_id: number;
   declare mentor_id: number;
@@ -103,6 +99,16 @@ export class Project extends Base {
   static allAsMethod() {
     return this.all();
   }
+}
+export interface Project {
+  get mentor(): Mentor | null | Promise<Mentor | null>;
+  set mentor(value: Mentor | null);
+  get firm(): Firm | null | Promise<Firm | null>;
+  set firm(value: Firm | null);
+  get leadDeveloper(): Developer | null | Promise<Developer | null>;
+  set leadDeveloper(value: Developer | null);
+  get leadDeveloperDisableJoins(): Developer | null | Promise<Developer | null>;
+  set leadDeveloperDisableJoins(value: Developer | null);
 }
 
 export class SpecialProject extends Project {}

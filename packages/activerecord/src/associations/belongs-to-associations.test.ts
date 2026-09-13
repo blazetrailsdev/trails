@@ -81,7 +81,6 @@ class CarPolymorphicName extends Base {
 }
 
 class WheelPolymorphicName extends Base {
-  declare wheelable: Base | null | Promise<Base | null>;
   declare wheelable_id: number;
   declare wheelable_type: string;
   static {
@@ -96,6 +95,10 @@ class WheelPolymorphicName extends Base {
     if (name !== "polymorphic_car") throw new Error(`Unexpected name: ${name}`);
     return CarPolymorphicName;
   }
+}
+interface WheelPolymorphicName {
+  get wheelable(): Base | null | Promise<Base | null>;
+  set wheelable(value: Base | null);
 }
 
 class EssayDestroy extends Base {
@@ -351,22 +354,26 @@ describe("BelongsToAssociationsTest", () => {
 
   it("optional relation can be set per model", async () => {
     class FirstModel extends Base {
-      declare company: Company | null | Promise<Company | null>;
-
       static _tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = false;
         this.belongsTo("company", { inverseOf: false });
       }
     }
+    interface FirstModel {
+      get company(): Company | null | Promise<Company | null>;
+      set company(value: Company | null);
+    }
     class SecondModel extends Base {
-      declare company: Company | null | Promise<Company | null>;
-
       static _tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = true;
         this.belongsTo("company", { inverseOf: false });
       }
+    }
+    interface SecondModel {
+      get company(): Company | null | Promise<Company | null>;
+      set company(value: Company | null);
     }
 
     const m1 = new FirstModel({});
@@ -380,12 +387,14 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null | Promise<Company | null>;
-
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: true, inverseOf: false });
         }
+      }
+      interface TempModel {
+        get company(): Company | null | Promise<Company | null>;
+        set company(value: Company | null);
       }
       const account = new TempModel({});
       expect(await account.isValid()).toBe(true);
@@ -399,12 +408,14 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null | Promise<Company | null>;
-
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: false, inverseOf: false });
         }
+      }
+      interface TempModel {
+        get company(): Company | null | Promise<Company | null>;
+        set company(value: Company | null);
       }
       const account = new TempModel({});
       expect(await account.isValid()).toBe(false);
@@ -419,12 +430,14 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
-        declare company: Company | null | Promise<Company | null>;
-
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { inverseOf: false });
         }
+      }
+      interface TempModel {
+        get company(): Company | null | Promise<Company | null>;
+        set company(value: Company | null);
       }
       const account = new TempModel({});
       expect(await account.isValid()).toBe(false);
@@ -439,12 +452,14 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = await Developer.find(developers("jamis").id);
 
     class TempDefault extends Base {
-      declare developer: Developer | null | Promise<Developer | null>;
-
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { default: () => david, inverseOf: false });
       }
+    }
+    interface TempDefault {
+      get developer(): Developer | null | Promise<Developer | null>;
+      set developer(value: Developer | null);
     }
 
     let ship = await TempDefault.create({});
@@ -459,8 +474,6 @@ describe("BelongsToAssociationsTest", () => {
 
   it("default with lambda", async () => {
     class TempDefault extends Base {
-      declare developer: Developer | null | Promise<Developer | null>;
-
       static _tableName = "ships";
       static {
         this.belongsTo("developer", {
@@ -471,6 +484,10 @@ describe("BelongsToAssociationsTest", () => {
       defaultDeveloper(): Promise<any> {
         return Developer.first();
       }
+    }
+    interface TempDefault {
+      get developer(): Developer | null | Promise<Developer | null>;
+      set developer(value: Developer | null);
     }
 
     const david = await Developer.find(developers("david").id);
@@ -488,8 +505,6 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = await Developer.find(developers("jamis").id);
 
     class TempDefault extends Base {
-      declare developer: Developer | null | Promise<Developer | null>;
-
       static _tableName = "ships";
       static {
         this.belongsTo("developer", {
@@ -498,6 +513,10 @@ describe("BelongsToAssociationsTest", () => {
           inverseOf: false,
         });
       }
+    }
+    interface TempDefault {
+      get developer(): Developer | null | Promise<Developer | null>;
+      set developer(value: Developer | null);
     }
 
     let ship = await TempDefault.create({});
@@ -1839,12 +1858,14 @@ describe("BelongsToAssociationsTest", () => {
   it("polymorphic with false", async () => {
     expect(() => {
       class TempPost extends Base {
-        declare category: Category | null | Promise<Category | null>;
-
         static _tableName = "posts";
         static {
           this.belongsTo("category", { polymorphic: false } as any);
         }
+      }
+      interface TempPost {
+        get category(): Category | null | Promise<Category | null>;
+        set category(value: Category | null);
       }
     }).not.toThrow();
   });
@@ -2007,12 +2028,15 @@ describe("BelongsToAssociationsTest", () => {
   it("runs parent presence check if parent changed or nil", async () => {
     class ShipRequired extends Base {
       declare name: any;
-      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
+    }
+    interface ShipRequired {
+      get developer(): Developer | null | Promise<Developer | null>;
+      set developer(value: Developer | null);
     }
 
     const david = developers("david");
@@ -2037,12 +2061,15 @@ describe("BelongsToAssociationsTest", () => {
   it("skips parent presence check if parent has not changed", async () => {
     class ShipRequired extends Base {
       declare name: any;
-      declare developer: Developer | null | Promise<Developer | null>;
 
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
+    }
+    interface ShipRequired {
+      get developer(): Developer | null | Promise<Developer | null>;
+      set developer(value: Developer | null);
     }
 
     const david = developers("david");
@@ -2062,12 +2089,15 @@ describe("BelongsToAssociationsTest", () => {
     try {
       class TempShip extends Base {
         declare name: any;
-        declare developer: Developer | null | Promise<Developer | null>;
 
         static _tableName = "ships";
         static {
           this.belongsTo("developer", { required: true, inverseOf: false });
         }
+      }
+      interface TempShip {
+        get developer(): Developer | null | Promise<Developer | null>;
+        set developer(value: Developer | null);
       }
 
       const david = developers("david");

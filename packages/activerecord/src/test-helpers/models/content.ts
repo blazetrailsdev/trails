@@ -2,8 +2,6 @@ import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
 export class Content extends Base {
-  declare contentPosition: ContentPosition | null | Promise<ContentPosition | null>;
-
   static _tableName = "content";
 
   static destroyedIds: number[] = [];
@@ -15,10 +13,12 @@ export class Content extends Base {
     });
   }
 }
+export interface Content {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
 
 export class ContentWhichRequiresTwoDestroyCalls extends Base {
-  declare contentPosition: ContentPosition | null | Promise<ContentPosition | null>;
-
   static _tableName = "content";
 
   private destroyCount: number = 0;
@@ -36,9 +36,12 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
   }
 }
+export interface ContentWhichRequiresTwoDestroyCalls {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
 
 export class ContentPosition extends Base {
-  declare content: Content | null | Promise<Content | null>;
   declare content_id: number;
 
   static destroyedIds: number[] = [];
@@ -49,4 +52,8 @@ export class ContentPosition extends Base {
       ContentPosition.destroyedIds.push(record.id as number);
     });
   }
+}
+export interface ContentPosition {
+  get content(): Content | null | Promise<Content | null>;
+  set content(value: Content | null);
 }

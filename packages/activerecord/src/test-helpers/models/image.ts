@@ -1,7 +1,6 @@
 import { Base } from "../../base.js";
 
 export class Image extends Base {
-  declare imageable: Base | null | Promise<Base | null>;
   declare imageable_class: string;
   declare imageable_identifier: number;
 
@@ -12,4 +11,8 @@ export class Image extends Base {
       foreignType: "imageable_class",
     });
   }
+}
+export interface Image {
+  get imageable(): Base | null | Promise<Base | null>;
+  set imageable(value: Base | null);
 }

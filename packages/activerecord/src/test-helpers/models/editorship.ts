@@ -3,8 +3,6 @@ import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
 export class Editorship extends Base {
-  declare publication: Publication | null | Promise<Publication | null>;
-  declare editor: Editor | null | Promise<Editor | null>;
   declare editor_id: string;
   declare publication_id: string;
 
@@ -12,4 +10,10 @@ export class Editorship extends Base {
     this.belongsTo("publication");
     this.belongsTo("editor");
   }
+}
+export interface Editorship {
+  get publication(): Publication | null | Promise<Publication | null>;
+  set publication(value: Publication | null);
+  get editor(): Editor | null | Promise<Editor | null>;
+  set editor(value: Editor | null);
 }

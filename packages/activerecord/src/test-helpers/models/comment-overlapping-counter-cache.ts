@@ -2,9 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 
 export class CommentOverlappingCounterCache extends Base {
-  declare userCommentsCount: UserCommentsCount | null | Promise<UserCommentsCount | null>;
-  declare postCommentsCount: PostCommentsCount | null | Promise<PostCommentsCount | null>;
-  declare commentable: Base | null | Promise<Base | null>;
   declare commentable_id: number;
   declare commentable_type: string;
   declare post_comments_count_id: number;
@@ -15,6 +12,14 @@ export class CommentOverlappingCounterCache extends Base {
     this.belongsTo("postCommentsCount", { className: "PostCommentsCount" });
     this.belongsTo("commentable", { polymorphic: true, counterCache: "comments_count" });
   }
+}
+export interface CommentOverlappingCounterCache {
+  get userCommentsCount(): UserCommentsCount | null | Promise<UserCommentsCount | null>;
+  set userCommentsCount(value: UserCommentsCount | null);
+  get postCommentsCount(): PostCommentsCount | null | Promise<PostCommentsCount | null>;
+  set postCommentsCount(value: PostCommentsCount | null);
+  get commentable(): Base | null | Promise<Base | null>;
+  set commentable(value: Base | null);
 }
 
 export class UserCommentsCount extends Base {

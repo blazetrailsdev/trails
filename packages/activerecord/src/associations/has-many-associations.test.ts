@@ -2653,7 +2653,6 @@ describe("HasManyAssociationsTest", () => {
     class InvValPost extends Base {
       declare author_id: number | null;
       declare title: string | null;
-      declare author: InvValAuthor | null | Promise<InvValAuthor | null>;
 
       static {
         this._tableName = "posts";
@@ -2665,6 +2664,10 @@ describe("HasManyAssociationsTest", () => {
           inverseOf: "inv_val_posts",
         });
       }
+    }
+    interface InvValPost {
+      get author(): InvValAuthor | null | Promise<InvValAuthor | null>;
+      set author(value: InvValAuthor | null);
     }
     registerModel(InvValAuthor);
     registerModel(InvValPost);

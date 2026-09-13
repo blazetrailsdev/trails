@@ -6,7 +6,6 @@ import { association } from "../../associations.js";
 import { association as associationInstance } from "../../associations/instance-methods.js";
 
 export class Bulb extends Base {
-  declare car: Car | null | Promise<Car | null>;
   declare static awesome: () => Relation<Bulb>;
   declare car_id: number;
   declare frickinawesome: boolean | null;
@@ -41,6 +40,10 @@ export class Bulb extends Base {
   set color(color: string) {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
+}
+export interface Bulb {
+  get car(): Car | null | Promise<Car | null>;
+  set car(value: Car | null);
 }
 
 export class CustomBulb extends Bulb {

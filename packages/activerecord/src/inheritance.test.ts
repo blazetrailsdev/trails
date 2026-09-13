@@ -621,13 +621,15 @@ describe("InheritanceAttributeMappingTest", () => {
   registerSubclass(IamtEmpire);
 
   class IamtSponsor extends Base {
-    declare sponsorable: Base | null | Promise<Base | null>;
-
     static {
       this.tableName = "sponsors";
       this.attribute("sponsorable_type", "omg_sti");
       this.belongsTo("sponsorable", { polymorphic: true });
     }
+  }
+  interface IamtSponsor {
+    get sponsorable(): Base | null | Promise<Base | null>;
+    set sponsorable(value: Base | null);
   }
   registerModel(IamtSponsor);
 

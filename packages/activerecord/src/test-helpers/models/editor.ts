@@ -4,7 +4,6 @@ import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
 
 export class Editor extends Base {
-  declare publication: Publication | null | Promise<Publication | null>;
   declare editorships: AssociationProxy<Editorship>;
   declare name: string;
 
@@ -14,4 +13,8 @@ export class Editor extends Base {
     this.hasOne("publication", { foreignKey: "editor_in_chief_id", inverseOf: "editorInChief" });
     this.hasMany("editorships");
   }
+}
+export interface Editor {
+  get publication(): Publication | null | Promise<Publication | null>;
+  set publication(value: Publication | null);
 }

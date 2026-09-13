@@ -10,13 +10,7 @@ import { Notification } from "./notification.js";
 
 export class User extends Base {
   declare jobsPool: AssociationProxy<Job>;
-  declare room: Room | null | Promise<Room | null>;
-  declare ownedRoom: Room | null | Promise<Room | null>;
-  declare familyTree: FamilyTree | null | Promise<FamilyTree | null>;
-  declare family: Family | null | Promise<Family | null>;
   declare familyMembers: AssociationProxy<User>;
-  declare letRoom: Room | null | Promise<Room | null>;
-  declare rentedRoom: Room | null | Promise<Room | null>;
   declare auth_token: string;
   declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare password: string | null;
@@ -41,6 +35,20 @@ export class User extends Base {
     this.hasOne("letRoom", { className: "Room", foreignKey: "landlord_id", dependent: "destroy" });
     this.hasOne("rentedRoom", { className: "Room", foreignKey: "tenant_id", dependent: "destroy" });
   }
+}
+export interface User {
+  get room(): Room | null | Promise<Room | null>;
+  set room(value: Room | null);
+  get ownedRoom(): Room | null | Promise<Room | null>;
+  set ownedRoom(value: Room | null);
+  get familyTree(): FamilyTree | null | Promise<FamilyTree | null>;
+  set familyTree(value: FamilyTree | null);
+  get family(): Family | null | Promise<Family | null>;
+  set family(value: Family | null);
+  get letRoom(): Room | null | Promise<Room | null>;
+  set letRoom(value: Room | null);
+  get rentedRoom(): Room | null | Promise<Room | null>;
+  set rentedRoom(value: Room | null);
 }
 
 hasSecurePassword.call(User, "password", { validations: false });

@@ -3,11 +3,6 @@ import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import { Base } from "../../base.js";
 
 export class DlKeyedJoin extends Base {
-  declare destroyAsyncParent: DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
-  declare dlKeyedHasManyThrough:
-    | DlKeyedHasManyThrough
-    | null
-    | Promise<DlKeyedHasManyThrough | null>;
   declare destroy_async_parent_id: number;
   declare dl_keyed_has_many_through_id: number;
   declare joins_key: number;
@@ -18,4 +13,12 @@ export class DlKeyedJoin extends Base {
     this.belongsTo("destroyAsyncParent", { primaryKey: "parent_id" });
     this.belongsTo("dlKeyedHasManyThrough", { primaryKey: "through_key" });
   }
+}
+export interface DlKeyedJoin {
+  get dlKeyedHasManyThrough(): DlKeyedHasManyThrough | null | Promise<DlKeyedHasManyThrough | null>;
+  set dlKeyedHasManyThrough(value: DlKeyedHasManyThrough | null);
+}
+export interface DlKeyedJoin {
+  get destroyAsyncParent(): DestroyAsyncParent | null | Promise<DestroyAsyncParent | null>;
+  set destroyAsyncParent(value: DestroyAsyncParent | null);
 }

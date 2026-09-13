@@ -1086,4 +1086,19 @@ export default defineConfig(
       "@typescript-eslint/no-floating-promises": "error",
     },
   },
+  // ── generated association readers (CLAUDE.md "Generated attribute readers are properties") ──
+  // A singular association reader returns `Target | null | Promise<Target | null>`
+  // while its writer takes `Target | null`, so the model declares a `get` / `set`
+  // pair in an interface merged with the class — a class body cannot hold a
+  // bodiless accessor.
+  {
+    files: [
+      "packages/activerecord/src/**/*.test.ts",
+      "packages/activerecord/src/test-helpers/**/*.ts",
+      "packages/activerecord/dx-tests/**/*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-unsafe-declaration-merging": "off",
+    },
+  },
 );

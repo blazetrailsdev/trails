@@ -6,11 +6,6 @@ import type { Organization } from "./organization.js";
 import { Base } from "../../base.js";
 
 export class MemberDetail extends Base {
-  declare member: Member | null | Promise<Member | null>;
-  declare organization: Organization | null | Promise<Organization | null>;
-  declare memberType: MemberType | null | Promise<MemberType | null>;
-  declare membership: Membership | null | Promise<Membership | null>;
-  declare admittable: Member | null | Promise<Member | null>;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
   declare extra_data: string;
   declare member_id: number;
@@ -27,4 +22,16 @@ export class MemberDetail extends Base {
       source: "memberDetails",
     });
   }
+}
+export interface MemberDetail {
+  get member(): Member | null | Promise<Member | null>;
+  set member(value: Member | null);
+  get organization(): Organization | null | Promise<Organization | null>;
+  set organization(value: Organization | null);
+  get memberType(): MemberType | null | Promise<MemberType | null>;
+  set memberType(value: MemberType | null);
+  get membership(): Membership | null | Promise<Membership | null>;
+  set membership(value: Membership | null);
+  get admittable(): Member | null | Promise<Member | null>;
+  set admittable(value: Member | null);
 }

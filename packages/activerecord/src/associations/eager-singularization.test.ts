@@ -68,7 +68,6 @@ describe("EagerSingularizationTest", () => {
   class Virus extends Base {
     declare octopus_id: number | null;
     declare species: string | null;
-    declare octopus: Octopus | null | Promise<Octopus | null>;
 
     static {
       this.attribute("octopus_id", "integer");
@@ -76,25 +75,35 @@ describe("EagerSingularizationTest", () => {
       this.belongsTo("octopus");
     }
   }
+  interface Virus {
+    get octopus(): Octopus | null | Promise<Octopus | null>;
+    set octopus(value: Octopus | null);
+  }
   class Octopus extends Base {
     declare species: string | null;
-    declare virus: Virus | null | Promise<Virus | null>;
 
     static {
       this.attribute("species", "string");
       this.hasOne("virus");
     }
   }
+  interface Octopus {
+    get virus(): Virus | null | Promise<Virus | null>;
+    set virus(value: Virus | null);
+  }
   class Pass extends Base {
     declare bus_id: number | null;
     declare rides: number | null;
-    declare bus: Bus | null | Promise<Bus | null>;
 
     static {
       this.attribute("bus_id", "integer");
       this.attribute("rides", "integer");
       this.belongsTo("bus");
     }
+  }
+  interface Pass {
+    get bus(): Bus | null | Promise<Bus | null>;
+    set bus(value: Bus | null);
   }
   class Bus extends Base {
     declare name: string | null;
@@ -134,8 +143,6 @@ describe("EagerSingularizationTest", () => {
   class Analysis extends Base {
     declare crisis_id: number | null;
     declare success_id: number | null;
-    declare crisis: Crisis | null | Promise<Crisis | null>;
-    declare success: Success | null | Promise<Success | null>;
 
     static {
       this.attribute("crisis_id", "integer");
@@ -143,6 +150,12 @@ describe("EagerSingularizationTest", () => {
       this.belongsTo("crisis");
       this.belongsTo("success");
     }
+  }
+  interface Analysis {
+    get crisis(): Crisis | null | Promise<Crisis | null>;
+    set crisis(value: Crisis | null);
+    get success(): Success | null | Promise<Success | null>;
+    set success(value: Success | null);
   }
   class Success extends Base {
     declare name: string | null;
@@ -157,7 +170,6 @@ describe("EagerSingularizationTest", () => {
   }
   class Dress extends Base {
     declare crisis_id: number | null;
-    declare crisis: Crisis | null | Promise<Crisis | null>;
     declare compresses: AssociationProxy<Compress>;
 
     static {
@@ -166,14 +178,21 @@ describe("EagerSingularizationTest", () => {
       this.hasMany("compresses");
     }
   }
+  interface Dress {
+    get crisis(): Crisis | null | Promise<Crisis | null>;
+    set crisis(value: Crisis | null);
+  }
   class Compress extends Base {
     declare dress_id: number | null;
-    declare dress: Dress | null | Promise<Dress | null>;
 
     static {
       this.attribute("dress_id", "integer");
       this.belongsTo("dress");
     }
+  }
+  interface Compress {
+    get dress(): Dress | null | Promise<Dress | null>;
+    set dress(value: Dress | null);
   }
 
   registerModel("Virus", Virus);

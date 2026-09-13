@@ -6,17 +6,11 @@ import { Base } from "../../base.js";
 
 export class Human extends Base {
   declare name: string;
-  declare face: Face | null | Promise<Face | null>;
-  declare autosaveFace: Face | null | Promise<Face | null>;
-  declare polymorphicFace: Face | null | Promise<Face | null>;
-  declare polymorphicFaceWithoutInverse: Face | null | Promise<Face | null>;
   declare interests: AssociationProxy<Interest>;
   declare interestsWithCallbacks: AssociationProxy<Interest>;
   declare polymorphicInterests: AssociationProxy<Interest>;
   declare polymorphicInterestsWithCallbacks: AssociationProxy<Interest>;
-  declare confusedFace: Face | null | Promise<Face | null>;
   declare secretInterests: AssociationProxy<Interest>;
-  declare mixedCaseMonkey: MixedCaseMonkey | null | Promise<MixedCaseMonkey | null>;
 
   static _tableName = "humans";
 
@@ -63,6 +57,20 @@ export class Human extends Base {
   addCalled(_interest: unknown) {
     this.addCallbackCalled = true;
   }
+}
+export interface Human {
+  get face(): Face | null | Promise<Face | null>;
+  set face(value: Face | null);
+  get autosaveFace(): Face | null | Promise<Face | null>;
+  set autosaveFace(value: Face | null);
+  get polymorphicFace(): Face | null | Promise<Face | null>;
+  set polymorphicFace(value: Face | null);
+  get polymorphicFaceWithoutInverse(): Face | null | Promise<Face | null>;
+  set polymorphicFaceWithoutInverse(value: Face | null);
+  get confusedFace(): Face | null | Promise<Face | null>;
+  set confusedFace(value: Face | null);
+  get mixedCaseMonkey(): MixedCaseMonkey | null | Promise<MixedCaseMonkey | null>;
+  set mixedCaseMonkey(value: MixedCaseMonkey | null);
 }
 
 export class SuperHuman extends Human {}

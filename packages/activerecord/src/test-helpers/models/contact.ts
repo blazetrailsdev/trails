@@ -50,21 +50,26 @@ export class Contact extends Base {
   declare avatar: Uint8Array | null;
   declare awesome: boolean | null;
   declare name: string;
-  declare alternative: Contact | null | Promise<Contact | null>;
 
   static column = column;
+}
+export interface Contact {
+  get alternative(): Contact | null | Promise<Contact | null>;
+  set alternative(value: Contact | null);
 }
 
 await extended(Contact);
 
 export class ContactSti extends Base {
-  declare alternative: Contact | null | Promise<Contact | null>;
-
   static column = column;
 
   get type(): string {
     return "ContactSti";
   }
+}
+export interface ContactSti {
+  get alternative(): Contact | null | Promise<Contact | null>;
+  set alternative(value: Contact | null);
 }
 
 await extended(ContactSti);
