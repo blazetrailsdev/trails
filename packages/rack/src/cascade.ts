@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -21,7 +22,7 @@ export class Cascade {
     for (const app of this.apps) {
       if (lastBody && typeof lastBody.close === "function") lastBody.close();
       result = await app(env);
-      if (!this.cascadeFor[result[0]]) return result;
+      if (!hasKey(this.cascadeFor, Number(result[0]))) return result;
       lastBody = result[2];
     }
     return result;
