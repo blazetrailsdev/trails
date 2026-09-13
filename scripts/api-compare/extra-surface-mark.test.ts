@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   COUNTED_PACKAGES,
   GATED_PACKAGES,
+  ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
   exceedances,
   measure,
   staleMarks,
+  strandedMarks,
   taggedOnlyViolations,
   tightened,
   unmarkedPackages,
@@ -32,14 +34,10 @@ describe("extra-surface mark", () => {
   });
 
   it("names a gated package the mark file never seeded", () => {
-    expect(unmarkedPackages({ activerecord: { novel: 399, total: 1424 } })).toEqual([
-      "arel",
-      "ruby-compat",
-    ]);
-    expect(unmarkedPackages({})).toEqual([...GATED_PACKAGES]);
+    expect(unmarkedPackages({ arel: { novel: 0, total: 35 } })).toEqual(["ruby-compat"]);
+    expect(unmarkedPackages({})).toEqual(["arel", "ruby-compat"]);
     expect(
       unmarkedPackages({
-        activerecord: { novel: 399, total: 1424 },
         arel: { novel: 0, total: 35 },
         "ruby-compat": { novel: 0, total: 0 },
       }),
@@ -50,10 +48,26 @@ describe("extra-surface mark", () => {
     expect(unmarkedPackages({})).toContain("arel");
     expect(
       unmarkedPackages({
-        activerecord: { novel: 399, total: 1424 },
         "ruby-compat": { novel: 0, total: 0 },
       }),
     ).toEqual(["arel"]);
+  });
+
+  it("demands no mark from a rowless package, and refuses one re-added", () => {
+    expect(unmarkedPackages({})).not.toContain("activerecord");
+    expect(strandedMarks({ arel: { novel: 0, total: 35 } })).toEqual([]);
+    expect(strandedMarks({ activerecord: { novel: 0, total: 0 } })).toEqual(["activerecord"]);
+  });
+
+  it("pins a rowless package at zero in both dimensions with no mark to consult", () => {
+    expect(taggedOnlyViolations({ activerecord: { novel: 0, total: 0 } })).toEqual([]);
+    expect(taggedOnlyViolations({ activerecord: { novel: 0, total: 1 } })).toEqual([
+      { package: "activerecord", dimension: "total", mark: 0, current: 1 },
+    ]);
+    expect(taggedOnlyViolations({ activerecord: { novel: 1, total: 1 } })).toEqual([
+      { package: "activerecord", dimension: "novel", mark: 0, current: 1 },
+      { package: "activerecord", dimension: "total", mark: 0, current: 1 },
+    ]);
   });
 
   it("holds a tagged-only package at zero novel with no mark to consult", () => {
@@ -154,12 +168,15 @@ describe("extra-surface mark", () => {
 
   it("still demands a measurement for a tagged-only package, which has no mark to miss", () => {
     expect(unmeasuredPackages({ activerecord: { novel: 1, total: 1 } })).toContain("arel");
+    expect(unmeasuredPackages({ arel: { novel: 0, total: 1 } })).toContain("activerecord");
   });
 
   it("gates every package in exactly one mode", () => {
     const counted = new Set<string>(COUNTED_PACKAGES);
     const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
-    expect([...counted].filter((p) => taggedOnly.has(p))).toEqual([]);
-    expect([...GATED_PACKAGES].sort()).toEqual([...counted, ...taggedOnly].sort());
+    const rowless = new Set<string>(ROWLESS_PACKAGES);
+    const all = [...counted, ...taggedOnly, ...rowless];
+    expect(new Set(all).size).toEqual(all.length);
+    expect([...GATED_PACKAGES].sort()).toEqual(all.sort());
   });
 });

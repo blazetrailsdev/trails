@@ -12,7 +12,10 @@
  *   - UNRECEIPTED — a tagged-only package measured with any novel surface at
  *     all. Its `novel` is pinned at 0 independently of its mark row, so the
  *     only remedies are a `@noRailsEquivalent` receipt at the declaration or
- *     deleting the name.
+ *     deleting the name. A rowless package is pinned the same way in `total`
+ *     too;
+ *   - STRANDED — a mark row for a rowless package, which carries none by
+ *     construction.
  *
  * A mark left ABOVE the current measurement is reported, not failed: the mark
  * only shrinks, so narrow it in the same PR that converged the surface with
@@ -41,11 +44,13 @@ import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
 import {
   MARK_PATH,
+  ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
   exceedances,
   loadMarks,
   measure,
   staleMarks,
+  strandedMarks,
   taggedOnlyViolations,
   tightened,
   unmarkedPackages,
@@ -94,6 +99,17 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
+  const stranded = strandedMarks(marks);
+  if (stranded.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${stranded.length} rowless package(s) carry a mark row: ${stranded.join(", ")}.\n` +
+        "A rowless package is pinned at novel === 0 AND total === 0 with no row to\n" +
+        "consult, so a row there is a number nothing may read. Delete the row from\n" +
+        `${path.relative(ROOT_DIR, MARK_PATH)}.\n`,
+    );
+    return 1;
+  }
+
   const grew = exceedances(marks, current);
   const unreceipted = taggedOnlyViolations(current);
   const stale = staleMarks(marks, current);
@@ -104,9 +120,10 @@ async function main(tighten: boolean): Promise<number> {
         grew.length > 0
           ? "\nextra-surface gate: refusing to tighten while a mark is EXCEEDED — " +
               "`--tighten` only narrows.\nRemove the added surface first, then re-run.\n"
-          : "\nextra-surface gate: refusing to tighten while a tagged-only package " +
-              "carries novel surface.\nThose packages have no mark to narrow — receipt " +
-              "the names or delete them, then re-run.\n",
+          : "\nextra-surface gate: refusing to tighten while a pinned dimension " +
+              `carries unreceipted surface (${unreceipted.map((v) => `${v.package} ${v.dimension}`).join(", ")}).\n` +
+              "A pinned dimension has no mark to narrow — receipt the names, delete them, " +
+              "or relocate a moved one to its Rails file, then re-run.\n",
       );
       return 1;
     }
@@ -119,18 +136,23 @@ async function main(tighten: boolean): Promise<number> {
 
   if (unreceipted.length > 0) {
     console.error(
-      `\nextra-surface gate: ${unreceipted.length} tagged-only package(s) carry novel surface.`,
+      `\nextra-surface gate: ${unreceipted.length} pinned dimension(s) carry unreceipted surface.`,
     );
     console.error(
       "These packages are pinned at novel === 0: every public TS name with no Ruby\n" +
-        "counterpart carries a `@noRailsEquivalent <PERMANENT|CONVERGEABLE <story>>`\n" +
+        "counterpart (and, for a rowless package, every name Rails defines in another\n" +
+        "`.rb`) carries a `@noRailsEquivalent <PERMANENT|CONVERGEABLE <story>>`\n" +
         "receipt at its declaration. The pin does not read the mark, so raising the\n" +
-        "row will not clear this. Add the receipt, or delete the name. See the\n" +
-        "offending names with:\n" +
-        "  pnpm parity:api:extra --package <pkg> --novel-only\n",
+        "row will not clear this. Add the receipt, delete the name, or relocate a\n" +
+        "moved name to the file mirroring its Rails `.rb`. See the offending names:\n",
     );
     for (const v of unreceipted) {
-      console.error(`  + ${v.package}  novel: 0 → current ${v.current}`);
+      console.error(`  + ${v.package}  ${v.dimension}: 0 → current ${v.current}`);
+      console.error(
+        v.dimension === "novel"
+          ? `      pnpm parity:api:extra --package ${v.package} --novel-only`
+          : `      pnpm parity:api:extra --package ${v.package} --verbose`,
+      );
     }
     return 1;
   }
@@ -159,14 +181,16 @@ async function main(tighten: boolean): Promise<number> {
     );
   }
   const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
+  const rowless = new Set<string>(ROWLESS_PACKAGES);
   const summary = Object.entries(current)
-    .map(
-      ([name, m]) =>
-        `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
-        `, total ${m.total}/${marks[name].total}` +
-        (m.inlinedFrom === undefined
-          ? ""
-          : `, inlined-from ${m.inlinedFrom}/${marks[name].inlinedFrom}`),
+    .map(([name, m]) =>
+      rowless.has(name)
+        ? `${name} novel ${m.novel}/0, total ${m.total}/0 (rowless)`
+        : `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
+          `, total ${m.total}/${marks[name].total}` +
+          (m.inlinedFrom === undefined
+            ? ""
+            : `, inlined-from ${m.inlinedFrom}/${marks[name].inlinedFrom}`),
     )
     .join("; ");
   console.log(`extra-surface gate: OK (${summary})`);

@@ -78,9 +78,20 @@
  *
  * arel enrolled first, being the only package measured at `novel: 0`;
  * ruby-compat joined it once RFC 0129 burnt its 4 down to zero.
- * activerecord's 340 stays ungated on `novel` until its own burndown (the
- * `activerecord-extra-surface-receipt-burndown` RFC) retires it, one receipt
- * or one deletion at a time.
+ *
+ * ROWLESS MODE is the end of that road. Once a package's `total` is burnt to
+ * zero as well — every moved-not-novel extra receipted, deleted, or relocated
+ * to the file mirroring the `.rb` that defines it — the row has nothing left
+ * to count. {@link ROWLESS_PACKAGES} pins BOTH dimensions at the constant 0,
+ * so the package carries no row at all and there is no shared counter left to
+ * conflict on. {@link unmarkedPackages} does not demand a row for one, and
+ * {@link strandedMarks} fails if a row is re-added, because a row would read
+ * as a number to widen where the rule is a constant. {@link unmeasuredPackages}
+ * still covers it: the measurement is what the pin is checked against.
+ *
+ * activerecord enrolled there directly under the
+ * `activerecord-extra-surface-receipt-burndown` RFC, once its receipt stories
+ * drove both its 340 novel and its 396 moved extras to zero.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
@@ -99,7 +110,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
-export const COUNTED_PACKAGES = ["activerecord"] as const;
+export const COUNTED_PACKAGES = [] as const;
 
 /**
  * Gated packages whose `novel` is pinned at the constant 0 regardless of what
@@ -110,16 +121,25 @@ export const COUNTED_PACKAGES = ["activerecord"] as const;
 export const TAGGED_ONLY_PACKAGES = ["arel", "ruby-compat"] as const;
 
 /**
+ * Gated packages pinned at the constant 0 in BOTH `novel` and `total`, which
+ * therefore carry no mark row — see ROWLESS MODE in the module comment.
+ * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
+ */
+export const ROWLESS_PACKAGES = ["activerecord"] as const;
+
+/**
  * The packages this gate covers, in either mode. Everything else is measured
  * by `parity:api:extra` and left ungated — see the module comment.
  */
 export type GatedPackage =
   | (typeof COUNTED_PACKAGES)[number]
-  | (typeof TAGGED_ONLY_PACKAGES)[number];
+  | (typeof TAGGED_ONLY_PACKAGES)[number]
+  | (typeof ROWLESS_PACKAGES)[number];
 
 export const GATED_PACKAGES: readonly GatedPackage[] = [
   ...COUNTED_PACKAGES,
   ...TAGGED_ONLY_PACKAGES,
+  ...ROWLESS_PACKAGES,
 ].sort();
 
 /**
@@ -244,16 +264,29 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
  * {@link staleMarks} and {@link tightened} all skip a package with no mark, so
  * adding a name to {@link GATED_PACKAGES} without seeding its numbers disarms
  * the gate for that package instead of half-enabling it. The mark-side twin of
- * {@link unmeasuredPackages}.
+ * {@link unmeasuredPackages}. A rowless package is exempt: it has no number to
+ * seed.
  */
 export function unmarkedPackages(marks: SurfaceMarks): string[] {
-  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
+  const rowless = new Set<string>(ROWLESS_PACKAGES);
+  return GATED_PACKAGES.filter((name) => !rowless.has(name) && marks[name] === undefined);
 }
 
 /**
- * Every tagged-only package measured with novel surface left. Non-empty means
- * a public TS name with no Ruby counterpart was added without a
- * `@noRailsEquivalent` receipt — the fix is the receipt or the deletion.
+ * A rowless package the mark file carries a row for anyway. Every comparison
+ * would then read that row as a number to hold, and a widened one would look
+ * like a budget where the rule is the constant 0 — so the row is refused
+ * rather than consulted.
+ */
+export function strandedMarks(marks: SurfaceMarks): string[] {
+  return ROWLESS_PACKAGES.filter((name) => marks[name] !== undefined);
+}
+
+/**
+ * Every tagged-only package measured with novel surface left, and every
+ * rowless package measured with novel OR moved surface left. Non-empty means
+ * a public TS name with no Ruby counterpart in its own file was added without
+ * a `@noRailsEquivalent` receipt — the fix is the receipt or the deletion.
  *
  * Checked IN ADDITION to {@link exceedances}, not instead of it: that one
  * compares against whatever the row says, while this one holds the constant 0
@@ -266,6 +299,15 @@ export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
     if (!now) continue;
     if (now.novel > 0) {
       violations.push({ package: name, dimension: "novel", mark: 0, current: now.novel });
+    }
+  }
+  for (const name of ROWLESS_PACKAGES) {
+    const now = current[name];
+    if (!now) continue;
+    for (const dimension of ["novel", "total"] as const) {
+      if (now[dimension] > 0) {
+        violations.push({ package: name, dimension, mark: 0, current: now[dimension] });
+      }
     }
   }
   return violations;
