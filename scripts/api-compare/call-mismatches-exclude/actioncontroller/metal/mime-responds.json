@@ -9,15 +9,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any_response?",
-    "call": "fetch",
-    "kind": "rubyCompat",
-    "tsExport": "fetch",
-    "reason": "`@responses` is a Hash (mime_responds.rb:250) the port keeps as the ActionDispatch base's handlers Map; converging it is story converge-mime-responds-collector-responses-hash."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
     "rubyName": "custom",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
