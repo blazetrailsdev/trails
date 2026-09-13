@@ -612,12 +612,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private _disconnect(): Promise<void> | void {
     const conn = this._rawConnection;
-    this._rawConnection = null;
+    let closing: Promise<void> | void = undefined;
     if (conn?.isOpen()) {
-      const closing = conn.close();
+      closing = conn.close();
       if (closing) this._chainClose(closing);
-      return closing;
     }
+    this._rawConnection = null;
+    return closing;
   }
 
   /** @internal */
