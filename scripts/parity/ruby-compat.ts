@@ -96,8 +96,6 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind; ivar?: true }
 >([
-  // `rb_hash_delete_m` (`vendor/ruby/hash.c:2441`): the stored value or nil,
-  // which the JS `delete` operator — not a call — cannot return.
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash", ivar: true }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
