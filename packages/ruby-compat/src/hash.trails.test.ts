@@ -12,6 +12,7 @@ import {
   except,
   fetch,
   hasKey,
+  hashDelete,
   merge,
   mergeBang,
   reject,
@@ -383,5 +384,21 @@ describe("eachValue", () => {
     const seen: number[] = [];
     expect(eachValue(h, (v) => seen.push(v))).toBe(h);
     expect(seen).toEqual([1, 2]);
+  });
+});
+
+describe("hashDelete", () => {
+  it("removes the entry and returns its stored value, including a stored nil", () => {
+    const hash: Record<string, number | null> = { foo: 0, bar: null };
+    expect(hashDelete(hash, "foo")).toBe(0);
+    expect(hashDelete(hash, "bar")).toBeNull();
+    expect(hash).toEqual({});
+  });
+
+  it("returns nil for an absent key, or the block's value for it", () => {
+    const hash: Record<string, number> = { foo: 0 };
+    expect(hashDelete(hash, "baz")).toBeNull();
+    expect(hashDelete(hash, "baz", (key) => `no ${key}`)).toBe("no baz");
+    expect(hash).toEqual({ foo: 0 });
   });
 });

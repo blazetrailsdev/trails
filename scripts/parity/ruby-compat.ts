@@ -92,6 +92,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind }
 >([
+  ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
   // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/hash.c:7255`),
@@ -150,19 +151,26 @@ const BY_BARE_NAME = byBareName();
  *  A row keyed on a receiver is admitted only when EVERY kind recorded for the
  *  name proves that receiver — the same all-sites discipline `weakCalls` has,
  *  and the reason a body mixing `options.fetch` with `cache.fetch` credits
- *  neither. Two rows claiming one bare name for DIFFERENT exports still resolve
- *  nothing, the unresolvable-receiver case an {@link AMBIGUOUS_RUBY_CALLS}
- *  member is, excluded for the same reason. */
+ *  neither. Two rows claiming one bare name for DIFFERENT exports resolve only
+ *  where the recorded kinds admit exactly one of them — `delete` on a `hash`
+ *  is `Hash#delete`, never `String#delete` — and otherwise nothing,
+ *  the unresolvable-receiver case an {@link AMBIGUOUS_RUBY_CALLS} member is. */
 export function rubyCompatExport(
   rubyCall: string,
   receiverKinds?: readonly string[],
 ): string | undefined {
   const claims = BY_BARE_NAME.get(rubyCall);
-  if (claims === undefined || claims.size !== 1) return undefined;
-  const claim = [...claims][0];
-  if (claim.receiver === undefined) return claim.tsExport;
+  if (claims === undefined) return undefined;
+  if (claims.size === 1) {
+    const claim = [...claims][0];
+    if (claim.receiver === undefined) return claim.tsExport;
+  }
   if (receiverKinds === undefined || receiverKinds.length === 0) return undefined;
-  return receiverKinds.every((kind) => kind === claim.receiver) ? claim.tsExport : undefined;
+  const admitted = [...claims].filter(
+    (claim) =>
+      claim.receiver !== undefined && receiverKinds.every((kind) => kind === claim.receiver),
+  );
+  return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
 
 /** Forward: JS call names counting as Ruby `rubyCall`, as `jsEnumerableAliases` consults. */

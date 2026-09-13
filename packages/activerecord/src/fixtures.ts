@@ -4,7 +4,6 @@ import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import {
   camelize,
-  isPresent,
   OID_NAMESPACE,
   runLoadHooks,
   singularize,
@@ -12,7 +11,6 @@ import {
 } from "@blazetrails/activesupport";
 import { Zlib, prepend } from "@blazetrails/ruby-compat";
 import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
-import { Configurable } from "./encryption/configurable.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 
@@ -261,8 +259,6 @@ export async function prepareModelFixtures(
 
   await ModelClass.loadSchema();
 
-  const encryptFixtures =
-    Configurable.config.encryptFixtures && isPresent(ModelClass.encryptedAttributes);
   const fkColToCompositeRef = new Map<string, { column: string; pkCols: string[] }>();
   {
     const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -329,7 +325,7 @@ export async function prepareModelFixtures(
 
       row[col] = val;
     }
-    modelFixtures[label] = new Fixture(row, encryptFixtures ? ModelClass : null);
+    modelFixtures[label] = new Fixture(row, ModelClass);
   }
 
   const tables = new TableRows(tableName, {

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { BinaryType, BinaryData } from "@blazetrails/activemodel";
+import { BinaryType, BinaryData, StringType } from "@blazetrails/activemodel";
 import { Serialized } from "../type/serialized.js";
 import {
   configureEncryption,
+  makeKeyProvider,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
 } from "./test-helpers.js";
@@ -169,5 +170,33 @@ describe("EncryptedAttributeType#supportUnencryptedData — global config conjun
     });
 
     expect(type.supportUnencryptedData).toBe(false);
+  });
+});
+
+describe("EncryptedAttributeType — a deterministic previous scheme's own key_provider", () => {
+  let savedConfig: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    savedConfig = snapshotEncryptionConfig();
+    configureEncryption();
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(savedConfig);
+  });
+
+  it("serializes with the previous provider, and the fixed current type serializes with the oldest", () => {
+    const keyProvider = makeKeyProvider("prev-key-for-uniqueness-test-32b!!");
+    const scheme = new Scheme({ deterministic: true });
+    scheme.previousSchemes = [scheme.merge(new Scheme({ keyProvider, deterministic: true }))];
+    const type = new EncryptedAttributeType({ scheme, castType: new StringType() });
+    const withoutPrevious = new EncryptedAttributeType({
+      scheme: new Scheme({ deterministic: true }),
+      castType: new StringType(),
+    });
+
+    expect(type.previousTypes[0].keyProvider).toBe(keyProvider);
+    expect(type.previousTypes[0].serialize("dune")).not.toEqual(withoutPrevious.serialize("dune"));
+    expect(type.serialize("dune")).toEqual(type.previousTypes[0].serialize("dune"));
   });
 });

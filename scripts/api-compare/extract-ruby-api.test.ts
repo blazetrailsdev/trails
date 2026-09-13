@@ -3028,6 +3028,52 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Reassigned#call"]).toEqual({ fetch: ["local"] });
   });
 
+  it("proves a Hash ivar only when every assignment in the file is a plain to_hash assignment", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/row.rb": `
+        class Row
+          def initialize(fixture)
+            @row = fixture.to_hash
+            @seen = fixture.to_hash
+            @items = compute
+            @cache ||= {}
+          end
+
+          def call(name)
+            @cache.fetch(name)
+            @row.delete(name)
+            @seen.include?(name)
+            @items.include?(name)
+          end
+
+          def reset
+            @seen = []
+          end
+        end
+      `,
+    });
+    expect(c["Row#call"]).toEqual({ fetch: ["ivar"], delete: ["hash"], "include?": ["ivar"] });
+  });
+
+  it("proves a Hash ivar only within the class that assigns it", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/two.rb": `
+        class Seeded
+          def initialize
+            @row = fixture.to_hash
+          end
+        end
+
+        class Unseeded
+          def call(name)
+            @row.delete(name)
+          end
+        end
+      `,
+    });
+    expect(c["Unseeded#call"]).toEqual({ delete: ["ivar"] });
+  });
+
   it("records self beside the other kinds when a name is called both ways", () => {
     const c = rubyCallReceivers({
       "lib/active_support/both.rb": `

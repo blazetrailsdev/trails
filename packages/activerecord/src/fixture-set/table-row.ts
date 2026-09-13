@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, hashDelete } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import { findStiClass } from "../inheritance.js";
@@ -119,7 +119,6 @@ export class TableRow {
     this.resolveStiReflections();
   }
 
-  /** @missingRailsCall include? — PERMANENT */
   private get reflectionClass(): typeof Base {
     return (this._reflectionClass ??= (() => {
       const inheritanceColumnName = this.modelMetadata.inheritanceColumnName;
@@ -169,12 +168,10 @@ export class TableRow {
     }
   }
 
-  /** @missingRailsCall include? — PERMANENT */
   private isColumnDefined(col: string): boolean {
     return !this.modelMetadata.hasColumn(col) || hasKey(this._row, col);
   }
 
-  /** @missingRailsCall include? — PERMANENT */
   private resolveEnums(): void {
     const definedEnums = (
       this.reflectionClass as {
@@ -190,7 +187,6 @@ export class TableRow {
     }
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   private resolveStiReflections(): void {
     const reflections = (this.reflectionClass as { _reflections?: Record<string, unknown> })
       ._reflections;
@@ -201,8 +197,7 @@ export class TableRow {
 
           let value: unknown;
           if (association.name !== fkName) {
-            value = this._row[association.name];
-            delete this._row[association.name];
+            value = hashDelete(this._row, association.name);
           }
           if (association.name !== fkName && value != null && value !== false) {
             if (association.isPolymorphic()) {
@@ -241,10 +236,8 @@ export class TableRow {
     }
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   private addJoinRecords(association: HasManyThroughProxy): void {
-    let targets = this._row[association.name];
-    delete this._row[association.name];
+    let targets = hashDelete(this._row, association.name);
     if (targets != null && targets !== false) {
       const tableName = association.joinTable;
       const columnType = association.primaryKeyType;
