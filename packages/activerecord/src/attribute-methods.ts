@@ -10,10 +10,7 @@ import {
 import { DangerousAttributeError } from "./errors.js";
 import { _Base } from "./base-slot.js";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
-import {
-  attributeForInspect as _attrForInspect,
-  initializeGeneratedModules as _coreInitializeGeneratedModules,
-} from "./core.js";
+import { initializeGeneratedModules as _coreInitializeGeneratedModules } from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, loadSchema } from "./model-schema.js";
@@ -551,7 +548,13 @@ export const ClassMethods = {
 };
 
 export function attributeForInspect(this: InstanceMethodHost, attrName: string): string {
-  return _attrForInspect.call(this as any, attrName);
+  attrName = String(attrName);
+  attrName =
+    (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
+      attrName
+    ] ?? attrName;
+  const value = this._readAttribute(attrName);
+  return _formatForInspect.call(this as any, attrName, value);
 }
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {

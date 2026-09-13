@@ -1593,6 +1593,14 @@ function collectAllowedNames(
     const isConcern = (ext: string): boolean =>
       ext === CONCERN || (ext === "Concern" && fqn.startsWith("ActiveSupport::"));
     if ((mod.extends ?? []).some(isConcern)) {
+      // The singleton methods the `included` block defines run on the host
+      // too (`included: true`, see extract-ruby-api.rb concern_included_block?).
+      addMethods(
+        (mod.classMethods ?? []).filter((m) => m.included === true),
+        fqn,
+        methodFile,
+        target,
+      );
       walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile);
       for (const ext of mod.extends ?? [])
         if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile);

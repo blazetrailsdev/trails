@@ -230,6 +230,12 @@ export interface MethodInfo {
    * `resolve_aliases!` and arity.ts `isForwardingRubyEntry`.
    */
   aliasResolved?: boolean;
+  /**
+   * Ruby-side only, on a module's `classMethods`: recorded inside the module's
+   * `included do … end` block, so ActiveSupport::Concern defines it on the
+   * INCLUDER. See extract-ruby-api.rb `concern_included_block?`.
+   */
+  included?: boolean;
   /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
    *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
   option_keys?: string[];

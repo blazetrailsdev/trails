@@ -3596,3 +3596,43 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
     expect(out["ActiveRecord::Encryption::Cipher"].file).toBe("encryption/cipher.rb");
   });
 });
+
+describe("Ruby extractor Concern included-block class methods", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("marks the singleton methods an `included do` block defines as included", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "included-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "core.rb"),
+        `
+          module ActiveRecord
+            module Core
+              extend ActiveSupport::Concern
+              included do
+                class_attribute :default_shard, instance_writer: false
+                def self.current_role; end
+                define_model_callbacks :save
+              end
+              def self.outside; end
+            end
+          end
+        `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "core.rb"), ${JSON.stringify(dir)})
+        puts JSON.generate(ex.modules["ActiveRecord::Core"][:classMethods].map { |m| [m[:name], m[:included] == true] }.to_h)
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out.default_shard).toBe(true);
+      expect(out.current_role).toBe(true);
+      expect(out.after_save).toBe(true);
+      expect(out.outside).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

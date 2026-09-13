@@ -153,7 +153,6 @@
   "packages/activerecord/src/date-time-precision.test.ts",
   "packages/activerecord/src/date-time.test.ts",
   "packages/activerecord/src/defaults.test.ts",
-  "packages/activerecord/src/delegate.trails.test.ts",
   "packages/activerecord/src/delegated-type-scope.trails.test.ts",
   "packages/activerecord/src/delegated-type.test.ts",
   "packages/activerecord/src/dirty.test.ts",

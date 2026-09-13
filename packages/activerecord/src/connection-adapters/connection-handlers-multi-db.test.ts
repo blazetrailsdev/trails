@@ -4,7 +4,6 @@ import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
-import { ActiveRecord } from "../ar-config.js";
 import { currentRole } from "../core.js";
 import { restoreWorkerConnection } from "../support/connection.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
@@ -326,21 +325,21 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("default handlers are writing and reading", () => {
-    expect(ActiveRecord.writingRole).toBe("writing");
-    expect(ActiveRecord.readingRole).toBe("reading");
+    expect(Base.writingRole).toBe("writing");
+    expect(Base.readingRole).toBe("reading");
   });
 
   it("an application can change the default handlers", () => {
-    const oldWriting = ActiveRecord.writingRole;
-    const oldReading = ActiveRecord.readingRole;
+    const oldWriting = Base.writingRole;
+    const oldReading = Base.readingRole;
     try {
-      ActiveRecord.writingRole = "default";
-      ActiveRecord.readingRole = "readonly";
-      expect(ActiveRecord.writingRole).toBe("default");
-      expect(ActiveRecord.readingRole).toBe("readonly");
+      Base.writingRole = "default";
+      Base.readingRole = "readonly";
+      expect(Base.writingRole).toBe("default");
+      expect(Base.readingRole).toBe("readonly");
     } finally {
-      ActiveRecord.writingRole = oldWriting;
-      ActiveRecord.readingRole = oldReading;
+      Base.writingRole = oldWriting;
+      Base.readingRole = oldReading;
     }
   });
 });

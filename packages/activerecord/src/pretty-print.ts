@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: pp. */
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 export interface PrettyPrinter {

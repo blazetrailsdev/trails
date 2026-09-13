@@ -79,7 +79,6 @@
   "packages/activerecord/src/core.ts",
   "packages/activerecord/src/counter-cache.ts",
   "packages/activerecord/src/database-configurations/database-config.ts",
-  "packages/activerecord/src/delegate.ts",
   "packages/activerecord/src/delegated-type.ts",
   "packages/activerecord/src/encryption-hooks.ts",
   "packages/activerecord/src/encryption.ts",

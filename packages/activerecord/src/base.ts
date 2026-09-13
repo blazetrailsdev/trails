@@ -53,8 +53,6 @@ import {
   stiName,
   polymorphicName as inheritancePolymorphicName,
   computeType as inheritanceComputeType,
-  subclasses as inheritanceSubclasses,
-  descendants as inheritanceDescendants,
   isFinderNeedsTypeCondition,
   typeCondition,
   primaryAbstractClass,
@@ -153,8 +151,8 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
-import { ActiveRecord, AsyncExecutor } from "./ar-config.js";
-import { ActiveSupport } from "@blazetrails/activesupport";
+import { AsyncExecutor } from "./ar-config.js";
+import { ActiveSupport, DescendantsTracker } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -223,6 +221,7 @@ import {
   isSavedChanges as _isSavedChanges,
   get as _get,
   set as _set,
+  attributeForInspect as _attributeForInspect,
 } from "./attribute-methods.js";
 import * as Normalization from "./normalization.js";
 import type { NormalizesArgs } from "./normalization.js";
@@ -268,10 +267,9 @@ import { noTouching as _noTouchingBlock, isNoTouching as _isNoTouching } from ".
 import * as _NoTouching from "./no-touching.js";
 import * as _Transactions from "./transactions.js";
 import * as _Callbacks from "./callbacks.js";
-import { suppress as _suppressBlock, registry as _suppressorRegistry } from "./suppressor.js";
+import { suppress as _suppressBlock } from "./suppressor.js";
 import {
   inspect as _inspect,
-  attributeForInspect as _attributeForInspect,
   equals as _equals,
   compare as _compare,
   hash as _hash,
@@ -675,6 +673,8 @@ let _databaseCli: Record<string, string | string[]> = {
   sqlite: "sqlite3",
 };
 let _defaultTimezone: "utc" | "local" = "utc";
+let _writingRole = "writing";
+let _readingRole = "reading";
 let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
@@ -777,6 +777,22 @@ export class Base extends Model {
       throw new ArgumentError("default_timezone must be either :utc (default) or :local.");
     }
     _defaultTimezone = defaultTimezone;
+  }
+
+  static get writingRole(): string {
+    return _writingRole;
+  }
+
+  static set writingRole(writingRole: string) {
+    _writingRole = writingRole;
+  }
+
+  static get readingRole(): string {
+    return _readingRole;
+  }
+
+  static set readingRole(readingRole: string) {
+    _readingRole = readingRole;
   }
 
   static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
@@ -1298,7 +1314,9 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
-  declare static defaultShard: typeof ConnectionHandling.defaultShard;
+  static defaultShard(): string {
+    return _Core.defaultShard.call(this);
+  }
   /** @internal */
   declare static withRoleAndShard: typeof ConnectionHandling.withRoleAndShard;
   /** @internal */
@@ -1407,11 +1425,6 @@ export class Base extends Model {
     primaryAbstractClass(this);
   }
 
-  /**
-   * @internal
-   * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
-   * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) surfaced on Base as well as in inheritance.ts; one of the two should go.
-   */
   static applicationRecordClassQ(): boolean {
     return _applicationRecordClassQ(this);
   }
@@ -1424,12 +1437,26 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static get subclasses(): (typeof Base)[] {
-    return inheritanceSubclasses(this);
+    const result: (typeof Base)[] = Object.prototype.hasOwnProperty.call(this, "_subclasses")
+      ? [...((this as any)._subclasses as (typeof Base)[])]
+      : [];
+    for (const klass of DescendantsTracker.subclasses(
+      this as never,
+    ) as unknown as (typeof Base)[]) {
+      if (klass !== this && !result.includes(klass)) result.push(klass);
+    }
+    return result;
   }
 
   static get descendants(): (typeof Base)[] {
-    return inheritanceDescendants(this);
+    const result: (typeof Base)[] = [];
+    for (const sub of this.subclasses) {
+      result.push(sub);
+      result.push(...sub.descendants);
+    }
+    return result;
   }
 
   static _logger: BenchmarkLogger | null = null;
@@ -1544,10 +1571,6 @@ export class Base extends Model {
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);
-  }
-
-  static get registry(): Record<string, true | undefined> {
-    return _suppressorRegistry();
   }
 
   declare static encryptedAttributes: Set<string> | undefined;
@@ -1678,22 +1701,6 @@ export class Base extends Model {
   declare static scopeForAssociation: typeof NamedScoping.scopeForAssociation;
   declare static defaultScoped: typeof NamedScoping.defaultScoped;
   declare static defaultExtensions: typeof NamedScoping.defaultExtensions;
-
-  static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R>;
-  static async scoping<R>(
-    rel: any,
-    options: { allQueries?: boolean | null },
-    fn: () => R | Promise<R>,
-  ): Promise<R>;
-  static async scoping<R>(
-    rel: any,
-    optionsOrFn: { allQueries?: boolean | null } | (() => R | Promise<R>),
-    maybeFn?: () => R | Promise<R>,
-  ): Promise<R> {
-    return typeof optionsOrFn === "function"
-      ? rel.scoping(optionsOrFn)
-      : rel.scoping(optionsOrFn, maybeFn);
-  }
 
   static currentScope(skipInheritedScope = false): any | null {
     return ScopeRegistry.currentScope(this, skipInheritedScope);
@@ -2629,7 +2636,7 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  static defaultRole: string = ActiveRecord.writingRole;
+  static defaultRole: string = _writingRole;
 
   static belongsToRequiredByDefault = false;
 
@@ -3035,7 +3042,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
 }
 
-extend(Base, ConnectionHandling.ClassMethods);
+extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);

@@ -2,7 +2,6 @@ import type { Base } from "./base.js";
 import { include, included, type Callback } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { getCallbackChains, peekCallbackChain, runCallbacks } from "@blazetrails/activesupport";
-import { subclasses as _subclasses } from "./inheritance.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
 import {
@@ -31,7 +30,7 @@ export async function resetCallbacks(
   fn: () => void | Promise<void>,
 ): Promise<void> {
   const oldCallbacks = new Map<ModelCtor, Callback[] | undefined>();
-  const targets = [modelClass, ..._subclasses(modelClass)];
+  const targets = [modelClass, ...modelClass.subclasses];
   for (const klass of targets) {
     const chain = peekCallbackChain((klass as { prototype: object }).prototype, event);
     oldCallbacks.set(klass, chain ? [...chain.entries] : undefined);

@@ -1,7 +1,8 @@
 import { _setBelongsToPolymorphicAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import { modelRegistry } from "../associations.js";
-import { baseClass, demodulize } from "../inheritance.js";
+import { demodulize } from "@blazetrails/activesupport";
+import { baseClass } from "../inheritance.js";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
 export class BelongsToPolymorphicAssociation extends BelongsToAssociation {

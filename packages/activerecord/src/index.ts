@@ -1,3 +1,5 @@
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, disconnectAllBang, pp, RuntimeRegistry, Type. */
+
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";
 export { pp } from "./pretty-print.js";
@@ -95,7 +97,6 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export { resetCallbacks } from "./callbacks.js";
-export { delegate } from "./delegate.js";
 export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";

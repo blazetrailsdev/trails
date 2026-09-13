@@ -20,13 +20,13 @@ let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 
 /** @noRailsEquivalent PERMANENT */
 export class AsyncExecutor {
+  /** @noRailsEquivalent PERMANENT */
   post(task: () => void): void {
     queueMicrotask(() => void new Thread(task));
   }
 }
-let _writingRole = "writing";
-let _readingRole = "reading";
 
+/** @noRailsEquivalent CONVERGEABLE relocate-ar-config-seats-onto-base */
 export const ActiveRecord = {
   /** @internal */
   get indexNestedAttributeErrors(): boolean {
@@ -46,21 +46,5 @@ export const ActiveRecord = {
   /** @internal */
   set schemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>) {
     _schemaCacheIgnoredTables = value;
-  },
-
-  get writingRole(): string {
-    return _writingRole;
-  },
-
-  set writingRole(value: string) {
-    _writingRole = value;
-  },
-
-  get readingRole(): string {
-    return _readingRole;
-  },
-
-  set readingRole(value: string) {
-    _readingRole = value;
   },
 };

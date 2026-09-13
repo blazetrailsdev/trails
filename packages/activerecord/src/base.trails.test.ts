@@ -23,7 +23,7 @@ describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => 
   it("applies current-scope attributes to new instances", async () => {
     const User = makeModel();
     const rel = User.where({ role: "admin" });
-    await User.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const u = new User({});
       expect(u.readAttribute("role")).toBe("admin");
     });
@@ -32,7 +32,7 @@ describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => 
   it("explicit constructor attrs take precedence over scope attrs", async () => {
     const User = makeModel();
     const rel = User.where({ role: "admin" });
-    await User.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const u = new User({ role: "guest" });
       expect(u.readAttribute("role")).toBe("guest");
     });
@@ -41,7 +41,7 @@ describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => 
   it("scope attrs fill in keys not provided explicitly", async () => {
     const User = makeModel();
     const rel = User.where({ role: "admin", status: "active" });
-    await User.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const u = new User({ role: "guest" });
       expect(u.readAttribute("role")).toBe("guest");
       expect(u.readAttribute("status")).toBe("active");
@@ -66,7 +66,7 @@ describe("_applyScopeAttributes — multiparameter path", () => {
       }
     }
     const rel = Event.where({ role: "organizer" });
-    await Event.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const e = new Event({ "starts_on(1i)": "2024", "starts_on(2i)": "6", "starts_on(3i)": "15" });
       expect(e.readAttribute("role")).toBe("organizer");
     });
@@ -82,7 +82,7 @@ describe("_applyScopeAttributes — multiparameter path", () => {
       }
     }
     const rel = Event.where({ role: "organizer" });
-    await Event.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const e = new Event({
         "starts_on(1i)": "2024",
         "starts_on(2i)": "6",
@@ -103,7 +103,7 @@ describe("_applyScopeAttributes — multiparameter path", () => {
       }
     }
     const rel = Event.where({ starts_on: "2020-01-01" });
-    await Event.scoping(rel, async () => {
+    await rel.scoping(async () => {
       const e = new Event({
         "starts_on(1i)": "2024",
         "starts_on(2i)": "6",
@@ -129,7 +129,7 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
     registerSubclass(ScopeStiCar);
 
     const rel = ScopeStiVehicle.where({ type: "ScopeStiVehicle" });
-    await ScopeStiVehicle.scoping(rel, async () => {
+    await rel.scoping(async () => {
       expect(() => new ScopeStiCar({})).toThrow(
         new SubclassNotFound(
           "Invalid single-table inheritance type: ScopeStiVehicle is not a subclass of ScopeStiCar",
