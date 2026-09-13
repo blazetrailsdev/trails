@@ -134,11 +134,11 @@ export function currentTimeFromProperTimezone(): RubyTime {
 }
 
 /** @internal */
-export function reloadSchemaFromCache(this: TimestampHost): void {
+export function reloadSchemaFromCache(this: TimestampHost, recursive = true): void {
   this._timestampAttributesForCreateInModel = undefined;
   this._timestampAttributesForUpdateInModel = undefined;
   this._allTimestampAttributesInModel = undefined;
-  attributesReloadSchemaFromCache.call(this);
+  attributesReloadSchemaFromCache.call(this, recursive);
 }
 
 /** @internal */

@@ -295,28 +295,7 @@ export interface SchemaHost {
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: ValueType): ValueType;
   /** @internal */
-  reloadSchemaFromCache(): void;
-}
-
-/**
- * Drop the memoized class-level `attributeNames` and `columnNames` on `host`
- * and its descendants — Rails' `reload_schema_from_cache` nils
- * `@attribute_names` and `@column_names` recursively (model_schema.rb:553-568).
- * Used by every invalidation path (`attribute`, `table_name=`,
- * `ignored_columns=`, `reload_schema_from_cache`, `load_schema!`).
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the recursive the recursive attribute-name and column-name memo nil-out of reload_schema_from_cache (model_schema.rb:553-568).
- */
-export function clearAttributeNamesMemo(host: SchemaHost): void {
-  const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
-  for (const klass of [host, ...descendants]) {
-    for (const memo of ["_attributeNamesMemo", "_columnNamesMemo"] as const) {
-      if (Object.prototype.hasOwnProperty.call(klass, memo)) {
-        Reflect.deleteProperty(klass, memo);
-      }
-    }
-  }
+  reloadSchemaFromCache(recursive?: boolean): void;
 }
 
 export function deriveJoinTableName(firstTable: string, secondTable: string): string {
@@ -501,16 +480,20 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 }
 
 /** @internal */
-export function reloadSchemaFromCache(this: SchemaHost): void {
-  this._columnsHash = undefined;
-  this._columns = undefined;
+export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._returningColumnsForInsertCache = undefined;
+  this._columnNamesMemo = undefined;
   this._attributesBuilder = undefined;
+  this._columns = undefined;
+  this._columnsHash = undefined;
   this._schemaLoaded = false;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  clearAttributeNamesMemo(this);
-  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    sub.reloadSchemaFromCache();
+  (this as SchemaHost & { _attributeNamesMemo?: unknown })._attributeNamesMemo = undefined;
+  this._yamlEncoder = undefined;
+  if (recursive) {
+    for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+      sub.reloadSchemaFromCache();
+    }
   }
 }
 
@@ -597,8 +580,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
 
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
-
-  clearAttributeNamesMemo(host);
 }
 
 /**

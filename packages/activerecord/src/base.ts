@@ -1376,7 +1376,7 @@ export class Base extends Model {
   /** @internal */
   declare static resetDefaultAttributes: typeof _resetDefaultAttributes;
   /** @internal */
-  declare static reloadSchemaFromCache: () => void;
+  declare static reloadSchemaFromCache: (recursive?: boolean) => void;
 
   declare static columnNames: typeof ModelSchema.columnNames;
   declare static columnsHash: typeof ModelSchema.columnsHash;
