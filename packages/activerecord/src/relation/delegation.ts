@@ -324,7 +324,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
-      if (target.respondToMissing(prop)) {
+      if (target.respondToMissing(prop, false)) {
         return (...args: any[]) => target.methodMissing(prop, ...args);
       }
       return value;
@@ -333,7 +333,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return target.respondToMissing(prop);
+      return target.respondToMissing(prop, false);
     },
   });
 }
@@ -463,7 +463,7 @@ function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
 }
 
 export class Delegation {
-  respondToMissing(this: any, method: string): boolean {
+  respondToMissing(this: any, method: string, _: boolean): boolean {
     const model = this._model as typeof Base;
     if (typeof (model as { respondTo?: unknown }).respondTo === "function") {
       return rbObjRespondTo(model, method);

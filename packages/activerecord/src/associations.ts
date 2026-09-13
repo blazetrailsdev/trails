@@ -757,7 +757,7 @@ function wrapCollectionProxy<T extends Base = Base>(
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
 
-      if (target.respondToMissing(prop)) {
+      if (target.respondToMissing(prop, false)) {
         return (...args: any[]) => scope.methodMissing(prop, ...args);
       }
 
@@ -767,7 +767,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return target.respondToMissing(prop);
+      return target.respondToMissing(prop, false);
     },
   });
 }
