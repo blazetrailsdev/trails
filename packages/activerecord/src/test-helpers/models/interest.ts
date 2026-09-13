@@ -8,11 +8,6 @@ export class Interest extends Base {
   declare polymorphicHuman: Base | null;
   declare polymorphicHumanWithCallbacks: Base | null;
   declare zine: Zine | null;
-  declare loadBelongsTo: ((name: "human") => Promise<Human | null>) &
-    ((name: "humanWithCallbacks") => Promise<Human | null>) &
-    ((name: "polymorphicHuman") => Promise<Base | null>) &
-    ((name: "polymorphicHumanWithCallbacks") => Promise<Base | null>) &
-    ((name: "zine") => Promise<Zine | null>);
   declare human_id: number;
   declare polymorphic_human_id: number;
   declare polymorphic_human_type: string;

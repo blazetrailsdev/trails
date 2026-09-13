@@ -149,13 +149,6 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(Article.notDraft()).toMatchTypeOf<Relation<Article>>();
   });
 
-  it("loadBelongsTo / loadHasOne overloads narrow by association name", async () => {
-    const profile = new Profile({ bio: "hi", author_id: 1 });
-    expectTypeOf(await profile.loadBelongsTo("author")).toEqualTypeOf<Author | null>();
-    const author = new Author({ name: "dean" });
-    expectTypeOf(await author.loadHasOne("profile")).toEqualTypeOf<Profile | null>();
-  });
-
   it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → Instant | TimeWithZone", () => {
     const e = new Event({});
     expectTypeOf(e.starts_at).toEqualTypeOf<

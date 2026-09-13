@@ -6,7 +6,6 @@ import { registerModel } from "../../associations.js";
 
 export class Bird extends Base {
   declare pirate: Pirate | null;
-  declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
   declare color: string;
   declare name: string;
   declare pirate_id: number;

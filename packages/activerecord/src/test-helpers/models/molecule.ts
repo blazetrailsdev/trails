@@ -6,7 +6,6 @@ import { Base } from "../../base.js";
 export class Molecule extends Base {
   declare liquid: Liquid | null;
   declare electrons: AssociationProxy<Electron>;
-  declare loadBelongsTo: (name: "liquid") => Promise<Liquid | null>;
   declare liquid_id: number;
   declare name: string;
 

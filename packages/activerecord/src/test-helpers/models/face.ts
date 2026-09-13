@@ -10,13 +10,6 @@ export class Face extends Base {
   declare polyHumanWithoutInverse: Base | null;
   declare confusedHuman: Human | null;
   declare puzzledPolymorphicHuman: Base | null;
-  declare loadBelongsTo: ((name: "human") => Promise<Human | null>) &
-    ((name: "autosaveHuman") => Promise<Human | null>) &
-    ((name: "superHuman") => Promise<Base | null>) &
-    ((name: "polymorphicHuman") => Promise<Base | null>) &
-    ((name: "polyHumanWithoutInverse") => Promise<Base | null>) &
-    ((name: "confusedHuman") => Promise<Human | null>) &
-    ((name: "puzzledPolymorphicHuman") => Promise<Base | null>);
   declare description: string;
   declare human_id: number;
   declare poly_human_without_inverse_id: number;

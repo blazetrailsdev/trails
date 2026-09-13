@@ -45,13 +45,6 @@ export class Pirate extends Base {
   declare fooBulb: Bulb | null;
   declare mateys: AssociationProxy<Matey>;
   declare attackerMatey: Matey | null;
-  declare loadBelongsTo: ((name: "parrot") => Promise<Parrot | null>) &
-    ((name: "nonValidatedParrot") => Promise<Parrot | null>);
-  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
-    ((name: "updateOnlyShip") => Promise<Ship | null>) &
-    ((name: "nonValidatedShip") => Promise<Ship | null>) &
-    ((name: "fooBulb") => Promise<Bulb | null>) &
-    ((name: "attackerMatey") => Promise<Matey | null>);
   declare created_on: RubyTime | Temporal.PlainDateTime;
   declare non_validated_parrot_id: number;
   declare updated_on: RubyTime | Temporal.PlainDateTime;
@@ -175,14 +168,6 @@ acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_b
 
 export class DestructivePirate extends Pirate {
   declare dependentShip: Ship | null;
-  declare loadBelongsTo: ((name: "parrot") => Promise<Parrot | null>) &
-    ((name: "nonValidatedParrot") => Promise<Parrot | null>);
-  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
-    ((name: "updateOnlyShip") => Promise<Ship | null>) &
-    ((name: "nonValidatedShip") => Promise<Ship | null>) &
-    ((name: "fooBulb") => Promise<Bulb | null>) &
-    ((name: "attackerMatey") => Promise<Matey | null>) &
-    ((name: "dependentShip") => Promise<Ship | null>);
 
   static {
     this.hasOne("dependentShip", {
@@ -210,8 +195,6 @@ export class SpacePirate extends Base {
   declare birds: AssociationProxy<Bird>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;
-  declare loadBelongsTo: (name: "parrot") => Promise<Parrot | null>;
-  declare loadHasOne: (name: "ship") => Promise<Ship | null>;
 
   static {
     this.tableName = "pirates";

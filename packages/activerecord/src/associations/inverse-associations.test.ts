@@ -175,8 +175,8 @@ describe("AutomaticInverseFindingTests", () => {
     const ownedRoom = await Room.create({ owner_id: (user as any).id });
     expect(await (user as any).room).toBeNull();
     expect((ownedRoom as any).user).toBeNull();
-    expect((await (ownedRoom as any).loadBelongsTo("owner")).id).toBe((user as any).id);
-    expect((await (user as any).loadHasOne("ownedRoom")).id).toBe((ownedRoom as any).id);
+    expect((await (ownedRoom as any).owner).id).toBe((user as any).id);
+    expect((await (user as any).ownedRoom).id).toBe((ownedRoom as any).id);
   });
 
   it("has one and belongs to with custom association name should not find wrong inverse automatically", () => {
@@ -379,7 +379,7 @@ describe("InverseAssociationTests", () => {
 
     const newProject = (await (Project as any).last()) as Project;
     expect((Project as any).reflectOnAssociation("leadDeveloper").inverseOf()).toBeTruthy();
-    expect(await (newProject as any).loadHasOne("leadDeveloper")).toBeTruthy();
+    expect(await (newProject as any).leadDeveloper).toBeTruthy();
   });
 });
 
@@ -1082,7 +1082,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with replaced via accessor parent", async () => {
     const face = faces("confused");
-    await (face as any).loadBelongsTo("polymorphicHuman");
+    await (face as any).polymorphicHuman;
     expect((face as any).polymorphicHuman).not.toBeNull();
     const newHuman = new Human();
     (face as any).polymorphicHuman = newHuman;
@@ -1171,7 +1171,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
-      const human = await (interest as any).loadBelongsTo("polymorphicHumanWithCallbacks");
+      const human = await (interest as any).polymorphicHumanWithCallbacks;
       expect(human.addCallbackCalled).toBe(false);
     });
   });

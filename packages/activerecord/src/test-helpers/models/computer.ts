@@ -6,8 +6,6 @@ import { Base } from "../../base.js";
 export class Computer extends Base {
   declare developer: Developer | null;
   declare firm: Firm | null;
-  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
-  declare loadHasOne: (name: "firm") => Promise<Firm | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare extendedWarranty: number;
   declare system: string;

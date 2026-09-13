@@ -20,9 +20,6 @@ export class CpkBook extends Base {
   declare orderExplicitFkPk: CpkOrder | null;
   declare author: CpkAuthor | null;
   declare chapters: AssociationProxy<CpkChapter>;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
   declare author_id: number;
   declare order_id: number;
   declare revision: number;
@@ -59,19 +56,11 @@ acceptsNestedAttributesFor(CpkBook, "chapters");
 CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-
   static _demodulizedName = "BestSeller";
 }
 
 export class CpkBrokenBook extends CpkBook {
   declare order: CpkOrderWithSpecialPrimaryKey | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "order") => Promise<CpkOrderWithSpecialPrimaryKey | null>);
 
   static _demodulizedName = "BrokenBook";
   static {
@@ -81,10 +70,6 @@ export class CpkBrokenBook extends CpkBook {
 
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
   declare order: CpkNonCpkOrder | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "order") => Promise<CpkNonCpkOrder | null>);
 
   static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
@@ -97,10 +82,6 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
 
 export class CpkNonCpkBook extends CpkBook {
   declare nonCpkOrder: CpkNonCpkOrder | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>) &
-    ((name: "nonCpkOrder") => Promise<CpkNonCpkOrder | null>);
 
   static _demodulizedName = "NonCpkBook";
   static {
@@ -111,10 +92,6 @@ export class CpkNonCpkBook extends CpkBook {
 
 export class CpkNullifiedBook extends CpkBook {
   declare chapter: CpkChapter | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-  declare loadHasOne: (name: "chapter") => Promise<CpkChapter | null>;
 
   static _demodulizedName = "NullifiedBook";
   static {
@@ -129,10 +106,6 @@ export class CpkNullifiedBook extends CpkBook {
 export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
   declare orderAgreement: CpkOrderAgreement | null;
-  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
-    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
-    ((name: "author") => Promise<CpkAuthor | null>);
-  declare loadHasOne: (name: "orderAgreement") => Promise<CpkOrderAgreement | null>;
 
   static _demodulizedName = "BookWithOrderAgreements";
   static {
@@ -158,7 +131,6 @@ export class CpkBookDestroyAsync extends Base {
 
 export class CpkChapter extends Base {
   declare book: CpkBook | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
   declare author_id: number;
   declare book_id: number;
   declare title: string;
@@ -174,7 +146,6 @@ export class CpkChapter extends Base {
 
 export class CpkChapterDestroyAsync extends Base {
   declare book: CpkBookDestroyAsync | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBookDestroyAsync | null>;
 
   static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
@@ -194,7 +165,6 @@ export class CpkOrder extends Base {
   declare book: CpkBook | null;
   declare orderTags: AssociationProxy<CpkOrderTag>;
   declare tags: AssociationProxy<CpkTag>;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
   declare books_count: number | null;
   declare shop_id: number;
   declare status: string;
@@ -221,7 +191,6 @@ export class CpkOrder extends Base {
 
 export class CpkBrokenOrder extends CpkOrder {
   declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "BrokenOrder";
   static {
@@ -233,7 +202,6 @@ export class CpkBrokenOrder extends CpkOrder {
 
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
   declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
@@ -245,8 +213,6 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
 
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
   declare book: CpkNonCpkBook | null;
-  declare loadHasOne: ((name: "book") => Promise<CpkBook | null>) &
-    ((name: "book") => Promise<CpkNonCpkBook | null>);
 
   static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
@@ -257,8 +223,6 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
 }
 
 export class CpkNonCpkOrder extends CpkOrder {
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
-
   static _demodulizedName = "NonCpkOrder";
   static {
     this._primaryKey = "id";
@@ -267,7 +231,6 @@ export class CpkNonCpkOrder extends CpkOrder {
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
   declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
@@ -277,7 +240,6 @@ export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
 
 export class CpkOrderWithNullifiedBook extends CpkOrder {
   declare book: CpkBook | null;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithNullifiedBook";
   static {
@@ -291,7 +253,6 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
 
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
   declare chapters: AssociationProxy<CpkChapter>;
-  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
 
   static _demodulizedName = "OrderWithSingularBookChapters";
   static {
@@ -301,7 +262,6 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
 
 export class CpkOrderAgreement extends Base {
   declare order: CpkOrder | null;
-  declare loadBelongsTo: (name: "order") => Promise<CpkOrder | null>;
   declare order_id: number;
   declare signature: string;
 
@@ -316,8 +276,6 @@ export class CpkOrderAgreement extends Base {
 export class CpkOrderTag extends Base {
   declare tag: CpkTag | null;
   declare order: CpkOrder | null;
-  declare loadBelongsTo: ((name: "tag") => Promise<CpkTag | null>) &
-    ((name: "order") => Promise<CpkOrder | null>);
   declare attached_by: string;
   declare attached_reason: string;
   declare order_id: number;
@@ -367,8 +325,6 @@ export class CpkPost extends Base {
 export class CpkComment extends Base {
   declare commentable: Base | null;
   declare post: CpkPost | null;
-  declare loadBelongsTo: ((name: "commentable") => Promise<Base | null>) &
-    ((name: "post") => Promise<CpkPost | null>);
   declare commentable_author: string;
   declare commentable_title: string;
   declare commentable_type: string;
@@ -392,7 +348,6 @@ export class CpkComment extends Base {
 
 export class CpkReview extends Base {
   declare book: CpkBook | null;
-  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
   declare author_id: number;
   declare comment: string;
   declare "number": number;
@@ -427,7 +382,6 @@ export class CpkCar extends Base {
 
 export class CpkCarReview extends Base {
   declare car: CpkCar | null;
-  declare loadBelongsTo: (name: "car") => Promise<CpkCar | null>;
   declare car_make: string;
   declare car_model: string;
   declare comment: string;

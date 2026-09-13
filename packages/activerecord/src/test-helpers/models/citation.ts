@@ -6,8 +6,6 @@ export class Citation extends Base {
   declare book: Book | null;
   declare referenceOf: Book | null;
   declare citations: AssociationProxy<Citation>;
-  declare loadBelongsTo: ((name: "book") => Promise<Book | null>) &
-    ((name: "referenceOf") => Promise<Book | null>);
   declare book1_id: bigint;
   declare book2_id: bigint;
   declare citation_id: bigint;

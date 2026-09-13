@@ -13,8 +13,6 @@ function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
 export class Eye extends Base {
   declare iris: Iris | null;
   declare irisWithReadOnlyForeignKey: IrisWithReadOnlyForeignKey | null;
-  declare loadHasOne: ((name: "iris") => Promise<Iris | null>) &
-    ((name: "irisWithReadOnlyForeignKey") => Promise<IrisWithReadOnlyForeignKey | null>);
 
   afterCreateCallbacksStack: boolean[] = [];
   afterUpdateCallbacksStack: boolean[] = [];
@@ -69,7 +67,6 @@ acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
 export class Iris extends Base {
   declare eye: Eye | null;
-  declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
   declare color: string;
   declare eye_id: number;
 
@@ -105,8 +102,6 @@ export class Iris extends Base {
 }
 
 export class IrisWithReadOnlyForeignKey extends Iris {
-  declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
-
   static {
     this.attrReadonly("eye_id");
   }

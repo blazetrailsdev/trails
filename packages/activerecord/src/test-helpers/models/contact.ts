@@ -51,7 +51,6 @@ export class Contact extends Base {
   declare awesome: boolean | null;
   declare name: string;
   declare alternative: Contact | null;
-  declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;
 
   static column = column;
 }
@@ -60,7 +59,6 @@ await extended(Contact);
 
 export class ContactSti extends Base {
   declare alternative: Contact | null;
-  declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;
 
   static column = column;
 

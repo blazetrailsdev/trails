@@ -14,7 +14,6 @@ export class Pet extends Base {
   declare petTreasures: AssociationProxy<PetTreasure>;
   declare treasures: AssociationProxy<Treasure>;
   declare persons: AssociationProxy<Person>;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare integer: number | null;
   declare name: string;
@@ -43,7 +42,6 @@ export class PetTouchHappyAt extends Base {
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
 
   static {
     this._primaryKey = "pet_id";
@@ -56,7 +54,6 @@ export class PetCounterCacheTouch extends Base {
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;
-  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
 
   static {
     this._primaryKey = "pet_id";

@@ -847,7 +847,7 @@ describe("DefaultScopingTest", () => {
         body: "sti has_one comment",
         post_id: reader.id,
       });
-      const loaded = await reader.loadHasOne("verySpecialComment");
+      const loaded = await reader.verySpecialComment;
       expect(loaded.id).toBe(comment.id);
 
       const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
@@ -903,7 +903,7 @@ describe("DefaultScopingTest", () => {
       body: "Great post.",
       developer_id: (await Developer.first())!.id,
     });
-    expect((await post.loadHasOne("firstComment")).id).toBe(comment.id);
+    expect((await post.firstComment).id).toBe(comment.id);
   });
 
   it("default scope with references works with find by", async () => {

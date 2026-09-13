@@ -6,7 +6,6 @@ import { Base } from "../../base.js";
 export class Editor extends Base {
   declare publication: Publication | null;
   declare editorships: AssociationProxy<Editorship>;
-  declare loadHasOne: (name: "publication") => Promise<Publication | null>;
   declare name: string;
 
   static {

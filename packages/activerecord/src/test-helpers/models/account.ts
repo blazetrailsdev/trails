@@ -9,8 +9,6 @@ export class Account extends Base {
   declare unautosavedFirm: Firm | null;
   declare static open: () => Relation<Account>;
   declare static available: () => Relation<Account>;
-  declare loadBelongsTo: ((name: "firm") => Promise<Company | null>) &
-    ((name: "unautosavedFirm") => Promise<Firm | null>);
   declare credit_limit: number;
   declare firm_id: number;
   declare firm_name: string;

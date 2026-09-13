@@ -998,7 +998,7 @@ describe("HasOneAssociationsTest", () => {
 
     const mainImage = await readHasOne(post, "mainImage");
     expect(mainImage.id).toBe(image.id);
-    const imageable = await (image as any).loadBelongsTo("imageable");
+    const imageable = await (image as any).imageable;
     expect(imageable.id).toBe(post.id);
   });
 

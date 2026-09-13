@@ -4,7 +4,6 @@ import { Base } from "../../base.js";
 
 export class Entry extends Base {
   declare account: Account | null;
-  declare loadBelongsTo: (name: "account") => Promise<Account | null>;
   declare account_id: number;
   declare entryable_id: number;
   declare entryable_type: string;

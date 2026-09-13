@@ -46,12 +46,6 @@ export class Developer extends Base {
   declare contractedProjects: AssociationProxy<Project>;
   declare static jamises: () => Relation<Developer>;
   declare lastName: string;
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "strictLoadingMentor") => Promise<Mentor | null>) &
-    ((name: "strictLoadingOffMentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
-    ((name: "strictLoadingShip") => Promise<Ship | null>);
   declare firm_id: number;
   declare first_name: string;
   declare legacy_created_at: RubyTime | Temporal.PlainDateTime;
@@ -227,8 +221,6 @@ export class SymbolIgnoredDeveloper extends Base {
 export class AuditLog extends Base {
   declare developer: Developer | null;
   declare unvalidatedDeveloper: Developer | null;
-  declare loadBelongsTo: ((name: "developer") => Promise<Developer | null>) &
-    ((name: "unvalidatedDeveloper") => Promise<Developer | null>);
   declare developer_id: number;
   declare message: string;
   declare unvalidated_developer_id: number;
@@ -241,7 +233,6 @@ export class AuditLog extends Base {
 
 export class AuditLogRequired extends Base {
   declare developer: Developer | null;
-  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
 
   static {
     this.tableName = "audit_logs";

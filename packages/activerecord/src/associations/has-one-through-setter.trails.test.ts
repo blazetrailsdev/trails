@@ -18,7 +18,7 @@ describe("HasOneThroughSetterTrails", () => {
 
   it("assigning to a persisted owner updates the existing join row inline", async () => {
     const member = members("some_other_guy");
-    const membership = await member.loadHasOne("currentMembership");
+    const membership = await member.currentMembership;
     expect(membership).not.toBeNull();
 
     const newClub = clubs("moustache_club");
@@ -30,7 +30,7 @@ describe("HasOneThroughSetterTrails", () => {
 
   it("assigning to a persisted owner with no join row creates it inline", async () => {
     const member = await Member.create({ name: "Joinless" });
-    expect(await member.loadHasOne("currentMembership")).toBeNull();
+    expect(await member.currentMembership).toBeNull();
 
     const club = clubs("boring_club");
     await (member as unknown as AwaitableClubSetter).setClub(club);
@@ -42,7 +42,7 @@ describe("HasOneThroughSetterTrails", () => {
 
   it("assigning nil to a persisted owner destroys the join row inline", async () => {
     const member = members("some_other_guy");
-    const membership = await member.loadHasOne("currentMembership");
+    const membership = await member.currentMembership;
     expect(membership).not.toBeNull();
 
     await (member as unknown as AwaitableClubSetter).setClub(null);

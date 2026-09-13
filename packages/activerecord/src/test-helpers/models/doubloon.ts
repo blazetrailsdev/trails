@@ -3,7 +3,6 @@ import { Base } from "../../base.js";
 
 export class AbstractDoubloon extends Base {
   declare pirate: Pirate | null;
-  declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
 
   static {
     this.abstractClass = true;

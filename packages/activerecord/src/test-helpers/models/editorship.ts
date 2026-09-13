@@ -5,8 +5,6 @@ import { Base } from "../../base.js";
 export class Editorship extends Base {
   declare publication: Publication | null;
   declare editor: Editor | null;
-  declare loadBelongsTo: ((name: "publication") => Promise<Publication | null>) &
-    ((name: "editor") => Promise<Editor | null>);
   declare editor_id: string;
   declare publication_id: string;
 

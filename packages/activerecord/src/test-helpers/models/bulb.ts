@@ -8,7 +8,6 @@ import { association as associationInstance } from "../../associations/instance-
 export class Bulb extends Base {
   declare car: Car | null;
   declare static awesome: () => Relation<Bulb>;
-  declare loadBelongsTo: (name: "car") => Promise<Car | null>;
   declare car_id: number;
   declare frickinawesome: boolean | null;
   declare ID: number;

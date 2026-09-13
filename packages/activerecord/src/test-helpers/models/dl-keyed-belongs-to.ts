@@ -5,8 +5,6 @@ import { Base } from "../../base.js";
 export class DlKeyedBelongsTo extends Base {
   declare destroyAsyncParent: DestroyAsyncParent | null;
   declare destroyAsyncParentSoftDelete: DestroyAsyncParentSoftDelete | null;
-  declare loadBelongsTo: ((name: "destroyAsyncParent") => Promise<DestroyAsyncParent | null>) &
-    ((name: "destroyAsyncParentSoftDelete") => Promise<DestroyAsyncParentSoftDelete | null>);
   declare belongs_key: number;
   declare destroy_async_parent_id: number;
 

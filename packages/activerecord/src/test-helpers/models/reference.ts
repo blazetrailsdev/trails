@@ -9,8 +9,6 @@ export class Reference extends Base {
   declare job: Job | null;
   declare idealJobs: AssociationProxy<Job>;
   declare agentsPostsAuthors: AssociationProxy<Author>;
-  declare loadBelongsTo: ((name: "person") => Promise<Person | null>) &
-    ((name: "job") => Promise<Job | null>);
   declare favorite: boolean;
   declare job_id: number;
   declare lock_version: number | null;

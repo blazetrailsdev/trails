@@ -7,8 +7,6 @@ export class Node extends Base {
   declare tree: Tree | null;
   declare parent: Node | null;
   declare children: AssociationProxy<Node>;
-  declare loadBelongsTo: ((name: "tree") => Promise<Tree | null>) &
-    ((name: "parent") => Promise<Node | null>);
   declare name: string;
   declare parent_id: number;
   declare tree_id: number;

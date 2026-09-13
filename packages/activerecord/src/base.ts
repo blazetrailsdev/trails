@@ -2171,7 +2171,6 @@ export class Base extends Model {
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
-  _strictLoadingBypassCount = 0;
 
   /** @internal */
   _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
@@ -2962,10 +2961,6 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _associationInstances: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
-  /** @noRailsEquivalent PERMANENT */
-  loadBelongsTo(name: string): Promise<Base | null>;
-  /** @noRailsEquivalent PERMANENT */
-  loadHasOne(name: string): Promise<Base | null>;
   readonly savedChanges: Record<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;
   readonly changesToSave: Record<string, [unknown, unknown]>;

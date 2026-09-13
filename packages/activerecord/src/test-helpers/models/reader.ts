@@ -10,10 +10,6 @@ export class Reader extends Base {
   declare person: Person | null;
   declare singlePerson: Person | null;
   declare firstPost: FirstPost | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "person") => Promise<Person | null>) &
-    ((name: "singlePerson") => Promise<Person | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>);
   declare first_post_id: number;
   declare person_id: number;
   declare post_id: number;
@@ -34,8 +30,6 @@ export class Reader extends Base {
 export class SecureReader extends Base {
   declare securePost: Post | null;
   declare securePerson: Person | null;
-  declare loadBelongsTo: ((name: "securePost") => Promise<Post | null>) &
-    ((name: "securePerson") => Promise<Person | null>);
 
   static {
     this._tableName = "readers";
@@ -52,8 +46,6 @@ export class LazyReader extends Base {
   declare static skimmersOrNot: () => Relation<LazyReader>;
   declare post: Post | null;
   declare person: Person | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "person") => Promise<Person | null>);
 
   static {
     this._tableName = "readers";

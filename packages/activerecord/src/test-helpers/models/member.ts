@@ -46,27 +46,6 @@ export class Member extends Base {
   declare premiumClub: Base | null;
   declare static unnamed: () => Relation<Member>;
   declare static withMemberTypeId: (id: number) => Relation<Member>;
-  declare loadBelongsTo: ((name: "memberType") => Promise<MemberType | null>) &
-    ((name: "admittable") => Promise<Base | null>);
-  declare loadHasOne: ((name: "currentMembership") => Promise<CurrentMembership | null>) &
-    ((name: "selectedMembership") => Promise<SelectedMembership | null>) &
-    ((name: "membership") => Promise<Membership | null>) &
-    ((name: "club") => Promise<Club | null>) &
-    ((name: "clubWithoutJoins") => Promise<Club | null>) &
-    ((name: "selectedClub") => Promise<Club | null>) &
-    ((name: "favoriteClub") => Promise<Club | null>) &
-    ((name: "hairyClub") => Promise<Club | null>) &
-    ((name: "sponsor") => Promise<Sponsor | null>) &
-    ((name: "sponsorClub") => Promise<Club | null>) &
-    ((name: "memberDetail") => Promise<MemberDetail | null>) &
-    ((name: "organization") => Promise<Organization | null>) &
-    ((name: "organizationWithoutJoins") => Promise<Organization | null>) &
-    ((name: "nestedMemberType") => Promise<MemberType | null>) &
-    ((name: "nestedSponsor") => Promise<Sponsor | null>) &
-    ((name: "clubCategory") => Promise<Category | null>) &
-    ((name: "generalClub") => Promise<Club | null>) &
-    ((name: "clubThroughMany") => Promise<Club | null>) &
-    ((name: "premiumClub") => Promise<Base | null>);
   declare admittable_id: number;
   declare admittable_type: string;
   declare member_type_id: number;

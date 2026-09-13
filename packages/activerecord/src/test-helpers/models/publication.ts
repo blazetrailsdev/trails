@@ -7,7 +7,6 @@ export class Publication extends Base {
   declare editorInChief: Editor | null;
   declare editorships: AssociationProxy<Editorship>;
   declare editors: AssociationProxy<Editor>;
-  declare loadBelongsTo: (name: "editorInChief") => Promise<Editor | null>;
   declare editor_in_chief_id: number;
   declare name: string;
 

@@ -533,7 +533,6 @@ export class Association {
   /** @internal */
   protected isViolatesStrictLoading(): boolean {
     if (this._skipStrictLoading) return false;
-    if (this.owner._strictLoadingBypassCount) return false;
 
     if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
 

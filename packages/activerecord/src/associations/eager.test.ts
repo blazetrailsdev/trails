@@ -622,7 +622,7 @@ describe("EagerAssociationTest", () => {
     const taggings = await tagWithIncludes.orderedTaggings;
     const taggableTitles: string[] = [];
     for (const tagging of taggings) {
-      const taggable = (await tagging.loadBelongsTo("taggable")) as Post;
+      const taggable = (await tagging.taggable) as Post;
       taggableTitles.push(taggable.title);
     }
     const taggedPostTitles = (await tagWithIncludes.taggedPosts).map((p: any) => p.title);
@@ -716,7 +716,7 @@ describe("EagerAssociationTest", () => {
     const d2 = await findAllOrdered(Firm, "account");
     for (let i = 0; i < d1.length; i++) {
       expect(d2[i].id).toBe(d1[i].id);
-      const a1 = await d1[i].loadHasOne("account");
+      const a1 = await d1[i].account;
       const a2 = d2[i].association("account").target ?? null;
       if (a1 == null) {
         expect(a2).toBeNull();
@@ -733,7 +733,7 @@ describe("EagerAssociationTest", () => {
       expect(d2[i].id).toBe(d1[i].id);
       for (const type of firmTypes) {
         const name = type.slice(1);
-        const expected = await d1[i].loadBelongsTo(name);
+        const expected = await d1[i][name];
         const actual = d2[i].association(name).target ?? null;
         if (expected == null) {
           expect(actual).toBeNull();
@@ -869,8 +869,8 @@ describe("EagerAssociationTest", () => {
     }
 
     const author = await TempAuthor.first();
-    const post = await (author as any).loadHasOne("post");
-    const reorderedPost = await (author as any).loadHasOne("reorderedPost");
+    const post = await (author as any).post;
+    const reorderedPost = await (author as any).reorderedPost;
     expect(Number(post.id)).not.toBe(Number(reorderedPost.id));
 
     const preloaded = await TempAuthor.preload(":reorderedPost").first();
@@ -2464,7 +2464,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager with has one dependent does not destroy dependent", async () => {
     const firstFirm = companies("first_firm") as Firm;
-    expect(await firstFirm.loadHasOne("account")).not.toBeNull();
+    expect(await firstFirm.account).not.toBeNull();
 
     const f = (await Firm.all()
       .includes(":account")
@@ -2473,9 +2473,7 @@ describe("EagerAssociationTest", () => {
     expect(f.association("account").target ?? null).not.toBeNull();
 
     const reloaded = await Firm.find(firstFirm.id);
-    expect((f.association("account").target as Account).id).toBe(
-      (await reloaded.loadHasOne("account"))!.id,
-    );
+    expect((f.association("account").target as Account).id).toBe((await reloaded.account)!.id);
   });
 
   Comment.inheritanceColumn = "type";
@@ -2532,9 +2530,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it("belongs_to association ignores the scoping", async () => {
-    const post = await (await Comment.find(1)).loadBelongsTo("post");
+    const post = await (await Comment.find(1)).post;
     await Post.where("1=0").scoping(async () => {
-      expect((await (await Comment.find(1)).loadBelongsTo("post"))!.id).toBe(post!.id);
+      expect((await (await Comment.find(1)).post)!.id).toBe(post!.id);
       const preloaded = await Comment.preload(":post").find(1);
       expect((preloaded.association("post").target as Base).id).toBe(post!.id);
       const eagerLoaded = await Comment.eagerLoad(":post").find(1);

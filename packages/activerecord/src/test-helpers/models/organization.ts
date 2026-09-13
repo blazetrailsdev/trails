@@ -16,8 +16,6 @@ export class Organization extends Base {
   declare authorOwnedEssayCategory: Category | null;
   declare posts: AssociationProxy<Post>;
   declare static clubs: () => Relation<Organization>;
-  declare loadHasOne: ((name: "author") => Promise<Author | null>) &
-    ((name: "authorOwnedEssayCategory") => Promise<Category | null>);
   declare name: string;
 
   static {

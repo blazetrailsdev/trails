@@ -147,7 +147,6 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare owner: Owner \| null;/);
     expect(text).not.toMatch(/OtherThing/);
     expect(text).not.toMatch(/Gadget/);
-    expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
   });
 
   test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
@@ -591,7 +590,6 @@ describe("virtualize — materializing-generator gaps", () => {
     const aliases = new Map([["EsOctopus", "Octopus"]]);
     const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
     expect(text).toContain("declare octopus: Octopus | null;");
-    expect(text).toContain('declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;');
     expect(text).not.toMatch(/declare octopus: EsOctopus/);
   });
 
@@ -606,20 +604,6 @@ describe("virtualize — materializing-generator gaps", () => {
       'declare commentsWithOrder: import("@blazetrails/activerecord").AssociationProxy<Comment>;',
     );
     expect(text).not.toMatch(/CommentsWithOrder/);
-  });
-
-  test("subclass loader overloads include inherited base overloads", () => {
-    const src =
-      "class Comment extends Base {\n" +
-      '  static { this.belongsTo("post"); }\n' +
-      "}\n" +
-      "class SpecialComment extends Comment {\n" +
-      '  static { this.belongsTo("ordinaryPost", { className: "Post" }); }\n' +
-      "}\n";
-    const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
-    expect(text).toContain(
-      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "ordinaryPost") => Promise<Post | null>);',
-    );
   });
 
   test("cross-file subtype: narrowed declare is kept when superclass chain lives in another file", () => {
@@ -657,9 +641,6 @@ describe("virtualize — materializing-generator gaps", () => {
     const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
     const midBody = text.slice(text.indexOf("class Mid"), text.indexOf("class Leaf"));
     expect(midBody).not.toMatch(/declare post:/);
-    expect(midBody).toContain(
-      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "post") => Promise<Sibling | null>);',
-    );
     expect(text.slice(text.indexOf("class Leaf"))).toContain("declare post: SpecialPost | null;");
   });
 });

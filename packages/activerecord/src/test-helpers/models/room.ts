@@ -6,10 +6,6 @@ export class Room extends Base {
   declare owner: User | null;
   declare landlord: User | null;
   declare tenant: User | null;
-  declare loadBelongsTo: ((name: "user") => Promise<User | null>) &
-    ((name: "owner") => Promise<User | null>) &
-    ((name: "landlord") => Promise<User | null>) &
-    ((name: "tenant") => Promise<User | null>);
   declare landlord_id: number;
   declare owner_id: number;
   declare tenant_id: number;

@@ -83,7 +83,6 @@ export class LiveParrot extends Parrot {
 
 export class DeadParrot extends Parrot {
   declare killer: Pirate | null;
-  declare loadBelongsTo: (name: "killer") => Promise<Pirate | null>;
 
   static {
     this.belongsTo("killer", { className: "Pirate", foreignKey: "killer_id" });

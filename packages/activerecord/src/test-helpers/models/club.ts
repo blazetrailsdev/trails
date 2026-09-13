@@ -19,10 +19,6 @@ export class Club extends Base {
   declare customMemberships: AssociationProxy<Membership>;
   declare customFavorites: AssociationProxy<Member>;
   declare static general: () => Relation<Club>;
-  declare loadBelongsTo: (name: "category") => Promise<Category | null>;
-  declare loadHasOne: ((name: "membership") => Promise<Membership | null>) &
-    ((name: "sponsor") => Promise<Sponsor | null>) &
-    ((name: "sponsoredMember") => Promise<Member | null>);
   declare category_id: number;
   declare name: string;
 

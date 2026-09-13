@@ -4,7 +4,6 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Squeak extends Base {
   declare mouse: Mouse | null;
-  declare loadBelongsTo: (name: "mouse") => Promise<Mouse | null>;
   declare mouse_id: number;
 
   static {

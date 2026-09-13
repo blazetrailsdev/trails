@@ -2654,7 +2654,6 @@ describe("HasManyAssociationsTest", () => {
       declare author_id: number | null;
       declare title: string | null;
       declare author: InvValAuthor | null;
-      declare loadBelongsTo: (name: "author") => Promise<InvValAuthor | null>;
 
       static {
         this._tableName = "posts";
@@ -6306,7 +6305,7 @@ describe("HasManyAssociationsTest", () => {
     const images = await post.images;
     expect(images.some((i: any) => Number(i.id) === Number(image.id))).toBe(true);
     const reloaded = (await HmImage.find(Number(image.id))) as any;
-    const imageable = await reloaded.loadBelongsTo("imageable");
+    const imageable = await reloaded.imageable;
     expect(Number(imageable.id)).toBe(Number(post.id));
   });
 

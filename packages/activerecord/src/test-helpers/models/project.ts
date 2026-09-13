@@ -21,10 +21,6 @@ export class Project extends Base {
   declare leadDeveloper: Developer | null;
   declare leadDeveloperDisableJoins: Developer | null;
   declare static allAsScope: () => Relation<Project>;
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
-    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
   declare firm_id: number;
   declare mentor_id: number;
   declare name: string;
@@ -109,9 +105,4 @@ export class Project extends Base {
   }
 }
 
-export class SpecialProject extends Project {
-  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
-    ((name: "firm") => Promise<Firm | null>);
-  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
-    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
-}
+export class SpecialProject extends Project {}

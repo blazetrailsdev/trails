@@ -5,9 +5,6 @@ export class CommentOverlappingCounterCache extends Base {
   declare userCommentsCount: UserCommentsCount | null;
   declare postCommentsCount: PostCommentsCount | null;
   declare commentable: Base | null;
-  declare loadBelongsTo: ((name: "userCommentsCount") => Promise<UserCommentsCount | null>) &
-    ((name: "postCommentsCount") => Promise<PostCommentsCount | null>) &
-    ((name: "commentable") => Promise<Base | null>);
   declare commentable_id: number;
   declare commentable_type: string;
   declare post_comments_count_id: number;

@@ -8,7 +8,6 @@ export class Job extends Base {
   declare people: AssociationProxy<Person>;
   declare idealReference: Reference | null;
   declare agents: AssociationProxy<Person>;
-  declare loadBelongsTo: (name: "idealReference") => Promise<Reference | null>;
   declare ideal_reference_id: number;
 
   static {

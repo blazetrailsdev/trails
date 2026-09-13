@@ -6,7 +6,6 @@ import { Base } from "../../base.js";
 export class Department extends Base {
   declare chefs: AssociationProxy<Chef>;
   declare hotel: Hotel | null;
-  declare loadBelongsTo: (name: "hotel") => Promise<Hotel | null>;
   declare hotel_id: number;
 
   static {

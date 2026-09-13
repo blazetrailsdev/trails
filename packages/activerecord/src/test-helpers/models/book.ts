@@ -120,9 +120,6 @@ export class Book extends Base {
   declare disabledBang: () => Promise<true | undefined>;
   declare static disabled: () => Relation<Book>;
   declare static notDisabled: () => Relation<Book>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "formatRecord") => Promise<Base | null>);
-  declare loadHasOne: (name: "essay") => Promise<Essay | null>;
   declare author_id: number;
   declare author_visibility: "visible" | "invisible" | null;
   declare boolean_status: "enabled" | "disabled" | null;

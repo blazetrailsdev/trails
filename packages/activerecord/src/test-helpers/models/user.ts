@@ -17,12 +17,6 @@ export class User extends Base {
   declare familyMembers: AssociationProxy<User>;
   declare letRoom: Room | null;
   declare rentedRoom: Room | null;
-  declare loadHasOne: ((name: "room") => Promise<Room | null>) &
-    ((name: "ownedRoom") => Promise<Room | null>) &
-    ((name: "familyTree") => Promise<FamilyTree | null>) &
-    ((name: "family") => Promise<Family | null>) &
-    ((name: "letRoom") => Promise<Room | null>) &
-    ((name: "rentedRoom") => Promise<Room | null>);
   declare auth_token: string;
   declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare password: string | null;
@@ -55,13 +49,6 @@ User.hasSecureToken();
 User.hasSecureToken("auth_token", { length: 36 });
 
 export class UserWithNotification extends User {
-  declare loadHasOne: ((name: "room") => Promise<Room | null>) &
-    ((name: "ownedRoom") => Promise<Room | null>) &
-    ((name: "familyTree") => Promise<FamilyTree | null>) &
-    ((name: "family") => Promise<Family | null>) &
-    ((name: "letRoom") => Promise<Room | null>) &
-    ((name: "rentedRoom") => Promise<Room | null>);
-
   static {
     this.afterCreate(async function () {
       await Notification.create({ message: "A new user has been created." });

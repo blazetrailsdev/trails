@@ -8,7 +8,6 @@ export class Rating extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithoutTag: AssociationProxy<Tagging>;
   declare taggingsWithNoTag: AssociationProxy<Tagging>;
-  declare loadBelongsTo: (name: "comment") => Promise<Comment | null>;
   declare comment_id: number;
   declare value: number;
 

@@ -23,7 +23,6 @@ export class BookDestroyAsync extends Base {
   declare publishedBang: () => Promise<true | undefined>;
   declare static published: () => Relation<BookDestroyAsync>;
   declare static notPublished: () => Relation<BookDestroyAsync>;
-  declare loadHasOne: (name: "content") => Promise<Content | null>;
 
   static _tableName = "books";
 

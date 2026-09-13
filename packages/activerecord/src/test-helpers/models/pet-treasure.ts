@@ -5,8 +5,6 @@ import { Base } from "../../base.js";
 export class PetTreasure extends Base {
   declare pet: Pet | null;
   declare treasure: Treasure | null;
-  declare loadBelongsTo: ((name: "pet") => Promise<Pet | null>) &
-    ((name: "treasure") => Promise<Treasure | null>);
 
   static {
     this._tableName = "pets_treasures";

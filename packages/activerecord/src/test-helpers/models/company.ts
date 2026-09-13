@@ -40,8 +40,6 @@ export class Company extends AbstractCompany {
   declare comments: AssociationProxy<Comment>;
   declare metadata: unknown | null;
   declare static ofFirstFirm: () => Relation<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
   declare account_id: number;
   declare client_of: bigint;
   declare description: string | null;
@@ -86,23 +84,15 @@ export class Company extends AbstractCompany {
   }
 }
 
-export class SpecialCo extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-}
+export class SpecialCo extends Company {}
 
 export class NamespacedCompany extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-
   static moduleName = "Namespaced";
   static _demodulizedName = "Company";
 }
 
 export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static moduleName = "Namespaced";
   static _demodulizedName = "Firm";
@@ -113,9 +103,6 @@ export class NamespacedFirm extends Company {
 }
 
 export class NamespacedClient extends Company {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-
   static moduleName = "Namespaced";
   static _demodulizedName = "Client";
 }
@@ -155,19 +142,6 @@ export class Firm extends Company {
   declare developersWithSelect: AssociationProxy<Developer>;
   declare leadDeveloper: Developer | null;
   declare projects: AssociationProxy<Project>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "unvalidatedAccount") => Promise<Account | null>) &
-    ((name: "accountWithSelect") => Promise<Account | null>) &
-    ((name: "readonlyAccount") => Promise<Account | null>) &
-    ((name: "accountUsingPrimaryKey") => Promise<Account | null>) &
-    ((name: "accountUsingForeignAndPrimaryKeys") => Promise<Account | null>) &
-    ((name: "accountWithInexistentForeignKey") => Promise<Account | null>) &
-    ((name: "deletableAccount") => Promise<Account | null>) &
-    ((name: "client") => Promise<Client | null>) &
-    ((name: "accountLimit500WithHashConditions") => Promise<Account | null>) &
-    ((name: "unautosavedAccount") => Promise<Account | null>) &
-    ((name: "leadDeveloper") => Promise<Developer | null>);
 
   _log: string[] = [];
   declare clients: CollectionProxy<Client>;
@@ -317,9 +291,6 @@ export class DependentFirm extends Company {
   declare account: Account | null;
   declare companies: AssociationProxy<Company>;
   declare company: Company | null;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "company") => Promise<Company | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -334,8 +305,6 @@ export class DependentFirm extends Company {
 export class RestrictedWithExceptionFirm extends Company {
   declare account: Account | null;
   declare companies: AssociationProxy<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -352,8 +321,6 @@ export class RestrictedWithExceptionFirm extends Company {
 export class RestrictedWithErrorFirm extends Company {
   declare account: Account | null;
   declare companies: AssociationProxy<Company>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", (q: any) => q.order("id"), {
@@ -368,20 +335,6 @@ export class RestrictedWithErrorFirm extends Company {
 }
 
 export class Agency extends Firm {
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>) &
-    ((name: "unvalidatedAccount") => Promise<Account | null>) &
-    ((name: "accountWithSelect") => Promise<Account | null>) &
-    ((name: "readonlyAccount") => Promise<Account | null>) &
-    ((name: "accountUsingPrimaryKey") => Promise<Account | null>) &
-    ((name: "accountUsingForeignAndPrimaryKeys") => Promise<Account | null>) &
-    ((name: "accountWithInexistentForeignKey") => Promise<Account | null>) &
-    ((name: "deletableAccount") => Promise<Account | null>) &
-    ((name: "client") => Promise<Client | null>) &
-    ((name: "accountLimit500WithHashConditions") => Promise<Account | null>) &
-    ((name: "unautosavedAccount") => Promise<Account | null>) &
-    ((name: "leadDeveloper") => Promise<Developer | null>);
-
   static {
     this.hasMany("projects", { foreignKey: "firm_id" });
   }
@@ -400,18 +353,6 @@ export class Client extends Company {
   declare bobFirm: Firm | null;
   declare accounts: AssociationProxy<Account>;
   declare account: Account | null;
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   raiseOnSave = false;
   throwOnSave = false;
@@ -505,8 +446,6 @@ export class ExclusivelyDependentFirm extends Company {
   declare dependentSanitizedConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentHashConditionalClientsOfFirm: AssociationProxy<Client>;
   declare dependentConditionalClientsOfFirm: AssociationProxy<Client>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasOne("account", { foreignKey: "firm_id", dependent: "delete" });
@@ -530,18 +469,6 @@ export class ExclusivelyDependentFirm extends Company {
 
 export class LargeClient extends Client {
   declare extraSize: number | null;
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.attribute("extraSize", "integer");
@@ -555,40 +482,12 @@ export class LargeClient extends Client {
   }
 }
 
-export class SpecialClient extends Client {
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-}
+export class SpecialClient extends Client {}
 
-export class VerySpecialClient extends SpecialClient {
-  declare loadBelongsTo: ((name: "firm") => Promise<Firm | null>) &
-    ((name: "firmWithBasicId") => Promise<Firm | null>) &
-    ((name: "firmWithSelect") => Promise<Firm | null>) &
-    ((name: "firmWithOtherName") => Promise<Firm | null>) &
-    ((name: "firmWithCondition") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKey") => Promise<Firm | null>) &
-    ((name: "firmWithPrimaryKeySymbols") => Promise<Firm | null>) &
-    ((name: "readonlyFirm") => Promise<Firm | null>) &
-    ((name: "bobFirm") => Promise<Firm | null>) &
-    ((name: "account") => Promise<Account | null>);
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
-}
+export class VerySpecialClient extends SpecialClient {}
 
 export class NewlyContractedCompany extends Company {
   declare newContracts: AssociationProxy<NewContract>;
-  declare loadHasOne: ((name: "account") => Promise<Account | null>) &
-    ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
     this.hasMany("newContracts", { foreignKey: "company_id" });

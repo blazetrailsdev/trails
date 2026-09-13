@@ -47,8 +47,6 @@ class Author extends Base {
 
   declare profile: Profile | null;
 
-  declare loadHasOne: (name: "profile") => Promise<Profile | null>;
-
   static {
     this.attribute("name", "string");
     this.hasMany("comments");

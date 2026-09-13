@@ -166,7 +166,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     });
     let loaded: any;
     try {
-      loaded = await (author as any).loadHasOne("noJoinsDpOnePhoto");
+      loaded = await (author as any).noJoinsDpOnePhoto;
     } finally {
       Notifications.unsubscribe(sub);
     }

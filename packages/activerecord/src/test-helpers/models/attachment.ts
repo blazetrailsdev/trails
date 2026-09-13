@@ -4,8 +4,6 @@ import { Base } from "../../base.js";
 export class Attachment extends Base {
   declare record: Base | null;
   declare translation: Translation | null;
-  declare loadBelongsTo: (name: "record") => Promise<Base | null>;
-  declare loadHasOne: (name: "translation") => Promise<Translation | null>;
   declare record_id: number;
   declare record_type: string;
 

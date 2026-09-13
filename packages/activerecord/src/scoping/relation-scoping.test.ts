@@ -45,10 +45,10 @@ const { developers, people, references, authors, comments } = fixtures([
 describe("RelationScopingTest", () => {
   it("unscoped breaks caching", async () => {
     const author = authors("mary");
-    expect(await author.loadHasOne("firstPost")).toBeNull();
+    expect(await author.firstPost).toBeNull();
     const post = await FirstPost.unscoped(async () => {
       await author.reload();
-      return author.loadHasOne("firstPost");
+      return author.firstPost;
     });
     expect(post).not.toBeNull();
   });

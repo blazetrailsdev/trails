@@ -12,13 +12,6 @@ export class Tagging extends Base {
   declare blueTag: Tag | null;
   declare tagWithPrimaryKey: Tag | null;
   declare things: AssociationProxy<Base>;
-  declare loadBelongsTo: ((name: "tag") => Promise<Tag | null>) &
-    ((name: "superTag") => Promise<Tag | null>) &
-    ((name: "invalidTag") => Promise<Tag | null>) &
-    ((name: "orderedTag") => Promise<OrderedTag | null>) &
-    ((name: "blueTag") => Promise<Tag | null>) &
-    ((name: "tagWithPrimaryKey") => Promise<Tag | null>) &
-    ((name: "taggable") => Promise<Base | null>);
   declare comment: string;
   declare super_tag_id: number;
   declare "type": string;
@@ -48,14 +41,6 @@ export class Tagging extends Base {
 }
 
 export class IndestructibleTagging extends Tagging {
-  declare loadBelongsTo: ((name: "tag") => Promise<Tag | null>) &
-    ((name: "superTag") => Promise<Tag | null>) &
-    ((name: "invalidTag") => Promise<Tag | null>) &
-    ((name: "orderedTag") => Promise<OrderedTag | null>) &
-    ((name: "blueTag") => Promise<Tag | null>) &
-    ((name: "tagWithPrimaryKey") => Promise<Tag | null>) &
-    ((name: "taggable") => Promise<Base | null>);
-
   static {
     this.beforeDestroy(() => throwAbort());
   }

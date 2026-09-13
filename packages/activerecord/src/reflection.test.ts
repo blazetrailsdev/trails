@@ -130,7 +130,6 @@ describe("ReflectionTest", () => {
       declare employable_id: number | null;
       declare employable_type: string | null;
       declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("department_id", "integer");
@@ -196,7 +195,6 @@ describe("ReflectionTest", () => {
       declare employable_id: number | null;
       declare employable_type: string | null;
       declare employable: Base | null;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("employable_list_id", "integer");
@@ -258,7 +256,6 @@ describe("ReflectionTest", () => {
       declare format_record_id: number | null;
       declare format_record_type: string | null;
       declare formatRecord: Base | null;
-      declare loadBelongsTo: (name: "formatRecord") => Promise<Base | null>;
 
       static {
         this.attribute("author_id", "integer");
@@ -338,7 +335,6 @@ describe("ReflectionTest", () => {
       declare employable_type: string | null;
       declare employable: Base | null;
       declare recipes: AssociationProxy<SC4Recipe>;
-      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
 
       static {
         this.attribute("department_id", "integer");
@@ -421,7 +417,6 @@ describe("ReflectionTest", () => {
       declare subscriber_id: number | null;
       declare book_id: number | null;
       declare subBook: SubBook | null;
-      declare loadBelongsTo: (name: "subBook") => Promise<SubBook | null>;
 
       static {
         this.attribute("subscriber_id", "integer");
@@ -568,7 +563,6 @@ describe("ReflectionTest", () => {
     class RfAdminUser extends Base {
       declare name: string | null;
       declare user: RfNestedUser | null;
-      declare loadHasOne: (name: "user") => Promise<RfNestedUser | null>;
 
       static {
         this.attribute("name", "string");
@@ -1341,7 +1335,6 @@ describe("ReflectionTest", () => {
     class RfComment extends Base {
       declare blog_post_id: number | null;
       declare blogPost: BlogPost | null;
-      declare loadBelongsTo: (name: "blogPost") => Promise<BlogPost | null>;
 
       static {
         this.attribute("id", "integer");

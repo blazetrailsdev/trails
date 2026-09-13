@@ -16,9 +16,6 @@ export class Ship extends Base {
   declare developer: Developer | null;
   declare parts: AssociationProxy<ShipPart>;
   declare treasures: AssociationProxy<Treasure>;
-  declare loadBelongsTo: ((name: "pirate") => Promise<Pirate | null>) &
-    ((name: "updateOnlyPirate") => Promise<Pirate | null>) &
-    ((name: "developer") => Promise<Developer | null>);
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare created_on: RubyTime | Temporal.PlainDateTime;
   declare developer_id: number;
@@ -77,7 +74,6 @@ export class ShipWithoutNestedAttributes extends Base {
 
 export class Prisoner extends Base {
   declare ship: ShipWithoutNestedAttributes | null;
-  declare loadBelongsTo: (name: "ship") => Promise<ShipWithoutNestedAttributes | null>;
   declare ship_id: number;
 
   static {
@@ -91,7 +87,6 @@ export class Prisoner extends Base {
 
 export class FamousShip extends Base {
   declare famousPirate: FamousPirate | null;
-  declare loadBelongsTo: (name: "famousPirate") => Promise<FamousPirate | null>;
 
   static {
     this.tableName = "ships";

@@ -50,40 +50,6 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
   }
 }
 
-function assertSingularAssociation(
-  this: Base,
-  name: string,
-  expected: "belongsTo" | "hasOne",
-): AssocDef {
-  const ctor = this.constructor as typeof Base;
-  const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | null;
-  if (!assocDef) {
-    throw new AssociationNotFoundError(this, name);
-  }
-  if (assocDef.macro !== expected) {
-    if (assocDef.macro === "hasMany" || assocDef.macro === "hasAndBelongsToMany") {
-      throw new Error(
-        `load${expected === "belongsTo" ? "BelongsTo" : "HasOne"} is for singular associations. ` +
-          `\`${ctor.name}.${name}\` is a ${assocDef.macro} — await the reader: \`await record.${name}\`.`,
-      );
-    }
-    const right = assocDef.macro === "belongsTo" ? "loadBelongsTo" : "loadHasOne";
-    throw new Error(
-      `\`${ctor.name}.${name}\` is a ${assocDef.macro}, not ${expected}. Use \`record.${right}("${name}")\` instead.`,
-    );
-  }
-  return assocDef;
-}
-
-async function bypassStrictLoading<T>(this: Base, fn: () => Promise<T>): Promise<T> {
-  this._strictLoadingBypassCount += 1;
-  try {
-    return await fn();
-  } finally {
-    this._strictLoadingBypassCount = Math.max(0, this._strictLoadingBypassCount - 1);
-  }
-}
-
 /** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export function association(this: Base, name: string): AssociationInstance {
   const existing = this._associationInstances.get(name);
@@ -104,27 +70,7 @@ export function association(this: Base, name: string): AssociationInstance {
   return instance;
 }
 
-/** @noRailsEquivalent CONVERGEABLE retire-load-belongs-to-and-load-has-one */
-export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
-  assertSingularAssociation.call(this, name, "belongsTo");
-  const result = await bypassStrictLoading.call(this, () =>
-    Promise.resolve(association.call(this, name).loadTarget()),
-  );
-  return result as Base | null;
-}
-
-/** @noRailsEquivalent CONVERGEABLE retire-load-belongs-to-and-load-has-one */
-export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
-  assertSingularAssociation.call(this, name, "hasOne");
-  const result = await bypassStrictLoading.call(this, () =>
-    Promise.resolve(association.call(this, name).loadTarget()),
-  );
-  return result as Base | null;
-}
-
 /** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
 export const InstanceMethods = {
   association,
-  loadBelongsTo,
-  loadHasOne,
 };

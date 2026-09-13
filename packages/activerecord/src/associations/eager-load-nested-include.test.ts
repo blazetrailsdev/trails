@@ -15,8 +15,6 @@ class ShapeExpression extends Base {
   declare paint_id: number;
   declare shape: Base | null;
   declare paint: Base | null;
-  declare loadBelongsTo: ((name: "shape") => Promise<Base | null>) &
-    ((name: "paint") => Promise<Base | null>);
 
   static {
     this._tableName = "shape_expressions";
@@ -46,7 +44,6 @@ class Triangle extends Base {
 class PaintColor extends Base {
   declare non_poly_one_id: number;
   declare nonPoly: NonPolyOne | null;
-  declare loadBelongsTo: (name: "nonPoly") => Promise<NonPolyOne | null>;
 
   static {
     this._tableName = "paint_colors";
@@ -60,7 +57,6 @@ class PaintColor extends Base {
 class PaintTexture extends Base {
   declare non_poly_two_id: number;
   declare nonPoly: NonPolyTwo | null;
-  declare loadBelongsTo: (name: "nonPoly") => Promise<NonPolyTwo | null>;
 
   static {
     this._tableName = "paint_textures";

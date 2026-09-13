@@ -29,8 +29,6 @@ export class Membership extends Base {
   declare static notTenantMembership: () => Relation<Membership>;
   declare member: Member | null;
   declare club: Club | null;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "club") => Promise<Club | null>);
   declare club_id: number;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare favorite: boolean | null;
@@ -62,8 +60,6 @@ export class Membership extends Base {
 export class CurrentMembership extends Membership {
   declare member: Member | null;
   declare club: Club | null;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "club") => Promise<Club | null>);
 
   static {
     registerModel(CurrentMembership);
@@ -76,8 +72,6 @@ export class CurrentMembership extends Membership {
 export class SuperMembership extends Membership {
   declare member: Member | null;
   declare club: Club | null;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "club") => Promise<Club | null>);
 
   static {
     registerModel(SuperMembership);
@@ -98,8 +92,6 @@ export class SelectedMembership extends Membership {
 export class TenantMembership extends Membership {
   declare member: Member | null;
   declare club: Club | null;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "club") => Promise<Club | null>);
 
   static currentMember: any = null;
 

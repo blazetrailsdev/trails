@@ -13,7 +13,6 @@ export class Owner extends Base {
   declare persons: AssociationProxy<Person>;
   declare lastPet: Pet | null;
   declare static includingLastPet: () => Relation<Owner>;
-  declare loadBelongsTo: (name: "lastPet") => Promise<Pet | null>;
   declare essay_id: string;
   declare happy_at: RubyTime | Temporal.PlainDateTime;
   declare name: string;

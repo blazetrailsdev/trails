@@ -103,10 +103,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     let withoutJoins: unknown;
     let withJoins: unknown;
     const noJoins = await captureSql(async () => {
-      withoutJoins = await member.loadHasOne("organizationWithoutJoins");
+      withoutJoins = await member.organizationWithoutJoins;
     });
     const joins = await captureSql(async () => {
-      withJoins = await member.loadHasOne("organization");
+      withJoins = await member.organization;
     });
 
     expect((withoutJoins as Organization)?.id).toBe((withJoins as Organization)?.id);
@@ -124,10 +124,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     let org: unknown;
     let orgNoJoins: unknown;
     const joins = await captureSql(async () => {
-      org = await blarpy.loadHasOne("organization");
+      org = await blarpy.organization;
     });
     const noJoins = await captureSql(async () => {
-      orgNoJoins = await blarpy.loadHasOne("organizationWithoutJoins");
+      orgNoJoins = await blarpy.organizationWithoutJoins;
     });
     expect(org).toBeNull();
     expect(orgNoJoins).toBeNull();
@@ -158,10 +158,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     let leadDeveloper: unknown;
     let leadDeveloperDisableJoins: unknown;
     const joins = await captureSql(async () => {
-      leadDeveloper = await project.loadHasOne("leadDeveloper");
+      leadDeveloper = await project.leadDeveloper;
     });
     const noJoins = await captureSql(async () => {
-      leadDeveloperDisableJoins = await project.loadHasOne("leadDeveloperDisableJoins");
+      leadDeveloperDisableJoins = await project.leadDeveloperDisableJoins;
     });
 
     expect((leadDeveloperDisableJoins as Developer)?.id).toBe((leadDeveloper as Developer)?.id);
@@ -177,10 +177,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     let withJoins: unknown;
     let withoutJoins: unknown;
     const joins = await captureSql(async () => {
-      withJoins = await member.loadHasOne("club");
+      withJoins = await member.club;
     });
     const noJoins = await captureSql(async () => {
-      withoutJoins = await member.loadHasOne("clubWithoutJoins");
+      withoutJoins = await member.clubWithoutJoins;
     });
 
     expect((withoutJoins as { id?: number })?.id).toBe((withJoins as { id?: number })?.id);

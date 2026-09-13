@@ -12,11 +12,6 @@ export class MemberDetail extends Base {
   declare membership: Membership | null;
   declare admittable: Member | null;
   declare organizationMemberDetails: AssociationProxy<MemberDetail>;
-  declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
-    ((name: "organization") => Promise<Organization | null>);
-  declare loadHasOne: ((name: "memberType") => Promise<MemberType | null>) &
-    ((name: "membership") => Promise<Membership | null>) &
-    ((name: "admittable") => Promise<Member | null>);
   declare extra_data: string;
   declare member_id: number;
   declare organization_id: number;

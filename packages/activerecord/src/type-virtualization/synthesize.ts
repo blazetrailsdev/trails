@@ -92,12 +92,6 @@ export function synthesizeDeclares(
       }
     }
   }
-  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors, isKnownTarget)) {
-    if (!info.existingMembers.has(l.declaredName)) {
-      out.push(l.text);
-      synthesizedInstanceNames.add(l.declaredName);
-    }
-  }
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
     emit(line);
   }
@@ -169,41 +163,6 @@ function isValidIdentifier(name: string): boolean {
   return token === ts.SyntaxKind.Identifier && identifierScanner.getTextPos() === name.length;
 }
 
-function renderLoaderOverloads(
-  info: ClassInfo,
-  aliases: ReadonlyMap<string, string> | undefined,
-  targets: ReadonlyMap<string, string> | undefined,
-  ancestors: readonly ClassInfo[] | undefined,
-  isKnownTarget: ((name: string) => boolean) | undefined,
-): RenderedLine[] {
-  const belongsToOverloads: string[] = [];
-  const hasOneOverloads: string[] = [];
-  const sources: ClassInfo[] = [...(ancestors ?? [])].reverse();
-  sources.push(info);
-  for (const source of sources) {
-    for (const call of source.calls) {
-      if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
-      const target =
-        call.options["polymorphic"] === "true"
-          ? "Base"
-          : resolveTarget(source, call, aliases, targets, isKnownTarget);
-      const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
-      const bucket = call.kind === "belongsTo" ? belongsToOverloads : hasOneOverloads;
-      if (!bucket.includes(overload)) bucket.push(overload);
-    }
-  }
-  const out: RenderedLine[] = [];
-  if (belongsToOverloads.length > 0) {
-    out.push(
-      line(`declare loadBelongsTo: ${joinOverloads(belongsToOverloads)};`, "loadBelongsTo", false),
-    );
-  }
-  if (hasOneOverloads.length > 0) {
-    out.push(line(`declare loadHasOne: ${joinOverloads(hasOneOverloads)};`, "loadHasOne", false));
-  }
-  return out;
-}
-
 function collectConflictingCollections(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
   const out = new Set<string>();
   const ancestors = opts.ancestors;
@@ -273,10 +232,6 @@ function classExtends(
     current = superNameOf.get(current);
   }
   return false;
-}
-
-function joinOverloads(overloads: string[]): string {
-  return overloads.length === 1 ? overloads[0].slice(1, -1) : overloads.join(" & ");
 }
 
 interface RenderedLine {

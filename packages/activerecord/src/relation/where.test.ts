@@ -101,7 +101,7 @@ describe("WhereTest", () => {
 
     expect(joined.length).toBeGreaterThan(0);
     for (const post of joined) {
-      const a = await (post as any).loadBelongsTo("author");
+      const a = await (post as any).author;
       expect(a.id).toBe(author.id);
       expect((post as any).id).not.toBe(1);
     }

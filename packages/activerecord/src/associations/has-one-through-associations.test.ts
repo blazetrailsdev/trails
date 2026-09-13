@@ -763,8 +763,6 @@ describe("HasOneThroughAssociationsTest", () => {
       class Thing extends Base {
         declare otherThing: Base | null;
         declare thing: Base | null;
-        declare loadHasOne: ((name: "otherThing") => Promise<Base | null>) &
-          ((name: "thing") => Promise<Base | null>);
 
         static {
           this.hasOne("otherThing");

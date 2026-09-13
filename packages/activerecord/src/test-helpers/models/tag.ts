@@ -10,7 +10,6 @@ export class Tag extends Base {
   declare taggedPosts: AssociationProxy<Post>;
   declare nullTaggings: AssociationProxy<Tagging>;
   declare nullTaggedPosts: AssociationProxy<Post>;
-  declare loadHasOne: (name: "tagging") => Promise<Tagging | null>;
   declare name: string;
   declare taggings_count: number | null;
 
@@ -32,7 +31,6 @@ export class Tag extends Base {
 export class OrderedTag extends Tag {
   declare orderedTaggings: AssociationProxy<Tagging>;
   declare taggedPosts: AssociationProxy<Post>;
-  declare loadHasOne: (name: "tagging") => Promise<Tagging | null>;
 
   static {
     this._tableName = "tags";

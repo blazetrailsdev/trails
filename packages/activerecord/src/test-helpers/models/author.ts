@@ -165,25 +165,6 @@ export class Author extends Base {
   declare lazyReadersSkimmersOrNot: AssociationProxy<LazyReader>;
   declare lazyReadersSkimmersOrNot_2: AssociationProxy<LazyReader>;
   declare lazyReadersSkimmersOrNot_3: AssociationProxy<LazyReader>;
-  declare loadBelongsTo: ((name: "ownedEssay") => Promise<Essay | null>) &
-    ((name: "authorAddress") => Promise<AuthorAddress | null>) &
-    ((name: "authorAddressExtra") => Promise<AuthorAddress | null>);
-  declare loadHasOne: ((name: "post") => Promise<Post | null>) &
-    ((name: "postAboutThinking") => Promise<Post | null>) &
-    ((name: "postAboutThinkingWithLastComment") => Promise<Post | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "commentOnFirstPost") => Promise<Comment | null>) &
-    ((name: "specialCategory") => Promise<Category | null>) &
-    ((name: "unreadListing") => Promise<Book | null>) &
-    ((name: "readingListing") => Promise<Book | null>) &
-    ((name: "essay") => Promise<Essay | null>) &
-    ((name: "essayCategory") => Promise<Category | null>) &
-    ((name: "essayOwner") => Promise<Owner | null>) &
-    ((name: "essay_2") => Promise<Essay | null>) &
-    ((name: "essayCategory_2") => Promise<Category | null>) &
-    ((name: "ownedEssayCategory") => Promise<Category | null>) &
-    ((name: "recentPost") => Promise<Post | null>) &
-    ((name: "recentResponse") => Promise<Comment | null>);
   declare author_address_extra_id: number;
   declare author_address_id: number;
   declare name: string;
@@ -664,7 +645,6 @@ export class Author extends Base {
 
 export class AuthorAddress extends Base {
   declare author: Author | null;
-  declare loadHasOne: (name: "author") => Promise<Author | null>;
 
   static destroyedAuthorAddressIds: number[] = [];
 
@@ -679,8 +659,6 @@ export class AuthorAddress extends Base {
 export class AuthorFavorite extends Base {
   declare author: Author | null;
   declare favoriteAuthor: Author | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "favoriteAuthor") => Promise<Author | null>);
   declare author_id: number;
   declare favorite_author_id: number;
 
@@ -693,8 +671,6 @@ export class AuthorFavorite extends Base {
 export class AuthorFavoriteWithScope extends Base {
   declare author: Author | null;
   declare favoriteAuthor: Author | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "favoriteAuthor") => Promise<Author | null>);
 
   static {
     this._tableName = "author_favorites";

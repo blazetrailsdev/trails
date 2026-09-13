@@ -310,7 +310,7 @@ describe("TimestampTest", () => {
 
   it("saving a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
     const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
-    const petOwner = await pet.loadBelongsTo("owner");
+    const petOwner = await pet.owner;
     const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
     travel(1000);
@@ -322,13 +322,13 @@ describe("TimestampTest", () => {
     }
 
     const reloadedPet = await Pet.find(pet.pet_id);
-    const updatedOwner = await reloadedPet.loadBelongsTo("owner");
+    const updatedOwner = await reloadedPet.owner;
     expect((updatedOwner as Owner).updated_at).not.toEqual(previousOwnerUpdatedAt);
   });
 
   it("destroying a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
     const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
-    const petOwner = await pet.loadBelongsTo("owner");
+    const petOwner = await pet.owner;
     const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
     travel(1000);
@@ -353,7 +353,7 @@ describe("TimestampTest", () => {
 
   it("saving a record with a belongs to that specifies touching a specific attribute the parent should update that attribute", async () => {
     const pet = await PetTouchHappyAt.find((pets("parrot") as any).readAttribute("pet_id"));
-    const ownerInst = await (pet as any).loadBelongsTo("owner");
+    const ownerInst = await (pet as any).owner;
     const previousOwnerHappyAt = ownerInst.happy_at;
 
     pet.name = "Fluffy the Third";
@@ -364,7 +364,7 @@ describe("TimestampTest", () => {
 
   it("touching a record with a belongs to that uses a counter cache should update the parent", async () => {
     const pet = await PetCounterCacheTouch.find((pets("parrot") as any).readAttribute("pet_id"));
-    const ownerInst = await (pet as any).loadBelongsTo("owner");
+    const ownerInst = await (pet as any).owner;
     const threeDAgo = Temporal.Now.instant().subtract({ hours: 24 * 3 });
     await ownerInst.updateColumns({ happy_at: threeDAgo });
     const previousOwnerUpdatedAt = ownerInst.updated_at as RubyTime;
@@ -382,8 +382,8 @@ describe("TimestampTest", () => {
 
   it("touching a record touches parent record and grandparent record", async () => {
     const toy = await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"));
-    const pet = await (toy as any).loadBelongsTo("pet");
-    const ownerInst = await pet.loadBelongsTo("owner");
+    const pet = await (toy as any).pet;
+    const ownerInst = await pet.owner;
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
     await ownerInst.updateColumns({ updated_at: time });
@@ -408,10 +408,10 @@ describe("TimestampTest", () => {
 
   it("changing parent of a record touches both new and old parent record", async () => {
     const toy1 = (await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"))) as any;
-    const oldPet = await toy1.loadBelongsTo("pet");
+    const oldPet = await toy1.pet;
 
     const toy2 = (await ToyTouchPet.find((toys("doll") as any).readAttribute("toy_id"))) as any;
-    const newPet = await toy2.loadBelongsTo("pet");
+    const newPet = await toy2.pet;
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
     await oldPet.updateColumns({ updated_at: time });
@@ -465,7 +465,7 @@ describe("TimestampTest", () => {
 
   it("clearing association touches the old record", async () => {
     const toy = (await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"))) as any;
-    const pet = await toy.loadBelongsTo("pet");
+    const pet = await toy.pet;
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
     await pet.updateColumns({ updated_at: time });

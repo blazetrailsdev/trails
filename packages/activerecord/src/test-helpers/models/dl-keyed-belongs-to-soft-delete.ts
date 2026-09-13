@@ -3,9 +3,6 @@ import { Base } from "../../base.js";
 
 export class DlKeyedBelongsToSoftDelete extends Base {
   declare destroyAsyncParentSoftDelete: DestroyAsyncParentSoftDelete | null;
-  declare loadBelongsTo: (
-    name: "destroyAsyncParentSoftDelete",
-  ) => Promise<DestroyAsyncParentSoftDelete | null>;
   declare deleted: boolean;
   declare destroy_async_parent_soft_delete_id: number;
 

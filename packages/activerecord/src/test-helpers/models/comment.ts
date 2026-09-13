@@ -6,7 +6,6 @@ import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
 import type { FirstPost } from "./post.js";
 import type { Post } from "./post.js";
-import type { PostThatLoadsCommentsInAnAfterSaveHook } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
@@ -47,14 +46,6 @@ export class Comment extends Base {
   declare childBang: () => Promise<true | undefined>;
   declare static child: () => Relation<Comment>;
   declare static notChild: () => Relation<Comment>;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
   declare body: string;
   declare children_count: number | null;
   declare comments: number;
@@ -146,16 +137,6 @@ export class Comment extends Base {
 export class SpecialComment extends Comment {
   declare ordinaryPost: Post | null;
   declare author: Author | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Author | null>;
 
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
@@ -168,41 +149,11 @@ export class SpecialComment extends Comment {
   }
 }
 
-export class SubSpecialComment extends SpecialComment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Author | null>;
-}
+export class SubSpecialComment extends SpecialComment {}
 
-export class VerySpecialComment extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
-}
+export class VerySpecialComment extends Comment {}
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "post") => Promise<PostThatLoadsCommentsInAnAfterSaveHook | null>);
-
   static {
     this.belongsTo("post", {
       className: "PostThatLoadsCommentsInAnAfterSaveHook",
@@ -217,15 +168,6 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
 
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
   declare developer: Developer | null;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>) &
-    ((name: "developer") => Promise<Developer | null>);
 
   static {
     this.defaultScope((q: any) =>
@@ -236,15 +178,6 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
 }
 
 export class CommentWithAfterCreateUpdate extends Comment {
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "author") => Promise<Base | null>) &
-    ((name: "resource") => Promise<Base | null>) &
-    ((name: "origin") => Promise<Base | null>) &
-    ((name: "company") => Promise<Company | null>) &
-    ((name: "firstPost") => Promise<FirstPost | null>) &
-    ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
-    ((name: "parent") => Promise<Comment | null>);
-
   static {
     this.afterCreate(async function (this: any) {
       await this.update({ body: "bar" });

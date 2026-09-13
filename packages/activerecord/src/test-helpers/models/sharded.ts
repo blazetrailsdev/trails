@@ -29,8 +29,6 @@ export class ShardedBlogPost extends Base {
   declare tags: AssociationProxy<ShardedTag>;
   declare commentsWithCompositePk: AssociationProxy<ShardedComment>;
   declare commentsWithInverse: AssociationProxy<ShardedComment>;
-  declare loadBelongsTo: ((name: "parent") => Promise<Base | null>) &
-    ((name: "blog") => Promise<ShardedBlog | null>);
   declare blog_id: number;
   declare parent_id: number;
   declare parent_type: string;
@@ -96,10 +94,6 @@ export class ShardedComment extends Base {
   declare blogPostById: ShardedBlogPost | null;
   declare blogPostWithInverse: ShardedBlogPost | null;
   declare blog: ShardedBlog | null;
-  declare loadBelongsTo: ((name: "blogPost") => Promise<ShardedBlogPost | null>) &
-    ((name: "blogPostById") => Promise<ShardedBlogPost | null>) &
-    ((name: "blogPostWithInverse") => Promise<ShardedBlogPost | null>) &
-    ((name: "blog") => Promise<ShardedBlog | null>);
   declare blog_id: number;
   declare blog_post_id: number;
   declare body: string;
@@ -147,8 +141,6 @@ export class ShardedTag extends Base {
 export class ShardedBlogPostTag extends Base {
   declare blogPost: ShardedBlogPost | null;
   declare tag: ShardedTag | null;
-  declare loadBelongsTo: ((name: "blogPost") => Promise<ShardedBlogPost | null>) &
-    ((name: "tag") => Promise<ShardedTag | null>);
 
   static _tableName = "sharded_blog_posts_tags";
 

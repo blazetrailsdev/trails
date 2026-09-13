@@ -7,11 +7,6 @@ export class Sponsor extends Base {
   declare sponsor: Base | null;
   declare thing: Base | null;
   declare sponsorableWithConditions: Base | null;
-  declare loadBelongsTo: ((name: "sponsorClub") => Promise<Club | null>) &
-    ((name: "sponsorable") => Promise<Base | null>) &
-    ((name: "sponsor") => Promise<Base | null>) &
-    ((name: "thing") => Promise<Base | null>) &
-    ((name: "sponsorableWithConditions") => Promise<Base | null>);
   declare club_id: number;
   declare sponsor_id: number;
   declare sponsor_type: string;

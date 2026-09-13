@@ -26,8 +26,8 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
 
   it("sync access returns the record (no throw) once loaded", async () => {
     const ship = await Ship.create({ name: "Loaded Ship", developer_id: developers("david").id });
+    await ship.developer;
     ship.strictLoadingBang();
-    await ship.loadBelongsTo("developer");
     expect(() => (ship as any).developer).not.toThrow();
     const dev = (ship as any).developer as Developer;
     expect(dev.id).toBe(developers("david").id);

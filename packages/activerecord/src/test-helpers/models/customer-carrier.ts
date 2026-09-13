@@ -5,8 +5,6 @@ import { Base } from "../../base.js";
 export class CustomerCarrier extends Base {
   declare customer: Customer | null;
   declare carrier: Carrier | null;
-  declare loadBelongsTo: ((name: "customer") => Promise<Customer | null>) &
-    ((name: "carrier") => Promise<Carrier | null>);
   declare carrier_id: number;
   declare customer_id: number;
 

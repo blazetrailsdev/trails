@@ -8,10 +8,6 @@ export class Essay extends Base {
   declare writer: Base | null;
   declare category: Category | null;
   declare owner: Owner | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "writer") => Promise<Base | null>) &
-    ((name: "category") => Promise<Category | null>);
-  declare loadHasOne: (name: "owner") => Promise<Owner | null>;
   declare author_id: string;
   declare book_id: number;
   declare category_id: string;

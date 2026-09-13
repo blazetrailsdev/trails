@@ -6,7 +6,6 @@ import { Base } from "../../base.js";
 export class Speedometer extends Base {
   declare dashboard: Dashboard | null;
   declare minivans: AssociationProxy<Minivan>;
-  declare loadBelongsTo: (name: "dashboard") => Promise<Dashboard | null>;
   declare dashboard_id: string;
   declare name: string;
   declare speedometer_id: string;

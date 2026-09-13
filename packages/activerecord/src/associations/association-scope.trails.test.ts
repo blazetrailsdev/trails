@@ -51,7 +51,6 @@ describe("AssociationScope", () => {
       declare as_author_id: number | null;
       declare title: string | null;
       declare as_author: AsAuthor | null;
-      declare loadBelongsTo: (name: "as_author") => Promise<AsAuthor | null>;
 
       static {
         this.attribute("id", "integer");
@@ -360,7 +359,6 @@ describe("AssociationScope", () => {
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
     class AsOneOwner extends Base {
       declare as_one_image: AsOneImage | null;
-      declare loadHasOne: (name: "as_one_image") => Promise<AsOneImage | null>;
 
       static {
         this.attribute("id", "integer");
@@ -401,7 +399,6 @@ describe("AssociationScope", () => {
       declare commentable_id: number | null;
       declare commentable_type: string | null;
       declare commentable: Base | null;
-      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "integer");
@@ -471,7 +468,6 @@ describe("AssociationScope", () => {
       declare commentable_id: string | null;
       declare commentable_type: string | null;
       declare commentable: Base | null;
-      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
 
       static {
         this.attribute("commentable_id", "string");
@@ -516,7 +512,6 @@ describe("AssociationScope", () => {
       declare cc_tag_id: number | null;
       declare active: boolean | null;
       declare cc_tag: CcTag | null;
-      declare loadBelongsTo: (name: "cc_tag") => Promise<CcTag | null>;
 
       static {
         this.attribute("cc_author_id", "integer");
@@ -568,7 +563,7 @@ describe("AssociationScope", () => {
 
   it.skip("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {});
 
-  it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
+  it("hasOne reader through with hasOne source routes via AssociationScope and returns one record", async () => {
     const member = await Member.create({ name: "Alice" });
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
@@ -592,7 +587,7 @@ describe("AssociationScope", () => {
     expect(comments.map((c) => c.body).sort()).toEqual(["first", "second"]);
   });
 
-  it("loadHasOne through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
+  it("hasOne reader through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
     const member = await Member.create({ name: "Alice" });
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
@@ -641,8 +636,6 @@ describe("AssociationScope", () => {
     class HotUser extends Base {
       declare hot_account: HotAccount | null;
       declare hot_settings: HotSettings | null;
-      declare loadHasOne: ((name: "hot_account") => Promise<HotAccount | null>) &
-        ((name: "hot_settings") => Promise<HotSettings | null>);
 
       static {
         this.attribute("id", "integer");
@@ -659,7 +652,6 @@ describe("AssociationScope", () => {
     class HotAccount extends Base {
       declare hot_user_id: number | null;
       declare hot_settings: HotSettings | null;
-      declare loadHasOne: (name: "hot_settings") => Promise<HotSettings | null>;
 
       static {
         this.attribute("id", "integer");
@@ -720,7 +712,6 @@ describe("AssociationScope", () => {
       declare through_author_id: number | null;
       declare through_post_id: number | null;
       declare through_post: ThroughPost | null;
-      declare loadBelongsTo: (name: "through_post") => Promise<ThroughPost | null>;
 
       static {
         this.attribute("through_author_id", "integer");
@@ -765,7 +756,6 @@ describe("AssociationScope", () => {
       declare children: AssociationProxy<PstGallery>;
       declare imageable: Base | null;
       declare imageables: AssociationProxy<PstGallery>;
-      declare loadBelongsTo: (name: "imageable") => Promise<Base | null>;
 
       static {
         this._tableName = "pst_galleries";

@@ -2,7 +2,6 @@ import { Base } from "../../base.js";
 
 export class Wheel extends Base {
   declare wheelable: Base | null;
-  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
   declare size: number;
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -20,7 +19,6 @@ export class WheelPolymorphicTouch extends Base {
   declare wheelable: Base | null;
   declare wheelable_id: number;
   declare wheelable_type: string;
-  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
 
   static {
     this.tableName = "wheels";

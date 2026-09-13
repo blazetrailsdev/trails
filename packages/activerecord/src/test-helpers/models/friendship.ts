@@ -8,11 +8,6 @@ export class Friendship extends Base {
   declare follower: Person | null;
   declare friendFavoriteReferenceJob: Job | null;
   declare followerFavoriteReferenceJob: Job | null;
-  declare loadBelongsTo: ((name: "friend") => Promise<Person | null>) &
-    ((name: "friendToo") => Promise<Person | null>) &
-    ((name: "follower") => Promise<Person | null>);
-  declare loadHasOne: ((name: "friendFavoriteReferenceJob") => Promise<Job | null>) &
-    ((name: "followerFavoriteReferenceJob") => Promise<Job | null>);
   declare follower_id: number;
   declare friend_id: number;
 

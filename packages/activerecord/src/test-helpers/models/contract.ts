@@ -9,9 +9,6 @@ export class Contract extends Base {
   declare developer: Developer | null;
   declare firm: Firm | null;
   declare metadata: unknown;
-  declare loadBelongsTo: ((name: "company") => Promise<Company | null>) &
-    ((name: "developer") => Promise<Developer | null>) &
-    ((name: "firm") => Promise<Firm | null>);
   declare company_id: number;
   declare count: number;
   declare developer_id: number;
@@ -60,8 +57,6 @@ export class NewContract extends Contract {
 export class SpecialContract extends Base {
   declare company: Company | null;
   declare specialDeveloper: SpecialDeveloper | null;
-  declare loadBelongsTo: ((name: "company") => Promise<Company | null>) &
-    ((name: "specialDeveloper") => Promise<SpecialDeveloper | null>);
 
   static {
     this._tableName = "contracts";

@@ -908,7 +908,7 @@ describe("RelationTest", () => {
     const postsWithLastComment = await Post.preload(":lastComment");
     const postWithLastComment = postsWithLastComment.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
-    const directLastComment = await freshPost.loadHasOne("lastComment");
+    const directLastComment = await freshPost.lastComment;
     expect(postWithLastComment.lastComment).toEqual(directLastComment);
   });
 
@@ -933,7 +933,7 @@ describe("RelationTest", () => {
     const postsEager = await Post.eagerLoad(":lastComment").order("comments.id DESC");
     const post = postsEager.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
-    const directLastComment = await freshPost.loadHasOne("lastComment");
+    const directLastComment = await freshPost.lastComment;
     expect(post.lastComment!.equals(directLastComment)).toBe(true);
   });
 
@@ -1437,8 +1437,8 @@ describe("RelationTest", () => {
     const comment = await Comment.where({ post: welcome, author: david }).createBang({
       body: "hello",
     });
-    const loadedAuthor = await (comment as any).loadBelongsTo("author");
-    const loadedPost = await (comment as any).loadBelongsTo("post");
+    const loadedAuthor = await (comment as any).author;
+    const loadedPost = await (comment as any).post;
     expect(loadedAuthor).toBeInstanceOf(Author);
     expect(Number(loadedAuthor.id)).toBe(Number(david.id));
     expect(loadedPost).toBeInstanceOf(Post);
@@ -1776,7 +1776,7 @@ describe("RelationTest", () => {
     const order2 = await CpkOrder.createBang({ id: [1, 2] });
     await CpkBook.createBang({ id: [2, 1], order: order1 });
     const book = await CpkBook.findOrInitializeBy({ order: order2 });
-    const loadedOrder = await (book as any).loadBelongsTo("order");
+    const loadedOrder = await (book as any).order;
     expect(loadedOrder.shop_id).toBe((order2 as any).shop_id);
     expect(loadedOrder.id_value).toBe((order2 as any).id_value);
   });

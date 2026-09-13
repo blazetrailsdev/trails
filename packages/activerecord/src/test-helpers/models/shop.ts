@@ -29,7 +29,6 @@ export class ShopProductType extends Base {
 export class ShopProduct extends Base {
   declare variants: AssociationProxy<ShopVariant>;
   declare "type": ShopProductType | null;
-  declare loadBelongsTo: (name: "type") => Promise<ShopProductType | null>;
 
   static {
     this.tableName = "products";

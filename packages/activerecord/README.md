@@ -279,17 +279,14 @@ In Rails, reading an unloaded `belongs_to`/`has_one` lazily fires a query
 **synchronously**. JavaScript can't do a synchronous DB read, so trails splits
 the behavior:
 
-- **The sync reader `post.author` does NOT query.** It returns the currently
-  loaded or preloaded record, or `null` if the association hasn't been loaded.
-  It will never issue a lazy query the way Rails does.
-- **To actually load, `await` the per-macro loader** — `loadBelongsTo(name)` /
-  `loadHasOne(name)` — or preload up front with `.includes(...)`:
+- **The reader `post.author` returns the loaded or preloaded record
+  synchronously.** When the association isn't loaded yet, it returns a
+  `Promise` that runs the query — so `await post.author` always works:
 
 ```ts
 const post = await Post.find(1);
 
-post.author; // null — not loaded yet (no query)
-const author = await post.loadBelongsTo("author"); // queries (or returns cached/preloaded)
+const author = await post.author; // queries (or returns cached/preloaded)
 post.author; // now the loaded Author
 
 // or preload, so the sync read is safe:
@@ -297,14 +294,10 @@ const p = await Post.includes("author").find(1);
 p.author; // Author (preloaded)
 ```
 
-- **Under strict loading, the sync reader throws.** When strict loading is
-  enabled on a record (`Post.strictLoadingByDefault = true`,
-  `record.strictLoadingBang()`, or globally), accessing an **unloaded** singular
-  association via the sync reader throws `StrictLoadingViolationError` instead of
-  silently returning `null` — pointing you at `loadBelongsTo`/`loadHasOne` or
-  `.includes(...)`. Strict loading is **off by default** (Rails parity). See
-  [`src/strict-loading-sync-reader.trails.test.ts`](src/strict-loading-sync-reader.trails.test.ts)
-  and the `loadBelongsTo` implementation in [`src/associations.ts`](src/associations.ts).
+- **Under strict loading, reading an unloaded association throws**
+  `StrictLoadingViolationError` (Rails parity). Strict loading is **off by
+  default**. See
+  [`src/strict-loading-sync-reader.trails.test.ts`](src/strict-loading-sync-reader.trails.test.ts).
 
 ### 3. `isValid()` is async
 

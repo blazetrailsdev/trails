@@ -55,11 +55,6 @@ export class Person extends Base {
   declare agentsPostsAuthors: AssociationProxy<Author>;
   declare essays: AssociationProxy<Essay>;
   declare static males: () => Relation<Person>;
-  declare loadBelongsTo: ((name: "primaryContact") => Promise<Person | null>) &
-    ((name: "number1Fan") => Promise<Person | null>);
-  declare loadHasOne: ((name: "reader") => Promise<Reader | null>) &
-    ((name: "favoriteReference") => Promise<Reference | null>) &
-    ((name: "favoriteReferenceJob") => Promise<Job | null>);
   declare best_friend_id: number;
   declare best_friend_of_id: number;
   declare born_at: RubyTime | Temporal.PlainDateTime;
@@ -192,8 +187,6 @@ export class LoosePerson extends Base {
   declare bestFriend: LoosePerson | null;
   declare bestFriendOf: LoosePerson | null;
   declare bestFriends: AssociationProxy<LoosePerson>;
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
 
   static {
     this._tableName = "people";
@@ -208,17 +201,12 @@ acceptsNestedAttributesFor(LoosePerson, "bestFriend");
 acceptsNestedAttributesFor(LoosePerson, "bestFriendOf");
 acceptsNestedAttributesFor(LoosePerson, "bestFriends");
 
-export class LooseDescendant extends LoosePerson {
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
-}
+export class LooseDescendant extends LoosePerson {}
 
 export class TightPerson extends Base {
   declare bestFriend: TightPerson | null;
   declare bestFriendOf: TightPerson | null;
   declare bestFriends: AssociationProxy<TightPerson>;
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
 
   static {
     this._tableName = "people";
@@ -232,10 +220,7 @@ acceptsNestedAttributesFor(TightPerson, "bestFriend");
 acceptsNestedAttributesFor(TightPerson, "bestFriendOf");
 acceptsNestedAttributesFor(TightPerson, "bestFriends");
 
-export class TightDescendant extends TightPerson {
-  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
-  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
-}
+export class TightDescendant extends TightPerson {}
 
 export class RichPerson extends Base {
   declare treasures: AssociationProxy<Treasure>;
@@ -268,7 +253,6 @@ export class RichPerson extends Base {
 
 export class NestedPerson extends Base {
   declare bestFriend: NestedPerson | null;
-  declare loadHasOne: (name: "bestFriend") => Promise<NestedPerson | null>;
 
   static {
     this._tableName = "people";

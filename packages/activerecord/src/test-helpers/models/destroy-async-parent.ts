@@ -10,7 +10,6 @@ export class DestroyAsyncParent extends Base {
   declare dlKeyedHasMany: AssociationProxy<DlKeyedHasMany>;
   declare dlKeyedJoin: AssociationProxy<DlKeyedJoin>;
   declare dlKeyedHasManyThrough: AssociationProxy<DlKeyedHasManyThrough>;
-  declare loadHasOne: (name: "dlKeyedHasOne") => Promise<DlKeyedHasOne | null>;
   declare name: string;
   declare parent_id: number;
   declare tags_count: number | null;

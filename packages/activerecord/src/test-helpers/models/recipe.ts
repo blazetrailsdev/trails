@@ -3,7 +3,6 @@ import { Base } from "../../base.js";
 
 export class Recipe extends Base {
   declare chef: Chef | null;
-  declare loadBelongsTo: (name: "chef") => Promise<Chef | null>;
   declare chef_id: number;
   declare hotel_id: number;
 

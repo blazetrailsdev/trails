@@ -17,12 +17,6 @@ export class Human extends Base {
   declare confusedFace: Face | null;
   declare secretInterests: AssociationProxy<Interest>;
   declare mixedCaseMonkey: MixedCaseMonkey | null;
-  declare loadHasOne: ((name: "face") => Promise<Face | null>) &
-    ((name: "autosaveFace") => Promise<Face | null>) &
-    ((name: "polymorphicFace") => Promise<Face | null>) &
-    ((name: "polymorphicFaceWithoutInverse") => Promise<Face | null>) &
-    ((name: "confusedFace") => Promise<Face | null>) &
-    ((name: "mixedCaseMonkey") => Promise<MixedCaseMonkey | null>);
 
   static _tableName = "humans";
 

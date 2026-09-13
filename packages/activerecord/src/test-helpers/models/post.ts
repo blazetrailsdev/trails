@@ -31,9 +31,6 @@ export class CategoryPost extends Base {
   declare group: Category | null;
   declare category: Category | null;
   declare post: Post | null;
-  declare loadBelongsTo: ((name: "group") => Promise<Category | null>) &
-    ((name: "category") => Promise<Category | null>) &
-    ((name: "post") => Promise<Post | null>);
 
   static {
     this._tableName = "categories_posts";
@@ -136,20 +133,6 @@ export class Post extends Base {
   declare lazyPeople: AssociationProxy<Person>;
   declare lazyReadersUnscopeSkimmers: AssociationProxy<LazyReader>;
   declare lazyPeopleUnscopeSkimmers: AssociationProxy<Person>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
   declare author_id: number;
   declare indestructible_tags_count: number | null;
   declare legacy_comments_count: number | null;
@@ -269,7 +252,9 @@ export class Post extends Base {
 
     Object.defineProperty(this.prototype, "firstComment", {
       get(this: any): Promise<string | null> {
-        return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
+        return Promise.resolve(this.association("firstComment").reader).then(
+          (c: any) => c?.body ?? null,
+        );
       },
       configurable: false,
       enumerable: false,
@@ -562,40 +547,10 @@ export class Post extends Base {
   }
 }
 
-export class SpecialPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-}
+export class SpecialPost extends Post {}
 
 export class StiPost extends Post {
   declare specialComment: SpecialComment | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>) &
-    ((name: "specialComment") => Promise<SpecialComment | null>);
 
   static {
     this.hasOne("specialComment", { className: "SpecialComment" });
@@ -603,85 +558,24 @@ export class StiPost extends Post {
 }
 
 export class AbstractStiPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.abstractClass = true;
   }
 }
 
 export class SubStiPost extends StiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>) &
-    ((name: "specialComment") => Promise<SpecialComment | null>);
-
   static {
     this._tableName = "posts";
   }
 }
 
 export class SubAbstractStiPost extends AbstractStiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this._tableName = "posts";
   }
 }
 
 export class NullPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.defaultScope((q: any) => q.none());
   }
@@ -691,8 +585,6 @@ export class FirstPost extends Base {
   declare comments: AssociationProxy<Comment>;
   declare comment: Comment | null;
   declare commentWithInverse: Comment | null;
-  declare loadHasOne: ((name: "comment") => Promise<Comment | null>) &
-    ((name: "commentWithInverse") => Promise<Comment | null>);
 
   static {
     this.inheritanceColumn = "disabled";
@@ -718,20 +610,6 @@ export class PostWithDefaultSelect extends Base {
 export class TaggedPost extends Post {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
 
   static {
     this.hasMany("taggings", (q: any) => q.rewhere({ taggable_type: "TaggedPost" }), {
@@ -754,20 +632,6 @@ export class PostWithDefaultInclude extends Base {
 
 export class PostWithSpecialCategorization extends Post {
   declare categorizations: AssociationProxy<Categorization>;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
 
   static {
     this.hasMany("categorizations", { foreignKey: "post_id" });
@@ -860,9 +724,6 @@ export class PostWithAfterCreateCallback extends Base {
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
   declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
   declare firstComment: CommentWithDefaultScopeReferencesAssociation | null;
-  declare loadHasOne: (
-    name: "firstComment",
-  ) => Promise<CommentWithDefaultScopeReferencesAssociation | null>;
 
   static {
     this.inheritanceColumn = "disabled";
@@ -885,42 +746,12 @@ export class SerializedPost extends Base {
 }
 
 export class ConditionalStiPost extends Post {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-
   static {
     this.defaultScope((q: any) => q.where({ title: "Untitled" }));
   }
 }
 
-export class SubConditionalStiPost extends ConditionalStiPost {
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "readonlyAuthor") => Promise<Author | null>) &
-    ((name: "authorWithPosts") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithSelect") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
-  declare loadHasOne: ((name: "firstComment") => Promise<Comment | null>) &
-    ((name: "lastComment") => Promise<Comment | null>) &
-    ((name: "verySpecialComment") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPost") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithPostWithJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "verySpecialCommentWithStringJoins") => Promise<VerySpecialComment | null>) &
-    ((name: "tagging") => Promise<Tagging | null>) &
-    ((name: "mainImage") => Promise<Image | null>);
-}
+export class SubConditionalStiPost extends ConditionalStiPost {}
 
 export class PostWithDestroyCallback extends Base {
   static {
@@ -936,9 +767,6 @@ export class Postesque extends Base {
   declare author: Author | null;
   declare authorWithAddress: Author | null;
   declare authorWithTheLetterA: Author | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "authorWithAddress") => Promise<Author | null>) &
-    ((name: "authorWithTheLetterA") => Promise<Author | null>);
   declare author_id: string;
   declare author_name: string;
 

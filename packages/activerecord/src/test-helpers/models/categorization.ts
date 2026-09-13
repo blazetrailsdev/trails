@@ -13,11 +13,6 @@ export class Categorization extends Base {
   declare postTaggings: AssociationProxy<Tagging>;
   declare authorUsingCustomPk: Author | null;
   declare authorsUsingCustomPk: AssociationProxy<Author>;
-  declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
-    ((name: "category") => Promise<Category | null>) &
-    ((name: "namedCategory") => Promise<Category | null>) &
-    ((name: "author") => Promise<Author | null>) &
-    ((name: "authorUsingCustomPk") => Promise<Author | null>);
   declare author_id: number;
   declare category_id: number;
   declare named_category_name: string;
@@ -50,8 +45,6 @@ export class Categorization extends Base {
 export class SpecialCategorization extends Base {
   declare author: Author | null;
   declare category: Category | null;
-  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
-    ((name: "category") => Promise<Category | null>);
 
   static {
     this._tableName = "categorizations";

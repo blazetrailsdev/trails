@@ -7,9 +7,6 @@ export class ShopAccount extends Base {
   declare customer: Customer | null;
   declare customerCarrier: CustomerCarrier | null;
   declare carrier: Carrier | null;
-  declare loadBelongsTo: ((name: "customer") => Promise<Customer | null>) &
-    ((name: "customerCarrier") => Promise<CustomerCarrier | null>);
-  declare loadHasOne: (name: "carrier") => Promise<Carrier | null>;
   declare customer_carrier_id: number;
   declare customer_id: number;
 

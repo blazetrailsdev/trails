@@ -7,7 +7,6 @@ import { Base } from "../../base.js";
 export class Message extends Base {
   declare entry: Entry | null;
   declare recipients: AssociationProxy<Recipient>;
-  declare loadHasOne: (name: "entry") => Promise<Entry | null>;
   declare subject: string;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
 

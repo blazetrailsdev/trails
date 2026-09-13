@@ -8,7 +8,6 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 export class ShipPart extends Base {
   declare ship: Ship | null;
   declare trinkets: AssociationProxy<Treasure>;
-  declare loadBelongsTo: (name: "ship") => Promise<Ship | null>;
   declare name: string;
   declare ship_id: number;
   declare updated_at: RubyTime | Temporal.PlainDateTime;

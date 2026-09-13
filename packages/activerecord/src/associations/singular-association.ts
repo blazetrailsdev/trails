@@ -99,6 +99,7 @@ export class SingularAssociation extends Association {
       }
       return this.loadTarget() as Promise<Base | null>;
     }
+    this.loadedBang();
     return this.target;
   }
 

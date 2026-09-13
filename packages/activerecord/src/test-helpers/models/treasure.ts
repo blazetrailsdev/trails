@@ -12,8 +12,6 @@ export class Treasure extends Base {
   declare ship: Ship | null;
   declare priceEstimates: AssociationProxy<PriceEstimate>;
   declare richPeople: AssociationProxy<RichPerson>;
-  declare loadBelongsTo: ((name: "looter") => Promise<Base | null>) &
-    ((name: "ship") => Promise<Ship | null>);
   declare looter_id: number;
   declare looter_type: string;
   declare name: string;

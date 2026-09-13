@@ -148,8 +148,8 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("touch account", async () => {
-    const message = await (entryWithMessage as any).loadBelongsTo("entryable");
-    const account = await (entryWithMessage as any).loadBelongsTo("account");
+    const message = await (entryWithMessage as any).entryable;
+    const account = await (entryWithMessage as any).account;
     const previousAccountUpdatedAt = account.updated_at;
     const previousEntryUpdatedAt = (entryWithMessage as any).updated_at;
     const previousMessageUpdatedAt = message.updated_at;
@@ -162,11 +162,9 @@ describe("DelegatedTypeTest", () => {
     }
 
     const reloadedEntry = await Entry.find(entryWithMessage.id!);
-    expect((await (reloadedEntry as any).loadBelongsTo("account")).updated_at).not.toEqual(
-      previousAccountUpdatedAt,
-    );
+    expect((await (reloadedEntry as any).account).updated_at).not.toEqual(previousAccountUpdatedAt);
     expect((reloadedEntry as any).updated_at).not.toEqual(previousEntryUpdatedAt);
-    expect((await (reloadedEntry as any).loadBelongsTo("entryable")).updated_at).not.toEqual(
+    expect((await (reloadedEntry as any).entryable).updated_at).not.toEqual(
       previousMessageUpdatedAt,
     );
   });

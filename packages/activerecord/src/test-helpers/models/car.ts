@@ -31,8 +31,6 @@ export class Car extends Base {
   declare static inclEngines: () => Relation<Car>;
   declare static orderUsingNewStyle: () => Relation<Car>;
   declare wheels_owned_at: RubyTime | Temporal.PlainDateTime;
-  declare loadBelongsTo: (name: "person") => Promise<Person | null>;
-  declare loadHasOne: (name: "bulb") => Promise<Bulb | null>;
   declare bulbs_count: number;
   declare created_at: RubyTime | Temporal.PlainDateTime;
   declare custom_tyres_count: number;

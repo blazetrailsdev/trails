@@ -4,8 +4,6 @@ import { Base } from "../../base.js";
 export class Order extends Base {
   declare billing: Customer | null;
   declare shipping: Customer | null;
-  declare loadBelongsTo: ((name: "billing") => Promise<Customer | null>) &
-    ((name: "shipping") => Promise<Customer | null>);
   declare billing_customer_id: number;
   declare name: string;
   declare shipping_customer_id: number;

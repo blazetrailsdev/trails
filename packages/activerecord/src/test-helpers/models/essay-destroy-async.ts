@@ -4,8 +4,6 @@ import { Base } from "../../base.js";
 export class EssayDestroyAsync extends Base {
   declare book: BookDestroyAsync | null;
   declare writer: Base | null;
-  declare loadBelongsTo: ((name: "book") => Promise<BookDestroyAsync | null>) &
-    ((name: "writer") => Promise<Base | null>);
 
   static _tableName = "essays";
 

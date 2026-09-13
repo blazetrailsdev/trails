@@ -3,7 +3,6 @@ import { throwAbort } from "@blazetrails/activesupport";
 
 export class Content extends Base {
   declare contentPosition: ContentPosition | null;
-  declare loadHasOne: (name: "contentPosition") => Promise<ContentPosition | null>;
 
   static _tableName = "content";
 
@@ -19,7 +18,6 @@ export class Content extends Base {
 
 export class ContentWhichRequiresTwoDestroyCalls extends Base {
   declare contentPosition: ContentPosition | null;
-  declare loadHasOne: (name: "contentPosition") => Promise<ContentPosition | null>;
 
   static _tableName = "content";
 
@@ -41,7 +39,6 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
 
 export class ContentPosition extends Base {
   declare content: Content | null;
-  declare loadBelongsTo: (name: "content") => Promise<Content | null>;
   declare content_id: number;
 
   static destroyedIds: number[] = [];

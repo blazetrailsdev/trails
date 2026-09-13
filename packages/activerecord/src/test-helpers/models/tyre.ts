@@ -3,7 +3,6 @@ import { Base } from "../../base.js";
 
 export class Tyre extends Base {
   declare car: Car | null;
-  declare loadBelongsTo: (name: "car") => Promise<Car | null>;
   declare car_id: number;
 
   static {

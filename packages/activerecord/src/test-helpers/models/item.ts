@@ -3,7 +3,6 @@ import { Base } from "../../base.js";
 
 export class AbstractItem extends Base {
   declare tagging: Tagging | null;
-  declare loadHasOne: (name: "tagging") => Promise<Tagging | null>;
 
   static {
     this.abstractClass = true;
