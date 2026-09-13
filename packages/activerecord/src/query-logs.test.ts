@@ -48,25 +48,35 @@ describe("QueryLogsTest", () => {
   });
 
   it("escaping good comment", () => {
-    expect((queryLogs as any).escapeSqlComment("app:foo")).toBe("app:foo");
+    expect(Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, ["app:foo"])).toBe(
+      "app:foo",
+    );
   });
 
   it("escaping good comment with custom separator", () => {
     queryLogs.tagsFormatter = "sqlcommenter";
 
-    expect((queryLogs as any).escapeSqlComment("app='foo'")).toBe("app='foo'");
+    expect(
+      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, ["app='foo'"]),
+    ).toBe("app='foo'");
   });
 
   it("escaping bad comments", () => {
-    expect((queryLogs as any).escapeSqlComment("*/; DROP TABLE USERS;/*")).toBe(
-      "* /; DROP TABLE USERS;/ *",
-    );
-    expect((queryLogs as any).escapeSqlComment("**//; DROP TABLE USERS;/*")).toBe(
-      "** //; DROP TABLE USERS;/ *",
-    );
-    expect((queryLogs as any).escapeSqlComment("* *//; DROP TABLE USERS;//* *")).toBe(
-      "* * //; DROP TABLE USERS;// * *",
-    );
+    expect(
+      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+        "*/; DROP TABLE USERS;/*",
+      ]),
+    ).toBe("* /; DROP TABLE USERS;/ *");
+    expect(
+      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+        "**//; DROP TABLE USERS;/*",
+      ]),
+    ).toBe("** //; DROP TABLE USERS;/ *");
+    expect(
+      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+        "* *//; DROP TABLE USERS;//* *",
+      ]),
+    ).toBe("* * //; DROP TABLE USERS;// * *");
   });
 
   it("basic commenting", async () => {
