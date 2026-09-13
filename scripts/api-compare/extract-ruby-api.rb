@@ -2718,7 +2718,7 @@ class ApiExtractor
 
     case inner[0]
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
-    when :@ivar then @hash_ivars.include?(inner[1]) ? "hash" : "ivar"
+    when :@ivar then @hash_ivars.include?([@namespace_stack.join("::"), inner[1]]) ? "hash" : "ivar"
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
     when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
@@ -2789,23 +2789,33 @@ class ApiExtractor
     node.each { |child| note_hash_assignments(child, assigned) if child.is_a?(Array) }
   end
 
-  # The file's ivars that are provably a Hash: every `@x = …` / `@x ||= …` in
-  # the file assigns a hash literal or a `to_hash` call, whose result Ruby's
+  # The file's ivars that are provably a Hash, keyed `[owner, name]` by the
+  # lexical class/module that assigns them: every `@x = …` / `@x ||= …` in that
+  # owner assigns a hash literal or a `to_hash` call, whose result Ruby's
   # implicit-conversion contract requires to be a Hash — `@row =
-  # fixture.to_hash` (`fixture_set/table_row.rb:69`). One other assignment
-  # anywhere in the file leaves the ivar an `ivar`.
-  def hash_typed_ivars(node, assigned = {})
-    if node.is_a?(Array)
-      if %i[assign opassign].include?(node[0]) && node[1].is_a?(Array) && node[1][0] == :var_field &&
-          node[1][1].is_a?(Array) && node[1][1][0] == :@ivar
-        name = node[1][1][1]
+  # fixture.to_hash` (`fixture_set/table_row.rb:69`). One other assignment in
+  # the same owner leaves the ivar an `ivar`, and an ivar of the same name in
+  # another class of the file is not proven by it.
+  def hash_typed_ivars(node, owner = [], assigned = {})
+    return assigned unless node.is_a?(Array)
+
+    case node[0]
+    when :class, :module
+      name = const_name(node[1])
+      body = node[0] == :class ? node[3] : node[2]
+      hash_typed_ivars(body, owner + [name], assigned) if name
+      return assigned
+    when :assign, :opassign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@ivar
+        key = [owner.join("::"), target[1][1]]
         value = node[2]
         hashy = value.is_a?(Array) && (%i[hash bare_assoc_hash].include?(value[0]) ||
           (value[0] == :call && ident_name(value[3]) == "to_hash"))
-        assigned[name] = assigned.fetch(name, true) && hashy
+        assigned[key] = assigned.fetch(key, true) && hashy
       end
-      node.each { |child| hash_typed_ivars(child, assigned) if child.is_a?(Array) }
     end
+    node.each { |child| hash_typed_ivars(child, owner, assigned) if child.is_a?(Array) }
     assigned
   end
 

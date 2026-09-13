@@ -3053,6 +3053,25 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Row#call"]).toEqual({ delete: ["hash"], "include?": ["ivar"] });
   });
 
+  it("proves a Hash ivar only within the class that assigns it", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/two.rb": `
+        class Seeded
+          def initialize
+            @row = {}
+          end
+        end
+
+        class Unseeded
+          def call(name)
+            @row.delete(name)
+          end
+        end
+      `,
+    });
+    expect(c["Unseeded#call"]).toEqual({ delete: ["ivar"] });
+  });
+
   it("records self beside the other kinds when a name is called both ways", () => {
     const c = rubyCallReceivers({
       "lib/active_support/both.rb": `
