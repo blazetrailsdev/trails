@@ -3028,13 +3028,13 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Reassigned#call"]).toEqual({ fetch: ["local"] });
   });
 
-  it("proves a Hash ivar only when every assignment in the file is a plain hash or to_hash assignment", () => {
+  it("proves a Hash ivar only when every assignment in the file is a plain to_hash assignment", () => {
     const c = rubyCallReceivers({
       "lib/active_record/row.rb": `
         class Row
           def initialize(fixture)
             @row = fixture.to_hash
-            @seen = {}
+            @seen = fixture.to_hash
             @items = compute
             @cache ||= {}
           end
@@ -3060,7 +3060,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       "lib/active_record/two.rb": `
         class Seeded
           def initialize
-            @row = {}
+            @row = fixture.to_hash
           end
         end
 
