@@ -215,19 +215,12 @@ export class Association {
 
     const association = (owner as any).association(this.reflection.name);
     const isCollection = (this.reflection as any).isCollection?.() ?? false;
-    let value: Base | Base[] | null;
     if (isCollection) {
       const currentTarget: Base[] = Array.isArray(association.target) ? association.target : [];
       const notPersistedRecords = currentTarget.filter((r) => !(r as any).isPersisted());
-      value = [...records, ...notPersistedRecords];
-      association._setTargetFromLoader(value);
+      association._setTargetFromLoader([...records, ...notPersistedRecords]);
     } else {
-      value = records[0] ?? null;
-      association._setTargetFromLoader(value);
-    }
-
-    for (const record of records) {
-      association.setInverseInstance(record);
+      association._setTargetFromLoader(records[0] ?? null);
     }
   }
 

@@ -3,7 +3,6 @@ import { Inflections, camelize } from "@blazetrails/activesupport";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
-  castEnumValue,
   detectNegativeEnumConditionsBang,
   enumTypeOf,
   EnumType,
@@ -298,7 +297,9 @@ describe("Enum subtype resolved from the reflected column type", () => {
   });
 
   it("serializes an enum label through the reflected decimal subtype", () => {
-    expect(castEnumValue(Book, "status", "written")).toEqual(new DecimalType().serialize(1));
+    expect(enumTypeOf(Book, "status")!.serialize("written")).toEqual(
+      new DecimalType().serialize(1),
+    );
   });
 
   it("serializes through the reflected subtype on the query type-caster path too", () => {
@@ -342,7 +343,9 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
 
   it("serializes labels through the reflected decimal subtype on both read paths", () => {
     const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtype;
-    expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(subtype.serialize(1));
+    expect(enumTypeOf(NumericEnum, "decimal_number")!.serialize("mid")).toEqual(
+      subtype.serialize(1),
+    );
     const caster = new MapCaster(NumericEnum);
     expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(subtype.serialize(1));
   });
@@ -372,7 +375,7 @@ describe("Enum with an undeclared type raises on the serialize path", () => {
   }
 
   it("castEnumValue raises for an enum with no column and no explicit type", async () => {
-    expect(() => castEnumValue(TypelessBook, "typeless_genre", "comic")).toThrow(
+    expect(() => enumTypeOf(TypelessBook, "typeless_genre")!.serialize("comic")).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in/,
     );
   });
