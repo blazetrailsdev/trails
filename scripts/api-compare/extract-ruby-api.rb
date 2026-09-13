@@ -2790,12 +2790,13 @@ class ApiExtractor
   end
 
   # The file's ivars that are provably a Hash, keyed `[owner, name]` by the
-  # lexical class/module that assigns them: every `@x = …` / `@x ||= …` in that
-  # owner assigns a hash literal or a `to_hash` call, whose result Ruby's
+  # lexical class/module that assigns them: every `@x = …` in that owner
+  # assigns a hash literal or a `to_hash` call, whose result Ruby's
   # implicit-conversion contract requires to be a Hash — `@row =
-  # fixture.to_hash` (`fixture_set/table_row.rb:69`). One other assignment in
-  # the same owner leaves the ivar an `ivar`, and an ivar of the same name in
-  # another class of the file is not proven by it.
+  # fixture.to_hash` (`fixture_set/table_row.rb:69`). An `@x ||= …` keeps
+  # whatever truthy value `@x` already held, so it proves nothing; it, or any
+  # other non-Hash assignment in the same owner, leaves the ivar an `ivar`. An
+  # ivar of the same name in another class of the file is not proven by it.
   def hash_typed_ivars(node, owner = [], assigned = {})
     return assigned unless node.is_a?(Array)
 
@@ -2809,8 +2810,8 @@ class ApiExtractor
       target = node[1]
       if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@ivar
         key = [owner.join("::"), target[1][1]]
-        value = node[0] == :opassign ? node[3] : node[2]
-        hashy = value.is_a?(Array) && (%i[hash bare_assoc_hash].include?(value[0]) ||
+        value = node[2]
+        hashy = node[0] == :assign && value.is_a?(Array) && (%i[hash bare_assoc_hash].include?(value[0]) ||
           (value[0] == :call && ident_name(value[3]) == "to_hash"))
         assigned[key] = assigned.fetch(key, true) && hashy
       end
