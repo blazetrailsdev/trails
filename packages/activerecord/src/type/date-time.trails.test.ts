@@ -61,7 +61,7 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
 
   it("preserves wall clock through the time zone aware wrapper", () => {
     setZone(TimeZone.find("America/New_York"));
-    const converter = TimeZoneConverter.wrap(new DateTime({ timezone: "local" }));
+    const converter = new TimeZoneConverter(new DateTime({ timezone: "local" }));
 
     const casted = converter.cast(Temporal.PlainDateTime.from("2024-01-02T12:00:00"));
 
@@ -72,7 +72,7 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
 
   it("resolves is_utc? through a wrapping range subtype", () => {
     setZone(TimeZone.find("America/New_York"));
-    const converter = TimeZoneConverter.wrap(
+    const converter = new TimeZoneConverter(
       new RangeType(new DateTime({ timezone: "local" }), "tsrange"),
     );
 

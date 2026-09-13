@@ -383,8 +383,6 @@ export class DeleteRestrictionError extends ActiveRecordError {
 
 /** @noRailsEquivalent PERMANENT */
 export class HasOnePersistedAssignmentError extends ActiveRecordError {
-  readonly association: string;
-
   constructor(association: string) {
     const cap = association.charAt(0).toUpperCase() + association.slice(1);
     super(
@@ -394,14 +392,11 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
         `\`await owner.association("${association}").writer(x)\`).`,
     );
     this.name = "HasOnePersistedAssignmentError";
-    this.association = association;
   }
 }
 
 /** @noRailsEquivalent PERMANENT */
 export class CollectionPersistedAssignmentError extends ActiveRecordError {
-  readonly association: string;
-
   constructor(association: string) {
     super(
       `Cannot assign collection association \`${association}\` by mass assignment when the ` +
@@ -410,14 +405,11 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
         `(or \`.concat(...)\` / \`.destroy(...)\`).`,
     );
     this.name = "CollectionPersistedAssignmentError";
-    this.association = association;
   }
 }
 
 /** @noRailsEquivalent PERMANENT */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
-  readonly association: string;
-
   constructor(association: string) {
     const idsName = `${singularize(association)}Ids`;
     super(
@@ -428,6 +420,5 @@ export class CollectionIdsAssignmentError extends ActiveRecordError {
         `\`await owner.association("${association}").idsWriter([...])\`).`,
     );
     this.name = "CollectionIdsAssignmentError";
-    this.association = association;
   }
 }

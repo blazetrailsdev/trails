@@ -41,12 +41,9 @@ export function foreignKeyPresent(this: ForeignAssociationHost): boolean {
 }
 
 export class ForeignAssociation {
-  foreignKeyPresent: boolean;
+  foreignKeyPresent: boolean = false;
 
-  constructor() {
-    this.foreignKeyPresent = false;
-  }
-
+  /** @missingRailsCall new — PERMANENT */
   static nullifiedOwnerAttributes(
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {

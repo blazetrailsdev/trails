@@ -21,7 +21,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
     const proxy = association<Post>(author, "posts");
-    await proxy.load();
+    await proxy.loadTarget();
     return author;
   }
 
@@ -43,7 +43,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("refuses to coerce `length` to a number", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
-    await proxy.load();
+    await proxy.loadTarget();
 
     expect(() => proxy.length > 0).toThrow(/`length` is a method on a collection/);
     expect(() => `${proxy.length}`).toThrow(/`length` is a method on a collection/);
@@ -352,7 +352,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     const author = await AuthorWithRaisingAfterRemove.create({ name: "Owner" });
     const post = await Post.create({ title: "p", body: "p", author_id: author.id as number });
     const proxy = association<Post>(author, "posts");
-    await proxy.load();
+    await proxy.loadTarget();
 
     await expect(proxy.delete(post)).rejects.toThrow("after_remove boom");
 
@@ -423,7 +423,7 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
     const author = await AuthorWithAbortingBeforeRemove.create({ name: "Owner" });
     const post = await Post.create({ title: "p", body: "p", author_id: author.id as number });
     const proxy = association<Post>(author, "posts");
-    await proxy.load();
+    await proxy.loadTarget();
 
     expect(await proxy.delete(post)).toBeUndefined();
     const reloaded = await Post.find(post.id as number);
@@ -466,7 +466,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
       tag_id: tag.id as number,
     });
     const proxy = association<Tag>(post, "tags");
-    await proxy.load();
+    await proxy.loadTarget();
 
     const result = await proxy.delete(tag);
     expect(result).toHaveLength(1);
@@ -486,7 +486,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
       tag_id: tag.id as number,
     });
     const proxy = association<Tag>(post, "tags");
-    await proxy.load();
+    await proxy.loadTarget();
 
     await expect((proxy.delete as (...r: unknown[]) => Promise<unknown>)([tag.id])).rejects.toThrow(
       /Tag.*expected/,
@@ -603,7 +603,7 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
   it("emits the pluralized aggregate message for a missing id in a loaded inverse_of collection", async () => {
     const firm = await Firm.find(companies("first_firm").id);
     const proxy = association<Base>(firm, "clientsOfFirm");
-    const clients = await proxy.load();
+    const clients = await proxy.loadTarget();
     expect(clients.length).toBeGreaterThan(0);
     const realId = clients[0].id as number;
 

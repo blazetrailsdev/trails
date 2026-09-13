@@ -145,13 +145,13 @@ export class JoinAssociation extends JoinPart {
     return joins;
   }
 
-  override isReadonly(): boolean {
+  isReadonly(): boolean {
     if (this._readonly !== undefined) return this._readonly;
     this._readonly = !!this._scopeRelation()?.readonlyValue;
     return this._readonly;
   }
 
-  override isStrictLoading(): boolean {
+  isStrictLoading(): boolean {
     if (this._strictLoading !== undefined) return this._strictLoading;
     this._strictLoading =
       !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?.strictLoadingValue;

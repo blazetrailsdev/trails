@@ -1,6 +1,5 @@
 import { _setHasOneAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { throwAbort, underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
@@ -15,10 +14,6 @@ import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-  }
-
   /** @internal */
   protected syncWrite(record: Base | null): void {
     if (record)
@@ -29,10 +24,6 @@ export class HasOneAssociation extends SingularAssociation {
       throw new HasOnePersistedAssignmentError(this.reflection.name);
     }
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
-  }
-
-  override writer(record: Base | null): void | Promise<void> {
-    return this.replace(record);
   }
 
   async handleDependency(): Promise<void> {

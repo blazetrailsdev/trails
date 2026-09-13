@@ -1,5 +1,4 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import {
   underscore,
   isAbortSignal,
@@ -25,10 +24,7 @@ export abstract class CollectionAssociation extends Association {
   /** @internal */
   callbacksFor = callbacksFor;
 
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-    this._targetStore = [];
-  }
+  override _targetStore: Base | Base[] | null = [];
 
   override get target(): Base[] {
     return this._targetStore as Base[];
@@ -449,7 +445,7 @@ export abstract class CollectionAssociation extends Association {
         this.owner as unknown as { association: (n: string) => Association }
       ).association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
-      const reader = (await assoc.reader) as Base[];
+      const reader = (await (assoc as unknown as { reader: unknown }).reader) as Base[];
       for (const source of reader) {
         const targetReflection = await (source as unknown as Record<string, unknown>)[sourceName];
         if (
@@ -525,7 +521,7 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
-  override get reader(): Promise<Base[]> {
+  get reader(): Promise<Base[]> {
     this.ensureKlassExists();
 
     return (async () => {

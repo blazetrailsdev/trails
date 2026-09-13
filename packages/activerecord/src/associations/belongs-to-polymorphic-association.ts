@@ -1,15 +1,10 @@
 import { _setBelongsToPolymorphicAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import { modelRegistry } from "../associations.js";
 import { baseClass, demodulize } from "../inheritance.js";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
 export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-  }
-
   override get klass(): typeof Base {
     const type = this.readForeignType();
     if (!type) return undefined as any;

@@ -20,17 +20,6 @@ export class ThroughAssociation extends Association {
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
 
-  constructor(
-    klass: typeof Base,
-    owners: Base[],
-    reflection: AssociationLikeReflection,
-    preloadScope?: any,
-    reflectionScope?: any,
-    associateByDefault: boolean = true,
-  ) {
-    super(klass, owners, reflection, preloadScope, reflectionScope, associateByDefault);
-  }
-
   async preloadedRecords(): Promise<Base[]> {
     if (this._throughPreloadedRecords !== undefined) return this._throughPreloadedRecords;
     const records: Base[] = [];

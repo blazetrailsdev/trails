@@ -32,14 +32,6 @@ export abstract class JoinPart {
     return this.constructor === other.constructor;
   }
 
-  isReadonly(): boolean {
-    return false;
-  }
-
-  isStrictLoading(): boolean {
-    return false;
-  }
-
   each(fn: (part: JoinPart) => void): void {
     fn(this);
     for (const child of this.children) {

@@ -150,7 +150,7 @@ export function findParameterPosition(multiparameterName: string): number {
   return match ? parseInt(match[1], 10) : 0;
 }
 
-export const InstanceMethods = {
+export const AttributeAssignment = {
   _assignAttributes,
   assignNestedParameterAttributes,
   assignMultiparameterAttributes,

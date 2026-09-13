@@ -13,6 +13,8 @@ function _guardKey(association: unknown): string {
   if (typeof association === "string") return association;
   if (association && typeof (association as any).name === "string")
     return (association as any).name;
+  if (association && typeof (association as any).reflection?.name === "string")
+    return (association as any).reflection.name;
   return String(association);
 }
 

@@ -45,27 +45,6 @@ export class ColumnNotSerializableError extends Error {
   }
 }
 
-export class ColumnSerializer {
-  readonly attribute: string;
-  readonly coder: { dump(value: unknown): string; load(raw: unknown): unknown };
-
-  constructor(
-    attribute: string,
-    coder: { dump(value: unknown): string; load(raw: unknown): unknown },
-  ) {
-    this.attribute = attribute;
-    this.coder = coder;
-  }
-
-  dump(value: unknown): string {
-    return this.coder.dump(value);
-  }
-
-  load(raw: unknown): unknown {
-    return this.coder.load(raw);
-  }
-}
-
 /** @internal */
 export function isTypeIncompatibleWithSerialize(
   castType: unknown,

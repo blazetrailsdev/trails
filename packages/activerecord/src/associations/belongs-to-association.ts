@@ -1,6 +1,5 @@
 import { _setBelongsToAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
@@ -10,10 +9,6 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 
 export class BelongsToAssociation extends SingularAssociation {
   private _updated = false;
-
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-  }
 
   /** @missingRailsCall fetch — PERMANENT */
   async handleDependency(): Promise<void> {

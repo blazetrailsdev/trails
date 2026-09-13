@@ -1,6 +1,5 @@
 import { _setHasOneThroughAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import { RecordInvalid } from "../validations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
@@ -25,10 +24,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   private _pendingUnloadedThroughReconcile = false;
 
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
-  }
-
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   override reset(): void {
     super.reset();
     this._pendingReplace = null;
@@ -85,6 +81,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return false;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
   override writer(record: Base | null): void | Promise<void> {
     const assigned = this.replace(record);
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {

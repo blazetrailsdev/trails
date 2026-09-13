@@ -70,10 +70,6 @@ export class Association {
     this.disableJoins = this.reflection.options.disableJoins || false;
   }
 
-  get name(): string {
-    return this.reflection.name;
-  }
-
   get options(): AssociationOptions {
     return this.reflection.options;
   }
@@ -384,10 +380,6 @@ export class Association {
 
   isCollection(): boolean {
     return false;
-  }
-
-  get reader(): Base | Base[] | null | Promise<Base | Base[] | null> {
-    return this.target;
   }
 
   protected staleState(): unknown {

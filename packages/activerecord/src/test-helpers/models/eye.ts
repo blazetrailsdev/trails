@@ -2,7 +2,12 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
-  return Promise.resolve(eye.association(name).reader as T | null | Promise<T | null>);
+  return Promise.resolve(
+    (eye.association(name) as unknown as { reader: unknown }).reader as
+      | T
+      | null
+      | Promise<T | null>,
+  );
 }
 
 export class Eye extends Base {
