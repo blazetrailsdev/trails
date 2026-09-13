@@ -54,8 +54,12 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     await Ticket.loadSchema();
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeDefined();
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
+    Ticket.columnNames();
+    expect(own<unknown>(Ticket, "_columnNamesMemo")).toBeDefined();
 
     reloadSchemaFromCache.call(Shape as never);
+
+    expect(own<unknown>(Ticket, "_columnNamesMemo")).toBeUndefined();
 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
