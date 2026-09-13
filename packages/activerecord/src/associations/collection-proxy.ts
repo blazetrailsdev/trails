@@ -10,7 +10,7 @@ import {
   type CallbackHost,
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
-import { collectionProxyClassFor, wrapWithScopeProxy } from "../relation/delegation.js";
+import { relationClassFor, wrapWithScopeProxy } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 import { stripThenable } from "../relation/thenable.js";
@@ -188,7 +188,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     assocDef: AssociationDefinition,
   ): CollectionProxy<T> {
     const targetModel = this._targetModelFor(record, assocName, assocDef);
-    const Ctor = collectionProxyClassFor(targetModel);
+    const Ctor = relationClassFor.call(CollectionProxy, targetModel);
     const association = record.association(assocName) as unknown as CollectionAssociation;
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }

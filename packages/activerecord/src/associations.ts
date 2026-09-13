@@ -8,8 +8,7 @@ import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,
   delegateEnumerableMethod,
-  classMethodDelegator,
-  uncacheableMethods,
+  methodMissing,
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
 } from "./relation/delegation.js";
@@ -762,10 +761,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        if (!uncacheableMethods().has(prop)) {
-          modelClass.generateRelationMethod(prop);
-        }
-        return (...args: any[]) => classMethodDelegator(prop).apply(scope, args);
+        return (...args: any[]) => methodMissing.call(scope, prop, ...args);
       }
 
       return scopeVal;

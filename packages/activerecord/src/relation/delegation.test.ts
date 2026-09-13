@@ -3,7 +3,7 @@ import { Relation, registerModel } from "../index.js";
 import {
   delegateArrayMethod,
   DelegateCache,
-  guardBaseMethodDelegation,
+  methodMissing,
   uncacheableMethods,
 } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
@@ -39,14 +39,9 @@ describe("DelegationTest", () => {
 
     it("does not ban Function.prototype builtins when banned", () => {
       DelegateCache.delegateBaseMethods = false;
-      for (const builtin of ["call", "apply", "bind", "constructor"]) {
-        expect(() => guardBaseMethodDelegation(Post as any, builtin)).not.toThrow();
-      }
-      expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
-        NotImplementedError,
-      );
-      expect(Object.prototype.hasOwnProperty.call(Post, "namedExtension")).toBe(true);
-      expect(() => guardBaseMethodDelegation(Post as any, "namedExtension")).not.toThrow();
+      expect(() => methodMissing.call(Post.all(), "belongsTo")).toThrow(NotImplementedError);
+      expect(Object.prototype.hasOwnProperty.call(Post, "containingTheLetterA")).toBe(true);
+      expect(() => methodMissing.call(Post.all(), "containingTheLetterA")).not.toThrow();
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {

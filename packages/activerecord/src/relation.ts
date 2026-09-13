@@ -32,7 +32,7 @@ import {
   wrapWithScopeProxy,
   relationClassFor,
   create as _delegationCreate,
-  DelegationMethods,
+  Delegation,
   type ToSentenceOptions,
   type ToXmlOptions,
 } from "./relation/delegation.js";
@@ -1735,7 +1735,7 @@ export class Relation<T extends Base> {
   }
 
   clone(): Relation<T> {
-    const ctor = relationClassFor(this._model as unknown as typeof Base);
+    const ctor = relationClassFor.call(Relation, this._model as unknown as typeof Base);
     const rel = new ctor(this._model) as Relation<T>;
     rel.initializeCopy(this);
     return wrapWithScopeProxy(rel);
@@ -2129,7 +2129,7 @@ export interface Relation<T extends Base> {
   sanitizeSqlLike(value: string, escapeChar?: string): string;
 }
 
-include(Relation, DelegationMethods);
+include(Relation, Delegation);
 include(Relation, Explain);
 include(Relation, Batches);
 include(Relation, QueryMethods);

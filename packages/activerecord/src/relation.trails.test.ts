@@ -9,7 +9,7 @@ import { FinderMethods } from "./relation/finder-methods.js";
 import { Calculations } from "./relation/calculations.js";
 import { Batches } from "./relation/batches.js";
 import { Explain } from "./explain.js";
-import { DelegationMethods } from "./relation/delegation.js";
+import { Delegation } from "./relation/delegation.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
@@ -784,7 +784,7 @@ describe("relation.rb:68 mixin ancestry", () => {
     ["QueryMethods", QueryMethods as unknown as Record<string, unknown>],
     ["Batches", Batches as unknown as Record<string, unknown>],
     ["Explain", Explain as unknown as Record<string, unknown>],
-    ["Delegation", DelegationMethods as unknown as Record<string, unknown>],
+    ["Delegation", Delegation as unknown as Record<string, unknown>],
   ];
 
   it("resolves a colliding method to the module highest in relation.rb:68's order", () => {
