@@ -501,6 +501,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._statements = null;
       this._endRawConnection();
       this._rawConnection = null;
+      await this._endingClient;
     });
   }
 

@@ -916,8 +916,7 @@ describe("schema dump and load", () => {
       ))!;
       expect(tables).toHaveLength(1);
     } finally {
-      sourceAdapter.disconnectBang();
-      targetAdapter.disconnectBang();
+      await Promise.all([sourceAdapter.disconnectBang(), targetAdapter.disconnectBang()]);
     }
   });
 });
@@ -2518,7 +2517,7 @@ export class CreateThings extends Migration {
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    new (
+    await new (
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
     ).BetterSQLite3Adapter({ database: dbFile }).disconnectBang();
 
