@@ -37,10 +37,7 @@ import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Relation } from "./relation.js";
 import "./relation.js";
-import {
-  generateRelationMethod as _generateRelationMethod,
-  generatedRelationMethods as _generatedRelationMethods,
-} from "./relation/delegation.js";
+import { DelegateCache } from "./relation/delegation.js";
 import { _setBase } from "./base-slot.js";
 import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
@@ -2673,10 +2670,10 @@ export class Base extends Model {
   /** @internal */
   static generateAssociationWriter = _NestedAttributes.generateAssociationWriter;
 
-  static generateRelationMethod = _generateRelationMethod;
+  static generateRelationMethod = DelegateCache.generateRelationMethod;
 
   /** @internal */
-  static generatedRelationMethods = _generatedRelationMethods;
+  static generatedRelationMethods = DelegateCache.generatedRelationMethods;
 
   static polymorphicName(): string {
     return inheritancePolymorphicName(this);

@@ -4,7 +4,7 @@ import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import { associationRelationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
+import { relationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 export class AssociationRelation<T extends Base> extends Relation<T> {
@@ -31,7 +31,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * @noRailsEquivalent PERMANENT
    */
   override clone(): Relation<T> {
-    const Ctor = associationRelationClassFor(this.model);
+    const Ctor = relationClassFor.call(AssociationRelation, this.model);
     const rel = new Ctor(this.model, this._association) as Relation<T>;
     rel.initializeCopy(this);
     return wrapWithScopeProxy(rel);
@@ -139,6 +139,6 @@ _registerRelationFamily(
   AssociationRelation as unknown as new (...a: never[]) => unknown,
 );
 setAssociationRelationFactory((klass, assoc) => {
-  const Ctor = associationRelationClassFor(klass as typeof Base);
+  const Ctor = relationClassFor.call(AssociationRelation, klass as typeof Base);
   return wrapWithScopeProxy(new Ctor(klass as typeof Base, assoc as Association));
 });

@@ -17,97 +17,29 @@ import {
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
+import { Module, NoMethodError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { _Base } from "../base-slot.js";
 import { _CollectionProxyCtor } from "../associations/collection-proxy-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
 
-type RelationCtor = new (modelClass: typeof Base, table?: any, predicateBuilder?: any) => any;
+type FamilyCtor = new (...args: any[]) => any;
 
-export interface Delegation {
-  delegatedClasses: Set<typeof Base>;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ClassSpecificRelation {}
-
-const _carrierNamePriority = new WeakMap<object, Map<string, number>>();
-
-function installOnCarrier(carrier: object, name: string, fn: AnyCallable, priority: number): void {
-  let priorities = _carrierNamePriority.get(carrier);
-  if (!priorities) {
-    priorities = new Map();
-    _carrierNamePriority.set(carrier, priorities);
-  }
-  const existing = priorities.get(name);
-  if (existing !== undefined && priority < existing) return;
-  (carrier as Record<string, AnyCallable>)[name] = fn;
-  priorities.set(name, priority);
-}
-
-export class GeneratedRelationMethods {
-  private _methods: Map<string, AnyCallable> = new Map();
-  private _carriers: { carrier: object; priority: number }[] = [];
-
-  /**
-   * @missingRailsCall define_method — PERMANENT
-   * @missingRailsCall include? — PERMANENT
-   * @missingRailsCall match? — PERMANENT
-   * @missingRailsCall scoping — PERMANENT
-   */
-  generateMethod(method: string): void {
-    if (this._methods.has(method)) return;
-    const fn = classMethodDelegator(method);
-    this._methods.set(method, fn);
-    for (const { carrier, priority } of this._carriers) {
-      installOnCarrier(carrier, method, fn, priority);
-    }
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-  includeInto(carrier: object, priority: number): void {
-    if (this._carriers.some((entry) => entry.carrier === carrier)) return;
-    this._carriers.push({ carrier, priority });
-    for (const [name, fn] of this._methods) {
-      installOnCarrier(carrier, name, fn, priority);
-    }
-  }
-}
-
-export class DelegateCache {
-  static delegateBaseMethods = true;
-
-  private _cache: Map<typeof Base, Set<string>> = new Map();
-
-  /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-  initialize(modelClass: typeof Base): void {
-    if (!this._cache.has(modelClass)) {
-      this._cache.set(modelClass, new Set());
-    }
-  }
-}
-
-const _delegatedClasses = new Set<typeof Base>();
-const _delegateCache = new DelegateCache();
-
-export function delegatedClasses(): Set<typeof Base> {
-  return _delegatedClasses;
+export function delegatedClasses(): FamilyCtor[] {
+  const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
+    _relationFamilySlot;
+  return [relation, collectionProxy, associationRelation, disableJoinsAssociationRelation].filter(
+    (klass): klass is FamilyCtor => klass !== undefined,
+  );
 }
 
 function computeUncacheableMethods(): Set<string> {
-  const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
-    _relationFamilySlot;
   const result = new Set<string>();
-  for (const klass of [
-    relation,
-    collectionProxy,
-    associationRelation,
-    disableJoinsAssociationRelation,
-  ]) {
-    if (!klass) continue;
+  for (const klass of delegatedClasses()) {
     for (const n of publicInstanceMethods(klass)) result.add(n);
   }
+  const relation = _relationFamilySlot.relation;
   if (relation) {
     for (const n of publicInstanceMethods(relation)) result.delete(n);
   }
@@ -129,177 +61,138 @@ export function uncacheableMethods(): Set<string> {
   return _uncacheableMethodsCache;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string): void {
-  if (DelegateCache.delegateBaseMethods) return;
-  for (
-    let ctor: unknown = _Base;
-    typeof ctor === "function" && ctor !== Function.prototype;
-    ctor = Object.getPrototypeOf(ctor)
-  ) {
-    if (Object.prototype.hasOwnProperty.call(ctor, prop)) {
-      // @nie disposition=TODO
-      throw new NotImplementedError(
-        "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
+const _relationDelegateCache = new WeakMap<typeof Base, Map<FamilyCtor, FamilyCtor>>();
+const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
+const _includedCarriers = new WeakMap<GeneratedRelationMethods, Record<string, unknown>[]>();
+
+export class DelegateCache {
+  static delegateBaseMethods = true;
+
+  static relationDelegateClass(this: typeof Base, klass: FamilyCtor): FamilyCtor {
+    if (!_relationDelegateCache.get(this)?.has(klass)) {
+      DelegateCache.initializeRelationDelegateCache.call(this);
+    }
+    return _relationDelegateCache.get(this)!.get(klass)!;
+  }
+
+  /** @missingRailsArgs include — PERMANENT */
+  static initializeRelationDelegateCache(this: typeof Base): void {
+    const cache = new Map<FamilyCtor, FamilyCtor>();
+    _relationDelegateCache.set(this, cache);
+    for (const klass of delegatedClasses()) {
+      const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
+      include(delegate, ClassSpecificRelation);
+      Object.defineProperty(delegate, "name", { value: klass.name, configurable: true });
+      DelegateCache.includeRelationMethods.call(this, delegate);
+      cache.set(klass, delegate);
+    }
+  }
+
+  static generateRelationMethod(this: typeof Base, method: string): void {
+    this.generatedRelationMethods().generateMethod(method);
+  }
+
+  /** @internal */
+  static includeRelationMethods(this: typeof Base, delegate: FamilyCtor): void {
+    if (!this.isBaseClass()) {
+      DelegateCache.includeRelationMethods.call(
+        Object.getPrototypeOf(this) as typeof Base,
+        delegate,
+      );
+    }
+    const mod = this.generatedRelationMethods();
+    include(delegate, mod);
+    const carriers = _includedCarriers.get(mod) ?? [];
+    carriers.push(Object.getPrototypeOf(delegate.prototype) as Record<string, unknown>);
+    _includedCarriers.set(mod, carriers);
+  }
+
+  /** @internal */
+  static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
+    let methods = _generatedRelationMethodsByModel.get(this);
+    if (!methods) {
+      methods = new GeneratedRelationMethods();
+      _generatedRelationMethodsByModel.set(this, methods);
+    }
+    return methods;
+  }
+}
+
+export class GeneratedRelationMethods extends Module {
+  /**
+   * @missingRailsCall define_method — PERMANENT
+   * @missingRailsCall include? — PERMANENT
+   * @missingRailsCall match? — PERMANENT
+   */
+  generateMethod(method: string): void {
+    if (this.moduleEval((mod) => Object.prototype.hasOwnProperty.call(mod, method))) return;
+
+    const fn = function (this: any, ...args: any[]) {
+      return scoping(this, () => this._model[method](...args));
+    };
+    this.moduleEval((mod) => {
+      mod[method] = fn;
+    });
+    for (const carrier of _includedCarriers.get(this) ?? []) carrier[method] = fn;
+  }
+}
+
+export class ClassSpecificRelation {
+  methodMissing(this: any, method: string, ...args: any[]): unknown {
+    const model = this._model as typeof Base;
+    if (rbObjRespondTo(model, method)) {
+      if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(_Base, method)) {
+        // @nie disposition=TODO
+        throw new NotImplementedError(
+          "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
+        );
+      } else if (!uncacheableMethods().has(method)) {
+        model.generateRelationMethod(method);
+      }
+
+      return scoping(this, () => (model as any)[method](...args));
+    } else {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of ${this.constructor.name}`,
       );
     }
   }
 }
 
-export function delegateBaseMethods(klass: typeof Base): void {
-  _delegatedClasses.add(klass);
-  _delegateCache.initialize(klass);
-}
-
-export function relationDelegateClass(klass: typeof Base): typeof Base {
-  _delegatedClasses.add(klass);
-  return klass;
-}
-
-/**
- * @missingRailsCall include — CONVERGEABLE delegation-relation-delegate-cache-builds-lazily
- * @missingRailsCall include_relation_methods — CONVERGEABLE delegation-relation-delegate-cache-builds-lazily
- */
-export function initializeRelationDelegateCache(): void {
-  for (const klass of _delegatedClasses) {
-    _delegateCache.initialize(klass);
-  }
-}
-
-const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
-
-/** @internal */
-export function generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
-  let methods = _generatedRelationMethodsByModel.get(this);
-  if (!methods) {
-    methods = new GeneratedRelationMethods();
-    _generatedRelationMethodsByModel.set(this, methods);
-  }
-  return methods;
-}
-
-/**
- * @internal
- * @missingRailsCall base_class? — PERMANENT
- */
-export function includeRelationMethods(modelClass: typeof Base, delegate: object): void {
-  stiCarrierChain(modelClass).forEach((ancestor, priority) => {
-    ancestor.generatedRelationMethods().includeInto(delegate, priority);
-  });
-}
-
-type FamilyCtor = new (...args: any[]) => any;
-
-function perModelCarrier(
-  cache: WeakMap<typeof Base, FamilyCtor>,
-  modelClass: typeof Base,
-  base: FamilyCtor | undefined,
-): FamilyCtor {
-  let subclass = cache.get(modelClass);
-  if (!subclass) {
-    const baseCtor = base as unknown as new (...args: never[]) => object;
-    subclass = class extends baseCtor {} as FamilyCtor;
-    Object.defineProperty(subclass, "name", {
-      value: (baseCtor as { name: string }).name,
-      configurable: true,
-    });
-    cache.set(modelClass, subclass);
-    includeRelationMethods(modelClass, subclass.prototype);
-  }
-  return subclass;
-}
-
-function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
-  const chain: (typeof Base)[] = [];
-  let current: typeof Base | null = modelClass;
-  while (current) {
-    chain.push(current);
-    if (current.isBaseClass()) break;
-    const parent = Object.getPrototypeOf(current) as unknown;
-    current = typeof parent === "function" ? (parent as typeof Base) : null;
-  }
-  return chain.reverse();
-}
-
-const _relationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
-
-/** @internal */
-export function relationClassFor(model: typeof Base): RelationCtor {
-  return perModelCarrier(
-    _relationClassByModel,
-    model,
-    _relationFamilySlot.relation,
-  ) as RelationCtor;
-}
-
 export function create(
+  this: FamilyCtor,
   model: typeof Base,
   kwargs: { table?: any; predicateBuilder?: any } = {},
 ): any {
   const { table, predicateBuilder } = kwargs;
-  return wrapWithScopeProxy(new (relationClassFor(model))(model, table, predicateBuilder));
-}
-
-const _associationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor {
-  return perModelCarrier(
-    _associationRelationClassByModel,
-    modelClass,
-    _relationFamilySlot.associationRelation,
+  return wrapWithScopeProxy(
+    new (relationClassFor.call(this, model))(model, table, predicateBuilder),
   );
 }
 
-const _disableJoinsAssociationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base): FamilyCtor {
-  return perModelCarrier(
-    _disableJoinsAssociationRelationClassByModel,
-    modelClass,
-    _relationFamilySlot.disableJoinsAssociationRelation,
-  );
+/** @internal */
+export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCtor {
+  return DelegateCache.relationDelegateClass.call(model, this);
 }
 
-const _collectionProxyClassByModel = new WeakMap<typeof Base, FamilyCtor>();
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
-  return perModelCarrier(
-    _collectionProxyClassByModel,
-    modelClass,
-    _relationFamilySlot.collectionProxy,
-  );
-}
-
-export function generateRelationMethod(this: typeof Base, method: string): void {
-  this.generatedRelationMethods().generateMethod(method);
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export function classMethodDelegator(prop: string): AnyCallable {
-  return function (this: any, ...args: any[]) {
-    const modelClass = this._model as typeof Base;
-    guardBaseMethodDelegation(modelClass, prop);
-    const classMethod = (modelClass as any)[prop] as AnyCallable;
-    const scope =
-      _CollectionProxyCtor && this instanceof _CollectionProxyCtor ? this.scope() : this;
-    const prev = ScopeRegistry.currentScope(modelClass);
-    (modelClass as any).setCurrentScope(scope);
-    let result: unknown;
-    try {
-      result = classMethod.apply(modelClass, args);
-    } catch (e) {
-      (modelClass as any).setCurrentScope(prev);
-      throw e;
-    }
-    if (result instanceof Promise) {
-      return result.finally(() => (modelClass as any).setCurrentScope(prev));
-    }
-    (modelClass as any).setCurrentScope(prev);
-    return result;
-  };
+function scoping(relation: any, block: () => unknown): unknown {
+  const model = relation._model as typeof Base;
+  const scope =
+    _CollectionProxyCtor && relation instanceof _CollectionProxyCtor ? relation.scope() : relation;
+  const prev = ScopeRegistry.currentScope(model);
+  (model as any).setCurrentScope(scope);
+  let result: unknown;
+  try {
+    result = block();
+  } catch (e) {
+    (model as any).setCurrentScope(prev);
+    throw e;
+  }
+  if (result instanceof Promise) {
+    return result.finally(() => (model as any).setCurrentScope(prev));
+  }
+  (model as any).setCurrentScope(prev);
+  return result;
 }
 
 /**
@@ -365,7 +258,7 @@ function uniqRecords(records: unknown[]): unknown[] {
   return uniq;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
 export function delegateArrayMethod(
   prop: string,
   records: () => unknown[],
@@ -393,7 +286,7 @@ function delegateArrayMethodAsync(
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
 export function delegateEnumerableMethod(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
@@ -411,21 +304,8 @@ export function delegateEnumerableMethod(
   return delegateArrayMethodAsync(prop, loadRecords);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
-  const modelRespondTo = (modelClass: object, prop: string): boolean => {
-    for (
-      let o: object | null = modelClass;
-      o !== null && o !== Function.prototype;
-      o = Object.getPrototypeOf(o) as object | null
-    ) {
-      if (Object.prototype.hasOwnProperty.call(o, prop)) {
-        return typeof (modelClass as any)[prop] === "function";
-      }
-    }
-    return false;
-  };
-
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
@@ -444,20 +324,16 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
-      if (modelRespondTo(modelClass, prop)) {
-        if (!uncacheableMethods().has(prop)) {
-          modelClass.generateRelationMethod(prop);
-        }
-        return (...args: any[]) => classMethodDelegator(prop).apply(target, args);
+      if (target.respondToMissing(prop, false)) {
+        return (...args: any[]) => target.methodMissing(prop, ...args);
       }
       return value;
     },
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
-      const modelClass = target._model as typeof Base;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return modelRespondTo(modelClass, prop);
+      return target.respondToMissing(prop, false);
     },
   });
 }
@@ -558,7 +434,7 @@ export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
   Object.keys(RECORD_DELEGATES),
 );
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
 export function delegateRecordMethodSync(
   prop: string,
   records: () => Base[],
@@ -586,8 +462,24 @@ function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
   return fn;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
-export class DelegationMethods {
+export class Delegation {
+  respondToMissing(this: any, method: string, _: boolean): boolean {
+    const model = this._model as typeof Base;
+    if (typeof (model as { respondTo?: unknown }).respondTo === "function") {
+      return rbObjRespondTo(model, method);
+    }
+    for (
+      let o: object | null = model;
+      o !== null && o !== Function.prototype;
+      o = Object.getPrototypeOf(o) as object | null
+    ) {
+      if (Object.prototype.hasOwnProperty.call(o, method)) {
+        return typeof (model as any)[method] === "function";
+      }
+    }
+    return false;
+  }
+
   async length(this: DelegationHost): Promise<number> {
     return RECORD_DELEGATES.length(await this.records()) as number;
   }
@@ -729,7 +621,7 @@ export class DelegationMethods {
   }
 }
 
-refuseImplicitCount(DelegationMethods.prototype.length);
+refuseImplicitCount(Delegation.prototype.length);
 
 function shuffleInPlace<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {

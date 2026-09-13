@@ -8,7 +8,7 @@ import {
   unionOrderClauses,
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { disableJoinsAssociationRelationClassFor } from "../relation/delegation.js";
+import { relationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
 import { WhereClause } from "../relation/where-clause.js";
 import type { ExceptKey } from "../relation/query-methods.js";
@@ -193,7 +193,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     const finalOrders = (finalOrd.orderValues?.length ?? 0) > 0 ? [1] : [];
     if (finalOrders.length === 0 && ordered) {
       if ((scope as { _isNone: boolean })._isNone) return scope;
-      const Ctor = disableJoinsAssociationRelationClassFor(klass);
+      const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, klass);
       const split =
         keyCols.length === 1
           ? new Ctor(klass, keyCols[0], joinIds as unknown[])

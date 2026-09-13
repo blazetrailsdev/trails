@@ -1,11 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import {
-  delegateArrayMethod,
-  DelegateCache,
-  guardBaseMethodDelegation,
-  uncacheableMethods,
-} from "./delegation.js";
+import { delegateArrayMethod, DelegateCache, uncacheableMethods } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { fixtures } from "../test-fixtures.js";
@@ -39,14 +34,9 @@ describe("DelegationTest", () => {
 
     it("does not ban Function.prototype builtins when banned", () => {
       DelegateCache.delegateBaseMethods = false;
-      for (const builtin of ["call", "apply", "bind", "constructor"]) {
-        expect(() => guardBaseMethodDelegation(Post as any, builtin)).not.toThrow();
-      }
-      expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
-        NotImplementedError,
-      );
-      expect(Object.prototype.hasOwnProperty.call(Post, "namedExtension")).toBe(true);
-      expect(() => guardBaseMethodDelegation(Post as any, "namedExtension")).not.toThrow();
+      expect(() => (Post.all() as any).methodMissing("belongsTo")).toThrow(NotImplementedError);
+      expect(Object.prototype.hasOwnProperty.call(Post, "containingTheLetterA")).toBe(true);
+      expect(() => (Post.all() as any).methodMissing("containingTheLetterA")).not.toThrow();
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {

@@ -1,9 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import {
-  disableJoinsAssociationRelationClassFor,
-  wrapWithScopeProxy,
-} from "./relation/delegation.js";
+import { relationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
@@ -72,7 +69,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     klass: typeof Base,
     chainWalker: () => Promise<{ relation: Relation<T> }>,
   ): DisableJoinsAssociationRelation<T> {
-    const Ctor = disableJoinsAssociationRelationClassFor(klass);
+    const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, klass);
     const relation = new Ctor(klass, "", []) as DisableJoinsAssociationRelation<T>;
     relation._chainWalker = chainWalker;
     return relation;
@@ -206,7 +203,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * @noRailsEquivalent PERMANENT
    */
   override clone(): Relation<T> {
-    const Ctor = disableJoinsAssociationRelationClassFor(this.model);
+    const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, this.model);
     const copy = new Ctor(this.model, this.key, []) as DisableJoinsAssociationRelation<T>;
     copy._adoptNormalizedState(this);
     const rel = copy as unknown as Relation<T>;

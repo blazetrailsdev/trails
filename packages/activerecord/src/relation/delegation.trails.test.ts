@@ -1,20 +1,14 @@
 import { describe, it, expect } from "vitest";
-import {
-  delegateArrayMethod,
-  relationClassFor,
-  associationRelationClassFor,
-  disableJoinsAssociationRelationClassFor,
-  collectionProxyClassFor,
-  uncacheableMethods,
-} from "./delegation.js";
+import { delegateArrayMethod, relationClassFor, uncacheableMethods } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
 import { registerModel } from "../index.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
-import "../association-relation.js";
-import "../disable-joins-association-relation.js";
+import { Relation } from "../relation.js";
+import { AssociationRelation } from "../association-relation.js";
+import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 
 const defineClassMethod = (model: object, name: string, fn: (...args: never[]) => unknown) =>
   Object.defineProperty(model, name, { value: fn, writable: true, configurable: true });
@@ -24,8 +18,11 @@ describe("generated relation methods — per-model prototype carrier", () => {
     defineClassMethod(Post, "somethingGenerated", () => "generated-result");
     Post.generateRelationMethod("somethingGenerated");
 
-    const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
-    expect(Object.prototype.hasOwnProperty.call(carrier, "somethingGenerated")).toBe(true);
+    const carrier = relationClassFor.call(Relation, Post as never).prototype as Record<
+      string,
+      unknown
+    >;
+    expect("somethingGenerated" in carrier).toBe(true);
     const rel = Post.all() as unknown as { somethingGenerated: () => string };
     expect(rel.somethingGenerated()).toBe("generated-result");
   });
@@ -33,7 +30,10 @@ describe("generated relation methods — per-model prototype carrier", () => {
   it("keeps the first generated delegator for a name (Rails' method_defined? memo)", () => {
     defineClassMethod(Post, "memoizedGenerated", () => "first");
     Post.generateRelationMethod("memoizedGenerated");
-    const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
+    const carrier = relationClassFor.call(Relation, Post as never).prototype as Record<
+      string,
+      unknown
+    >;
     const first = carrier.memoizedGenerated;
     Post.generateRelationMethod("memoizedGenerated");
 
@@ -49,7 +49,7 @@ describe("generated relation methods — per-model prototype carrier", () => {
   });
 
   it("reports the base Relation class name (per-model carrier stays anonymous)", () => {
-    const carrier = relationClassFor(Post as never);
+    const carrier = relationClassFor.call(Relation, Post as never);
     expect(carrier.name).toBe("Relation");
     expect((Post.limit(2) as unknown as { constructor: { name: string } }).constructor.name).toBe(
       "Relation",
@@ -59,28 +59,38 @@ describe("generated relation methods — per-model prototype carrier", () => {
   it("gives distinct models distinct carriers (no cross-model leakage)", () => {
     defineClassMethod(Post, "postOnly", () => "post");
     Post.generateRelationMethod("postOnly");
-    expect(relationClassFor(Post as never)).not.toBe(relationClassFor(Comment as never));
-    const commentCarrier = relationClassFor(Comment as never).prototype as Record<string, unknown>;
-    expect(Object.prototype.hasOwnProperty.call(commentCarrier, "postOnly")).toBe(false);
+    expect(relationClassFor.call(Relation, Post as never)).not.toBe(
+      relationClassFor.call(Relation, Comment as never),
+    );
+    const commentCarrier = relationClassFor.call(Relation, Comment as never).prototype as Record<
+      string,
+      unknown
+    >;
+    expect("postOnly" in commentCarrier).toBe(false);
   });
 
   it("never generates an uncacheable method onto the carrier (gate is load-bearing)", () => {
     expect("target" in CollectionProxy.prototype).toBe(true);
     const uncacheable = uncacheableMethods();
     expect(uncacheable.has("target")).toBe(true);
-    const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
+    const carrier = relationClassFor.call(Relation, Post as never).prototype as Record<
+      string,
+      unknown
+    >;
     for (const name of uncacheable) {
-      expect(Object.prototype.hasOwnProperty.call(carrier, name)).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(carrier), name)).toBe(
+        false,
+      );
     }
   });
 });
 
 describe("generated relation methods — remaining delegate-class carriers", () => {
   const allCarriersFor = (model: never) => [
-    relationClassFor(model),
-    associationRelationClassFor(model),
-    disableJoinsAssociationRelationClassFor(model),
-    collectionProxyClassFor(model),
+    relationClassFor.call(Relation, model),
+    relationClassFor.call(AssociationRelation, model),
+    relationClassFor.call(DisableJoinsAssociationRelation, model),
+    relationClassFor.call(CollectionProxy, model),
   ];
 
   it("feeds one generated method to all four per-model carriers (propagation)", () => {
@@ -90,7 +100,7 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     const fn = (carriers[0].prototype as Record<string, unknown>).sharedAcrossCarriers;
     for (const carrier of carriers) {
       const proto = carrier.prototype as Record<string, unknown>;
-      expect(Object.prototype.hasOwnProperty.call(proto, "sharedAcrossCarriers")).toBe(true);
+      expect("sharedAcrossCarriers" in proto).toBe(true);
       expect(proto.sharedAcrossCarriers).toBe(fn);
     }
   });
@@ -99,28 +109,33 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     defineClassMethod(Comment, "lateCarrierGenerated", () => "late");
     Comment.generateRelationMethod("lateCarrierGenerated");
     for (const carrier of [
-      associationRelationClassFor(Comment as never),
-      disableJoinsAssociationRelationClassFor(Comment as never),
-      collectionProxyClassFor(Comment as never),
+      relationClassFor.call(AssociationRelation, Comment as never),
+      relationClassFor.call(DisableJoinsAssociationRelation, Comment as never),
+      relationClassFor.call(CollectionProxy, Comment as never),
     ]) {
       const proto = carrier.prototype as Record<string, unknown>;
-      expect(Object.prototype.hasOwnProperty.call(proto, "lateCarrierGenerated")).toBe(true);
+      expect("lateCarrierGenerated" in proto).toBe(true);
     }
   });
 
   it("each carrier reports its base delegate class name (per-model subclass stays anonymous)", () => {
-    expect(associationRelationClassFor(Post as never).name).toBe("AssociationRelation");
-    expect(disableJoinsAssociationRelationClassFor(Post as never).name).toBe(
+    expect(relationClassFor.call(AssociationRelation, Post as never).name).toBe(
+      "AssociationRelation",
+    );
+    expect(relationClassFor.call(DisableJoinsAssociationRelation, Post as never).name).toBe(
       "DisableJoinsAssociationRelation",
     );
-    expect(collectionProxyClassFor(Post as never).name).toBe("CollectionProxy");
+    expect(relationClassFor.call(CollectionProxy, Post as never).name).toBe("CollectionProxy");
   });
 
   it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
     defineClassMethod(Company, "stiBaseGenerated", () => "base");
     Company.generateRelationMethod("stiBaseGenerated");
-    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
-    expect(Object.prototype.hasOwnProperty.call(firmCarrier, "stiBaseGenerated")).toBe(true);
+    const firmCarrier = relationClassFor.call(Relation, Firm as never).prototype as Record<
+      string,
+      unknown
+    >;
+    expect("stiBaseGenerated" in firmCarrier).toBe(true);
     expect((Firm.all() as unknown as { stiBaseGenerated: () => string }).stiBaseGenerated()).toBe(
       "base",
     );
@@ -140,11 +155,11 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {
-    expect(associationRelationClassFor(Post as never)).not.toBe(
-      associationRelationClassFor(Comment as never),
+    expect(relationClassFor.call(AssociationRelation, Post as never)).not.toBe(
+      relationClassFor.call(AssociationRelation, Comment as never),
     );
-    expect(collectionProxyClassFor(Post as never)).not.toBe(
-      collectionProxyClassFor(Comment as never),
+    expect(relationClassFor.call(CollectionProxy, Post as never)).not.toBe(
+      relationClassFor.call(CollectionProxy, Comment as never),
     );
   });
 
@@ -154,7 +169,9 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     for (const carrier of allCarriersFor(Post as never)) {
       const proto = carrier.prototype as Record<string, unknown>;
       for (const name of uncacheable) {
-        expect(Object.prototype.hasOwnProperty.call(proto, name)).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(proto), name)).toBe(
+          false,
+        );
       }
     }
   });

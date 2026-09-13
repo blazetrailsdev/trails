@@ -3,7 +3,7 @@ import { Relation } from "../relation.js";
 import { relationClassFor } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 
-const PerModelRelation = relationClassFor(Post);
+const PerModelRelation = relationClassFor.call(Relation, Post);
 
 describe("relation construction hot path", () => {
   bench("new (shared Relation)", () => {
