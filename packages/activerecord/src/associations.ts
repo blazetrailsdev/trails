@@ -8,7 +8,6 @@ import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,
   delegateEnumerableMethod,
-  methodMissing,
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
 } from "./relation/delegation.js";
@@ -758,10 +757,8 @@ function wrapCollectionProxy<T extends Base = Base>(
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
 
-      const modelClass = target.model;
-      const classMethod = modelClass[prop];
-      if (typeof classMethod === "function") {
-        return (...args: any[]) => methodMissing.call(scope, prop, ...args);
+      if (target.respondToMissing(prop)) {
+        return (...args: any[]) => scope.methodMissing(prop, ...args);
       }
 
       return scopeVal;
@@ -769,9 +766,8 @@ function wrapCollectionProxy<T extends Base = Base>(
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
-      const modelClass = target.model as typeof Base;
       if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return typeof (modelClass as any)[prop] === "function";
+      return target.respondToMissing(prop);
     },
   });
 }
