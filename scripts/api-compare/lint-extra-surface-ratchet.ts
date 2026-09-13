@@ -120,9 +120,10 @@ async function main(tighten: boolean): Promise<number> {
         grew.length > 0
           ? "\nextra-surface gate: refusing to tighten while a mark is EXCEEDED — " +
               "`--tighten` only narrows.\nRemove the added surface first, then re-run.\n"
-          : "\nextra-surface gate: refusing to tighten while a tagged-only package " +
-              "carries novel surface.\nThose packages have no mark to narrow — receipt " +
-              "the names or delete them, then re-run.\n",
+          : "\nextra-surface gate: refusing to tighten while a pinned dimension " +
+              `carries unreceipted surface (${unreceipted.map((v) => `${v.package} ${v.dimension}`).join(", ")}).\n` +
+              "A pinned dimension has no mark to narrow — receipt the names, delete them, " +
+              "or relocate a moved one to its Rails file, then re-run.\n",
       );
       return 1;
     }
@@ -142,12 +143,16 @@ async function main(tighten: boolean): Promise<number> {
         "counterpart (and, for a rowless package, every name Rails defines in another\n" +
         "`.rb`) carries a `@noRailsEquivalent <PERMANENT|CONVERGEABLE <story>>`\n" +
         "receipt at its declaration. The pin does not read the mark, so raising the\n" +
-        "row will not clear this. Add the receipt, or delete the name. See the\n" +
-        "offending names with:\n" +
-        "  pnpm parity:api:extra --package <pkg> --novel-only\n",
+        "row will not clear this. Add the receipt, delete the name, or relocate a\n" +
+        "moved name to the file mirroring its Rails `.rb`. See the offending names:\n",
     );
     for (const v of unreceipted) {
       console.error(`  + ${v.package}  ${v.dimension}: 0 → current ${v.current}`);
+      console.error(
+        v.dimension === "novel"
+          ? `      pnpm parity:api:extra --package ${v.package} --novel-only`
+          : `      pnpm parity:api:extra --package ${v.package} --verbose`,
+      );
     }
     return 1;
   }
