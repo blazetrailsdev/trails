@@ -16,7 +16,7 @@ export class ExplainSubscriber {
   start(_name: unknown, _id: unknown, _payload: ExplainPayload): void {}
 
   finish(_name: unknown, _id: unknown, payload: ExplainPayload): void {
-    if (ExplainRegistry.collectQ() && !this.ignorePayload(payload)) {
+    if (ExplainRegistry.isCollect() && !this.ignorePayload(payload)) {
       ExplainRegistry.queries.push([payload.sql!, payload.binds ?? []]);
     }
   }

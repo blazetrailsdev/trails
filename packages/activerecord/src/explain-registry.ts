@@ -11,8 +11,8 @@ export class ExplainRegistry {
     instance().collect = value;
   }
 
-  static collectQ(): boolean {
-    return instance().collectQ();
+  static isCollect(): boolean {
+    return instance().isCollect();
   }
 
   static get queries(): [string, unknown[]][] {
@@ -34,7 +34,7 @@ export class ExplainRegistry {
     return this.#queries;
   }
 
-  collectQ(): boolean {
+  isCollect(): boolean {
     return this.collect;
   }
 
