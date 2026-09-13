@@ -2565,22 +2565,11 @@ PostgreSQLAdapter.prototype.performQuery = function (
   typeCastedBinds,
   options,
 ) {
-  return pgPerformQuery
-    .call(this as never, rawConnection, sql, binds, typeCastedBinds, {
-      prepare: options.prepare,
-      notificationPayload: options.notificationPayload ?? {},
-      rowMode: "array",
-    })
-    .then((runResult) => {
-      const pgResult = new Result(
-        (runResult.fields ?? []).map((f) => f.name),
-        (runResult.rows ?? []) as unknown[][],
-      ).toArray() as unknown as pg.QueryResult;
-      for (const [key, value] of Object.entries(runResult)) {
-        Object.defineProperty(pgResult, key, { value, writable: true, configurable: true });
-      }
-      return pgResult;
-    });
+  return pgPerformQuery.call(this as never, rawConnection, sql, binds, typeCastedBinds, {
+    prepare: options.prepare,
+    notificationPayload: options.notificationPayload ?? {},
+    rowMode: "array",
+  });
 };
 
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
