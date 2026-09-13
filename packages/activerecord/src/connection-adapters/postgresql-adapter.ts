@@ -3,7 +3,7 @@ import type {
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import pg from "pg";
-import { fetch, setEnv } from "@blazetrails/ruby-compat";
+import { block, fetch, setEnv } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
@@ -394,7 +394,7 @@ export class PostgreSQLAdapter
   private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
   private _warnedOids = new Set<number>();
-  private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
+  private _caseInsensitiveCache: Record<string, boolean> | null = null;
   private _connectionConfigured = false;
   private _typeMapEagerLoaded = false;
   /** @internal */
@@ -612,42 +612,35 @@ export class PostgreSQLAdapter
     return pgLookupCastTypeFromColumn.call(this, column);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall fetch — PERMANENT
-   */
+  /** @internal */
   override async canPerformCaseInsensitiveComparisonFor(column: {
     sqlType?: string | null;
   }): Promise<boolean> {
-    const sqlType = column.sqlType ?? "";
-    if (!sqlType) {
-      this._caseInsensitiveCache.set(sqlType, false);
-      return false;
-    }
-    if (this._caseInsensitiveCache.has(sqlType)) {
-      return this._caseInsensitiveCache.get(sqlType)!;
-    }
-    const sql = `
-      SELECT (
-        exists(
-          SELECT * FROM pg_proc
-          WHERE proname = 'lower'
-            AND proargtypes = ARRAY[${this.quote(sqlType)}::regtype]::oidvector
-        ) OR exists(
-          SELECT * FROM pg_proc
-          INNER JOIN pg_cast
-            ON ARRAY[casttarget]::oidvector = proargtypes
-          WHERE proname = 'lower'
-            AND castsource = ${this.quote(sqlType)}::regtype
-        )
-      ) AS can_lower`;
-    const rawResult = (await this.internalExecute(sql, "SCHEMA", [], {
-      allowRetry: true,
-      materializeTransactions: false,
-    })) as { rows: unknown[][] };
-    const result = rawResult.rows[0][0] === true;
-    this._caseInsensitiveCache.set(sqlType, result);
-    return result;
+    this._caseInsensitiveCache ??= { citext: false };
+    const caseInsensitiveCache = this._caseInsensitiveCache;
+    return fetch<boolean | Promise<boolean>>(
+      caseInsensitiveCache,
+      column.sqlType as string,
+      block(async () => {
+        const sql = `
+          SELECT exists(
+            SELECT * FROM pg_proc
+            WHERE proname = 'lower'
+              AND proargtypes = ARRAY[${this.quote(column.sqlType)}::regtype]::oidvector
+          ) OR exists(
+            SELECT * FROM pg_proc
+            INNER JOIN pg_cast
+              ON ARRAY[casttarget]::oidvector = proargtypes
+            WHERE proname = 'lower'
+              AND castsource = ${this.quote(column.sqlType)}::regtype
+          )`;
+        const result = (await this.internalExecute(sql, "SCHEMA", [], {
+          allowRetry: true,
+          materializeTransactions: false,
+        })) as { rows: unknown[][] };
+        return (caseInsensitiveCache[column.sqlType as string] = result.rows[0][0] as boolean);
+      }),
+    );
   }
 
   /** @internal */
