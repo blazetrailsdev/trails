@@ -44,7 +44,7 @@ import { migrationArConfig } from "./migration/ar-config-source.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
+import { _Compatibility } from "./migration/compatibility-slot.js";
 import { VERSION } from "./gem-version.js";
 
 export type {
@@ -299,7 +299,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
   static forVersion(v: string | number): typeof Migration {
-    return findVersion(v) as unknown as typeof Migration;
+    return _Compatibility!.find(v) as typeof Migration;
   }
 
   static async migrate(direction: "up" | "down"): Promise<void> {
@@ -1984,7 +1984,7 @@ export class Migrator {
 }
 
 export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migration<A> {
-  static readonly VERSION = CURRENT_VERSION;
+  static readonly VERSION = `${VERSION.MAJOR}.${VERSION.MINOR}`;
 
   override async createTable(
     tableName: string,
@@ -2071,8 +2071,6 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     return t;
   }
 }
-
-registerVersion(CURRENT_VERSION, Current);
 
 export class CheckPending {
   private app: (env: Record<string, unknown>) => Promise<unknown>;

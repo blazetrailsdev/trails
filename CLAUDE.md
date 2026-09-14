@@ -797,7 +797,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Fourteen instances exist and are the only ones:
+where Ruby resolves the constant. Fifteen instances exist and are the only ones:
 
 - `activerecord/src/associations/association-class-slots.ts` — the six
   concrete association ctors `AssociationReflection#association_class` returns,
@@ -896,6 +896,12 @@ extends Association`, whose modules reach `reflection.ts` back through
 connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts`,
   whose module-scope `include(AbstractAdapter, SchemaStatements)`
   (`abstract_adapter.rb:50-56`) would read `SchemaStatements` in TDZ.
+- `activerecord/src/migration/compatibility-slot.ts` — the `Compatibility`
+  module, read by `migration.ts` for `Migration.[]` (`migration.rb:629-631`
+  names `Compatibility.find` at call time, autoloaded at `:573`). The cycle is
+  closed by `V8_0 = Current` / `class V7_2 < V8_0`
+  (`migration/compatibility.rb:32-36`), so `migration.ts` cannot import
+  `compatibility.ts` back.
 - `activerecord/src/connection-handling-slot.ts` — `DEFAULT_ENV`, read by
   `migration.ts`, `database-configurations.ts` and
   `database-configurations/database-config.ts` (`migration.rb:676,773,1341`

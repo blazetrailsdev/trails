@@ -51,11 +51,6 @@ export class EncryptedAttributeType extends ValueType {
     return this.serializeWithCurrent(value);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-encryption-moved-residue */
-  override serializeCastValue(value: unknown): unknown {
-    return this.serialize(value);
-  }
-
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldValue = rawOldValue === null ? null : this.deserialize(rawOldValue);
     return oldValue !== newValue;
