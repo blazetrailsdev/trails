@@ -890,6 +890,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("indexExists", tableName, columnName)) as boolean;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
   static get(version: string | number): typeof Migration {
     return _Compatibility!.find(version) as typeof Migration;
   }
