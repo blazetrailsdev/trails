@@ -1,4 +1,4 @@
-import { classAttribute, included } from "@blazetrails/activesupport";
+import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
 import { DelegateClass } from "@blazetrails/ruby-compat";
 
@@ -128,6 +128,14 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
       this.normalizer === (other as unknown as NormalizedValueType).normalizer &&
       castTypesEqual(this.castType, (other as unknown as NormalizedValueType).castType)
     );
+  }
+
+  eql(other: ValueType): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash([this.constructor, this.castType, this.normalizer, this.normalizeNil]);
   }
 
   private normalize(value: unknown): unknown {

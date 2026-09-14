@@ -9,6 +9,7 @@ import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
+import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
 import { _Base } from "../base-slot.js";
@@ -598,7 +599,7 @@ export class PostgreSQLAdapter
       console.warn(
         `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
       );
-      const castType = new ValueType();
+      const castType = Type.defaultValue();
       this.typeMap.registerType(oid, castType);
       return castType;
     });

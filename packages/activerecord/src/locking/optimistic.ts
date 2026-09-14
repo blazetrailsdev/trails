@@ -24,6 +24,14 @@ export class LockingType extends DelegateClass(ValueType) {
   override serialize(value: unknown): number {
     return toInt(super.serialize(value));
   }
+
+  initWith(coder: Record<string, unknown>): void {
+    this.__setobj__(coder["subtype"]);
+  }
+
+  encodeWith(coder: Record<string, unknown>): void {
+    coder["subtype"] = this.__getobj__();
+  }
 }
 
 function toInt(value: unknown): number {
