@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
-import { Base, disconnectAllBang } from "./index.js";
+import { Base } from "./index.js";
+import { disconnectAllBang } from "./active-record.js";
 import { fixtures } from "./test-fixtures.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 

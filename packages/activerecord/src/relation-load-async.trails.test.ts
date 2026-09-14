@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { FutureResult } from "./future-result.js";
+import { globalThreadPoolAsyncQueryExecutor } from "./active-record.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -22,7 +23,7 @@ describe("Relation#load_async", () => {
 
     const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
     const previous = pool.asyncExecutor;
-    pool.asyncExecutor = Base.globalThreadPoolAsyncQueryExecutor();
+    pool.asyncExecutor = globalThreadPoolAsyncQueryExecutor();
     restoreExecutor = () => {
       pool.asyncExecutor = previous;
     };

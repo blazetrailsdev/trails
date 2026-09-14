@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, disconnectAllBang, pp, RuntimeRegistry, Type. */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, pp, RuntimeRegistry, Type. */
 
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";
@@ -98,7 +98,7 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export { resetCallbacks } from "./callbacks.js";
-export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
+export { ActiveRecord } from "./ar-config.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";
 export { LockingType } from "./locking/optimistic.js";
@@ -249,10 +249,7 @@ export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { PoolConfig as _PoolConfig } from "./connection-adapters/pool-config.js";
-export async function disconnectAllBang(): Promise<void> {
-  await _PoolConfig.disconnectAllBang();
-}
+export { disconnectAllBang, isSchemaCacheIgnoredTable } from "./active-record.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {

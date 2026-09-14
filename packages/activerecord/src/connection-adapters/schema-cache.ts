@@ -7,7 +7,7 @@ import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { isSchemaCacheIgnoredTable } from "../ar-config.js";
+import { isSchemaCacheIgnoredTable } from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 

@@ -40,15 +40,6 @@ export function currentTransactionPublic(): PublicTransaction {
   return (internalTx as any).userTransaction ?? new PublicTransaction(internalTx);
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void | Promise<void> {
-  const tx = currentTransactionPublic();
-  if (tx.isClosed()) {
-    return fn();
-  }
-  return tx.afterCommit(fn);
-}
-
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: PublicTransaction) => Promise<T>,

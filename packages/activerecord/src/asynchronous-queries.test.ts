@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { setGlobalExecutorConcurrency } from "./active-record.js";
 
 describe("AsynchronousQueriesTest", () => {
   it.skip("async select all", () => {});
@@ -16,13 +17,13 @@ describe("AsynchronousExecutorTypeTest", () => {
       Base.asyncQueryExecutor = null;
 
       expect(() => {
-        Base.globalExecutorConcurrency = 8;
+        setGlobalExecutorConcurrency(8);
       }).toThrow(ArgumentError);
 
       Base.asyncQueryExecutor = "multi_thread_pool";
 
       expect(() => {
-        Base.globalExecutorConcurrency = 8;
+        setGlobalExecutorConcurrency(8);
       }).toThrow(ArgumentError);
     } finally {
       Base.asyncQueryExecutor = oldValue;

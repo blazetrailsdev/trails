@@ -148,8 +148,15 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
-import { AsyncExecutor } from "./ar-config.js";
-import { ActiveSupport, DescendantsTracker } from "@blazetrails/activesupport";
+import {
+  dbWarningsAction,
+  defaultTimezone,
+  permanentConnectionCheckout,
+  setDbWarningsAction,
+  setDefaultTimezone,
+  setPermanentConnectionCheckout,
+} from "./active-record.js";
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -658,8 +665,6 @@ interface _ConstructorAssociationWriter {
   syncIdsWrite?: (v: unknown[]) => void;
 }
 
-type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
-
 type AnyClass = abstract new (...args: never[]) => object;
 
 let _disablePreparedStatements = false;
@@ -669,15 +674,10 @@ let _databaseCli: Record<string, string | string[]> = {
   mysql: ["mysql", "mysql5"],
   sqlite: "sqlite3",
 };
-let _defaultTimezone: "utc" | "local" = "utc";
 let _writingRole = "writing";
 let _readingRole = "reading";
-let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
-let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
-let _globalExecutorConcurrency: number | null = null;
-let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
 let _raiseOnAssignToAttrReadonly = false;
@@ -767,14 +767,11 @@ export class Base extends Model {
   }
 
   static get defaultTimezone(): "utc" | "local" {
-    return _defaultTimezone;
+    return defaultTimezone();
   }
 
   static set defaultTimezone(defaultTimezone: "utc" | "local") {
-    if (defaultTimezone !== "local" && defaultTimezone !== "utc") {
-      throw new ArgumentError("default_timezone must be either :utc (default) or :local.");
-    }
-    _defaultTimezone = defaultTimezone;
+    setDefaultTimezone(defaultTimezone);
   }
 
   static get writingRole(): string {
@@ -794,40 +791,11 @@ export class Base extends Model {
   }
 
   static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
-    return _dbWarningsAction;
+    return dbWarningsAction();
   }
 
-  static set dbWarningsAction(action: DbWarningsAction) {
-    switch (action) {
-      case "ignore":
-        _dbWarningsAction = null;
-        break;
-      case "log":
-        _dbWarningsAction = (warning) => {
-          let warningMessage = `[${warning.name}] ${warning.message}`;
-          if (warning.code) warningMessage += ` (${warning.code})`;
-          (Base.logger as { warn: (msg: string) => void }).warn(warningMessage);
-        };
-        break;
-      case "raise":
-        _dbWarningsAction = (warning) => {
-          throw warning;
-        };
-        break;
-      case "report":
-        _dbWarningsAction = (warning) => {
-          ActiveSupport.errorReporter.report(warning, { handled: true });
-        };
-        break;
-      default:
-        if (typeof action === "function") {
-          _dbWarningsAction = action;
-          break;
-        }
-        throw new ArgumentError(
-          "db_warnings_action must be one of :ignore, :log, :raise, :report, or a custom proc.",
-        );
-    }
+  static set dbWarningsAction(action: Parameters<typeof setDbWarningsAction>[0]) {
+    setDbWarningsAction(action);
   }
 
   static get dbWarningsIgnore(): (string | RegExp)[] {
@@ -846,43 +814,12 @@ export class Base extends Model {
     _asyncQueryExecutor = value;
   }
 
-  /**
-   * @missingRailsArgs new — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder
-   */
-  static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
-    const concurrency = this.globalExecutorConcurrency ?? 4;
-    void concurrency;
-    return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
-  static set globalExecutorConcurrency(globalExecutorConcurrency: number | null) {
-    if (this.asyncQueryExecutor == null || this.asyncQueryExecutor === "multi_thread_pool") {
-      throw new ArgumentError(
-        "`global_executor_concurrency` cannot be set when the executor is nil or set to `:multi_thread_pool`. For multiple thread pools, please set the concurrency in your database configuration.",
-      );
-    }
-
-    _globalExecutorConcurrency = globalExecutorConcurrency;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
-  static get globalExecutorConcurrency(): number | null {
-    return (_globalExecutorConcurrency ??= null);
-  }
-
   static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
-    return _permanentConnectionCheckout;
+    return permanentConnectionCheckout();
   }
 
   static set permanentConnectionCheckout(value: true | "deprecated" | "disallowed") {
-    if (value !== true && value !== "deprecated" && value !== "disallowed") {
-      throw new ArgumentError(
-        "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
-      );
-    }
-    _permanentConnectionCheckout = value;
+    setPermanentConnectionCheckout(value);
   }
 
   static get queues(): Record<string, unknown> {
