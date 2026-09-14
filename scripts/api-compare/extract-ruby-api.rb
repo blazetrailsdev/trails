@@ -860,21 +860,20 @@ class ApiExtractor
 
   def process_defs(node)
     # def self.method_name or def obj.method_name
+    return if @scanning_umbrella
+
     _receiver = node[1]
     _dot = node[2]
     name_node = node[3]
     name = ident_name(name_node)
     return unless name
 
-    fqn = current_fqn
-    redirect_fqn = umbrella_base_redirect(fqn, true)
-    return if @scanning_umbrella && !redirect_fqn
-
     params = extract_params(find_params_defs(node))
     vis = current_visibility
     vis = :public if @current_doc_methods&.include?(name)
 
-    target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
     return unless target
 
     method_info = {
@@ -885,14 +884,10 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[5], find_params_defs(node), fqn)
-    if redirect_fqn
-      method_info[:file] = target[:file] || @current_file
-      method_info[:umbrellaConfig] = true
-    end
 
     target[:classMethods] << method_info
 
-    maybe_update_module_file(fqn, target) unless redirect_fqn
+    maybe_update_module_file(fqn, target)
   end
 
   # Update a module's or class's file to where its first method is defined, not
