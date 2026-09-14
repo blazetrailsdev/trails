@@ -397,6 +397,16 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
+    className: "FixturesResetPkSequenceTest",
+    tests: ["create fixtures resets sequences when not cached"],
+    reason:
+      "Reads create_fixtures(table_name).first.fixtures after FixtureSet.reset_cache " +
+      "(fixtures_test.rb:713-716,740-745); trails' FixtureSet has no instance form, " +
+      "fixture-set cache or reset_cache. " +
+      "CONVERGEABLE fixture-set-instance-form-and-all-loaded-fixtures.",
+  },
+  {
+    testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["binary in fixtures"],
     reason:
