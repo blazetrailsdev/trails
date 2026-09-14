@@ -636,6 +636,27 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:2943` `rb_io_path`, registered as `IO#to_path`
+   * (`io.c:15545`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#to_path`
+   * (`vendor/ruby/io.c:15545`).
+   */
+  toPath(): string | null {
+    return this.pathv;
+  }
+
+  /**
+   * `vendor/ruby/io.c:5093` `rb_io_to_io`, which answers the stream itself.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#to_io`
+   * (`vendor/ruby/io.c:5093`).
+   */
+  toIo(): this {
+    return this;
+  }
+
+  /**
    * `vendor/ruby/io.c:12121` `rb_io_s_readlines`, in its whole-file form:
    * every line of the file, each keeping its trailing separator.
    *

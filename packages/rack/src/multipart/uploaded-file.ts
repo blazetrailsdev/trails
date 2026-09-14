@@ -44,14 +44,14 @@ export class UploadedFile {
         encoding: Encoding.BINARY,
       });
       if (binary) tempfile.binmode();
-      FileUtils.copyFile(path, tempfile.path!);
+      FileUtils.copyFile(path, tempfile.path()!);
       this._tempfile = tempfile;
     }
     this.contentType = contentType;
   }
 
   get path(): string | undefined {
-    return "path" in this._tempfile ? (this._tempfile.path ?? undefined) : undefined;
+    return "path" in this._tempfile ? (this._tempfile.path() ?? undefined) : undefined;
   }
 
   get localPath(): string | undefined {

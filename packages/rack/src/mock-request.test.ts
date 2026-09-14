@@ -54,7 +54,9 @@ it("should handle :input object that does not respond to set_encoding", () => {
     read() {
       return "data";
     },
-    size: 4,
+    size() {
+      return 4;
+    },
   };
   const env = MockRequest.envFor("/", { ":input": input });
   expect(env["rack.input"].read()).toBe("data");

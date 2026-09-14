@@ -23,12 +23,12 @@ describe("StringIO", () => {
     const io = new StringIO("abc");
     io.read();
     expect(io.string()).toBe("abc");
-    expect(io.size).toBe(3);
+    expect(io.size()).toBe(3);
   });
 
   it("counts bytes, not code points, in a binary string", () => {
     const io = new StringIO("\xff");
-    expect(io.size).toBe(1);
+    expect(io.size()).toBe(1);
     expect(io.read()).toBe("\xff");
   });
 
@@ -59,7 +59,7 @@ describe("StringIO", () => {
     const buffer = String.fromCharCode(...bytes);
     const io = new StringIO(buffer);
 
-    expect(io.size).toBe(256);
+    expect(io.size()).toBe(256);
     const read = io.read();
     expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
   });

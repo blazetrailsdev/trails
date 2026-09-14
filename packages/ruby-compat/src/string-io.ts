@@ -34,7 +34,7 @@ export class StringIO {
     return this._string;
   }
 
-  get size(): number {
+  size(): number {
     return this._string.length;
   }
 

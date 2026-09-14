@@ -67,19 +67,19 @@ describe("FixtureSet", () => {
 
     it("empty file", () => {
       tmpYaml(["empty", "yml"], "", (t) => {
-        expect(File.open(t.path!, (fh) => [...fh.each()])).toEqual([]);
+        expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual([]);
       });
     });
 
     it("wrong fixture format string", () => {
       tmpYaml(["empty", "yml"], "qwerty", (t) => {
-        expect(() => File.open(t.path!, (fh) => [...fh.each()])).toThrow(FormatError);
+        expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(FormatError);
       });
     });
 
     it("wrong fixture format nested", () => {
       tmpYaml(["empty", "yml"], "one: two", (t) => {
-        expect(() => File.open(t.path!, (fh) => [...fh.each()])).toThrow(FormatError);
+        expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(FormatError);
       });
     });
 
@@ -87,7 +87,7 @@ describe("FixtureSet", () => {
       tmpYaml(["empty", "yml"], "---\n_fixture:\n  class_name: Foo\n", (t) => {
         let error!: Error;
         expect(() =>
-          File.open(t.path!, (fh) => {
+          File.open(t.path()!, (fh) => {
             try {
               return fh.modelClass;
             } catch (raised) {
@@ -108,7 +108,7 @@ describe("FixtureSet", () => {
       const yaml = "one:\n  name: <%= fixtureHelper() %>\n";
       tmpYaml(["curious", "yml"], yaml, (t) => {
         const golden = [["one", { name: "Fixture helper" }]];
-        expect(File.open(t.path!, (fh) => [...fh.each()])).toEqual(golden);
+        expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual(golden);
       });
       delete (FixtureSet.contextClass.prototype as Record<string, unknown>)["fixtureHelper"];
     });
@@ -118,8 +118,8 @@ describe("FixtureSet", () => {
       const yaml2 = "one:\n  name: <%= leakedMethod() %>\n";
       tmpYaml(["leaky", "yml"], yaml1, (t1) => {
         tmpYaml(["curious", "yml"], yaml2, (t2) => {
-          File.open(t1.path!, (fh) => [...fh.each()]);
-          expect(() => File.open(t2.path!, (fh) => [...fh.each()])).toThrow(ReferenceError);
+          File.open(t1.path()!, (fh) => [...fh.each()]);
+          expect(() => File.open(t2.path()!, (fh) => [...fh.each()])).toThrow(ReferenceError);
         });
       });
     });

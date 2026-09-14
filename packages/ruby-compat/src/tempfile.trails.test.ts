@@ -58,14 +58,14 @@ describe("Tempfile", () => {
     expect(tempfile.write("a")).toBe(1);
     tempfile.write("b");
     tempfile.close();
-    expect(File.read(tempfile.path!)).toBe("ab");
+    expect(File.read(tempfile.path()!)).toBe("ab");
     tempfile.unlink();
   });
 
   it("write reaches the file before close", () => {
     const tempfile = Tempfile.new("early");
     tempfile.write("hi");
-    expect(File.read(tempfile.path!)).toBe("hi");
+    expect(File.read(tempfile.path()!)).toBe("hi");
     tempfile.close();
     tempfile.unlink();
   });
@@ -73,7 +73,7 @@ describe("Tempfile", () => {
   it("open leaves the file in place on block exit", () => {
     let path = "";
     const value = Tempfile.open("bar", undefined, (tempfile) => {
-      path = tempfile.path!;
+      path = tempfile.path()!;
       tempfile.write("hi");
       return 7;
     });
@@ -95,7 +95,7 @@ describe("Tempfile", () => {
   it("new gives each temp file a distinct name", () => {
     const a = Tempfile.new("dup");
     const b = Tempfile.new("dup");
-    expect(a.path).not.toBe(b.path);
+    expect(a.path()).not.toBe(b.path());
     a.unlink();
     b.unlink();
   });
@@ -151,7 +151,7 @@ describe("Tempfile", () => {
     };
     try {
       const tempfile = Tempfile.new("perm");
-      expect(File.stat(tempfile.path!).mode & 0o777).toBe(0o600);
+      expect(File.stat(tempfile.path()!).mode & 0o777).toBe(0o600);
       tempfile.close();
       tempfile.unlink();
     } finally {
@@ -161,7 +161,7 @@ describe("Tempfile", () => {
 
   it("the name carries the local date, the process id and a random draw", () => {
     const tempfile = Tempfile.new("stamp");
-    const name = tempfile.path!.split("/").pop()!;
+    const name = tempfile.path()!.split("/").pop()!;
     const now = new Date();
     const t = `${String(now.getFullYear()).padStart(4, "0")}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
@@ -174,7 +174,7 @@ describe("Tempfile", () => {
   it("open reopens the closed stream at the same path and to_io answers it", () => {
     const tempfile = Tempfile.new("reopen");
     tempfile.write("thunderhorse");
-    const path = tempfile.path!;
+    const path = tempfile.path()!;
     tempfile.close();
     expect(tempfile.isClosed()).toBe(true);
 

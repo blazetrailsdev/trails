@@ -5,7 +5,7 @@ import { methodMissingProxy } from "./method-missing-proxy.js";
 type MixinBase = new (...args: any[]) => object;
 
 type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
-  __getobj__(): unknown;
+  __getobj__(): InstanceType<T>;
   __setobj__(obj: unknown): void;
 };
 
