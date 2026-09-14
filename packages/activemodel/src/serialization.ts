@@ -72,19 +72,8 @@ export function serializableHash(
         assocName,
         items.map((r) => serializableHash(r as SerializationRecord, opts, true)),
       );
-    } else if (
-      records &&
-      typeof records === "object" &&
-      ((records as unknown as SerializationRecord)._attributes ||
-        (records as unknown as SerializationRecord).attributes)
-    ) {
-      safeSet(
-        result,
-        assocName,
-        serializableHash(records as unknown as SerializationRecord, opts, true),
-      );
     } else {
-      safeSet(result, assocName, records);
+      safeSet(result, assocName, serializableHash(records as SerializationRecord, opts, true));
     }
   });
 

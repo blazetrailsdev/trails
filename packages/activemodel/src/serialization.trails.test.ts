@@ -234,7 +234,7 @@ describe("Serialization — trails-only coverage", () => {
       include: { author: { include: "comments" } },
     });
     expect(comments.loaded).toBe(true);
-    expect((result.author as { name: string }).name).toBe("Bob");
+    expect(result.author).toEqual({ comments: [{ text: "Nice" }] });
   });
 
   describe("asJson type coercion (Rails ActiveSupport::JSON parity)", () => {
