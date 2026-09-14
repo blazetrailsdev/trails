@@ -584,7 +584,7 @@ function formatFloat(
   width: number,
   prec: number,
 ): string {
-  if (conv === "f") {
+  float: if (conv === "f") {
     let num: bigint, den: bigint;
     let sign = flags & FPLUS ? 1 : 0;
     let zero = 0;
@@ -598,7 +598,7 @@ function formatFloat(
       den = val.denominator;
       num = val.numerator;
     } else {
-      return floatValue(val, conv, flags, width, prec);
+      break float;
     }
     if (!(flags & FPREC)) prec = DEFAULT_FLOAT_PRECISION;
     if (num < 0n) {
@@ -632,17 +632,6 @@ function formatFloat(
     if (fill && flags & FMINUS) buf += " ".repeat(fill);
     return buf;
   }
-  return floatValue(val, conv, flags, width, prec);
-}
-
-/** The `float_value:` label the non-exact conversions share (`vendor/ruby/sprintf.c:880`). */
-function floatValue(
-  val: unknown,
-  conv: string,
-  flags: number,
-  width: number,
-  prec: number,
-): string {
   const fval = typeof val === "bigint" ? Number(val) : kernelFloat(val);
   let sc = "";
   if (fval < 0 || Object.is(fval, -0)) sc = "-";
