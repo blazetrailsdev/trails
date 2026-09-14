@@ -36,7 +36,7 @@ describe("write-path prepared-statement binds", () => {
         typeof payload.type_casted_binds === "function"
           ? (payload.type_casted_binds as () => unknown[])()
           : (payload.type_casted_binds as unknown[])
-      ).map(String);
+      ).map((v) => (v instanceof RubyTime ? v.toS() : String(v)));
       expect(casted.some((v) => /202[45]-03-05/.test(v))).toBe(true);
     }
 
