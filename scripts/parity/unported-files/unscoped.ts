@@ -397,22 +397,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "FixturesResetPkSequenceTest",
-    tests: [
-      "create fixtures resets sequences when not cached",
-      "resets to min pk with default pk and sequence",
-      "resets to min pk with specified pk and sequence",
-    ],
-    reason:
-      "The whole class is gated on Account.lease_connection.respond_to?(:reset_pk_sequence!) " +
-      "(fixtures_test.rb:715), which is PostgreSQL-only. trails has resetPkSequenceBang on " +
-      "the PG adapter alone (postgresql/schema-statements.ts:1402); on sqlite and MySQL " +
-      "there is no sequence to reset, so the class does not run there in Rails either. " +
-      "CONVERGEABLE port-fixtures-reset-pk-sequence-cases: the method exists, so the " +
-      "adapter gate is the port rather than the exclusion.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["binary in fixtures"],
     reason:

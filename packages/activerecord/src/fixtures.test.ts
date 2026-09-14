@@ -52,6 +52,10 @@ import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
+import { Account } from "./test-helpers/models/account.js";
+import { Company } from "./test-helpers/models/company.js";
+import { accountFixtureData } from "./test-helpers/fixtures/accounts.js";
+import { companyFixtureData } from "./test-helpers/fixtures/companies.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { DeadParrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import {
@@ -805,6 +809,79 @@ describe("SetFixtureClassPrevailsTest", () => {
 
   it("uses set fixture class", () => {
     expect(badPosts("bad_welcome")).toBeInstanceOf(Post);
+  });
+});
+
+describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
+  fixtures(["accounts", "companies"], { useTransactionalTests: false });
+
+  let instances: Base[];
+
+  beforeEach(() => {
+    instances = [
+      new Account({ credit_limit: 50 }),
+      new Company({ name: "RoR Consulting" }),
+      new Course({ name: "Test" }),
+    ];
+  });
+
+  it("resets to min pk with specified pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(
+          table: string,
+          pk?: string | null,
+          sequence?: string | null,
+        ): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(
+        model.tableName,
+        model.primaryKey as string,
+        model.sequenceName,
+      );
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("resets to min pk with default pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(table: string): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(model.tableName);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("create fixtures resets sequences when not cached", async () => {
+    const fixtureData = new Map<typeof Base, Record<string, Record<string, unknown>>>([
+      [Account, accountFixtureData],
+      [Company, companyFixtureData],
+      [Course, courseFixtureData],
+    ]);
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      const created = await FixtureSet.createFixtures(
+        await model.leaseConnection(),
+        model,
+        fixtureData.get(model)!,
+      );
+      const maxId = Object.values(created).reduce((_maxId: number, fixture) => {
+        const fixtureId = Number(fixture.id);
+        return fixtureId > _maxId ? fixtureId : _maxId;
+      }, 0);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
+    }
   });
 });
 
