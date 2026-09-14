@@ -4,9 +4,9 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
-import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 function nsec(v: RubyTime): number {
   return v.nsec;
@@ -217,7 +217,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: 6 });
       });
-      const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema(adapter, "foos");
       expect(output).toMatch(/t\.datetime\("created_at",\s*\{[^}]*null:\s*false/);
       expect(output).not.toMatch(/precision/);
     },
@@ -230,7 +230,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: null });
       });
-      const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema(adapter, "foos");
       expect(output).toMatch(/t\.datetime\("created_at".*precision.*null/);
       expect(output).toMatch(/t\.datetime\("updated_at".*precision.*null/);
     },

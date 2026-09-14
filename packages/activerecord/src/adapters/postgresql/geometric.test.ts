@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Point, PointValue } from "../../connection-adapters/postgresql/oid/point.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const pointType = new Point();
 
@@ -163,7 +163,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("legacy schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_points");
+      const output = await dumpTableSchema(adapter, "postgresql_points");
       expect(output).toMatch(/t\.point\("x"\)/);
       expect(output).toMatch(/t\.point\("y",/);
       expect(output).toMatch(/t\.point\("z",/);
@@ -620,7 +620,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_geometric");
+      const output = await dumpTableSchema(adapter, "postgresql_geometric");
       expect(output).toMatch(/t\.lseg\("a_lseg"\)/);
       expect(output).toMatch(/t\.box\("a_box"\)/);
       expect(output).toMatch(/t\.path\("a_path"\)/);
@@ -660,7 +660,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping for line type", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_lines");
+      const output = await dumpTableSchema(adapter, "postgresql_lines");
       expect(output).toMatch(/t\.line\("a_line"\)/);
     });
   });

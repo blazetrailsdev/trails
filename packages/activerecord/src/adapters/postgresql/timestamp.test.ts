@@ -8,12 +8,12 @@ import {
   withPostgresqlDatetimeType,
   withNativeDatabaseTypeOverrides,
 } from "./test-helper.js";
-import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 fixtures(["topics"], { useTransactionalTests: false });
 
@@ -92,7 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_timestamps");
+      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
       expect(output).toContain("postgresql_timestamps");
       expect(output).toMatch(/t\.datetime\s*\("created_at"/);
     });
@@ -123,7 +123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("datetime schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_timestamps");
+      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
       expect(output).toContain("postgresql_timestamps");
       expect(output).toMatch(/t\.datetime/);
     });

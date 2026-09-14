@@ -1266,7 +1266,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       const filtered = Object.fromEntries(
         Object.entries(last)
           .filter(([k]) => !this.isInternalOption(k))
-          .map(([k, v]) => [`:${k}`, v]),
+          .map(([k, v]) => [`:${underscore(k)}`, v]),
       );
       if (Object.keys(filtered).length > 0) argList.push(rbInspect(filtered));
     } else {

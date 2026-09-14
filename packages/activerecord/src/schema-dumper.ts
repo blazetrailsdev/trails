@@ -258,28 +258,6 @@ export abstract class SchemaDumper {
     return this.create(pool, options).dump(stream);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-migration-area-moved-residue */
-  static dumpTableSchema(adapter: DatabaseAdapter, tableName: string): Promise<string>;
-  static dumpTableSchema(source: SchemaSource, tableName: string): Promise<string>;
-  static async dumpTableSchema(
-    source: SchemaSource | DatabaseAdapter,
-    tableName: string,
-  ): Promise<string> {
-    const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
-    let dumper: SchemaDumper;
-    if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
-      dumper = (source as any).createSchemaDumper({}) as SchemaDumper;
-    } else {
-      dumper = this.create(wrappedSource);
-    }
-    const stream = new StringIO();
-    await dumper.schemas(stream);
-    await dumper.extensions(stream);
-    await dumper.types(stream);
-    await dumper.dumpTable(stream, tableName);
-    return stream.string();
-  }
-
   async dump<S extends IO | StringIO>(stream: S): Promise<S> {
     this.header(stream);
     await this.schemas(stream);

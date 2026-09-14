@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -53,7 +53,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_collations");
+      const output = await dumpTableSchema(adapter, "postgresql_collations");
       expect(output).toMatch(/t\.string\("string_c",\s*\{\s*collation:\s*"C"\s*\}\)/);
       expect(output).toMatch(/t\.text\("text_posix",\s*\{\s*collation:\s*"POSIX"\s*\}\)/);
     });

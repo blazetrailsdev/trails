@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, registerModel } from "../../index.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -231,7 +231,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uuid schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "uuid_data_type");
+      const output = await dumpTableSchema(adapter, "uuid_data_type");
       expect(output).toContain("uuid_data_type");
       expect(output).toMatch(/t\.uuid\("guid"/);
     });
@@ -745,7 +745,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids");
+        const output = await dumpTableSchema(adapter, "pg_uuids");
         expect(output).toMatch(/createTable\("pg_uuids".*id: "uuid"/);
         expect(output).toMatch(/default: \(\) => "gen_random_uuid\(\)"/);
       } finally {
@@ -767,7 +767,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             name text
           )
         `);
-        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_2");
+        const output = await dumpTableSchema(adapter, "pg_uuids_2");
         expect(output).toMatch(
           /createTable\("pg_uuids_2".*id: "uuid".*default: \(\) => "my_uuid_generator\(\)"/,
         );
@@ -786,7 +786,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_3");
+        const output = await dumpTableSchema(adapter, "pg_uuids_3");
         expect(output).toMatch(
           /createTable\("pg_uuids_3".*id: "uuid".*default: \(\) => "gen_random_uuid\(\)"/,
         );
@@ -845,7 +845,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_nil");
+        const output = await dumpTableSchema(adapter, "pg_uuids_nil");
         expect(output).toMatch(/createTable\("pg_uuids_nil".*id: "uuid".*default: null/);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_nil`);

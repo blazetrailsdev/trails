@@ -1,13 +1,13 @@
 import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../index.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { FixtureSet } from "../../fixtures.js";
 import { fixtures } from "../../test-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -143,7 +143,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   );
 
   itIfSupports("virtual_columns", "schema dumping", async () => {
-    const output = await SchemaDumper.dumpTableSchema(adapter, "virtual_columns");
+    const output = await dumpTableSchema(adapter, "virtual_columns");
     expect(output).toMatch(
       /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"UPPER\(name\)",\s*stored:\s*true\s*\}\s*\);/i,
     );

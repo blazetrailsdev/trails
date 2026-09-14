@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class TagCollection {
   constructor(private readonly hash: Record<string, string | null>) {}
@@ -383,7 +383,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "hstores");
+      const output = await dumpTableSchema(connection, "hstores");
       expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
     });
   });

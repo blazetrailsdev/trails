@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -58,7 +58,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter as any, "virtual_columns");
+      const output = await dumpTableSchema(adapter as any, "virtual_columns");
       expect(output).toMatch(
         /t\.virtual\("upper_name", \{ type: "string", as: "(?:upper|ucase)\(`?name`?\)" \}\);/i,
       );

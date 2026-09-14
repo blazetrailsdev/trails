@@ -1,14 +1,20 @@
 import { SchemaDumper as BaseSchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import { Base } from "../base.js";
 
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 
-export async function dumpTableSchema(pool: SchemaSource, ...tables: string[]): Promise<string> {
+export async function dumpTableSchema(
+  pool: SchemaSource | DatabaseAdapter,
+  ...tables: string[]
+): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   const enumerated = pool as { dataSources?: () => Promise<string[]> };
-  const dataSources = enumerated.dataSources ? await enumerated.dataSources() : await pool.tables();
+  const dataSources = enumerated.dataSources
+    ? await enumerated.dataSources()
+    : await (pool as SchemaSource).tables();
   BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
     return (await SchemaDumper.dump(pool)).string();

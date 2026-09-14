@@ -4,7 +4,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
-import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 describe("CommentTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -136,7 +136,7 @@ describe("CommentTest", () => {
         comment: "Whoa, content describes itself!",
       });
       await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
-      const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
+      const output = await dumpTableSchema(adapter, "commenteds");
       expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
       expect(output).toMatch(
         /t\.\w+\("name"[^)]*\{[^}]*comment:\s*"Comment should help clarify the column purpose"/,
@@ -156,7 +156,7 @@ describe("CommentTest", () => {
     "comments",
     "schema dump omits blank comments",
     async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "blank_comments");
+      const output = await dumpTableSchema(adapter, "blank_comments");
       expect(output).toMatch(/createTable.*"blank_comments"/);
       expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
       for (const field of ["space_comment", "empty_comment", "nil_comment", "absent_comment"]) {
@@ -206,7 +206,7 @@ describe("CommentTest", () => {
     "comments",
     "schema dump with primary key comment",
     async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "pk_commenteds");
+      const output = await dumpTableSchema(adapter, "pk_commenteds");
       expect(output).toMatch(
         /createTable.*"pk_commenteds".*id:\s*\{\s*comment:\s*"Primary key comment"\s*\}.*comment:\s*"Table comment"/,
       );

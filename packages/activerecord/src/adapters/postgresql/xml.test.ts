@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class XmlDataType extends Base {
   static {
@@ -57,7 +57,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("xml schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "xml_data_type");
+      const output = await dumpTableSchema(connection, "xml_data_type");
       expect(output).toMatch(/t\.xml\("payload"\)/);
     });
   });

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -20,10 +20,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         t.integer("id", { null: false, autoIncrement: true });
         t.index(["id"]);
       });
-      const output = await SchemaDumper.dumpTableSchema(
-        adapter as unknown as SchemaSource,
-        "auto_increments",
-      );
+      const output = await dumpTableSchema(adapter as unknown as SchemaSource, "auto_increments");
       expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
 
@@ -36,10 +33,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           t.datetime("created_at", { null: false });
         },
       );
-      const output = await SchemaDumper.dumpTableSchema(
-        adapter as unknown as SchemaSource,
-        "auto_increments",
-      );
+      const output = await dumpTableSchema(adapter as unknown as SchemaSource, "auto_increments");
       expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
 

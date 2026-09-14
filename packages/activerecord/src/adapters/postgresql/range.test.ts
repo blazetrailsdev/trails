@@ -3,7 +3,6 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, TimeZone, setZone, BigDecimal } from "@blazetrails/activesupport";
 import { BigIntegerType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
@@ -12,6 +11,7 @@ import { Decimal } from "../../connection-adapters/postgresql/oid/decimal.js";
 import { Timestamp } from "../../connection-adapters/postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "../../connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
 import { fixtures } from "../../test-fixtures.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -306,7 +306,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("range schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_ranges");
+      const output = await dumpTableSchema(adapter, "postgresql_ranges");
       expect(output).toContain(
         '# Could not dump table "postgresql_ranges" because of following StandardError',
       );

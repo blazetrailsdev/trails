@@ -3,10 +3,10 @@ import { Temporal } from "@blazetrails/date";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 import { Base } from "../base.js";
 import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
-import { SchemaDumper } from "../schema-dumper.js";
 import { pp } from "../pretty-print.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 export interface JSONSharedTestCasesHost {
   columnType: string;
@@ -58,7 +58,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_schema_dumping", async () => {
-    const output = await SchemaDumper.dumpTableSchema(connection, "json_data_type");
+    const output = await dumpTableSchema(connection, "json_data_type");
     expect(output).toMatch(new RegExp(`t\\.${columnType}\\(\\s*"settings"`));
   });
 
