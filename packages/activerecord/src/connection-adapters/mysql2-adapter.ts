@@ -15,7 +15,6 @@ import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import {
-  AdapterError,
   AdapterTimeout,
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -336,8 +335,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = err instanceof Error ? err : new ConnectionNotEstablished(String(err));
         if (translated instanceof ConnectionNotEstablished) {
           translated.setPool(this.pool);
-        } else if (translated instanceof AdapterError) {
-          translated.setConnectionPool(this.pool);
         }
         throw translated;
       },

@@ -25,8 +25,7 @@ export class Name {
     return this.schema === other.schema && this.identifier === other.identifier;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  hashKey(): string {
+  hash(): string {
     return JSON.stringify([this.schema, this.identifier]);
   }
 

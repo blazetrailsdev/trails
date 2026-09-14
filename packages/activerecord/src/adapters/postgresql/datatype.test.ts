@@ -136,7 +136,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("ex");
       const col = cols.find((c) => c.name === "data");
       expect(col).toBeDefined();
-      expect(col!.baseType).toBe("string");
+      expect(col!.type).toBe("string");
     });
 
     it("char column type", async () => {
@@ -144,7 +144,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("ex");
       const col = cols.find((c) => c.name === "data");
       expect(col).toBeDefined();
-      expect(col!.baseType).toBe("string");
+      expect(col!.type).toBe("string");
     });
   });
 });

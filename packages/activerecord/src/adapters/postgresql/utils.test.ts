@@ -88,10 +88,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("can be used as hash key", () => {
       const map = new Map<string, string>();
-      map.set(new Name("schema", "article_seq").hashKey(), "success");
-      expect(map.get(new Name("schema", "article_seq").hashKey())).toBe("success");
-      expect(map.get(new Name("schema", "articles").hashKey())).toBeUndefined();
-      expect(map.get(new Name("public", "article_seq").hashKey())).toBeUndefined();
+      map.set(new Name("schema", "article_seq").hash(), "success");
+      expect(map.get(new Name("schema", "article_seq").hash())).toBe("success");
+      expect(map.get(new Name("schema", "articles").hash())).toBeUndefined();
+      expect(map.get(new Name("public", "article_seq").hash())).toBeUndefined();
     });
   });
 });

@@ -109,11 +109,6 @@ export class PoolConfig {
     return this._pool;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  get poolInitialized(): boolean {
-    return this._pool !== null;
-  }
-
   async disconnectBang({
     automaticReconnect = false,
   }: { automaticReconnect?: boolean } = {}): Promise<void> {

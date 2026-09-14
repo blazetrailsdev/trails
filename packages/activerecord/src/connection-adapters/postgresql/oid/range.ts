@@ -84,16 +84,16 @@ export class RangeType extends ValueType<Range<unknown>> {
     excludeEnd: boolean;
   } {
     const fromTo = value.slice(1, -1);
-    const separator = findRangeSeparator(fromTo);
-    const from = fromTo.slice(0, separator);
-    const to = fromTo.slice(separator + 1);
+    const separator = fromTo.indexOf(",");
+    const from = separator === -1 ? fromTo : fromTo.slice(0, separator);
+    const to = separator === -1 ? undefined : fromTo.slice(separator + 1);
 
     return {
       from:
         from === "" || from === "-infinity"
           ? this.infinity({ negative: true })
           : this.unquote(from),
-      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to),
+      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to as string),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };
@@ -111,34 +111,15 @@ export class RangeType extends ValueType<Range<unknown>> {
 
   /** @internal */
   private unquote(value: string): string {
-    return unquoteRangeBound(value);
-  }
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function findRangeSeparator(value: string): number {
-  let inQuotes = false;
-  for (let i = 0; i < value.length; i++) {
-    const char = value[i];
-    if (char === '"') {
-      if (inQuotes && value[i + 1] === '"') {
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      return i;
+    if (value.startsWith('"') && value.endsWith('"')) {
+      let unquotedValue = value.slice(1, -1);
+      unquotedValue = unquotedValue.replaceAll('""', '"');
+      unquotedValue = unquotedValue.replaceAll("\\\\", "\\");
+      return unquotedValue;
+    } else {
+      return value;
     }
   }
-  return value.length;
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function unquoteRangeBound(value: string): string {
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
-  }
-  return value;
 }
 
 const INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
+import { ACCEPTABLE_UUID, Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -61,10 +61,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uuid type cast", async () => {
-      expect(normalizeUuid("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(
+      expect(new Uuid().cast("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(
         "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       );
-      expect(normalizeUuid("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(
+      expect(new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(
         "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       );
     });
@@ -145,7 +145,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const rows = await adapter.execute(`SELECT id FROM uuid_pk_test`);
         expect(rows).toHaveLength(1);
         expect(rows[0].id).toBeTruthy();
-        expect(isValidUuid(rows[0].id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
       }
@@ -184,7 +184,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["auto"]);
         const rows = await adapter.execute(`SELECT id, name FROM uuid_pk_test`);
         expect(rows[0].name).toBe("auto");
-        expect(isValidUuid(rows[0].id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
       }
@@ -202,7 +202,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["created"]);
         const rows = await adapter.execute(`SELECT * FROM uuid_pk_test`);
         expect(rows).toHaveLength(1);
-        expect(isValidUuid(rows[0].id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
       }
@@ -237,7 +237,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("uuid gen random uuid", async () => {
       const rows = await adapter.execute(`SELECT gen_random_uuid() AS uuid`);
-      expect(isValidUuid(rows[0].uuid as string)).toBe(true);
+      expect(ACCEPTABLE_UUID.test(rows[0].uuid as string)).toBe(true);
     });
 
     it("uuid gen random uuid default", async () => {
@@ -245,12 +245,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       ]);
       const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
-      expect(isValidUuid(rows[0].guid as string)).toBe(true);
+      expect(ACCEPTABLE_UUID.test(rows[0].guid as string)).toBe(true);
     });
 
     it("uuid invalid", async () => {
-      expect(isValidUuid("not-a-uuid")).toBe(false);
-      expect(normalizeUuid("not-a-uuid")).toBeNull();
+      expect(ACCEPTABLE_UUID.test("not-a-uuid")).toBe(false);
+      expect(new Uuid().cast("not-a-uuid")).toBeNull();
     });
 
     it("uuid nil", async () => {
@@ -260,8 +260,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uuid blank", async () => {
-      expect(normalizeUuid("")).toBeNull();
-      expect(normalizeUuid("   ")).toBeNull();
+      expect(new Uuid().cast("")).toBeNull();
+      expect(new Uuid().cast("   ")).toBeNull();
     });
 
     it("uuid uniqueness", async () => {
@@ -368,10 +368,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         await UuidAssocComment.loadSchema();
 
         const post = await UuidAssocPost.createBang({});
-        expect(isValidUuid(post.id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(post.id as string)).toBe(true);
 
         const comment = await (post as any).uuidAssocComments.createBang({ body: "hello" });
-        expect(isValidUuid(comment.id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(comment.id as string)).toBe(true);
         expect(comment.uuid_assoc_post_id).toBe(post.id);
 
         const found = await (post as any).uuidAssocComments.find(comment.id);
@@ -574,16 +574,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("treat blank uuid as nil", () => {
-      expect(normalizeUuid("")).toBeNull();
+      expect(new Uuid().cast("")).toBeNull();
     });
 
     it("treat invalid uuid as nil", () => {
-      expect(normalizeUuid("foobar")).toBeNull();
+      expect(new Uuid().cast("foobar")).toBeNull();
     });
 
     it("invalid uuid dont modify before type cast", () => {
       const raw = "foobar";
-      expect(normalizeUuid(raw)).toBeNull();
+      expect(new Uuid().cast(raw)).toBeNull();
       expect(raw).toBe("foobar");
     });
 
@@ -597,32 +597,32 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uuid change format does not mark dirty", () => {
-      const a = normalizeUuid("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11");
-      const b = normalizeUuid("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
-      const c = normalizeUuid("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}");
+      const a = new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11");
+      const b = new Uuid().cast("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+      const c = new Uuid().cast("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}");
       expect(a).toBe(b);
       expect(b).toBe(c);
     });
 
     it("acceptable uuid regex", () => {
-      expect(isValidUuid("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(true);
-      expect(isValidUuid("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(true);
-      expect(isValidUuid("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(true);
-      expect(isValidUuid("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(true);
-      expect(isValidUuid("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(true);
+      expect(ACCEPTABLE_UUID.test("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(true);
+      expect(ACCEPTABLE_UUID.test("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(true);
+      expect(ACCEPTABLE_UUID.test("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(true);
+      expect(ACCEPTABLE_UUID.test("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(true);
+      expect(ACCEPTABLE_UUID.test("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(true);
 
-      expect(isValidUuid("")).toBe(false);
-      expect(isValidUuid("hello")).toBe(false);
-      expect(isValidUuid("zz0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
-      expect(isValidUuid("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
+      expect(ACCEPTABLE_UUID.test("")).toBe(false);
+      expect(ACCEPTABLE_UUID.test("hello")).toBe(false);
+      expect(ACCEPTABLE_UUID.test("zz0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
+      expect(ACCEPTABLE_UUID.test("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
     });
 
     it("uuid formats", () => {
       const expected = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      expect(normalizeUuid("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(expected);
-      expect(normalizeUuid("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(expected);
-      expect(normalizeUuid("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(expected);
-      expect(normalizeUuid("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(expected);
+      expect(new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(expected);
+      expect(new Uuid().cast("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(expected);
+      expect(new Uuid().cast("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(expected);
+      expect(new Uuid().cast("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(expected);
     });
 
     it("uniqueness validation ignores uuid", async () => {
@@ -692,7 +692,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
         const rows = await adapter.execute(`SELECT id FROM uuid_gen_test`);
         expect(rows[0].id).toBeTruthy();
-        expect(isValidUuid(rows[0].id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
       }
@@ -710,8 +710,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
         const rows = await adapter.execute(`SELECT id, other FROM uuid_gen_test`);
-        expect(isValidUuid(rows[0].id as string)).toBe(true);
-        expect(isValidUuid(rows[0].other as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
+        expect(ACCEPTABLE_UUID.test(rows[0].other as string)).toBe(true);
         expect(rows[0].id).not.toBe(rows[0].other);
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);

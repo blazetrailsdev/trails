@@ -92,11 +92,6 @@ export class SchemaMigration {
     )) as string[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  async allVersions(): Promise<string[]> {
-    return this.versions();
-  }
-
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.Count([star()]));
