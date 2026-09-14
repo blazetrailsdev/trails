@@ -109,6 +109,38 @@ export function rbInspect(value: unknown): string {
 }
 
 /**
+ * `rb_obj_inspect` (`vendor/ruby/object.c:783-795`), Ruby's `Kernel#inspect`:
+ * `#<Class:0x… @ivar=value, …>`, or `rb_any_to_s` when there are no ivars.
+ * A trails field `fooBar` / `_fooBar` is Ruby's `@foo_bar`. JS exposes no
+ * object address, so each object is assigned a stable one on first inspection.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjInspect(obj: object): string {
+  const c = obj.constructor.name;
+  let address = objAddresses.get(obj);
+  if (address === undefined) {
+    address = nextObjAddress += 8;
+    objAddresses.set(obj, address);
+  }
+  const str = `#<${c}:0x${address.toString(16).padStart(16, "0")}`;
+  const ivars = Object.keys(obj);
+  if (ivars.length === 0) return `${str}>`;
+  return `${str} ${ivars
+    .map(
+      (name) =>
+        `@${name
+          .replace(/^_/, "")
+          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+          .toLowerCase()}=${rbInspect((obj as Record<string, unknown>)[name])}`,
+    )
+    .join(", ")}>`;
+}
+
+const objAddresses = new WeakMap<object, number>();
+let nextObjAddress = 0x7f0000000000;
+
+/**
  * The dispatch under the `rb_exec_recursive` stack its collection arms are
  * wrapped in (`vendor/ruby/hash.c:3487`, `vendor/ruby/array.c:2918`).
  * `recursing` is that stack, which `rb_exec_recursive` keeps per-thread.

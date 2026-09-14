@@ -1,6 +1,6 @@
-import { classAttribute, included, rbHash, underscore } from "@blazetrails/activesupport";
+import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
-import { DelegateClass, rbInspect } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
 export type NormalizesArgs = [
   ...names: string[],
@@ -139,13 +139,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
   }
 
   inspect(): string {
-    const ivars = Object.keys(this).map(
-      (name) =>
-        `@${underscore(name.replace(/^_/, ""))}=${rbInspect((this as Record<string, unknown>)[name])}`,
-    );
-    const address = `0x${objectAddress(this).toString(16).padStart(16, "0")}`;
-    if (ivars.length === 0) return `#<${this.constructor.name}:${address}>`;
-    return `#<${this.constructor.name}:${address} ${ivars.join(", ")}>`;
+    return rbObjInspect(this);
   }
 
   private normalize(value: unknown): unknown {
@@ -157,16 +151,4 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
 function castTypesEqual(a: ValueType, b: ValueType): boolean {
   const equals = (a as { equals?(other: ValueType): boolean }).equals;
   return equals ? equals.call(a, b) : a === b;
-}
-
-const objectAddresses = new WeakMap<object, number>();
-let nextObjectAddress = 0x7f0000000000;
-
-function objectAddress(obj: object): number {
-  let address = objectAddresses.get(obj);
-  if (address === undefined) {
-    address = nextObjectAddress += 8;
-    objectAddresses.set(obj, address);
-  }
-  return address;
 }
