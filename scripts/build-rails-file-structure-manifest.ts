@@ -270,8 +270,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, host.fqn);
-        // Operators are instance-only ports; resolve the class-specific spelling.
-        const opCandidates = m.isStatic ? undefined : operatorSpelling(host.fqn, m.name);
+        const opCandidates = operatorSpelling(host.fqn, m.name, m.isStatic);
         pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
       }
     }
@@ -298,7 +297,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
           noteClass(file, mixin.className, mixin.parentFqn);
           const b = bucketFor(file, mixin.parentFqn);
           const isStatic = mixin.extendsSingleton || m.isStatic;
-          const opCandidates = isStatic ? undefined : operatorSpelling(mixin.parentFqn, m.name);
+          const opCandidates = operatorSpelling(mixin.parentFqn, m.name, isStatic);
           pushMethod(b.names, b.seen, m.name, isStatic, opCandidates);
         }
         continue;

@@ -92,7 +92,15 @@ describe("operatorSpelling", () => {
 
   it("only keys operators recognised by api-compare's OPERATORS set", () => {
     for (const ops of Object.values(OPERATOR_SPELLING_BY_FQN)) {
-      for (const op of Object.keys(ops)) expect(OPERATORS.has(op)).toBe(true);
+      for (const op of Object.keys(ops))
+        expect(OPERATORS.has(op.replace(/^self\./, ""))).toBe(true);
     }
+  });
+
+  it("resolves a singleton operator only through its self.-keyed entry", () => {
+    expect(operatorSpelling("ActiveRecord::Migration", "[]", true)).toEqual(["get"]);
+    expect(operatorSpelling("ActiveRecord::Migration", "[]", false)).toBeUndefined();
+    expect(operatorSpelling("ActiveRecord::Migration", "[]")).toEqual(["get"]);
+    expect(operatorSpelling("Arel::Table", "[]", true)).toBeUndefined();
   });
 });
