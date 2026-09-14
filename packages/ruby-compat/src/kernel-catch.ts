@@ -20,10 +20,8 @@ import { TypeError as RbTypeError } from "./type-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the extra-surface gate scores a class field as extra surface and excludes an interface member, so the tag/value readers are declared by merging
 export class UncaughtThrowError extends ArgumentError {
-  declare readonly tag: unknown;
-  declare readonly value: unknown;
-
   constructor(...argv: unknown[]) {
     if (argv.length < 2) {
       throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 2+)`);
@@ -46,6 +44,13 @@ export class UncaughtThrowError extends ArgumentError {
       },
     });
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- pairs with the class above
+export interface UncaughtThrowError {
+  readonly tag: unknown;
+  readonly value: unknown;
 }
 
 UncaughtThrowError.prototype.name = "UncaughtThrowError";
