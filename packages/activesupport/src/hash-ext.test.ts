@@ -366,7 +366,9 @@ describe("HashExtTest", () => {
   it("symbolize keys preserves keys that cant be symbolized", () => {
     const key: unknown[] = [];
     const h = new Map<unknown, number>([[key, 3]]);
-    expect([...symbolizeKeys(h as never as Map<string, number>).keys()]).toEqual([key]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      key,
+    ]);
   });
 
   it("deep symbolize keys preserves keys that cant be symbolized", () => {
@@ -380,7 +382,9 @@ describe("HashExtTest", () => {
       [0, 1],
       [1, 2],
     ]);
-    expect([...symbolizeKeys(h as never as Map<string, number>).keys()]).toEqual([0, 1]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      0, 1,
+    ]);
   });
 
   it("deep symbolize keys preserves integer keys", () => {
