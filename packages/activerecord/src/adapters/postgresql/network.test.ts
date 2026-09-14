@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { IPAddr } from "@blazetrails/ruby-compat";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
@@ -72,8 +73,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
 
       const address = (await PostgresqlNetworkAddress.first()) as any;
-      expect(address.cidr_address).toMatchObject({ address: "192.168.0.0", prefixLength: 24 });
-      expect(address.inet_address).toMatchObject({ address: "172.16.1.254", prefixLength: 32 });
+      expect(address.cidr_address.equals(new IPAddr("192.168.0.0/24"))).toBe(true);
+      expect(address.inet_address.equals(new IPAddr("172.16.1.254"))).toBe(true);
       expect(address.mac_address).toBe("01:23:45:67:89:0a");
 
       address.cidr_address = "10.1.2.3/32";
@@ -82,8 +83,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       await address.saveBang();
       expect(await address.reload()).toBeTruthy();
-      expect(address.cidr_address).toMatchObject({ address: "10.1.2.3", prefixLength: 32 });
-      expect(address.inet_address).toMatchObject({ address: "10.0.0.0", prefixLength: 8 });
+      expect(address.cidr_address.equals(new IPAddr("10.1.2.3/32"))).toBe(true);
+      expect(address.inet_address.equals(new IPAddr("10.0.0.0/8"))).toBe(true);
       expect(address.mac_address).toBe("bc:de:f0:12:34:56");
     });
 

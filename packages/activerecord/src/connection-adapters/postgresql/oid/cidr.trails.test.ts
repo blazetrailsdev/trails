@@ -1,46 +1,50 @@
 import { describe, expect, it } from "vitest";
 
-import { Cidr, IPAddr } from "./cidr.js";
+import { IPAddr } from "@blazetrails/ruby-compat";
+
+import { Cidr } from "./cidr.js";
 
 describe("PostgreSQL::OID::Cidr", () => {
   it("type_cast_for_schema quotes the address, eliding /32 and /128", () => {
     const type = new Cidr();
-    expect(type.typeCastForSchema(new IPAddr("192.168.1.0", 24))).toBe('"192.168.1.0/24"');
-    expect(type.typeCastForSchema(new IPAddr("192.168.1.1", 32))).toBe('"192.168.1.1"');
-    expect(type.typeCastForSchema(new IPAddr("::1", 128))).toBe('"::1/128"');
-    expect(type.typeCastForSchema(new IPAddr("2001:db8::", 32))).toBe('"2001:db8::"');
+    expect(type.typeCastForSchema(new IPAddr("192.168.1.0/24"))).toBe('"192.168.1.0/24"');
+    expect(type.typeCastForSchema(new IPAddr("192.168.1.1/32"))).toBe('"192.168.1.1"');
+    expect(type.typeCastForSchema(new IPAddr("::1/128"))).toBe('"::1/128"');
+    expect(type.typeCastForSchema(new IPAddr("2001:db8::/32"))).toBe('"2001:db8::"');
   });
 
   it("castValue is the public Rails-named hook", () => {
     const type = new Cidr();
     const result = type.castValue("192.168.1.1");
     expect(result).toBeInstanceOf(IPAddr);
-    expect(result?.address).toBe("192.168.1.1");
-    expect(result?.prefixLength).toBe(32);
+    expect(result?.toString()).toBe("192.168.1.1");
+    expect(result?.prefix).toBe(32);
 
     const cidr = type.castValue("192.168.1.0/24");
-    expect(cidr?.address).toBe("192.168.1.0");
-    expect(cidr?.prefixLength).toBe(24);
+    expect(cidr?.toString()).toBe("192.168.1.0");
+    expect(cidr?.prefix).toBe(24);
 
     expect(type.castValue("not-an-ip")).toBeNull();
     expect(type.castValue(null)).toBeNull();
 
-    const ip = new IPAddr("10.0.0.1", 32);
+    const ip = new IPAddr("10.0.0.1/32");
     expect(type.castValue(ip)).toBe(ip);
   });
 
   it("canonicalizes IPv6 to RFC 5952 form on cast (matches Ruby IPAddr#to_s)", () => {
     const type = new Cidr();
-    expect(type.castValue("2001:DB8::1")?.address).toBe("2001:db8::1");
-    expect(type.castValue("2001:0DB8:0000:0000:0000:0000:0000:0001")?.address).toBe("2001:db8::1");
-    expect(type.castValue("2001:db8:0:0:1:0:0:1")?.address).toBe("2001:db8::1:0:0:1");
-    expect(type.castValue("::1")?.address).toBe("::1");
-    expect(type.castValue("::")?.address).toBe("::");
-    expect(type.castValue("0:0:0:0:0:0:0:0")?.address).toBe("::");
-    expect(type.castValue("::ffff:192.168.0.1")?.address).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("::ffff:c0a8:1")?.address).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("0:0:0:0:0:ffff:c0a8:1")?.address).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("2001:db8:0:1:1:1:1:1")?.address).toBe("2001:db8:0:1:1:1:1:1");
+    expect(type.castValue("2001:DB8::1")?.toString()).toBe("2001:db8::1");
+    expect(type.castValue("2001:0DB8:0000:0000:0000:0000:0000:0001")?.toString()).toBe(
+      "2001:db8::1",
+    );
+    expect(type.castValue("2001:db8:0:0:1:0:0:1")?.toString()).toBe("2001:db8::1:0:0:1");
+    expect(type.castValue("::1")?.toString()).toBe("::1");
+    expect(type.castValue("::")?.toString()).toBe("::");
+    expect(type.castValue("0:0:0:0:0:0:0:0")?.toString()).toBe("::");
+    expect(type.castValue("::ffff:192.168.0.1")?.toString()).toBe("::ffff:192.168.0.1");
+    expect(type.castValue("::ffff:c0a8:1")?.toString()).toBe("::ffff:192.168.0.1");
+    expect(type.castValue("0:0:0:0:0:ffff:c0a8:1")?.toString()).toBe("::ffff:192.168.0.1");
+    expect(type.castValue("2001:db8:0:1:1:1:1:1")?.toString()).toBe("2001:db8:0:1:1:1:1:1");
   });
 
   it("isChanged uses canonical form so textual variants don't mark dirty", () => {

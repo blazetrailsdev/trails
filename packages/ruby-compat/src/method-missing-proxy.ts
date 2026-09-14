@@ -49,6 +49,20 @@ function respondsTo(delegate: unknown, prop: string | symbol): boolean {
 }
 
 /**
+ * Whether `prop` resolves to a method rather than a reader: Ruby's
+ * `target.__send__(m)` (`vendor/ruby/lib/delegate.rb:88`) returns a reader's
+ * value as-is, so only a data descriptor on the delegate's prototype chain is
+ * bound — a getter returning a class hands back the class itself.
+ */
+function isMethod(delegate: object, prop: string | symbol): boolean {
+  for (let owner: object | null = delegate; owner; owner = Object.getPrototypeOf(owner)) {
+    const descriptor = Object.getOwnPropertyDescriptor(owner, prop);
+    if (descriptor) return "value" in descriptor;
+  }
+  return false;
+}
+
+/**
  * Ruby-style `method_missing` forwarding for a TypeScript object.
  *
  * Ruby wrappers define `method_missing` / `respond_to_missing?` to forward what
@@ -59,7 +73,7 @@ function respondsTo(delegate: unknown, prop: string | symbol): boolean {
  * `delegate` is read on every access, because the wrappers that need this can
  * swap it after construction, as Ruby re-reads the ivar. A forwarded value comes
  * back whether or not it is callable — `public_send` makes no such distinction
- * (command_recorder.rb:400-404) — with functions bound to the delegate. When
+ * (command_recorder.rb:400-404) — with methods bound to the delegate and a getter's value passed through unbound. When
  * `delegate(target)` returns `target` there is no own-property step (DelegateClass).
  *
  * Both traps are *public*-only, because Rails asks `delegate.respond_to?(method)`
@@ -98,7 +112,9 @@ export function methodMissingProxy<T extends object>(
       }
       if (respondsTo(delegate, prop)) {
         const value = (delegate as Record<string | symbol, unknown>)[prop];
-        return typeof value === "function" ? value.bind(delegate) : value;
+        return typeof value === "function" && isMethod(delegate as object, prop)
+          ? value.bind(delegate)
+          : value;
       }
       if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
       return () => {
