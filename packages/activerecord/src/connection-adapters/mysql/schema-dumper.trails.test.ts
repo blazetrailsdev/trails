@@ -50,9 +50,6 @@ const col = (
 };
 
 describe("MySQL::SchemaDumper", () => {
-  it("defaultPrimaryKeyType returns bigint", () =>
-    expect(make().defaultPrimaryKeyType()).toBe("bigint"));
-
   describe("schemaType", () => {
     it("timestamp → 'timestamp'", () =>
       expect((make() as any).schemaType(col({ sqlType: "timestamp" }))).toBe(":timestamp"));

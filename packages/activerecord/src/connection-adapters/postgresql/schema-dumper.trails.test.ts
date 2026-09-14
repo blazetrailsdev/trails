@@ -42,11 +42,6 @@ describe("PostgreSQL::SchemaDumper", () => {
     expect(dumper).toBeInstanceOf(SchemaDumper);
   });
 
-  it("defaultPrimaryKeyType returns bigserial", () => {
-    const dumper = SchemaDumper.create(emptySource);
-    expect(dumper.defaultPrimaryKeyType()).toBe("bigserial");
-  });
-
   describe("schemaType", () => {
     it("returns bigserial for a serial bigint column", () => {
       const dumper = SchemaDumper.create(emptySource) as any;

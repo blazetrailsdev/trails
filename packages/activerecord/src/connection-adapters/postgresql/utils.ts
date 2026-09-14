@@ -1,3 +1,5 @@
+import { rbHash } from "@blazetrails/activesupport";
+
 export class Name {
   static readonly SEPARATOR = ".";
 
@@ -25,9 +27,8 @@ export class Name {
     return this.schema === other.schema && this.identifier === other.identifier;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  hashKey(): string {
-    return JSON.stringify([this.schema, this.identifier]);
+  hash(): number {
+    return rbHash(this.parts());
   }
 
   /** @internal */

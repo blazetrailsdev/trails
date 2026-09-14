@@ -3,9 +3,6 @@ import { ValueType } from "@blazetrails/activemodel";
 export const ACCEPTABLE_UUID = /^(?:\{([a-fA-F0-9]{4}-?){8}\}|([a-fA-F0-9]{4}-?){8})$/;
 export const CANONICAL_UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 
-export const ACCEPTABLE_UUID_REGEX =
-  /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i;
-
 export class Uuid extends ValueType<string> {
   override type(): string {
     return "uuid";
@@ -39,28 +36,4 @@ export class Uuid extends ValueType<string> {
     const stripped = uuid.replace(/[{}-]/g, "").toLowerCase();
     return `${stripped.slice(0, 8)}-${stripped.slice(8, 12)}-${stripped.slice(12, 16)}-${stripped.slice(16, 20)}-${stripped.slice(20)}`;
   }
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function isValidUuid(value: string): boolean {
-  return ACCEPTABLE_UUID_REGEX.test(value.trim());
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function normalizeUuid(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  if (!isValidUuid(trimmed)) return null;
-
-  const hex = trimmed.replace(/[{}-]/g, "").toLowerCase();
-  if (hex.length !== 32) return null;
-
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20, 32),
-  ].join("-");
 }

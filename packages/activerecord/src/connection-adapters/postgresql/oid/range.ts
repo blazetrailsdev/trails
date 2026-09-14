@@ -41,13 +41,13 @@ export class RangeType extends ValueType<Range<unknown>> {
     const from = this.typeCastSingle(extracted.from);
     const to = this.typeCastSingle(extracted.to);
 
-    if (!isInfinity(from) && extracted.excludeStart) {
+    if (!this.isInfinity(from) && extracted.excludeStart) {
       throw new ArgumentError(
         `The Ruby Range object does not support excluding the beginning of a Range. (unsupported value: '${value}')`,
       );
     }
 
-    const [begin, end] = sanitizeBounds(from, to);
+    const [begin, end] = this.sanitizeBounds(from, to);
     return new Range(begin, end, extracted.excludeEnd);
   }
 
@@ -69,11 +69,11 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   private typeCastSingle(value: unknown): unknown {
-    return isInfinity(value) ? value : this.subtype.deserialize(value);
+    return this.isInfinity(value) ? value : this.subtype.deserialize(value);
   }
 
   private typeCastSingleForDatabase(value: unknown): unknown {
-    return isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
+    return this.isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
   /** @missingRailsCall split — PERMANENT */
@@ -84,19 +84,41 @@ export class RangeType extends ValueType<Range<unknown>> {
     excludeEnd: boolean;
   } {
     const fromTo = value.slice(1, -1);
-    const separator = findRangeSeparator(fromTo);
-    const from = fromTo.slice(0, separator);
-    const to = fromTo.slice(separator + 1);
+    const separator = fromTo.indexOf(",");
+    const from = separator === -1 ? fromTo : fromTo.slice(0, separator);
+    const to = separator === -1 ? undefined : fromTo.slice(separator + 1);
 
     return {
       from:
         from === "" || from === "-infinity"
           ? this.infinity({ negative: true })
           : this.unquote(from),
-      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to),
+      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to as string),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };
+  }
+
+  static readonly INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);
+
+  /** @internal */
+  private sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
+    return [
+      rbEqual(from, -Infinity) && !RangeType.INFINITE_FLOAT_RANGE.cover(to) ? null : from,
+      rbEqual(to, Infinity) && !RangeType.INFINITE_FLOAT_RANGE.cover(from) ? null : to,
+    ];
+  }
+
+  /** @internal */
+  private unquote(value: string): string {
+    if (value.startsWith('"') && value.endsWith('"')) {
+      let unquotedValue = value.slice(1, -1);
+      unquotedValue = unquotedValue.replaceAll('""', '"');
+      unquotedValue = unquotedValue.replaceAll("\\\\", "\\");
+      return unquotedValue;
+    } else {
+      return value;
+    }
   }
 
   private infinity({ negative = false }: { negative?: boolean } = {}): unknown {
@@ -110,55 +132,14 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   /** @internal */
-  private unquote(value: string): string {
-    return unquoteRangeBound(value);
-  }
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function findRangeSeparator(value: string): number {
-  let inQuotes = false;
-  for (let i = 0; i < value.length; i++) {
-    const char = value[i];
-    if (char === '"') {
-      if (inQuotes && value[i + 1] === '"') {
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      return i;
+  private isInfinity(value: unknown): boolean {
+    const fn = (value as { isInfinite?: unknown })?.isInfinite;
+    if (typeof fn === "function") {
+      const result = (fn as () => unknown).call(value);
+      return result != null && result !== false;
     }
+    return value === Infinity || value === -Infinity;
   }
-  return value.length;
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function unquoteRangeBound(value: string): string {
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
-  }
-  return value;
-}
-
-const INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);
-
-/** @internal */
-function sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
-  return [
-    rbEqual(from, -Infinity) && !INFINITE_FLOAT_RANGE.cover(to) ? null : from,
-    rbEqual(to, Infinity) && !INFINITE_FLOAT_RANGE.cover(from) ? null : to,
-  ];
-}
-
-/** @internal */
-function isInfinity(value: unknown): boolean {
-  const fn = (value as { isInfinite?: unknown })?.isInfinite;
-  if (typeof fn === "function") {
-    const result = (fn as () => unknown).call(value);
-    return result != null && result !== false;
-  }
-  return value === Infinity || value === -Infinity;
 }
 
 function inspect(value: unknown): string {

@@ -1110,7 +1110,7 @@ describe("MigrationTest", () => {
       throw e;
     }
 
-    const versionsAfterFirst = await sm.allVersions();
+    const versionsAfterFirst = await sm.versions();
     expect(versionsAfterFirst).toContain("foo");
 
     await adapter.beginTransaction({ _lazy: false });
@@ -1124,7 +1124,7 @@ describe("MigrationTest", () => {
       throw e;
     }
 
-    const versionsAfterSecond = await sm.allVersions();
+    const versionsAfterSecond = await sm.versions();
     expect(versionsAfterSecond).toContain("foo");
     expect(versionsAfterSecond).toContain("bar");
   });

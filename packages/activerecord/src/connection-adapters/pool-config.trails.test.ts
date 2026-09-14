@@ -65,10 +65,10 @@ describe("PoolConfig", () => {
 
   describe("pool", () => {
     it("lazily creates a ConnectionPool on first access", () => {
-      expect(config.poolInitialized).toBe(false);
+      expect(config["_pool"]).toBeNull();
       const pool = config.pool;
       expect(pool).toBeTruthy();
-      expect(config.poolInitialized).toBe(true);
+      expect(config["_pool"]).not.toBeNull();
     });
 
     it("returns the same pool on subsequent accesses", () => {
@@ -135,7 +135,7 @@ describe("PoolConfig", () => {
 
       expect(discardedDuringDisconnect).toBe(false);
       expect(discardSpy).toHaveBeenCalledTimes(1);
-      expect(config.poolInitialized).toBe(false);
+      expect(config["_pool"]).toBeNull();
     });
 
     it("defaults automaticReconnect to false", async () => {
@@ -150,18 +150,18 @@ describe("PoolConfig", () => {
   describe("discardPoolBang", () => {
     it("is a no-op when pool is not initialized", async () => {
       await expect(config.discardPoolBang()).resolves.toBeUndefined();
-      expect(config.poolInitialized).toBe(false);
+      expect(config["_pool"]).toBeNull();
     });
 
     it("discards and nulls the pool", async () => {
       const pool = config.pool;
-      expect(config.poolInitialized).toBe(true);
+      expect(config["_pool"]).not.toBeNull();
       const spy = vi.spyOn(pool, "discardBangDraining");
       const promise = config.discardPoolBang();
-      expect(config.poolInitialized).toBe(false);
+      expect(config["_pool"]).toBeNull();
       await promise;
       expect(spy).toHaveBeenCalled();
-      expect(config.poolInitialized).toBe(false);
+      expect(config["_pool"]).toBeNull();
     });
 
     it("creates a new pool after discard", async () => {
@@ -177,7 +177,7 @@ describe("PoolConfig", () => {
         throw new Error("discard failed");
       });
       await expect(config.discardPoolBang()).rejects.toThrow("discard failed");
-      expect(config.poolInitialized).toBe(true);
+      expect(config["_pool"]).not.toBeNull();
       spy.mockRestore();
     });
   });
@@ -279,11 +279,11 @@ describe("PoolConfig", () => {
       const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));
       void c1.pool;
       void c2.pool;
-      expect(c1.poolInitialized).toBe(true);
-      expect(c2.poolInitialized).toBe(true);
+      expect(c1["_pool"]).not.toBeNull();
+      expect(c2["_pool"]).not.toBeNull();
       await PoolConfig.discardPoolsBang();
-      expect(c1.poolInitialized).toBe(false);
-      expect(c2.poolInitialized).toBe(false);
+      expect(c1["_pool"]).toBeNull();
+      expect(c2["_pool"]).toBeNull();
     });
   });
 

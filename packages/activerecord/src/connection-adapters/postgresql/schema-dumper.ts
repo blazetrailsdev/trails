@@ -196,11 +196,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return adapter.tableOptions(tableName);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  defaultPrimaryKeyType(): string {
-    return "bigserial";
-  }
-
   private pgAdapter(): any {
     return this._adapter();
   }

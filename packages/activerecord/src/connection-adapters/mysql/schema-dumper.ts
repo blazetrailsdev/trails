@@ -36,11 +36,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  defaultPrimaryKeyType(): string {
-    return "bigint";
-  }
-
   /** @internal */
   protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column);

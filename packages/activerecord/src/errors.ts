@@ -62,14 +62,6 @@ export class AdapterError extends ActiveRecordError {
     this.name = "ActiveRecord::AdapterError";
     this._connectionPool = options?.connectionPool;
   }
-
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  setConnectionPool(connectionPool: unknown): this {
-    if (this._connectionPool === undefined) {
-      this._connectionPool = connectionPool;
-    }
-    return this;
-  }
 }
 
 export class ConnectionNotEstablished extends AdapterError {
