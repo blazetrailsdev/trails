@@ -546,13 +546,16 @@ export function cachedFindByStatement(
 }
 
 export function inspectionFilter(this: CoreHost): ParameterFilter {
-  if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
-    const superclass = parentClass(this);
-    if (superclass) return inspectionFilter.call(superclass);
+  const filterAttributes = Object.prototype.hasOwnProperty.call(this, "_filterAttributes")
+    ? this._filterAttributes
+    : undefined;
+  const superclass = parentClass(this);
+  if (filterAttributes == null && superclass) {
+    return inspectionFilter.call(superclass);
   }
   return (this._inspectionFilter ??= (() => {
     const mask = new InspectionMask(ParameterFilter.FILTERED);
-    return new ParameterFilter(this._filterAttributes ?? [], { mask });
+    return new ParameterFilter(filterAttributes ?? [], { mask });
   })());
 }
 

@@ -541,7 +541,6 @@ export class FixtureSet {
         : [];
 
     if (!this._ignoredFixtures.includes("DEFAULTS")) this._ignoredFixtures.push("DEFAULTS");
-    this._ignoredFixtures = this._ignoredFixtures.filter((f) => f != null);
   }
 
   private readFixtureFiles(path: string): Record<string, Fixture> {
