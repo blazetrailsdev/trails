@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
-import { Base } from "./index.js";
+import { Base, disconnectAllBang } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
@@ -11,7 +11,7 @@ describe("ActiveRecordTest", () => {
     await (await Base.leaseConnection()).connectBang();
     assertPredicate(Base, (b) => b.connectedQ());
 
-    await Base.disconnectAllBang();
+    await disconnectAllBang();
     assertNotPredicate(Base, (b) => b.connectedQ());
 
     await (await Base.leaseConnection()).connectBang();
