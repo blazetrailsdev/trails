@@ -66,8 +66,11 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * (`:394,442`); `call` supplies the class as `this`, which is the `self`
  * `module_eval` binds. The five `define_singleton_method` reflection overrides
  * that union the superclass's method lists into the generated class's
- * (`:421-440`) need no port: this class's prototype chain runs through `superclass.prototype`, so JS reflection
- * already walks through to those members.
+ * (`:421-440`) need no port: they list INSTANCE methods, and an instance
+ * member lookup on this class walks its prototype chain through
+ * `superclass.prototype`, so JS reflection already reaches those members.
+ * Static members resolve separately, through the constructor chain
+ * `klass -> delegator -> superclass` that `Object.setPrototypeOf` links.
  *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
  * than a `#private` field: a `#` field is unreachable through the
