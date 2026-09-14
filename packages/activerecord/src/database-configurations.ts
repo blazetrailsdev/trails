@@ -239,10 +239,7 @@ export class DatabaseConfigurations {
       .join("\n");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall symbolize_keys — PERMANENT
-   */
+  /** @internal */
   private buildDbConfigFromRawConfig(
     envName: string,
     name: string,

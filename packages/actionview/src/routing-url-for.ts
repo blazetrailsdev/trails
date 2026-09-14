@@ -12,7 +12,6 @@ export type UrlForOptions = string | null | undefined | object | ReadonlyArray<u
 type Host = RoutingUrlFor & RoutingUrlForHost;
 
 export class RoutingUrlFor {
-  /** @missingRailsCall symbolize_keys — PERMANENT */
   urlFor(this: Host, options: UrlForOptions = null): string {
     if (typeof options === "string" && !isSymbol(options)) {
       return options;
