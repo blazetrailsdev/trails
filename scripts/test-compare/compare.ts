@@ -114,6 +114,17 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 // ---------------------------------------------------------------------------
 
 /**
+ * ruby/spec keeps one spec per member (`core/kernel/catch_spec.rb`), while
+ * ruby-compat keeps one file per MRI definition site: `Kernel#catch` and
+ * `Kernel#throw` are both `vendor/ruby/vm_eval.c` and both port to
+ * `kernel-catch.ts`, following the `kernel-float.ts` naming.
+ */
+const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
+  "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
+  "core/kernel/throw_spec.rb": "kernel-catch.test.ts",
+};
+
+/**
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
@@ -150,6 +161,10 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     const kebab = base.replace(/_/g, "-");
     const tsFile = kebab + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
+  if (pkg === "ruby-compat" && RUBY_COMPAT_SPEC_TS_FILES[rubyFile]) {
+    return RUBY_COMPAT_SPEC_TS_FILES[rubyFile];
   }
 
   if (pkg === "i18n" && rubyFile.startsWith("i18n/")) {

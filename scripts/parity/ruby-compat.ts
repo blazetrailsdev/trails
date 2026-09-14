@@ -52,6 +52,8 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Hash#key?", "hasKey"],
   ["Hash#transform_values", "transformValues"],
   ["Kernel#Float", "kernelFloat"],
+  ["Kernel#catch", "kernelCatch"],
+  ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
