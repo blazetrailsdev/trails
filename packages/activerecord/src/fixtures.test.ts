@@ -52,6 +52,9 @@ import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
+import { withSecondPool } from "./support/setup-second-pool.js";
+import { Account } from "./test-helpers/models/account.js";
+import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { DeadParrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import {
@@ -805,6 +808,58 @@ describe("SetFixtureClassPrevailsTest", () => {
 
   it("uses set fixture class", () => {
     expect(badPosts("bad_welcome")).toBeInstanceOf(Post);
+  });
+});
+
+describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
+  fixtures(["accounts", "companies"], { useTransactionalTests: false });
+  withSecondPool();
+
+  let instances: Base[];
+
+  beforeEach(async () => {
+    await Course.loadSchema();
+    instances = [
+      new Account({ credit_limit: 50 }),
+      new Company({ name: "RoR Consulting" }),
+      new Course({ name: "Test" }),
+    ];
+  });
+
+  it("resets to min pk with specified pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(
+          table: string,
+          pk?: string | null,
+          sequence?: string | null,
+        ): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(
+        model.tableName,
+        model.primaryKey as string,
+        model.sequenceName,
+      );
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("resets to min pk with default pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(table: string): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(model.tableName);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
   });
 });
 

@@ -57,6 +57,10 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * (`vendor/rack-test/lib/rack/test.rb:199`). Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here.
  *
+ * The argument is read as bytes, one code unit per byte — ruby-compat's
+ * ASCII-8BIT convention — as `pack.c:663-690` reads `RSTRING_PTR` with no
+ * re-encoding. A caller holding a UTF-8 String passes its `String#b`.
+ *
  * `*` is `1` for the `PMm` types rather than the array remainder
  * (`pack.c:281-284`), so `m*` is `m`. The `u`-only `len > 63` clamp
  * (`pack.c:676`) is not reachable without that directive.
@@ -101,7 +105,8 @@ export function pack(ary: ReadonlyArray<string>, fmt: string): string {
     if (type !== "m") unknownDirective("pack", type, fmt);
 
     const from = nextfrom();
-    const s = new TextEncoder().encode(from);
+    const s = new Uint8Array(from.length);
+    for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
     let ptr = 0;
     let plen = s.length;
 

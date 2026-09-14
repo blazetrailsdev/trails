@@ -1,5 +1,5 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, pack } from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, b, pack } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -191,7 +191,7 @@ export class Session {
   }
 
   basicAuthorize(username: unknown, password: unknown): void {
-    const encodedLogin = pack([`${String(username)}:${String(password)}`], "m0");
+    const encodedLogin = pack([b(`${String(username)}:${String(password)}`)], "m0");
     this.header("Authorization", `Basic ${encodedLogin}`);
   }
 
