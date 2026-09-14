@@ -18,19 +18,21 @@ import { LocalJumpError } from "./local-jump-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class UncaughtThrowError extends ArgumentError {
-  constructor(tag: unknown, value: unknown, mesg: string) {
-    super(format(mesg, tag));
-    Object.assign(this, { tag, value });
-  }
-}
+  declare readonly tag: unknown;
+  declare readonly value: unknown;
 
-/** @noRailsEquivalent PERMANENT */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface UncaughtThrowError {
-  readonly tag: unknown;
-  readonly value: unknown;
+  constructor(...argv: unknown[]) {
+    if (argv.length < 2) {
+      throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 2+)`);
+    }
+    const args = argv.slice(2);
+    if (args.length > 1) {
+      throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0..1)`);
+    }
+    super(args.length === 0 ? "UncaughtThrowError" : format(args[0] as string, argv[0]));
+    Object.assign(this, { tag: argv[0], value: argv[1] });
+  }
 }
 
 UncaughtThrowError.prototype.name = "UncaughtThrowError";
@@ -39,6 +41,7 @@ interface RbVmTag {
   tag: unknown;
   retval: unknown;
   prev: RbVmTag | undefined;
+  popped: boolean;
 }
 
 class VmThrowData {
@@ -65,7 +68,7 @@ function ecTagSlot(): AsyncContext<RbVmTag> {
  * without defining.
  */
 export function kernelThrow(tag: unknown, value: unknown = null): never {
-  if (arguments.length > 2) {
+  if (arguments.length < 1 || arguments.length > 2) {
     throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 1..2)`);
   }
   return rbThrowObj(tag, value);
@@ -75,7 +78,7 @@ function rbThrowObj(tag: unknown, value: unknown): never {
   let tt = ecTagSlot().getStore();
 
   while (tt) {
-    if (tt.tag === tag) {
+    if (!tt.popped && tt.tag === tag) {
       tt.retval = value;
       break;
     }
@@ -119,7 +122,7 @@ export function kernelCatch(...argv: unknown[]): unknown {
 
 function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
   const context = ecTagSlot();
-  const tt: RbVmTag = { tag, retval: null, prev: context.getStore() };
+  const tt: RbVmTag = { tag, retval: null, prev: context.getStore(), popped: false };
   const rescue = (errinfo: unknown): unknown => {
     if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
     throw errinfo;
@@ -129,11 +132,17 @@ function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
     try {
       val = func(tag);
     } catch (errinfo) {
+      tt.popped = true;
       return rescue(errinfo);
     }
     if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
-      return Promise.resolve(val as PromiseLike<unknown>).then(undefined, rescue);
+      return Promise.resolve(val as PromiseLike<unknown>)
+        .finally(() => {
+          tt.popped = true;
+        })
+        .then(undefined, rescue);
     }
+    tt.popped = true;
     return val;
   });
 }

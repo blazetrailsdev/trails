@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { kernelCatch, kernelThrow, UncaughtThrowError } from "./kernel-catch.js";
 
 describe("kernelCatch", () => {
@@ -28,6 +29,28 @@ describe("kernelCatch", () => {
     });
     expect(res).toBe(1);
     expect(carrier).not.toBeInstanceOf(Error);
+  });
+
+  it("raises ArgumentError when throw is given no tag", () => {
+    const throw0 = kernelThrow as (...args: unknown[]) => never;
+    expect(() => throw0()).toThrow("wrong number of arguments (given 0, expected 1..2)");
+  });
+
+  it("constructs UncaughtThrowError from a tag and value with an optional message", () => {
+    const Ctor = UncaughtThrowError as unknown as new (...args: unknown[]) => UncaughtThrowError;
+    expect(new Ctor(":a", 1).tag).toBe(":a");
+    expect(new Ctor(":a", 1, "uncaught throw %p").message).toBe("uncaught throw :a");
+    expect(() => new Ctor(":a")).toThrow(ArgumentError);
+    expect(() => new Ctor(":a", 1, "m", "n")).toThrow(ArgumentError);
+  });
+
+  it("does not let a child async resource throw to a catch that has settled", async () => {
+    let later!: Promise<unknown>;
+    await kernelCatch(":blah", () => {
+      later = new Promise((resolve) => setTimeout(resolve, 5)).then(() => kernelThrow(":blah"));
+      return Promise.resolve();
+    });
+    await expect(later).rejects.toBeInstanceOf(UncaughtThrowError);
   });
 
   it("keeps a sync block sync", () => {
