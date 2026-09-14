@@ -1,3 +1,5 @@
+import { rbHash } from "@blazetrails/activesupport";
+
 export class Name {
   static readonly SEPARATOR = ".";
 
@@ -25,8 +27,8 @@ export class Name {
     return this.schema === other.schema && this.identifier === other.identifier;
   }
 
-  hash(): string {
-    return JSON.stringify(this.parts());
+  hash(): number {
+    return rbHash(this.parts());
   }
 
   /** @internal */
