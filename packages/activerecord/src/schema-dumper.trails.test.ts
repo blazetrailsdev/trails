@@ -265,8 +265,6 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("dumps schema from adapter introspection", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("horses", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
@@ -278,8 +276,6 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("dumps schema with indexes from adapter", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("testings", {}, (t) => {
       t.integer("post_id");
     });
@@ -290,8 +286,6 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
@@ -300,8 +294,6 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });

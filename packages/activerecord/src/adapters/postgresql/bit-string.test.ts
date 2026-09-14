@@ -24,7 +24,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlBitStringTest", () => {
     it("bit string", async () => {
-      const { SchemaDumper } = await import("../../schema-dumper.js");
       const output = await dumpTableSchema(adapter, "postgresql_bit_strings");
       expect(output).toMatch(/t\.bit\("a_bit",\s*\{[^}]*limit:\s*8[^}]*default:\s*"00000011"/);
       expect(output).toMatch(

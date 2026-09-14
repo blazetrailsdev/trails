@@ -887,7 +887,6 @@ describe("SchemaDumperDefaultsTest", () => {
         t.date("date_with_neg_inf_default", { default: -Infinity });
         t.date("date_with_pos_inf_default", { default: Infinity });
       });
-      const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
       const output = await dumpTableSchema(adapter, "infinity_defaults");
       expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
       expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
