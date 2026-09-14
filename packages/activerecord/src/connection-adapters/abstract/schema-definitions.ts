@@ -203,8 +203,9 @@ export class ForeignKeyDefinition {
     return this.isValidate;
   }
 
+  /** @missingRailsCall match? — PERMANENT */
   get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? !SchemaDumper.fkIgnorePattern.test(this.name) : false;
+    return this.name != null ? this.name.search(SchemaDumper.fkIgnorePattern) === -1 : false;
   }
 
   isDefinedFor({
@@ -270,7 +271,7 @@ export class CheckConstraintDefinition {
   }
 
   get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? !SchemaDumper.chkIgnorePattern.test(this.name) : false;
+    return this.name != null ? this.name.search(SchemaDumper.chkIgnorePattern) === -1 : false;
   }
 
   isDefinedFor(options: {
