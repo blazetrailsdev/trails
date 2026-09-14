@@ -1,5 +1,5 @@
 import { hasKey } from "@blazetrails/ruby-compat";
-import { getEnv, symbolizeKeys } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
@@ -247,11 +247,7 @@ export class DatabaseConfigurations {
   ): HashConfig {
     if (typeof config === "string") return this.buildDbConfigFromString(envName, name, config);
     if (typeof config === "object" && config !== null && !Array.isArray(config))
-      return this.buildDbConfigFromHash(
-        envName,
-        name,
-        symbolizeKeys(config) as DatabaseConfigOptions,
-      );
+      return this.buildDbConfigFromHash(envName, name, { ...config });
     throw new InvalidConfigurationError(
       `'{ ${envName} => ${String(config)} }' is not a valid configuration. Expected a URL string or a Hash.`,
     );

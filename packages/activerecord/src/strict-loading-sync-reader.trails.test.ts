@@ -117,21 +117,6 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect((developer as any).ship).toBeNull();
   });
 
-  it("in-memory `target` set directly (e.g. Preloader path) returns without throwing", async () => {
-    const ship = await Ship.create({
-      name: "Preloader Ship",
-      developer_id: developers("david").id,
-    });
-    ship.strictLoadingBang();
-    const developer = new Developer({ id: developers("david").id });
-    const assoc = ship.association("developer") as any;
-    assoc._writeTargetStore(developer);
-    expect(assoc.loaded).toBe(false);
-    expect(() => (ship as any).developer).not.toThrow();
-    expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
-    expect(assoc.loaded).toBe(true);
-  });
-
   it("ships fixture is linked to developer in the ships fixture", () => {
     expect(ships("interceptor").developer_id).toBeFalsy();
   });

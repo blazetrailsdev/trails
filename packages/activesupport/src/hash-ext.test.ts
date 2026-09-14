@@ -83,7 +83,7 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize_keys — returns object with string keys (identity in TS)", () => {
-    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ a: 1, b: 2 });
+    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("symbolize_keys does not mutate original", () => {
@@ -93,8 +93,7 @@ describe("HashExtTest", () => {
   });
 
   it("deep_symbolize_keys — recursively normalizes keys", () => {
-    const nested = { a: { b: { c: 3 } } };
-    expect(deepSymbolizeKeys(nested)).toEqual({ a: { b: { c: 3 } } });
+    expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({ ":a": { ":b": { ":c": 3 } } });
   });
 
   it("stringify_keys — converts keys to strings", () => {
@@ -314,10 +313,9 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys", () => {
-    const h = { a: 1, b: 2 };
-    const result = symbolizeKeys(h);
-    expect(result.a).toBe(1);
-    expect(result.b).toBe(2);
+    expect(symbolizeKeys({ ":a": 1, ":b": 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeys({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("symbolize keys not mutates", () => {
@@ -327,9 +325,13 @@ describe("HashExtTest", () => {
   });
 
   it("deep symbolize keys", () => {
-    const h = { a: { b: 1 } };
-    const result = deepSymbolizeKeys(h);
-    expect((result as any).a.b).toBe(1);
+    expect(deepSymbolizeKeys({ ":a": { ":b": { ":c": 3 } } })).toEqual({
+      ":a": { ":b": { ":c": 3 } },
+    });
+    expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({ ":a": { ":b": { ":c": 3 } } });
+    expect(deepSymbolizeKeys({ a: [{ b: 2 }, { c: 3 }, 4] })).toEqual({
+      ":a": [{ ":b": 2 }, { ":c": 3 }, 4],
+    });
   });
 
   it("deep symbolize keys not mutates", () => {
@@ -339,51 +341,55 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys!", () => {
-    const h = { key: "val" };
-    expect(symbolizeKeys(h).key).toBe("val");
+    expect(symbolizeKeysBang({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeysBang({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("symbolize keys with bang mutates", () => {
-    const h = { x: 42 };
-    const r = symbolizeKeys(h);
-    expect(r.x).toBe(42);
+    const h = { ":a": 1, b: 2 };
+    symbolizeKeysBang(h);
+    expect(h).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("deep symbolize keys!", () => {
-    const h = { a: { b: { c: 3 } } };
-    const r = deepSymbolizeKeys(h);
-    expect((r as any).a.b.c).toBe(3);
+    expect(deepSymbolizeKeysBang({ a: { ":b": { c: 3 } } })).toEqual({
+      ":a": { ":b": { ":c": 3 } },
+    });
   });
 
   it("deep symbolize keys with bang mutates", () => {
-    const h = { nested: { val: 1 } };
-    const r = deepSymbolizeKeys(h);
-    expect((r as any).nested.val).toBe(1);
+    const h = { a: { ":b": { c: 3 } } };
+    deepSymbolizeKeysBang(h);
+    expect(h).toEqual({ ":a": { ":b": { ":c": 3 } } });
   });
 
   it("symbolize keys preserves keys that cant be symbolized", () => {
-    const h = { valid: 1, "also-valid": 2 };
-    const r = symbolizeKeys(h);
-    expect(r["valid"]).toBe(1);
-    expect(r["also-valid"]).toBe(2);
+    const key: unknown[] = [];
+    const h = new Map<unknown, number>([[key, 3]]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      key,
+    ]);
   });
 
   it("deep symbolize keys preserves keys that cant be symbolized", () => {
-    const h = { "a-b": { "c-d": 1 } };
-    const r = deepSymbolizeKeys(h);
-    expect((r as any)["a-b"]["c-d"]).toBe(1);
+    const key: unknown[] = [];
+    const h = new Map<unknown, unknown>([[key, 3]]);
+    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([key]);
   });
 
   it("symbolize keys preserves integer keys", () => {
-    const h = { 1: "one", 2: "two" };
-    const r = symbolizeKeys(h as any);
-    expect(r[1]).toBe("one");
+    const h = new Map<unknown, number>([
+      [0, 1],
+      [1, 2],
+    ]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      0, 1,
+    ]);
   });
 
   it("deep symbolize keys preserves integer keys", () => {
-    const h = { 1: { 2: "val" } };
-    const r = deepSymbolizeKeys(h);
-    expect((r as any)[1][2]).toBe("val");
+    const h = new Map<unknown, unknown>([[0, 1]]);
+    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([0]);
   });
 
   it("stringify keys", () => {

@@ -236,6 +236,27 @@ describe("PoolConfig", () => {
       expect(await config.serverVersion(mockConn as any)).toBe("15.0");
     });
 
+    it("a first probe holding the connection lock completes while disconnect! holds the monitor", async () => {
+      const lock = new Monitor();
+      const mockConn = {
+        lock,
+        async getDatabaseVersion() {
+          await new Promise<void>((r) => setTimeout(r, 10));
+          return "15.0";
+        },
+      };
+      vi.spyOn(config.pool, "disconnectBang").mockImplementation(() =>
+        lock.synchronize(async () => undefined),
+      );
+      const probe = lock.synchronize(async () => {
+        await Promise.resolve();
+        return config.serverVersion(mockConn as any);
+      });
+      const disconnect = config.disconnectBang();
+      expect(await probe).toBe("15.0");
+      await disconnect;
+    }, 5000);
+
     it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {
       let fetches = 0;
       const mockConn = {

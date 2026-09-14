@@ -9,6 +9,7 @@ import {
   FileUpdateChecker,
   Monitor,
   NameError,
+  symbolizeKeys,
 } from "@blazetrails/activesupport";
 import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
@@ -1263,10 +1264,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const argList = arguments_.slice(0, -1).map((a) => rbInspect(a));
     const last = arguments_[arguments_.length - 1];
     if (isPlainObject(last)) {
-      const filtered = Object.fromEntries(
-        Object.entries(last)
-          .filter(([k]) => !this.isInternalOption(k))
-          .map(([k, v]) => [`:${k}`, v]),
+      const filtered = symbolizeKeys(
+        Object.fromEntries(Object.entries(last).filter(([k]) => !this.isInternalOption(k))),
       );
       if (Object.keys(filtered).length > 0) argList.push(rbInspect(filtered));
     } else {

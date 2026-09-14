@@ -1,4 +1,4 @@
-import { extractOptionsBang, isPlainObject, symbolizeKeys } from "@blazetrails/activesupport";
+import { extractOptionsBang, isPlainObject } from "@blazetrails/activesupport";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { _UrlFor, type ParametersLike } from "./routing-url-for-slot.js";
 
@@ -18,7 +18,7 @@ export class RoutingUrlFor {
     } else if (options == null) {
       return _UrlFor!.urlFor.call(this, { only_path: this._generatePathsByDefault() });
     } else if (isPlainObject(options)) {
-      const hash = symbolizeKeys(options as Record<string, unknown>);
+      const hash = { ...(options as Record<string, unknown>) };
       this.ensureOnlyPathOption(hash);
 
       return _UrlFor!.urlFor.call(this, hash);
