@@ -66,7 +66,7 @@ describe("TestDelegateClass", () => {
   it("test_override", () => {
     class Overriding extends DelegateClass(Target) {
       override first(): string {
-        return `overridden ${(this.__getobj__() as Target).first()}`;
+        return `overridden ${this.__getobj__().first()}`;
       }
     }
     const delegator = new Overriding(new Target()) as unknown as Target;
