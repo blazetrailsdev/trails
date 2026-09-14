@@ -305,8 +305,9 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#close!`
    * (`vendor/ruby/lib/tempfile.rb:214`).
    */
-  closeBang(): null {
-    return this.close(true);
+  closeBang(): true | null {
+    this.close();
+    return this.unlink();
   }
 
   /**
