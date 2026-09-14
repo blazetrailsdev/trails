@@ -860,9 +860,6 @@ class ApiExtractor
 
   def process_defs(node)
     # def self.method_name or def obj.method_name
-    # In an umbrella scan a module-level `def self.` (`ActiveRecord.disconnect_all!`,
-    # active_record.rb:510) is redirected onto `<Module>::Base` exactly like
-    # umbrella config, and tagged so compare credits the port wherever it lands.
     redirect_fqn = umbrella_base_redirect(current_fqn, true)
     return if @scanning_umbrella && !redirect_fqn
 
@@ -879,8 +876,6 @@ class ApiExtractor
     fqn = current_fqn
     target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
     return unless target
-    # `def self.default_timezone=` (active_record.rb:218) overrides the writer an
-    # umbrella `singleton_class.attr_accessor` already recorded.
     return if redirect_fqn && target[:classMethods].any? { |m| m[:name] == name }
 
     method_info = {
