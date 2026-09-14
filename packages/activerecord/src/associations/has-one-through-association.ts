@@ -24,6 +24,13 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   private _pendingUnloadedThroughReconcile = false;
 
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-define-writers-and-constructors */
+  override reset(): void {
+    super.reset();
+    this._pendingReplace = null;
+    this._pendingUnloadedThroughReconcile = false;
+  }
+
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {
     const throughProxy = this.throughAssociation() as {

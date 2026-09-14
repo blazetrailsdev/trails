@@ -58,7 +58,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(adapter as any, "virtual_columns");
+      const output = await dumpTableSchema(adapter, "virtual_columns");
       expect(output).toMatch(
         /t\.virtual\("upper_name", \{ type: "string", as: "(?:upper|ucase)\(`?name`?\)" \}\);/i,
       );

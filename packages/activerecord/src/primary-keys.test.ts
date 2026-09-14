@@ -447,7 +447,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it("schema dump primary key includes type and options", async () => {
-    const schema = await dumpTableSchema(Base.connection as any, "barcodes");
+    const schema = await dumpTableSchema(Base.connection, "barcodes");
     expect(schema).toMatch(
       /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
     );
@@ -462,7 +462,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
       force: true,
     });
     try {
-      const schema = await dumpTableSchema(Base.connection as any, "scheduled_logs");
+      const schema = await dumpTableSchema(Base.connection, "scheduled_logs");
       expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
     } finally {
       await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
@@ -569,12 +569,12 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   it("collectly dump composite primary key", async () => {
-    const schema = await dumpTableSchema(Base.connection as any, "uber_barcodes");
+    const schema = await dumpTableSchema(Base.connection, "uber_barcodes");
     expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
   it("dumping composite primary key out of order", async () => {
-    const schema = await dumpTableSchema(Base.connection as any, "barcodes_reverse");
+    const schema = await dumpTableSchema(Base.connection, "barcodes_reverse");
     expect(schema).toMatch(/createTable\("barcodes_reverse", \{ primaryKey: \["code","region"\]/);
   });
 
@@ -624,7 +624,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
         default: null,
         force: true,
       });
-      const schema = await dumpTableSchema(Base.connection as any, "int_defaults");
+      const schema = await dumpTableSchema(Base.connection, "int_defaults");
       expect(schema).toMatch(/createTable\("int_defaults", \{ id: "integer", default: null/);
     },
   );
@@ -635,7 +635,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
       default: null,
       force: true,
     });
-    const schema = await dumpTableSchema(Base.connection as any, "int_defaults");
+    const schema = await dumpTableSchema(Base.connection, "int_defaults");
     expect(schema).toMatch(/createTable\("int_defaults", \{ id: "bigint", default: null/);
   });
 });
@@ -682,7 +682,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
   it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", async () => {
     await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
-    const schema = await dumpTableSchema(Base.connection as any, "widgets");
+    const schema = await dumpTableSchema(Base.connection, "widgets");
     expect(schema).toMatch(new RegExp(`createTable\\("widgets", \\{ id: "${pkType}", `));
   });
 
