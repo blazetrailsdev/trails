@@ -94,3 +94,12 @@ describe("NormalizedValueType equality", () => {
     ).toBe(false);
   });
 });
+
+describe("NormalizedValueType inspect", () => {
+  it("does not delegate inspect to the cast type", () => {
+    const castType = new ValueType();
+    (castType as unknown as { inspect(): string }).inspect = () => "delegated";
+    const type = new NormalizedValueType({ castType, normalizer: (v) => v, normalizeNil: false });
+    expect(type.inspect()).toMatch(/^#<NormalizedValueType /);
+  });
+});

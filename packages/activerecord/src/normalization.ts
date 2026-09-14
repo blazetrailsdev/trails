@@ -1,6 +1,6 @@
 import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
-import { DelegateClass } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbInspect } from "@blazetrails/ruby-compat";
 
 export type NormalizesArgs = [
   ...names: string[],
@@ -136,6 +136,10 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
 
   hash(): number {
     return rbHash([this.constructor, this.castType, this.normalizer, this.normalizeNil]);
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name} castType=${rbInspect(this.castType)}, normalizer=${rbInspect(this.normalizer)}, normalizeNil=${rbInspect(this.normalizeNil)}>`;
   }
 
   private normalize(value: unknown): unknown {
