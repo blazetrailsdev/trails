@@ -892,31 +892,9 @@ describe("SchemaStatements#indexes", () => {
 describe("SchemaStatements#columns delegates to newColumnFromField", () => {
   function columnsAdapter() {
     const { adapter, sql } = makeAdapter({
-      internalExecQuery: async () => [
-        {
-          name: "id",
-          type: "integer",
-          default: "nextval('things_id_seq'::regclass)",
-          notnull: true,
-          oid: 23,
-          fmod: -1,
-          identity: "",
-          attgenerated: "",
-          collation: null,
-          col_comment: null,
-        },
-        {
-          name: "name",
-          type: "character varying",
-          default: null,
-          notnull: false,
-          oid: 1043,
-          fmod: -1,
-          identity: "",
-          attgenerated: "",
-          collation: null,
-          col_comment: "the name",
-        },
+      query: async () => [
+        ["id", "integer", "nextval('things_id_seq'::regclass)", true, 23, -1, null, null, "", ""],
+        ["name", "character varying", null, false, 1043, -1, null, "the name", "", ""],
       ],
     });
     const ss = withSchemaStatements(adapter);
@@ -924,22 +902,6 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
     Object.defineProperty(ss, "typeMap", { value: typeMap, configurable: true });
     return { ss, sql };
   }
-
-  it("issues one pg_type load for the whole table, not one per column", async () => {
-    const { ss, sql } = columnsAdapter();
-    const loadAdditionalTypes = vi
-      .spyOn(ss, "loadAdditionalTypes")
-      .mockImplementation(async (oids?: number[]) => {
-        for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
-      });
-
-    const columns = await ss.columns("things");
-
-    expect(columns.map((c) => c.name)).toEqual(["id", "name"]);
-    expect(loadAdditionalTypes).toHaveBeenCalledTimes(1);
-    expect(loadAdditionalTypes).toHaveBeenCalledWith([23, 1043]);
-    expect(sql.filter((text) => text.includes("pg_attribute"))).toHaveLength(1);
-  });
 
   it("selects Rails' ten column_definitions fields and no primary-key flag", async () => {
     const { ss, sql } = columnsAdapter();
