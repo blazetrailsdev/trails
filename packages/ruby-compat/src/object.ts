@@ -126,17 +126,24 @@ export function rbObjInspect(obj: object): string {
   const str = `#<${c}:0x${address.toString(16).padStart(16, "0")}`;
   const ivars = Object.keys(obj);
   if (ivars.length === 0) return `${str}>`;
-  return `${str} ${ivars
-    .map(
-      (name) =>
-        `@${name
-          .replace(/^_/, "")
-          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-          .toLowerCase()}=${rbInspect((obj as Record<string, unknown>)[name])}`,
-    )
-    .join(", ")}>`;
+  if (objInspectRecursing.has(obj)) return `${str} ...>`;
+  objInspectRecursing.add(obj);
+  try {
+    return `${str} ${ivars
+      .map(
+        (name) =>
+          `@${name
+            .replace(/^_/, "")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase()}=${rbInspect((obj as Record<string, unknown>)[name])}`,
+      )
+      .join(", ")}>`;
+  } finally {
+    objInspectRecursing.delete(obj);
+  }
 }
 
+const objInspectRecursing = new Set<object>();
 const objAddresses = new WeakMap<object, number>();
 let nextObjAddress = 0x7f0000000000;
 
