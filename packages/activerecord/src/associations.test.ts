@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
-import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
+import {
+  Base,
+  collectionProxyFor as association,
+  reflectOnAssociation,
+  registerModel,
+  NameError,
+  pp,
+} from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
 import { clearReflectionsCache } from "./reflection.js";

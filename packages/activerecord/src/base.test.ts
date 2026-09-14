@@ -4,7 +4,7 @@ import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./support/quote-regex.js";
-import { association } from "./associations.js";
+import { collectionProxyFor as association } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";

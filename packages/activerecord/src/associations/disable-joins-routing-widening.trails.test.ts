@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
-import { Associations, association } from "../associations.js";
+import { Associations, collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {

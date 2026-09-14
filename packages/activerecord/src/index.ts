@@ -57,7 +57,7 @@ export {
   Associations,
   registerModel,
   modelRegistry,
-  association,
+  collectionProxyFor,
   isAssociationCached,
   eagerLoadBang,
 } from "./associations.js";

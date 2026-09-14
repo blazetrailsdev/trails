@@ -2,8 +2,10 @@ import { throwAbort } from "@blazetrails/activesupport";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
-import { association } from "../../associations.js";
-import { association as associationInstance } from "../../associations/instance-methods.js";
+import {
+  association as associationInstance,
+  collectionProxyFor as association,
+} from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {

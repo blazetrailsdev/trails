@@ -7,7 +7,7 @@ import {
   RecordNotUnique,
   RecordNotFound,
 } from "./index.js";
-import { Associations, association } from "./associations.js";
+import { Associations, collectionProxyFor as association } from "./associations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";

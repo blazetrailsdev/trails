@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,

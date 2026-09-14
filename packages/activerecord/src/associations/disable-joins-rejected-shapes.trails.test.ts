@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import type { TableDefinition } from "../connection-adapters/abstract/schema-definitions.js";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   HasManyThroughAssociationPolymorphicSourceError,

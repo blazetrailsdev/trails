@@ -1,7 +1,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel, registerSubclass } from "./index.js";
-import { association } from "./associations.js";
+import { collectionProxyFor as association } from "./associations.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
 import { Car } from "./test-helpers/models/car.js";

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 import { Reply } from "../test-helpers/models/reply.js";

@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
-import { modelRegistry, association as collectionProxyFor } from "./associations.js";
+import { modelRegistry, collectionProxyFor as collectionProxyFor } from "./associations.js";
 import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, isBlank } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";

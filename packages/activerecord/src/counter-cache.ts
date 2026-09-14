@@ -57,7 +57,7 @@ export async function resetCounters(
   }
 
   const object = await this.find(id);
-  const { association } = await import("./associations.js");
+  const { collectionProxyFor: association } = await import("./associations.js");
   const { reflectOnAllAssociations } = await import("./reflection.js");
 
   const updates: Record<string, unknown> = {};

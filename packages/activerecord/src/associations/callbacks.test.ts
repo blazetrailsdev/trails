@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, association, registerModel, registerSubclass } from "../index.js";
+import {
+  Base,
+  collectionProxyFor as association,
+  registerModel,
+  registerSubclass,
+} from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-fixtures.js";

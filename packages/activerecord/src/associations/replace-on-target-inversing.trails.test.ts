@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Base, association } from "../index.js";
+import { Base, collectionProxyFor as association } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { Interest } from "../test-helpers/models/interest.js";

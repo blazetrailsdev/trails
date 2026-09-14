@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Relation, association, registerModel } from "../index.js";
+import { Relation, collectionProxyFor as association, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";

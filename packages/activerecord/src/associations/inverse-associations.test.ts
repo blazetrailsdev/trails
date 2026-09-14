@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
   Base,
-  association,
+  collectionProxyFor as association,
   registerModel,
   registerSubclass,
   InverseOfAssociationNotFoundError,

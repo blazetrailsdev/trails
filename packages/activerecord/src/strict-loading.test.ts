@@ -3,7 +3,7 @@ import { SingularAssociation } from "./associations/singular-association.js";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
-import { association } from "./associations.js";
+import { collectionProxyFor as association } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";

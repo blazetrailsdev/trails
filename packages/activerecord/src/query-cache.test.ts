@@ -7,7 +7,7 @@ import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
-import { association } from "./associations.js";
+import { collectionProxyFor as association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";

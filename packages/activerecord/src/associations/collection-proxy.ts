@@ -27,7 +27,11 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
-import { autoloadModel, association as associationProxy } from "../associations.js";
+import {
+  _buildAssociationInstance,
+  autoloadModel,
+  collectionProxyFor as associationProxy,
+} from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
@@ -237,7 +241,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ) {
       return [];
     }
-    const { _buildAssociationInstance } = await import("./instance-methods.js");
     const assoc = _buildAssociationInstance.call(
       this._association.owner,
       this.reflection,
