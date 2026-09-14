@@ -24,12 +24,14 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * name the delegate answers.
  *
  * Ruby's class extends `Delegator` and gets the superclass's API only through
- * those generated members (`delegate.rb:395`). This one extends `superclass`
- * itself, because TypeScript has no structural stand-in for Ruby's duck typing:
- * callers narrow with `instanceof`, so a delegator that is not an instance of
- * what it delegates to is not usable as one. The generated members sit on the
- * class's own prototype, between the subclass and `superclass`, which is the
- * ancestor position — and therefore the precedence — they hold in Ruby.
+ * those generated members (`delegate.rb:395`). This one extends `delegator`, a
+ * no-op constructor whose `prototype` is `superclass.prototype` and whose own
+ * prototype is `superclass`, because TypeScript has no structural stand-in for
+ * Ruby's duck typing: callers narrow with `instanceof`, so a delegator that is
+ * not an instance of what it delegates to is not usable as one. The generated
+ * members sit on the class's own prototype, directly above
+ * `superclass.prototype`, which is the ancestor position — and therefore the
+ * precedence — they hold in Ruby.
  *
  * Extending does not construct `superclass`: Ruby's class is
  * `Class.new(Delegator)` and `Delegator#initialize` only stores the delegate
@@ -64,7 +66,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * (`:394,442`); `call` supplies the class as `this`, which is the `self`
  * `module_eval` binds. The five `define_singleton_method` reflection overrides
  * that union the superclass's method lists into the generated class's
- * (`:421-440`) need no port: this class extends `superclass`, so JS reflection
+ * (`:421-440`) need no port: this class's prototype chain runs through `superclass.prototype`, so JS reflection
  * already walks through to those members.
  *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
