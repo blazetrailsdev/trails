@@ -38,6 +38,12 @@ describe("Array#pack", () => {
     expect(pack([""], "m0")).toBe("");
   });
 
+  it("encodes bytes 0x80..0xff rather than UTF-8-expanding them", () => {
+    expect(pack(["\x00\x7f\x80\xff"], "m0")).toBe("AH+A/w==");
+    expect(pack(["\x80\xff"], "m0")).toBe("gP8=");
+    expect(pack(["\xc3\xbf"], "m0")).toBe("w78=");
+  });
+
   it("packs the HTTP Basic credential Rack::Test builds", () => {
     expect(pack(["user:pass"], "m0")).toBe("dXNlcjpwYXNz");
   });
