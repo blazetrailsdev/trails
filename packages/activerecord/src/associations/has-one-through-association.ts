@@ -24,13 +24,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   private _pendingUnloadedThroughReconcile = false;
 
-  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
-  override reset(): void {
-    super.reset();
-    this._pendingReplace = null;
-    this._pendingUnloadedThroughReconcile = false;
-  }
-
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {
     const throughProxy = this.throughAssociation() as {
@@ -72,29 +65,14 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /** @internal */
-  protected override loadDisplacedForBuild(): Promise<unknown> | null {
-    return null;
-  }
-
-  /** @internal */
   protected override displacementNeedsAwait(): boolean {
     return false;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
-  override writer(record: Base | null): void | Promise<void> {
-    const assigned = this.replace(record);
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
-      return assigned ? assigned.then(() => this.persistReplace()) : this.persistReplace();
-    }
-    return assigned;
   }
 
   sourceReflection(): unknown {
     return sourceReflection(this);
   }
 
-  /** @missingRailsCall create_through_record — PERMANENT */
   protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
   protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
@@ -121,7 +99,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       }
     }
     this.target = record;
-    if (record) return this.constructThroughRecordInMemory(record, save);
+    const assigned = record ? this.constructThroughRecordInMemory(record, save) : undefined;
+    if (save && (this.owner as any).isPersisted?.() && this._pendingReplace) {
+      return assigned ? assigned.then(() => this.persistReplace()) : this.persistReplace();
+    }
+    return assigned;
   }
 
   /** @internal */
@@ -167,7 +149,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   /** @noRailsEquivalent PERMANENT */
   async persistReplace(save = true): Promise<void> {
-    const pending = this._pendingReplace;
+    const pending = this.loaded ? this._pendingReplace : null;
     this._pendingReplace = null;
     if (this._pendingUnloadedThroughReconcile) {
       this._pendingUnloadedThroughReconcile = false;

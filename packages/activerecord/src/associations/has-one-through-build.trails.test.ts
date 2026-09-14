@@ -116,3 +116,26 @@ describe("HasOneThroughBuildTrails", () => {
     expect((member.association("club").target as Club | null)?.id).toBe(created.id);
   });
 });
+
+describe("HasOneThroughResetTrails", () => {
+  const { members } = fixtures(["members", "clubs", "memberships"]);
+
+  registerModel(Member);
+  registerModel(Club);
+  Membership.inheritanceColumn = "type";
+  registerModel(Membership);
+  registerModel(CurrentMembership);
+
+  it("reset discards a build that has not been saved", async () => {
+    const member = members("groucho");
+    const before = (await (member as unknown as { club: Promise<Club | null> }).club) as Club;
+    await (
+      member as unknown as { buildClub(attrs: Record<string, unknown>): Promise<Club> }
+    ).buildClub({ name: "Discarded Club" });
+    member.association("club").reset();
+    await member.save();
+
+    await member.association("club").reload();
+    expect((member.association("club").target as Club | null)?.id).toBe(before.id);
+  });
+});

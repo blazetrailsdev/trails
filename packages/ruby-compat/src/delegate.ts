@@ -24,22 +24,21 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * name the delegate answers.
  *
  * Ruby's class extends `Delegator` and gets the superclass's API only through
- * those generated members (`delegate.rb:395`). This one extends `superclass`
- * itself, because TypeScript has no structural stand-in for Ruby's duck typing:
- * callers narrow with `instanceof`, so a delegator that is not an instance of
- * what it delegates to is not usable as one. The generated members sit on the
- * class's own prototype, between the subclass and `superclass`, which is the
- * ancestor position — and therefore the precedence — they hold in Ruby.
+ * those generated members (`delegate.rb:395`). This one extends `delegator`, a
+ * no-op constructor whose `prototype` is `superclass.prototype` and whose own
+ * prototype is `superclass`, because TypeScript has no structural stand-in for
+ * Ruby's duck typing: callers narrow with `instanceof`, so a delegator that is
+ * not an instance of what it delegates to is not usable as one. The generated
+ * members sit on the class's own prototype, directly above
+ * `superclass.prototype`, which is the ancestor position — and therefore the
+ * precedence — they hold in Ruby.
  *
- * Extending also forces a `super()` call, which JS requires before `this` in a
- * derived constructor. Ruby never runs `superclass#initialize`: its class is
+ * Extending does not construct `superclass`: Ruby's class is
  * `Class.new(Delegator)` and `Delegator#initialize` only stores the delegate
- * (`:75-77,394-411`). So `superclass`'s constructor runs here, on a wrapper
- * that will forward every read anyway, and a `superclass` whose constructor
- * requires an argument or has side effects is out of range — see
- * `delegate-class-must-not-construct-the-delegated-superclass`. `super()` is
- * passed no arguments for that reason, and `ValueType`'s constructor
- * (`activemodel/lib/active_model/type/value.rb:17`) takes only optional kwargs.
+ * (`:75-77,394-411`). The class therefore extends a constructor that does
+ * nothing but shares `superclass.prototype` (and inherits its statics), so
+ * `super()` runs no `superclass` constructor while `instanceof superclass`
+ * still holds.
  *
  * Ruby reads `superclass.public_instance_methods` and
  * `protected_instance_methods` (`delegate.rb:397-400`), whose `all` default is
@@ -67,8 +66,11 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * (`:394,442`); `call` supplies the class as `this`, which is the `self`
  * `module_eval` binds. The five `define_singleton_method` reflection overrides
  * that union the superclass's method lists into the generated class's
- * (`:421-440`) need no port: this class extends `superclass`, so JS reflection
- * already walks through to those members.
+ * (`:421-440`) need no port: they list INSTANCE methods, and an instance
+ * member lookup on this class walks its prototype chain through
+ * `superclass.prototype`, so JS reflection already reaches those members.
+ * Static members resolve separately, through the constructor chain
+ * `klass -> delegator -> superclass` that `Object.setPrototypeOf` links.
  *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
  * than a `#private` field: a `#` field is unreachable through the
@@ -81,7 +83,10 @@ export function DelegateClass<T extends MixinBase>(
   superclass: T,
   block?: (this: Delegating<T>) => void,
 ): Delegating<T> {
-  const klass = class extends superclass {
+  const delegator = function () {} as unknown as T;
+  Object.setPrototypeOf(delegator, superclass);
+  delegator.prototype = superclass.prototype;
+  const klass = class extends delegator {
     declare _delegateDcObj: unknown;
 
     constructor(...args: ConstructorParameters<MixinBase>) {
