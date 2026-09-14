@@ -22,6 +22,8 @@ export class PoolConfig {
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
   private _serverVersion: unknown = null;
+  private _serverVersionInFlight: { connection: DatabaseAdapter; fetch: Promise<unknown> } | null =
+    null;
 
   constructor(
     connectionClass: ConnectionDescriptor | ConnectionOwner,
@@ -78,14 +80,21 @@ export class PoolConfig {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      connection.lock.synchronize(
-        () =>
-          this._serverVersion ??
-          synchronize.call(this, async () => {
-            this._serverVersion ??= await connection.getDatabaseVersion?.();
-            return this._serverVersion;
-          }),
-      )
+      connection.lock.synchronize(async () => {
+        const inFlight = this._serverVersionInFlight;
+        if (this._serverVersion == null && inFlight && inFlight.connection !== connection) {
+          await inFlight.fetch.catch(() => undefined);
+        }
+        if (this._serverVersion != null) return this._serverVersion;
+        const fetch = Promise.resolve(connection.getDatabaseVersion?.());
+        this._serverVersionInFlight = { connection, fetch };
+        try {
+          this._serverVersion ??= await fetch;
+        } finally {
+          if (this._serverVersionInFlight?.fetch === fetch) this._serverVersionInFlight = null;
+        }
+        return this._serverVersion;
+      })
     );
   }
 
