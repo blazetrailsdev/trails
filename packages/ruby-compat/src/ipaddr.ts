@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { NoMethodError } from "./no-method-error.js";
 
 const AF_UNSPEC = 0;
 const AF_INET = 2;
@@ -127,7 +128,7 @@ export class IPAddr {
   }
 
   protected set(addr: bigint, ...family: number[]): this {
-    switch (family[0] ? family[0] : this.family) {
+    switch (family[0] !== undefined ? family[0] : this.family) {
       case AF_INET:
         if (addr < 0n || addr > IPAddr.IN4MASK) {
           throw new IPAddr.InvalidAddressError(`invalid address: ${this._addr ?? ""}`);
@@ -142,7 +143,7 @@ export class IPAddr {
         throw new IPAddr.AddressFamilyError("unsupported address family");
     }
     this._addr = addr;
-    if (family[0]) {
+    if (family[0] !== undefined) {
       this.family = family[0];
       if (this.family === AF_INET && this._maskAddr !== null) this._maskAddr &= IPAddr.IN4MASK;
     }
@@ -196,13 +197,18 @@ export class IPAddr {
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:593` */
-  constructor(addr: string | bigint = "::", family: number = AF_UNSPEC) {
+  constructor(addr: unknown = "::", family: number = AF_UNSPEC) {
     this._maskAddr = null;
     if (typeof addr !== "string") {
       switch (family) {
         case AF_INET:
         case AF_INET6:
-          this.set(addr, family);
+          if (typeof addr !== "bigint" && !(typeof addr === "number" && Number.isFinite(addr))) {
+            throw new NoMethodError(
+              `undefined method 'to_i' for ${addr === null ? "nil" : typeof addr}`,
+            );
+          }
+          this.set(typeof addr === "bigint" ? addr : BigInt(Math.trunc(addr)), family);
           this._maskAddr = family === AF_INET ? IPAddr.IN4MASK : IPAddr.IN6MASK;
           return;
         case AF_UNSPEC:
@@ -249,7 +255,7 @@ export class IPAddr {
   private coerceOther(other: unknown): IPAddr {
     if (other instanceof IPAddr) return other;
     if (typeof other === "string") return new (this.constructor as typeof IPAddr)(other);
-    return new (this.constructor as typeof IPAddr)(BigInt(other as bigint), this.family!);
+    return new (this.constructor as typeof IPAddr)(other, this.family!);
   }
 
   private inAddr(addr: string | string[]): bigint | null {
