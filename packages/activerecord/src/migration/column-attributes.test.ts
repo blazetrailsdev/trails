@@ -1,20 +1,29 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
+   empty class/interface merge carries the mixed-in methods onto its type. */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/ruby-compat";
 import { TestHelper, TestModel } from "../test-helpers/migration-helper.js";
 import { assertColumn, assertNoColumn } from "../test-helpers/test-case.js";
 import { adapterType } from "../test-adapter.js";
 
+class ColumnAttributesTest {}
+interface ColumnAttributesTest extends TestHelper {}
+include(ColumnAttributesTest, TestHelper);
+
 describe("Migration", () => {
   describe("ColumnAttributesTest", () => {
-    beforeEach(() => TestHelper.setup());
-    afterEach(() => TestHelper.teardown());
+    const self = new ColumnAttributesTest();
+
+    beforeEach(() => self.setup());
+    afterEach(() => self.teardown());
 
     it("add column newline default", async () => {
-      const { connection } = TestHelper;
       const string = "foo\nbar";
-      await connection.addColumn("test_models", "command", "string", { default: string });
+      await self.addColumn("test_models", "command", "string", { default: string });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
@@ -22,55 +31,50 @@ describe("Migration", () => {
     });
 
     it("add remove single field using string arguments", async () => {
-      const { connection } = TestHelper;
       await assertNoColumn(TestModel, "last_name");
 
-      await connection.addColumn("test_models", "last_name", "string");
+      await self.addColumn("test_models", "last_name", "string");
       await assertColumn(TestModel, "last_name");
 
-      await connection.removeColumn("test_models", "last_name");
+      await self.removeColumn("test_models", "last_name");
       await assertNoColumn(TestModel, "last_name");
     });
 
     it("add remove single field using symbol arguments", async () => {
-      const { connection } = TestHelper;
       await assertNoColumn(TestModel, "last_name");
 
-      await connection.addColumn("test_models", "last_name", "string");
+      await self.addColumn("test_models", "last_name", "string");
       await assertColumn(TestModel, "last_name");
 
-      await connection.removeColumn("test_models", "last_name");
+      await self.removeColumn("test_models", "last_name");
       await assertNoColumn(TestModel, "last_name");
     });
 
     it.skipIf(adapterType === "mysql")("add column without limit", async () => {
-      const { connection } = TestHelper;
-      await connection.addColumn("test_models", "description", "string", { limit: null });
+      await self.addColumn("test_models", "description", "string", { limit: null });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["description"].limit).toBeNull();
     });
 
     it.skipIf(adapterType === "sqlite")("unabstracted database dependent types", async () => {
-      const { connection } = TestHelper;
-      await connection.addColumn("test_models", "intelligence_quotient", "smallint");
+      await self.addColumn("test_models", "intelligence_quotient", "smallint");
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["intelligence_quotient"].sqlType).toMatch(/smallint/);
     });
 
     it.skipIf(adapterType === "sqlite")("native decimal insert manual vs automatic", async () => {
-      const { connection } = TestHelper;
       const correctValue = new BigDecimal("0012345678901234567890.0123456789");
 
-      await connection.addColumn("test_models", "wealth", "decimal", {
+      await self.addColumn("test_models", "wealth", "decimal", {
         precision: 30,
         scale: 10,
       });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
-      await connection.execute(
+      await self.connection.execute(
         "insert into test_models (wealth) values (12345678901234567890.0123456789)",
       );
 
@@ -90,8 +94,7 @@ describe("Migration", () => {
     });
 
     it("add column with precision and scale", async () => {
-      const { connection } = TestHelper;
-      await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
+      await self.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
@@ -101,10 +104,9 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType !== "sqlite")("change column with new precision and scale", async () => {
-      const { connection } = TestHelper;
-      await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
+      await self.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
 
-      await connection.changeColumn("test_models", "wealth", "decimal", {
+      await self.changeColumn("test_models", "wealth", "decimal", {
         precision: 12,
         scale: 8,
       });
@@ -119,9 +121,8 @@ describe("Migration", () => {
     it.skipIf(adapterType !== "sqlite")(
       "change column preserve other column precision and scale",
       async () => {
-        const { connection } = TestHelper;
-        await connection.addColumn("test_models", "last_name", "string");
-        await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
+        await self.addColumn("test_models", "last_name", "string");
+        await self.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
         void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
 
@@ -129,7 +130,7 @@ describe("Migration", () => {
         expect(wealthColumn.precision).toBe(9);
         expect(wealthColumn.scale).toBe(7);
 
-        await connection.changeColumn("test_models", "last_name", "string", { null: false });
+        await self.changeColumn("test_models", "last_name", "string", { null: false });
         void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
 
@@ -140,17 +141,16 @@ describe("Migration", () => {
     );
 
     it.skipIf(adapterType === "sqlite")("native types", async () => {
-      const { connection } = TestHelper;
-      await connection.addColumn("test_models", "first_name", "string");
-      await connection.addColumn("test_models", "last_name", "string");
-      await connection.addColumn("test_models", "bio", "text");
-      await connection.addColumn("test_models", "age", "integer");
-      await connection.addColumn("test_models", "height", "float");
-      await connection.addColumn("test_models", "wealth", "decimal", { precision: 30, scale: 10 });
-      await connection.addColumn("test_models", "birthday", "datetime");
-      await connection.addColumn("test_models", "favorite_day", "date");
-      await connection.addColumn("test_models", "moment_of_truth", "datetime");
-      await connection.addColumn("test_models", "male", "boolean");
+      await self.addColumn("test_models", "first_name", "string");
+      await self.addColumn("test_models", "last_name", "string");
+      await self.addColumn("test_models", "bio", "text");
+      await self.addColumn("test_models", "age", "integer");
+      await self.addColumn("test_models", "height", "float");
+      await self.addColumn("test_models", "wealth", "decimal", { precision: 30, scale: 10 });
+      await self.addColumn("test_models", "birthday", "datetime");
+      await self.addColumn("test_models", "favorite_day", "date");
+      await self.addColumn("test_models", "moment_of_truth", "datetime");
+      await self.addColumn("test_models", "male", "boolean");
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
@@ -188,15 +188,14 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType === "sqlite")("out of range limit should raise", async () => {
-      const { connection } = TestHelper;
       await expect(
-        connection.addColumn("test_models", "integer_too_big", "integer", { limit: 10 }),
+        self.addColumn("test_models", "integer_too_big", "integer", { limit: 10 }),
       ).rejects.toThrow(ArgumentError);
       await expect(
-        connection.addColumn("test_models", "text_too_big", "text", { limit: 0xfffffffff }),
+        self.addColumn("test_models", "text_too_big", "text", { limit: 0xfffffffff }),
       ).rejects.toThrow(ArgumentError);
       await expect(
-        connection.addColumn("test_models", "binary_too_big", "binary", { limit: 0xfffffffff }),
+        self.addColumn("test_models", "binary_too_big", "binary", { limit: 0xfffffffff }),
       ).rejects.toThrow(ArgumentError);
     });
   });

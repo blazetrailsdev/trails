@@ -1,3 +1,5 @@
+import { delegate } from "@blazetrails/activesupport";
+import { included } from "@blazetrails/ruby-compat";
 import type { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -36,10 +38,24 @@ export class TestModel extends Base {
   }
 }
 
-export const TestHelper = {
-  connection: null as unknown as AbstractAdapter,
+type ConnectionMethods = Pick<
+  AbstractAdapter,
+  Extract<(typeof CONNECTION_METHODS)[number], keyof AbstractAdapter>
+>;
 
-  async setup(): Promise<void> {
+export interface TestHelper extends ConnectionMethods {
+  connection: AbstractAdapter;
+  tableName: string;
+  setup(): Promise<void>;
+  teardown(): Promise<void>;
+}
+
+export const TestHelper = {
+  [included](base: { prototype: object }): void {
+    delegate.call(base.prototype, ...CONNECTION_METHODS, { to: "connection" });
+  },
+
+  async setup(this: TestHelper): Promise<void> {
     this.connection = (await Base.leaseConnection()) as unknown as AbstractAdapter;
     await this.connection.createTable("test_models", {}, (t) => {
       t.timestamps({ null: true });
@@ -48,7 +64,7 @@ export const TestHelper = {
     void TestModel.resetColumnInformation();
   },
 
-  async teardown(): Promise<void> {
+  async teardown(this: TestHelper): Promise<void> {
     TestModel.resetTableName();
     TestModel.resetSequenceName();
     await this.connection.dropTable("test_models", { ifExists: true });
