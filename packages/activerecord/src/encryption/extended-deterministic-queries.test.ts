@@ -441,6 +441,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
         return (this as any)._wheres ?? {};
       }
     }
+    Object.setPrototypeOf(FakeRelation.prototype, Relation.prototype);
     class FakeBase {
       static findBy(conditions: Record<string, unknown>) {
         (this as any)._lastFindBy = conditions;

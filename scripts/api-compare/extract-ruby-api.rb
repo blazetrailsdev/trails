@@ -333,8 +333,8 @@ DEPENDENCY_PATTERNS = {
 # sees only the aliases, so the ported facade is measured against a denominator
 # of 3. Rails' umbrella files stay on the config-only path: `active_record.rb`
 # and its siblings are autoload manifests whose only method bodies are
-# `def self.` boot helpers no trails file ports, and walking them attributes
-# those to the umbrella module's junk-drawer entity file as false-missing.
+# module-level `def self.` helpers, which the umbrella scan redirects onto
+# `<Module>::Base` alongside the singleton config.
 #
 # `activerecord/lib/arel.rb` is the same shape as i18n's: `Arel.sql`,
 # `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute` are defined there
@@ -814,8 +814,8 @@ class ApiExtractor
 
   def process_def(node)
     # In an umbrella scan we only harvest `singleton_class.attr_*` config; the
-    # `def self.` helpers in the umbrella (eager_load!, disconnect_all!, …) are
-    # not ported as Base statics and would surface as false-missing.
+    # module-level `def self.` helpers go through process_defs, which redirects
+    # them onto `<Module>::Base`.
     return if @scanning_umbrella
 
     name_node = node[1]
@@ -860,7 +860,11 @@ class ApiExtractor
 
   def process_defs(node)
     # def self.method_name or def obj.method_name
-    return if @scanning_umbrella
+    # In an umbrella scan a module-level `def self.` (`ActiveRecord.disconnect_all!`,
+    # active_record.rb:510) is redirected onto `<Module>::Base` exactly like
+    # umbrella config, and tagged so compare credits the port wherever it lands.
+    redirect_fqn = umbrella_base_redirect(current_fqn, true)
+    return if @scanning_umbrella && !redirect_fqn
 
     _receiver = node[1]
     _dot = node[2]
@@ -873,21 +877,25 @@ class ApiExtractor
     vis = :public if @current_doc_methods&.include?(name)
 
     fqn = current_fqn
-    target = @classes[fqn] || @modules[fqn]
+    target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
     return unless target
+    # `def self.default_timezone=` (active_record.rb:218) overrides the writer an
+    # umbrella `singleton_class.attr_accessor` already recorded.
+    return if redirect_fqn && target[:classMethods].any? { |m| m[:name] == name }
 
     method_info = {
       name: name,
       visibility: vis.to_s,
       params: params,
-      file: @current_file,
+      file: redirect_fqn ? (target[:file] || @current_file) : @current_file,
       line: @current_line,
     }
+    method_info[:umbrellaConfig] = true if redirect_fqn
     record_body_facts(method_info, node[5], find_params_defs(node), fqn)
 
     target[:classMethods] << method_info
 
-    maybe_update_module_file(fqn, target)
+    maybe_update_module_file(fqn, target) unless redirect_fqn
   end
 
   # Update a module's or class's file to where its first method is defined, not

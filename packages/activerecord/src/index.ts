@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, disconnectAllBang, pp, RuntimeRegistry, Type. */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, pp, RuntimeRegistry, Type. */
 
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";
@@ -249,10 +249,6 @@ export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { PoolConfig as _PoolConfig } from "./connection-adapters/pool-config.js";
-export async function disconnectAllBang(): Promise<void> {
-  await _PoolConfig.disconnectAllBang();
-}
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {

@@ -1444,8 +1444,8 @@ describe(
       for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
-      // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
-      expect(names).not.toContain("eager_load!");
+      // The umbrella's `def self.` helpers redirect to Base the same way.
+      expect(base.classMethods.find((m) => m.name === "eager_load!")?.umbrellaConfig).toBe(true);
     });
 
     it("redirects the `class << self; attr_accessor` block form to Base too", () => {
@@ -1523,6 +1523,7 @@ describe(
       );
       expect(out["ActiveRecord::Facade"].instanceMethods).toEqual([]);
       expect(out["ActiveRecord"].classMethods).toEqual([]);
+      expect(out["ActiveRecord::Base"].classMethods.map((m) => m.name)).toContain("reserve_key");
     });
   },
 );

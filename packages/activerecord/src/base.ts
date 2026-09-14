@@ -149,6 +149,7 @@ import {
   setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
 import { AsyncExecutor } from "./ar-config.js";
+import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { ActiveSupport, DescendantsTracker } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
@@ -846,17 +847,13 @@ export class Base extends Model {
     _asyncQueryExecutor = value;
   }
 
-  /**
-   * @missingRailsArgs new — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names
-   */
+  /** @missingRailsArgs new — PERMANENT */
   static globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
     const concurrency = this.globalExecutorConcurrency ?? 4;
     void concurrency;
     return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   }
 
-  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
   static set globalExecutorConcurrency(globalExecutorConcurrency: number | null) {
     if (this.asyncQueryExecutor == null || this.asyncQueryExecutor === "multi_thread_pool") {
       throw new ArgumentError(
@@ -867,7 +864,6 @@ export class Base extends Model {
     _globalExecutorConcurrency = globalExecutorConcurrency;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE harvest-active-record-umbrella-singleton-defs */
   static get globalExecutorConcurrency(): number | null {
     return (_globalExecutorConcurrency ??= null);
   }
@@ -883,6 +879,10 @@ export class Base extends Model {
       );
     }
     _permanentConnectionCheckout = value;
+  }
+
+  static async disconnectAllBang(): Promise<void> {
+    await PoolConfig.disconnectAllBang();
   }
 
   static get queues(): Record<string, unknown> {
