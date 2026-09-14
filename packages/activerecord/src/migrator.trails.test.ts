@@ -17,11 +17,7 @@ import {
   Migration,
   Current,
 } from "./migration.js";
-import {
-  registerVersion,
-  resetVersionRegistry,
-  CURRENT_VERSION,
-} from "./migration/compatibility.js";
+import { V7_1, V7_2, V8_0 } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -263,23 +259,16 @@ describe("Migrator trails extensions", () => {
 
   it("findVersion raises for a version above the highest registered one", () => {
     expect(() => Migration.forVersion(8.5)).toThrow(
-      /Unknown migration version "8\.5"; expected one of "8\.0"/,
+      /Unknown migration version "8\.5"; expected one of "7\.1", "7\.2", "8\.0"/,
     );
   });
 
-  it("registerVersion allows custom versions", () => {
-    class V0_9 extends Migration {
-      async up(): Promise<void> {}
-      async down(): Promise<void> {}
-    }
-    registerVersion("0.9", V0_9);
-    try {
-      const Klass = Migration.forVersion(0.9);
-      expect(Klass).toBe(V0_9);
-    } finally {
-      resetVersionRegistry();
-      registerVersion(CURRENT_VERSION, Current);
-    }
+  it("Migration.version resolves every ported Compatibility version", () => {
+    expect(V8_0).toBe(Current);
+    expect(Migration.forVersion(8.0)).toBe(V8_0);
+    expect(Migration.forVersion("7.2")).toBe(V7_2);
+    expect(Migration.forVersion(7.1)).toBe(V7_1);
+    expect(Object.getPrototypeOf(V7_1)).toBe(V7_2);
   });
 });
 

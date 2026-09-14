@@ -77,6 +77,7 @@ export { collectingQueriesForExplain, execExplain } from "./explain.js";
 
 import { _registerBase as _registerBaseWithMigration } from "./migration.js";
 _registerBaseWithMigration(_Base);
+import "./migration/compatibility.js";
 
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
 _LogSubscriber.attachTo("active_record");
