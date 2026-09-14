@@ -10,6 +10,7 @@ describe("kernelCatch", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(UncaughtThrowError);
+    expect((error as UncaughtThrowError).name).toBe("UncaughtThrowError");
     expect((error as UncaughtThrowError).message).toBe("uncaught throw :blah");
     expect((error as UncaughtThrowError).tag).toBe(":blah");
     expect((error as UncaughtThrowError).value).toBe(42);

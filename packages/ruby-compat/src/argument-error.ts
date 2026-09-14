@@ -11,9 +11,6 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `ArgumentError`, which Rails
  * inherits rather than defines.
  */
-export class ArgumentError extends StandardError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+export class ArgumentError extends StandardError {}
+
+ArgumentError.prototype.name = "ArgumentError";

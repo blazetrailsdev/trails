@@ -13,22 +13,22 @@ import { LocalJumpError } from "./local-jump-error.js";
  * the tag and value and hands the rest to `super`
  * (`uncaught_throw_init`, `vm_eval.c:2180-2188`); `to_s` formats the message
  * with the tag (`uncaught_throw_to_s`, `vm_eval.c:2222-2228`). A JS `message`
- * is read eagerly, so the format runs at construction.
+ * is read eagerly, so `rb_throw_obj` formats it and sets the two ivars.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
  */
-export class UncaughtThrowError extends ArgumentError {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class UncaughtThrowError extends ArgumentError {}
+
+/** @noRailsEquivalent PERMANENT */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface UncaughtThrowError {
   readonly tag: unknown;
   readonly value: unknown;
-
-  constructor(tag: unknown, value: unknown, mesg: string) {
-    super(format(mesg, tag));
-    this.name = "UncaughtThrowError";
-    this.tag = tag;
-    this.value = value;
-  }
 }
+
+UncaughtThrowError.prototype.name = "UncaughtThrowError";
 
 interface RbVmTag {
   tag: unknown;
@@ -82,7 +82,7 @@ function rbThrowObj(tag: unknown, value: unknown): never {
     tt = tt.prev;
   }
   if (!tt) {
-    throw new UncaughtThrowError(tag, value, "uncaught throw %p");
+    throw Object.assign(new UncaughtThrowError(format("uncaught throw %p", tag)), { tag, value });
   }
 
   throw new VmThrowData(tag);

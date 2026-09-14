@@ -8,9 +8,6 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `LocalJumpError`, which Rails
  * inherits rather than defines.
  */
-export class LocalJumpError extends StandardError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "LocalJumpError";
-  }
-}
+export class LocalJumpError extends StandardError {}
+
+LocalJumpError.prototype.name = "LocalJumpError";

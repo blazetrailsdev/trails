@@ -107,7 +107,7 @@ describe("Kernel.catch", () => {
   });
 
   it("raises LocalJumpError if no block is given", () => {
-    expect(() => kernelCatch(":blah")).toThrow(LocalJumpError);
+    expect(() => (kernelCatch as (...args: unknown[]) => unknown)(":blah")).toThrow(LocalJumpError);
   });
 });
 
