@@ -79,7 +79,11 @@ export function serializableHash(
           `undefined method 'serializableHash' for an instance of ${(records as object).constructor.name}`,
         );
       }
-      safeSet(result, assocName, serializableHash(records as SerializationRecord, opts, true));
+      safeSet(
+        result,
+        assocName,
+        (records as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts),
+      );
     }
   });
 

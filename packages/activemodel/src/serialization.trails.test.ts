@@ -440,10 +440,17 @@ describe("Serialization", () => {
 
   it("include as string for single association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const author = { _attributes: new Map([["name", "Alice"]]), serializableHash: () => ({}) };
+    const received: unknown[] = [];
+    const author = {
+      serializableHash(opts: unknown) {
+        received.push(opts);
+        return { name: "Alice" };
+      },
+    };
     setAssociationAccessors(p, { author });
     const result = p.serializableHash({ include: "author" });
-    expect((result.author as any).name).toBe("Alice");
+    expect(result.author).toEqual({ name: "Alice" });
+    expect(received).toEqual([{}]);
   });
 });
 
