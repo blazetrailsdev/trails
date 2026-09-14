@@ -42,6 +42,8 @@ describe("kernelCatch", () => {
     expect(() => new Ctor(":a", 1).message).toThrow("no implicit conversion of nil into String");
     expect(new Ctor(":a", 1, "uncaught throw %p").message).toBe("uncaught throw :a");
     expect(() => new Ctor(":a")).toThrow(ArgumentError);
+    const unformattable = new Ctor(":a", 1, 123);
+    expect(() => unformattable.message).toThrow("no implicit conversion of Integer into String");
     expect(() => new Ctor(":a", 1, "m", "n")).toThrow(ArgumentError);
   });
 
