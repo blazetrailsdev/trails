@@ -1,6 +1,6 @@
-import { classAttribute, included, methodMissingProxy } from "@blazetrails/activesupport";
-import { SerializeCastValue } from "@blazetrails/activemodel";
-import type { ValueType } from "@blazetrails/activemodel";
+import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
+import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
+import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
 export type NormalizesArgs = [
   ...names: string[],
@@ -45,7 +45,7 @@ export const ClassMethods = {
           castType,
           normalizer: options.with,
           normalizeNil: applyToNil,
-        }) as unknown as ValueType,
+        }),
     );
 
     this.normalizedAttributes = new Set([...this.normalizedAttributes, ...names]);
@@ -78,41 +78,47 @@ export const InstanceMethods = {
   },
 };
 
-export class NormalizedValueType {
+export class NormalizedValueType extends DelegateClass(ValueType) {
   readonly castType: ValueType;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
-  constructor(options: {
+  constructor({
+    castType,
+    normalizer,
+    normalizeNil,
+  }: {
     castType: ValueType;
     normalizer: (value: unknown) => unknown;
     normalizeNil: boolean;
   }) {
-    this.castType = options.castType;
-    this.normalizer = options.normalizer;
-    this.normalizeNil = options.normalizeNil;
-    return methodMissingProxy(this, {
-      delegate: (target) => target.castType,
-    });
+    super(castType);
+    this.castType = castType;
+    this.normalizer = normalizer;
+    this.normalizeNil = normalizeNil;
   }
 
-  cast(value: unknown): unknown {
-    return normalize(this, this.castType.cast(value));
+  override cast(value: unknown): unknown {
+    return this.normalize(super.cast(value));
   }
 
-  serialize(value: unknown): unknown {
+  override serialize(value: unknown): unknown {
     return this.serializeCastValue(this.cast(value));
   }
 
-  serializeCastValue(value: unknown): unknown {
+  override serializeCastValue(value: unknown): unknown {
     return SerializeCastValue.serialize(
       this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
       value,
     );
   }
 
-  itselfIfSerializeCastValueCompatible(): ValueType {
-    return this as unknown as ValueType;
+  override itselfIfSerializeCastValueCompatible(): this | null {
+    return (
+      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
+    ).serializeCastValueCompatible()
+      ? this
+      : null;
   }
 
   equals(other: ValueType): boolean {
@@ -123,15 +129,26 @@ export class NormalizedValueType {
       castTypesEqual(this.castType, (other as unknown as NormalizedValueType).castType)
     );
   }
+
+  eql(other: ValueType): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash([this.constructor, this.castType, this.normalizer, this.normalizeNil]);
+  }
+
+  inspect(): string {
+    return rbObjInspect(this);
+  }
+
+  private normalize(value: unknown): unknown {
+    if ((value === null || value === undefined) && !this.normalizeNil) return value;
+    return this.normalizer(value);
+  }
 }
 
 function castTypesEqual(a: ValueType, b: ValueType): boolean {
   const equals = (a as { equals?(other: ValueType): boolean }).equals;
   return equals ? equals.call(a, b) : a === b;
-}
-
-/** @internal */
-function normalize(type: NormalizedValueType, value: unknown): unknown {
-  if ((value === null || value === undefined) && !type.normalizeNil) return value;
-  return type.normalizer(value);
 }

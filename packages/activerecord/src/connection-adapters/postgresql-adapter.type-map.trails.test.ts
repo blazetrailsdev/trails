@@ -51,20 +51,24 @@ describe("PostgreSQLAdapter#getOidType", () => {
 
   it("returns the registered type for a known OID", async () => {
     adapter.typeMap.registerType(2950, new Uuid());
-    const type = adapter.getOidType(2950, -1, "guid");
+    const type = await adapter.getOidType(2950, -1, "guid");
     expect(type).toBeInstanceOf(Uuid);
   });
 
-  it("warns and registers a fallback ValueType for an unknown OID", () => {
+  it("warns and registers a fallback ValueType for an unknown OID", async () => {
+    const load = vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const type = adapter.getOidType(999_999, -1, "mystery_column");
+    const type = await adapter.getOidType(999_999, -1, "mystery_column");
     expect(type).toBeInstanceOf(ValueType);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("unknown OID 999999"));
     warn.mockClear();
-    const second = adapter.getOidType(999_999, -1, "mystery_column");
-    expect(second).toBeInstanceOf(ValueType);
+    expect(load).toHaveBeenCalledWith([999_999]);
+    load.mockClear();
+    const second = await adapter.getOidType(999_999, -1, "mystery_column");
+    expect(second).toBe(type);
     expect(warn).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   basicObjRespondTo,
   rbInspect as inspect,
+  rbObjInspect,
   rbObjAsString as toS,
   rbObjRespondTo,
 } from "./object.js";
@@ -48,5 +49,19 @@ describe("Object#respond_to?", () => {
     expect(rbObjRespondTo(overriding, "name")).toBe(true);
     expect(rbObjRespondTo(overriding, "respondTo")).toBe(false);
     expect(rbObjRespondTo({ id: 1 }, "id")).toBe(true);
+  });
+});
+
+describe("rbObjInspect", () => {
+  it("renders a self-referencing ivar as ... instead of recursing", () => {
+    class Node {
+      self: unknown = null;
+      inspect(): string {
+        return rbObjInspect(this);
+      }
+    }
+    const node = new Node();
+    node.self = node;
+    expect(node.inspect()).toMatch(/^#<Node:0x[0-9a-f]{16} @self=#<Node:0x[0-9a-f]{16} \.\.\.>>$/);
   });
 });

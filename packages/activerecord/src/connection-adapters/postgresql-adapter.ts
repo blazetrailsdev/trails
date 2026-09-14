@@ -9,6 +9,7 @@ import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
+import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
 import { _Base } from "../base-slot.js";
@@ -393,7 +394,6 @@ export class PostgreSQLAdapter
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
   private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
-  private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   private _connectionConfigured = false;
   private _typeMapEagerLoaded = false;
@@ -584,19 +584,22 @@ export class PostgreSQLAdapter
     await this.loadAdditionalTypes();
   }
 
-  /**
-   * @internal
-   * @missingRailsCall load_additional_types — PERMANENT
-   */
-  getOidType(oid: number, fmod: number, columnName: string, sqlType: string = ""): ValueType {
+  /** @internal */
+  async getOidType(
+    oid: number,
+    fmod: number,
+    columnName: string,
+    sqlType: string = "",
+  ): Promise<ValueType> {
+    if (!this.typeMap.isKey(oid)) {
+      await this.loadAdditionalTypes([oid]);
+    }
+
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
-      if (!this._warnedOids.has(oid)) {
-        this._warnedOids.add(oid);
-        console.warn(
-          `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
-        );
-      }
-      const castType = new ValueType();
+      console.warn(
+        `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
+      );
+      const castType = Type.defaultValue();
       this.typeMap.registerType(oid, castType);
       return castType;
     });
@@ -2336,7 +2339,12 @@ export interface PostgreSQLAdapter {
   dataSourceSql(options: { type?: string }): string;
 
   /** @internal */
-  fetchTypeMetadata(columnName: string, sqlType: string, oid: number, fmod: number): TypeMetadata;
+  fetchTypeMetadata(
+    columnName: string,
+    sqlType: string,
+    oid: number,
+    fmod: number,
+  ): Promise<TypeMetadata>;
 
   /** @internal */
   quotedScope(

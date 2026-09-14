@@ -27,6 +27,7 @@ export {
   basicObjRespondTo,
   rbBuiltinClassName,
   rbInspect,
+  rbObjInspect,
   rbObjAsString,
   rbObjClass,
   rbObjRespondTo,

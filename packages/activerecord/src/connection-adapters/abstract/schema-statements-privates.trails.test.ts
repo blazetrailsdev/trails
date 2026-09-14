@@ -1,3 +1,4 @@
+import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { describe, it, expect, vi } from "vitest";
 import { SchemaStatements, canRemoveIndexByName } from "./schema-statements.js";
 import {
@@ -435,14 +436,14 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("fetchTypeMetadata returns SqlTypeMetadata with sqlType", () => {
-    const meta = makeStatements().fetchTypeMetadata("varchar(255)");
+    const meta = makeStatements().fetchTypeMetadata("varchar(255)") as SqlTypeMetadata;
     expect(meta.sqlType).toBe("varchar(255)");
     expect(meta.type).toBe("string");
     expect(meta.limit).toBe(255);
   });
 
   it("fetchTypeMetadata keeps a nil sql_type nil", () => {
-    const meta = makeStatements().fetchTypeMetadata(null);
+    const meta = makeStatements().fetchTypeMetadata(null) as SqlTypeMetadata;
     expect(meta.sqlType).toBeNull();
     expect(meta.type).toBeUndefined();
   });

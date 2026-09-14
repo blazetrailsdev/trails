@@ -1,3 +1,4 @@
+import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
@@ -344,9 +345,12 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  return new TypeMetadata(BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType), {
-    extra,
-  });
+  return new TypeMetadata(
+    BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType) as SqlTypeMetadata,
+    {
+      extra,
+    },
+  );
 }
 
 /** @internal */

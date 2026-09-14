@@ -235,7 +235,10 @@ export interface AbstractAdapter {
   ): Promise<void>;
   renameTable(tableName: string, newName: string): Promise<void>;
   /** @internal */
-  fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata;
+  fetchTypeMetadata(
+    sqlType: string | null,
+    ..._rest: unknown[]
+  ): SqlTypeMetadata | Promise<SqlTypeMetadata>;
   addColumn(
     tableName: string,
     columnName: string,
