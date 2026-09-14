@@ -85,9 +85,9 @@ export class EncryptedQuery {
     if (isEmpty(deterministicEncryptedAttributes.call(owner))) return args;
 
     let options: unknown;
-    if (Array.isArray(args) && isPlainObject((options = args[0]))) {
-      options = transformKeys(
-        options as Record<string, unknown>,
+    if (Array.isArray(args) && (isPlainObject((options = args[0])) || options instanceof Map)) {
+      const hash = transformKeys(
+        options as Map<string, unknown>,
         ((key: unknown) => {
           if (Array.isArray(key)) {
             return key.map((k) => String(k));
@@ -95,8 +95,8 @@ export class EncryptedQuery {
             return String(key);
           }
         }) as (key: string) => string,
-      );
-      args[0] = options;
+      ) as Map<string, unknown> | Record<string, unknown>;
+      args[0] = hash;
 
       for (let attributeName of deterministicEncryptedAttributes.call(owner)) {
         attributeName = String(attributeName);
@@ -104,14 +104,12 @@ export class EncryptedQuery {
         let value: unknown;
         if (
           !isEmpty(type.previousTypes) &&
-          (value = (options as Record<string, unknown>)[attributeName]) != null &&
+          (value = hash instanceof Map ? hash.get(attributeName) : hash[attributeName]) != null &&
           value !== false
         ) {
-          (options as Record<string, unknown>)[attributeName] = this.processEncryptedQueryArgument(
-            value,
-            checkForAdditionalValues,
-            type,
-          );
+          value = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
+          if (hash instanceof Map) hash.set(attributeName, value);
+          else hash[attributeName] = value;
         }
       }
     }
