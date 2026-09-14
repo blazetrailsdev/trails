@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class PostgresqlMoney extends Base {
   static {
@@ -111,7 +111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "postgresql_moneys");
+      const output = await dumpTableSchema(connection, "postgresql_moneys");
       expect(output).toMatch(/t\.money\s*\("wealth",\s*\{\s*scale:\s*2\s*\}/);
       expect(output).toMatch(
         /t\.money\s*\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"[^}]*\}/,

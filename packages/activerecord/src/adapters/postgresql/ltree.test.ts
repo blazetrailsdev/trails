@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { Base } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class Ltree extends Base {
   static {
@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "ltrees");
+      const output = await dumpTableSchema(connection, "ltrees");
       expect(output).toMatch(/t\.ltree\("path"\)/);
     });
   });

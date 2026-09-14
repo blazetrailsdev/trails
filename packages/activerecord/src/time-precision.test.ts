@@ -4,10 +4,10 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
-import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Rational } from "@blazetrails/ruby-compat";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 function nsecTime(v: RubyTime): number {
   return v.nsec;
@@ -113,7 +113,7 @@ describe("TimePrecisionTest", () => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
     });
-    const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
+    const output = await dumpTableSchema(adapter, "foos");
     expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
     expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
   });

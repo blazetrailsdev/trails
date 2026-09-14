@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const TABLE_NAME = "things";
 const LOGGED_QUERY = `SELECT relpersistence FROM pg_class WHERE relname = '${TABLE_NAME}'`;
@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("not included in schema dump", async () => {
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, () => {});
-      const output = await SchemaDumper.dumpTableSchema(connection, TABLE_NAME);
+      const output = await dumpTableSchema(connection, TABLE_NAME);
       expect(output).not.toMatch(/unlogged/i);
     });
 

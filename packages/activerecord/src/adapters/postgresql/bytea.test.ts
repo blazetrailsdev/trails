@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class ByteaDataType extends Base {
   static {
@@ -154,7 +154,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "bytea_data_type");
+      const output = await dumpTableSchema(connection, "bytea_data_type");
       expect(output).toMatch(/t\.binary\s*\("payload"\);$/m);
       expect(output).toMatch(/t\.binary\s*\("serialized"\);$/m);
     });

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
@@ -13,6 +12,7 @@ import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 fixtures({}, { useTransactionalTests: false });
 
@@ -201,10 +201,7 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   });
 
   it("schema dump includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
     expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
     expect(output).toMatch(
       /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
@@ -230,10 +227,7 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   });
 
   itIfSupports("default_expression", "schema dump includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
     expect(output).toMatch(
       /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
     );
@@ -243,10 +237,7 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
     "default_expression",
     "schema dump includes default expression with single quotes reflected correctly",
     async () => {
-      const output = await SchemaDumper.dumpTableSchema(
-        adapter as unknown as SchemaSource,
-        "defaults",
-      );
+      const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
       expect(output).toMatch(
         /t\.string\("char2_concatenated", \{ default: \(\) => "\(?concat\(`char2`,\s*(_utf8mb4)?'-'\)\)?" \}\)/i,
       );
@@ -254,70 +245,49 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   );
 
   it("schema dump datetime includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "datetime_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("modified_datetime", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
     );
   });
 
   it("schema dump datetime includes precise default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "datetime_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("precise_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump datetime includes precise default expression with on update", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "datetime_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("updated_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "timestamp_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("modified_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes precise default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "timestamp_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("precise_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes precise default expression with on update", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "timestamp_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("updated_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp without default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "timestamp_defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "timestamp_defaults");
     expect(output).toMatch(/t\.timestamp\("nullable_timestamp"\);/);
   });
 });
@@ -390,10 +360,7 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   });
 
   it("schema dump includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
+    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
     expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
     expect(output).toMatch(
       /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import {
   describeIfMysqlAdapter,
@@ -9,6 +8,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "./test-helper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const skipNoTableOptions =
   isMariaDb ||
@@ -16,7 +16,7 @@ const skipNoTableOptions =
   new Version(mysqlVersion.replace(/-.*$/, "")).compare("5.7.22") >= 0;
 
 const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
-  SchemaDumper.dumpTableSchema(adapter as unknown as SchemaSource, tableName);
+  dumpTableSchema(adapter as unknown as SchemaSource, tableName);
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

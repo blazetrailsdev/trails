@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -23,8 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlBitStringTest", () => {
     it("bit string", async () => {
-      const { SchemaDumper } = await import("../../schema-dumper.js");
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_bit_strings");
+      const output = await dumpTableSchema(adapter, "postgresql_bit_strings");
       expect(output).toMatch(/t\.bit\("a_bit",\s*\{[^}]*limit:\s*8[^}]*default:\s*"00000011"/);
       expect(output).toMatch(
         /t\.bitVarying\("a_bit_varying",\s*\{[^}]*limit:\s*4[^}]*default:\s*"0011"/,

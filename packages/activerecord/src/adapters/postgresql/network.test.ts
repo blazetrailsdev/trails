@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class PostgresqlNetworkAddress extends Base {
   static {
@@ -106,7 +106,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await SchemaDumper.dumpTableSchema(connection, "postgresql_network_addresses");
+      const output = await dumpTableSchema(connection, "postgresql_network_addresses");
       expect(output).toMatch(/t\.inet\(\s*"inet_address",\s*\{[^}]*default:\s*"192\.168\.1\.1"/);
       expect(output).toMatch(
         /t\.cidr\(\s*"cidr_address",\s*\{[^}]*default:\s*"192\.168\.1\.0\/24"/,

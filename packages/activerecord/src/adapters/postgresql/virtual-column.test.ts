@@ -5,7 +5,7 @@ import { FixtureSet } from "../../fixtures.js";
 import { fixtures } from "../../test-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { Base } from "../../index.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -108,7 +108,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "virtual_columns");
+      const output = await dumpTableSchema(adapter, "virtual_columns");
       expect(output).toMatch(
         /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"upper\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
       );

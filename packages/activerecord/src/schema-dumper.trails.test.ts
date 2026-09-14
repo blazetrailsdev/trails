@@ -12,6 +12,7 @@ import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {
   return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }), true, {
@@ -264,47 +265,39 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("dumps schema from adapter introspection", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("horses", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
     });
-    const result = await TopLevelDumper.dumpTableSchema(adapter, "horses");
+    const result = await dumpTableSchema(adapter, "horses");
     expect(result).toContain("horses");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
   });
 
   it("dumps schema with indexes from adapter", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("testings", {}, (t) => {
       t.integer("post_id");
     });
     await adapter.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
-    const result = await TopLevelDumper.dumpTableSchema(adapter, "testings");
+    const result = await dumpTableSchema(adapter, "testings");
     expect(result).toContain("t.index(");
     expect(result).toContain("index_testings_on_post_id");
   });
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
-    const result = await TopLevelDumper.dumpTableSchema(adapter, "octopi");
+    const result = await dumpTableSchema(adapter, "octopi");
     expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
   });
 
   it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
-    const result = await TopLevelDumper.dumpTableSchema(adapter, "barcodes");
+    const result = await dumpTableSchema(adapter, "barcodes");
     expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
   });
 

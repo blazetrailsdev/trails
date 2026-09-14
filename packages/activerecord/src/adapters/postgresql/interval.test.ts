@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
 class IntervalDataType extends Base {
@@ -122,7 +122,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with default value", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "interval_data_types");
+      const output = await dumpTableSchema(adapter, "interval_data_types");
       expect(output).toMatch(
         /t\.interval\("default_term",\s*\{[^}]*default:\s*"P3Y"|t\.column\("default_term",\s*"interval"(?:\([^)]*\))?,\s*\{[^}]*default:\s*"P3Y"/,
       );

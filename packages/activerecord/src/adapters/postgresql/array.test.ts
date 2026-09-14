@@ -1,13 +1,13 @@
 import { Rational } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const textArray = new OidArray(new ValueType());
 
@@ -144,7 +144,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("schema dump with shorthand", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
+      const output = await dumpTableSchema(adapter, "pg_arrays");
       expect(output).toMatch(/t\.string\("tags",/);
       expect(output).toMatch(/limit: 255/);
       expect(output).toMatch(/t\.integer\("ratings",/);
@@ -172,7 +172,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
       await adapter.loadAdditionalTypes();
       try {
-        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_array_defaults");
+        const output = await dumpTableSchema(adapter, "pg_array_defaults");
         const line = (name: string) => output.split("\n").find((l) => l.includes(`"${name}"`))!;
         expect(line("ints")).toMatch(/default: \[4, 4, 2\]/);
         expect(line("flags")).toMatch(/default: \[true, false\]/);

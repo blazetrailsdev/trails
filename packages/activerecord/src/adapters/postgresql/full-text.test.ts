@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -34,7 +34,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "tsvectors");
+      const output = await dumpTableSchema(adapter, "tsvectors");
       expect(output).toMatch(/t\.tsvector\("text_vector"\)/);
     });
 
