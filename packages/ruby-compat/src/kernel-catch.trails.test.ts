@@ -39,6 +39,7 @@ describe("kernelCatch", () => {
   it("constructs UncaughtThrowError from a tag and value with an optional message", () => {
     const Ctor = UncaughtThrowError as unknown as new (...args: unknown[]) => UncaughtThrowError;
     expect(new Ctor(":a", 1).tag).toBe(":a");
+    expect(() => new Ctor(":a", 1).message).toThrow("no implicit conversion of nil into String");
     expect(new Ctor(":a", 1, "uncaught throw %p").message).toBe("uncaught throw :a");
     expect(() => new Ctor(":a")).toThrow(ArgumentError);
     expect(() => new Ctor(":a", 1, "m", "n")).toThrow(ArgumentError);

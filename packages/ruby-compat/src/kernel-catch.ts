@@ -6,6 +6,7 @@ import {
 } from "./async-context-adapter.js";
 import { format } from "./kernel-format.js";
 import { LocalJumpError } from "./local-jump-error.js";
+import { TypeError as RbTypeError } from "./type-error.js";
 
 /**
  * Ruby's core `UncaughtThrowError < ArgumentError`
@@ -30,8 +31,15 @@ export class UncaughtThrowError extends ArgumentError {
     if (args.length > 1) {
       throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0..1)`);
     }
-    super(args.length === 0 ? "UncaughtThrowError" : format(args[0] as string, argv[0]));
+    super(...(args.length === 0 ? [] : [format(args[0] as string, argv[0])]));
     Object.assign(this, { tag: argv[0], value: argv[1] });
+    if (args.length === 0) {
+      Object.defineProperty(this, "message", {
+        get: () => {
+          throw new RbTypeError("no implicit conversion of nil into String");
+        },
+      });
+    }
   }
 }
 
