@@ -30,7 +30,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     adapter = new Mysql2Adapter({ _fakeConnection: true });
   });
   afterEach(async () => {
-    await adapter.close().catch(() => {});
+    await adapter.disconnectBang().catch(() => {});
   });
 
   it("active is false for a never-connected / fake adapter", async () => {
@@ -139,7 +139,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);
       } finally {
-        await fresh.close();
+        await fresh.disconnectBang();
       }
     });
   });

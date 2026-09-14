@@ -11,7 +11,7 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
   });
 
   afterEach(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("is not preventing writes inside an ambient Base scope", async () => {
@@ -28,7 +28,7 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
       expect(replica.connectionDescriptor).toBeUndefined();
       expect(replica.isPreventingWrites()).toBe(true);
     } finally {
-      await replica.close();
+      await replica.disconnectBang();
     }
   });
 });

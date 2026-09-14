@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.dropTable("bars", { ifExists: true }).catch(() => {});
     await adapter.dropTable("foos", { ifExists: true }).catch(() => {});
     await adapter.dropEnum("color", { ifExists: true }).catch(() => {});
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlInvertibleMigrationTest", () => {

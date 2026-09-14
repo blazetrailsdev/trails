@@ -77,7 +77,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await a.connectBang();
     expect(a.isActive()).toBe(true);
     expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
-    await a.close();
+    await a.disconnectBang();
     fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
@@ -95,7 +95,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await a.connectBang();
       expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
     } finally {
-      await a.close();
+      await a.disconnectBang();
       fs.rmSync(dbPath, { force: true });
     }
   });
@@ -108,14 +108,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("connect memory with url", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("column types", async () => {
@@ -191,19 +191,19 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("bad timeout", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     expect(a).toBeDefined();
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("nil timeout", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     expect(a).toBeDefined();
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("connect", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     expect(a).toBeDefined();
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("encoding", async () => {
@@ -627,7 +627,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
     expect(a.isActive()).toBe(false);
   });
 
@@ -635,14 +635,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("db is not readonly when readonly option is unspecified", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    await a.close();
+    await a.disconnectBang();
   });
 
   it("db is readonly when readonly option is true", async () => {
@@ -652,11 +652,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-test-${Date.now()}.db`);
     const writer = new BetterSQLite3Adapter({ database: tmpFile });
     await writer.execute(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await writer.close();
+    await writer.disconnectBang();
     const reader = new BetterSQLite3Adapter({ database: tmpFile, readonly: true });
     const rows = (await reader.execute(`SELECT * FROM "test"`))!;
     expect(rows).toHaveLength(0);
-    await reader.close();
+    await reader.disconnectBang();
     fs.unlinkSync(tmpFile);
   });
 
@@ -667,12 +667,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-write-${Date.now()}.db`);
     const writer = new BetterSQLite3Adapter({ database: tmpFile });
     await writer.execute(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await writer.close();
+    await writer.disconnectBang();
     const reader = new BetterSQLite3Adapter({ database: tmpFile, readonly: true });
     await expect(
       reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
     ).rejects.toThrow();
-    await reader.close();
+    await reader.disconnectBang();
     fs.unlinkSync(tmpFile);
   });
 
@@ -680,7 +680,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
     const conn = new BetterSQLite3Adapter({ database: ":memory:" });
     expect(conn._strictStrings).toBe(false);
-    await conn.close();
+    await conn.disconnectBang();
 
     SQLite3Adapter.strictStringsByDefault = true;
     try {
@@ -690,7 +690,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await expect(
         strict.execute(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
       ).rejects.toThrow(/no such column/i);
-      await strict.close();
+      await strict.disconnectBang();
     } finally {
       SQLite3Adapter.strictStringsByDefault = false;
     }
@@ -705,7 +705,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         conn.execute(`CREATE INDEX "idx_non_existent" ON "testings" ("non_existent")`),
       ).rejects.toThrow(/no such column/i);
     } finally {
-      await conn.close();
+      await conn.disconnectBang();
     }
 
     SQLite3Adapter.strictStringsByDefault = true;
@@ -718,7 +718,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
           strict.execute(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
         ).rejects.toThrow(/no such column/i);
       } finally {
-        await strict.close();
+        await strict.disconnectBang();
       }
     } finally {
       SQLite3Adapter.strictStringsByDefault = false;
@@ -730,7 +730,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     try {
       expect(conn._strictStrings).toBe(false);
     } finally {
-      await conn.close();
+      await conn.disconnectBang();
     }
 
     SQLite3Adapter.strictStringsByDefault = true;
@@ -739,7 +739,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       try {
         expect(strict._strictStrings).toBe(false);
       } finally {
-        await strict.close();
+        await strict.disconnectBang();
       }
     } finally {
       SQLite3Adapter.strictStringsByDefault = false;
@@ -795,7 +795,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         expect(capture.config?.strict).toBe(true);
         expect(conn._strictStrings).toBe(true);
       } finally {
-        await conn.close();
+        await conn.disconnectBang();
       }
     } finally {
       SQLite3Adapter.strictStringsByDefault = originalDefault;
@@ -812,7 +812,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(false);
       expect(explicit._strictStrings).toBe(false);
     } finally {
-      await explicit.close();
+      await explicit.disconnectBang();
     }
   });
 

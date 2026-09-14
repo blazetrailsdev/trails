@@ -17,7 +17,7 @@ describe("SQLite3Adapter integer bind serialization", () => {
   });
 
   afterEach(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

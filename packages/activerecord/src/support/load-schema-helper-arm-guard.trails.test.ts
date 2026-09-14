@@ -9,7 +9,7 @@ async function withAdapter(fn: (adapter: BetterSQLite3Adapter) => Promise<void>)
   try {
     await fn(adapter);
   } finally {
-    await adapter.close();
+    await adapter.disconnectBang();
   }
 }
 
@@ -92,7 +92,7 @@ describe("load_schema arm-probe guard", () => {
       expect(err).toBeInstanceOf(Error);
       expect(String(err)).not.toMatch(/is stubbed/);
     } finally {
-      await probe.close();
+      await probe.disconnectBang();
     }
   });
 

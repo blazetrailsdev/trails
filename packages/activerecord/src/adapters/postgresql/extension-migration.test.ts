@@ -12,7 +12,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS test_citext_tbl").catch(() => {});
     await adapter.disableExtension("citext", { force: "cascade" }).catch(() => {});
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlExtensionMigrationTest", () => {

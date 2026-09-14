@@ -93,7 +93,7 @@ async function recordLayPath(): Promise<Set<string>> {
   try {
     await loadCanonicalSchema(proxy);
   } finally {
-    await (real as unknown as BetterSQLite3Adapter).close();
+    await (real as unknown as BetterSQLite3Adapter).disconnectBang();
   }
   return touched;
 }

@@ -22,7 +22,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS before_rename CASCADE");
     await adapter.execute("DROP TABLE IF EXISTS after_rename CASCADE");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlRenameTableTest", () => {

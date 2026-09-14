@@ -60,7 +60,7 @@ afterEach(async () => {
     try {
       await a.execute("DROP TABLE IF EXISTS topics");
     } catch {}
-    await a.close();
+    await a.disconnectBang();
   }
 });
 

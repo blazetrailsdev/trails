@@ -20,7 +20,7 @@ describe("SQLite3Adapter bigint narrowing", () => {
 
   afterEach(async () => {
     await adapter.dropTable("widgets", { ifExists: true });
-    await adapter.close();
+    await adapter.disconnectBang();
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 

@@ -51,7 +51,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `DROP TABLE IF EXISTS referential_integrity_test_schema.nodes, referential_integrity_violation_test.parents, referential_integrity_violation_test.children, referential_integrity_tx_test.nodes CASCADE`,
       );
     } catch {}
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlReferentialIntegrityTest", () => {

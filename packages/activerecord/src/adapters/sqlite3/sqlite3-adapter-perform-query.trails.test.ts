@@ -17,7 +17,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await adapter.execute(`DROP TABLE IF EXISTS "pq"`).catch(() => undefined);
   await adapter.execute(`DROP TABLE IF EXISTS "pq_ddl"`).catch(() => undefined);
-  await adapter.close();
+  await adapter.disconnectBang();
 });
 
 describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {

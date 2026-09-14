@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.dropTable("partitioned_events", { ifExists: true });
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlPartitionsTest", () => {

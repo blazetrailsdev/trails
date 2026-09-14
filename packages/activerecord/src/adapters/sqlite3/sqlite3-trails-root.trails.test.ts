@@ -19,7 +19,7 @@ describeIfSqlite("SQLite3 Trails.root path resolution", () => {
 
       expect(fs.existsSync(path.join(root, "db", "foo.sqlite3"))).toBe(true);
     } finally {
-      await conn?.close();
+      await conn?.disconnectBang();
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
@@ -35,7 +35,7 @@ describeIfSqlite("SQLite3 Trails.root path resolution", () => {
 
       expect(fs.existsSync(path.join(root, "db", "bar.sqlite3"))).toBe(true);
     } finally {
-      await conn?.close();
+      await conn?.disconnectBang();
       process.chdir(original);
       fs.rmSync(root, { recursive: true, force: true });
     }

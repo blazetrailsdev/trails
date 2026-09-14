@@ -27,7 +27,7 @@ describe("loadCanonicalSchema", () => {
       expect(dump).not.toContain("undefined undefined: undefined");
       expect(dump).toMatch(/table topics: CREATE TABLE "?topics"?/);
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await (adapter as unknown as BetterSQLite3Adapter).disconnectBang();
     }
   });
 });

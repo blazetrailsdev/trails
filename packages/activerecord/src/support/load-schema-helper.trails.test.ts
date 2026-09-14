@@ -59,7 +59,7 @@ describe("LoadSchemaHelper", () => {
       expect(tables).not.toContain("chat_messages");
       expect(tables).toContain("defaults");
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await (adapter as unknown as BetterSQLite3Adapter).disconnectBang();
     }
   });
 });

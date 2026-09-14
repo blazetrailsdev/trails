@@ -18,7 +18,7 @@ describeIfPg("Migration", () => {
   });
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS strings");
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PgChangeSchemaTest", () => {

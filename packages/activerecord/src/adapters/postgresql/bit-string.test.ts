@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_bit_strings`);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlBitStringTest", () => {

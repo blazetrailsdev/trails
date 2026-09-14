@@ -64,7 +64,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
           `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${currentEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         );
       } finally {
-        await adapter.close();
+        await adapter.disconnectBang();
       }
 
       try {
@@ -82,7 +82,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
 
         await cleanup.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
-        await cleanup.close();
+        await cleanup.disconnectBang();
         DatabaseTasks.databaseConfiguration = originalConfigurations;
         DatabaseTasks.clearRegisteredTasks();
         fs.rmSync(tmp, { recursive: true, force: true });
@@ -117,7 +117,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
       await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
     } finally {
-      await adapter.close();
+      await adapter.disconnectBang();
     }
     try {
       await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
@@ -126,7 +126,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     } finally {
       const cleanup = new BetterSQLite3Adapter({ database: dbFile });
       await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
-      await cleanup.close();
+      await cleanup.disconnectBang();
       DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -166,7 +166,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
           `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${env}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         );
       } finally {
-        await adapter.close();
+        await adapter.disconnectBang();
       }
     }
 
@@ -181,7 +181,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
         );
         await secondary.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
       } finally {
-        await secondary.close();
+        await secondary.disconnectBang();
       }
 
       Base.protectedEnvironments = [env];
@@ -1198,7 +1198,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     await seed.executeMutation("INSERT INTO colleges (name) VALUES ('trails')");
     await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
     await seed.executeMutation("INSERT INTO ar_internal_metadata (key, value) VALUES ('a', 'b')");
-    await seed.close();
+    await seed.disconnectBang();
 
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
@@ -1222,7 +1222,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     } finally {
       await reader.executeMutation("DROP TABLE IF EXISTS courses");
       await reader.executeMutation("DROP TABLE IF EXISTS colleges");
-      await reader.close();
+      await reader.disconnectBang();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });

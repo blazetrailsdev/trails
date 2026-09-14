@@ -159,7 +159,7 @@ describe("SQLite adapter driver binding", () => {
   it("disconnectBang fires async driver.close() and close() drains it", async () => {
     let closed = false;
     let resolveClose: () => void;
-    const closeGate = new Promise<void>((resolve) => {
+    let closeGate = new Promise<void>((resolve) => {
       resolveClose = resolve;
     });
     const driver = asyncDriver(async (config) => {
@@ -179,10 +179,30 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
-    await adapter.disconnectBang();
+    const disconnecting = adapter.disconnectBang();
     expect(closed).toBe(false);
     resolveClose!();
-    await adapter.close();
+    await disconnecting;
+    expect(closed).toBe(true);
+
+    const queued = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
+    let releaseStatement: () => void;
+    queued._statementLock = new Promise<void>((resolve) => {
+      releaseStatement = resolve;
+    });
+    closed = false;
+    closeGate = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    let settled = false;
+    const queuedDisconnect = queued.disconnectBang().then(() => {
+      settled = true;
+    });
+    releaseStatement!();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(settled).toBe(false);
+    resolveClose!();
+    await queuedDisconnect;
     expect(closed).toBe(true);
   });
 
@@ -202,8 +222,7 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await SQLite3Adapter.openAsync({ database: ":memory:", driver });
-    await adapter.disconnectBang();
-    await expect(adapter.close()).resolves.toBeUndefined();
+    await expect(adapter.disconnectBang()).resolves.toBeUndefined();
   });
 
   it("completes a deferred async-only open on the first query (sync checkout path)", async () => {
@@ -433,11 +452,12 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
-    await conn.disconnectBang();
+    const disconnecting = conn.disconnectBang();
 
     const draining = pool.discardBang();
     expect(isClosed()).toBe(false);
     release();
+    await disconnecting;
     await draining;
     expect(isClosed()).toBe(true);
   });

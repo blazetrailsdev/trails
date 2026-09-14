@@ -21,7 +21,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     await adapter.execute(`DROP TABLE IF EXISTS pq`);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {

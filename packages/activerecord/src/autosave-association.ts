@@ -9,15 +9,6 @@ import { throwAbort, underscore } from "@blazetrails/activesupport";
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
 const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor");
 
-function _guardKey(association: unknown): string {
-  if (typeof association === "string") return association;
-  if (association && typeof (association as any).name === "string")
-    return (association as any).name;
-  if (association && typeof (association as any).reflection?.name === "string")
-    return (association as any).reflection.name;
-  return String(association);
-}
-
 interface AutosaveAssociationHost {
   [key: symbol]: unknown;
   _markedForDestruction: boolean;
@@ -74,13 +65,13 @@ export const AutosaveAssociation = {
   },
 
   isValidatingBelongsToFor(this: AutosaveAssociationHost, association: unknown): boolean {
-    const map = this[VALIDATING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
-    return map?.get(_guardKey(association)) ?? false;
+    this[VALIDATING_BELONGS_TO_FOR] ??= new Map<unknown, boolean>();
+    return (this[VALIDATING_BELONGS_TO_FOR] as Map<unknown, boolean>).get(association) ?? false;
   },
 
   isAutosavingBelongsToFor(this: AutosaveAssociationHost, association: unknown): boolean {
-    const map = this[AUTOSAVING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
-    return map?.get(_guardKey(association)) ?? false;
+    this[AUTOSAVING_BELONGS_TO_FOR] ??= new Map<unknown, boolean>();
+    return (this[AUTOSAVING_BELONGS_TO_FOR] as Map<unknown, boolean>).get(association) ?? false;
   },
 
   associatedRecordsToValidateOrSave,
@@ -97,38 +88,6 @@ export const AutosaveAssociation = {
   isInversePolymorphicAssociationChanged,
   saveBelongsToAssociation,
 };
-
-function _setValidatingBelongsToFor(record: any, association: unknown, value: boolean): void {
-  let map = record[VALIDATING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
-  if (!map) {
-    if (!value) return;
-    map = new Map();
-    record[VALIDATING_BELONGS_TO_FOR] = map;
-  }
-  const key = _guardKey(association);
-  if (value) {
-    map.set(key, true);
-  } else {
-    map.delete(key);
-    if (map.size === 0) delete record[VALIDATING_BELONGS_TO_FOR];
-  }
-}
-
-function _setAutosavingBelongsToFor(record: any, association: unknown, value: boolean): void {
-  let map = record[AUTOSAVING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
-  if (!map) {
-    if (!value) return;
-    map = new Map();
-    record[AUTOSAVING_BELONGS_TO_FOR] = map;
-  }
-  const key = _guardKey(association);
-  if (value) {
-    map.set(key, true);
-  } else {
-    map.delete(key);
-    if (map.size === 0) delete record[AUTOSAVING_BELONGS_TO_FOR];
-  }
-}
 
 export function build(_model: typeof Base, reflection: { options: Record<string, unknown> }): void {
   if (reflection.options.autosave && reflection.options.validate === undefined) {
@@ -274,11 +233,8 @@ export async function saveHasOneAssociation(
       typeof reflection?.inverseOf === "function"
         ? reflection.inverseOf()
         : (reflection?.inverseOf ?? null);
-    if (
-      inverse &&
-      typeof (record as any).isAutosavingBelongsToFor === "function" &&
-      (record as any).isAutosavingBelongsToFor(inverse)
-    )
+    const inverseAssociation = inverse && (record as any).association(inverse.name);
+    if (inverseAssociation && (record as any).isAutosavingBelongsToFor(inverseAssociation))
       return true;
 
     const saved = await record.save({ validate: !autosave });
@@ -316,12 +272,13 @@ export async function saveBelongsToAssociation(
   }
 
   if (record.isNewRecord() || (autosave && record.changedForAutosave())) {
-    _setAutosavingBelongsToFor(owner, association, true);
     let saved: boolean | undefined;
     try {
+      (owner as any)[AUTOSAVING_BELONGS_TO_FOR] ??= new Map<unknown, boolean>();
+      (owner as any)[AUTOSAVING_BELONGS_TO_FOR].set(association, true);
       saved = await record.save({ validate: !autosave });
     } finally {
-      _setAutosavingBelongsToFor(owner, association, false);
+      (owner as any)[AUTOSAVING_BELONGS_TO_FOR].set(association, false);
     }
     if (!saved) {
       if (autosave) {
@@ -417,14 +374,13 @@ export async function validateHasOneAssociation(
     typeof reflection.inverseOf === "function"
       ? reflection.inverseOf()
       : (reflection.inverseOf ?? null);
-  if (inverse) {
-    const inverseInst = associationInstanceGet.call(record, inverse.name) as any;
-    if (
-      inverseInst &&
-      (record.isValidatingBelongsToFor?.(inverse) || record.isAutosavingBelongsToFor?.(inverse))
-    )
-      return;
-  }
+  const inverseAssociation = inverse && record.association(inverse.name);
+  if (
+    inverseAssociation &&
+    (record.isValidatingBelongsToFor(inverseAssociation) ||
+      record.isAutosavingBelongsToFor(inverseAssociation))
+  )
+    return;
   await isAssociationValid.call(this, inst, record);
 }
 
@@ -440,11 +396,12 @@ export async function validateBelongsToAssociation(
     typeof (this as any).customValidationContext === "function" &&
     (this as any).customValidationContext();
   if (!record.changedForAutosave() && !customCtx) return;
-  _setValidatingBelongsToFor(this, reflection, true);
   try {
+    this[VALIDATING_BELONGS_TO_FOR] ??= new Map<unknown, boolean>();
+    (this[VALIDATING_BELONGS_TO_FOR] as Map<unknown, boolean>).set(inst, true);
     await isAssociationValid.call(this, inst, record);
   } finally {
-    _setValidatingBelongsToFor(this, reflection, false);
+    (this[VALIDATING_BELONGS_TO_FOR] as Map<unknown, boolean>).set(inst, false);
   }
 }
 

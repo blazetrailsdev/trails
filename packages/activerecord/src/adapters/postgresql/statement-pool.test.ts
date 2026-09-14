@@ -9,7 +9,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("StatementPoolTest", () => {
@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const pool = adapter._statements;
       await adapter.rollbackDbTransaction();
-      await adapter.close();
+      await adapter.disconnectBang();
       expect(() => pool.clear()).not.toThrow();
     });
 

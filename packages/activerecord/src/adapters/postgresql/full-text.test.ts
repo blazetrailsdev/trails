@@ -11,7 +11,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   describe("PostgresqlFullTextTest", () => {

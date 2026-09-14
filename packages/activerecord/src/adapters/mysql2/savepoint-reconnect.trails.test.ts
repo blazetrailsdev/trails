@@ -19,7 +19,7 @@ describeIfMysqlAdapter("Mysql2Adapter savepoint statements dirty the parent (tra
   });
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("createSavepoint dirties the current (parent) transaction frame", async () => {

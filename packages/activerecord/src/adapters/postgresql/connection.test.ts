@@ -15,7 +15,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   afterEach(async () => {
     subscriber.stop();
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   it("encoding", async () => {
@@ -47,7 +47,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const result = await optionsAdapter.execute("SHOW geqo");
       expect(result[0]?.geqo).toBe("off");
     } finally {
-      await optionsAdapter.close();
+      await optionsAdapter.disconnectBang();
     }
   });
 
@@ -156,7 +156,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
       expect(rows.rows).toEqual([["on"]]);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -169,7 +169,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
       expect(rows.rows).toEqual([["off"]]);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -183,7 +183,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
       expect(rows.rows).toEqual(baseline.rows);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -197,7 +197,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
       expect(rows.rows).toEqual(baseline.rows);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -210,7 +210,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execute("SHOW TIME ZONE");
       expect(rows[0]?.TimeZone).toBe("America/New_York");
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -245,7 +245,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const level = await a.clientMinMessages();
       expect(level).toBe("notice");
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -290,7 +290,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execute("SELECT 1 AS n");
       expect(rows[0]?.n).toBe(1);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 
@@ -304,7 +304,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       const rows = await a.execute("SELECT 2 AS n");
       expect(rows[0]?.n).toBe(2);
     } finally {
-      await a.close();
+      await a.disconnectBang();
     }
   });
 });

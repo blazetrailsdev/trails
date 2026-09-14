@@ -94,7 +94,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
   });
 
   afterAll(async () => {
-    await adapter.close();
+    await adapter.disconnectBang();
   });
 
   withTransactionalFixtures(() => adapter);

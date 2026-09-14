@@ -7,7 +7,7 @@ async function configureSql(config: Record<string, unknown>): Promise<string> {
   vi.spyOn(adapter, "checkVersion").mockResolvedValue(undefined as never);
   const rawExecute = vi.spyOn(adapter, "rawExecute").mockResolvedValue(undefined);
   await AbstractMysqlAdapter.prototype.configureConnection.call(adapter);
-  await adapter.close();
+  await adapter.disconnectBang();
   expect(rawExecute).toHaveBeenCalledTimes(1);
   expect(rawExecute.mock.calls[0][1]).toBe("SCHEMA");
   return rawExecute.mock.calls[0][0];

@@ -43,7 +43,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await expect(badAdapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
       } finally {
-        await badAdapter.close();
+        await badAdapter.disconnectBang();
       }
     });
 
@@ -57,7 +57,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           await new Promise((r) => setTimeout(r, 2000));
           expect(await singleConn.active()).toBe(false);
         } finally {
-          await singleConn.close();
+          await singleConn.disconnectBang();
         }
       },
       10_000,
@@ -72,7 +72,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
-        await singleConn.close();
+        await singleConn.disconnectBang();
       }
     }, 10_000);
     it("successful reconnection after timeout with verify", async () => {
@@ -86,7 +86,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
-        await singleConn.close();
+        await singleConn.disconnectBang();
       }
     }, 10_000);
     it("execute after disconnect reconnects", async () => {
@@ -148,7 +148,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(parseInt(result.rows![0][0] as string, 10)).toBe(60);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("wait timeout as url", async () => {
@@ -161,7 +161,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(parseInt(result.rows![0][0] as string, 10)).toBe(60);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
 
@@ -189,7 +189,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(String(result.rows![0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("mysql strict mode specified default", async () => {
@@ -203,7 +203,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(sessionResult.rows![0][0]).toBe(globalResult.rows![0][0]);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("mysql sql mode variable overrides strict mode", async () => {
@@ -217,7 +217,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(String(result.rows![0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("passing arbitrary flags to adapter", async () => {
@@ -225,7 +225,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         expect(testAdapter._testOnlyPoolFlags()).toEqual(["COMPRESS", "FOUND_ROWS"]);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("passing flags by array to adapter", async () => {
@@ -236,7 +236,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         expect(testAdapter._testOnlyPoolFlags()).toEqual(["FOUND_ROWS", "COMPRESS"]);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("mysql set session variable", async () => {
@@ -250,7 +250,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(parseInt(result.rows![0][0] as string, 10)).toBe(3);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
     it("mysql set session variable to default", async () => {
@@ -267,7 +267,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         )) as Mysql2RawResult;
         expect(sessionResult.rows![0][0]).toBe(globalResult.rows![0][0]);
       } finally {
-        await testAdapter.close();
+        await testAdapter.disconnectBang();
       }
     });
 
@@ -392,7 +392,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -404,7 +404,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("baduser");
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -416,7 +416,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("myuser");
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -428,7 +428,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(err).toBeInstanceOf(DatabaseConnectionError);
         expect(err.message).toContain("myhost.example.com");
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
 
@@ -438,7 +438,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
       } finally {
-        await a.close();
+        await a.disconnectBang();
       }
     });
   });
