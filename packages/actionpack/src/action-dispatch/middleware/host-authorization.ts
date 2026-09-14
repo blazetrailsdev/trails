@@ -1,7 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { Logger } from "./debug-exceptions.js";
 
 /** @internal */
@@ -20,6 +20,117 @@ export const VALID_IP_HOSTNAME: RegExp[] = [
   new RegExp(`^${IPV6_HOSTNAME}$`, "i"),
   new RegExp(`^${IPV6_HOSTNAME_WITH_PORT}$`, "i"),
 ];
+
+export class IPAddr {
+  readonly family: "v4" | "v6";
+  private readonly network: bigint;
+  private readonly mask: bigint;
+
+  constructor(spec: string) {
+    const [addr, prefixStr] = spec.split("/");
+    if (addr.includes(":")) {
+      this.family = "v6";
+      const full = parseIpv6(addr);
+      const prefix = parsePrefix(prefixStr, 128, spec);
+      this.mask = prefixToMask(prefix, 128);
+      this.network = full & this.mask;
+    } else {
+      this.family = "v4";
+      const full = parseIpv4(addr);
+      const prefix = parsePrefix(prefixStr, 32, spec);
+      this.mask = prefixToMask(prefix, 32);
+      this.network = full & this.mask;
+    }
+  }
+
+  includes(host: string): boolean {
+    try {
+      if (this.family === "v4") {
+        if (host.includes(":")) return false;
+        return (parseIpv4(host) & this.mask) === this.network;
+      }
+      const stripped = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+      if (!stripped.includes(":")) return false;
+      return (parseIpv6(stripped) & this.mask) === this.network;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function parsePrefix(prefixStr: string | undefined, bits: number, spec: string): number {
+  if (prefixStr === undefined) return bits;
+  if (!/^\d+$/.test(prefixStr)) throw new Error(`invalid IP prefix: ${spec}`);
+  const n = Number.parseInt(prefixStr, 10);
+  if (n < 0 || n > bits) throw new Error(`invalid IP prefix: ${spec}`);
+  return n;
+}
+
+function prefixToMask(prefix: number, bits: number): bigint {
+  if (prefix === 0) return 0n;
+  if (prefix === bits) return (1n << BigInt(bits)) - 1n;
+  const full = (1n << BigInt(bits)) - 1n;
+  return full ^ ((1n << BigInt(bits - prefix)) - 1n);
+}
+
+function parseIpv4(addr: string): bigint {
+  const parts = addr.split(".");
+  if (parts.length !== 4) throw new Error(`invalid IPv4: ${addr}`);
+  let out = 0n;
+  for (const p of parts) {
+    const n = Number.parseInt(p, 10);
+    if (!Number.isInteger(n) || n < 0 || n > 255) throw new Error(`invalid IPv4: ${addr}`);
+    out = (out << 8n) | BigInt(n);
+  }
+  return out;
+}
+
+const HEXTET_RE = /^[0-9a-f]{1,4}$/i;
+
+function parseIpv6(addr: string): bigint {
+  const doubleColonCount = addr.split("::").length - 1;
+  if (doubleColonCount > 1) throw new Error(`invalid IPv6: ${addr}`);
+  let head: string;
+  let tail: string;
+  let collapsed: boolean;
+  if (doubleColonCount === 1) {
+    const [h, t] = addr.split("::");
+    head = h;
+    tail = t ?? "";
+    collapsed = true;
+  } else {
+    head = addr;
+    tail = "";
+    collapsed = false;
+  }
+  const headParts = head ? head.split(":") : [];
+  const tailParts = tail ? tail.split(":") : [];
+  const last =
+    tailParts.length > 0 ? tailParts[tailParts.length - 1] : headParts[headParts.length - 1];
+  if (last && last.includes(".")) {
+    const v4 = parseIpv4(last);
+    const hi = Number(v4 >> 16n).toString(16);
+    const lo = Number(v4 & 0xffffn).toString(16);
+    const target = tailParts.length > 0 ? tailParts : headParts;
+    target.splice(target.length - 1, 1, hi, lo);
+  }
+  const groupCount = headParts.length + tailParts.length;
+  let all: string[];
+  if (collapsed) {
+    const missing = 8 - groupCount;
+    if (missing < 1) throw new Error(`invalid IPv6: ${addr}`);
+    all = [...headParts, ...Array(missing).fill("0"), ...tailParts];
+  } else {
+    if (groupCount !== 8) throw new Error(`invalid IPv6: ${addr}`);
+    all = headParts;
+  }
+  let out = 0n;
+  for (const p of all) {
+    if (!HEXTET_RE.test(p)) throw new Error(`invalid IPv6: ${addr}`);
+    out = (out << 16n) | BigInt(Number.parseInt(p, 16));
+  }
+  return out;
+}
 
 /** @internal */
 export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
@@ -46,11 +157,7 @@ export class Permissions {
   allows(host: string): boolean {
     for (const allowed of this.hosts) {
       if (allowed instanceof IPAddr) {
-        try {
-          if (allowed.includes(extractHostname(host))) return true;
-        } catch {
-          continue;
-        }
+        if (allowed.includes(extractHostname(host))) return true;
       } else if (allowed.test(host)) {
         return true;
       }

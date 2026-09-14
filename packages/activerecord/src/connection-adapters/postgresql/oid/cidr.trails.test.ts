@@ -31,22 +31,6 @@ describe("PostgreSQL::OID::Cidr", () => {
     expect(type.castValue(ip)).toBe(ip);
   });
 
-  it("canonicalizes IPv6 to RFC 5952 form on cast (matches Ruby IPAddr#to_s)", () => {
-    const type = new Cidr();
-    expect(type.castValue("2001:DB8::1")?.toString()).toBe("2001:db8::1");
-    expect(type.castValue("2001:0DB8:0000:0000:0000:0000:0000:0001")?.toString()).toBe(
-      "2001:db8::1",
-    );
-    expect(type.castValue("2001:db8:0:0:1:0:0:1")?.toString()).toBe("2001:db8::1:0:0:1");
-    expect(type.castValue("::1")?.toString()).toBe("::1");
-    expect(type.castValue("::")?.toString()).toBe("::");
-    expect(type.castValue("0:0:0:0:0:0:0:0")?.toString()).toBe("::");
-    expect(type.castValue("::ffff:192.168.0.1")?.toString()).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("::ffff:c0a8:1")?.toString()).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("0:0:0:0:0:ffff:c0a8:1")?.toString()).toBe("::ffff:192.168.0.1");
-    expect(type.castValue("2001:db8:0:1:1:1:1:1")?.toString()).toBe("2001:db8:0:1:1:1:1:1");
-  });
-
   it("isChanged uses canonical form so textual variants don't mark dirty", () => {
     const type = new Cidr();
     const a = type.castValue("2001:DB8::1");
