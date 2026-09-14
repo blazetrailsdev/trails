@@ -10,9 +10,10 @@ import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
   isDangerousClassMethod,
+  isMethodDefinedWithin,
 } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
-import { isRelationInstanceMethod } from "./scoping/named.js";
+import { Relation } from "./relation.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 type EnumValue = number | string | boolean | null;
@@ -77,7 +78,7 @@ interface EnumInstanceHost {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
@@ -454,10 +455,7 @@ export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumM
   return mod;
 }
 
-/**
- * @missingRailsCall method_defined_within? — PERMANENT
- * @internal
- */
+/** @internal */
 export function detectEnumConflictBang(
   this: typeof import("./base.js").Base,
   enumName: string,
@@ -468,7 +466,7 @@ export function detectEnumConflictBang(
     if (isDangerousClassMethod.call(this, methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
-    if (isRelationInstanceMethod(methodName)) {
+    if (isMethodDefinedWithin.call(this, methodName, Relation)) {
       raiseConflictError.call(this, enumName, methodName, {
         type: "class",
         source: "ActiveRecord::Relation",

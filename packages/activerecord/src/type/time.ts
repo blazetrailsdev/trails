@@ -6,8 +6,7 @@ import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 export class Value {
   constructor(private readonly obj: Temporal.Instant | TimeWithZone | RubyTime) {}
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  getobj(): Temporal.Instant | TimeWithZone | RubyTime {
+  __getobj__(): Temporal.Instant | TimeWithZone | RubyTime {
     return this.obj;
   }
 }
@@ -44,6 +43,6 @@ export class Time extends ActiveModelTime {
 
   protected override castValue(value: unknown): TimeWithZone | RubyTime | null {
     const cast = super.castValue(value);
-    return cast instanceof Value ? (cast.getobj() as TimeWithZone | RubyTime) : cast;
+    return cast instanceof Value ? (cast.__getobj__() as TimeWithZone | RubyTime) : cast;
   }
 }

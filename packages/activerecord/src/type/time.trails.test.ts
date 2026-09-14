@@ -15,7 +15,7 @@ describe("ActiveRecord::Type::Time serialize_cast_value normalization", () => {
   it("getutc's a time zone-aware value when is_utc?", () => {
     const type = new Time();
     const value = new TimeWithZone(Temporal.Instant.from("2000-01-01T10:30:00Z"), pacific());
-    const obj = (type.serializeCastValue(value) as Value).getobj() as RubyTime;
+    const obj = (type.serializeCastValue(value) as Value).__getobj__() as RubyTime;
     expect(obj).toBeInstanceOf(RubyTime);
     expect(obj.isUtc()).toBe(true);
     expect(obj.strftime("%H:%M:%S")).toBe("10:30:00");
@@ -25,7 +25,7 @@ describe("ActiveRecord::Type::Time serialize_cast_value normalization", () => {
     Base.defaultTimezone = "local";
     const type = new Time();
     const value = new TimeWithZone(Temporal.Instant.from("2000-01-01T10:30:00Z"), pacific());
-    const obj = (type.serializeCastValue(value) as Value).getobj() as RubyTime;
+    const obj = (type.serializeCastValue(value) as Value).__getobj__() as RubyTime;
     expect(obj).toBeInstanceOf(RubyTime);
     expect(obj.isUtc()).toBe(false);
   });

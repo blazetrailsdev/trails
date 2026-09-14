@@ -1,16 +1,5 @@
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export async function eachDatabase(
-  adapters: DatabaseAdapter[],
-  callback: (adapter: DatabaseAdapter, index: number) => void | Promise<void>,
-): Promise<void> {
-  for (let i = 0; i < adapters.length; i++) {
-    await callback(adapters[i], i);
-  }
-}
 
 export async function createAndLoadSchema(
   i: number,

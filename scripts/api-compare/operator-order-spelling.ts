@@ -148,6 +148,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // attribute_methods.rb:415 `def [](attr_name)` / :428 `def []=(attr_name, value)`
   // → attribute-methods.ts `get` / `set`.
   "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
+  // type/adapter_specific_registry.rb:63 `def <=>(other)` →
+  // type/adapter-specific-registry.ts `Registration#compare`.
+  "ActiveRecord::Type::Registration": { "<=>": ["compare"] },
+  // migration.rb:629 `def self.[](version)` → migration.ts `Migration.get`.
+  "ActiveRecord::Migration": { "[]": ["get"] },
   // internal_metadata.rb:47 `def [](key)` / :39 `def []=(key, value)` →
   // internal-metadata.ts `InternalMetadata#get` / `set`.
   "ActiveRecord::InternalMetadata": { "[]": ["get"], "[]=": ["set"] },

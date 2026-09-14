@@ -1984,7 +1984,7 @@ describe("MigrationTest", () => {
     });
 
     it("unknown migration version should raise an argument error", () => {
-      expect(Migration.get("nonexistent")).toBeNull();
+      expect(() => Migration.get(1.0)).toThrow(ArgumentError);
     });
 
     describe("MigrationValidationTest", () => {

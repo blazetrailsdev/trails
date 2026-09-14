@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { PostgreSQLDatabaseTasks, normalizeSchemaSearchPath } from "./postgresql-database-tasks.js";
+import { PostgreSQLDatabaseTasks } from "./postgresql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
@@ -130,19 +130,6 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(env.PGUSER).toBe("someone");
     expect(env.PGPASSWORD).toBe("secret");
     expect(env.PGSSLMODE).toBe("require");
-  });
-
-  describe("structureDump schema filtering", () => {
-    it("normalizes $user and quoted entries out of --schema= args", () => {
-      expect(normalizeSchemaSearchPath("'$user', public, \"custom\"")).toEqual([
-        "public",
-        "custom",
-      ]);
-    });
-
-    it("handles empty and whitespace-only entries", () => {
-      expect(normalizeSchemaSearchPath("  , public, ,")).toEqual(["public"]);
-    });
   });
 
   it("a global ignore_tables regexp excludes every matching data source", async () => {

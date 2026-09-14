@@ -19,7 +19,7 @@ export function registerGeneratedTokenVerifierSink(
   buildDefaultVerifier();
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;
   buildDefaultVerifier();

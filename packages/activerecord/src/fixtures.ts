@@ -57,7 +57,7 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   const names: string[] = [];
@@ -202,7 +202,7 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
   ModelClass: T,
@@ -213,7 +213,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   return result as { [P in K]: InstanceType<T> };
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
   ModelClass: BaseClass,
@@ -375,7 +375,7 @@ export async function prepareModelFixtures(
   return { tables, serialReset, rollback: () => {}, finalize };
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function defineJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -386,7 +386,7 @@ export async function defineJoinTableFixtures(
   return result as Record<string, FixtureAttrs>;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function prepareJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,

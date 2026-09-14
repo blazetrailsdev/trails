@@ -88,9 +88,7 @@ export class PostgreSQLDatabaseTasks {
     }
 
     if (!isBlank(searchPath)) {
-      for (const part of normalizeSchemaSearchPath(searchPath as string)) {
-        args.push(`--schema=${part}`);
-      }
+      args.push(...(searchPath as string).split(",").map((part) => `--schema=${part.trim()}`));
     }
 
     const { SchemaDumper } = await import("../schema-dumper.js");
@@ -208,25 +206,6 @@ export class PostgreSQLDatabaseTasks {
   private publicSchemaConfig(): ConfigHash {
     return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
   }
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function normalizeSchemaSearchPath(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .map((s) => {
-      if (
-        s.length >= 2 &&
-        ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"')))
-      ) {
-        const quote = s[0];
-        const inner = s.slice(1, -1).trim();
-        return quote === '"' ? inner.replace(/""/g, '"') : inner.replace(/''/g, "'");
-      }
-      return s;
-    })
-    .filter((s) => s.length > 0 && s !== "$user");
 }
 
 /** @internal */

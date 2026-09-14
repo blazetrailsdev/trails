@@ -434,7 +434,7 @@ interface DeleteRecord {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {

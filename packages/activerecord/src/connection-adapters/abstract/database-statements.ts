@@ -176,7 +176,7 @@ export interface DatabaseStatementsHost {
   supportsConcurrentConnections?(): boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export class DatabaseStatementsBase {
   /** @missingRailsCall reset_transaction — PERMANENT */
   constructor() {

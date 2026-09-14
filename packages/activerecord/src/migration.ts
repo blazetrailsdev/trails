@@ -298,11 +298,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._version = version;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  static forVersion(v: string | number): typeof Migration {
-    return _Compatibility!.find(v) as typeof Migration;
-  }
-
   static async migrate(direction: "up" | "down"): Promise<void> {
     await new (this as unknown as new () => Migration)().migrate(direction);
   }
@@ -895,9 +890,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("indexExists", tableName, columnName)) as boolean;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  static get(_version: string): Migration | null {
-    return null;
+  static get(version: string | number): typeof Migration {
+    return _Compatibility!.find(version) as typeof Migration;
   }
 
   static currentVersion(): number {

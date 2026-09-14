@@ -324,7 +324,7 @@ export function quotedDate(value: TemporalDateLike): string {
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
-    const obj = value.getobj();
+    const obj = value.__getobj__();
     value =
       obj instanceof TimeWithZone || obj instanceof RubyTime
         ? obj

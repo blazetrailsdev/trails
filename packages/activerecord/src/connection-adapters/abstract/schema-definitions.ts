@@ -33,17 +33,7 @@ export function splitColumnNames(
   return { names: rest as string[], options };
 }
 
-/** @internal */
-/** @internal */
-function statelessTest(pattern: RegExp, value: string): boolean {
-  const stateless =
-    pattern.global || pattern.sticky
-      ? new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""))
-      : pattern;
-  return stateless.test(value);
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function assertSafeMysqlIdentifier(value: string, kind: string): void {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
@@ -119,8 +109,6 @@ export class ColumnDefinition {
   ];
 
   sqlType?: string;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  datetimePhysicalType?: string;
   constructor(
     readonly name: string,
     readonly type: ColumnType,
@@ -215,9 +203,8 @@ export class ForeignKeyDefinition {
     return this.isValidate;
   }
 
-  /** @missingRailsCall match? — PERMANENT */
   get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
+    return this.name != null ? !SchemaDumper.fkIgnorePattern.test(this.name) : false;
   }
 
   isDefinedFor({
@@ -283,7 +270,7 @@ export class CheckConstraintDefinition {
   }
 
   get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
+    return this.name != null ? !SchemaDumper.chkIgnorePattern.test(this.name) : false;
   }
 
   isDefinedFor(options: {
@@ -1249,7 +1236,7 @@ export class Table {
   async numeric(...args: unknown[]): Promise<void> {
     await this.definedColumn("decimal", args);
   }
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
   async char(...names: string[]): Promise<void>;
   async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async char(...args: unknown[]): Promise<void> {
