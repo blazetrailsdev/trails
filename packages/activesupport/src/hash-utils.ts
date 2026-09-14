@@ -95,15 +95,15 @@ export function isExtractableOptions(self: unknown): boolean {
   return isPlainObject(self);
 }
 
-export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
+export function extractOptionsBang<T>(args: T[]): AnyObject {
   const last = args[args.length - 1];
   const isHash =
     isPlainObject(last) ||
     (last !== null && typeof last === "object" && "isExtractableOptions" in last);
   if (args.length > 0 && isHash && isExtractableOptions(last)) {
-    return [args.slice(0, -1), last as unknown as AnyObject];
+    return args.pop() as unknown as AnyObject;
   }
-  return [args, {}];
+  return {};
 }
 
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {

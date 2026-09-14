@@ -230,11 +230,10 @@ describe("Serialization — trails-only coverage", () => {
     setAssociationAccessors(p, { author });
 
     expect(comments.loaded).toBe(false);
-    const result = await p.serializableHash({
-      include: { author: { include: "comments" } },
-    });
+    await expect(
+      p.serializableHash({ include: { author: { include: "comments" } } }),
+    ).rejects.toThrow(NoMethodError);
     expect(comments.loaded).toBe(true);
-    expect((result.author as { name: string }).name).toBe("Bob");
   });
 
   describe("asJson type coercion (Rails ActiveSupport::JSON parity)", () => {
@@ -441,10 +440,17 @@ describe("Serialization", () => {
 
   it("include as string for single association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const author = { _attributes: new Map([["name", "Alice"]]) };
+    const received: unknown[] = [];
+    const author = {
+      serializableHash(opts: unknown) {
+        received.push(opts);
+        return { name: "Alice" };
+      },
+    };
     setAssociationAccessors(p, { author });
     const result = p.serializableHash({ include: "author" });
-    expect((result.author as any).name).toBe("Alice");
+    expect(result.author).toEqual({ name: "Alice" });
+    expect(received).toEqual([{}]);
   });
 });
 

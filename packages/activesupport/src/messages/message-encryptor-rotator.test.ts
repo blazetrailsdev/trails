@@ -25,7 +25,8 @@ describe("MessageEncryptorRotatorTest", () => {
     secret,
 
     makeCodec(...args: unknown[]): MessageEncryptor {
-      const [positional, options] = extractOptionsBang(args);
+      const options = extractOptionsBang(args);
+      const positional = args;
       return new MessageEncryptor(
         (positional[0] as Buffer) ?? secret("secret"),
         positional[1] as Buffer | undefined,

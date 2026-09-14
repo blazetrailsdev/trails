@@ -40,7 +40,8 @@ export function defineModelCallbacks(
   ...rest: [...string[], DefineModelCallbacksOptions]
 ): void;
 export function defineModelCallbacks(this: object, ...args: unknown[]): void {
-  const [callbacks, extracted] = extractOptionsBang(args);
+  const extracted = extractOptionsBang(args);
+  const callbacks = args;
   let options = extracted as DefineModelCallbacksOptions;
   options = {
     skipAfterCallbacksIfTerminated: true,

@@ -15,7 +15,8 @@ describe("MessageVerifierRotatorTest", () => {
     secret,
 
     makeCodec(...args: unknown[]): MessageVerifier {
-      const [positional, options] = extractOptionsBang(args);
+      const options = extractOptionsBang(args);
+      const positional = args;
       return new MessageVerifier((positional[0] as string) ?? secret("secret"), options);
     },
 

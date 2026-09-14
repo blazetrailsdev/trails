@@ -11,6 +11,7 @@ import {
   cachedColumnsHash,
   isSchemaLoaded,
   reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
+  typeForColumn as modelSchemaTypeForColumn,
 } from "./model-schema.js";
 import { connectionPool } from "./connection-handling.js";
 
@@ -146,14 +147,8 @@ export function resolveTypeName(
 
 /** @internal */
 function typeForColumn(this: AnyClass, connection: unknown, column: unknown): ValueType {
-  let type = (
-    connection as { lookupCastTypeFromColumn(c: unknown): ValueType }
-  ).lookupCastTypeFromColumn(column);
-
-  if (this.immutableStringsByDefault) {
-    const toImmutableString = (type as { toImmutableString?: () => ValueType }).toImmutableString;
-    if (typeof toImmutableString === "function") type = toImmutableString.call(type);
-  }
-
-  return this.hookAttributeType((column as { name: string }).name, type);
+  return this.hookAttributeType(
+    (column as { name: string }).name,
+    modelSchemaTypeForColumn.call(this, connection, column),
+  );
 }

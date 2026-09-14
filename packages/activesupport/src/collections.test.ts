@@ -295,19 +295,22 @@ describe("extractBang", () => {
 
 describe("extractOptionsBang", () => {
   it("extracts trailing hash from args", () => {
-    const [args, opts] = extractOptionsBang(["a", "b", { limit: 10 }]);
+    const args: unknown[] = ["a", "b", { limit: 10 }];
+    const opts = extractOptionsBang(args);
     expect(args).toEqual(["a", "b"]);
     expect(opts).toEqual({ limit: 10 });
   });
 
   it("returns empty object when no trailing hash", () => {
-    const [args, opts] = extractOptionsBang(["a", "b"]);
+    const args: unknown[] = ["a", "b"];
+    const opts = extractOptionsBang(args);
     expect(args).toEqual(["a", "b"]);
     expect(opts).toEqual({});
   });
 
   it("returns empty object for empty args", () => {
-    const [args, opts] = extractOptionsBang([]);
+    const args: unknown[] = [];
+    const opts = extractOptionsBang(args);
     expect(args).toEqual([]);
     expect(opts).toEqual({});
   });

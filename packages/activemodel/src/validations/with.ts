@@ -45,7 +45,8 @@ export interface ValidatesWithClassHost {
 }
 
 export async function validatesWith(this: ValidatableRecord, ...args: unknown[]): Promise<void> {
-  const [klasses, options] = extractOptionsBang(args);
+  const options = extractOptionsBang(args);
+  const klasses = args;
   options.class = this.constructor;
 
   for (const klass of klasses as ValidatorClass[]) {
@@ -63,7 +64,8 @@ export const ClassMethods = {
       !/^class[\s{]/.test(Function.prototype.toString.call(last))
         ? (args.pop() as ValidatorBlock)
         : undefined;
-    const [klasses, options] = extractOptionsBang(args);
+    const options = extractOptionsBang(args);
+    const klasses = args;
     options.class = this;
 
     for (const klass of klasses as ValidatorClass[]) {

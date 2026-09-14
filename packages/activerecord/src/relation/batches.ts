@@ -351,19 +351,16 @@ export function batchCondition(
   values: unknown,
   operators: string[],
 ): any {
-  const table = relation._model.arelTable;
+  const predicateBuilder = relation.predicateBuilder;
+  const cursorPositions = cursor.map((column, i) => [column, Array(values)[i], operators[i]]);
 
-  const cursorPositions = cursor.map(
-    (column, i) => [column, Array(values)[i], operators[i]] as const,
-  );
-  const [firstCol, firstVal, firstOp] = cursorPositions[cursorPositions.length - 1];
-  let whereClause: any = table.get(firstCol)[firstOp](firstVal);
+  const [firstClauseColumn, firstClauseValue, operator] = cursorPositions.pop()!;
+  let whereClause: any = predicateBuilder.get(firstClauseColumn, firstClauseValue, operator);
 
-  for (let i = cursorPositions.length - 2; i >= 0; i--) {
-    const [col, val, op] = cursorPositions[i];
-    const attr = table.get(col);
-    const strictOp = op === "lteq" ? "lt" : op === "gteq" ? "gt" : op;
-    whereClause = attr[strictOp](val).or(attr.eq(val).and(whereClause));
+  for (const [columnName, value, operator] of cursorPositions.reverse()) {
+    whereClause = predicateBuilder
+      .get(columnName, value, operator === "lteq" ? "lt" : "gt")
+      .or(predicateBuilder.get(columnName, value, "eq").and(whereClause));
   }
 
   return relation.where(whereClause);

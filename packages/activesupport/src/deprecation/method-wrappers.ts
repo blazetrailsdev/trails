@@ -6,7 +6,8 @@ export function deprecateMethods(
   targetModule: Record<string, unknown>,
   ...methodNames: Array<string | Record<string, string>>
 ): Record<string, unknown> {
-  const [names, options] = extractOptionsBang(methodNames as Array<string>);
+  const options = extractOptionsBang(methodNames as Array<string>);
+  const names = methodNames as Array<string>;
   const deprecator = (options.deprecator as Deprecation | undefined) ?? this;
   delete options.deprecator;
   const methodNamesWithOptions = [...names, ...Object.keys(options)];

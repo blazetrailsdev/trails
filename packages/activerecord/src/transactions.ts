@@ -179,7 +179,8 @@ export function setCallback<T extends typeof Model>(
   name: string,
   ...filterList: FilterListEntry<any>[]
 ): void {
-  const [rest, extracted] = extractOptionsBang(filterList);
+  const extracted = extractOptionsBang(filterList);
+  const rest = filterList;
   const options = { ...extracted } as Record<string, unknown>;
 
   if ((name === "commit" || name === "rollback") && options.on !== undefined) {
@@ -456,11 +457,11 @@ export function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
 ): void {
-  const [rest, extracted] = extractOptionsBang(args);
-  const options: Record<string, unknown> = { ...extracted, ...enforcedOptions };
-  const filterList = [...rest];
-  args.length = 0;
-  args.push(...filterList, options);
+  const options: Record<string, unknown> = {
+    ...extractOptionsBang(args),
+    ...enforcedOptions,
+  };
+  args.push(options);
 
   if (options.on !== undefined) {
     const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];

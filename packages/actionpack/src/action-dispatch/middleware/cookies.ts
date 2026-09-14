@@ -444,7 +444,8 @@ export class SignedKeyRotatingCookieJar extends AbstractCookieJar {
     });
 
     for (const entry of cookiesRotations.call(this.request)!.signed) {
-      const [secrets, options] = extractOptionsBang(entry);
+      const secrets = [...entry];
+      const options = extractOptionsBang(secrets);
       this.verifier.rotate(...secrets, { serializer: NullSerializer, ...options });
     }
   }
@@ -497,7 +498,8 @@ export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
     }
 
     for (const entry of cookiesRotations.call(this.request)!.encrypted) {
-      const [secrets, options] = extractOptionsBang(entry);
+      const secrets = [...entry];
+      const options = extractOptionsBang(secrets);
       this.encryptor.rotate(...secrets, { serializer: NullSerializer, ...options });
     }
 

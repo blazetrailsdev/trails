@@ -158,8 +158,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertDropTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const [rest, options] = extractOptionsBang(args);
-    args = rest;
+    const options = extractOptionsBang(args);
     delete options["ifExists"];
 
     if (args.length > 1) {
