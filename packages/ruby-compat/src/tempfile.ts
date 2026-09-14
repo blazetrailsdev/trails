@@ -253,6 +253,16 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   }
 
   /**
+   * `alias length size` (`vendor/ruby/lib/tempfile.rb:281`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#length`
+   * (`vendor/ruby/lib/tempfile.rb:281`).
+   */
+  length(): number {
+    return this.size();
+  }
+
+  /**
    * `Tempfile#inspect` (`vendor/ruby/lib/tempfile.rb:284`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#inspect`
@@ -260,10 +270,20 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    */
   inspect(): string {
     if (this.__getobj__().isClosed()) {
-      return `#<${this.constructor.name}:${this.path()} (closed)>`;
+      return `#<${this.constructor.name}:${this.path() ?? ""} (closed)>`;
     } else {
-      return `#<${this.constructor.name}:${this.path()}>`;
+      return `#<${this.constructor.name}:${this.path() ?? ""}>`;
     }
+  }
+
+  /**
+   * `alias to_s inspect` (`vendor/ruby/lib/tempfile.rb:291`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#to_s`
+   * (`vendor/ruby/lib/tempfile.rb:291`).
+   */
+  override toString(): string {
+    return this.inspect();
   }
 
   /**
@@ -280,6 +300,16 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   }
 
   /**
+   * `Tempfile#close!` (`vendor/ruby/lib/tempfile.rb:214`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#close!`
+   * (`vendor/ruby/lib/tempfile.rb:214`).
+   */
+  closeBang(): null {
+    return this.close(true);
+  }
+
+  /**
    * `Tempfile#unlink` (`vendor/ruby/lib/tempfile.rb:252`) — swallows
    * `Errno::ENOENT`, and returns without marking the file unlinked on
    * `Errno::EACCES`, which is Windows refusing to unlink an open file
@@ -288,16 +318,26 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#unlink`
    * (`vendor/ruby/lib/tempfile.rb:252`).
    */
-  unlink(): void {
-    if (this.unlinked) return;
+  unlink(): true | null {
+    if (this.unlinked) return null;
     try {
       File.delete(this.__getobj__().path()!);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "EACCES") return;
+      if (code === "EACCES") return null;
       if (code !== "ENOENT") throw error;
     }
-    this.unlinked = true;
+    return (this.unlinked = true);
+  }
+
+  /**
+   * `alias delete unlink` (`vendor/ruby/lib/tempfile.rb:264`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#delete`
+   * (`vendor/ruby/lib/tempfile.rb:264`).
+   */
+  delete(): true | null {
+    return this.unlink();
   }
 }
 
