@@ -4,7 +4,7 @@ import {
   CollectionProxy,
   AssociationProxy,
   Relation,
-  association,
+  collectionProxyFor as association,
 } from "@blazetrails/activerecord";
 import { defineEnum } from "@blazetrails/activerecord/enum";
 
