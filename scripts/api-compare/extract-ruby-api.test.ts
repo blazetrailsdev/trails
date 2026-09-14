@@ -1444,8 +1444,9 @@ describe(
       for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
-      // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
-      expect(names).not.toContain("eager_load!");
+      // The umbrella's `def self.` methods (`ActiveRecord.disconnect_all!`,
+      // `active_record.rb:510`) redirect onto Base the same way.
+      expect(base.classMethods.find((m) => m.name === "eager_load!")?.umbrellaConfig).toBe(true);
     });
 
     it("redirects the `class << self; attr_accessor` block form to Base too", () => {
