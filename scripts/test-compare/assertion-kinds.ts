@@ -111,6 +111,17 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_in_delta: "inDelta",
 };
 
+const MSPEC_MAP: Record<string, CanonicalKind> = {
+  "should_==": "equal",
+  "should_not_==": "notEqual",
+  should_be_nil: "nil",
+  should_not_be_nil: "notNil",
+  should_raise_error: "raises",
+  should_not_raise_error: "nothingRaised",
+  should_be_an_instance_of: "instanceOf",
+  should_be_kind_of: "instanceOf",
+};
+
 // trails/vitest matcher name → canonical kind. The extractor hands us the
 // terminal matcher of an `expect(...).matcher(...)` chain (a `not:` prefix marks
 // a negated chain, folded via NEGATION in normalizeTrailsKind).
@@ -209,7 +220,7 @@ const SPEC_FORM_ALIAS: Record<string, string> = {
  */
 export function normalizeRailsKind(name: string): CanonicalKind | null {
   const builtin = AREL_HELPER_ALIAS[name] ?? SPEC_FORM_ALIAS[name] ?? name;
-  const direct = RAILS_MAP[builtin];
+  const direct = RAILS_MAP[builtin] ?? MSPEC_MAP[name];
   if (direct) return direct;
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
   const must = /^must_(.+)$/.exec(name);

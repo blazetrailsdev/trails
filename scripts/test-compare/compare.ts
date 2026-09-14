@@ -113,6 +113,11 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 // Helpers
 // ---------------------------------------------------------------------------
 
+const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
+  "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
+  "core/kernel/throw_spec.rb": "kernel-catch.test.ts",
+};
+
 /**
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
@@ -150,6 +155,10 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     const kebab = base.replace(/_/g, "-");
     const tsFile = kebab + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
+  if (pkg === "ruby-compat" && RUBY_COMPAT_SPEC_TS_FILES[rubyFile]) {
+    return RUBY_COMPAT_SPEC_TS_FILES[rubyFile];
   }
 
   if (pkg === "i18n" && rubyFile.startsWith("i18n/")) {

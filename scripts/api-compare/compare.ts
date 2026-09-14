@@ -354,6 +354,8 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["throwAbort", "throw"],
   ["throwException", "throw"],
   ["catchException", "try"],
+  ["kernelThrow", "throw"],
+  ["kernelCatch", "try"],
 ]);
 
 export function foldSkeletonTokens(

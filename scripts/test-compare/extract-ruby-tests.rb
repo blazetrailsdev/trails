@@ -86,6 +86,7 @@ RUBY_COMPAT_SPECS = {
     default default_proc delete_if each_key each_pair except fetch has_key
     include key member merge reject slice transform_values update
   ],
+  "kernel" => %w[catch throw],
   "range" => %w[
     begin case_compare cover end equal_value exclude_end first include last
     max member min to_s
@@ -1730,6 +1731,8 @@ class TestExtractor
       # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
       # (never expanded as helpers, but still counted).
       count += 1
+    elsif mspec_should_kind(node)
+      count += 1
     end
 
     node.each { |child| count += count_assertions_expanded(child, visiting, depth, scope) if child.is_a?(Array) }
@@ -1749,6 +1752,20 @@ class TestExtractor
   def receiver_call_assertion?(node)
     return false unless node[0] == :call || node[0] == :command_call
     node[3] && assertion_method?(ident_name(node[3]))
+  end
+
+  MSPEC_SHOULD = %w[should should_not].freeze
+
+  def mspec_should_kind(node)
+    if node[0] == :binary && node[1].is_a?(Array) && node[1][0] == :call &&
+       MSPEC_SHOULD.include?(ident_name(node[1][3]))
+      "#{ident_name(node[1][3])}_#{node[2]}"
+    elsif node[0] == :command_call && MSPEC_SHOULD.include?(ident_name(node[3]))
+      matcher = positional_args(node[4])&.first
+      matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_arg
+      name = matcher.is_a?(Array) && %i[fcall vcall].include?(matcher[0]) ? ident_name(matcher[1]) : nil
+      name ? "#{ident_name(node[3])}_#{name}" : nil
+    end
   end
 
   # Collect every same-file `def name` → { scope:, body: } (node[3] is the
@@ -1952,6 +1969,9 @@ class TestExtractor
       results << (pending_never ? "#{rname}_never" : rname)
       args = node[0] == :command_call ? node[4] : pending_args
       values << literal_token(expected_arg(args, rname))
+    elsif (mname = mspec_should_kind(node))
+      results << mname
+      values << nil
     end
 
     # Thread a `:method_add_arg`'s arg node (node[2]) to its `:fcall`/`:call`
