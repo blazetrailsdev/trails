@@ -303,7 +303,7 @@ describe("Migration#createTable id option type", () => {
       } finally {
         Migration.verbose = verboseWas;
       }
-      expect(migration.lines[0]).toBe('-- removeColumn("widgets", "name", {:if_exists=>true})');
+      expect(migration.lines[0]).toBe('-- removeColumn("widgets", "name", {:ifExists=>true})');
       expect(migration.calls[0]).toEqual([
         "removeColumn",
         ["widgets", "name", undefined, { ifExists: true }],
