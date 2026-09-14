@@ -1,4 +1,4 @@
-import { merge } from "@blazetrails/ruby-compat";
+import { DelegateClass, merge } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -11,30 +11,18 @@ import {
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 
-export class LockingType extends ValueType<number> {
-  private _subtype: ValueType;
-
+export class LockingType extends DelegateClass(ValueType) {
   constructor(subtype: ValueType) {
-    super();
-    this._subtype = subtype;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  override type(): string | undefined {
-    return this._subtype.type();
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  override cast(value: unknown): number {
-    return (this._subtype.cast(value) as number | null) ?? 0;
+    if (subtype instanceof LockingType) return subtype;
+    super(subtype);
   }
 
   override deserialize(value: unknown): number {
-    return toInt(this._subtype.deserialize(value));
+    return toInt(super.deserialize(value));
   }
 
   override serialize(value: unknown): number {
-    return toInt(this._subtype.serialize(value));
+    return toInt(super.serialize(value));
   }
 }
 

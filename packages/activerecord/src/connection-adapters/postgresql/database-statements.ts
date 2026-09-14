@@ -27,7 +27,7 @@ const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
 
 /** @internal */
 interface CastResultHost {
-  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): ValueType;
+  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<ValueType>;
   /** @internal */
   loadAdditionalTypes(oids?: number[]): Promise<void>;
   typeMap: { isKey(oid: number): boolean };
@@ -368,21 +368,11 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
     return Result.empty();
   }
 
-  const missing: number[] = [];
-  for (const f of fields) {
-    if (!this.typeMap.isKey(f.dataTypeID) && !missing.includes(f.dataTypeID)) {
-      missing.push(f.dataTypeID);
-    }
-  }
-  if (missing.length > 0) {
-    await this.loadAdditionalTypes(missing);
-  }
-
   const columnNames = fields.map((f) => f.name);
   const columnTypes: Record<string | number, ValueType> = {};
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i];
-    const type = this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
+    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
     columnTypes[i] = type;
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }

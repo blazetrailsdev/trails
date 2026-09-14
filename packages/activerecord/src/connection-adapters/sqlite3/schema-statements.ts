@@ -41,7 +41,10 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
     expression?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  fetchTypeMetadata(sqlType: string | null, ..._rest: unknown[]): SqlTypeMetadata;
+  fetchTypeMetadata(
+    sqlType: string | null,
+    ..._rest: unknown[]
+  ): SqlTypeMetadata | Promise<SqlTypeMetadata>;
   alterTable(
     tableName: string,
     foreignKeys?: ForeignKeyDefinition[],
@@ -287,7 +290,7 @@ export function newColumnFromField(
 ): Column {
   const dfltValue = (field["dflt_value"] as string | null) ?? null;
   const sqlType = String(field["type"] ?? "");
-  const typeMetadata = adapter.fetchTypeMetadata(sqlType);
+  const typeMetadata = adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
   const defaultValue = extractValueFromDefault(dfltValue);
   const generatedType = extractGeneratedType(field);
 

@@ -1,3 +1,4 @@
+import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -20,10 +21,12 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   const castType = (sqlType: string) =>
-    adapter.lookupCastTypeFromColumn(adapter.fetchTypeMetadata(sqlType));
+    adapter.lookupCastTypeFromColumn(adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata);
 
   it("keeps the full sql_type for limit-bearing families", () => {
-    expect(adapter.fetchTypeMetadata("varchar(255)").sqlType).toBe("varchar(255)");
+    expect((adapter.fetchTypeMetadata("varchar(255)") as SqlTypeMetadata).sqlType).toBe(
+      "varchar(255)",
+    );
   });
 
   it("threads the parsed limit onto the cast type for each limit-bearing family", () => {
@@ -68,7 +71,7 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   it("reflects an unmapped sql_type as a nil cast type keeping the sql name", () => {
-    const meta = adapter.fetchTypeMetadata("mystery_type");
+    const meta = adapter.fetchTypeMetadata("mystery_type") as SqlTypeMetadata;
     expect(castType("mystery_type").type()).toBeUndefined();
     expect(meta.sqlType).toBe("mystery_type");
     expect(meta.type).toBeUndefined();
