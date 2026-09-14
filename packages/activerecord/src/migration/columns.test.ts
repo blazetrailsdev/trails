@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Base } from "../base.js";
+import { TestHelper, TestModel } from "../test-helpers/migration-helper.js";
 import type { Column } from "../connection-adapters/column.js";
 import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
 import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../errors.js";
@@ -27,31 +27,9 @@ async function indexNames(conn: AbstractAdapter, table: string): Promise<string[
   return indexes.map((i) => i.name);
 }
 
-class TestModel extends Base {
-  declare age: unknown;
-  declare contributor: unknown;
-  declare exgirlfriend: unknown;
-  declare first_name: unknown;
-  declare nick_name: unknown;
-  static {
-    this._tableName = "test_models";
-  }
-}
-
 describe("Migration", () => {
-  beforeEach(async () => {
-    const connection = await ambientConnection();
-    await connection.createTable("test_models", { force: true }, (t) => {
-      t.timestamps({ null: true });
-    });
-    void TestModel.resetColumnInformation();
-  });
-
-  afterEach(async () => {
-    const connection = await ambientConnection();
-    await connection.dropTable("test_models", { ifExists: true });
-    void TestModel.resetColumnInformation();
-  });
+  beforeEach(() => TestHelper.setup());
+  afterEach(() => TestHelper.teardown());
 
   describe("ColumnsTest", () => {
     it("add rename", async () => {

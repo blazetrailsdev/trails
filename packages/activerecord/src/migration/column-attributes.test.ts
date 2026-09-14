@@ -2,52 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "../base.js";
+import { TestHelper, TestModel } from "../test-helpers/migration-helper.js";
+import { assertColumn, assertNoColumn } from "../test-helpers/test-case.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 
-class TestModel extends Base {
-  declare age: unknown;
-  declare bio: unknown;
-  declare birthday: unknown;
-  declare command: unknown;
-  declare favorite_day: unknown;
-  declare first_name: unknown;
-  declare height: unknown;
-  declare last_name: unknown;
-  declare wealth: BigDecimal | null;
-  static {
-    this._tableName = "test_models";
-  }
-}
-
-async function assertColumn(model: typeof TestModel, columnName: string): Promise<void> {
-  void model.resetColumnInformation();
-  await model.loadSchema();
-  expect(model.columnNames()).toContain(columnName);
-}
-
-async function assertNoColumn(model: typeof TestModel, columnName: string): Promise<void> {
-  void model.resetColumnInformation();
-  await model.loadSchema();
-  expect(model.columnNames()).not.toContain(columnName);
-}
-
 describe("Migration", () => {
   describe("ColumnAttributesTest", () => {
-    beforeEach(async () => {
-      const connection = await ambientConnection();
-      await connection.createTable("test_models", { force: true }, (t) => {
-        t.timestamps({ null: true });
-      });
-      void TestModel.resetColumnInformation();
-    });
-
-    afterEach(async () => {
-      const connection = await ambientConnection();
-      await connection.dropTable("test_models", { ifExists: true });
-      void TestModel.resetColumnInformation();
-    });
+    beforeEach(() => TestHelper.setup());
+    afterEach(() => TestHelper.teardown());
 
     it("add column newline default", async () => {
       const connection = await ambientConnection();
