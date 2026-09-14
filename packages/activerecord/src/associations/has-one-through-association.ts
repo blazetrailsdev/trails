@@ -24,7 +24,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   private _pendingUnloadedThroughReconcile = false;
 
-  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-define-writers-and-constructors */
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-through-replace-pending-state */
   override reset(): void {
     super.reset();
     this._pendingReplace = null;
