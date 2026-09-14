@@ -364,6 +364,13 @@ export interface ClassInfo {
    * `resolve-wide-candidates-through-include-graph` is the consumer story.
    */
   delegatesTo?: string[];
+  /**
+   * Ruby-side only: the public names a forwarding `method_missing` answers
+   * (`Migration#method_missing`, `activerecord/lib/active_record/migration.rb:1044-1057`),
+   * resolved by `resolve_method_missing_forwards!` in `extract-ruby-api.rb`.
+   * Extra-surface allowed names only — not methods of this class.
+   */
+  forwardedMethods?: string[];
   instanceMethods: MethodInfo[];
   classMethods: MethodInfo[];
   /**

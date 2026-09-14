@@ -326,10 +326,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createTable(
     ...args: [
       tableName: string,
@@ -353,10 +350,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("createTable", ...args);
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async dropTable(
     ...args: Array<
       | string
@@ -385,7 +379,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addColumn(
     ...args: [
       tableName: string,
@@ -397,7 +390,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addColumn", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeColumn(
     tableName: string,
     columnName: string,
@@ -415,19 +407,16 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameColumn", tableName, oldName, newName);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addIndex(
     ...args: [tableName: string, columns: string | string[], options?: AddIndexOptions]
   ): Promise<void> {
     await this.methodMissing("addIndex", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeIndex(
     ...args: [
       tableName: string,
@@ -441,24 +430,20 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("removeIndex", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async changeColumn(
     ...args: [tableName: string, columnName: string, type: ColumnType, options?: ColumnOptions]
   ): Promise<void> {
     await this.methodMissing("changeColumn", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async renameTable(oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameTable", oldName, newName);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async tableExists(tableName: string): Promise<boolean | null> {
     return (await this.methodMissing("tableExists", tableName)) as boolean | null;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async columnExists(
     tableName: string,
     columnName: string,
@@ -479,7 +464,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("columnExists", tableName, columnName)) as boolean;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
@@ -488,7 +472,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeColumnDefault", tableName, columnName, defaultOrChanges);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async changeColumnNull(
     tableName: string,
     columnName: string,
@@ -502,7 +485,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addReference(
     ...args: [
       tableName: string,
@@ -518,7 +500,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addReference", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addBelongsTo(
     ...args: [
       tableName: string,
@@ -534,28 +515,24 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addBelongsTo", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeReference(
     ...args: [tableName: string, refName: string, options?: { polymorphic?: boolean }]
   ): Promise<void> {
     await this.methodMissing("removeReference", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeBelongsTo(
     ...args: [tableName: string, refName: string, options?: { polymorphic?: boolean }]
   ): Promise<void> {
     await this.methodMissing("removeBelongsTo", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addForeignKey(
     ...args: [fromTable: string, toTable: string, options?: AddForeignKeyOptions]
   ): Promise<void> {
     await this.methodMissing("addForeignKey", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeForeignKey(
     fromTable: string,
     toTableOrOptions?:
@@ -572,7 +549,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addCheckConstraint(
     ...args: [
       tableName: string,
@@ -588,7 +564,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addCheckConstraint", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
@@ -603,7 +578,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
@@ -611,7 +585,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("validateCheckConstraint", tableName, nameOrOptions);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async validateForeignKey(
     fromTable: string,
     toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
@@ -628,7 +601,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async changeColumnComment(
     tableName: string,
     columnName: string,
@@ -637,12 +609,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeColumnComment", tableName, columnName, commentOrChanges);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     await this.methodMissing("changeTableComment", tableName, commentOrChanges);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
     if (options !== undefined) {
       await this.methodMissing("enableExtension", name, options);
@@ -651,7 +621,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
     if (options !== undefined) {
       await this.methodMissing("disableExtension", name, options);
@@ -660,7 +629,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async createEnum(
     name: string,
     values: string[],
@@ -673,7 +641,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async dropEnum(
     name: string,
     valuesOrOptions?: string[] | { ifExists?: boolean },
@@ -694,12 +661,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
     await this.methodMissing("renameEnumValue", name, options);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addUniqueConstraint(
     tableName: string,
     columnName?: string | string[],
@@ -714,7 +679,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeUniqueConstraint(
     tableName: string,
     columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
@@ -735,20 +699,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addTimestamps(...args: [tableName: string, options?: ColumnOptions]): Promise<void> {
     await this.methodMissing("addTimestamps", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeTimestamps(tableName: string): Promise<void> {
     await this.methodMissing("removeTimestamps", tableName);
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createJoinTable(
     ...args: [
       table1: string,
@@ -760,7 +719,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("createJoinTable", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async dropJoinTable(
     table1: string,
     table2: string,
@@ -773,10 +731,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async changeTable(
     ...args: [
       tableName: string,
@@ -787,12 +742,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeTable", ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.methodMissing("renameIndex", tableName, oldName, newName);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   indexName(
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
@@ -800,7 +753,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return this.connection.indexName(this._pt(tableName), options);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
   async removeColumns(
     tableName: string,
@@ -813,7 +765,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("removeColumns", tableName, ...columnsOrOptions);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async addColumns(
     tableName: string,
     ...args: [...string[], { type: ColumnType } & ColumnOptions]
@@ -825,7 +776,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addColumns", tableName, ...columnsAndOptions);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
     return (await this.methodMissing(
       "columns",
@@ -833,27 +783,22 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     )) as import("./connection-adapters/column.js").Column[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     return (await this.methodMissing("indexes", tableName)) as IndexDefinition[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     return (await this.methodMissing("primaryKey", tableName)) as string | string[] | null;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     return (await this.methodMissing("foreignKeys", tableName)) as ForeignKeyDefinition[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async tables(): Promise<string[]> {
     return (await this.methodMissing("tables")) as string[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async views(): Promise<string[]> {
     return (await this.methodMissing("views")) as string[];
   }
@@ -936,12 +881,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return isCommandRecorder(connection) && connection.reverting;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async viewExists(viewName: string): Promise<boolean | null> {
     return (await this.methodMissing("viewExists", viewName)) as boolean;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE credit-method-missing-forwarded-surface-in-the-extractor */
   async indexExists(
     tableName: string,
     columnName: string | string[],
