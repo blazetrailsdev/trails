@@ -6,7 +6,7 @@ const AF_INET6 = 10;
 
 /**
  * Ruby stdlib `IPAddr` (`vendor/ruby/lib/ipaddr.rb`), the part Rails reaches
- * from `OID::Cidr` (`postgresql/oid/cidr.rb`): the String arm of `initialize`.
+ * from `OID::Cidr` (`postgresql/oid/cidr.rb`).
  *
  * @noRailsEquivalent PERMANENT — Ruby's ipaddr library (`vendor/ruby/lib/ipaddr.rb:42`), which
  * Rails calls without defining.
@@ -30,44 +30,6 @@ export class IPAddr {
   private _addr: bigint | null = null;
   private _maskAddr: bigint | null = null;
   private _zoneId: string | null = null;
-
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:593` */
-  constructor(addr: string = "::", family: number = AF_UNSPEC) {
-    this._maskAddr = null;
-    const slash = addr.indexOf("/");
-    let prefix = slash === -1 ? addr : addr.slice(0, slash);
-    const prefixlen = slash === -1 ? null : addr.slice(slash + 1);
-    let m = /^\[(.*)\]$/i.exec(prefix);
-    if (m) {
-      prefix = m[1];
-      family = AF_INET6;
-    }
-    let zoneId: string | null = null;
-    m = /^(.*)(%\w+)$/.exec(prefix);
-    if (m) {
-      prefix = m[1];
-      zoneId = m[2];
-      family = AF_INET6;
-    }
-    this._addr = this.family = null;
-    if (family === AF_UNSPEC || family === AF_INET) {
-      this._addr = this.inAddr(prefix);
-      if (this._addr !== null) this.family = AF_INET;
-    }
-    if (this._addr === null && (family === AF_UNSPEC || family === AF_INET6)) {
-      this._addr = this.in6Addr(prefix);
-      this.family = AF_INET6;
-    }
-    this._zoneId = zoneId;
-    if (family !== AF_UNSPEC && this.family !== family) {
-      throw new IPAddr.AddressFamilyError("address family mismatch");
-    }
-    if (prefixlen !== null) {
-      this.maskBang(prefixlen);
-    } else {
-      this._maskAddr = this.family === AF_INET ? IPAddr.IN4MASK : IPAddr.IN6MASK;
-    }
-  }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:150` */
   equals(other: unknown): boolean {
@@ -164,6 +126,29 @@ export class IPAddr {
     return i;
   }
 
+  protected set(addr: bigint, ...family: number[]): this {
+    switch (family[0] ? family[0] : this.family) {
+      case AF_INET:
+        if (addr < 0n || addr > IPAddr.IN4MASK) {
+          throw new IPAddr.InvalidAddressError(`invalid address: ${this._addr ?? ""}`);
+        }
+        break;
+      case AF_INET6:
+        if (addr < 0n || addr > IPAddr.IN6MASK) {
+          throw new IPAddr.InvalidAddressError(`invalid address: ${this._addr ?? ""}`);
+        }
+        break;
+      default:
+        throw new IPAddr.AddressFamilyError("unsupported address family");
+    }
+    this._addr = addr;
+    if (family[0]) {
+      this.family = family[0];
+      if (this.family === AF_INET && this._maskAddr !== null) this._maskAddr &= IPAddr.IN4MASK;
+    }
+    return this;
+  }
+
   protected maskBang(mask: string | number): this {
     let prefixlen: number;
     if (typeof mask === "string") {
@@ -210,9 +195,61 @@ export class IPAddr {
     return this;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:593` */
+  constructor(addr: string | bigint = "::", family: number = AF_UNSPEC) {
+    this._maskAddr = null;
+    if (typeof addr !== "string") {
+      switch (family) {
+        case AF_INET:
+        case AF_INET6:
+          this.set(addr, family);
+          this._maskAddr = family === AF_INET ? IPAddr.IN4MASK : IPAddr.IN6MASK;
+          return;
+        case AF_UNSPEC:
+          throw new IPAddr.AddressFamilyError("address family must be specified");
+        default:
+          throw new IPAddr.AddressFamilyError(`unsupported address family: ${family}`);
+      }
+    }
+    const slash = addr.indexOf("/");
+    let prefix = slash === -1 ? addr : addr.slice(0, slash);
+    const prefixlen = slash === -1 ? null : addr.slice(slash + 1);
+    let m = /^\[(.*)\]$/i.exec(prefix);
+    if (m) {
+      prefix = m[1];
+      family = AF_INET6;
+    }
+    let zoneId: string | null = null;
+    m = /^(.*)(%\w+)$/.exec(prefix);
+    if (m) {
+      prefix = m[1];
+      zoneId = m[2];
+      family = AF_INET6;
+    }
+    this._addr = this.family = null;
+    if (family === AF_UNSPEC || family === AF_INET) {
+      this._addr = this.inAddr(prefix);
+      if (this._addr !== null) this.family = AF_INET;
+    }
+    if (this._addr === null && (family === AF_UNSPEC || family === AF_INET6)) {
+      this._addr = this.in6Addr(prefix);
+      this.family = AF_INET6;
+    }
+    this._zoneId = zoneId;
+    if (family !== AF_UNSPEC && this.family !== family) {
+      throw new IPAddr.AddressFamilyError("address family mismatch");
+    }
+    if (prefixlen !== null) {
+      this.maskBang(prefixlen);
+    } else {
+      this._maskAddr = this.family === AF_INET ? IPAddr.IN4MASK : IPAddr.IN6MASK;
+    }
+  }
+
   private coerceOther(other: unknown): IPAddr {
     if (other instanceof IPAddr) return other;
-    return new (this.constructor as typeof IPAddr)(other as string);
+    if (typeof other === "string") return new (this.constructor as typeof IPAddr)(other);
+    return new (this.constructor as typeof IPAddr)(BigInt(other as bigint), this.family!);
   }
 
   private inAddr(addr: string | string[]): bigint | null {
