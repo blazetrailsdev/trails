@@ -14,8 +14,10 @@ import { TypeError as RbTypeError } from "./type-error.js";
  * (`vendor/ruby/vm_eval.c:2588-2591`): `initialize(tag, value, *args)` stores
  * the tag and value and hands the rest to `super`
  * (`uncaught_throw_init`, `vm_eval.c:2180-2188`); `to_s` formats the message
- * with the tag (`uncaught_throw_to_s`, `vm_eval.c:2222-2228`). A JS `message`
- * is read eagerly, so the format runs at construction.
+ * with the tag (`uncaught_throw_to_s`, `vm_eval.c:2222-2228`). JS has no
+ * `to_s` hook on an `Error`, so the constructor installs `message` as a getter
+ * that runs that format on read, raising `TypeError` for a nil or non-String
+ * message just as `rb_str_format` does.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
