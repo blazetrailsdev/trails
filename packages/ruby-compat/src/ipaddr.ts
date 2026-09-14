@@ -1,9 +1,23 @@
 import { ArgumentError } from "./argument-error.js";
+import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 const AF_UNSPEC = 0;
 const AF_INET = 2;
 const AF_INET6 = 10;
+
+/** Ruby's `addr.to_i` send (`vendor/ruby/lib/ipaddr.rb:598`): `Integer#to_i`, `Float#to_i` (`vendor/ruby/numeric.c` `flo_to_i`, FloatDomainError off the finite range), else the operand's own `toI`. */
+function toI(addr: unknown): bigint | number {
+  if (typeof addr === "bigint") return addr;
+  if (typeof addr === "number") {
+    if (!Number.isFinite(addr)) throw new FloatDomainError(String(addr));
+    return Math.trunc(addr);
+  }
+  if (addr != null && typeof (addr as { toI?: unknown }).toI === "function") {
+    return (addr as { toI(): bigint | number }).toI();
+  }
+  throw new NoMethodError(`undefined method 'to_i' for ${addr === null ? "nil" : typeof addr}`);
+}
 
 /**
  * Ruby stdlib `IPAddr` (`vendor/ruby/lib/ipaddr.rb`), the part Rails reaches
@@ -203,12 +217,7 @@ export class IPAddr {
       switch (family) {
         case AF_INET:
         case AF_INET6:
-          if (typeof addr !== "bigint" && !(typeof addr === "number" && Number.isFinite(addr))) {
-            throw new NoMethodError(
-              `undefined method 'to_i' for ${addr === null ? "nil" : typeof addr}`,
-            );
-          }
-          this.set(typeof addr === "bigint" ? addr : BigInt(Math.trunc(addr)), family);
+          this.set(BigInt(toI(addr)), family);
           this._maskAddr = family === AF_INET ? IPAddr.IN4MASK : IPAddr.IN6MASK;
           return;
         case AF_UNSPEC:

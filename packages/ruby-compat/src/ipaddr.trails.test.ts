@@ -36,5 +36,7 @@ describe("IPAddr (trails)", () => {
     expect(new IPAddr("0.0.0.1").equals(1)).toBe(true);
     expect(new IPAddr("0.0.0.1").equals(1.5)).toBe(true);
     expect(new IPAddr("0.0.0.0").equals(null)).toBe(false);
+    expect(new IPAddr("0.0.0.1").equals({ toI: () => 1n })).toBe(true);
+    expect(() => new IPAddr(Infinity, 2)).toThrow("Infinity");
   });
 });
