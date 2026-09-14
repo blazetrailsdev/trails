@@ -93,58 +93,60 @@ export class SingularAssociation extends Association {
     if (!this.disableJoins && this.isViolatesStrictLoading()) {
       strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
     }
-    return this._findSingularTarget();
-  }
+    return (async (): Promise<Base | null> => {
+      this._loaderWritebackSuppressed++;
+      try {
+        const owner = this.owner;
+        const assocName = this.reflection.name;
+        const options = this.reflection.options;
+        const ctor = owner.constructor as typeof Base;
+        const reflection = ctor._reflectOnAssociation?.(assocName);
+        if (!reflection) throw new AssociationNotFoundError(owner, assocName);
+        const isBelongsTo = reflection.macro === "belongsTo";
 
-  private async _findSingularTarget(): Promise<Base | null> {
-    this._loaderWritebackSuppressed++;
-    try {
-      const owner = this.owner;
-      const assocName = this.reflection.name;
-      const options = this.reflection.options;
-      const ctor = owner.constructor as typeof Base;
-      const reflection = ctor._reflectOnAssociation?.(assocName);
-      if (!reflection) throw new AssociationNotFoundError(owner, assocName);
-      const isBelongsTo = reflection.macro === "belongsTo";
+        if (this.disableJoins) return this.scope().first();
 
-      if (this.disableJoins) return this.scope().first();
+        let targetModel: typeof Base;
+        if (isBelongsTo && options.polymorphic) {
+          const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
+          const typeName = owner._readAttribute(typeCol) as string | null;
+          if (!typeName) return null;
+          targetModel = ctor.polymorphicClassFor(typeName);
+        } else {
+          targetModel = resolveAssocClass(
+            owner,
+            assocName,
+            options.className ?? camelize(assocName),
+          );
+        }
 
-      let targetModel: typeof Base;
-      if (isBelongsTo && options.polymorphic) {
-        const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-        const typeName = owner._readAttribute(typeCol) as string | null;
-        if (!typeName) return null;
-        targetModel = ctor.polymorphicClassFor(typeName);
-      } else {
-        targetModel = resolveAssocClass(owner, assocName, options.className ?? camelize(assocName));
+        const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
+        const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
+          ? ownerSideReflection.joinForeignKey
+          : [ownerSideReflection.joinForeignKey];
+        for (const col of keyColsForCheck) {
+          const v = owner._readAttribute(col);
+          if (v === null || v === undefined) return null;
+        }
+
+        let result: Base | null;
+        if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+          result = await _loadSingularViaStatementCache(owner, assocName, reflection, targetModel);
+        } else {
+          const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
+          const baseRelation = _scopeForAssociation(targetModel);
+          let rel = baseRelation.merge(built);
+          rel = applyAssociationScope(rel, this.reflection.scope, owner, reflection.scope);
+          result = await rel.take();
+        }
+
+        if (result) this.setInverseInstance(result);
+
+        return result;
+      } finally {
+        this._loaderWritebackSuppressed--;
       }
-
-      const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
-      const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
-        ? ownerSideReflection.joinForeignKey
-        : [ownerSideReflection.joinForeignKey];
-      for (const col of keyColsForCheck) {
-        const v = owner._readAttribute(col);
-        if (v === null || v === undefined) return null;
-      }
-
-      let result: Base | null;
-      if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-        result = await _loadSingularViaStatementCache(owner, assocName, reflection, targetModel);
-      } else {
-        const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
-        const baseRelation = _scopeForAssociation(targetModel);
-        let rel = baseRelation.merge(built);
-        rel = applyAssociationScope(rel, this.reflection.scope, owner, reflection.scope);
-        result = await rel.take();
-      }
-
-      if (result) this.setInverseInstance(result);
-
-      return result;
-    } finally {
-      this._loaderWritebackSuppressed--;
-    }
+    })();
   }
 
   protected override async _createRecord(
