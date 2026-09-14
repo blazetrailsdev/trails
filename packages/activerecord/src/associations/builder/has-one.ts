@@ -14,25 +14,7 @@ export class HasOne extends SingularAssociation {
     return valid;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
-  static override defineConstructors(mixin: any, name: string): void {
-    super.defineConstructors(mixin, name);
-    if (!mixin || typeof mixin !== "object") return;
-    const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    Object.defineProperty(mixin, `build${cap}`, {
-      value: function (this: { association(n: string): any }, ...args: unknown[]) {
-        const assoc = this.association(name);
-        if (typeof assoc.findTargetNeeded === "function" && assoc.findTargetNeeded()) {
-          return assoc.loadTargetForBuild().then(() => assoc.build(...args));
-        }
-        return assoc.build(...args);
-      },
-      writable: true,
-      configurable: true,
-    });
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-and-through-writer-overrides */
+  /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-define-writers */
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);

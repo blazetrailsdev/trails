@@ -151,7 +151,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("creating association builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
-    const newClub = (newMember.association("club") as any).build();
+    const newClub = await (newMember.association("club") as any).build();
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
     expect(tgt(newMember, "club")).toBe(newClub);
     expect(newClub.isNewRecord()).toBe(true);
@@ -163,7 +163,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("association build constructor builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
-    const newClub = (newMember.association("club") as any).build();
+    const newClub = await (newMember.association("club") as any).build();
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
     expect(tgt(newMember, "club")).toBe(newClub);
     expect(newClub.isNewRecord()).toBe(true);
@@ -200,10 +200,10 @@ describe("HasOneThroughAssociationsTest", () => {
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const membership = await (newMember.association("currentMembership") as any).create();
-    const newClub = (newMember.association("club") as any).build();
+    const newClub = await (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
 
-    const finalClub = (newMember.association("club") as any).build();
+    const finalClub = await (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(finalClub);
 
     const countForMember = () => Membership.where({ member_id: newMember.id }).count();
@@ -219,7 +219,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const newMember = await Member.create({ name: "Joe" });
     const membership = await (newMember.association("currentMembership") as any).create();
     membership.writeAttribute("favorite", true);
-    const newClub = (newMember.association("club") as any).build();
+    const newClub = await (newMember.association("club") as any).build();
     expect(await newMember.save()).toBe(true);
     const reloaded = await Membership.find(membership.id);
     expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
@@ -234,7 +234,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
     const refetched = await Member.find(newMember.id);
-    const newClub = (refetched.association("club") as any).build();
+    const newClub = await (refetched.association("club") as any).build();
 
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
     const before = await countForMember();
@@ -253,7 +253,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await newMember.save();
 
     const refetched = await Member.find(newMember.id);
-    (refetched.association("club") as any).build();
+    await (refetched.association("club") as any).build();
     expect(await refetched.save()).toBe(true);
 
     const laterClub = await Club.create({ name: "Later Club" });
@@ -338,7 +338,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
     const refetched = await Member.find(newMember.id);
     refetched.association("currentMembership");
-    const newClub = (refetched.association("club") as any).build();
+    const newClub = await (refetched.association("club") as any).build();
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
     const before = await countForMember();
     expect(await refetched.save()).toBe(true);
@@ -355,8 +355,8 @@ describe("HasOneThroughAssociationsTest", () => {
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
     const refetched = await Member.find(newMember.id);
-    (refetched.association("club") as any).build({ name: "First" });
-    const finalClub = (refetched.association("club") as any).build({ name: "Final" });
+    await (refetched.association("club") as any).build({ name: "First" });
+    const finalClub = await (refetched.association("club") as any).build({ name: "Final" });
     expect(await refetched.save()).toBe(true);
     const reloaded = await Membership.find(membershipId);
     expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
