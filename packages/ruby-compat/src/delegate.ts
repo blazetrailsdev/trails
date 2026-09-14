@@ -81,7 +81,7 @@ export function DelegateClass<T extends MixinBase>(
   const klass = class extends superclass {
     declare _delegateDcObj: unknown;
 
-    // @ts-expect-error TS2377: returning an object from a derived constructor makes `super()` unnecessary in JS.
+    // @ts-expect-error TS2377
     constructor(...args: ConstructorParameters<MixinBase>) {
       const obj = Object.create(new.target.prototype) as InstanceType<typeof klass>;
       obj.__setobj__(args[0] as unknown);
