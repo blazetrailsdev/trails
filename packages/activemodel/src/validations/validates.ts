@@ -42,7 +42,7 @@ export function validates(
   ...args: [...attributes: string[], rules: Record<string, unknown>]
 ): void {
   const extracted = extractOptionsBang(args as unknown[]);
-  const attributes = args;
+  const attributes = args as unknown[];
   const defaults = { ...extracted };
   const validations = sliceBang(defaults, ...this._validatesDefaultKeys());
 
@@ -74,7 +74,7 @@ export function validatesBang(
   ...args: [...attributes: string[], rules: Record<string, unknown>]
 ): void {
   const options = extractOptionsBang(args as unknown[]);
-  const attributes = args;
+  const attributes = args as unknown[];
   options.strict = true;
   this.validates(...(attributes as string[]), options);
 }

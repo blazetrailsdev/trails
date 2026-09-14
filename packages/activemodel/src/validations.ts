@@ -183,7 +183,7 @@ export const ClassMethods = {
     ...args: ValidateArgs<T>
   ): void {
     const extracted = extractOptionsBang(args as unknown[]);
-    const filters = args;
+    const filters = args as unknown[];
     let options = extracted as ConditionalOptions;
 
     if (filters.every((arg) => typeof arg === "string" && arg.startsWith(":"))) {
