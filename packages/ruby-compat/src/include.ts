@@ -467,7 +467,11 @@ type CallableMethods<M extends object> = {
     ? M[K] extends AnyFunction
       ? K
       : never
-    : never]: M[K] extends (this: never, ...args: infer A) => infer R ? (...args: A) => R : never;
+    : never]: unknown extends ThisParameterType<M[K]>
+    ? M[K]
+    : M[K] extends (this: never, ...args: infer A) => infer R
+      ? (...args: A) => R
+      : never;
 };
 
 export type Included<M extends object> = CallableMethods<M>;
