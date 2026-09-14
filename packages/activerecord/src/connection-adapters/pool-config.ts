@@ -78,11 +78,13 @@ export class PoolConfig {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      connection.lock.synchronize(() =>
-        synchronize.call(this, async () => {
-          this._serverVersion ??= await connection.getDatabaseVersion?.();
-          return this._serverVersion;
-        }),
+      connection.lock.synchronize(
+        () =>
+          this._serverVersion ??
+          synchronize.call(this, async () => {
+            this._serverVersion ??= await connection.getDatabaseVersion?.();
+            return this._serverVersion;
+          }),
       )
     );
   }
@@ -114,13 +116,6 @@ export class PoolConfig {
       this._pool.automaticReconnect = automaticReconnect;
       await this._pool.disconnectBang();
     });
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-config-disconnect-lock-order */
-  async disconnect(): Promise<void> {
-    if (this._pool) {
-      await this._pool.disconnect();
-    }
   }
 
   private _discardPoolBangSync(): Array<Promise<void>> {
