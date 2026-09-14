@@ -1,10 +1,4 @@
-import {
-  BigIntegerType,
-  BooleanType,
-  FloatType,
-  IntegerType,
-  StringType,
-} from "@blazetrails/activemodel";
+import { BooleanType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { describe, expect, it } from "vitest";
 
 import { Date as OidDate } from "./postgresql/oid/date.js";
@@ -38,7 +32,7 @@ describe("initialize_type_map seeds the PG type_map with known types", () => {
   it.each([
     ["int2", IntegerType],
     ["int4", IntegerType],
-    ["int8", BigIntegerType],
+    ["int8", IntegerType],
     ["oid", Oid],
     ["float4", FloatType],
     ["float8", FloatType],

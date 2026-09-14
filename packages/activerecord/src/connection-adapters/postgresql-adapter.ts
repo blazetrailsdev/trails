@@ -39,13 +39,7 @@ import {
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import { Money } from "./postgresql/oid/money.js";
-import {
-  BigIntegerType,
-  BooleanType,
-  FloatType,
-  IntegerType,
-  StringType,
-} from "@blazetrails/activemodel";
+import { BooleanType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
 
 import { Array as OidArray } from "./postgresql/oid/array.js";
 import { RangeType } from "./postgresql/oid/range.js";
@@ -219,20 +213,6 @@ function prepare(conn: pg.Client, stmtName: string, sql: string): Promise<void> 
     };
     (conn.query as unknown as (s: object) => unknown)(submittable);
   });
-}
-
-class PgInteger8 extends BigIntegerType {
-  protected override maxValue(): number {
-    return 2 ** (this._limit() * 8 - 1);
-  }
-
-  override serializeCastValue(value: number | null): number | null {
-    return this.ensureInRange(value) as number | null;
-  }
-
-  override serialize(value: unknown): unknown {
-    return this.ensureInRange(this.cast(value));
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -609,7 +589,7 @@ export class PostgreSQLAdapter
   static override initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
     m.registerType("int2", new IntegerType({ limit: 2 }));
     m.registerType("int4", new IntegerType({ limit: 4 }));
-    m.registerType("int8", new PgInteger8({ limit: 8 }));
+    m.registerType("int8", new IntegerType({ limit: 8 }));
     m.registerType("oid", new Oid());
     m.registerType("float4", new FloatType({ limit: 24 }));
     m.registerType("float8", new FloatType());
@@ -618,8 +598,6 @@ export class PostgreSQLAdapter
     m.aliasType("char", "varchar");
     m.aliasType("name", "varchar");
     m.aliasType("bpchar", "varchar");
-    (m as HashLookupTypeMap).registerType(18, new StringType());
-    (m as HashLookupTypeMap).registerType(19, new StringType());
     m.registerType("bool", new BooleanType());
     this.registerClassWithLimit(m, "bit", Bit);
     this.registerClassWithLimit(m, "varbit", BitVarying);
