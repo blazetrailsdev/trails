@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
         await new Promise<void>((r) => setTimeout(r, 500));
         const sent = (
-          await other.execQuery("SELECT pg_cancel_backend(?) AS ok", "SQL", [pid])
+          await other.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [pid])
         ).toArray();
         expect((sent[0] as { ok: boolean }).ok).toBe(true);
         await slow;
@@ -129,7 +129,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             const rows = (
               await canceler.execQuery(
                 "SELECT 1 AS n FROM pg_stat_activity " +
-                  "WHERE pid = ? AND state = 'active' AND wait_event_type = 'Lock'",
+                  "WHERE pid = $1 AND state = 'active' AND wait_event_type = 'Lock'",
                 "SQL",
                 [otherPid],
               )
@@ -142,7 +142,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           expect(waiting).toBe(true);
           const sent = (
-            await canceler.execQuery("SELECT pg_cancel_backend(?) AS ok", "SQL", [otherPid])
+            await canceler.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [otherPid])
           ).toArray();
           expect((sent[0] as { ok: boolean }).ok).toBe(true);
           await blocked;

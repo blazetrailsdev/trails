@@ -15,6 +15,7 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
 
   describe("combine_multi_statements", () => {
     it("sends the statements as one packet when they fit in max_allowed_packet", async () => {
+      await adapter.maxAllowedPacket();
       const rawExecute = vi.spyOn(adapter as never, "rawExecute").mockResolvedValue(undefined);
       let calls: unknown[][];
       try {

@@ -18,7 +18,7 @@ describe("SQLite3::SchemaStatements", () => {
   describe("createSchemaDumper", () => {
     it("returns a SchemaDumper instance", () => {
       const fakeAdapter = {} as any;
-      expect(createSchemaDumper.call(fakeAdapter)).toBeInstanceOf(SchemaDumper);
+      expect(createSchemaDumper.call(fakeAdapter, {})).toBeInstanceOf(SchemaDumper);
     });
   });
 

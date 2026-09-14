@@ -64,7 +64,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       const rows = (
         await adapter.execQuery(
-          `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = ?`,
+          `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = $1`,
           "SQL",
           [id],
         )

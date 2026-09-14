@@ -89,9 +89,17 @@ export async function execute(
   { allowRetry = false }: { allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
   try {
-    return (await AbstractAdapter.prototype.execute.call(this, sql, name, {
+    const result = (await AbstractAdapter.prototype.execute.call(this, sql, name, {
       allowRetry,
-    })) as Record<string, unknown>[];
+    })) as pg.QueryResult;
+    const rows = new Result(
+      (result.fields ?? []).map((f) => f.name),
+      (result.rows ?? []) as unknown[][],
+    ).toArray();
+    for (const [key, value] of Object.entries(result)) {
+      Object.defineProperty(rows, key, { value, writable: true, configurable: true });
+    }
+    return rows;
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }

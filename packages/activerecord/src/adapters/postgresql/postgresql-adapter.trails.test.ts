@@ -128,7 +128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
       const lines = new StringIO();
-      await adapter.createSchemaDumper().dumpTable(lines, "ex_idx_both");
+      await adapter.createSchemaDumper({}).dumpTable(lines, "ex_idx_both");
       const indexLine = lines
         .string()
         .split("\n")
@@ -594,7 +594,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (?)`, [false]);
       const rows = (
         await adapter.execQuery(
-          `SELECT "flag" FROM "ex_bool" WHERE "flag" = ? ORDER BY "id"`,
+          `SELECT "flag" FROM "ex_bool" WHERE "flag" = $1 ORDER BY "id"`,
           "SQL",
           [true],
         )
@@ -609,7 +609,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.executeMutation(`INSERT INTO "ex_float" ("val") VALUES (?)`, [3.14]);
       const rows = (
-        await adapter.execQuery(`SELECT "val" FROM "ex_float" WHERE "val" > ?`, "SQL", [3.0])
+        await adapter.execQuery(`SELECT "val" FROM "ex_float" WHERE "val" > $1`, "SQL", [3.0])
       ).toArray();
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBeCloseTo(3.14);
@@ -621,7 +621,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const id = await adapter.executeMutation(`INSERT INTO "ex_int" ("val") VALUES (?)`, [42]);
       expect(id).toBeGreaterThan(0);
       const rows = (
-        await adapter.execQuery(`SELECT "val" FROM "ex_int" WHERE "id" = ?`, "SQL", [id])
+        await adapter.execQuery(`SELECT "val" FROM "ex_int" WHERE "id" = $1`, "SQL", [id])
       ).toArray();
       expect(rows[0].val).toBe(42);
     });
@@ -642,7 +642,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.executeMutation(`INSERT INTO "ex_numeric" ("val") VALUES (?)`, [123.45]);
       const rows = (
-        await adapter.execQuery(`SELECT "val" FROM "ex_numeric" WHERE "val" > ?`, "SQL", [100])
+        await adapter.execQuery(`SELECT "val" FROM "ex_numeric" WHERE "val" > $1`, "SQL", [100])
       ).toArray();
       expect(rows).toHaveLength(1);
       expect(parseFloat(String(rows[0].val))).toBeCloseTo(123.45);
@@ -666,7 +666,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ]);
 
       const rows = (
-        await adapter.execQuery(`SELECT "val" FROM "ex_jsonb" WHERE "val" @> ?::jsonb`, "SQL", [
+        await adapter.execQuery(`SELECT "val" FROM "ex_jsonb" WHERE "val" @> $1::jsonb`, "SQL", [
           '{"b":2}',
         ])
       ).toArray();
@@ -696,7 +696,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_arr" ("val") VALUES ('{1,2,3}')`);
 
       const rows = (
-        await adapter.execQuery(`SELECT "val" FROM "ex_arr" WHERE ? = ANY("val")`, "SQL", [2])
+        await adapter.execQuery(`SELECT "val" FROM "ex_arr" WHERE $1 = ANY("val")`, "SQL", [2])
       ).toArray();
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toEqual([1, 2, 3]);
@@ -708,7 +708,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.executeMutation(`INSERT INTO "ex_uuid" ("name") VALUES (?)`, ["test"]);
       const rows = (
-        await adapter.execQuery(`SELECT "id" FROM "ex_uuid" WHERE "name" = ?`, "SQL", ["test"])
+        await adapter.execQuery(`SELECT "id" FROM "ex_uuid" WHERE "name" = $1`, "SQL", ["test"])
       ).toArray();
       expect(typeof rows[0].id).toBe("string");
       expect(String(rows[0].id)).toMatch(/^[0-9a-f-]{36}$/);
@@ -957,7 +957,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ]);
       const rows = (
         await adapter.execQuery(
-          `SELECT * FROM "ex_multi" WHERE "a" = ? AND "b" > ? AND "c" = ?`,
+          `SELECT * FROM "ex_multi" WHERE "a" = $1 AND "b" > $2 AND "c" = $3`,
           "SQL",
           ["hello", 10, true],
         )
@@ -990,7 +990,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name TEXT
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const id = cols.find((c) => c.name === "id")!;
       expect(id.isIdentity()).toBe(true);
       expect(id.isAutoIncrementedByDb()).toBe(true);
@@ -1005,7 +1005,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           sum INT GENERATED ALWAYS AS (a + b) STORED
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const sum = cols.find((c) => c.name === "sum")!;
       expect(sum.isVirtual()).toBe(true);
       expect(sum.hasDefault).toBe(false);
@@ -1019,7 +1019,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           tags TEXT[]
         )
       `);
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const tags = cols.find((c) => c.name === "tags")!;
       expect(tags.array).toBe(true);
       expect(tags.sqlType).toBe("text");
@@ -1035,7 +1035,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
 
       await adapter.loadAdditionalTypes();
-      const cols = await adapter.columns("col_reflection_test");
+      const cols = (await adapter.columns("col_reflection_test")) as PgColumn[];
       const mood = cols.find((c) => c.name === "mood")!;
       expect(mood.isEnum()).toBe(true);
     });
