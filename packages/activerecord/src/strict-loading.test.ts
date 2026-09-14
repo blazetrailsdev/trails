@@ -86,13 +86,13 @@ describe("StrictLoadingTest", () => {
     const projects = await association(developer!, "projects");
 
     expect(projects.every((p) => p.isStrictLoading())).toBe(true);
-    await expect(
+    await expect(async () =>
       (projects[projects.length - 1] as any).association("firm").loadTarget(),
     ).rejects.toThrow(StrictLoadingViolationError);
 
     const projectsExt = await association(developer!, "projectsExtendedByName");
     expect(projectsExt.every((p) => p.isStrictLoading())).toBe(true);
-    await expect(
+    await expect(async () =>
       (projectsExt[projectsExt.length - 1] as any).association("firm").loadTarget(),
     ).rejects.toThrow(StrictLoadingViolationError);
   });

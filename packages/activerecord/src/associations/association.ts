@@ -106,14 +106,14 @@ export class Association {
     }
   }
 
-  async reload(force = false): Promise<this> {
+  reload(force = false): this | Promise<this> {
     if (force) {
       this.klass.connectionPool().clearQueryCache();
     }
     this.reset();
     this.resetScope();
-    await this.loadTarget();
-    return this;
+    const loaded = this.loadTarget();
+    return loaded instanceof Promise ? loaded.then(() => this) : this;
   }
 
   setTarget(target: Base | Base[] | null): void {
@@ -294,14 +294,15 @@ export class Association {
     return loaded();
   }
 
-  private async _findTarget(): Promise<void> {
+  private _findTarget(): Promise<void> {
     const staleStateBeforeLoad = this.staleState();
-    const result = await this.findTarget();
-    if (result !== undefined) {
-      if (result !== null) this.setStrictLoading(result as Base);
-      if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
-      this._writeTargetStore(result);
-    }
+    return this.findTarget().then((result) => {
+      if (result !== undefined) {
+        if (result !== null) this.setStrictLoading(result as Base);
+        if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
+        this._writeTargetStore(result);
+      }
+    });
   }
 
   async asyncLoadTarget(): Promise<Base | Base[] | null> {
@@ -499,10 +500,9 @@ export class Association {
     );
   }
 
-  private ensureKlassExistsBang(): typeof Base {
-    const k = this.klass;
-    if (!k) throw new Error(`Could not find the association ${this.reflection.name}`);
-    return k;
+  /** @internal */
+  protected ensureKlassExistsBang(): void {
+    void this.klass;
   }
 
   protected async findTarget(): Promise<Base | Base[] | null> {

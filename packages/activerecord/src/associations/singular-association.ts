@@ -72,34 +72,11 @@ export class SingularAssociation extends Association {
   }
 
   get reader(): Base | null | Promise<Base | null> {
-    if (this.loaded) {
-      if (this.isStaleTarget()) {
-        return this.reload().then(() => this.target);
-      }
-      return this.target;
+    this.ensureKlassExistsBang();
+    if (!this.isLoaded() || this.isStaleTarget()) {
+      const reloaded = this.reload();
+      if (reloaded instanceof Promise) return reloaded.then(() => this.target);
     }
-
-    if (this.target != null) {
-      this.loadedBang();
-      return this.target;
-    }
-
-    const cached = this.doFindTarget();
-    if (cached !== undefined) {
-      this.target = cached as Base | null;
-      return this.target;
-    }
-
-    if (this.findTargetNeeded()) {
-      if (this.isViolatesStrictLoading()) {
-        const ctor = this.owner.constructor as typeof Base;
-        const reflection = ctor._reflectOnAssociation?.(this.reflection.name);
-        if (!reflection) throw new AssociationNotFoundError(this.owner, this.reflection.name);
-        strictLoadingViolationBang({ owner: ctor, reflection });
-      }
-      return this.loadTarget() as Promise<Base | null>;
-    }
-    this.loadedBang();
     return this.target;
   }
 
@@ -112,7 +89,14 @@ export class SingularAssociation extends Association {
     return attrs;
   }
 
-  protected override async findTarget(): Promise<Base | null> {
+  protected override findTarget(): Promise<Base | null> {
+    if (!this.disableJoins && this.isViolatesStrictLoading()) {
+      strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
+    }
+    return this._findSingularTarget();
+  }
+
+  private async _findSingularTarget(): Promise<Base | null> {
     this._loaderWritebackSuppressed++;
     try {
       const owner = this.owner;
@@ -124,10 +108,6 @@ export class SingularAssociation extends Association {
       const isBelongsTo = reflection.macro === "belongsTo";
 
       if (this.disableJoins) return this.scope().first();
-
-      if (this.isViolatesStrictLoading()) {
-        strictLoadingViolationBang({ owner: owner.constructor, reflection });
-      }
 
       let targetModel: typeof Base;
       if (isBelongsTo && options.polymorphic) {
