@@ -885,10 +885,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async run(...migrationClasses: Array<MigrationClass | MigrationRunOptions>): Promise<void> {
-    const [klasses, opts] = extractOptionsBang(migrationClasses) as [
-      MigrationClass[],
-      MigrationRunOptions,
-    ];
+    const opts = extractOptionsBang(migrationClasses) as MigrationRunOptions;
+    const klasses = migrationClasses as MigrationClass[];
     let dir = opts.direction ?? "up";
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {

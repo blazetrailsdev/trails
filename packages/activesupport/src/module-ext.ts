@@ -6,7 +6,8 @@ import { extractOptionsBang } from "./hash-utils.js";
 
 /** @missingRailsArgs generate — PERMANENT */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
-  const [names, options] = extractOptionsBang(methods);
+  const options = extractOptionsBang(methods);
+  const names = methods;
   const { to, prefix, allowNil } = options as unknown as DelegateOptions;
 
   return Delegation.generate(this, names as string[], { to, prefix, allowNil });
@@ -64,7 +65,8 @@ function setMattrDefault(
 
 export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
-  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
+  const options = extractOptionsBang(syms) as MattrOptions;
+  const names = syms as string[];
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
@@ -86,7 +88,8 @@ export const cattrReader = mattrReader;
 
 export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
-  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
+  const options = extractOptionsBang(syms) as MattrOptions;
+  const names = syms as string[];
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
@@ -115,7 +118,8 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
 export const cattrWriter = mattrWriter;
 
 export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
-  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
+  const options = extractOptionsBang(syms) as MattrOptions;
+  const names = syms as string[];
   const writerOptions: MattrOptions = { ...options };
   delete writerOptions.default;
 
@@ -272,7 +276,8 @@ export function rescueFrom(
   this: any,
   ...klasses: Array<(new (...args: any[]) => Error) | string | { with?: ErrorHandler }>
 ): void {
-  const [keys, options] = extractOptionsBang(klasses) as [unknown[], { with?: ErrorHandler }];
+  const options = extractOptionsBang(klasses) as { with?: ErrorHandler };
+  const keys = klasses as unknown[];
   const handler = options.with;
   if (!handler) {
     throw new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block.");

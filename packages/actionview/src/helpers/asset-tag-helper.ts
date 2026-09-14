@@ -41,7 +41,8 @@ export type AssetTagHelperHost = AssetUrlHelperHost &
   };
 
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
-  const [rawSources, extracted] = extractOptionsBang(sources);
+  const extracted = extractOptionsBang(sources);
+  const rawSources = sources;
   const options = stringifyKeys(extracted);
   const pathOptions = extractBang(options, [
     "protocol",

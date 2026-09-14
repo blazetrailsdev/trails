@@ -20,7 +20,8 @@ export { setFormatVersion } from "./cache/format-version-slot.js";
 
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
-    const [rest, options] = extractOptionsBang(parameters);
+    const options = extractOptionsBang(parameters);
+    const rest = parameters;
     return new (retrieveStoreClass(store))(
       ...rest,
       ...(Object.keys(options as object).length === 0 ? [] : [options]),

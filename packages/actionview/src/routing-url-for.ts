@@ -29,8 +29,8 @@ export class RoutingUrlFor {
     } else if (options === ":back") {
       return this._backUrl();
     } else if (Array.isArray(options)) {
-      const [components, extracted] = extractOptionsBang([...options]);
-      const opts = extracted as Record<string, unknown>;
+      const components = [...options];
+      const opts = extractOptionsBang(components) as Record<string, unknown>;
       this.ensureOnlyPathOption(opts);
 
       if (opts["only_path"]) {
