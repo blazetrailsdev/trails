@@ -113,12 +113,6 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * ruby/spec keeps one spec per member (`core/kernel/catch_spec.rb`), while
- * ruby-compat keeps one file per MRI definition site: `Kernel#catch` and
- * `Kernel#throw` are both `vendor/ruby/vm_eval.c` and both port to
- * `kernel-catch.ts`, following the `kernel-float.ts` naming.
- */
 const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
   "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
   "core/kernel/throw_spec.rb": "kernel-catch.test.ts",

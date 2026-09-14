@@ -111,8 +111,6 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_in_delta: "inDelta",
 };
 
-// ruby/spec's mspec expectations, as extract-ruby-tests.rb's
-// `mspec_should_kind` spells them (`x.should == y` → `should_==`).
 const MSPEC_MAP: Record<string, CanonicalKind> = {
   "should_==": "equal",
   "should_not_==": "notEqual",

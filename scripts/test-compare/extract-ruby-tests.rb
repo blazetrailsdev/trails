@@ -1754,13 +1754,6 @@ class TestExtractor
     node[3] && assertion_method?(ident_name(node[3]))
   end
 
-  # ruby/spec's mspec expectations, the assertions of the ruby-compat specs:
-  # `x.should == y` is `[:binary, [:call, x, :".", should], :==, y]`, and
-  # `-> { }.should raise_error(E)` / `x.should be_nil` is a `:command_call` on
-  # `should` whose argument is the matcher. Recorded as `should_<op|matcher>`
-  # (`should_==`, `should_not_raise_error`) for assertion-kinds.ts to map. The
-  # expected value is not captured: ruby/spec's Symbols are JS `":name"`
-  # strings in the port, which no literal token would line up with.
   MSPEC_SHOULD = %w[should should_not].freeze
 
   def mspec_should_kind(node)

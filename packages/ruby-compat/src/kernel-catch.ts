@@ -13,13 +13,18 @@ import { LocalJumpError } from "./local-jump-error.js";
  * the tag and value and hands the rest to `super`
  * (`uncaught_throw_init`, `vm_eval.c:2180-2188`); `to_s` formats the message
  * with the tag (`uncaught_throw_to_s`, `vm_eval.c:2222-2228`). A JS `message`
- * is read eagerly, so `rb_throw_obj` formats it and sets the two ivars.
+ * is read eagerly, so the format runs at construction.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class UncaughtThrowError extends ArgumentError {}
+export class UncaughtThrowError extends ArgumentError {
+  constructor(tag: unknown, value: unknown, mesg: string) {
+    super(format(mesg, tag));
+    Object.assign(this, { tag, value });
+  }
+}
 
 /** @noRailsEquivalent PERMANENT */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -66,11 +71,6 @@ export function kernelThrow(tag: unknown, value: unknown = null): never {
   return rbThrowObj(tag, value);
 }
 
-/**
- * `rb_throw_obj` (`vendor/ruby/vm_eval.c:2253-2276`): find the innermost
- * enclosing tag, raising `UncaughtThrowError` at the throw site when there is
- * none, then unwind to it.
- */
 function rbThrowObj(tag: unknown, value: unknown): never {
   let tt = ecTagSlot().getStore();
 
@@ -82,7 +82,7 @@ function rbThrowObj(tag: unknown, value: unknown): never {
     tt = tt.prev;
   }
   if (!tt) {
-    throw Object.assign(new UncaughtThrowError(format("uncaught throw %p", tag)), { tag, value });
+    throw new UncaughtThrowError(tag, value, "uncaught throw %p");
   }
 
   throw new VmThrowData(tag);
@@ -117,11 +117,6 @@ export function kernelCatch(...argv: unknown[]): unknown {
   return rbCatchObj(tag, block as (tag: unknown) => unknown);
 }
 
-/**
- * `rb_catch_obj` / `vm_catch_protect` (`vendor/ruby/vm_eval.c:2352-2391`):
- * push a tag, run the block, and take the tag's `retval` when a throw for this
- * tag unwinds to it; any other state re-raises (`EC_JUMP_TAG`).
- */
 function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
   const context = ecTagSlot();
   const tt: RbVmTag = { tag, retval: null, prev: context.getStore() };
