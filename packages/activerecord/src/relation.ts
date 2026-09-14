@@ -700,7 +700,6 @@ export class Relation<T extends Base> {
   ): Promise<number> {
     if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
     if (this.isNullRelation()) return 0;
-    await this._materializeDeferredDistinctPkPredicates();
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
     if (typeof updates !== "string" && !Array.isArray(updates)) {
@@ -747,7 +746,6 @@ export class Relation<T extends Base> {
 
   async deleteAll(): Promise<number> {
     if (this.isNullRelation()) return 0;
-    await this._materializeDeferredDistinctPkPredicates();
 
     const invalidMethods = Relation.INVALID_METHODS_FOR_DELETE_ALL.filter((method) => {
       const value = (this._values as Record<string, unknown>)[method];
@@ -2136,6 +2134,18 @@ include(Relation, QueryMethods);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);
+
+for (const name of ["updateAll", "deleteAll"] as const) {
+  const body = Relation.prototype[name] as (this: Relation<any>, ...args: any[]) => Promise<number>;
+  Object.defineProperty(Relation.prototype, name, {
+    value: async function (this: Relation<any>, ...args: any[]): Promise<number> {
+      await this._materializeDeferredDistinctPkPredicates();
+      return body.apply(this, args);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
 
 defineValueMethods(Relation);
 
