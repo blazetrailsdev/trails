@@ -100,6 +100,12 @@ describe("NormalizedValueType inspect", () => {
     const castType = new ValueType();
     (castType as unknown as { inspect(): string }).inspect = () => "delegated";
     const type = new NormalizedValueType({ castType, normalizer: (v) => v, normalizeNil: false });
-    expect(type.inspect()).toMatch(/^#<NormalizedValueType /);
+    const inspected = type.inspect();
+    expect(inspected).not.toBe("delegated");
+    expect(inspected).toMatch(/^#<NormalizedValueType:0x[0-9a-f]{16} /);
+    expect(inspected).toContain("@cast_type=delegated");
+    expect(inspected).toContain("@normalize_nil=false");
+    expect(inspected).toContain("@normalizer=");
+    expect(type.inspect()).toBe(inspected);
   });
 });
