@@ -33,10 +33,10 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  *
  * Extending does not construct `superclass`: Ruby's class is
  * `Class.new(Delegator)` and `Delegator#initialize` only stores the delegate
- * (`:75-77,394-411`). A derived JS constructor that returns an object need not
- * call `super()`, so the constructor builds the instance from
- * `new.target.prototype` — keeping `instanceof superclass` — and never runs
- * `superclass`'s constructor, whatever arguments it requires.
+ * (`:75-77,394-411`). The class therefore extends a constructor that does
+ * nothing but shares `superclass.prototype` (and inherits its statics), so
+ * `super()` runs no `superclass` constructor while `instanceof superclass`
+ * still holds.
  *
  * Ruby reads `superclass.public_instance_methods` and
  * `protected_instance_methods` (`delegate.rb:397-400`), whose `all` default is
@@ -78,14 +78,16 @@ export function DelegateClass<T extends MixinBase>(
   superclass: T,
   block?: (this: Delegating<T>) => void,
 ): Delegating<T> {
-  const klass = class extends superclass {
+  const delegator = function () {} as unknown as T;
+  Object.setPrototypeOf(delegator, superclass);
+  delegator.prototype = superclass.prototype;
+  const klass = class extends delegator {
     declare _delegateDcObj: unknown;
 
-    // @ts-expect-error TS2377
     constructor(...args: ConstructorParameters<MixinBase>) {
-      const obj = Object.create(new.target.prototype) as InstanceType<typeof klass>;
-      obj.__setobj__(args[0] as unknown);
-      return methodMissingProxy(obj, { delegate: (self) => self.__getobj__() });
+      super();
+      this.__setobj__(args[0] as unknown);
+      return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
     }
 
     __getobj__(): unknown {

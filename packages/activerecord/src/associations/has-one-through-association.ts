@@ -149,7 +149,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   /** @noRailsEquivalent PERMANENT */
   async persistReplace(save = true): Promise<void> {
-    const pending = this._pendingReplace;
+    const pending = this.loaded ? this._pendingReplace : null;
     this._pendingReplace = null;
     if (this._pendingUnloadedThroughReconcile) {
       this._pendingUnloadedThroughReconcile = false;
