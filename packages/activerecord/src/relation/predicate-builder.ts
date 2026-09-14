@@ -187,13 +187,21 @@ export class PredicateBuilder {
     return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
-  get(attrName: string, value: unknown): Nodes.Node {
-    return this.build(this.table.arelTable.get(attrName), value);
+  get(attrName: string, value: unknown, operator: string | null = null): Nodes.Node {
+    return this.build(this.table.arelTable.get(attrName), value, operator);
   }
 
-  build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+  build(attribute: Nodes.Attribute, value: unknown, operator: string | null = null): Nodes.Node {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;
+    }
+    if (
+      (operator ??=
+        this.table.type(toS(attribute.name)).isForceEquality?.(value) === true ? "eq" : null) !=
+      null
+    ) {
+      const bind = this.buildBindAttribute(toS(attribute.name), value);
+      return (attribute as unknown as Record<string, (b: unknown) => Nodes.Node>)[operator](bind);
     }
     if (this.isScalarQueryValue(value)) {
       const normalized = this.normalizeQueryValue(toS(attribute.name), value);
@@ -203,9 +211,6 @@ export class PredicateBuilder {
     }
     if (value === null || value === undefined) {
       return attribute.eq(null);
-    }
-    if (this.table.type(toS(attribute.name)).isForceEquality?.(value) === true) {
-      return attribute.eq(this.buildBindAttribute(toS(attribute.name), value));
     }
     return this.handlerFor(value).call(attribute, value);
   }
