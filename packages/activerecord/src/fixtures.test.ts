@@ -52,6 +52,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
+import { withSecondPool } from "./support/setup-second-pool.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
@@ -812,10 +813,12 @@ describe("SetFixtureClassPrevailsTest", () => {
 
 describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
   fixtures(["accounts", "companies"], { useTransactionalTests: false });
+  withSecondPool();
 
   let instances: Base[];
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await Course.loadSchema();
     instances = [
       new Account({ credit_limit: 50 }),
       new Company({ name: "RoR Consulting" }),
