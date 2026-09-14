@@ -1,4 +1,5 @@
 import { asJson } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -73,6 +74,11 @@ export function serializableHash(
         items.map((r) => serializableHash(r as SerializationRecord, opts, true)),
       );
     } else {
+      if (!rbObjRespondTo(records, "serializableHash")) {
+        throw new NoMethodError(
+          `undefined method 'serializableHash' for an instance of ${(records as object).constructor.name}`,
+        );
+      }
       safeSet(result, assocName, serializableHash(records as SerializationRecord, opts, true));
     }
   });
