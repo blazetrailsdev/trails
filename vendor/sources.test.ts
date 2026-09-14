@@ -180,7 +180,12 @@ describe("vendor/sources.ts", () => {
         testPath: "test",
       },
     ]);
-    expect(Object.keys(libEntryFilesManifest())).toEqual(["arel", "rack-test", "i18n"]);
+    expect(Object.keys(libEntryFilesManifest())).toEqual([
+      "arel",
+      "activerecord",
+      "rack-test",
+      "i18n",
+    ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
     expect(Object.keys(testPathsManifest())).toContain("i18n");
