@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { _setDeriveJoinTableName } from "./model-schema-slot.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
@@ -859,7 +860,7 @@ export function isSchemaLoaded(this: SchemaHost): boolean {
 export function typeForColumn(this: SchemaHost, connection: any, column: any): any {
   let type = connection.lookupCastTypeFromColumn(column);
 
-  if ((this as any).immutableStringsByDefault && typeof type.toImmutableString === "function") {
+  if ((this as any).immutableStringsByDefault && rbObjRespondTo(type, "toImmutableString")) {
     type = type.toImmutableString();
   }
 
