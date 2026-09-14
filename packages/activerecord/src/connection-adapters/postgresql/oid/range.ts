@@ -41,13 +41,13 @@ export class RangeType extends ValueType<Range<unknown>> {
     const from = this.typeCastSingle(extracted.from);
     const to = this.typeCastSingle(extracted.to);
 
-    if (!isInfinity(from) && extracted.excludeStart) {
+    if (!this.isInfinity(from) && extracted.excludeStart) {
       throw new ArgumentError(
         `The Ruby Range object does not support excluding the beginning of a Range. (unsupported value: '${value}')`,
       );
     }
 
-    const [begin, end] = sanitizeBounds(from, to);
+    const [begin, end] = this.sanitizeBounds(from, to);
     return new Range(begin, end, extracted.excludeEnd);
   }
 
@@ -69,11 +69,11 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   private typeCastSingle(value: unknown): unknown {
-    return isInfinity(value) ? value : this.subtype.deserialize(value);
+    return this.isInfinity(value) ? value : this.subtype.deserialize(value);
   }
 
   private typeCastSingleForDatabase(value: unknown): unknown {
-    return isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
+    return this.isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
   /** @missingRailsCall split — PERMANENT */
@@ -99,14 +99,14 @@ export class RangeType extends ValueType<Range<unknown>> {
     };
   }
 
-  private infinity({ negative = false }: { negative?: boolean } = {}): unknown {
-    if (this.subtype.infinity) {
-      return this.subtype.infinity({ negative });
-    } else if (negative) {
-      return -Infinity;
-    } else {
-      return Infinity;
-    }
+  static readonly INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);
+
+  /** @internal */
+  private sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
+    return [
+      rbEqual(from, -Infinity) && !RangeType.INFINITE_FLOAT_RANGE.cover(to) ? null : from,
+      rbEqual(to, Infinity) && !RangeType.INFINITE_FLOAT_RANGE.cover(from) ? null : to,
+    ];
   }
 
   /** @internal */
@@ -120,26 +120,26 @@ export class RangeType extends ValueType<Range<unknown>> {
       return value;
     }
   }
-}
 
-const INFINITE_FLOAT_RANGE = new Range<unknown>(-Infinity, Infinity);
-
-/** @internal */
-function sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
-  return [
-    rbEqual(from, -Infinity) && !INFINITE_FLOAT_RANGE.cover(to) ? null : from,
-    rbEqual(to, Infinity) && !INFINITE_FLOAT_RANGE.cover(from) ? null : to,
-  ];
-}
-
-/** @internal */
-function isInfinity(value: unknown): boolean {
-  const fn = (value as { isInfinite?: unknown })?.isInfinite;
-  if (typeof fn === "function") {
-    const result = (fn as () => unknown).call(value);
-    return result != null && result !== false;
+  private infinity({ negative = false }: { negative?: boolean } = {}): unknown {
+    if (this.subtype.infinity) {
+      return this.subtype.infinity({ negative });
+    } else if (negative) {
+      return -Infinity;
+    } else {
+      return Infinity;
+    }
   }
-  return value === Infinity || value === -Infinity;
+
+  /** @internal */
+  private isInfinity(value: unknown): boolean {
+    const fn = (value as { isInfinite?: unknown })?.isInfinite;
+    if (typeof fn === "function") {
+      const result = (fn as () => unknown).call(value);
+      return result != null && result !== false;
+    }
+    return value === Infinity || value === -Infinity;
+  }
 }
 
 function inspect(value: unknown): string {

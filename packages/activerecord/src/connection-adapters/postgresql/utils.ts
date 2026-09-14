@@ -26,7 +26,7 @@ export class Name {
   }
 
   hash(): string {
-    return JSON.stringify([this.schema, this.identifier]);
+    return JSON.stringify(this.parts());
   }
 
   /** @internal */
