@@ -1,4 +1,7 @@
-import { prepend } from "@blazetrails/activesupport";
+import { any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
+import { isEmpty } from "@blazetrails/ruby-compat";
+import { Relation } from "../relation.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
 export interface SerializableType {
@@ -72,35 +75,46 @@ export class ExtendedDeterministicQueries {
 }
 
 export class EncryptedQuery {
-  /** @missingRailsCall empty? — PERMANENT */
   static processArguments(
     owner: any,
     args: unknown[],
     checkForAdditionalValues: boolean,
   ): unknown[] {
-    const model = owner._model ?? owner;
-    const encryptedAttrs = model.encryptedAttributes as Set<string> | undefined;
-    if (!encryptedAttrs?.size) return args;
+    if (owner instanceof Relation) owner = owner.model;
 
-    if (!Array.isArray(args) || args.length === 0) return args;
-    const options = args[0];
-    if (typeof options !== "object" || options === null) return args;
+    if (isEmpty(deterministicEncryptedAttributes.call(owner))) return args;
 
-    const result = { ...options } as Record<string, unknown>;
-    let modified = false;
+    let options: unknown;
+    if (Array.isArray(args) && (isPlainObject((options = args[0])) || options instanceof Map)) {
+      const hash = transformKeys(
+        options as Map<string, unknown>,
+        ((key: unknown) => {
+          if (Array.isArray(key)) {
+            return key.map((k) => String(k));
+          } else {
+            return String(key);
+          }
+        }) as (key: string) => string,
+      ) as Map<string, unknown> | Record<string, unknown>;
+      args[0] = hash;
 
-    for (const attrName of encryptedAttrs) {
-      const type = model.typeForAttribute(attrName) as EncryptedAttributeType | undefined;
-      if (!type) continue;
-      if (!type.deterministic) continue;
-      if (!type.previousTypes.length) continue;
-      const value = result[attrName];
-      if (value === undefined) continue;
-      result[attrName] = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
-      modified = true;
+      for (let attributeName of deterministicEncryptedAttributes.call(owner)) {
+        attributeName = String(attributeName);
+        const type = owner.typeForAttribute(attributeName) as EncryptedAttributeType;
+        let value: unknown;
+        if (
+          !isEmpty(type.previousTypes) &&
+          (value = hash instanceof Map ? hash.get(attributeName) : hash[attributeName]) != null &&
+          value !== false
+        ) {
+          value = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
+          if (hash instanceof Map) hash.set(attributeName, value);
+          else hash[attributeName] = value;
+        }
+      }
     }
 
-    return modified ? [result, ...args.slice(1)] : args;
+    return args;
   }
 
   private static processEncryptedQueryArgument(
@@ -152,30 +166,25 @@ export class RelationQueries {
     return originalExists.call(this, ...EncryptedQuery.processArguments(this, args, true));
   }
 
-  /** @missingRailsCall any? — PERMANENT */
   static scopeForCreate(
     this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
   ): Record<string, unknown> {
-    const model = this.model ?? this;
-    const encryptedAttrs = model.encryptedAttributes as Set<string> | undefined;
-    if (!encryptedAttrs?.size) return originalScopeForCreate.call(this) as Record<string, unknown>;
+    if (!any([...deterministicEncryptedAttributes.call(this.model)]))
+      return originalScopeForCreate.call(this) as Record<string, unknown>;
 
-    const scopeAttrs = originalScopeForCreate.call(this) as Record<string, unknown>;
+    const scopeAttributes = originalScopeForCreate.call(this) as Record<string, unknown>;
     const wheres = this.whereValuesHash();
-    for (const attrName of encryptedAttrs) {
-      const type = model.typeForAttribute(attrName) as EncryptedAttributeType;
-      if (!type.deterministic) continue;
-      const values = wheres[attrName];
-      if (
-        Array.isArray(values) &&
-        values.length > 0 &&
-        values.slice(1).every((v) => v instanceof AdditionalValue)
-      ) {
-        scopeAttrs[attrName] = values[0];
+
+    for (let attributeName of deterministicEncryptedAttributes.call(this.model)) {
+      attributeName = String(attributeName);
+      const values = wheres[attributeName];
+      if (Array.isArray(values) && values.slice(1).every((v) => v instanceof AdditionalValue)) {
+        scopeAttributes[attributeName] = values[0];
       }
     }
-    return scopeAttrs;
+
+    return scopeAttributes;
   }
 }
 

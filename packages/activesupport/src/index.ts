@@ -188,6 +188,7 @@ export {
   toParam,
   toQuery,
   isPlainObject,
+  transformKeys,
   compact,
   compactBlank as compactBlankObj,
   compactBlankBang,

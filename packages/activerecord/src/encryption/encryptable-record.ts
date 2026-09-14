@@ -287,7 +287,6 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
 export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
   const modelClass = this;
   modelClass.encryptedAttributes.add(name);
-  delete modelClass._deterministicEncryptedAttributes;
 
   modelClass.decorateAttributes([name], (name: string, castType: ValueType) => {
     const scheme = schemeFor(options);

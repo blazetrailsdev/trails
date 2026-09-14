@@ -134,3 +134,32 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(() => fullType.serialize(av)).toThrow(/Tried to dump unspecified class/);
   });
 });
+
+describe("EncryptedQuery.processArguments (trails extras)", () => {
+  it("stringifies Array and Symbol keys of a Map hash and expands deterministic values", async () => {
+    const { EncryptedQuery } = await import("./extended-deterministic-queries.js");
+    const { NullEncryptor } = await import("./null-encryptor.js");
+    const prev = new Scheme({ deterministic: true, encryptor: new NullEncryptor() });
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({
+        deterministic: true,
+        encryptor: new NullEncryptor(),
+        previousSchemes: [prev],
+      }),
+    });
+    const owner = { encryptedAttributes: new Set(["email"]), typeForAttribute: () => type };
+    const args: unknown[] = [
+      new Map<unknown, unknown>([
+        [["id", 1], [[1, 2]]],
+        ["email", "a@x"],
+      ]),
+    ];
+    EncryptedQuery.processArguments(owner, args, true);
+    const hash = args[0] as Map<unknown, unknown>;
+    const keys = [...hash.keys()];
+    expect(keys[0]).toEqual(["id", "1"]);
+    const email = hash.get("email") as unknown[];
+    expect(email[0]).toBe("a@x");
+    expect(email[1]).toBeInstanceOf(AdditionalValue);
+  });
+});
