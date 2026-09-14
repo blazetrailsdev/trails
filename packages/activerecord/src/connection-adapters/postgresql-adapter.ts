@@ -11,7 +11,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
-import { TypeMap } from "../type/type-map.js";
+import type { TypeMap } from "../type/type-map.js";
 import { _Base } from "../base-slot.js";
 import { Name, Utils } from "./postgresql/utils.js";
 import {
@@ -40,9 +40,39 @@ import {
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import { Money } from "./postgresql/oid/money.js";
 import {
-  initializeTypeMap as staticInitializeTypeMap,
-  registerClassWithPrecision,
-} from "./postgresql/type-map-init.js";
+  BigIntegerType,
+  BooleanType,
+  FloatType,
+  IntegerType,
+  StringType,
+} from "@blazetrails/activemodel";
+
+import { Array as OidArray } from "./postgresql/oid/array.js";
+import { RangeType } from "./postgresql/oid/range.js";
+import { Date as OidDate } from "./postgresql/oid/date.js";
+import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
+import { Json as ArJson } from "../type/json.js";
+import { Text as ArText } from "../type/text.js";
+import { Bit } from "./postgresql/oid/bit.js";
+import { BitVarying } from "./postgresql/oid/bit-varying.js";
+import { Bytea } from "./postgresql/oid/bytea.js";
+import { Cidr } from "./postgresql/oid/cidr.js";
+import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
+import { Decimal } from "./postgresql/oid/decimal.js";
+import { Enum } from "./postgresql/oid/enum.js";
+import { Hstore } from "./postgresql/oid/hstore.js";
+import { Inet } from "./postgresql/oid/inet.js";
+import { Interval } from "./postgresql/oid/interval.js";
+import { Jsonb } from "./postgresql/oid/jsonb.js";
+import { LegacyPoint } from "./postgresql/oid/legacy-point.js";
+import { Macaddr } from "./postgresql/oid/macaddr.js";
+import { Oid } from "./postgresql/oid/oid.js";
+import { Point } from "./postgresql/oid/point.js";
+import { SpecializedString } from "./postgresql/oid/specialized-string.js";
+import { Uuid } from "./postgresql/oid/uuid.js";
+import { Vector } from "./postgresql/oid/vector.js";
+import { Xml } from "./postgresql/oid/xml.js";
+
 import { Timestamp } from "./postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "./postgresql/oid/timestamp-with-time-zone.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -189,6 +219,20 @@ function prepare(conn: pg.Client, stmtName: string, sql: string): Promise<void> 
     };
     (conn.query as unknown as (s: object) => unknown)(submittable);
   });
+}
+
+class PgInteger8 extends BigIntegerType {
+  protected override maxValue(): number {
+    return 2 ** (this._limit() * 8 - 1);
+  }
+
+  override serializeCastValue(value: number | null): number | null {
+    return this.ensureInRange(value) as number | null;
+  }
+
+  override serialize(value: unknown): unknown {
+    return this.ensureInRange(this.cast(value));
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -562,11 +606,61 @@ export class PostgreSQLAdapter
     });
   }
 
-  static initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
-    if (!(m instanceof HashLookupTypeMap)) {
-      throw new TypeError("initializeTypeMap expects a HashLookupTypeMap");
-    }
-    staticInitializeTypeMap(m);
+  /** @internal */
+  static override initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
+    m.registerType("int2", new IntegerType({ limit: 2 }));
+    m.registerType("int4", new IntegerType({ limit: 4 }));
+    m.registerType("int8", new PgInteger8({ limit: 8 }));
+    m.registerType("oid", new Oid());
+    m.registerType("float4", new FloatType({ limit: 24 }));
+    m.registerType("float8", new FloatType());
+    m.registerType("text", new ArText());
+    this.registerClassWithLimit(m, "varchar", StringType);
+    m.aliasType("char", "varchar");
+    m.aliasType("name", "varchar");
+    m.aliasType("bpchar", "varchar");
+    (m as HashLookupTypeMap).registerType(18, new StringType());
+    (m as HashLookupTypeMap).registerType(19, new StringType());
+    m.registerType("bool", new BooleanType());
+    this.registerClassWithLimit(m, "bit", Bit);
+    this.registerClassWithLimit(m, "varbit", BitVarying);
+    m.registerType("date", new OidDate());
+    m.registerType("money", new Money());
+    m.registerType("bytea", new Bytea());
+    m.registerType("point", new Point());
+    m.registerType("hstore", new Hstore());
+    m.registerType("json", new ArJson());
+    m.registerType("jsonb", new Jsonb());
+    m.registerType("cidr", new Cidr());
+    m.registerType("inet", new Inet());
+    m.registerType("uuid", new Uuid());
+    m.registerType("xml", new Xml());
+    m.registerType("tsvector", new SpecializedString("tsvector"));
+    m.registerType("macaddr", new Macaddr());
+    m.registerType("citext", new SpecializedString("citext"));
+    m.registerType("ltree", new SpecializedString("ltree"));
+    m.registerType("line", new SpecializedString("line"));
+    m.registerType("lseg", new SpecializedString("lseg"));
+    m.registerType("box", new SpecializedString("box"));
+    m.registerType("path", new SpecializedString("path"));
+    m.registerType("polygon", new SpecializedString("polygon"));
+    m.registerType("circle", new SpecializedString("circle"));
+
+    m.registerType("numeric", undefined, (_: unknown, fmod: unknown, sqlType: unknown) => {
+      const precision = this.extractPrecision(sqlType as string);
+      const scale = this.extractScale(sqlType as string);
+
+      if (fmod != null && (((fmod as number) - 4) & 0xffff) === 0) {
+        return new DecimalWithoutScale({ precision });
+      } else {
+        return new Decimal({ precision, scale });
+      }
+    });
+
+    m.registerType("interval", undefined, (...args: unknown[]) => {
+      const precision = this.extractPrecision(args.at(-1) as string);
+      return new Interval({ precision });
+    });
   }
 
   /** @internal */
@@ -577,9 +671,20 @@ export class PostgreSQLAdapter
   private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {
     (this.constructor as typeof PostgreSQLAdapter).initializeTypeMap(m);
 
-    registerClassWithPrecision(m, "time", TimeType, { timezone: this._defaultTimezone });
-    registerClassWithPrecision(m, "timestamp", Timestamp, { timezone: this._defaultTimezone });
-    registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);
+    (this.constructor as typeof PostgreSQLAdapter).registerClassWithPrecision(m, "time", TimeType, {
+      timezone: this._defaultTimezone,
+    });
+    (this.constructor as typeof PostgreSQLAdapter).registerClassWithPrecision(
+      m,
+      "timestamp",
+      Timestamp,
+      { timezone: this._defaultTimezone },
+    );
+    (this.constructor as typeof PostgreSQLAdapter).registerClassWithPrecision(
+      m,
+      "timestamptz",
+      TimestampWithTimeZone,
+    );
 
     await this.loadAdditionalTypes();
   }
@@ -2550,6 +2655,28 @@ PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
 include(PostgreSQLAdapter, SchemaStatements);
+
+Type.addModifier({ array: true }, OidArray, { adapter: "postgresql" });
+Type.addModifier({ range: true }, RangeType, { adapter: "postgresql" });
+
+Type.register("bit", Bit, { adapter: "postgresql" });
+Type.register("bit_varying", BitVarying, { adapter: "postgresql" });
+Type.register("binary", Bytea, { adapter: "postgresql" });
+Type.register("cidr", Cidr, { adapter: "postgresql" });
+Type.register("date", OidDate, { adapter: "postgresql" });
+Type.register("datetime", OidDateTime, { adapter: "postgresql" });
+Type.register("decimal", Decimal, { adapter: "postgresql" });
+Type.register("enum", Enum, { adapter: "postgresql" });
+Type.register("hstore", Hstore, { adapter: "postgresql" });
+Type.register("inet", Inet, { adapter: "postgresql" });
+Type.register("interval", Interval, { adapter: "postgresql" });
+Type.register("jsonb", Jsonb, { adapter: "postgresql" });
+Type.register("money", Money, { adapter: "postgresql" });
+Type.register("point", Point, { adapter: "postgresql" });
+Type.register("legacy_point", LegacyPoint, { adapter: "postgresql" });
+Type.register("uuid", Uuid, { adapter: "postgresql" });
+Type.register("vector", Vector, { adapter: "postgresql" });
+Type.register("xml", Xml, { adapter: "postgresql" });
 
 PostgreSQLAdapter.prototype.performQuery = function (
   this: PostgreSQLAdapter,

@@ -12,7 +12,7 @@ import { Base } from "./base.js";
 import { AdapterNotFound, ConnectionNotDefined } from "./errors.js";
 import { ValueType, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
-import "./connection-adapters/postgresql/type-map-init.js";
+import "./connection-adapters/postgresql-adapter.js";
 import { Bytea } from "./connection-adapters/postgresql/oid/bytea.js";
 import { Date as OidDate } from "./connection-adapters/postgresql/oid/date.js";
 import { DateTime as OidDateTime } from "./connection-adapters/postgresql/oid/date-time.js";
