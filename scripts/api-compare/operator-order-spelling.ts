@@ -148,6 +148,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // attribute_methods.rb:415 `def [](attr_name)` / :428 `def []=(attr_name, value)`
   // → attribute-methods.ts `get` / `set`.
   "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
+  // type/adapter_specific_registry.rb:63 `def <=>(other)` →
+  // type/adapter-specific-registry.ts `Registration#compare`.
+  "ActiveRecord::Type::Registration": { "<=>": ["compare"] },
+  // migration.rb:629 `def self.[](version)` → migration.ts `static get`.
+  "ActiveRecord::Migration": { "self.[]": ["get"] },
   // internal_metadata.rb:47 `def [](key)` / :39 `def []=(key, value)` →
   // internal-metadata.ts `InternalMetadata#get` / `set`.
   "ActiveRecord::InternalMetadata": { "[]": ["get"], "[]=": ["set"] },
@@ -209,12 +214,30 @@ const usedKeys = new Set<string>();
 /**
  * TS spelling candidates for a Ruby operator method on a given class, or
  * `undefined` when `name` is not an operator or the class has no verified entry.
+ *
+ * A singleton operator (`def self.[](version)`) is keyed `self.<op>`. `isStatic`
+ * selects the arm when the caller knows which one it holds; a caller that does
+ * not (the compare/extra walks, which merge instance and class methods) gets
+ * the instance entry first and the singleton entry otherwise.
  */
-export function operatorSpelling(fqn: string, name: string): string[] | undefined {
+export function operatorSpelling(
+  fqn: string,
+  name: string,
+  isStatic?: boolean,
+): string[] | undefined {
   if (!OPERATORS.has(name)) return undefined;
-  const spelling = OPERATOR_SPELLING_BY_FQN[fqn]?.[name];
-  if (spelling) usedKeys.add(`${fqn}#${name}`);
-  return spelling;
+  const ops = OPERATOR_SPELLING_BY_FQN[fqn];
+  if (ops === undefined) return undefined;
+  const keys =
+    isStatic === true ? [`self.${name}`] : isStatic === false ? [name] : [name, `self.${name}`];
+  for (const key of keys) {
+    const spelling = ops[key];
+    if (spelling) {
+      usedKeys.add(`${fqn}#${key}`);
+      return spelling;
+    }
+  }
+  return undefined;
 }
 
 /**

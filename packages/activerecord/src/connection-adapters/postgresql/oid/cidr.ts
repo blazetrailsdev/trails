@@ -4,9 +4,9 @@ import { ValueType } from "@blazetrails/activemodel";
 export class IPAddr {
   /** @noRailsEquivalent CONVERGEABLE move-ipaddr-into-ruby-compat */
   constructor(
-    /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+    /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
     readonly address: string,
-    /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+    /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
     readonly prefixLength: number,
   ) {}
 

@@ -71,8 +71,7 @@ export class Registration {
     return result;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-  compareTo(other: Registration): number {
+  compare(other: Registration): number {
     if (this.isConflictsWith(other)) {
       throw new TypeConflictError(
         `Type ${this.name} was registered for all adapters, but shadows a native type with the same name for ${this.adapter ?? other.adapter}`,
@@ -200,7 +199,7 @@ export class AdapterSpecificRegistry {
     const matching = this.registrations.filter((r) => r.matches(symbol, ...args));
     if (matching.length === 0) return undefined;
     return matching.reduce((best, current) => {
-      const cmp = best.compareTo(current);
+      const cmp = best.compare(current);
       return cmp < 0 ? current : best;
     });
   }

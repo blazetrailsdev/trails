@@ -111,7 +111,7 @@ interface ExtensionList {
   }): void;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export async function flushPendingReplaces(record: Base): Promise<void> {
   const instances: Map<string, unknown> = (record as any)._associationInstances;
   if (!instances?.values) return;

@@ -13,7 +13,7 @@ describe("TimeTest", () => {
     const type = new Time();
     const serialized = type.serialize("10:30:00");
     expect(serialized).toBeInstanceOf(Value);
-    expect(((serialized as Value).getobj() as RubyTime).getutc().xmlschema()).toBe(
+    expect(((serialized as Value).__getobj__() as RubyTime).getutc().xmlschema()).toBe(
       "2000-01-01T10:30:00Z",
     );
     expect(type.serialize(null)).toBe(null);
@@ -22,7 +22,7 @@ describe("TimeTest", () => {
   it("cast unwraps a Type::Time::Value", () => {
     const type = new Time();
     const value = type.serialize("10:30:00") as Value;
-    expect(type.cast(value)).toEqual(value.getobj());
+    expect(type.cast(value)).toEqual(value.__getobj__());
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {

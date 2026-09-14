@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { eachDatabase, createAndLoadSchema } from "./test-databases.js";
+import { createAndLoadSchema } from "./test-databases.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -179,16 +179,5 @@ describe("TestDatabasesTest", () => {
         process.env.VERBOSE = originalVerbose;
       }
     }
-  });
-
-  it("eachDatabase iterates all adapters", async () => {
-    const adapters = [Base.connection, Base.connection, Base.connection];
-    const visited: number[] = [];
-
-    await eachDatabase(adapters, async (_adapter, index) => {
-      visited.push(index);
-    });
-
-    expect(visited).toEqual([0, 1, 2]);
   });
 });

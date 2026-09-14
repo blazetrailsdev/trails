@@ -414,7 +414,9 @@ export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
-  superklass: any = Object.getPrototypeOf(klass),
+  superklass: any = Object.getPrototypeOf(klass) === Function.prototype
+    ? Object
+    : Object.getPrototypeOf(klass),
 ): boolean {
   if (name in klass.prototype) {
     if (superklass?.prototype != null && name in superklass.prototype) {

@@ -135,15 +135,6 @@ class AdapterSchemaSource implements SchemaSource {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function statelessTest(pattern: RegExp, value: string): boolean {
-  const safe =
-    pattern.global || pattern.sticky
-      ? new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""))
-      : pattern;
-  return safe.test(value);
-}
-
 export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
   /** @noRailsEquivalent PERMANENT */

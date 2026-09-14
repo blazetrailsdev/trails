@@ -240,17 +240,17 @@ describe("Migrator trails extensions", () => {
   });
 
   it("Migration.version returns Current for the current version", () => {
-    const Klass = Migration.forVersion(8.0);
+    const Klass = Migration.get(8.0);
     expect(Klass).toBe(Current);
   });
 
   it("Migration.version returns Current for string version", () => {
-    const Klass = Migration.forVersion("8.0");
+    const Klass = Migration.get("8.0");
     expect(Klass).toBe(Current);
   });
 
   it("Migration.version throws when no compatible version exists", () => {
-    expect(() => Migration.forVersion(0.1)).toThrow(/Unknown migration version/);
+    expect(() => Migration.get(0.1)).toThrow(/Unknown migration version/);
   });
 
   it("currentVersion returns the current version string", () => {
@@ -258,16 +258,16 @@ describe("Migrator trails extensions", () => {
   });
 
   it("findVersion raises for a version above the highest registered one", () => {
-    expect(() => Migration.forVersion(8.5)).toThrow(
+    expect(() => Migration.get(8.5)).toThrow(
       /Unknown migration version "8\.5"; expected one of "7\.1", "7\.2", "8\.0"/,
     );
   });
 
   it("Migration.version resolves every ported Compatibility version", () => {
     expect(V8_0).toBe(Current);
-    expect(Migration.forVersion(8.0)).toBe(V8_0);
-    expect(Migration.forVersion("7.2")).toBe(V7_2);
-    expect(Migration.forVersion(7.1)).toBe(V7_1);
+    expect(Migration.get(8.0)).toBe(V8_0);
+    expect(Migration.get("7.2")).toBe(V7_2);
+    expect(Migration.get(7.1)).toBe(V7_1);
     expect(Object.getPrototypeOf(V7_1)).toBe(V7_2);
   });
 });

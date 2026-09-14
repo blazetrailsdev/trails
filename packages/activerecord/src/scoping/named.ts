@@ -3,18 +3,8 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 import { Relation } from "../relation.js";
-import { isDangerousClassMethod } from "../attribute-methods.js";
+import { isDangerousClassMethod, isMethodDefinedWithin } from "../attribute-methods.js";
 import { Default } from "./default.js";
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
-export function isRelationInstanceMethod(name: string): boolean {
-  let proto: any = Relation.prototype;
-  while (proto && proto !== Object.prototype) {
-    if (Object.prototype.hasOwnProperty.call(proto, name)) return true;
-    proto = Object.getPrototypeOf(proto);
-  }
-  return false;
-}
 
 /** @noRailsEquivalent PERMANENT */
 export type ScopeMethod<T extends Base, A extends unknown[] = []> = (...args: A) => Relation<T>;
@@ -44,7 +34,7 @@ export function scope<T extends typeof Base>(
     );
   }
 
-  if (isRelationInstanceMethod(name)) {
+  if (isMethodDefinedWithin.call(modelClass, name, Relation)) {
     throw new ArgumentError(
       `You tried to define a scope named "${name}" on the model ` +
         `"${modelClass.name}", but ActiveRecord::Relation already defined an ` +

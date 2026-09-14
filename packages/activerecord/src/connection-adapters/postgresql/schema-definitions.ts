@@ -1,5 +1,4 @@
-import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
-import { pgDatetimeConfig } from "./pg-datetime-config.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import {
   TableDefinition as AbstractTableDefinition,
@@ -76,7 +75,7 @@ export interface ColumnMethods {
   uuid(...args: [...names: string[], options: ColumnOptions]): unknown;
   xml(...names: string[]): unknown;
   xml(...args: [...names: string[], options: ColumnOptions]): unknown;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
   enum(...names: string[]): unknown;
   enum(...args: [...names: string[], options: ColumnOptions]): unknown;
@@ -115,7 +114,7 @@ export class ExclusionConstraintDefinition {
 
   /** @missingRailsCall match? — PERMANENT */
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && !statelessTest(SchemaDumper.exclIgnorePattern, this.name);
+    return this.name != null && this.name.search(SchemaDumper.exclIgnorePattern) === -1;
   }
 }
 
@@ -151,7 +150,7 @@ export class UniqueConstraintDefinition {
   }
 
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && !statelessTest(SchemaDumper.uniqueIgnorePattern, this.name);
+    return this.name != null && this.name.search(SchemaDumper.uniqueIgnorePattern) === -1;
   }
 
   definedFor(
@@ -251,14 +250,7 @@ export class TableDefinition extends AbstractTableDefinition {
     if ((type as string) === "virtual") {
       type = options.type as ColumnType;
     }
-    const def = super.newColumnDefinition(name, type, options);
-    const t = def.type as string;
-    if (t === "datetime") {
-      def.datetimePhysicalType = pgDatetimeConfig.datetimeType;
-    } else if (t === "timestamp" || t === "timestamptz") {
-      def.datetimePhysicalType = t;
-    }
-    return def;
+    return super.newColumnDefinition(name, type, options);
   }
 
   /** @internal */
