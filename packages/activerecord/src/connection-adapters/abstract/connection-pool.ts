@@ -24,12 +24,7 @@ import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import type { TransactionManager } from "./transaction.js";
-import {
-  ConnectionPoolConfiguration,
-  QueryCache,
-  type QueryCacheHost,
-  type Store,
-} from "./query-cache.js";
+import { ConnectionPoolConfiguration, QueryCache, type QueryCacheHost } from "./query-cache.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
@@ -927,20 +922,10 @@ export class ConnectionPool implements ReapablePool {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface ConnectionPool extends Omit<
-  Included<ConnectionPoolConfiguration>,
-  "_pinnedConnection" | "enableQueryCache" | "disableQueryCache" | "checkoutAndVerify"
-> {
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  readonly queryCache: Store;
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  readonly queryCacheEnabled: boolean;
-  readonly dirtiesQueryCache: boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
-  /** @noRailsEquivalent CONVERGEABLE converge-pool-and-cache-moved-residue */
-  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
-}
+export interface ConnectionPool
+  extends
+    Omit<Included<ConnectionPoolConfiguration>, "_pinnedConnection" | "checkoutAndVerify">,
+    Pick<ConnectionPoolConfiguration, "queryCache" | "queryCacheEnabled" | "dirtiesQueryCache"> {}
 include(ConnectionPool, ConnectionPoolConfiguration);
 prepend(ConnectionPool.prototype, {
   checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,

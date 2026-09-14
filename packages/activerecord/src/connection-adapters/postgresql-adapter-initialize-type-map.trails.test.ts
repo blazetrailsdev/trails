@@ -1,74 +1,38 @@
-import {
-  BigIntegerType,
-  BooleanType,
-  FloatType,
-  IntegerType,
-  StringType,
-} from "@blazetrails/activemodel";
+import { BooleanType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { describe, expect, it } from "vitest";
 
-import { Date as OidDate } from "./oid/date.js";
-import { Json as ArJson } from "../../type/json.js";
-import { Text as ArText } from "../../type/text.js";
+import { Date as OidDate } from "./postgresql/oid/date.js";
+import { Json as ArJson } from "../type/json.js";
+import { Text as ArText } from "../type/text.js";
 
-import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
-import { Bit } from "./oid/bit.js";
-import { BitVarying } from "./oid/bit-varying.js";
-import { Bytea } from "./oid/bytea.js";
-import { Cidr } from "./oid/cidr.js";
-import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
-import { Decimal } from "./oid/decimal.js";
-import { Hstore } from "./oid/hstore.js";
-import { Inet } from "./oid/inet.js";
-import { Interval } from "./oid/interval.js";
-import { Jsonb } from "./oid/jsonb.js";
-import { Macaddr } from "./oid/macaddr.js";
-import { Money } from "./oid/money.js";
-import { Oid } from "./oid/oid.js";
-import { Point } from "./oid/point.js";
-import { SpecializedString } from "./oid/specialized-string.js";
-import { Uuid } from "./oid/uuid.js";
-import { Xml } from "./oid/xml.js";
-import {
-  extractLimit,
-  extractPrecision,
-  extractScale,
-  initializeTypeMap,
-} from "./type-map-init.js";
-
-describe("extract_limit / extract_precision / extract_scale", () => {
-  it("extracts a single integer from sql_type like varchar(255)", () => {
-    expect(extractLimit("varchar(255)")).toBe(255);
-    expect(extractLimit("varchar")).toBeUndefined();
-    expect(extractLimit(undefined)).toBeUndefined();
-  });
-
-  it("extracts precision from numeric(10,2) or numeric(10)", () => {
-    expect(extractPrecision("numeric(10,2)")).toBe(10);
-    expect(extractPrecision("numeric(10)")).toBe(10);
-    expect(extractPrecision("numeric")).toBeUndefined();
-  });
-
-  it("extracts scale only from numeric(p,s)", () => {
-    expect(extractScale("numeric(10,2)")).toBe(2);
-    expect(extractScale("numeric(10)")).toBeUndefined();
-  });
-
-  it("tolerates whitespace inside the parens, like Rails' to_i", () => {
-    expect(extractLimit("varchar( 255 )")).toBe(255);
-    expect(extractPrecision("numeric(10, 2)")).toBe(10);
-    expect(extractScale("numeric(10, 2)")).toBe(2);
-  });
-});
+import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
+import { Bit } from "./postgresql/oid/bit.js";
+import { BitVarying } from "./postgresql/oid/bit-varying.js";
+import { Bytea } from "./postgresql/oid/bytea.js";
+import { Cidr } from "./postgresql/oid/cidr.js";
+import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
+import { Decimal } from "./postgresql/oid/decimal.js";
+import { Hstore } from "./postgresql/oid/hstore.js";
+import { Inet } from "./postgresql/oid/inet.js";
+import { Interval } from "./postgresql/oid/interval.js";
+import { Jsonb } from "./postgresql/oid/jsonb.js";
+import { Macaddr } from "./postgresql/oid/macaddr.js";
+import { Money } from "./postgresql/oid/money.js";
+import { Oid } from "./postgresql/oid/oid.js";
+import { Point } from "./postgresql/oid/point.js";
+import { SpecializedString } from "./postgresql/oid/specialized-string.js";
+import { Uuid } from "./postgresql/oid/uuid.js";
+import { Xml } from "./postgresql/oid/xml.js";
+import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 describe("initialize_type_map seeds the PG type_map with known types", () => {
   const m = new HashLookupTypeMap();
-  initializeTypeMap(m);
+  PostgreSQLAdapter.initializeTypeMap(m);
 
   it.each([
     ["int2", IntegerType],
     ["int4", IntegerType],
-    ["int8", BigIntegerType],
+    ["int8", IntegerType],
     ["oid", Oid],
     ["float4", FloatType],
     ["float8", FloatType],

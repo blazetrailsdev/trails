@@ -131,6 +131,7 @@ import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { StatementPool } from "./statement-pool.js";
 import type { Column } from "./column.js";
 import { TypeMap } from "../type/type-map.js";
+import type { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import {
   StringType,
   IntegerType,
@@ -1872,27 +1873,27 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   static registerClassWithLimit(
-    this: typeof AbstractAdapter,
-    mapping: TypeMap,
+    this: Pick<typeof AbstractAdapter, "extractLimit">,
+    mapping: TypeMap | HashLookupTypeMap,
     key: string | RegExp,
     klass: new (options?: { limit?: number }) => object,
   ): void {
-    mapping.registerType(key, undefined, (...args: string[]) => {
+    (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
       const limit = this.extractLimit(args.at(-1)!);
-      return new klass({ limit }) as ReturnType<typeof mapping.lookup>;
+      return new klass({ limit }) as ReturnType<TypeMap["lookup"]>;
     });
   }
 
   static registerClassWithPrecision(
-    this: typeof AbstractAdapter,
-    mapping: TypeMap,
+    this: Pick<typeof AbstractAdapter, "extractPrecision">,
+    mapping: TypeMap | HashLookupTypeMap,
     key: string | RegExp,
     klass: new (options?: { precision?: number }) => object,
     kwargs: Record<string, unknown> = {},
   ): void {
-    mapping.registerType(key, undefined, (...args: string[]) => {
+    (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
       const precision = this.extractPrecision(args.at(-1)!);
-      return new klass({ precision, ...kwargs }) as ReturnType<typeof mapping.lookup>;
+      return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
     });
   }
 
