@@ -1,5 +1,4 @@
-import { DeepMergeable } from "./deep-mergeable.js";
-import { isPlainObject } from "./hash-utils.js";
+import { deepMerge, isPlainObject } from "./hash-utils.js";
 
 export class OptionMerger {
   private context: any;
@@ -26,11 +25,9 @@ export class OptionMerger {
 
     if (args.length === 1 && typeof args[0] === "function") {
       const proc = args.shift() as (...procArgs: unknown[]) => Record<string, unknown>;
-      args.push((...procArgs: unknown[]) =>
-        DeepMergeable.deepMerge(this.options, proc(...procArgs)),
-      );
+      args.push((...procArgs: unknown[]) => deepMerge(this.options, proc(...procArgs)));
     } else if (isPlainObject(args[args.length - 1])) {
-      options = DeepMergeable.deepMerge(this.options, args.pop() as Record<string, unknown>);
+      options = deepMerge(this.options, args.pop() as Record<string, unknown>);
     } else {
       options = this.options;
     }
