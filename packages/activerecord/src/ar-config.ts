@@ -4,13 +4,15 @@ import { Thread } from "@blazetrails/ruby-compat";
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  return ActiveRecord.schemaCacheIgnoredTables.some((ignored) => {
-    if (ignored instanceof RegExp) {
-      ignored.lastIndex = 0;
-      return ignored.test(tableName);
+  for (const entry of ActiveRecord.schemaCacheIgnoredTables) {
+    if (entry instanceof RegExp) {
+      entry.lastIndex = 0;
+      if (entry.test(tableName)) return true;
+    } else if (entry === tableName) {
+      return true;
     }
-    return ignored === tableName;
-  });
+  }
+  return false;
 }
 
 let _indexNestedAttributeErrors = false;
