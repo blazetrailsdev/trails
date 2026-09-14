@@ -368,18 +368,22 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("temp_cache");
   });
 
-  it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await Base.connection.createTable(
-      "dump_string_key_objects",
-      { id: false, force: true },
-      (t) => {
-        t.string("key", { null: false });
-      },
-    );
-    await Base.connection.addIndex("dump_string_key_objects", "key", { unique: true });
-    const output = await dumpTableSchema(Base.connection, "dump_string_key_objects");
-    expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
-  });
+  it(
+    "schema dump keeps id false when id is false and unique not null column added",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      await Base.connection.createTable(
+        "dump_string_key_objects",
+        { id: false, force: true },
+        (t) => {
+          t.string("key", { null: false });
+        },
+      );
+      await Base.connection.addIndex("dump_string_key_objects", "key", { unique: true });
+      const output = await dumpTableSchema(Base.connection, "dump_string_key_objects");
+      expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
+    },
+  );
 
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
     const testAdapter = Base.connection;
@@ -436,6 +440,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await dumpTableSchema(Base.connection, "binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
@@ -444,6 +449,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql blob and text fields",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await dumpTableSchema(Base.connection, "binary_fields");
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
@@ -464,30 +470,44 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "mysql")(
     "schema does not include limit for emulated mysql boolean fields",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await dumpTableSchema(Base.connection, "booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
   );
-  it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
-    const output = await dumpTableSchema(Base.connection, "key_tests");
-    expect(output).toContain(
-      't.index(["awesome"], { name: "index_key_tests_on_awesome", type: "fulltext" })',
-    );
-    expect(output).toContain('t.index(["pizza"], { name: "index_key_tests_on_pizza" })');
-  });
+  it.skipIf(adapterType !== "mysql")(
+    "schema dumps index type",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "key_tests");
+      expect(output).toContain(
+        't.index(["awesome"], { name: "index_key_tests_on_awesome", type: "fulltext" })',
+      );
+      expect(output).toContain('t.index(["pizza"], { name: "index_key_tests_on_pizza" })');
+    },
+  );
 
-  it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {
-    const output = await dumpTableSchema(Base.connection, "defaults");
-    expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump includes bigint default",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "defaults");
+      expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
+    },
+  );
 
-  it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
-    const output = await dumpTableSchema(Base.connection, "bigint_array");
-    expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump includes limit on array type",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "bigint_array");
+      expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
+    },
+  );
   it.skipIf(adapterType !== "postgres")(
     "schema dump allows array of decimal defaults",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await dumpTableSchema(Base.connection, "bigint_array");
       expect(output).toMatch(
@@ -495,37 +515,50 @@ describe("SchemaDumperTest", () => {
       );
     },
   );
-  it.skipIf(adapterType !== "postgres")("schema dump interval type", async () => {
-    const output = await dumpTableSchema(Base.connection, "postgresql_times");
-    expect(output).toMatch(/t\.interval\("time_interval"\)/);
-    expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
-  });
-  it.skipIf(adapterType !== "postgres")("schema dump oid type", async () => {
-    const output = await dumpTableSchema(Base.connection, "postgresql_oids");
-    expect(output).toMatch(/t\.oid\("obj_id"\)/);
-  });
-  it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
-    const adapter = Base.connection;
-    const original = (adapter as any).extensions;
-    await adapter.createTable("schema_dump_probe", { force: true }, (t) => {
-      t.integer("x");
-    });
-    try {
-      (adapter as any).extensions = async () => ["hstore"];
-      let output = await dumpTableSchema(adapter, "schema_dump_probe");
-      expect(output).toContain("These are extensions that must be enabled");
-      expect(output).toMatch(/enableExtension\("hstore"\)/);
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump interval type",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "postgresql_times");
+      expect(output).toMatch(/t\.interval\("time_interval"\)/);
+      expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
+    },
+  );
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump oid type",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "postgresql_oids");
+      expect(output).toMatch(/t\.oid\("obj_id"\)/);
+    },
+  );
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump includes extensions",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const adapter = Base.connection;
+      const original = (adapter as any).extensions;
+      await adapter.createTable("schema_dump_probe", { force: true }, (t) => {
+        t.integer("x");
+      });
+      try {
+        (adapter as any).extensions = async () => ["hstore"];
+        let output = await dumpTableSchema(adapter, "schema_dump_probe");
+        expect(output).toContain("These are extensions that must be enabled");
+        expect(output).toMatch(/enableExtension\("hstore"\)/);
 
-      (adapter as any).extensions = async () => [];
-      output = await dumpTableSchema(adapter, "schema_dump_probe");
-      expect(output).not.toContain("These are extensions that must be enabled");
-      expect(output).not.toContain("enableExtension");
-    } finally {
-      (adapter as any).extensions = original;
-    }
-  });
+        (adapter as any).extensions = async () => [];
+        output = await dumpTableSchema(adapter, "schema_dump_probe");
+        expect(output).not.toContain("These are extensions that must be enabled");
+        expect(output).not.toContain("enableExtension");
+      } finally {
+        (adapter as any).extensions = original;
+      }
+    },
+  );
   it.skipIf(adapterType !== "postgres")(
     "schema dump includes extensions in alphabetic order",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const adapter = Base.connection;
       const original = (adapter as any).extensions;
@@ -542,12 +575,17 @@ describe("SchemaDumperTest", () => {
       }
     },
   );
-  it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
-    const output = await dumpTableSchema(Base.connection, "numeric_data");
-    expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump include limit for float4 field",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const output = await dumpTableSchema(Base.connection, "numeric_data");
+      expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
+    },
+  );
   it.skipIf(adapterType !== "postgres")(
     "schema dump keeps enum intact if it contains comma",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const adapter = Base.connection;
       await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
@@ -677,6 +715,7 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
@@ -691,6 +730,7 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with timestamptz datetime format",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
         await Base.connection.createTable("timestamps", { force: true }, (t) => {
@@ -720,6 +760,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump when changing datetime type for an existing app",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
@@ -742,6 +783,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t timestamptz",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
@@ -759,6 +801,7 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
@@ -787,6 +830,7 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
@@ -805,19 +849,23 @@ describe("SchemaDumperDefaultsTest", () => {
     adapter = Base.connection;
   });
 
-  it("schema dump defaults with universally supported types", async () => {
-    await adapter.createTable("dump_defaults", { force: true }, (t) => {
-      t.string("string_with_default", { default: "Hello!" });
-      t.date("date_with_default", { default: "2014-06-05" });
-      t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
-      t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
-    });
-    const output = await dumpTableSchema(Base.connection, "dump_defaults");
-    expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
-    expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
-    expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
-    expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
-  });
+  it(
+    "schema dump defaults with universally supported types",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      await adapter.createTable("dump_defaults", { force: true }, (t) => {
+        t.string("string_with_default", { default: "Hello!" });
+        t.date("date_with_default", { default: "2014-06-05" });
+        t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
+        t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
+      });
+      const output = await dumpTableSchema(Base.connection, "dump_defaults");
+      expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
+      expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
+      expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
+      expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
+    },
+  );
 
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
     await adapter.createTable("dump_defaults", { force: true }, (t) => {
@@ -827,24 +875,28 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
   });
 
-  it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", async () => {
-    await adapter.createTable("infinity_defaults", {}, (t) => {
-      t.float("float_with_inf_default", { default: Infinity });
-      t.float("float_with_nan_default", { default: NaN });
-      t.datetime("beginning_of_time", { default: "-infinity" });
-      t.datetime("end_of_time", { default: "infinity" });
-      t.date("date_with_neg_inf_default", { default: -Infinity });
-      t.date("date_with_pos_inf_default", { default: Infinity });
-    });
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    const output = await dumpTableSchema(adapter, "infinity_defaults");
-    expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
-    expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
-    expect(output).toMatch(/t\.datetime\("beginning_of_time",.*default: -::Float::INFINITY/);
-    expect(output).toMatch(/t\.datetime\("end_of_time",.*default: ::Float::INFINITY/);
-    expect(output).toMatch(/t\.date\("date_with_neg_inf_default",.*default: -::Float::INFINITY/);
-    expect(output).toMatch(/t\.date\("date_with_pos_inf_default",.*default: ::Float::INFINITY/);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with column infinity default",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      await adapter.createTable("infinity_defaults", {}, (t) => {
+        t.float("float_with_inf_default", { default: Infinity });
+        t.float("float_with_nan_default", { default: NaN });
+        t.datetime("beginning_of_time", { default: "-infinity" });
+        t.datetime("end_of_time", { default: "infinity" });
+        t.date("date_with_neg_inf_default", { default: -Infinity });
+        t.date("date_with_pos_inf_default", { default: Infinity });
+      });
+      const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+      const output = await dumpTableSchema(adapter, "infinity_defaults");
+      expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
+      expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
+      expect(output).toMatch(/t\.datetime\("beginning_of_time",.*default: -::Float::INFINITY/);
+      expect(output).toMatch(/t\.datetime\("end_of_time",.*default: ::Float::INFINITY/);
+      expect(output).toMatch(/t\.date\("date_with_neg_inf_default",.*default: -::Float::INFINITY/);
+      expect(output).toMatch(/t\.date\("date_with_pos_inf_default",.*default: ::Float::INFINITY/);
+    },
+  );
 });
 
 afterAll(async () => {
