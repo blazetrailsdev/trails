@@ -867,10 +867,6 @@ class ApiExtractor
     return unless name
 
     fqn = current_fqn
-    # In an umbrella scan a module-level `def self.` (`ActiveRecord.disconnect_all!`,
-    # `active_record.rb:510`) is redirected onto `<Module>::Base` exactly as
-    # `singleton_class.attr_*` config is (see umbrella_base_redirect), and
-    # dropped when the module has no Base to credit it.
     redirect_fqn = umbrella_base_redirect(fqn, true)
     return if @scanning_umbrella && !redirect_fqn
 
@@ -1473,15 +1469,14 @@ class ApiExtractor
     end
   end
 
-  # The type a `method_missing` send receiver reads as — Ruby leaves it to the
-  # value at run time, so each hop is named here with the line that makes it.
+  # The types a `method_missing` send receiver reads as, which Ruby leaves to
+  # the value at run time: `execution_strategy` is
+  # `ActiveRecord.migration_strategy.new(self)` (migration.rb:807-809, default
+  # `DefaultStrategy` at active_record.rb:400-401), and `DefaultStrategy#connection`
+  # is `migration.connection` (migration/default_strategy.rb:17-19) — whichever
+  # adapter the pool opened.
   METHOD_MISSING_RECEIVER_TYPES = {
-    # `@execution_strategy ||= ActiveRecord.migration_strategy.new(self)`
-    # (migration.rb:807-809), defaulting to `Migration::DefaultStrategy`
-    # (active_record.rb:400-401).
     ["ActiveRecord::Migration", "execution_strategy"] => ["ActiveRecord::Migration::DefaultStrategy"],
-    # `migration.connection` (migration/default_strategy.rb:17-19): whichever
-    # adapter the pool opened, so every concrete adapter's surface answers.
     ["ActiveRecord::Migration::DefaultStrategy", "connection"] => %w[
       ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
       ActiveRecord::ConnectionAdapters::Mysql2Adapter
