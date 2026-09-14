@@ -133,7 +133,7 @@ describe("deepUnderscoreKeys", () => {
 
 describe("symbolizeKeys", () => {
   it("converts all keys to strings (identity in TS)", () => {
-    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ a: 1, b: 2 });
+    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("does not mutate the original", () => {
@@ -146,13 +146,13 @@ describe("symbolizeKeys", () => {
 describe("deepSymbolizeKeys", () => {
   it("recursively converts all keys to strings", () => {
     expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({
-      a: { b: { c: 3 } },
+      ":a": { ":b": { ":c": 3 } },
     });
   });
 
   it("handles arrays of objects", () => {
     expect(deepSymbolizeKeys({ a: [{ b: 2 }, { c: 3 }, 4] })).toEqual({
-      a: [{ b: 2 }, { c: 3 }, 4],
+      ":a": [{ ":b": 2 }, { ":c": 3 }, 4],
     });
   });
 });
@@ -595,7 +595,7 @@ describe("HashWithIndifferentAccess", () => {
 
   it("symbolizeKeys returns plain object with string keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(Object.fromEntries(h.symbolizeKeys())).toEqual({ a: 1, b: 2 });
+    expect(Object.fromEntries(h.symbolizeKeys())).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("stringifyKeys returns a new HashWithIndifferentAccess", () => {

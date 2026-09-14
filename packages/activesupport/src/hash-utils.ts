@@ -1,4 +1,4 @@
-import { ArgumentError, valuesAt } from "@blazetrails/ruby-compat";
+import { ArgumentError, isSymbol, valuesAt } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
@@ -123,7 +123,9 @@ export function deepStringifyKeys(obj: unknown): unknown {
 }
 
 export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
-  return transformKeys(obj, (key) => key);
+  return transformKeys(obj, (key) =>
+    typeof key !== "string" ? key : isSymbol(key) ? key : `:${key}`,
+  );
 }
 
 export function symbolizeKeysBang<T extends Map<string, unknown>>(hash: T): T;
@@ -131,7 +133,9 @@ export function symbolizeKeysBang<T extends AnyObject>(hash: T): T;
 export function symbolizeKeysBang(
   hash: AnyObject | Map<string, unknown>,
 ): AnyObject | Map<string, unknown> {
-  return transformKeysBang(hash as Map<string, unknown>, (key) => key);
+  return transformKeysBang(hash as Map<string, unknown>, (key) =>
+    typeof key !== "string" ? key : isSymbol(key) ? key : `:${key}`,
+  );
 }
 
 export const toOptions = symbolizeKeys;
@@ -140,7 +144,9 @@ export const toOptionsBang = symbolizeKeysBang;
 
 /** @missingRailsArgs deep_transform_keys — PERMANENT */
 export function deepSymbolizeKeys(obj: unknown): unknown {
-  return deepTransformKeys(obj, (key) => key);
+  return deepTransformKeys(obj, (key) =>
+    typeof key !== "string" ? key : isSymbol(key) ? key : `:${key}`,
+  );
 }
 
 export function deepTransformKeysBang<T extends Map<string, unknown>>(
@@ -171,7 +177,9 @@ export function deepSymbolizeKeysBang<T extends AnyObject>(hash: T): T;
 export function deepSymbolizeKeysBang(
   hash: AnyObject | Map<string, unknown>,
 ): AnyObject | Map<string, unknown> {
-  return deepTransformKeysBang(hash as Map<string, unknown>, (key) => key);
+  return deepTransformKeysBang(hash as Map<string, unknown>, (key) =>
+    typeof key !== "string" ? key : isSymbol(key) ? key : `:${key}`,
+  );
 }
 
 /** @internal */
@@ -183,7 +191,7 @@ export function _deepTransformKeysInObject(
   if (object instanceof Map) {
     const result = new (this.constructor as new () => Map<string, unknown>)();
     for (const [key, value] of object) {
-      result.set(block(String(key)), _deepTransformKeysInObject.call(this, value, block));
+      result.set(block(key), _deepTransformKeysInObject.call(this, value, block));
     }
     return result;
   } else if (isPlainObject(object)) {
@@ -207,7 +215,7 @@ export function _deepTransformKeysInObjectBang(
   if (object instanceof Map) {
     for (const [key, value] of [...object]) {
       object.delete(key);
-      object.set(block(String(key)), _deepTransformKeysInObjectBang(value, block));
+      object.set(block(key), _deepTransformKeysInObjectBang(value, block));
     }
     return object;
   } else if (isPlainObject(object)) {

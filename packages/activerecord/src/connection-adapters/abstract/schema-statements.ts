@@ -4,7 +4,7 @@ import { findJoinTableName, joinTableName } from "../../migration/join-table.js"
 import { CommandRecorder } from "../../migration/command-recorder.js";
 import type { MigrationCommand } from "../../migration/command-recorder.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { include, symbolizeKeys } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
@@ -1669,7 +1669,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
+        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(symbolizeKeys(options))}`,
       );
     }
     return fk;
@@ -1742,7 +1742,7 @@ export class SchemaStatements {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(Object.fromEntries(Object.entries(options).map(([k, v]) => [`:${k}`, v])))}`,
+        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(symbolizeKeys(options))}`,
       );
     }
     return chk;
