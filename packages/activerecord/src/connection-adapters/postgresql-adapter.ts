@@ -606,7 +606,6 @@ export class PostgreSQLAdapter
     });
   }
 
-  /** @internal */
   static override initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
     m.registerType("int2", new IntegerType({ limit: 2 }));
     m.registerType("int4", new IntegerType({ limit: 4 }));
