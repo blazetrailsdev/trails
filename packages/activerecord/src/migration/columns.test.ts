@@ -4,7 +4,6 @@ import type { Column } from "../connection-adapters/column.js";
 import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
 import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../errors.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 import {
   isMariaDb,
@@ -33,7 +32,7 @@ describe("Migration", () => {
 
   describe("ColumnsTest", () => {
     it("add rename", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "girlfriend", "string");
       void TestModel.resetColumnInformation();
 
@@ -49,7 +48,7 @@ describe("Migration", () => {
     });
 
     it("rename column using symbol arguments", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
 
       await TestModel.create({ first_name: "foo" });
@@ -62,7 +61,7 @@ describe("Migration", () => {
     });
 
     it("rename column", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
 
       await TestModel.create({ first_name: "foo" });
@@ -75,7 +74,7 @@ describe("Migration", () => {
     });
 
     it("rename column preserves default value not null", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "salary", "integer", { default: 70000 });
 
       const defaultBefore = (await connection.columns("test_models")).find(
@@ -95,7 +94,7 @@ describe("Migration", () => {
     });
 
     it("rename nonexistent column", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       const exception = adapterType === "postgres" ? StatementInvalid : ActiveRecordError;
 
       await expect(
@@ -104,7 +103,7 @@ describe("Migration", () => {
     });
 
     it("rename column with sql reserved word", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.renameColumn("test_models", "first_name", "group");
 
@@ -114,7 +113,7 @@ describe("Migration", () => {
     });
 
     it("rename column with an index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "hat_name", "string");
       await connection.addIndex("test_models", "hat_name");
 
@@ -125,7 +124,7 @@ describe("Migration", () => {
     });
 
     it("rename column with multi column index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "hat_size", "integer");
       await connection.addColumn("test_models", "hat_style", "string", { limit: 100 });
       await connection.addIndex("test_models", ["hat_style", "hat_size"], { unique: true });
@@ -142,7 +141,7 @@ describe("Migration", () => {
     });
 
     it("rename column does not rename custom named index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "hat_name", "string");
       await connection.addIndex("test_models", "hat_name", { name: "idx_hat_name" });
 
@@ -152,7 +151,7 @@ describe("Migration", () => {
     });
 
     it("remove column with index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "hat_name", "string");
       await connection.addIndex("test_models", "hat_name");
 
@@ -162,7 +161,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(mariaDbRejectsUniqueColumnDrop)("remove column with multi column index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "hat_size", "integer");
       await connection.addColumn("test_models", "hat_style", "string", { limit: 100 });
       await connection.addIndex("test_models", ["hat_style", "hat_size"], { unique: true });
@@ -180,7 +179,7 @@ describe("Migration", () => {
     });
 
     it("removing and renaming column preserves custom primary key", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.createTable(
           "my_table",
@@ -201,7 +200,7 @@ describe("Migration", () => {
     });
 
     it("column with index", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.createTable("my_table", { force: true }, (t) => {
           t.string("item_number", { index: true });
@@ -218,7 +217,7 @@ describe("Migration", () => {
     });
 
     it("change type of not null column", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.changeColumn("test_models", "updated_at", "datetime", { null: false });
         await connection.changeColumn("test_models", "updated_at", "datetime", { null: false });
@@ -232,7 +231,7 @@ describe("Migration", () => {
     });
 
     it("change column nullability", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "funny", "boolean");
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["funny"]?.null).toBeTruthy();
@@ -253,7 +252,7 @@ describe("Migration", () => {
     });
 
     it("change column", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "age", "integer");
       await connection.addColumn("test_models", "approved", "boolean", { default: true });
 
@@ -292,7 +291,7 @@ describe("Migration", () => {
     });
 
     it("change column with nil default", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "contributor", "boolean", { default: true });
       await TestModel.loadSchema();
       expect(TestModel.new().queryAttribute("contributor")).toBeTruthy();
@@ -305,7 +304,7 @@ describe("Migration", () => {
     });
 
     it("change column to drop default with null false", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "contributor", "boolean", {
         default: true,
         null: false,
@@ -324,7 +323,7 @@ describe("Migration", () => {
     });
 
     it("change column with new default", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "administrator", "boolean", { default: true });
       await TestModel.loadSchema();
       expect(TestModel.new().queryAttribute("administrator")).toBeTruthy();
@@ -336,7 +335,7 @@ describe("Migration", () => {
     });
 
     it("change column with custom index name", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "category", "string");
       await connection.addIndex("test_models", "category", { name: "test_models_categories_idx" });
 
@@ -350,7 +349,7 @@ describe("Migration", () => {
     });
 
     it("change column with long index name", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       const tableNamePrefix = "test_models_";
       const longIndexName =
         tableNamePrefix + "x".repeat(connection.indexNameLength() - tableNamePrefix.length);
@@ -366,7 +365,7 @@ describe("Migration", () => {
     });
 
     it("change column default", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnDefault("test_models", "first_name", "Tester");
 
@@ -376,7 +375,7 @@ describe("Migration", () => {
     });
 
     it("change column default to null", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnDefault("test_models", "first_name", null);
 
@@ -386,7 +385,7 @@ describe("Migration", () => {
     });
 
     it("change column default to null with not null", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string", { null: false });
       await connection.addColumn("test_models", "age", "integer", { null: false });
 
@@ -404,7 +403,7 @@ describe("Migration", () => {
     });
 
     it("change column default with from and to", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnDefault("test_models", "first_name", {
         from: null,
@@ -417,7 +416,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType !== "mysql")("mysql rename column preserves auto increment", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.renameColumn("test_models", "id", "id_test");
         const renamed = (await connection.columns("test_models")).find(
@@ -433,7 +432,7 @@ describe("Migration", () => {
     it.skipIf(adapterType !== "sqlite")(
       "change column default preserves existing column default function",
       async () => {
-        const connection = await ambientConnection();
+        const { connection } = TestHelper;
         await connection.changeColumnDefault(
           "test_models",
           "created_at",
@@ -455,7 +454,7 @@ describe("Migration", () => {
     it.skipIf(adapterType !== "sqlite")(
       "change column default supports default function with concatenation operator",
       async () => {
-        const connection = await ambientConnection();
+        const { connection } = TestHelper;
         await connection.addColumn("test_models", "ruby_on_rails", "string");
         await connection.changeColumnDefault(
           "test_models",
@@ -475,7 +474,7 @@ describe("Migration", () => {
         !adapterSupports("default_expression") ||
         !supportsDefaultExpression,
     )("change column null does not change default functions", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       const fn = isMariaDb ? "current_timestamp(6)" : "(now())";
 
       await connection.changeColumnDefault("test_models", "created_at", () => fn);
@@ -490,7 +489,7 @@ describe("Migration", () => {
     });
 
     it("change column null false", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnNull("test_models", "first_name", false);
       void TestModel.resetColumnInformation();
@@ -499,7 +498,7 @@ describe("Migration", () => {
     });
 
     it("change column null true", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnNull("test_models", "first_name", true);
       void TestModel.resetColumnInformation();
@@ -514,7 +513,7 @@ describe("Migration", () => {
     });
 
     it("change column null with non boolean arguments raises", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       const e = await assertRaises([ArgumentError], {}, () =>
         connection.changeColumnNull("test_models", "first_name", {
@@ -528,14 +527,14 @@ describe("Migration", () => {
     });
 
     it("remove column no second parameter raises exception", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await expect(
         (connection.removeColumn as (t: string) => Promise<void>)("funny"),
       ).rejects.toThrow(ArgumentError);
     });
 
     it("add column without column name", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         const e = await assertRaises([ArgumentError], {}, () =>
           connection.createTable("my_table", { force: true }, (t) => {
@@ -549,7 +548,7 @@ describe("Migration", () => {
     });
 
     it("remove columns single statement", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.createTable("my_table", {}, (t) => {
           t.integer("col_one");
@@ -568,7 +567,7 @@ describe("Migration", () => {
     });
 
     it("add timestamps single statement", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       try {
         await connection.createTable("my_table");
 

@@ -4,7 +4,6 @@ import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { TestHelper, TestModel } from "../test-helpers/migration-helper.js";
 import { assertColumn, assertNoColumn } from "../test-helpers/test-case.js";
-import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 
 describe("Migration", () => {
@@ -13,7 +12,7 @@ describe("Migration", () => {
     afterEach(() => TestHelper.teardown());
 
     it("add column newline default", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       const string = "foo\nbar";
       await connection.addColumn("test_models", "command", "string", { default: string });
       void TestModel.resetColumnInformation();
@@ -23,7 +22,7 @@ describe("Migration", () => {
     });
 
     it("add remove single field using string arguments", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await assertNoColumn(TestModel, "last_name");
 
       await connection.addColumn("test_models", "last_name", "string");
@@ -34,7 +33,7 @@ describe("Migration", () => {
     });
 
     it("add remove single field using symbol arguments", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await assertNoColumn(TestModel, "last_name");
 
       await connection.addColumn("test_models", "last_name", "string");
@@ -45,7 +44,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType === "mysql")("add column without limit", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "description", "string", { limit: null });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
@@ -53,7 +52,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType === "sqlite")("unabstracted database dependent types", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "intelligence_quotient", "smallint");
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
@@ -61,7 +60,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType === "sqlite")("native decimal insert manual vs automatic", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       const correctValue = new BigDecimal("0012345678901234567890.0123456789");
 
       await connection.addColumn("test_models", "wealth", "decimal", {
@@ -91,7 +90,7 @@ describe("Migration", () => {
     });
 
     it("add column with precision and scale", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
@@ -102,7 +101,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType !== "sqlite")("change column with new precision and scale", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
 
       await connection.changeColumn("test_models", "wealth", "decimal", {
@@ -120,7 +119,7 @@ describe("Migration", () => {
     it.skipIf(adapterType !== "sqlite")(
       "change column preserve other column precision and scale",
       async () => {
-        const connection = await ambientConnection();
+        const { connection } = TestHelper;
         await connection.addColumn("test_models", "last_name", "string");
         await connection.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
         void TestModel.resetColumnInformation();
@@ -141,7 +140,7 @@ describe("Migration", () => {
     );
 
     it.skipIf(adapterType === "sqlite")("native types", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await connection.addColumn("test_models", "first_name", "string");
       await connection.addColumn("test_models", "last_name", "string");
       await connection.addColumn("test_models", "bio", "text");
@@ -189,7 +188,7 @@ describe("Migration", () => {
     });
 
     it.skipIf(adapterType === "sqlite")("out of range limit should raise", async () => {
-      const connection = await ambientConnection();
+      const { connection } = TestHelper;
       await expect(
         connection.addColumn("test_models", "integer_too_big", "integer", { limit: 10 }),
       ).rejects.toThrow(ArgumentError);
