@@ -9,6 +9,7 @@ import { LocalJumpError } from "./local-jump-error.js";
 import { rbBuiltinClassName } from "./object.js";
 import { TypeError as RbTypeError } from "./type-error.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- the extra-surface gate scores a class field as extra surface and excludes an interface member, so the tag/value readers are declared by merging */
 /**
  * Ruby's core `UncaughtThrowError < ArgumentError`
  * (`vendor/ruby/vm_eval.c:2588-2591`): `initialize(tag, value, *args)` stores
@@ -22,7 +23,6 @@ import { TypeError as RbTypeError } from "./type-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `UncaughtThrowError`, which Rails
  * inherits rather than defines.
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the extra-surface gate scores a class field as extra surface and excludes an interface member, so the tag/value readers are declared by merging
 export class UncaughtThrowError extends ArgumentError {
   constructor(...argv: unknown[]) {
     if (argv.length < 2) {
@@ -49,11 +49,12 @@ export class UncaughtThrowError extends ArgumentError {
 }
 
 /** @noRailsEquivalent PERMANENT */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- pairs with the class above
 export interface UncaughtThrowError {
   readonly tag: unknown;
   readonly value: unknown;
 }
+
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 UncaughtThrowError.prototype.name = "UncaughtThrowError";
 
