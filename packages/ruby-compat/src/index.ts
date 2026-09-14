@@ -128,6 +128,7 @@ export { kernelRand } from "./kernel-rand.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
+export { IPAddr } from "./ipaddr.js";
 export { PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
 export { NoMethodError } from "./no-method-error.js";

@@ -487,7 +487,6 @@ export const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]
 const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   AssociationProxy: "../../associations/collection-proxy.js",
   Relation: "../../relation.js",
-  IPAddr: "../../connection-adapters/postgresql/oid/cidr.js",
   PrimaryKeyValue: "../../base.js",
 };
 

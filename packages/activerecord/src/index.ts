@@ -23,7 +23,7 @@ import { Base as _Base } from "./base.js";
 ExecutorHooks.setConnectionHandlerResolver(() => _Base.connectionHandler);
 export { Relation, Range } from "./relation.js";
 export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
-export { IPAddr } from "./connection-adapters/postgresql/oid/cidr.js";
+export { IPAddr } from "@blazetrails/ruby-compat";
 export type { LoadedRelation, RelationScopes } from "./relation.js";
 export type { ScopeMethod, ScopeOn } from "./scoping/named.js";
 export { QueryAttribute } from "./relation/query-attribute.js";

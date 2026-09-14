@@ -1,7 +1,7 @@
 /** @noRailsEquivalent PERMANENT */
 
 const T = `import("@blazetrails/date").Temporal`;
-const IPADDR = `import("@blazetrails/activerecord").IPAddr`;
+const IPADDR = `import("@blazetrails/ruby-compat").IPAddr`;
 const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {

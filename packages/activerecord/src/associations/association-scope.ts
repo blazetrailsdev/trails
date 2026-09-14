@@ -8,6 +8,7 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
 import { drop } from "../ruby-drop.js";
+import { methodMissingProxy } from "@blazetrails/ruby-compat";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
@@ -45,20 +46,7 @@ export class ReflectionProxy {
 
   constructor(reflection: AbstractReflection, aliasedTable: unknown) {
     this.aliasedTable = aliasedTable;
-    return new Proxy(this, {
-      get(target, key, receiver) {
-        if (key in target) return Reflect.get(target, key, receiver);
-        let owner: object | null = reflection;
-        while (owner && !Object.prototype.hasOwnProperty.call(owner, key)) {
-          owner = Object.getPrototypeOf(owner);
-        }
-        const descriptor = owner ? Object.getOwnPropertyDescriptor(owner, key) : undefined;
-        const value = Reflect.get(reflection, key, reflection);
-        return descriptor && "value" in descriptor && typeof value === "function"
-          ? value.bind(reflection)
-          : value;
-      },
-    });
+    return methodMissingProxy(this, { delegate: () => reflection });
   }
 
   allIncludes<T>(_cb?: () => T): T | null {
