@@ -1648,6 +1648,8 @@ function collectAllowedNames(
       walkMixin(inc, fqn, target, methodFile);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
+
+    for (const name of info.forwardedMethods ?? []) addRubyName(name, target);
   }
   return allowed;
 }

@@ -1,4 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
+import { DelegateClass } from "./delegate.js";
 import { Dir } from "./dir.js";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
@@ -83,10 +84,8 @@ function createTmpname(
  * `core_ext/file/atomic.rb:24`.
  *
  * `Tempfile < DelegateClass(File)` (`tempfile.rb:89`), so every stream method
- * is the `File` opened at `tempfile.rb:157`, cursor and all — `write` advances
- * the offset the same way `IO#write` does (`vendor/ruby/io.c:2263`). The
- * delegation is spelled out per method because TypeScript has no
- * `method_missing` a typed stream can use.
+ * it does not define is the `File` opened at `tempfile.rb:157`, cursor and
+ * all, handed to `super` at `tempfile.rb:165`.
  *
  * {@link open} and {@link create} run a synchronous block inline and return
  * its value directly, the way Ruby does (`vendor/ruby/lib/tempfile.rb:366`,
@@ -96,16 +95,14 @@ function createTmpname(
  * (`vendor/ruby/lib/tempfile.rb:89`), which Rails calls without defining, so
  * no Rails or gem file declares this class.
  */
-export class Tempfile {
-  /** `__getobj__` (`vendor/ruby/lib/tempfile.rb:165`), the delegated `File`. */
-  private tmpfile: File;
+export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   /** `@unlinked` (`vendor/ruby/lib/tempfile.rb:153`). */
   private unlinked = false;
   /** `@opts` (`vendor/ruby/lib/tempfile.rb:152`). */
   private readonly opts: TempfileOptions;
 
   private constructor(tmpfile: File, opts: TempfileOptions = {}) {
-    this.tmpfile = tmpfile;
+    super(tmpfile);
     this.opts = opts;
   }
 
@@ -217,8 +214,8 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#path`
    * (`vendor/ruby/lib/tempfile.rb:268`).
    */
-  get path(): string | null {
-    return this.unlinked ? null : this.tmpfile.path();
+  path(): string | null {
+    return this.unlinked ? null : this.__getobj__().path();
   }
 
   /**
@@ -231,55 +228,11 @@ export class Tempfile {
    * (`vendor/ruby/lib/tempfile.rb:188`).
    */
   open(): File {
-    const path = this.tmpfile.path()!;
-    this.tmpfile.close();
-    this.tmpfile = File.open(path, "r+");
-    if (this.opts.encoding != null) this.tmpfile.setEncoding(this.opts.encoding);
-    return this.tmpfile;
-  }
-
-  /**
-   * `File#to_path` (`vendor/ruby/file.c:311` `rb_file_path`) on the delegated
-   * `File` (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File#to_path`
-   * (`vendor/ruby/file.c:311`), delegated by Ruby stdlib `Tempfile`.
-   */
-  toPath(): string | null {
-    return this.tmpfile.path();
-  }
-
-  /**
-   * `IO#to_io` (`vendor/ruby/io.c:5093` `rb_io_to_io`), which answers the
-   * stream itself — the delegated `File` (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#to_io`
-   * (`vendor/ruby/io.c:5093`), delegated by Ruby stdlib `Tempfile`.
-   */
-  toIo(): File {
-    return this.tmpfile;
-  }
-
-  /**
-   * `IO#closed?` (`vendor/ruby/io.c:5442`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#closed?`
-   * (`vendor/ruby/io.c:5442`), delegated by Ruby stdlib `Tempfile`.
-   */
-  isClosed(): boolean {
-    return this.tmpfile.isClosed();
-  }
-
-  /**
-   * `IO#pos` (`vendor/ruby/io.c:2039`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#pos`
-   * (`vendor/ruby/io.c:2039`), delegated by Ruby stdlib `Tempfile`.
-   */
-  get pos(): number {
-    return this.tmpfile.pos;
+    const path = this.__getobj__().path()!;
+    this.__getobj__().close();
+    this.__setobj__(File.open(path, "r+"));
+    if (this.opts.encoding != null) this.__getobj__().setEncoding(this.opts.encoding);
+    return this.__getobj__();
   }
 
   /**
@@ -291,123 +244,46 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#size`
    * (`vendor/ruby/lib/tempfile.rb:274`).
    */
-  get size(): number {
-    if (!this.tmpfile.isClosed()) {
-      return this.tmpfile.size();
+  size(): number {
+    if (!this.__getobj__().isClosed()) {
+      return this.__getobj__().size();
     } else {
-      return File.size(this.tmpfile.path()!);
+      return File.size(this.__getobj__().path()!);
     }
   }
 
   /**
-   * `IO#binmode` (`vendor/ruby/io.c:6379`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`), so `atomic_write`'s
-   * `temp_file.binmode` (`core_ext/file/atomic.rb:25`) puts the held `File` in
-   * binary mode and {@link write} stops transcoding.
+   * `alias length size` (`vendor/ruby/lib/tempfile.rb:281`).
    *
-   * `rb_io_binmode_m` answers the stream it was sent, and `DelegateClass`
-   * forwards that through untouched — so this answers the `File`, not the
-   * `Tempfile`. MRI agrees: `Tempfile.new("x").binmode.class` is `File`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode`
-   * (`vendor/ruby/io.c:6379`), delegated by Ruby stdlib `Tempfile`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#length`
+   * (`vendor/ruby/lib/tempfile.rb:281`).
    */
-  binmode(): File {
-    return this.tmpfile.binmode();
+  length(): number {
+    return this.size();
   }
 
   /**
-   * `IO#set_encoding` (`vendor/ruby/io.c:13474` `rb_io_set_encoding`) on the
-   * delegated `File` (`vendor/ruby/lib/tempfile.rb:89`), which is how
-   * `Rack::Test::UploadedFile#initialize_from_file_path`
-   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:93`) puts the tempfile
-   * in binary before `FileUtils.copy_file` writes the bytes in.
+   * `Tempfile#inspect` (`vendor/ruby/lib/tempfile.rb:284`).
    *
-   * `rb_io_set_encoding` answers the stream it was sent and `DelegateClass`
-   * forwards that through untouched, so this answers the `File`, not the
-   * `Tempfile` — the same way {@link binmode} does.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#set_encoding`
-   * (`vendor/ruby/io.c:13474`), delegated by Ruby stdlib `Tempfile`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#inspect`
+   * (`vendor/ruby/lib/tempfile.rb:284`).
    */
-  setEncoding(extEnc: Encoding | string): File {
-    return this.tmpfile.setEncoding(extEnc);
+  inspect(): string {
+    if (this.__getobj__().isClosed()) {
+      return `#<${this.constructor.name}:${this.path() ?? ""} (closed)>`;
+    } else {
+      return `#<${this.constructor.name}:${this.path() ?? ""}>`;
+    }
   }
 
   /**
-   * `IO#binmode?` (`vendor/ruby/io.c:6400`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`).
+   * `alias to_s inspect` (`vendor/ruby/lib/tempfile.rb:291`).
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode?`
-   * (`vendor/ruby/io.c:6400`), delegated by Ruby stdlib `Tempfile`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#to_s`
+   * (`vendor/ruby/lib/tempfile.rb:291`).
    */
-  isBinmode(): boolean {
-    return this.tmpfile.isBinmode();
-  }
-
-  /**
-   * `IO#write` (`vendor/ruby/io.c:2263` `io_write_m`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`): the bytes go to the descriptor at the
-   * current offset, which the write then advances.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
-   * (`vendor/ruby/io.c:2263`), delegated by Ruby stdlib `Tempfile`.
-   */
-  write(string: string | Uint8Array): number {
-    return this.tmpfile.write(string);
-  }
-
-  /**
-   * `IO#read` (`vendor/ruby/io.c:3774` `io_read`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`): the rest of the stream FROM THE
-   * CURRENT OFFSET, so a read straight after a write answers `""` until
-   * {@link rewind} moves the cursor back.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
-   * (`vendor/ruby/io.c:3774`), delegated by Ruby stdlib `Tempfile`.
-   */
-  read(): string;
-  read(length: number | null, buffer?: Uint8Array | null): string | null;
-  read(length: number | null = null, buffer: Uint8Array | null = null): string | null {
-    return this.tmpfile.read(length, buffer);
-  }
-
-  /**
-   * `IO#readpartial` (`vendor/ruby/io.c:3590`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`), which is how
-   * `Rack::Test::UploadedFile#append_to`
-   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`) walks the tempfile
-   * in 64K chunks.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#readpartial`
-   * (`vendor/ruby/io.c:3590`), delegated by Ruby stdlib `Tempfile`.
-   */
-  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
-    return this.tmpfile.readpartial(maxlen, outbuf);
-  }
-
-  /**
-   * `IO#eof?` (`vendor/ruby/io.c:2668`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`) — the `until` guard on
-   * `Rack::Test::UploadedFile#append_to`'s chunk loop
-   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#eof?`
-   * (`vendor/ruby/io.c:2668`), delegated by Ruby stdlib `Tempfile`.
-   */
-  isEof(): boolean {
-    return this.tmpfile.isEof();
-  }
-
-  /**
-   * `IO#rewind` (`vendor/ruby/io.c:2565`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#rewind`
-   * (`vendor/ruby/io.c:2565`), delegated by Ruby stdlib `Tempfile`.
-   */
-  rewind(): number {
-    return this.tmpfile.rewind();
+  override toString(): string {
+    return this.inspect();
   }
 
   /**
@@ -417,9 +293,21 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#close`
    * (`vendor/ruby/lib/tempfile.rb:208`).
    */
-  close(unlinkNow = false): void {
-    this.tmpfile.close();
+  close(unlinkNow = false): null {
+    this.__getobj__().close();
     if (unlinkNow) this.unlink();
+    return null;
+  }
+
+  /**
+   * `Tempfile#close!` (`vendor/ruby/lib/tempfile.rb:214`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#close!`
+   * (`vendor/ruby/lib/tempfile.rb:214`).
+   */
+  closeBang(): true | null {
+    this.close();
+    return this.unlink();
   }
 
   /**
@@ -431,16 +319,26 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#unlink`
    * (`vendor/ruby/lib/tempfile.rb:252`).
    */
-  unlink(): void {
-    if (this.unlinked) return;
+  unlink(): true | null {
+    if (this.unlinked) return null;
     try {
-      File.delete(this.tmpfile.path()!);
+      File.delete(this.__getobj__().path()!);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "EACCES") return;
+      if (code === "EACCES") return null;
       if (code !== "ENOENT") throw error;
     }
-    this.unlinked = true;
+    return (this.unlinked = true);
+  }
+
+  /**
+   * `alias delete unlink` (`vendor/ruby/lib/tempfile.rb:264`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#delete`
+   * (`vendor/ruby/lib/tempfile.rb:264`).
+   */
+  delete(): true | null {
+    return this.unlink();
   }
 }
 

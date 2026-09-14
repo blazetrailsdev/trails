@@ -48,7 +48,7 @@ export class UploadedFile {
   }
 
   path(): string | null {
-    return this.tempfile.path;
+    return this.tempfile.path();
   }
 
   toPath(): string | null {
@@ -60,7 +60,7 @@ export class UploadedFile {
   }
 
   size(): number {
-    return this.tempfile.size;
+    return this.tempfile.size();
   }
 
   isEof(): boolean {

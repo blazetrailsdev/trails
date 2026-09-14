@@ -18,7 +18,13 @@ import {
   HEAD,
   OPTIONS,
 } from "./constants.js";
-import { type Generic, isSymbol, RFC2396Parser, StringIO } from "@blazetrails/ruby-compat";
+import {
+  type Generic,
+  isSymbol,
+  rbObjRespondTo,
+  RFC2396Parser,
+  StringIO,
+} from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
 import { buildMultipart, MULTIPART_BOUNDARY } from "./multipart.js";
@@ -162,8 +168,8 @@ export class MockRequest {
     if (rackInput != null && rackInput !== false) {
       env[RACK_INPUT] = rackInput;
 
-      if (env[RACK_INPUT].size !== undefined)
-        env["CONTENT_LENGTH"] ??= String(env[RACK_INPUT].size);
+      if (rbObjRespondTo(env[RACK_INPUT], "size"))
+        env["CONTENT_LENGTH"] ??= String(env[RACK_INPUT].size());
     }
 
     for (const [field, value] of Object.entries(opts)) {

@@ -14,7 +14,7 @@ import {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
 export interface UploadedFile {
   /** @noRailsEquivalent PERMANENT */
-  readonly size: number;
+  size(): number;
   /** @noRailsEquivalent PERMANENT */
   readonly pos: number;
   /** @noRailsEquivalent PERMANENT */
@@ -66,7 +66,7 @@ export class UploadedFile {
     if (!("path" in tempfile)) {
       throw new NoMethodError(`undefined method 'path' for an instance of ${rbObjClass(tempfile)}`);
     }
-    return tempfile.path;
+    return tempfile.path();
   }
 
   get localPath(): string | null {
@@ -112,6 +112,6 @@ export class UploadedFile {
     this.tempfile = Tempfile.new([File.basename(this.originalFilename, extension), extension]);
     this.tempfile.setEncoding(Encoding.BINARY);
 
-    FileUtils.copyFile(path, this.tempfile.path!);
+    FileUtils.copyFile(path, this.tempfile.path()!);
   }
 }

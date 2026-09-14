@@ -94,7 +94,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
         (this as { tempfile?: unknown }).tempfile = undefined;
       }
 
-      get size(): number {
+      size(): number {
         return 0;
       }
 

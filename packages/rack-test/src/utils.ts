@@ -133,7 +133,7 @@ function buildFilePart(
   buffer.write('"\r\ncontent-type: ');
   buffer.write(b(uploadedFile.contentType == null ? "" : String(uploadedFile.contentType)));
   buffer.write("\r\ncontent-length: ");
-  buffer.write(b(String(uploadedFile.size)));
+  buffer.write(b(String(uploadedFile.size())));
   buffer.write("\r\n\r\n");
 
   if ("setEncoding" in uploadedFile) {

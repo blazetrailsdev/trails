@@ -21,7 +21,7 @@ describe("FixtureSet::File ordered maps (trails)", () => {
   it("accepts a !!omap document and keeps its entry order", () => {
     const yaml = "--- !!omap\n- two:\n    name: b\n- one:\n    name: a\n";
     tmpYaml(["omap", "yml"], yaml, (t) => {
-      expect(File.open(t.path!, (fh) => [...fh.each()])).toEqual([
+      expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual([
         ["two", { name: "b" }],
         ["one", { name: "a" }],
       ]);
@@ -30,7 +30,9 @@ describe("FixtureSet::File ordered maps (trails)", () => {
 
   it("still rejects a !!omap whose row is not a hash", () => {
     tmpYaml(["omap", "yml"], "--- !!omap\n- one: two\n", (t) => {
-      expect(() => File.open(t.path!, (fh) => [...fh.each()])).toThrow(/fixture key is not a hash/);
+      expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(
+        /fixture key is not a hash/,
+      );
     });
   });
 });
@@ -49,9 +51,11 @@ describe("FixtureSet::RenderContext#binary (trails)", () => {
   it("renders a file's bytes as a strict-base64 !!binary scalar", () => {
     const blob = Tempfile.new(["blob", "bin"]);
     blob.close();
-    RubyFile.binwrite(blob.path!, "Hello");
+    RubyFile.binwrite(blob.path()!, "Hello");
     try {
-      expect(new (RenderContext.createSubclass())().binary(blob.path!)).toBe('!!binary "SGVsbG8="');
+      expect(new (RenderContext.createSubclass())().binary(blob.path()!)).toBe(
+        '!!binary "SGVsbG8="',
+      );
     } finally {
       blob.close(true);
     }
@@ -60,9 +64,11 @@ describe("FixtureSet::RenderContext#binary (trails)", () => {
   it("encodes bytes 0x80..0xff as themselves, not UTF-8-expanded", () => {
     const blob = Tempfile.new(["blob", "bin"]);
     blob.close();
-    RubyFile.binwrite(blob.path!, String.fromCharCode(0x00, 0x7f, 0x80, 0xc3, 0xff));
+    RubyFile.binwrite(blob.path()!, String.fromCharCode(0x00, 0x7f, 0x80, 0xc3, 0xff));
     try {
-      expect(new (RenderContext.createSubclass())().binary(blob.path!)).toBe('!!binary "AH+Aw/8="');
+      expect(new (RenderContext.createSubclass())().binary(blob.path()!)).toBe(
+        '!!binary "AH+Aw/8="',
+      );
     } finally {
       blob.close(true);
     }

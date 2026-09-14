@@ -838,6 +838,10 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
+    if name == "method_missing" && !@in_sclass
+      reader = method_missing_send_receiver(node[3], find_params(node))
+      (target[:methodMissingSends] ||= []) << reader if reader
+    end
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -1458,6 +1462,87 @@ class ApiExtractor
         info[bucket].each { |m| m.delete(:alias_target) }
       end
     end
+  end
+
+  # The types a `method_missing` send receiver reads as, which Ruby leaves to
+  # the value at run time: `execution_strategy` is
+  # `ActiveRecord.migration_strategy.new(self)` (migration.rb:807-809, default
+  # `DefaultStrategy` at active_record.rb:400-401), and `DefaultStrategy#connection`
+  # is `migration.connection` (migration/default_strategy.rb:17-19) — whichever
+  # adapter the pool opened.
+  METHOD_MISSING_RECEIVER_TYPES = {
+    ["ActiveRecord::Migration", "execution_strategy"] => ["ActiveRecord::Migration::DefaultStrategy"],
+    ["ActiveRecord::Migration::DefaultStrategy", "connection"] => %w[
+      ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
+      ActiveRecord::ConnectionAdapters::Mysql2Adapter
+      ActiveRecord::ConnectionAdapters::TrilogyAdapter
+      ActiveRecord::ConnectionAdapters::SQLite3Adapter
+    ],
+  }.freeze
+
+  # The receiver of a `method_missing` body that forwards the missing name on:
+  # `execution_strategy.send(method, *arguments, &block)` (migration.rb:1055)
+  # names `execution_strategy`. Only a bare reader receiver whose first `send`
+  # argument is `method_missing`'s own first parameter counts; anything else
+  # forwards nowhere this extractor can follow.
+  def method_missing_send_receiver(body, params_node)
+    first = params_node.is_a?(Array) && params_node[1].is_a?(Array) && params_node[1][0]
+    param = first.is_a?(Array) && first[0] == :@ident ? first[1] : nil
+    return nil unless param
+    found = nil
+    visit = lambda do |n|
+      next unless n.is_a?(Array) && found.nil?
+      next if [:def, :defs].include?(n[0])
+      if n[0] == :method_add_arg && n[1].is_a?(Array) && n[1][0] == :call &&
+         n[1][1].is_a?(Array) && [:vcall, :var_ref].include?(n[1][1][0]) &&
+         n[1][1][1].is_a?(Array) && n[1][1][1][0] == :@ident &&
+         ident_name(n[1][3]) == "send"
+        args = n[2].is_a?(Array) && n[2][0] == :arg_paren ? n[2][1] : nil
+        args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+        args = args[1] if args.is_a?(Array) && args[0] == :args_add_star
+        head = args.is_a?(Array) ? args[0] : nil
+        if head.is_a?(Array) && head[0] == :var_ref && head[1].is_a?(Array) && head[1][1] == param
+          found = n[1][1][1][1]
+          next
+        end
+      end
+      n.each { |c| visit.call(c) }
+    end
+    visit.call(body)
+    found
+  end
+
+  # Emits `forwardedMethods` on a class whose `method_missing` forwards to a
+  # reader it defines: the public instance methods the resolved receiver
+  # declares, followed transitively through that receiver's own forwarding
+  # `method_missing` (`Migration` -> `DefaultStrategy` -> the adapter). Names
+  # only, for extra-surface scoring — never methods of the class, so
+  # `parity:api` expects nothing new. A reader with no known type credits
+  # nothing. Drops the transient `methodMissingSends` key.
+  # Public: invoked by `run` per package and by the extractor unit test.
+  public def resolve_method_missing_forwards!
+    all = @classes.merge(@modules)
+    forwarded = lambda do |fqn, info, seen|
+      next [] if seen[fqn]
+      seen[fqn] = true
+      own = info[:instanceMethods] + ancestor_methods(fqn, info, :instanceMethods, all)
+      (info[:methodMissingSends] || []).flat_map do |reader|
+        next [] unless own.any? { |m| m[:name] == reader }
+        (METHOD_MISSING_RECEIVER_TYPES[[fqn, reader]] || []).flat_map do |type|
+          found = all[type]
+          next [] unless found
+          methods = found[:instanceMethods] + ancestor_methods(type, found, :instanceMethods, all)
+          methods.select { |m| m[:visibility] == "public" }.map { |m| m[:name] } +
+            forwarded.call(type, found, seen)
+        end
+      end
+    end
+    all.each do |fqn, info|
+      next unless info[:methodMissingSends]
+      names = forwarded.call(fqn, info, {}).uniq.sort
+      info[:forwardedMethods] = names unless names.empty?
+    end
+    all.each_value { |info| info.delete(:methodMissingSends) }
   end
 
   # Methods an alias in `fqn`'s `bucket` can resolve against beyond its own
@@ -4218,6 +4303,7 @@ def run
     # Fill alias param lists from their targets now that every file in the
     # package has been seen (a reopened class may define the target elsewhere).
     extractor.resolve_aliases!
+    extractor.resolve_method_missing_forwards!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
     # `internal: true`) so consumers can opt into private-API coverage.
@@ -4276,7 +4362,7 @@ def normalize_class_info(info)
     extends: info[:extends].uniq,
     instanceMethods: tag_internal(info[:instanceMethods]),
     classMethods: tag_internal(info[:classMethods]),
-  }
+  }.tap { |out| out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods] }
 end
 
 run if __FILE__ == $PROGRAM_NAME

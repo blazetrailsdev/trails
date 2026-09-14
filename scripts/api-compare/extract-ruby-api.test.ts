@@ -3682,3 +3682,87 @@ describe("Ruby extractor Concern included-block class methods", () => {
     }
   });
 });
+
+describe(
+  "Ruby extractor method_missing forwarding",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+    function forwardedMethods(src: string): Record<string, string[] | null> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "forward-rb-"));
+      try {
+        fs.writeFileSync(path.join(dir, "migration.rb"), src);
+        const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "migration.rb"), ${JSON.stringify(dir)})
+        ex.resolve_method_missing_forwards!
+        out = {}
+        ex.classes.each { |fqn, info| out[fqn] = info[:forwardedMethods] }
+        puts JSON.generate(out)
+      `;
+        return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    it("credits the names a forwarding method_missing reaches, through each hop", () => {
+      const out = forwardedMethods(`
+        module ActiveRecord
+          module ConnectionAdapters
+            module SchemaStatements
+              def add_column(table_name, column_name, type); end
+              private
+                def quoted_scope; end
+            end
+            class AbstractAdapter
+              include SchemaStatements
+            end
+            class PostgreSQLAdapter < AbstractAdapter
+              def validate_foreign_key(from_table, to_table); end
+            end
+          end
+          class Migration
+            class DefaultStrategy
+              private
+                def method_missing(method, ...)
+                  connection.send(method, ...)
+                end
+                def connection; end
+            end
+            def execution_strategy; end
+            def method_missing(method, *arguments, &block)
+              say_with_time "#{method}" do
+                return super unless execution_strategy.respond_to?(method)
+                execution_strategy.send(method, *arguments, &block)
+              end
+            end
+          end
+        end
+      `);
+      expect(out["ActiveRecord::Migration"]).toEqual(["add_column", "validate_foreign_key"]);
+      expect(out["ActiveRecord::Migration::DefaultStrategy"]).toEqual([
+        "add_column",
+        "validate_foreign_key",
+      ]);
+    });
+
+    it("credits nothing for a method_missing that forwards nowhere", () => {
+      const out = forwardedMethods(`
+        module ActiveRecord
+          class Migration
+            def execution_strategy; end
+            def method_missing(method, *arguments, &block)
+              execution_strategy.send(:fixed, *arguments)
+              super
+            end
+          end
+        end
+      `);
+      expect(out["ActiveRecord::Migration"]).toBeNull();
+    });
+  },
+);

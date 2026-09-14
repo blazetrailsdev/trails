@@ -38,7 +38,7 @@ describe("Rack::Multipart::Parser encodings", () => {
 
     const file = parseBody(body, Parser.TEMPFILE_FACTORY).params!["file"];
     file.tempfile.close();
-    expect(File.binread(file.tempfile.path)).toBe(bytes);
+    expect(File.binread(file.tempfile.path())).toBe(bytes);
   });
 
   it("decodes a text part's bytes under its charset", () => {

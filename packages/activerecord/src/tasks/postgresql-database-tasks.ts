@@ -192,7 +192,7 @@ export class PostgreSQLDatabaseTasks {
     } finally {
       tempfile.close();
     }
-    FileUtils.cp(tempfile.path!, filename);
+    FileUtils.cp(tempfile.path()!, filename);
     tempfile.unlink();
   }
 

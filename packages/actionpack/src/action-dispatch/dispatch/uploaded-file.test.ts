@@ -64,7 +64,7 @@ describe("UploadedFileTest", () => {
   it("delegates path to tempfile", () => {
     const tf = Tempfile.new();
     const uf = new UploadedFile({ tempfile: tf });
-    expect(uf.path()).toBe(tf.path);
+    expect(uf.path()).toBe(tf.path());
   });
 
   it("delegates open to tempfile", () => {
@@ -87,7 +87,7 @@ describe("UploadedFileTest", () => {
     const uf = new UploadedFile({ tempfile: tf });
     uf.close(true);
     expect(tf.isClosed()).toBe(true);
-    expect(tf.path).toBeNull();
+    expect(tf.path()).toBeNull();
   });
 
   it("delegates read to tempfile", () => {
