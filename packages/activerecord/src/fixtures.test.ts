@@ -1366,3 +1366,66 @@ describe("MultipleFixtureConnectionsTest", () => {
     });
   });
 });
+
+describe("HasManyThroughFixture", () => {
+  fixtures([]);
+
+  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+
+  function makeModel(name: string): typeof Base {
+    const klass = class extends Base {};
+    Object.defineProperty(klass, "name", { value: name });
+    return klass;
+  }
+
+  function loadHasAndBelongsToMany(): Record<string, Record<string, unknown>[]> {
+    const parrot = makeModel("Parrot");
+    parrot.hasAndBelongsToMany("treasures");
+
+    const parrots = `${FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    return fs.tableRows();
+  }
+
+  it("has many through with join table name changed to match habtm table name", () => {
+    const pt = makeModel("ParrotTreasure");
+    const parrot = makeModel("Parrot");
+    const treasure = makeModel("Treasure");
+
+    pt.tableName = "parrots_treasures";
+    pt.belongsTo("parrot", { anonymousClass: parrot });
+    pt.belongsTo("treasure", { anonymousClass: treasure });
+
+    parrot.hasMany("parrot_treasures", { anonymousClass: pt });
+    parrot.hasMany("treasures", { through: "parrot_treasures" });
+
+    const parrots = `${FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    const rows = fs.tableRows();
+    expect(rows["parrots_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+  });
+
+  it("has many through with default table name on join table", () => {
+    const pt = makeModel("ParrotTreasure");
+    const parrot = makeModel("Parrot");
+    const treasure = makeModel("Treasure");
+
+    pt.belongsTo("parrot", { anonymousClass: parrot });
+    pt.belongsTo("treasure", { anonymousClass: treasure });
+
+    parrot.hasMany("parrot_treasures", { anonymousClass: pt });
+    parrot.hasMany("treasures", { through: "parrot_treasures" });
+
+    const parrots = `${FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    const rows = fs.tableRows();
+    expect(rows["parrot_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+  });
+
+  it("has and belongs to many order", () => {
+    expect(Object.keys(loadHasAndBelongsToMany())).toEqual(["parrots", "parrots_treasures"]);
+  });
+});

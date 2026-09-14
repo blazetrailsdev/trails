@@ -1,5 +1,5 @@
-import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { isEmpty, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   AttributeMethods,
@@ -9,8 +9,13 @@ import {
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
 import { _Base } from "./base-slot.js";
-import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
-import { initializeGeneratedModules as _coreInitializeGeneratedModules } from "./core.js";
+import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import {
+  InspectionMask,
+  initializeGeneratedModules as _coreInitializeGeneratedModules,
+  inspectionFilter as _coreInspectionFilter,
+} from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, loadSchema } from "./model-schema.js";
@@ -499,9 +504,60 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   });
 }
 
+const bigintReplacer = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
+
+function inspectArray(arr: unknown[]): string {
+  return `[${arr
+    .map((v) => {
+      if (v == null) return "nil";
+      if (globalThis.Array.isArray(v)) return inspectArray(v as unknown[]);
+      if (typeof v === "bigint") return String(v);
+      try {
+        return JSON.stringify(v, bigintReplacer) ?? String(v);
+      } catch {
+        return String(v);
+      }
+    })
+    .join(", ")}]`;
+}
+
 /** @internal */
 export function formatForInspect(this: InstanceMethodHost, name: string, value: unknown): string {
-  return _formatForInspect.call(this as any, name, value);
+  if (value === null || value === undefined) {
+    return "nil";
+  } else {
+    let inspectedValue: string;
+    if (typeof value === "string" && value.length > 50) {
+      inspectedValue = inspect(`${value.substring(0, 50)}...`);
+    } else if (value instanceof Temporal.PlainDate) {
+      inspectedValue = `"${dateToFs(value, "inspect")}"`;
+    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
+      inspectedValue = `"${toFs(value, "inspect")}"`;
+    } else if (value instanceof TimeWithZone) {
+      inspectedValue = `"${value.toFs("inspect")}"`;
+      // boundary: legacy custom-typed attributes may still be JS Date.
+    } else if (value instanceof Date) {
+      inspectedValue = Number.isNaN(value.getTime())
+        ? `"${String(value)}"`
+        : `"${value.toISOString()}"`;
+    } else if (typeof value === "string") {
+      inspectedValue = inspect(value);
+    } else if (globalThis.Array.isArray(value)) {
+      inspectedValue = inspectArray(value as unknown[]);
+    } else {
+      try {
+        const stringified = JSON.stringify(value);
+        inspectedValue = stringified === undefined ? String(value) : stringified;
+      } catch {
+        inspectedValue = String(value);
+      }
+    }
+
+    const filtered = _coreInspectionFilter
+      .call(this.constructor as never)
+      .filterParam(name, inspectedValue);
+    return filtered instanceof InspectionMask ? String(filtered.__getobj__()) : String(filtered);
+  }
 }
 
 /** @internal */
@@ -556,7 +612,7 @@ export function attributeForInspect(this: InstanceMethodHost, attrName: string):
       attrName
     ] ?? attrName;
   const value = this._readAttribute(attrName);
-  return _formatForInspect.call(this as any, attrName, value);
+  return formatForInspect.call(this, attrName, value);
 }
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {

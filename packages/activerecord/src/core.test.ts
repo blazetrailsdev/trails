@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
-import { formatForInspect } from "./attribute-inspection.js";
+import { formatForInspect } from "./attribute-methods.js";
 
 import { pp } from "./pretty-print.js";
 import { fixtures } from "./test-fixtures.js";

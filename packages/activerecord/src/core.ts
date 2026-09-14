@@ -1,4 +1,4 @@
-import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, DelegateClass, hasKey } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
@@ -50,8 +50,6 @@ export interface Core {
   isStrictLoadingNPlusOneOnly(): boolean;
 }
 
-export { InspectionMask } from "./attribute-inspection.js";
-import { inspectionFilter as _inspectionFilterImpl } from "./attribute-inspection.js";
 import { _Base } from "./base-slot.js";
 
 interface CoreRecord {
@@ -548,7 +546,14 @@ export function cachedFindByStatement(
 }
 
 export function inspectionFilter(this: CoreHost): ParameterFilter {
-  return _inspectionFilterImpl.call(this);
+  if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
+    const superclass = parentClass(this);
+    if (superclass) return inspectionFilter.call(superclass);
+  }
+  return (this._inspectionFilter ??= (() => {
+    const mask = new InspectionMask(ParameterFilter.FILTERED);
+    return new ParameterFilter(this._filterAttributes ?? [], { mask });
+  })());
 }
 
 export function connectionHandler(this: CoreHost, value?: any): any {
@@ -788,4 +793,11 @@ export async function findByBang(this: CoreHost, ...args: any[]): Promise<any> {
       .where(...args)
       .raiseRecordNotFoundExceptionBang()
   );
+}
+
+/** @internal */
+export class InspectionMask extends DelegateClass(String) {
+  prettyPrint(pp: PrettyPrinter): void {
+    pp.text(String(this.__getobj__()));
+  }
 }

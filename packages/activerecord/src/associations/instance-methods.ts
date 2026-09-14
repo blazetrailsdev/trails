@@ -50,7 +50,7 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
+/** @noRailsEquivalent CONVERGEABLE relocate-association-instance-method-into-associations */
 export function association(this: Base, name: string): AssociationInstance {
   const existing = this._associationInstances.get(name);
   if (existing) {
@@ -70,7 +70,7 @@ export function association(this: Base, name: string): AssociationInstance {
   return instance;
 }
 
-/** @noRailsEquivalent CONVERGEABLE relocate-attribute-inspection-and-association-instance-methods */
+/** @noRailsEquivalent CONVERGEABLE relocate-association-instance-method-into-associations */
 export const InstanceMethods = {
   association,
 };

@@ -46,6 +46,7 @@ export type CollectionCallback<K extends string> =
 export interface AssociationOptions {
   foreignKey?: string | string[];
   className?: string;
+  anonymousClass?: typeof Base;
   primaryKey?: string | string[];
   queryConstraints?: string[];
   dependent?:

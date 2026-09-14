@@ -181,20 +181,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "HasManyThroughFixture",
-    tests: [
-      "has and belongs to many order",
-      "has many through with default table name on join table",
-      "has many through with join table name changed to match habtm table name",
-    ],
-    reason:
-      "All three build FixtureSet.new(nil, 'parrots', klass, File.join(FIXTURES_ROOT, " +
-      "'parrots')) and compare #table_rows (fixtures_test.rb:668,687,695). Same missing " +
-      "surfaces as the row above plus the instance form below: a fixture directory on " +
-      "disk, and a per-set object exposing table_rows.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["empty yaml fixture", "empty yaml fixture with a comment in it"],
     reason:
