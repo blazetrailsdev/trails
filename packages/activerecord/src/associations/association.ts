@@ -106,14 +106,18 @@ export class Association {
     }
   }
 
-  reload(force = false): this | Promise<this> {
+  reload(force = false): this | null | Promise<this | null> {
     if (force) {
       this.klass.connectionPool().clearQueryCache();
     }
     this.reset();
     this.resetScope();
     const loaded = this.loadTarget();
-    return loaded instanceof Promise ? loaded.then(() => this) : this;
+    return loaded instanceof Promise
+      ? loaded.then(() => (this.target == null ? null : this))
+      : this.target == null
+        ? null
+        : this;
   }
 
   setTarget(target: Base | Base[] | null): void {
