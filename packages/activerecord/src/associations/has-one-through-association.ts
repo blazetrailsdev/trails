@@ -78,7 +78,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return sourceReflection(this);
   }
 
-  /** @missingRailsCall create_through_record — PERMANENT */
   protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
   protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
