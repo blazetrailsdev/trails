@@ -2843,6 +2843,20 @@ export function dedupeRubyMethodInto(
   }
 }
 
+/**
+ * The candidates a scoped skip's `tsMirrorName` spellings contribute. A port
+ * spread over several declarations is credited only when EVERY spelling is
+ * declared; otherwise the undeclared ones are the candidates, so the method
+ * reports missing under a name that is really absent.
+ */
+export function scopedSkipMirrorCandidates(
+  tsMirrorNames: string[],
+  tsMethods: ReadonlySet<string>,
+): string[] {
+  const absent = tsMirrorNames.filter((n) => !tsMethods.has(n));
+  return absent.length === 0 ? tsMirrorNames : absent;
+}
+
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
 export interface SeenRubyMethod {
   rubyName: string;
@@ -4511,7 +4525,9 @@ export function main() {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
         const tsCandidates =
-          tsMirrorNames ?? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames);
+          tsMirrorNames === undefined
+            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames)
+            : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (tsCandidates === null) continue;
 
         // Check direct match first — find which candidate matched

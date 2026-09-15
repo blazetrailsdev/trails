@@ -14,6 +14,7 @@ import {
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
+  scopedSkipMirrorCandidates,
   type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
@@ -1766,6 +1767,19 @@ describe("dedupeRubyMethodInto", () => {
       "getAttrInternalNamingFormat",
       "setAttrInternalNamingFormat",
     ]);
+  });
+});
+
+describe("scopedSkipMirrorCandidates", () => {
+  const names = ["getAttrInternalNamingFormat", "setAttrInternalNamingFormat"];
+
+  it("credits a multi-name port only when every spelling is declared", () => {
+    expect(scopedSkipMirrorCandidates(names, new Set(names))).toEqual(names);
+  });
+
+  it("reports the undeclared spelling when the names only partially match", () => {
+    const candidates = scopedSkipMirrorCandidates(names, new Set(["setAttrInternalNamingFormat"]));
+    expect(candidates).toEqual(["getAttrInternalNamingFormat"]);
   });
 });
 

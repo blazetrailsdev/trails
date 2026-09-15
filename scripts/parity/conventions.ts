@@ -597,7 +597,7 @@ export interface ScopedSkipGroup {
    *
    * An array names a port spread over several TS declarations — a Ruby
    * `attr_reader` + `name=` pair ported as a `getX`/`setX` accessor pair. The
-   * method comparison credits the Ruby name when ANY of them is declared, and
+   * method comparison credits the Ruby name only when ALL of them are declared, and
    * extra-surface allows every one of them.
    */
   tsMirrorName?: string | string[];
