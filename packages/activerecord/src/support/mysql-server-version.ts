@@ -36,10 +36,6 @@ export const serverVersion = _serverVersion;
 
 export const supportsOptimizerHints = !mariaDb && (_serverVersion?.compare("5.7.7") ?? -1) >= 0;
 
-export const supportsDefaultExpression = mariaDb
-  ? (_serverVersion?.compare("10.2.1") ?? -1) >= 0
-  : (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
-
 export const supportsExpressionIndex = !mariaDb && (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
 
 export const supportsRenameIndex = mariaDb
@@ -49,15 +45,6 @@ export const supportsRenameIndex = mariaDb
 export const supportsJson = !mariaDb && (_serverVersion?.compare("5.7.8") ?? -1) >= 0;
 
 export const supportsInsertReturning = mariaDb && (_serverVersion?.compare("10.5.0") ?? -1) >= 0;
-
-export const supportsTextColumnWithDefault =
-  mariaDb && (_serverVersion?.compare("10.2.1") ?? -1) >= 0;
-
-export const supportsNonUniqueConstraintName = mariaDb;
-
-export const supportsSqlStandardDropConstraint = mariaDb
-  ? (_serverVersion?.compare("10.3.13") ?? -1) >= 0
-  : (_serverVersion?.compare("8.0.19") ?? -1) >= 0;
 
 export const supportsCheckConstraints = mariaDb
   ? (_serverVersion?.compare("10.3.10") ?? -1) >= 0 ||

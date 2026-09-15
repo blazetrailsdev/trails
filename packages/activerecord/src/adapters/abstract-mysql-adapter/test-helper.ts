@@ -10,7 +10,6 @@ export {
   MYSQL_TEST_URL,
   isMariaDb,
   mysqlVersion,
-  supportsDefaultExpression,
   supportsExpressionIndex,
   supportsOptimizerHints,
   supportsRenameIndex,
