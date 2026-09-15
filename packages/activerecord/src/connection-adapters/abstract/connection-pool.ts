@@ -423,27 +423,36 @@ export class ConnectionPool implements ReapablePool {
     const stickyWas = lease.sticky;
     if (preventPermanentCheckout) lease.sticky = false;
 
-    if (lease.connection) {
-      try {
-        return fn(lease.connection);
-      } finally {
+    const ensure = (release: boolean, result?: T): T => {
+      const restore = () => {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-      }
-    } else {
-      try {
+        if (release && !lease.sticky) this.releaseConnection(lease);
+      };
+      if (result instanceof Promise) return result.finally(restore) as T;
+      restore();
+      return result as T;
+    };
+
+    let result: T;
+    const release = !lease.connection;
+    try {
+      if (lease.connection) {
+        result = fn(lease.connection);
+      } else {
         const pinned = this._pinnedConnection;
         if (pinned && this._connections && !this._connections.includes(pinned)) {
           this._connections.push(pinned);
         }
-        return fn(
+        result = fn(
           (lease.connection =
             pinned ?? this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout))),
         );
-      } finally {
-        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (!lease.sticky) this.releaseConnection(lease);
       }
+    } catch (error) {
+      ensure(release);
+      throw error;
     }
+    return ensure(release, result);
   }
 
   isPermanentLease(): boolean {

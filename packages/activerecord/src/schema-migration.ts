@@ -1,4 +1,3 @@
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
 import { first } from "./ruby-first.js";
@@ -28,12 +27,6 @@ export class SchemaMigration {
     this.arelTable = new Table(this.tableName);
   }
 
-  private async _withConnection<T>(
-    fn: (connection: DatabaseAdapter) => T | Promise<T>,
-  ): Promise<T> {
-    return await this._pool.withConnection(fn);
-  }
-
   get primaryKey(): string {
     return "version";
   }
@@ -44,7 +37,7 @@ export class SchemaMigration {
   }
 
   async createTable(): Promise<void> {
-    await this._withConnection(async (connection) => {
+    await this._pool.withConnection(async (connection) => {
       if (await connection.tableExists(this.tableName)) return;
       await connection.createTable(this.tableName, { id: false }, (t) => {
         t.string(this.primaryKey, connection.internalStringOptionsForPrimaryKey());
@@ -53,7 +46,7 @@ export class SchemaMigration {
   }
 
   async dropTable(): Promise<void> {
-    await this._withConnection((connection) =>
+    await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }
@@ -61,7 +54,7 @@ export class SchemaMigration {
   async createVersion(version: string): Promise<string> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    return (await this._withConnection((connection) =>
+    return (await this._pool.withConnection((connection) =>
       connection.insert(im, `${this.constructor.name} Create`, this.primaryKey, version),
     )) as string;
   }
@@ -69,13 +62,13 @@ export class SchemaMigration {
   async deleteVersion(version: string): Promise<void> {
     const dm = new DeleteManager(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._withConnection((connection) =>
+    await this._pool.withConnection((connection) =>
       connection.delete(dm, `${this.constructor.name} Destroy`),
     );
   }
 
   async deleteAllVersions(): Promise<void> {
-    await this._withConnection(async () => {
+    await this._pool.withConnection(async () => {
       const vers = await this.versions();
       for (const version of vers) {
         await this.deleteVersion(version);
@@ -87,7 +80,7 @@ export class SchemaMigration {
     const sm = new SelectManager(this.arelTable);
     sm.project(this.arelTable.get(this.primaryKey));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    return (await this._withConnection((connection) =>
+    return (await this._pool.withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Load`),
     )) as string[];
   }
@@ -95,14 +88,16 @@ export class SchemaMigration {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.Count([star()]));
-    const values = await this._withConnection((connection) =>
+    const values = await this._pool.withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
     return first(values) as number;
   }
 
   async tableExists(): Promise<boolean | null> {
-    return await this._withConnection((connection) => connection.dataSourceExists(this.tableName));
+    return await this._pool.withConnection((connection) =>
+      connection.dataSourceExists(this.tableName),
+    );
   }
 
   static normalizeMigrationNumber(number: string | number): string {

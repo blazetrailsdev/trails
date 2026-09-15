@@ -2,7 +2,8 @@ import { hasKey } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
-import { connectionPool } from "./connection-handling.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { FutureResult, Complete } from "./future-result.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import { toI } from "./relation/query-methods.js";
@@ -21,17 +22,18 @@ export async function findBySql<T extends typeof Base>(
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  return this.withConnection(async () => {
-    const result = await _queryBySql.call(this, sql, binds, {
-      allowRetry: resolvedOpts.allowRetry,
-      preparable: resolvedOpts.preparable,
-    });
-    return _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
-      this,
-      result,
-      resolvedBlock,
-    );
-  });
+  const result = await this.withConnection(
+    (c) =>
+      _queryBySql.call(this, c, sql, binds, {
+        preparable: resolvedOpts.preparable,
+        allowRetry: resolvedOpts.allowRetry,
+      }) as Promise<Result>,
+  );
+  return _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
+    this,
+    result,
+    resolvedBlock,
+  );
 }
 
 export async function asyncFindBySql<T extends typeof Base>(
@@ -44,12 +46,21 @@ export async function asyncFindBySql<T extends typeof Base>(
     | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  return findBySql.call<T, Parameters<typeof findBySql<T>>, Promise<InstanceType<T>[]>>(
-    this,
-    sql,
-    binds,
-    opts as any,
-    block,
+  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
+  const resolvedBlock = typeof opts === "function" ? opts : block;
+  return this.withConnection(
+    (c) =>
+      _queryBySql.call(this, c, sql, binds, {
+        preparable: resolvedOpts.preparable,
+        allowRetry: resolvedOpts.allowRetry,
+        async: true,
+      }) as Promise<Result>,
+  ).then((result) =>
+    _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
+      this,
+      result,
+      resolvedBlock,
+    ),
   );
 }
 
@@ -71,20 +82,22 @@ export function asyncCountBySql(
 }
 
 /** @internal */
-export async function _queryBySql(
+export function _queryBySql(
   this: typeof Base,
-  sql: string | [string, ...unknown[]],
+  connection: DatabaseAdapter,
+  sql: unknown,
   binds: unknown[] = [],
-  opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
-): Promise<Result> {
-  const resolvedSql = Array.isArray(sql) ? (this.sanitizeSql(sql) ?? "") : sql;
-  const resolvedBinds = Array.isArray(sql) ? [] : binds;
-  const selectOpts: { allowRetry: boolean; preparable?: boolean | null } = {
-    allowRetry: opts.allowRetry ?? false,
-  };
-  if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  const adapter = connectionPool.call(this).activeConnection ?? this.connection;
-  return adapter.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
+  {
+    preparable = null,
+    async = false,
+    allowRetry = false,
+  }: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
+): Promise<Result> | FutureResult | Complete {
+  return connection.selectAll(this.sanitizeSql(sql as string), `${this.name} Load`, binds, {
+    preparable,
+    async,
+    allowRetry,
+  });
 }
 
 /** @internal */

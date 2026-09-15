@@ -440,6 +440,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection leases a connection when none is active", async () => {
+    Base.permanentConnectionCheckout = true;
     const pool = Base.connectionPool();
     Base.releaseConnection();
     expect(pool.activeConnection).toBeNull();
