@@ -782,6 +782,8 @@ describe("useFixtures encryption add-on is opt-in", () => {
 });
 
 describe("FixtureSet.createFixtures", () => {
+  beforeEach(() => FixtureSet.resetCache());
+
   it("returns keyed instances for all declared labels", async () => {
     const adapter = makeAdapter();
     const id1 = FixtureSet.identify("first");

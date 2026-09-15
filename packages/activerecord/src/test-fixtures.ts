@@ -26,6 +26,7 @@ import {
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
 import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
+import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 
 function effectiveFixtureKey(
   model: typeof Base,
@@ -315,10 +316,17 @@ function useFixtures(
       fixtureClassNames[fsName] = model;
       fixtureSetNames.push(fsName);
     }
+    const fixturePool = getAdapter().pool;
+    const config =
+      fixturePool instanceof NullPool
+        ? Base
+        : ({ connectionPool: () => fixturePool } as unknown as typeof Base);
+    FixtureSet.resetCache();
     const fixtureSets = await FixtureSet.createFixtures(
       fixturesDirectories,
       fixtureSetNames,
       fixtureClassNames,
+      config,
     );
     const loaded = Object.keys(fixtures);
     for (let i = 0; i < loaded.length; i++) {
