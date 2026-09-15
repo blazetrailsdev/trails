@@ -1041,11 +1041,10 @@ export function _touchRow(
   attributeNames: string[],
   time?: RubyTime | Date | null,
 ): Promise<number> {
-  const t = time ?? currentTimeFromProperTimezone();
-  // boundary: accepts JS Date from touch(time:) callers
-  const value = t instanceof Date ? RubyTime.at(new Rational(t.getTime(), 1000)) : t;
-  for (const attr of attributeNames) {
-    this._writeAttribute(attr, value);
+  time ??= currentTimeFromProperTimezone();
+  if (time instanceof Date) time = RubyTime.at(new Rational(time.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
+  for (const attrName of attributeNames) {
+    this._writeAttribute(attrName, time);
   }
   return (this as any)._updateRow(attributeNames, "touch");
 }

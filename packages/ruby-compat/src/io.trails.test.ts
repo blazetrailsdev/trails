@@ -162,7 +162,6 @@ describe("IO", () => {
     for (const [name, encoding, bytes] of cases) {
       const path = join(dir, name);
       writeFileSync(path, Uint8Array.from(bytes));
-      // vendor/ruby/io.c:3123-3126 — with no default internal the String is only tagged.
       File.open(path, `rb:${encoding}`, (file) => {
         expect(file.read()).toBe(String.fromCharCode(...bytes));
       });
@@ -184,7 +183,6 @@ describe("IO", () => {
         });
       }
 
-      // vendor/ruby/transcode.c:2126-2129 econv_incomplete_input — a partial unit after the BOM.
       const partial16 = join(dir, "partial16.bin");
       writeFileSync(partial16, Uint8Array.from([0xfe, 0xff, 0x68]));
       File.open(partial16, "rb:UTF-16", (file) => {

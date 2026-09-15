@@ -38,8 +38,6 @@ export function rbHash(value: unknown): number {
     }
     return h >>> 0;
   }
-  /* A `Uint8Array` stands in for a Ruby binary String, which `rbEqual` compares
-     by bytes, so it hashes by bytes (`vendor/ruby/string.c:3629` `rb_str_hash`). */
   if (value instanceof Uint8Array) {
     let h = 0x811c9dc5;
     for (const byte of value) {
