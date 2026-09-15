@@ -178,6 +178,7 @@ import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
+import { defaultTimezone } from "../active-record.js";
 
 const OID_JSON = 114;
 const OID_JSONB = 3802;
@@ -2208,7 +2209,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async updateTypemapForDefaultTimezone(): Promise<void> {
-    const tz = _Base!.defaultTimezone;
+    const tz = defaultTimezone();
     if (this._mappedDefaultTimezone === tz) return;
     this._mappedDefaultTimezone = tz;
     await this.reconfigureConnectionTimezone();

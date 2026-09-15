@@ -864,25 +864,27 @@ extends Association`, whose modules reach `reflection.ts` back through
   import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
   it: bare for `db_warnings_ignore` (`abstract_adapter.rb`, reached only from a
   live query), and as `_Base?.logger ?? null` in the constructor
-  (`abstract_adapter.rb:132,140`). Five reads on a standalone adapter's own
+  (`abstract_adapter.rb:132,140`). Three reads on a standalone adapter's own
   path are the only guarded slot reads, each falling back to the value Rails'
   autoloaded `active_record.rb` would hold: `_Base?.logger ?? null` and
   `_Base?.disablePreparedStatements ?? false` in the adapter constructor
-  (`abstract_adapter.rb:155`, default `active_record.rb:183`),
-  `_Base?.queryTransformers ?? []` in `preprocessQuery`
-  (`database_statements.rb`, default `active_record.rb:432`), and
-  `_Base?.asyncQueryExecutor ?? null` in `abstract-adapter.ts` and
-  `ConnectionPool#build_async_executor` (default `active_record.rb:284`), and
+  (`abstract_adapter.rb:155`, default `active_record.rb:183`), and
   `_Base?.lazilyLoadSchemaCache ?? false` in `ConnectionPool#new_connection`
   (`connection_pool.rb:932`, default `active_record.rb:190`). An
   adapter is a standalone public entry point, constructed and queried with no
   model layer loaded at all (the whole `sqlite-drivers` lane), so an unset
   slot there is not a load-order bug but a legitimate configuration. A read
-  is added to this list only when that lane is shown to reach it.
+  is added to this list only when that lane is shown to reach it. A seat that
+  has moved onto the `ActiveRecord` module (`active-record.ts`) needs no guard:
+  the module is a plain import with no slot, and it holds the Rails default
+  itself — which is how `queryTransformers()` in `preprocessQuery` and
+  `asyncQueryExecutor()` in `abstract-adapter.ts` and
+  `ConnectionPool#build_async_executor` left this list.
   It is also the read site for the `ActiveRecord` singleton config seats
   (`active_record.rb:182-491`'s `singleton_class.attr_accessor` block, which the
   api manifest flattens onto `base.rb`, so they are `static` accessor pairs on
-  `Base`): every module `base.ts` reaches at load that reads one —
+  `Base`) that have not yet moved onto `active-record.ts`: every module
+  `base.ts` reaches at load that reads one —
   `connection-adapters/**`, `transactions.ts`, `inheritance.ts`, `migration.ts`,
   `integration.ts`, `readonly-attributes.ts`, `relation/batches.ts`,
   `coders/yaml-column.ts`, `type/internal/timezone.ts`,

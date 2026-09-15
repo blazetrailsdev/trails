@@ -67,7 +67,6 @@ import {
 } from "./inheritance.js";
 import { NotImplementedError, StaleObjectError, type SQLWarning } from "./errors.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
-import type { QueryTransformer } from "./query-transformers.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -150,11 +149,10 @@ import {
 } from "./log-subscriber.js";
 import {
   dbWarningsAction,
-  defaultTimezone,
   permanentConnectionCheckout,
   setDbWarningsAction,
-  setDefaultTimezone,
   setPermanentConnectionCheckout,
+  writingRole,
 } from "./active-record.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
@@ -680,10 +678,7 @@ let _databaseCli: Record<string, string | string[]> = {
   mysql: ["mysql", "mysql5"],
   sqlite: "sqlite3",
 };
-let _writingRole = "writing";
-let _readingRole = "reading";
 let _dbWarningsIgnore: (string | RegExp)[] = [];
-let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
 let _raiseOnAssignToAttrReadonly = false;
@@ -700,7 +695,6 @@ let _schemaFormat: SchemaFormat = "ts";
 let _dumpSchemaAfterMigration = true;
 let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 let _verifyForeignKeysForFixtures = false;
-let _queryTransformers: QueryTransformer[] = [];
 let _useYamlUnsafeLoad = false;
 let _raiseIntWiderThan64bit = true;
 let _yamlColumnPermittedClasses: unknown[] = [Symbol];
@@ -772,30 +766,6 @@ export class Base extends Model {
     _databaseCli = value;
   }
 
-  static get defaultTimezone(): "utc" | "local" {
-    return defaultTimezone();
-  }
-
-  static set defaultTimezone(defaultTimezone: "utc" | "local") {
-    setDefaultTimezone(defaultTimezone);
-  }
-
-  static get writingRole(): string {
-    return _writingRole;
-  }
-
-  static set writingRole(writingRole: string) {
-    _writingRole = writingRole;
-  }
-
-  static get readingRole(): string {
-    return _readingRole;
-  }
-
-  static set readingRole(readingRole: string) {
-    _readingRole = readingRole;
-  }
-
   static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
     return dbWarningsAction();
   }
@@ -810,14 +780,6 @@ export class Base extends Model {
 
   static set dbWarningsIgnore(value: (string | RegExp)[]) {
     _dbWarningsIgnore = value;
-  }
-
-  static get asyncQueryExecutor(): "global_thread_pool" | "multi_thread_pool" | null {
-    return _asyncQueryExecutor;
-  }
-
-  static set asyncQueryExecutor(value: "global_thread_pool" | "multi_thread_pool" | null) {
-    _asyncQueryExecutor = value;
   }
 
   static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
@@ -954,14 +916,6 @@ export class Base extends Model {
 
   static set verifyForeignKeysForFixtures(value: boolean) {
     _verifyForeignKeysForFixtures = value;
-  }
-
-  static get queryTransformers(): QueryTransformer[] {
-    return _queryTransformers;
-  }
-
-  static set queryTransformers(value: QueryTransformer[]) {
-    _queryTransformers = value;
   }
 
   static get useYamlUnsafeLoad(): boolean {
@@ -2595,7 +2549,7 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  static defaultRole: string = _writingRole;
+  static defaultRole: string = writingRole();
 
   static belongsToRequiredByDefault = false;
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "./base.js";
-import { setGlobalExecutorConcurrency } from "./active-record.js";
+import {
+  asyncQueryExecutor,
+  setAsyncQueryExecutor,
+  setGlobalExecutorConcurrency,
+} from "./active-record.js";
 
 describe("AsynchronousQueriesTest", () => {
   it.skip("async select all", () => {});
@@ -12,21 +15,21 @@ describe("AsynchronousExecutorTypeTest", () => {
   it.skip("one global thread pool is used when set with default concurrency", () => {});
   it.skip("concurrency can be set on global thread pool", () => {});
   it("concurrency cannot be set with null executor or multi thread pool", () => {
-    const oldValue = Base.asyncQueryExecutor;
+    const oldValue = asyncQueryExecutor();
     try {
-      Base.asyncQueryExecutor = null;
+      setAsyncQueryExecutor(null);
 
       expect(() => {
         setGlobalExecutorConcurrency(8);
       }).toThrow(ArgumentError);
 
-      Base.asyncQueryExecutor = "multi_thread_pool";
+      setAsyncQueryExecutor("multi_thread_pool");
 
       expect(() => {
         setGlobalExecutorConcurrency(8);
       }).toThrow(ArgumentError);
     } finally {
-      Base.asyncQueryExecutor = oldValue;
+      setAsyncQueryExecutor(oldValue);
     }
   });
   it.skip("multi thread pool executor configuration", () => {});

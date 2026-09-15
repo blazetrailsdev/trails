@@ -148,6 +148,7 @@ import { Time as TimeType } from "../type/time.js";
 import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
+import { asyncQueryExecutor, defaultTimezone } from "../active-record.js";
 
 export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
@@ -1450,7 +1451,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get defaultTimezone(): string {
-    return this._defaultTimezone ?? _Base!.defaultTimezone;
+    return this._defaultTimezone ?? defaultTimezone();
   }
 
   get connectionDescriptor(): ConnectionDescriptor | undefined {
@@ -1526,7 +1527,7 @@ export class AbstractAdapter implements Quoting {
   asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
-      (_Base?.asyncQueryExecutor ?? null) != null &&
+      asyncQueryExecutor() != null &&
       this.pool?.asyncExecutor != null
     );
   }

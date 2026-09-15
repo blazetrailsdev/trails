@@ -4,11 +4,11 @@ import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "./date-time.js";
-import { Base } from "../base.js";
 import { Range } from "@blazetrails/ruby-compat";
+import { setDefaultTimezone } from "../active-record.js";
 
 afterEach(() => {
-  Base.defaultTimezone = "utc";
+  setDefaultTimezone("utc");
   setZone(null);
 });
 
@@ -20,7 +20,7 @@ describe("ActiveRecord::Type::DateTime serialize_cast_value normalization", () =
   });
 
   it("getlocal's the value when default_timezone is :local", () => {
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     const type = new DateTime();
     const value = type.cast("1999-12-31 12:34:56") as RubyTime;
     const serialized = type.serializeCastValue(value) as RubyTime;
@@ -32,16 +32,16 @@ describe("ActiveRecord::Type::DateTime serialize_cast_value normalization", () =
 
 describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
   it("is_utc? follows ActiveRecord.default_timezone", () => {
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     expect(new DateTime().isUtc).toBe(false);
-    Base.defaultTimezone = "utc";
+    setDefaultTimezone("utc");
     expect(new DateTime().isUtc).toBe(true);
   });
 
   it("is_utc? follows the per-type timezone override", () => {
-    Base.defaultTimezone = "utc";
+    setDefaultTimezone("utc");
     expect(new DateTime({ timezone: "local" }).isUtc).toBe(false);
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     expect(new DateTime({ timezone: "utc" }).isUtc).toBe(true);
   });
 
@@ -50,10 +50,10 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
     const utc = RubyTime.utc(2024, 1, 2, 12, 0, 0);
     const local = RubyTime.local(2024, 1, 2, 12, 0, 0);
 
-    Base.defaultTimezone = "utc";
+    setDefaultTimezone("utc");
     expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(utc.toI());
 
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(local.toI());
 
     expect((new DateTime({ timezone: "utc" }).cast(bare) as RubyTime).toI()).toBe(utc.toI());

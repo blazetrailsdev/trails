@@ -20,8 +20,8 @@ import {
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { _Base } from "../../base-slot.js";
 import { BinaryData } from "@blazetrails/activemodel";
+import { defaultTimezone } from "../../active-record.js";
 
 export function unquotedTrue(): number {
   return 1;
@@ -129,14 +129,14 @@ export function columnNameWithOrderMatcher(): RegExp {
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof TimeWithZone) {
-    if (_Base!.defaultTimezone === "utc") {
+    if (defaultTimezone() === "utc") {
       return value.getutc();
     } else {
       return value.getlocal();
     }
   }
   if (value instanceof RubyTime) {
-    if (_Base!.defaultTimezone === "utc") {
+    if (defaultTimezone() === "utc") {
       return value.isUtc() ? value : value.getutc();
     } else {
       return value.isUtc() ? value.getlocal() : value;

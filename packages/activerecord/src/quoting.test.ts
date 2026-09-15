@@ -31,11 +31,11 @@ const quoteTableNameForAssignment = (table: string, attr: string): string =>
 const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
   quotedTimeFn.call(HOST, value);
 import { formatPlainTimeForSql } from "./connection-adapters/abstract/sql-datetime.js";
-import { Base } from "./base.js";
 import { NotImplementedError } from "./errors.js";
+import { setDefaultTimezone } from "./active-record.js";
 
 afterEach(() => {
-  Base.defaultTimezone = "utc";
+  setDefaultTimezone("utc");
 });
 
 describe("QuotingTest", () => {
@@ -144,13 +144,13 @@ describe("QuotingTest", () => {
     expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     const zone = Temporal.Now.timeZoneId();
     const zdt = Temporal.ZonedDateTime.from(`2026-04-07T15:30:00[${zone}]`);
     expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
   });
   it("quoted time local", () => {
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     const t = Temporal.PlainTime.from("15:30:45");
     expect(quotedTime(t)).toBe("15:30:45");
   });
@@ -159,7 +159,7 @@ describe("QuotingTest", () => {
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
   it("quoted datetime local", () => {
-    Base.defaultTimezone = "local";
+    setDefaultTimezone("local");
     const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });

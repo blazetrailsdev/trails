@@ -7,6 +7,7 @@ import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 import { restoreWorkerConnection } from "../support/connection.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { readingRole, setReadingRole, setWritingRole, writingRole } from "../active-record.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
   let handler: ConnectionHandler;
@@ -325,21 +326,21 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("default handlers are writing and reading", () => {
-    expect(Base.writingRole).toBe("writing");
-    expect(Base.readingRole).toBe("reading");
+    expect(writingRole()).toBe("writing");
+    expect(readingRole()).toBe("reading");
   });
 
   it("an application can change the default handlers", () => {
-    const oldWriting = Base.writingRole;
-    const oldReading = Base.readingRole;
+    const oldWriting = writingRole();
+    const oldReading = readingRole();
     try {
-      Base.writingRole = "default";
-      Base.readingRole = "readonly";
-      expect(Base.writingRole).toBe("default");
-      expect(Base.readingRole).toBe("readonly");
+      setWritingRole("default");
+      setReadingRole("readonly");
+      expect(writingRole()).toBe("default");
+      expect(readingRole()).toBe("readonly");
     } finally {
-      Base.writingRole = oldWriting;
-      Base.readingRole = oldReading;
+      setWritingRole(oldWriting);
+      setReadingRole(oldReading);
     }
   });
 });

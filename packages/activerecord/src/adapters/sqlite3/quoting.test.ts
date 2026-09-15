@@ -7,6 +7,7 @@ import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import * as Type from "../../type.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { defaultTimezone, setDefaultTimezone } from "../../active-record.js";
 
 let conn: SQLite3Adapter;
 
@@ -77,8 +78,8 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quoted time dst utc", () => {
-    const previous = Base.defaultTimezone;
-    Base.defaultTimezone = "utc";
+    const previous = defaultTimezone();
+    setDefaultTimezone("utc");
     try {
       const t = new TimeWithZone(
         Temporal.ZonedDateTime.from("2000-07-01T00:00:00+04:30[+04:30]").toInstant(),
@@ -92,13 +93,13 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
       expect(conn.quotedTime(t)).toBe(expected);
     } finally {
-      Base.defaultTimezone = previous;
+      setDefaultTimezone(previous);
     }
   });
 
   it("quoted time dst local", () => {
-    const previous = Base.defaultTimezone;
-    Base.defaultTimezone = "local";
+    const previous = defaultTimezone();
+    setDefaultTimezone("local");
     try {
       const t = new TimeWithZone(
         Temporal.ZonedDateTime.from("2000-07-01T00:00:00+04:30[+04:30]").toInstant(),
@@ -112,7 +113,7 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
       expect(conn.quotedTime(t)).toBe(expected);
     } finally {
-      Base.defaultTimezone = previous;
+      setDefaultTimezone(previous);
     }
   });
 

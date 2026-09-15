@@ -50,11 +50,11 @@ import {
 } from "./database-statements.js";
 import { Transaction, TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
-import { Base } from "../../base.js";
 import type { QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import { queryTransformers } from "../../active-record.js";
 
 const pool = newSqlitePool();
 
@@ -644,14 +644,14 @@ describe("preprocessQuery", () => {
 
   describe("queryTransformers loop", () => {
     function withTransformers(transformers: QueryTransformer[], fn: () => void): void {
-      const saved = Base.queryTransformers.slice();
-      Base.queryTransformers.length = 0;
-      Base.queryTransformers.push(...transformers);
+      const saved = queryTransformers().slice();
+      queryTransformers().length = 0;
+      queryTransformers().push(...transformers);
       try {
         fn();
       } finally {
-        Base.queryTransformers.length = 0;
-        Base.queryTransformers.push(...saved);
+        queryTransformers().length = 0;
+        queryTransformers().push(...saved);
       }
     }
 

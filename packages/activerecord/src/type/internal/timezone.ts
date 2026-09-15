@@ -5,10 +5,10 @@ export interface TimezoneOptions {
   limit?: number;
 }
 
-import { _Base } from "../../base-slot.js";
+import { defaultTimezone } from "../../active-record.js";
 
 export function isUtc(timezone?: "utc" | "local"): boolean {
-  return (timezone ?? _Base!.defaultTimezone) === "utc";
+  return (timezone ?? defaultTimezone()) === "utc";
 }
 
 export class Timezone {
@@ -23,6 +23,6 @@ export class Timezone {
   }
 
   get defaultTimezone(): "utc" | "local" {
-    return this._timezone ?? _Base!.defaultTimezone;
+    return this._timezone ?? defaultTimezone();
   }
 }

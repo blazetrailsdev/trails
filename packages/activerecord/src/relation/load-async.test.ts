@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import { AsynchronousQueriesTracker } from "../asynchronous-queries-tracker.js";
-import { globalThreadPoolAsyncQueryExecutor } from "../active-record.js";
+import { globalThreadPoolAsyncQueryExecutor, setAsyncQueryExecutor } from "../active-record.js";
 import { Post } from "../test-helpers/models/post.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -13,7 +13,7 @@ describe("LoadAsyncTest", () => {
   let tracker: AsynchronousQueriesTracker | undefined;
 
   beforeEach(async () => {
-    Base.asyncQueryExecutor = "global_thread_pool";
+    setAsyncQueryExecutor("global_thread_pool");
     tracker = AsynchronousQueriesTracker.run();
     const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
     const previous = pool.asyncExecutor;
@@ -28,7 +28,7 @@ describe("LoadAsyncTest", () => {
     tracker = undefined;
     restoreExecutor?.();
     restoreExecutor = undefined;
-    Base.asyncQueryExecutor = null;
+    setAsyncQueryExecutor(null);
   });
 
   it.skip("scheduled?", () => {});

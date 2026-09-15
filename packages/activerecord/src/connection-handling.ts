@@ -17,6 +17,7 @@ import {
 } from "./core.js";
 import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
 import { _railsEnv, _setDefaultEnv } from "./connection-handling-slot.js";
+import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
@@ -155,7 +156,7 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   }
 
   const { role, shard } = options;
-  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
+  const preventWrites = role === readingRole() || !!options.preventWrites;
 
   const klasses: any[] = [...normalized];
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
@@ -214,8 +215,8 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = _Base!.writingRole, shard = defaultShard.call(this) } = options;
-  const preventWrites = role === _Base!.readingRole || !!options.preventWrites;
+  const { role = writingRole(), shard = defaultShard.call(this) } = options;
+  const preventWrites = role === readingRole() || !!options.preventWrites;
   appendToConnectedToStack({
     role,
     shard,
@@ -463,7 +464,7 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  const resolvedPreventWrites = role === _Base!.readingRole || preventWrites;
+  const resolvedPreventWrites = role === readingRole() || preventWrites;
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack(
     (entry = {
@@ -581,7 +582,7 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
     role,
     shard,
   });
-  if (tz) _Base!.defaultTimezone = tz;
+  if (tz) setDefaultTimezone(tz);
 }
 
 export const ConnectionHandling = {

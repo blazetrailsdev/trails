@@ -1,4 +1,4 @@
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, symbolizeKeys } from "@blazetrails/activesupport";
 import { Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
@@ -102,7 +102,7 @@ export class MissingTemplate extends ActionViewError {
 
     const searchedPaths = arrayPrefixes.map((prefix) => [prefix, path].join("/"));
 
-    let out = `Missing ${templateType} ${searchedPaths.join(", ")} with ${rbInspect(details)}.\n\nSearched in:\n`;
+    let out = `Missing ${templateType} ${searchedPaths.join(", ")} with ${rbInspect(symbolizeKeys(details as Record<string, unknown>))}.\n\nSearched in:\n`;
     out += Array.from(paths)
       .filter((p) => p != null)
       .map((p) => `  * ${rbInspect(String(p))}\n`)

@@ -4,15 +4,19 @@ import { ActiveRecord, AsyncExecutor } from "./ar-config.js";
 import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
-import { PoolConfig } from "./connection-adapters/pool-config.js";
+import type { QueryTransformer } from "./query-transformers.js";
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
 
 let _defaultTimezone: "utc" | "local" = "utc";
 let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
+let _writingRole = "writing";
+let _readingRole = "reading";
+let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+let _queryTransformers: QueryTransformer[] = [];
 
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
   return any(ActiveRecord.schemaCacheIgnoredTables, (ignored) => {
@@ -73,6 +77,32 @@ export function setDbWarningsAction(action: DbWarningsAction): void {
   }
 }
 
+export function writingRole(): string {
+  return _writingRole;
+}
+
+export function setWritingRole(writingRole: string): void {
+  _writingRole = writingRole;
+}
+
+export function readingRole(): string {
+  return _readingRole;
+}
+
+export function setReadingRole(readingRole: string): void {
+  _readingRole = readingRole;
+}
+
+export function asyncQueryExecutor(): "global_thread_pool" | "multi_thread_pool" | null {
+  return _asyncQueryExecutor;
+}
+
+export function setAsyncQueryExecutor(
+  asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null,
+): void {
+  _asyncQueryExecutor = asyncQueryExecutor;
+}
+
 /** @missingRailsArgs new — PERMANENT */
 export function globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
   const concurrency = globalExecutorConcurrency() ?? 4;
@@ -81,7 +111,7 @@ export function globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
 }
 
 export function setGlobalExecutorConcurrency(globalExecutorConcurrency: number | null): void {
-  if (_Base!.asyncQueryExecutor == null || _Base!.asyncQueryExecutor === "multi_thread_pool") {
+  if (asyncQueryExecutor() == null || asyncQueryExecutor() === "multi_thread_pool") {
     throw new ArgumentError(
       "`global_executor_concurrency` cannot be set when the executor is nil or set to `:multi_thread_pool`. For multiple thread pools, please set the concurrency in your database configuration.",
     );
@@ -107,6 +137,14 @@ export function setPermanentConnectionCheckout(value: true | "deprecated" | "dis
   _permanentConnectionCheckout = value;
 }
 
+export function queryTransformers(): QueryTransformer[] {
+  return _queryTransformers;
+}
+
+export function setQueryTransformers(queryTransformers: QueryTransformer[]): void {
+  _queryTransformers = queryTransformers;
+}
+
 export async function eagerLoadBang(): Promise<void> {
   const Associations = await import("./associations.js");
   const Encryption = await import("./encryption.js");
@@ -115,6 +153,7 @@ export async function eagerLoadBang(): Promise<void> {
 }
 
 export async function disconnectAllBang(): Promise<void> {
+  const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   await PoolConfig.disconnectAllBang();
 }
 

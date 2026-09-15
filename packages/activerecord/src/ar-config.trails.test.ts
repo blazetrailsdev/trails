@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
+import { asyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
 
 describe("ar-config module-level flags", () => {
   it("mirror the ActiveRecord module defaults from active_record.rb", () => {
@@ -9,7 +10,7 @@ describe("ar-config module-level flags", () => {
       mysql: ["mysql", "mysql5"],
       sqlite: "sqlite3",
     });
-    expect(Base.asyncQueryExecutor).toBeNull();
+    expect(asyncQueryExecutor()).toBeNull();
     expect(Base.queues).toEqual({});
     expect(Base.maintainTestSchema).toBeNull();
     expect(Base.applicationRecordClass).toBeNull();
@@ -25,7 +26,7 @@ describe("ar-config module-level flags", () => {
 
   describe("the ActiveRecord module object assigns through to the live value", () => {
     afterEach(() => {
-      Base.asyncQueryExecutor = null;
+      setAsyncQueryExecutor(null);
       Base.queues = {};
       Base.maintainTestSchema = null;
       Base.errorOnIgnoredOrder = false;
@@ -36,8 +37,8 @@ describe("ar-config module-level flags", () => {
     });
 
     it("round-trip a written value", () => {
-      Base.asyncQueryExecutor = "multi_thread_pool";
-      expect(Base.asyncQueryExecutor).toBe("multi_thread_pool");
+      setAsyncQueryExecutor("multi_thread_pool");
+      expect(asyncQueryExecutor()).toBe("multi_thread_pool");
 
       Base.queues = { destroyAssociationAsync: "low" };
       expect(Base.queues).toEqual({ destroyAssociationAsync: "low" });
