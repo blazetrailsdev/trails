@@ -36,6 +36,7 @@
         "../../activesupport/src/configuration-file.ts"
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
+      "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
