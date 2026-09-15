@@ -617,11 +617,21 @@ describe("SCOPED_SKIP_GROUPS", () => {
   });
 
   it("names the faithful TS spelling only where the scoped skip declares one", () => {
-    expect(scopedSkipMirrorName("initialize", "messages/rotator.rb")).toBe("initialize");
+    expect(scopedSkipMirrorName("initialize", "messages/rotator.rb")).toEqual(["initialize"]);
     expect(scopedSkipMirrorName("initialize", "messages/message_verifier.rb")).toBeNull();
     expect(
       scopedSkipMirrorName("lookup_cast_type", "connection_adapters/postgresql/quoting.rb"),
     ).toBeNull();
+  });
+
+  it("names every spelling of a port spread over several TS declarations", () => {
+    expect(
+      scopedSkipMirrorName("attr_internal_naming_format", "core_ext/module/attr_internal.rb"),
+    ).toEqual(["getAttrInternalNamingFormat", "setAttrInternalNamingFormat"]);
+    expect(
+      scopedSkipMirrorName("attr_internal_define", "core_ext/module/attr_internal.rb"),
+    ).toBeNull();
+    expect(isScopedSkip("attr_internal_define", "core_ext/module/attr_internal.rb")).toBe(true);
   });
 
   it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {

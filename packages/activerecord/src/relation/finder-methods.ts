@@ -12,7 +12,7 @@ import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { _Base } from "../base-slot.js";
 
-const ONE_AS_ONE = "1 AS one";
+export const ONE_AS_ONE = "1 AS one";
 
 interface FinderRelation {
   model: FinderRelation["_model"];

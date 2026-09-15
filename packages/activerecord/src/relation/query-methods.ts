@@ -1503,7 +1503,7 @@ export function buildBoundSqlLiteral(
  */
 export function buildSubquery(
   this: QueryMethodsHost,
-  subqueryAlias: string,
+  subqueryAlias: string | Nodes.SqlLiteral,
   selectValue: unknown,
 ): SelectManager {
   const relation =

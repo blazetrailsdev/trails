@@ -594,8 +594,13 @@ export interface ScopedSkipGroup {
    *
    * Leave unset for a genuinely-absent surface — then a TS declaration of the
    * name stays flagged.
+   *
+   * An array names a port spread over several TS declarations — a Ruby
+   * `attr_reader` + `name=` pair ported as a `getX`/`setX` accessor pair. The
+   * method comparison credits the Ruby name when ANY of them is declared, and
+   * extra-surface allows every one of them.
    */
-  tsMirrorName?: string;
+  tsMirrorName?: string | string[];
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
@@ -711,10 +716,20 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`@_%s` template it interpolates. trails' `attrInternal*` helpers assign the " +
       "underlying property directly rather than generating methods from a name " +
       "template, so there is no format string to expose and no define_method " +
-      "back end to name; the naming format is reachable as " +
-      "`getAttrInternalNamingFormat`/`setAttrInternalNamingFormat`.",
-    names: ["attr_internal_define", "attr_internal_naming_format"],
+      "back end to name.",
+    names: ["attr_internal_define"],
     rubyFiles: ["core_ext/module/attr_internal.rb"],
+  },
+  {
+    reason:
+      "`attr_internal_naming_format` is a `class << self` `attr_reader` beside a " +
+      "hand-written `attr_internal_naming_format=` (core_ext/module/attr_internal.rb:22-35). " +
+      "A module-level binding has no accessor syntax in TS, so the pair is " +
+      "ported as `getAttrInternalNamingFormat`/`setAttrInternalNamingFormat` " +
+      "(module-ext.ts).",
+    names: ["attr_internal_naming_format"],
+    rubyFiles: ["core_ext/module/attr_internal.rb"],
+    tsMirrorName: ["getAttrInternalNamingFormat", "setAttrInternalNamingFormat"],
   },
   {
     reason:
@@ -1174,13 +1189,16 @@ export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
 }
 
 /**
- * {@link ScopedSkipGroup.tsMirrorName} for `rubyName` in `rubyFile`, or null
- * when the scoped skip declares no faithful TS spelling (or doesn't apply).
+ * {@link ScopedSkipGroup.tsMirrorName} for `rubyName` in `rubyFile`, always as
+ * a list, or null when the scoped skip declares no faithful TS spelling (or
+ * doesn't apply).
  */
-export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string | null {
+export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string[] | null {
   for (const g of SCOPED_SKIP_GROUPS) {
     if (g.tsMirrorName === undefined) continue;
-    if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) return g.tsMirrorName;
+    if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) {
+      return typeof g.tsMirrorName === "string" ? [g.tsMirrorName] : g.tsMirrorName;
+    }
   }
   return null;
 }
@@ -1679,7 +1697,13 @@ export function explainConventions(): string {
   const scopedSkipSections = SCOPED_SKIP_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     const files = g.rubyFiles.map((f) => `\`${f}\``).join(", ");
-    const mirror = g.tsMirrorName === undefined ? "" : `; ported in TS as \`${g.tsMirrorName}\``;
+    const mirror =
+      g.tsMirrorName === undefined
+        ? ""
+        : `; ported in TS as ${[g.tsMirrorName]
+            .flat()
+            .map((n) => `\`${n}\``)
+            .join(" / ")}`;
     return `- ${g.reason}\n  - ${names} (only in: ${files}${mirror})`;
   }).join("\n");
 

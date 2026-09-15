@@ -1514,7 +1514,7 @@ function collectAllowedNames(
       // visibility divergence — the method exists in Rails. Excluding them
       // here would mislabel every public-port-of-a-private-method as drift.
       const mirror = scopedSkipMirrorName(m.name, rubyFile);
-      if (mirror !== null) allow(mirror);
+      for (const c of mirror ?? []) allow(c);
       const candidates = rubyMethodCandidates(m.name);
       if (!candidates) continue;
       for (const c of candidates) allow(c);
