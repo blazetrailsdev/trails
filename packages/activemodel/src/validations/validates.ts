@@ -1,4 +1,9 @@
-import { camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupport";
+import {
+  camelize,
+  extractOptionsBang,
+  safeConstantize,
+  sliceBang,
+} from "@blazetrails/activesupport";
 
 import { ArgumentError } from "../attribute-assignment.js";
 
@@ -58,7 +63,10 @@ export function validates(
   for (const [rawKey, options] of Object.entries(validations)) {
     const key = `${camelize(rawKey)}Validator`;
 
-    const validator = (this as unknown as Record<string, unknown>)[key] ?? BUNDLED_VALIDATORS[key];
+    const validator =
+      (this as unknown as Record<string, unknown>)[key] ??
+      BUNDLED_VALIDATORS[key] ??
+      safeConstantize(key);
     if (typeof validator !== "function") {
       throw new ArgumentError(`Unknown validator: '${key}'`);
     }

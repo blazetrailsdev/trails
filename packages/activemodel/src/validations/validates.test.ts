@@ -1,400 +1,168 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
-import { Model } from "../index.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot, assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
+import { Person } from "../test-helpers/models/person.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { PersonWithValidator } from "../test-helpers/models/person-with-validator.js";
+import "../test-helpers/validators/namespace/email-validator.js";
+import { ArgumentError } from "../attribute-assignment.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 describe("ValidatesTest", () => {
+  const resetCallbacks = () => {
+    Person.clearValidatorsBang();
+    Topic.clearValidatorsBang();
+    PersonWithValidator.clearValidatorsBang();
+  };
+  beforeEach(resetCallbacks);
+  afterEach(resetCallbacks);
+
   it("validates with messages empty", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    await p.isValid();
-    expect(p.errors.count).toBe(0);
-  });
-
-  it("validates with attribute specified as string", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates with unless shared conditions", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", {
-          presence: true,
-          unless: () => true,
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates with regexp", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("email", "string");
-        this.validates("email", { format: { with: /@/ } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ email: "invalid" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates with array", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { inclusion: { in: ["admin", "user"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ role: "admin" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates with range", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { greaterThan: 0, lessThan: 150 } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ age: 25 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates with included validator", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(Person.validators().length).toBeGreaterThan(0);
-  });
-
-  it("validates with included validator and options", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { length: { minimum: 2 } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "A" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates with included validator and wildcard shortcut", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(Person.validators().length).toBeGreaterThan(0);
-  });
-
-  it("defining extra default keys for validates", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(await p.isValid()).toBe(true);
+    Person.validates("title", { presence: { message: "" } });
+    const person = new Person();
+    assertNot(await person.isValid(), "person should not be valid.");
   });
 
   it("validates with built in validation", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Person.validates("title", { numericality: true });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("title")).toEqual(["is not a number"]);
+  });
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
+  it("validates with attribute specified as string", async () => {
+    Person.validates("title", { numericality: true });
+    let person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("title")).toEqual(["is not a number"]);
 
-    expect(await new Person({}).isValid()).toBe(false);
-    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
+    person = new Person();
+    (person as { title: unknown }).title = 123;
+    assertPredicate(await person.isValid(), (valid) => valid);
   });
 
   it("validates with built in validation and options", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, length: { minimum: 3 } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({}).isValid()).toBe(false);
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-  });
-
-  it("validates with if as local conditions", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.validates("name", {
-          presence: true,
-          if: (r: any) => r._readAttribute("active") === true,
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ active: false }).isValid()).toBe(true);
-    expect(await new Person({ active: true }).isValid()).toBe(false);
-  });
-
-  it("validates with unless as local conditions", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("skip", "boolean");
-        this.validates("name", {
-          presence: true,
-          unless: (r: any) => r._readAttribute("skip") === true,
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ skip: true }).isValid()).toBe(true);
-    expect(await new Person({ skip: false }).isValid()).toBe(false);
+    Person.validates("salary", { numericality: { message: "my custom message" } });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("salary")).toEqual(["my custom message"]);
   });
 
   it("validates with validator class", async () => {
-    class MyValidator {
-      validate(record: any) {
-        if (!record._readAttribute("name")) {
-          record.errors.add("name", ":blank", { message: "must be present" });
-        }
-      }
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(MyValidator);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person();
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("name")).toEqual(["must be present"]);
+    Person.validates("karma", { email: true });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("karma")).toEqual(["is not an email"]);
   });
 
   it("validates with namespaced validator class", async () => {
-    const Validators = {
-      NameValidator: class {
-        validate(record: any) {
-          if (!record._readAttribute("name")) {
-            record.errors.add("name", ":blank", { message: "is required" });
-          }
-        }
-      },
-    };
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(Validators.NameValidator);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person();
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("name")).toEqual(["is required"]);
+    Person.validates("karma", { "namespace/email": true });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("karma")).toEqual(["is not an email"]);
   });
 
-  it("validates with unknown validator", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(() => Person.validates("name", { unknown: true } as any)).toThrow(
-      "Unknown validator: 'UnknownValidator'",
-    );
-  });
-
-  it("validates with disabled unknown validator", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(() => Person.validates("name", { unknown: false } as any)).toThrow(
-      "Unknown validator: 'UnknownValidator'",
-    );
+  it("validates with if as local conditions", async () => {
+    Person.validates("karma", { presence: true, email: { if: ":conditionIsFalse" } });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("karma")).toEqual(["can't be blank"]);
   });
 
   it("validates with if as shared conditions", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Person.validates("karma", { presence: true, email: true, if: ":conditionIsFalse" });
+    const person = new Person();
+    assertPredicate(await person.isValid(), (valid) => valid);
+  });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.validates("name", {
-          presence: true,
-          length: { minimum: 3 },
-          if: (r: any) => r._readAttribute("active") === true,
-        });
-      }
-    }
-    interface Person extends Attributes {}
+  it("validates with unless as local conditions", async () => {
+    Person.validates("karma", { presence: true, email: { unless: ":conditionIsTrue" } });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("karma")).toEqual(["can't be blank"]);
+  });
 
-    expect(await new Person({ active: false }).isValid()).toBe(true);
-    expect(await new Person({ active: true }).isValid()).toBe(false);
-    expect(await new Person({ active: true, name: "abc" }).isValid()).toBe(true);
+  it("validates with unless shared conditions", async () => {
+    Person.validates("karma", { presence: true, email: true, unless: ":conditionIsTrue" });
+    const person = new Person();
+    assertPredicate(await person.isValid(), (valid) => valid);
   });
 
   it("validates with allow nil shared conditions", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Person.validates("karma", { length: { minimum: 20 }, email: true, allowNil: true });
+    const person = new Person();
+    assertPredicate(await person.isValid(), (valid) => valid);
+  });
 
-      static {
-        include(this, Attributes);
-        this.attribute("value", "string");
-        this.validates("value", {
-          numericality: true,
-          allowNil: true,
-        });
-      }
-    }
-    interface Person extends Attributes {}
+  it("validates with regexp", async () => {
+    Person.validates("karma", { format: /positive|negative/ });
+    const person = new Person();
+    assertPredicate(await person.isInvalid(), (invalid) => invalid);
+    expect(person.errors.messagesFor("karma")).toEqual(["is invalid"]);
+    person.karma = "positive";
+    assertPredicate(await person.isValid(), (valid) => valid);
+  });
 
-    expect(await new Person({}).isValid()).toBe(true);
-    expect(await new Person({ value: "42" }).isValid()).toBe(true);
-    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
+  it("validates with array", async () => {
+    Person.validates("gender", { inclusion: ["m", "f"] });
+    const person = new Person();
+    assertPredicate(await person.isInvalid(), (invalid) => invalid);
+    expect(person.errors.messagesFor("gender")).toEqual(["is not included in the list"]);
+    person.gender = "m";
+    assertPredicate(await person.isValid(), (valid) => valid);
+  });
+
+  it("validates with range", async () => {
+    Person.validates("karma", { length: new Range(6, 20) });
+    const person = new Person();
+    assertPredicate(await person.isInvalid(), (invalid) => invalid);
+    expect(person.errors.messagesFor("karma")).toEqual(["is too short (minimum is 6 characters)"]);
+    person.karma = "something";
+    assertPredicate(await person.isValid(), (valid) => valid);
   });
 
   it("validates with validator class and options", async () => {
-    class CustomValidator {
-      private min: number;
-      constructor(options: any = {}) {
-        this.min = options.minimum ?? 0;
-      }
-      validate(record: any) {
-        const val = record._readAttribute("name");
-        if (typeof val === "string" && val.length < this.min) {
-          record.errors.add("name", ":too_short", { message: "is too short" });
-        }
-      }
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Person.validates("karma", { email: { message: "my custom message" } });
+    const person = new Person();
+    await person.isValid();
+    expect(person.errors.messagesFor("karma")).toEqual(["my custom message"]);
+  });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator, { minimum: 5 });
-      }
-    }
-    interface Person extends Attributes {}
+  it("validates with unknown validator", () => {
+    expect(() => Person.validates("karma", { unknown: true })).toThrow(ArgumentError);
+  });
 
-    expect(await new Person({ name: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+  it("validates with disabled unknown validator", () => {
+    expect(() => Person.validates("karma", { unknown: false })).toThrow(ArgumentError);
+  });
+
+  it("validates with included validator", async () => {
+    PersonWithValidator.validates("title", { presence: true });
+    const person = new PersonWithValidator();
+    await person.isValid();
+    expect(person.errors.messagesFor("title")).toEqual(["Local validator"]);
+  });
+
+  it("validates with included validator and options", async () => {
+    PersonWithValidator.validates("title", { presence: { custom: " please" } });
+    const person = new PersonWithValidator();
+    await person.isValid();
+    expect(person.errors.messagesFor("title")).toEqual(["Local validator please"]);
+  });
+
+  it("validates with included validator and wildcard shortcut", async () => {
+    PersonWithValidator.validates("title", { like: "Mr." });
+    const person = new PersonWithValidator();
+    person.title = "Ms. Pacman";
+    await person.isValid();
+    expect(person.errors.messagesFor("title")).toEqual(["does not appear to be like Mr."]);
+  });
+
+  it("defining extra default keys for validates", async () => {
+    Topic.validates("title", { confirmation: true, message: "Y U NO CONFIRM" });
+    const topic = new Topic();
+    topic.title = "What's happening";
+    (topic as unknown as { titleConfirmation: string }).titleConfirmation = "Not this";
+    assertNotPredicate(await topic.isValid(), (valid) => valid);
+    expect(topic.errors.messagesFor("titleConfirmation")).toEqual(["Y U NO CONFIRM"]);
   });
 });

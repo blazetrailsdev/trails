@@ -13,6 +13,8 @@ import { DisallowedType, XMLConverter } from "./hash/conversions.js";
 import {
   fromXml,
   deepMerge,
+  deepMergeBang,
+  exceptBang,
   deepTransformKeys,
   deepTransformValues,
   symbolizeKeys,
@@ -214,10 +216,13 @@ describe("HashExtTest", () => {
   });
 
   it("deep merge", () => {
-    const a = { x: 1, nested: { y: 2 } };
-    const b = { nested: { z: 3 }, w: 4 };
-    const result = deepMerge(a, b);
-    expect(result).toEqual({ x: 1, nested: { y: 2, z: 3 }, w: 4 });
+    const hash1 = { a: "a", b: "b", c: { c1: "c1", c2: "c2", c3: { d1: "d1" } } };
+    const hash2 = { a: 1, c: { c1: 2, c3: { d2: "d2" } } };
+    const expected = { a: 1, b: "b", c: { c1: 2, c2: "c2", c3: { d1: "d1", d2: "d2" } } };
+    expect(deepMerge(hash1, hash2)).toEqual(expected);
+
+    deepMergeBang(hash1, hash2);
+    expect(hash1).toEqual(expected);
   });
 
   it("deep merge with block", () => {
@@ -305,19 +310,31 @@ describe("HashExtTest", () => {
   });
 
   it("extract nils", () => {
-    const h = { a: null, b: 2 } as Record<string, unknown>;
-    const extracted = extractBang(h, "a");
-    expect(extracted).toEqual({ a: null });
+    const original: Record<string, unknown> = { a: null, b: null };
+    const expected = { a: null };
+    const remaining = { b: null };
+    const extracted: Record<string, unknown> = extractBang(original, "a", "x");
+
+    expect(extracted).toEqual(expected);
+    expect(extracted["a"]).toBeNull();
+    expect(extracted["x"]).toBeUndefined();
+    expect(original).toEqual(remaining);
   });
 
   it("except", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    expect(except(h, "b")).toEqual({ a: 1, c: 3 });
+    const original = { a: "x", b: "y", c: 10 };
+    const expected = { a: "x", b: "y" };
+
+    expect(exceptBang(original, "c")).toEqual(expected);
+    expect(original).toEqual(expected);
   });
 
   it("except with more than one argument", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    expect(except(h, "a", "b")).toEqual({ c: 3 });
+    const original = { a: "x", b: "y", c: 10 };
+    const expected = { a: "x" };
+
+    expect(exceptBang(original, "b", "c")).toEqual(expected);
+    expect(original).toEqual(expected);
   });
 
   it("except with original frozen", () => {
