@@ -857,7 +857,13 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       'the zero-import slot module instead (CLAUDE.md, "Call-time constant ' +
       'resolution"); the two require_dependency suites in trails ' +
       "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
-      "reason. Scoped to these three files so `clear`, `autoload`, `autoloader`, " +
+      "reason. That includes every `eager_load!` a module inherits from " +
+      "`extend ActiveSupport::Autoload` with no `def` of its own — the `super` " +
+      "and the Locking / Scoping / AttributeMethods / ConnectionAdapters calls " +
+      "in `ActiveRecord.eager_load!` (active_record.rb:499-507) — so " +
+      "`eagerLoadBang` makes only the calls that reach a Rails `def`: " +
+      "Associations (associations.rb:44) then Encryption (encryption.rb:50). " +
+      "Scoped to these three files so `clear`, `autoload`, `autoloader`, " +
       "`initialize`, `running` and the `*_paths` readers stay expected everywhere " +
       "else.",
     names: [

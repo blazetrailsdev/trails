@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   HostAuthorization,
-  IPAddr,
   ALLOWED_HOSTS_IN_DEVELOPMENT,
   type HostPermission,
 } from "../middleware/host-authorization.js";
+import { IPAddr } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import type { Request } from "../http/request.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
