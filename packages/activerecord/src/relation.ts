@@ -1067,14 +1067,16 @@ export class Relation<T extends Base> {
    * @missingRailsCall with_connection — CONVERGEABLE converge-sync-eager-builders-async-to-sql
    */
   toSql(): string {
-    const conn = this._conn();
-    return conn.unpreparedStatement(() => {
-      if (this.isEagerLoading) {
-        const manager = this._buildEagerOperandManager();
-        if (manager !== null) return conn.toSql(manager.ast);
-      }
-      return conn.toSql(this.arel().ast);
-    }) as string;
+    return this._model.connectionPool().withConnectionSync(
+      (conn: DatabaseAdapter) =>
+        conn.unpreparedStatement(() => {
+          if (this.isEagerLoading) {
+            const manager = this._buildEagerOperandManager();
+            if (manager !== null) return conn.toSql(manager.ast);
+          }
+          return conn.toSql(this.arel().ast);
+        }) as string,
+    );
   }
 
   private instantiateRecords(rows: Result): T[] {
@@ -1224,11 +1226,6 @@ export class Relation<T extends Base> {
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
     return eagerRelation.arel();
-  }
-
-  /** @internal */
-  private _conn(): DatabaseAdapter {
-    return this._model.connectionPool().withConnectionSync((c) => c);
   }
 
   async preloadAssociations(records: T[]): Promise<void> {
