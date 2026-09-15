@@ -269,7 +269,6 @@ async function loadFixturesOnce<T>(
     }
     return loaded;
   }
-  FixtureSet.resetCache();
   alreadyLoadedFixtures = new Map();
   return loadFixtures();
 }
