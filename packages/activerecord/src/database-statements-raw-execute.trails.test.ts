@@ -7,10 +7,12 @@ describe("DatabaseStatementsRawExecuteTest (trails)", () => {
 
   it("rawExecute runs a read through the adapter's performQuery", async () => {
     const connection = await Base.leaseConnection();
-    const result = (await (
-      connection as never as { rawExecute(sql: string, name?: string): Promise<unknown> }
-    ).rawExecute("SELECT credit_limit FROM accounts WHERE 1 = 0", "SQL")) as { rows: unknown[] };
-    expect(result.rows).toEqual([]);
+    const adapter = connection as never as {
+      rawExecute(sql: string, name?: string): Promise<unknown>;
+      castResult(rawResult: unknown): Promise<{ rows: unknown[] }> | { rows: unknown[] };
+    };
+    const result = await adapter.rawExecute("SELECT credit_limit FROM accounts WHERE 1 = 0", "SQL");
+    expect((await adapter.castResult(result)).rows).toEqual([]);
   });
 
   it("rawExecute runs a write through the adapter's performQuery", async () => {

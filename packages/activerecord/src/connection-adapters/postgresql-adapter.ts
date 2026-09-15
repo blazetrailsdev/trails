@@ -174,6 +174,7 @@ import {
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
+import { PGResult } from "./postgresql/pg-result.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
@@ -687,8 +688,8 @@ export class PostgreSQLAdapter
         const result = (await this.internalExecute(sql, "SCHEMA", [], {
           allowRetry: true,
           materializeTransactions: false,
-        })) as { rows: unknown[][] };
-        return (caseInsensitiveCache[column.sqlType as string] = result.rows[0][0] as boolean);
+        })) as PGResult;
+        return (caseInsensitiveCache[column.sqlType as string] = result.getvalue(0, 0) as boolean);
       }),
     );
   }
@@ -697,14 +698,10 @@ export class PostgreSQLAdapter
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
     for await (const query of this.loadTypesQueries(initializer, oids)) {
-      const result = (await this.internalExecute(query, "SCHEMA", [], {
+      const records = (await this.internalExecute(query, "SCHEMA", [], {
         allowRetry: true,
         materializeTransactions: false,
-      })) as { fields?: Array<{ name: string }>; rows?: unknown[][] };
-      const records = new Result(
-        (result.fields ?? []).map((f) => f.name),
-        result.rows ?? [],
-      ).toArray() as unknown as PgTypeRow[];
+      })) as PgTypeRow[];
       this._captureRegtypeOids(records);
       initializer.run(records);
     }
@@ -847,7 +844,7 @@ export class PostgreSQLAdapter
   declare handleWarnings: (sql: unknown) => void;
 
   /** @internal */
-  affectedRows(result: pg.QueryResult): number {
+  affectedRows(result: PGResult): number {
     return pgAffectedRows(result);
   }
 
@@ -863,14 +860,12 @@ export class PostgreSQLAdapter
     if (isInsert && this.isUseInsertReturning() && !upper.includes("RETURNING")) {
       [sql, binds] = await this.sqlForInsert(sql, null, binds, null);
     }
-    const result = (await this.rawExecute(
-      this.rewriteBinds(sql, binds),
-      name,
-      binds,
-    )) as pg.QueryResult;
+    const result = (await this.rawExecute(this.rewriteBinds(sql, binds), name, binds)) as PGResult;
+    const ntuples = result.ntuples();
+    const value = result.getvalue(0, 0);
     const affected = this.affectedRows(result);
-    if (isInsert && result.rows.length === 1) {
-      return (result.rows[0] as unknown[])[0] as number;
+    if (isInsert && ntuples === 1) {
+      return value as number;
     }
     return affected;
   }
