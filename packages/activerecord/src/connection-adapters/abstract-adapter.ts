@@ -1946,7 +1946,6 @@ export class AbstractAdapter implements Quoting {
 
     const run = async (): Promise<T> => {
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
-      await this.awaitRawConnectionReady();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -2001,9 +2000,6 @@ export class AbstractAdapter implements Quoting {
   protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
     return this._connection;
   }
-
-  /** @internal */
-  protected async awaitRawConnectionReady(): Promise<void> {}
 
   /** @internal */
   verifiedBang(): void {
