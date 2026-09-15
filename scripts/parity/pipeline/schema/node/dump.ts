@@ -172,7 +172,7 @@ async function main(): Promise<void> {
       /* adapter unavailable or already closed */
     }
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       /* already removed or never opened */
     }
