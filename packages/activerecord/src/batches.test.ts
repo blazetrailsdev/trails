@@ -17,6 +17,7 @@ import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { registerModel } from "./associations.js";
+import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js";
 
 registerModel([Tagging, Tag]);
 
@@ -261,8 +262,8 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not error if config overridden", async () => {
-    const prev = Base.errorOnIgnoredOrder;
-    Base.errorOnIgnoredOrder = true;
+    const prev = errorOnIgnoredOrder();
+    setErrorOnIgnoredOrder(true);
     let threw = false;
     try {
       for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: false })) {
@@ -270,21 +271,21 @@ describe("EachTest", () => {
     } catch {
       threw = true;
     } finally {
-      Base.errorOnIgnoredOrder = prev;
+      setErrorOnIgnoredOrder(prev);
     }
     expect(threw).toBe(false);
   });
 
   it("find in batches should error on config specified to error", async () => {
-    const prev = Base.errorOnIgnoredOrder;
-    Base.errorOnIgnoredOrder = true;
+    const prev = errorOnIgnoredOrder();
+    setErrorOnIgnoredOrder(true);
     try {
       await expect(async () => {
         for await (const _b of PostWithDefaultScope.findInBatches({})) {
         }
       }).rejects.toThrow();
     } finally {
-      Base.errorOnIgnoredOrder = prev;
+      setErrorOnIgnoredOrder(prev);
     }
   });
 

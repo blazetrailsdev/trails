@@ -2,8 +2,11 @@ import { Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
-import { asyncQueryExecutor, globalThreadPoolAsyncQueryExecutor } from "../../active-record.js";
-import { _Base } from "../../base-slot.js";
+import {
+  asyncQueryExecutor,
+  globalThreadPoolAsyncQueryExecutor,
+  lazilyLoadSchemaCache,
+} from "../../active-record.js";
 import {
   Executor,
   include,
@@ -789,7 +792,7 @@ export class ConnectionPool implements ReapablePool {
       throw ex;
     }
     if (
-      (_Base?.lazilyLoadSchemaCache ?? false) &&
+      lazilyLoadSchemaCache() &&
       !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
       !this.poolConfig.schemaReflection.loadedCache

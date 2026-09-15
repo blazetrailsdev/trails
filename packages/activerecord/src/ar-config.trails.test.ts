@@ -1,23 +1,35 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
-import { asyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
+import {
+  asyncQueryExecutor,
+  databaseCli,
+  errorOnIgnoredOrder,
+  maintainTestSchema,
+  migrationStrategy,
+  setAsyncQueryExecutor,
+  setErrorOnIgnoredOrder,
+  setMaintainTestSchema,
+  setTimestampedMigrations,
+  timestampedMigrations,
+  verifyForeignKeysForFixtures,
+} from "./active-record.js";
 
 describe("ar-config module-level flags", () => {
   it("mirror the ActiveRecord module defaults from active_record.rb", () => {
-    expect(Base.databaseCli).toEqual({
+    expect(databaseCli()).toEqual({
       postgresql: "psql",
       mysql: ["mysql", "mysql5"],
       sqlite: "sqlite3",
     });
     expect(asyncQueryExecutor()).toBeNull();
     expect(Base.queues).toEqual({});
-    expect(Base.maintainTestSchema).toBeNull();
+    expect(maintainTestSchema()).toBeNull();
     expect(Base.applicationRecordClass).toBeNull();
-    expect(Base.errorOnIgnoredOrder).toBe(false);
-    expect(Base.timestampedMigrations).toBe(true);
-    expect(Base.migrationStrategy).toBe(DefaultStrategy);
-    expect(Base.verifyForeignKeysForFixtures).toBe(false);
+    expect(errorOnIgnoredOrder()).toBe(false);
+    expect(timestampedMigrations()).toBe(true);
+    expect(migrationStrategy()).toBe(DefaultStrategy);
+    expect(verifyForeignKeysForFixtures()).toBe(false);
     expect(Base.useYamlUnsafeLoad).toBe(false);
     expect(Base.raiseIntWiderThan64bit).toBe(true);
     expect(Base.yamlColumnPermittedClasses).toEqual([Symbol]);
@@ -28,9 +40,9 @@ describe("ar-config module-level flags", () => {
     afterEach(() => {
       setAsyncQueryExecutor(null);
       Base.queues = {};
-      Base.maintainTestSchema = null;
-      Base.errorOnIgnoredOrder = false;
-      Base.timestampedMigrations = true;
+      setMaintainTestSchema(null);
+      setErrorOnIgnoredOrder(false);
+      setTimestampedMigrations(true);
       Base.generateSecureTokenOn = "create";
       Base.raiseIntWiderThan64bit = true;
       Base.belongsToRequiredValidatesForeignKey = false;
@@ -43,14 +55,14 @@ describe("ar-config module-level flags", () => {
       Base.queues = { destroyAssociationAsync: "low" };
       expect(Base.queues).toEqual({ destroyAssociationAsync: "low" });
 
-      Base.maintainTestSchema = true;
-      expect(Base.maintainTestSchema).toBe(true);
+      setMaintainTestSchema(true);
+      expect(maintainTestSchema()).toBe(true);
 
-      Base.errorOnIgnoredOrder = true;
-      expect(Base.errorOnIgnoredOrder).toBe(true);
+      setErrorOnIgnoredOrder(true);
+      expect(errorOnIgnoredOrder()).toBe(true);
 
-      Base.timestampedMigrations = false;
-      expect(Base.timestampedMigrations).toBe(false);
+      setTimestampedMigrations(false);
+      expect(timestampedMigrations()).toBe(false);
 
       Base.generateSecureTokenOn = "initialize";
       expect(Base.generateSecureTokenOn).toBe("initialize");

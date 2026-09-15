@@ -10,6 +10,7 @@ import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapte
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
+import { dumpSchemas } from "../active-record.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
 
@@ -69,15 +70,14 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const dumpSchemas = Base.dumpSchemas;
     let searchPath: string | undefined;
-    if (dumpSchemas === "schema_search_path") {
+    if (dumpSchemas() === "schema_search_path") {
       const raw = this.configurationHash.schemaSearchPath;
       searchPath = typeof raw === "string" ? raw : undefined;
-    } else if (dumpSchemas === "all") {
+    } else if (dumpSchemas() === "all") {
       searchPath = undefined;
-    } else if (typeof dumpSchemas === "string") {
-      searchPath = dumpSchemas;
+    } else if (typeof dumpSchemas() === "string") {
+      searchPath = dumpSchemas();
     }
 
     const args = ["--schema-only", "--no-privileges", "--no-owner"];

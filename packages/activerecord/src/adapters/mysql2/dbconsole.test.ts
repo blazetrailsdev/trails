@@ -1,9 +1,9 @@
 import { it, expect, vi } from "vitest";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
-import { Base } from "../../base.js";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "../../database-configurations/database-config.js";
+import { databaseCli } from "../../active-record.js";
 
 describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
   const makeDbConfig = (config: Record<string, unknown>) =>
@@ -80,13 +80,13 @@ describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
   });
 
   it("mysql can use alternative cli", () => {
-    Base.databaseCli["mysql"] = "mycli";
+    databaseCli()["mysql"] = "mycli";
     try {
       const config = makeDbConfig({ adapter: "mysql2", database: "db", database_cli: "mycli" });
 
       assertFindCmdAndExecCalledWith(["mycli", "db"], () => Mysql2Adapter.dbconsole(config));
     } finally {
-      Base.databaseCli["mysql"] = ["mysql", "mysql5"];
+      databaseCli()["mysql"] = ["mysql", "mysql5"];
     }
   });
 });

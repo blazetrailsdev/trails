@@ -249,7 +249,14 @@ export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-export { disconnectAllBang, isSchemaCacheIgnoredTable } from "./active-record.js";
+export {
+  disconnectAllBang,
+  dumpSchemaAfterMigration,
+  isSchemaCacheIgnoredTable,
+  schemaFormat,
+  setMaintainTestSchema,
+  setSchemaFormat,
+} from "./active-record.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {

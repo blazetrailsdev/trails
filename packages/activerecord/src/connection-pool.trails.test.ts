@@ -12,7 +12,6 @@ import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
-import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
@@ -22,6 +21,7 @@ import { AsyncExecutor } from "./ar-config.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { lazilyLoadSchemaCache, setLazilyLoadSchemaCache } from "./active-record.js";
 
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
@@ -494,8 +494,8 @@ describe("ConnectionPool schema cache", () => {
   }
 
   it("lazily loads the schema cache on first connection when enabled", async () => {
-    const prevLazy = Base.lazilyLoadSchemaCache;
-    Base.lazilyLoadSchemaCache = true;
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
 
     await withCacheDir(async (dir) => {
       const cacheFile = join(dir, "schema_cache.json");
@@ -511,15 +511,15 @@ describe("ConnectionPool schema cache", () => {
           true,
         );
       } finally {
-        Base.lazilyLoadSchemaCache = prevLazy;
+        setLazilyLoadSchemaCache(prevLazy);
         await closePoolConnections(pool);
       }
     });
   });
 
   it("rejects a stale schema cache when checkSchemaCacheDumpVersion is enabled", async () => {
-    const prevLazy = Base.lazilyLoadSchemaCache;
-    Base.lazilyLoadSchemaCache = true;
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await withCacheDir(async (dir) => {
@@ -533,7 +533,7 @@ describe("ConnectionPool schema cache", () => {
         await pool._lazyLoadPromise;
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
       } finally {
-        Base.lazilyLoadSchemaCache = prevLazy;
+        setLazilyLoadSchemaCache(prevLazy);
         vi.restoreAllMocks();
         await closePoolConnections(pool);
       }
@@ -541,7 +541,7 @@ describe("ConnectionPool schema cache", () => {
   });
 
   it("does not lazy-load when the flag is off (default)", async () => {
-    expect(Base.lazilyLoadSchemaCache).toBe(false);
+    expect(lazilyLoadSchemaCache()).toBe(false);
 
     await withCacheDir(async (dir) => {
       const cacheFile = join(dir, "schema_cache.json");
@@ -585,9 +585,9 @@ describe("ConnectionPool schema cache", () => {
   it.skipIf(inMemoryDb())(
     "lets eager warming win when both lazy and eager flags are on",
     async () => {
-      const prevLazy = Base.lazilyLoadSchemaCache;
+      const prevLazy = lazilyLoadSchemaCache();
       const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      Base.lazilyLoadSchemaCache = true;
+      setLazilyLoadSchemaCache(true);
       SchemaReflection.eagerLoadSchemaCache = true;
 
       const pool = makeAmbientPool({ schemaCachePath: "" });
@@ -599,7 +599,7 @@ describe("ConnectionPool schema cache", () => {
         await pool._eagerWarmPromise;
         expect(await pool.schemaCache.isCached("posts")).toBe(true);
       } finally {
-        Base.lazilyLoadSchemaCache = prevLazy;
+        setLazilyLoadSchemaCache(prevLazy);
         SchemaReflection.eagerLoadSchemaCache = prevEager;
         await closePoolConnections(pool);
       }

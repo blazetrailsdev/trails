@@ -37,6 +37,7 @@ import {
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { disablePreparedStatements, setDisablePreparedStatements } from "./active-record.js";
 
 async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<void> {
   const qm = new Nodes.BindParam(null).toSql({ withConnection: (block) => block(conn) });
@@ -330,18 +331,18 @@ describe("AdapterTest", () => {
   });
 
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
-    const original = Base.disablePreparedStatements;
+    const original = disablePreparedStatements();
     try {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(true);
 
-        Base.disablePreparedStatements = true;
+        setDisablePreparedStatements(true);
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(false);
       });
     } finally {
-      Base.disablePreparedStatements = original;
+      setDisablePreparedStatements(original);
     }
   });
 

@@ -24,6 +24,7 @@ import {
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "../errors.js";
 import type { Base } from "../base.js";
+import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
 
 let _base: typeof Base | undefined;
 
@@ -369,7 +370,7 @@ export class DatabaseTasks {
   static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
-    const fmt = format ?? baseClass().schemaFormat;
+    const fmt = format ?? schemaFormat();
     const ext = fmt === "sql" ? "sql" : fmt;
     const base = fmt === "sql" ? "structure" : "schema";
     if (dbConfig && dbConfig.name !== "primary") {
@@ -589,8 +590,7 @@ export class DatabaseTasks {
     if (typeof cfgWithDump?.schemaDump !== "function") {
       return this.dumpSchemaFilename(dbConfig, format);
     }
-    const fmt =
-      (format ?? baseClass().schemaFormat) === "js" ? "ts" : (format ?? baseClass().schemaFormat);
+    const fmt = (format ?? schemaFormat()) === "js" ? "ts" : (format ?? schemaFormat());
     const filename = cfgWithDump.schemaDump(fmt);
     if (filename == null) return null;
 
@@ -605,7 +605,7 @@ export class DatabaseTasks {
 
   static async dumpSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = baseClass().schemaFormat,
+    format: SchemaFormat = schemaFormat(),
   ): Promise<void> {
     const rawFilename = this.schemaDumpPath(dbConfig, format);
     if (rawFilename == null) return;
@@ -637,7 +637,7 @@ export class DatabaseTasks {
   /** @missingRailsCall load — PERMANENT */
   static async loadSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = baseClass().schemaFormat,
+    format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
@@ -698,7 +698,7 @@ export class DatabaseTasks {
   }
 
   static async loadSchemaCurrent(
-    format: SchemaFormat = baseClass().schemaFormat,
+    format: SchemaFormat = schemaFormat(),
     file?: string,
     environment?: string,
   ): Promise<void> {
@@ -789,7 +789,7 @@ export class DatabaseTasks {
       }
     }
 
-    if (baseClass().dumpSchemaAfterMigration) {
+    if (dumpSchemaAfterMigration()) {
       for (const dbConfig of dumpDbConfigs) {
         await this.withTemporaryPool(dbConfig, async () => {
           await this.dumpSchema(dbConfig);
@@ -888,7 +888,7 @@ export class DatabaseTasks {
 
   static async schemaUpToDate(
     configuration: unknown,
-    format: SchemaFormat = baseClass().schemaFormat,
+    format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<boolean> {
     void format;
@@ -954,7 +954,7 @@ export class DatabaseTasks {
 
   static async reconstructFromSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = baseClass().schemaFormat,
+    format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
@@ -1080,7 +1080,7 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
       if (rawPath) {
         const resolved = DatabaseTasks._resolveSchemaPath(rawPath);
         if (File.isExist(resolved)) {
-          await DatabaseTasks.loadSchema(dbConfig, baseClass().schemaFormat, undefined);
+          await DatabaseTasks.loadSchema(dbConfig, schemaFormat(), undefined);
         }
       }
     }

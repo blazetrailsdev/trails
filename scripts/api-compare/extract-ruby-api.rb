@@ -354,9 +354,22 @@ DEPENDENCY_PATTERNS = {
 UMBRELLA_SEATS_ON_MODULE = {
   "ActiveRecord" => %w[
     async_query_executor
+    database_cli
     default_timezone
+    disable_prepared_statements
+    dump_schema_after_migration
+    dump_schemas
+    error_on_ignored_order
+    lazily_load_schema_cache
+    maintain_test_schema
+    migration_strategy
     query_transformers
     reading_role
+    schema_format
+    timestamped_migrations
+    validate_migration_timestamps
+    verbose_query_logs
+    verify_foreign_keys_for_fixtures
     writing_role
   ].to_set,
 }.freeze

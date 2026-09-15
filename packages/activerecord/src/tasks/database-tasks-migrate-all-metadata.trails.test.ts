@@ -5,6 +5,7 @@ import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
+import { dumpSchemaAfterMigration, setDumpSchemaAfterMigration } from "../active-record.js";
 
 const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
@@ -69,12 +70,12 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
 
   it("prepare_all does not create ar_internal_metadata when use_metadata_table is false", async () => {
     await setupConfigs();
-    const dumpWas = Base.dumpSchemaAfterMigration;
-    Base.dumpSchemaAfterMigration = false;
+    const dumpWas = dumpSchemaAfterMigration();
+    setDumpSchemaAfterMigration(false);
     try {
       await DatabaseTasks.prepareAll();
     } finally {
-      Base.dumpSchemaAfterMigration = dumpWas;
+      setDumpSchemaAfterMigration(dumpWas);
     }
     expect(await metadataTablesExist()).toEqual([false, false]);
   });

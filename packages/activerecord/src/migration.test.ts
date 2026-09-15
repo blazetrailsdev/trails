@@ -36,6 +36,7 @@ import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 import { adapterDouble } from "./test-helpers/adapter-double.js";
+import { setValidateMigrationTimestamps, validateMigrationTimestamps } from "./active-record.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -1996,9 +1997,9 @@ describe("MigrationTest", () => {
       });
 
       it("migration raises if timestamp is future date", () => {
-        const savedValidate = Base.validateMigrationTimestamps;
+        const savedValidate = validateMigrationTimestamps();
         try {
-          Base.validateMigrationTimestamps = true;
+          setValidateMigrationTimestamps(true);
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
           expect(
@@ -2009,7 +2010,7 @@ describe("MigrationTest", () => {
             /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
           );
         } finally {
-          Base.validateMigrationTimestamps = savedValidate;
+          setValidateMigrationTimestamps(savedValidate);
         }
       });
 

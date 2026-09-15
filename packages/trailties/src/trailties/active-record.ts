@@ -3,16 +3,17 @@ import "./action-controller.js";
 import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
 import {
   AsynchronousQueriesTracker,
+  AutoFilteredParameters,
   Base,
   ConnectionPool,
   ControllerRuntime,
   QueryCache,
-  AutoFilteredParameters,
-  type AutoFilteredParametersApp,
-  SchemaReflection,
   Relation,
+  SchemaReflection,
   UniquenessValidator,
   deprecator,
+  setMaintainTestSchema,
+  type AutoFilteredParametersApp,
 } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
@@ -142,7 +143,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.set_configs", () => {
       const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
-      Base.maintainTestSchema = cfg.maintainTestSchema;
+      setMaintainTestSchema(cfg.maintainTestSchema);
       Base.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
       Base.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
       Base.generateSecureTokenOn = cfg.generateSecureTokenOn;

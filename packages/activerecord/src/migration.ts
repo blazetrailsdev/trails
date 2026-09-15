@@ -58,8 +58,14 @@ export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
-import { _Base } from "./base-slot.js";
 import type { Base } from "./base.js";
+import {
+  maintainTestSchema,
+  migrationStrategy,
+  schemaFormat,
+  timestampedMigrations,
+  validateMigrationTimestamps,
+} from "./active-record.js";
 
 type BaseWithLogger = Pick<typeof Base, "logger">;
 
@@ -971,7 +977,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get executionStrategy(): ExecutionStrategy {
-    this._executionStrategy ??= new (_Base!.migrationStrategy as new (
+    this._executionStrategy ??= new (migrationStrategy() as new (
       migration: Migration,
     ) => ExecutionStrategy)(this);
     return this._executionStrategy;
@@ -1001,7 +1007,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           ? number
           : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
     const n = raw < 0n ? 0n : raw;
-    if (!_Base!.timestampedMigrations) return n.toString().padStart(3, "0");
+    if (!timestampedMigrations()) return n.toString().padStart(3, "0");
     const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
@@ -1134,7 +1140,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static async maintainTestSchemaBang(): Promise<void> {
-    if (_Base!.maintainTestSchema) {
+    if (maintainTestSchema()) {
       await this.nearestDelegate?.suppressMessages(async () => {
         await this.loadSchemaIfPendingBang();
       });
@@ -1224,7 +1230,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const databaseTasks = migrationArConfig()!.databaseTasks();
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
-      if (!(await databaseTasks.schemaUpToDate(dbConfig, _Base!.schemaFormat))) return true;
+      if (!(await databaseTasks.schemaUpToDate(dbConfig, schemaFormat()))) return true;
     }
     return false;
   }
@@ -1271,8 +1277,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
       const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? _Base!.schemaFormat) as SchemaFormat;
-      await databaseTasks.loadSchema(dbConfig, schemaFormat);
+      const format = (getEnv("SCHEMA_FORMAT") ?? schemaFormat()) as SchemaFormat;
+      await databaseTasks.loadSchema(dbConfig, format);
     });
   }
 }
@@ -1585,7 +1591,7 @@ export class MigrationContext<
 
   /** @internal */
   private isValidateTimestamp(): boolean {
-    return _Base!.timestampedMigrations && _Base!.validateMigrationTimestamps;
+    return timestampedMigrations() && validateMigrationTimestamps();
   }
 
   /** @internal */

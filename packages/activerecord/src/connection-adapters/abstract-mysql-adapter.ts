@@ -119,6 +119,7 @@ class MysqlBigInteger extends BigIntegerType {
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
+import { databaseCli } from "../active-record.js";
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
@@ -964,7 +965,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     args.push(config.database as string);
 
-    return this.findCmdAndExec(_Base!.databaseCli["mysql"], ...args);
+    return this.findCmdAndExec(databaseCli()["mysql"], ...args);
   }
 
   private _emulateBooleans = true;

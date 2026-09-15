@@ -16,6 +16,7 @@ import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
+import { verifyForeignKeysForFixtures } from "./active-record.js";
 
 export class FixtureClassNotFound extends ActiveRecordError {
   constructor(message?: string) {
@@ -200,7 +201,7 @@ export async function insertPreparedFixtureSets(
 
 /** @internal */
 async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
-  if (!Base.verifyForeignKeysForFixtures) return;
+  if (!verifyForeignKeysForFixtures()) return;
 
   try {
     await conn.checkAllForeignKeysValidBang();

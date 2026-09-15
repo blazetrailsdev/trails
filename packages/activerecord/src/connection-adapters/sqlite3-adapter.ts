@@ -14,7 +14,6 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { _Base } from "../base-slot.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
@@ -97,6 +96,7 @@ import {
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
+import { databaseCli } from "../active-record.js";
 
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   let bindsAsFloat = false;
@@ -694,7 +694,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
     args.push(File.expandPath(config.database!, trailsRoot() ?? undefined));
-    return this.findCmdAndExec(_Base!.databaseCli["sqlite"], ...args);
+    return this.findCmdAndExec(databaseCli()["sqlite"], ...args);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
