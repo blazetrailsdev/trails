@@ -66,7 +66,7 @@ export const IsolatedExecutionState = {
     state().set(key, value);
     return value;
   },
-  has(key: IsolatedKey): boolean {
+  isKey(key: IsolatedKey): boolean {
     return state().has(key);
   },
   delete<T = unknown>(key: IsolatedKey): T | undefined {

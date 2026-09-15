@@ -38,12 +38,12 @@ describe("IsolatedExecutionStateTest", () => {
   it.skip("changing the isolation level clear the old store");
 
   it("get/set/has/delete on the fallback (no scope)", () => {
-    expect(IsolatedExecutionState.has("k")).toBe(false);
+    expect(IsolatedExecutionState.isKey("k")).toBe(false);
     IsolatedExecutionState.set("k", 1);
     expect(IsolatedExecutionState.get<number>("k")).toBe(1);
-    expect(IsolatedExecutionState.has("k")).toBe(true);
+    expect(IsolatedExecutionState.isKey("k")).toBe(true);
     IsolatedExecutionState.delete("k");
-    expect(IsolatedExecutionState.has("k")).toBe(false);
+    expect(IsolatedExecutionState.isKey("k")).toBe(false);
   });
 
   it("delete returns the deleted value", () => {
