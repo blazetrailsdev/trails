@@ -1158,62 +1158,6 @@ describe("buildReport — novel vs moved classification", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 
-  it("admits scanned umbrella module config (Base class methods) over novel ports", () => {
-    // `singleton_class.attr_accessor :writing_role` / `:reading_role` lives in
-    // the umbrella file `lib/active_record.rb`, which sits above the extractor's
-    // libPath. The extractor now scans it and attributes the config to
-    // `ActiveRecord::Base` as class methods (see extract-ruby-api.rb
-    // #scan_umbrella_file), so the `Base` static ports have a real Ruby
-    // counterpart and aren't flagged novel — no curated allowlist needed.
-    const ruby: ApiManifest = {
-      source: "ruby",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {
-            "ActiveRecord::Base": rubyClass({
-              name: "Base",
-              file: "base.rb",
-              instance: [method("save")],
-              klass: [method("writing_role"), method("reading_role")],
-            }),
-          },
-          modules: {},
-        },
-      },
-    };
-    const ts: ApiManifest = {
-      source: "typescript",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {
-            Base: {
-              name: "Base",
-              file: "base.ts",
-              includes: [],
-              extends: [],
-              instanceMethods: [method("save")],
-              classMethods: [method("writingRole"), method("readingRole"), method("trulyNovel")],
-            },
-          },
-          modules: {},
-        },
-      },
-    };
-    const report = buildReport(ruby, ts, {
-      filterPkg: null,
-      excludeGlobs: [],
-      novelOnly: false,
-      topN: 50,
-    });
-    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
-    expect(f).toBeDefined();
-    // writingRole/readingRole credited from the scanned Base class methods;
-    // only the genuinely-extra static is flagged.
-    expect(f!.extras.map((e) => e.name)).toEqual(["trulyNovel"]);
-  });
-
   it("folds ASC ::ClassMethods submodules into parent's classMethods", () => {
     // host `include Foo` — Rails runtime gives Host the methods on
     // Foo::ClassMethods. The fold puts ascHelper on Foo.classMethods so
@@ -3520,8 +3464,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
 
 describe("buildReport — TS files with no Rails counterpart", () => {
   function makeManifests(tsFile: string): { ruby: ApiManifest; ts: ApiManifest } {
-    // Rails: active_record.rb declares the umbrella writer `foo=`; it maps
-    // onto base.ts, so nothing in the file map points at `tsFile`.
+    // Rails: base.rb declares the writer `foo=`; it maps onto base.ts, so nothing in the file map points at `tsFile`.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",

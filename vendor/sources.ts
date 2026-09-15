@@ -28,10 +28,11 @@ export interface PackageEntry {
    * the source's vendored root. `libPath` names a DIRECTORY, so the entry file
    * that sits beside it — and defines the gem's own module functions — is
    * outside the extractor's recursive .rb glob and invisible without this. Set it
-   * only where that file defines real methods a trails file ports. A Rails
-   * framework entry file is not a pure autoload manifest: `active_record.rb`
-   * defines `ActiveRecord.disconnect_all!`, `after_all_transactions_commit` and
-   * ten more `def self.` methods, ported in `packages/activerecord/src/active-record.ts`.
+   * only where that file defines real methods a trails file ports:
+   * `active_record.rb` defines the `ActiveRecord` module's `def self.` methods
+   * and `singleton_class.attr_*` config seats, ported in
+   * `packages/activerecord/src/active-record.ts`. Without it the file is only
+   * scanned for its class, module and constant declarations.
    */
   libEntryFile?: string;
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */

@@ -324,73 +324,6 @@ DEPENDENCY_PATTERNS = {
   },
 }
 
-# Packages whose umbrella file (`<libPath>.rb`) defines real methods rather than
-# only requires, autoloads and module-level config, and so must be walked in
-# full instead of harvested for singleton config alone.
-#
-# `vendor/i18n/lib/i18n.rb` is where `I18n::Base` — the gem's whole public
-# facade — is actually defined: 19 `def`s plus 3 aliases. The config-only scan
-# sees only the aliases, so the ported facade is measured against a denominator
-# of 3.
-#
-# `activerecord/lib/arel.rb` is the same shape as i18n's: `Arel.sql`,
-# `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute` are defined there
-# and ported in `packages/arel/src/arel.ts`, so the config-only scan leaves
-# arel.ts scored as having no Rails counterpart at all.
-#
-# Both are now declared as `libEntryFile` in vendor/sources.ts and walked as
-# ordinary package files instead — which is also what gives them a sane
-# `file:` (`arel.rb`, not the umbrella scan's `../arel.rb`, which maps to no TS
-# file at all). `active_record.rb` is walked the same way for its `def self.`
-# methods (`packages/activerecord/src/active-record.ts`), while the umbrella
-# path still credits its `singleton_class.attr_*` seats on `ActiveRecord::Base`.
-
-# `active_record.rb` `singleton_class.attr_*` seats whose trails port has moved
-# off `ActiveRecord::Base` onto the `ActiveRecord` module
-# (`packages/activerecord/src/active-record.ts`), RFC 0130's umbrella-seat
-# batches. The umbrella scan no longer redirects these onto `Base`; the entry
-# walk records them on `active_record.rb` beside the rest of the module. This
-# set only grows, and is deleted with `umbrella_base_redirect` itself.
-UMBRELLA_SEATS_ON_MODULE = {
-  "ActiveRecord" => %w[
-    action_on_strict_loading_violation
-    application_record_class
-    async_query_executor
-    before_committed_on_all_records
-    belongs_to_required_validates_foreign_key
-    database_cli
-    db_warnings_action
-    db_warnings_ignore
-    default_timezone
-    disable_prepared_statements
-    dump_schema_after_migration
-    dump_schemas
-    error_on_ignored_order
-    generate_secure_token_on
-    index_nested_attribute_errors
-    lazily_load_schema_cache
-    maintain_test_schema
-    migration_strategy
-    permanent_connection_checkout
-    protocol_adapters
-    query_transformers
-    queues
-    raise_int_wider_than_64bit
-    raise_on_assign_to_attr_readonly
-    reading_role
-    run_after_transaction_callbacks_in_order_defined
-    schema_cache_ignored_tables
-    schema_format
-    timestamped_migrations
-    use_yaml_unsafe_load
-    validate_migration_timestamps
-    verbose_query_logs
-    verify_foreign_keys_for_fixtures
-    writing_role
-    yaml_column_permitted_classes
-  ].to_set,
-}.freeze
-
 # ---- AST walker ----
 
 class ApiExtractor
@@ -457,12 +390,10 @@ class ApiExtractor
     # `include` beats an earlier one, while within one `include A, B` the FIRST
     # argument wins. Internal only — never emitted. See ancestor_methods.
     @include_groups = {}
-    # When true we're scanning a top-level umbrella file (e.g. active_record.rb)
-    # one level above libPath. We only harvest module-level singleton config
-    # (`singleton_class.attr_accessor` …) from it and redirect that config onto
-    # `<Module>::Base` — the entity that ports it as statics — rather than the
-    # umbrella module's junk-drawer entity file. Everything else in the umbrella
-    # (requires, autoloads, `def self.` helpers) is skipped. See scan_umbrella_file.
+    # When true we're scanning a top-level umbrella file (e.g. action_dispatch.rb)
+    # one level above libPath for its class, module and constant declarations.
+    # Methods, accessors and every other command in it are skipped. See
+    # scan_umbrella_file.
     @scanning_umbrella = false
     # `CONST.each` codegen loops whose constant was not yet known when the
     # reader was walked. The extractor is single-pass over a package's files
@@ -511,16 +442,10 @@ class ApiExtractor
     extract_const_set_classes(source) unless @scanning_umbrella
   end
 
-  # Scan a top-level umbrella file (e.g. `lib/active_record.rb`, one level above
-  # the package's libPath and therefore never reached by the `**/*.rb` glob).
-  # Only module-level singleton config is harvested — both the
-  # `singleton_class.attr_accessor`/`attr_reader`/`attr_writer` command form
-  # (what `active_record.rb` uses today) and the equivalent
-  # `class << self; attr_accessor; end` block form — and attributed to
-  # `<Module>::Base` (the trails entity that ports it as statics) so it credits
-  # against those statics instead of leaking into the umbrella module's
-  # entity-file bucket (the junk-drawer `deprecator.rb`). Must run AFTER the
-  # package's own files so the `<Module>::Base` class already exists in `@classes`.
+  # Scan a top-level umbrella file (e.g. `lib/action_dispatch.rb`, one level
+  # above the package's libPath and therefore never reached by the `**/*.rb`
+  # glob) for the classes, modules and constants it declares. Its methods are
+  # not harvested.
   #
   # A gem whose entry file defines real methods declares it as `libEntryFile`
   # in vendor/sources.ts instead, and is walked by process_file like any other
@@ -530,18 +455,6 @@ class ApiExtractor
     process_file(filepath, package_root)
   ensure
     @scanning_umbrella = false
-  end
-
-  # Walk a package's `libEntryFile` as an ordinary file. A module-level
-  # singleton accessor there that `scan_umbrella_file` redirects onto
-  # `<Module>::Base` is skipped, so it is not recorded twice — unless the file
-  # also defines its writer as `def self.<name>=` (`active_record.rb`'s
-  # `default_timezone`), in which case the accessor lives beside that writer.
-  def process_entry_file(entry_file)
-    @entry_def_writers = File.read(entry_file).scan(/^\s*def self\.(\w+)=/).flatten.to_set
-    process_file(entry_file, File.dirname(entry_file))
-  ensure
-    @entry_def_writers = nil
   end
 
   def extract_const_set_classes(source)
@@ -869,9 +782,7 @@ class ApiExtractor
   end
 
   def process_def(node)
-    # In an umbrella scan we only harvest `singleton_class.attr_*` config; the
-    # `def self.` helpers in the umbrella (eager_load!, disconnect_all!, …) are
-    # not ported as Base statics and would surface as false-missing.
+    # An umbrella scan harvests no methods (see scan_umbrella_file).
     return if @scanning_umbrella
 
     name_node = node[1]
@@ -976,16 +887,8 @@ class ApiExtractor
     # form; without forcing the class bucket they leak as instance methods.
     on_singleton = node[0] == :command_call && singleton_class_receiver?(node[1])
 
-    # Umbrella scans harvest only module-level singleton config; ignore every
-    # other command (include/extend/scope/visibility/…) in the umbrella file.
-    # Singleton accessors arrive either as `singleton_class.attr_*` (on_singleton)
-    # or as a plain `attr_*` inside a `class << self` block (@in_sclass); both
-    # are class-level config and must be kept.
-    if @scanning_umbrella
-      singleton_attr =
-        (on_singleton || @in_sclass) && %w[attr_reader attr_writer attr_accessor].include?(cmd_name)
-      return unless singleton_attr
-    end
+    # Umbrella scans harvest no methods; ignore every command in the umbrella file.
+    return if @scanning_umbrella
 
     case cmd_name
     when "private", "protected", "public"
@@ -1241,37 +1144,17 @@ class ApiExtractor
   end
 
   def process_attr(args, kind, force_class: false)
-    fqn = current_fqn
+    return if @scanning_umbrella
 
-    # In an umbrella scan, redirect a module-level `singleton_class.attr_*` onto
-    # `<Module>::Base` — the entity trails ports it to as statics — so it credits
-    # against those statics instead of the umbrella module's entity-file bucket.
-    redirect_fqn = umbrella_base_redirect(fqn, force_class)
-    # Umbrella scans harvest ONLY config that redirects to a `<Module>::Base`.
-    # Without a Base to credit it (e.g. `ActiveSupport.error_reporter`, whose
-    # module has no `::Base`), recording it would leak onto the umbrella module's
-    # entity-file bucket as false-missing — so skip it entirely, leaving that
-    # surface exactly as it was before the umbrella was scanned.
-    return if @scanning_umbrella && !redirect_fqn
-    moved_seats = UMBRELLA_SEATS_ON_MODULE.fetch(fqn, Set.new)
-    if @scanning_umbrella
-      return if extract_symbol_args(args).all? { |n| moved_seats.include?(n) }
-    end
-    if @entry_def_writers && (force_class || @in_sclass) && @classes.key?("#{fqn}::Base")
-      names = extract_symbol_args(args)
-      return unless names.all? { |n| @entry_def_writers.include?(n) || moved_seats.include?(n) }
-    end
-    target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    # Redirected config is always a class (singleton) accessor; otherwise keep
-    # the original bucketing. `class << self; attr_accessor :foo; end` declares
-    # singleton accessors; without bucketing into classMethods these would leak
-    # as instance methods of every includer. `force_class` covers the
-    # `singleton_class.attr_accessor` command form, with the same singleton effect.
-    bucket = (redirect_fqn || @in_sclass || force_class) ? :classMethods : :instanceMethods
-    # Group redirected methods under the Base entity's file, not the umbrella's.
-    file = redirect_fqn ? (target[:file] || @current_file) : @current_file
+    # `class << self; attr_accessor :foo; end` declares singleton accessors;
+    # without bucketing into classMethods these would leak as instance methods
+    # of every includer. `force_class` covers the `singleton_class.attr_accessor`
+    # command form, with the same singleton effect.
+    bucket = (@in_sclass || force_class) ? :classMethods : :instanceMethods
 
     vis = current_visibility
     names = extract_symbol_args(args) + star_const_symbols(args)
@@ -1281,11 +1164,10 @@ class ApiExtractor
           name: name,
           visibility: vis.to_s,
           params: [],
-          file: file,
+          file: @current_file,
           line: @current_line,
           reader: true,
         }
-        entry[:umbrellaConfig] = true if redirect_fqn
         target[bucket] << entry
       end
       if kind == :writer || kind == :accessor
@@ -1293,25 +1175,13 @@ class ApiExtractor
           name: "#{name}=",
           visibility: vis.to_s,
           params: [{ name: "value", kind: "required" }],
-          file: file,
+          file: @current_file,
           line: @current_line,
         }
-        entry[:umbrellaConfig] = true if redirect_fqn
         target[bucket] << entry
       end
-      maybe_update_module_file(fqn, target) unless redirect_fqn
+      maybe_update_module_file(fqn, target)
     end
-  end
-
-  # During an umbrella scan, a module-level singleton accessor (the
-  # `singleton_class.attr_*` command form sets `force_class`; the
-  # `class << self; attr_*; end` block form sets `@in_sclass`) on a module that
-  # has a `<Module>::Base` class is config trails ports as Base statics; return
-  # that Base FQN so the accessor is attributed there. Nil otherwise.
-  def umbrella_base_redirect(fqn, force_class)
-    return nil unless @scanning_umbrella && (force_class || @in_sclass)
-    base = "#{fqn}::Base"
-    @classes.key?(base) ? base : nil
   end
 
   def process_attr_from_arg_paren(args, cmd_name)
@@ -2033,8 +1903,7 @@ class ApiExtractor
   end
 
   def process_define_method(args, params_node, body = nil)
-    # Umbrella scans harvest only module-level singleton config (see
-    # process_def); anything else recorded there surfaces as false-missing.
+    # Umbrella scans harvest no methods (see scan_umbrella_file).
     return false if @scanning_umbrella
 
     list = positional_arg_list(args)
@@ -4341,23 +4210,17 @@ def run
       extractor.process_file(filepath, pkg_dir)
     end
 
-    # Scan the top-level umbrella file (`<libPath>.rb`, one level above the
-    # package's libPath and outside the glob above) for module-level singleton
-    # config and attribute it to `<Module>::Base`. Done last so that Base class
-    # already exists. See ApiExtractor#scan_umbrella_file.
+    # A gem's `libEntryFile` is walked as an ordinary file, relative to its own
+    # directory, so it records as `arel.rb` — the path `packages/arel/src/arel.ts`
+    # maps onto. Otherwise the top-level umbrella file (`<libPath>.rb`, one level
+    # above the package's libPath and outside the glob above) is scanned for its
+    # declarations. See ApiExtractor#scan_umbrella_file.
     entry_file = PACKAGE_ENTRY_FILES[pkg_name]
-    if entry_file
-      # Walked relative to its own directory, so it records as `arel.rb` — the
-      # path `packages/arel/src/arel.ts` maps onto — rather than the umbrella
-      # scan's `../arel.rb`, which matches no TS file.
-      abort "Entry file for #{pkg_name} not found at #{entry_file}." unless File.file?(entry_file)
-      extractor.process_entry_file(entry_file)
-    end
     umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
-    # An entry file's module-level seats still credit on `<Module>::Base`
-    # (`active_record.rb`); one with no such Base has nothing left to harvest.
-    umbrella_module = File.file?(umbrella_file) && File.read(umbrella_file)[/^module (\w+)/, 1]
-    if File.file?(umbrella_file) && (!entry_file || extractor.classes.key?("#{umbrella_module}::Base"))
+    if entry_file
+      abort "Entry file for #{pkg_name} not found at #{entry_file}." unless File.file?(entry_file)
+      extractor.process_file(entry_file, File.dirname(entry_file))
+    elsif File.file?(umbrella_file)
       extractor.scan_umbrella_file(umbrella_file, pkg_dir)
     end
 

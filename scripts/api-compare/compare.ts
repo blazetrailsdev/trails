@@ -2836,7 +2836,6 @@ export function dedupeRubyMethodInto(
       ...(tsMirrorNames === null ? {} : { tsMirrorNames }),
       rubyName: rm.name,
       rubyModule: itemFqn,
-      umbrellaConfig: rm.umbrellaConfig,
       notes: rm.notes,
       mixinFile: rm.mixinFile,
       definedInFile: rm.file,
@@ -2848,7 +2847,6 @@ export function dedupeRubyMethodInto(
 export interface SeenRubyMethod {
   rubyName: string;
   rubyModule: string;
-  umbrellaConfig?: boolean;
   /** The Ruby extractor's classification — `"class_attribute"` for an `mattr_accessor`/`class_attribute`-generated reader. */
   notes?: string;
   /** Set when the first sighting came in through `include`/`extend` — see `mixinMethodCreditedToOwnFile`. */
@@ -2937,9 +2935,8 @@ export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
  * either its mirrored `expectedTsFile` exists, or the misplaced-cluster vote
  * found the sibling file its port actually landed in.
  *
- * Cross-file credit — the include chain, the mixin/reopening arms, the umbrella
- * config arm — is gated on this. Those arms all say "the member is ported, just
- * in another file", which is only meaningful when this Ruby file is ported at
+ * Cross-file credit — the include chain and the mixin/reopening arms — is gated
+ * on this. Those arms all say "the member is ported, just in another file", which is only meaningful when this Ruby file is ported at
  * all. Without the gate a Ruby file with a 0-line port accumulates `matched`
  * from unrelated files that happen to define a TS name equal to one of its Ruby
  * member names — `active_support/execution_wrapper.rb` read as `matched: 2`
@@ -2949,9 +2946,8 @@ export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
  * file"; an unmapped file's members are missing, and read as missing.
  *
  * Every credit arm after the same-file direct match is cross-file — the include
- * chain, the mixin/reopening arms, the misplaced-cluster fallback and the
- * umbrella-config arm — so `main` short-circuits all of them to `missing` when
- * this returns false.
+ * chain, the mixin/reopening arms and the misplaced-cluster fallback — so `main`
+ * short-circuits all of them to `missing` when this returns false.
  */
 export function rubyFileHasTsCounterpart(
   tsFileExists: boolean,
@@ -4507,7 +4503,7 @@ export function main() {
 
       for (const [
         _dedupeKey,
-        { rubyName, rubyModule, umbrellaConfig, notes, mixinFile, definedInFile, tsMirrorNames },
+        { rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
@@ -4692,22 +4688,6 @@ export function main() {
           }
         }
 
-        // Umbrella module config (active_record.rb singleton accessors) is
-        // redirected onto Base, but trails ports the individual flags wherever
-        // they belong (schema-cache.ts, database-tasks.ts, …), not all on
-        // base.ts: some as class statics (`Base.writingRole`), most as
-        // ar-config.ts module exports with a `setX` setter function
-        // (`ActiveRecord.protocol_adapters=` → `setProtocolAdapters`). Credit the
-        // port wherever it lands in the package — the static/method form or the
-        // `setX` setter form — as a move rather than pinning it as a
-        // false-missing on base.ts. A flag trails doesn't implement anywhere
-        // still falls through to missing (a real, un-hidden convergence gap).
-        // The reader (`writing_role`) and writer (`writing_role=`) are two
-        // distinct `seen` entries that both map to the one TS symbol
-        // (`writingRole` / `setWritingRole`), so each is credited once — the
-        // same 2-Ruby-methods-cover-1-TS-property accounting the direct-match
-        // path already applies to every `attr_accessor`-backed property in the
-        // codebase. Not umbrella-specific inflation; just consistent with it.
         // An `mattr_accessor`/`class_attribute` reader on a MODULE has no
         // settable ESM counterpart — a module export is not assignable from
         // outside — so trails renders the pair as an exported binding plus a
@@ -4716,38 +4696,13 @@ export function main() {
         // settled shape RFC 0068 gives a blocking Ruby `x=`. The extractor
         // records an exported `let` as a value, not a method, so only the
         // writer half is in `tsFilesByMethod`; crediting the reader through it
-        // measures the accessor as the one ported pair it is, exactly as the
-        // umbrella-config arm below does for the same rendering.
+        // measures the accessor as the one ported pair it is.
         if (notes === "class_attribute") {
           const setter = tsCandidates.map((c) => `set${c.charAt(0).toUpperCase()}${c.slice(1)}`);
           const port = setter.find((c) => tsFilesByMethod.has(c));
           if (port) {
             const actualFile = [...(tsFilesByMethod.get(port) as Set<string>)].sort()[0];
             fileMatched++;
-            moves.push({
-              tsName: port,
-              rubyName,
-              rubyModule,
-              expectedFile: expectedTs,
-              actualFile,
-            });
-            continue;
-          }
-        }
-
-        if (umbrellaConfig) {
-          const directPort = tsCandidates.find((c) => tsFilesByMethod.has(c));
-          const setterForms = tsCandidates.map(
-            (c) => `set${c.charAt(0).toUpperCase()}${c.slice(1)}`,
-          );
-          const port = directPort ?? setterForms.find((c) => tsFilesByMethod.has(c));
-          if (port) {
-            const actualFile = [...(tsFilesByMethod.get(port) as Set<string>)].sort()[0];
-            fileMatched++;
-            // Only an arity-meaningful direct match (`writingRole`) is checked;
-            // a `setX` setter has an extra `value` param vs the Ruby reader, so
-            // comparing their arities manufactures a spurious mismatch.
-            if (directPort) checkArity(rubyName, directPort, actualFile, rubyModule);
             moves.push({
               tsName: port,
               rubyName,

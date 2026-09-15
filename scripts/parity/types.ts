@@ -268,16 +268,6 @@ export interface MethodInfo {
    *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
   optionKeys?: string[] | null;
   /**
-   * True when this method was harvested from a top-level umbrella file's
-   * module-level singleton config (e.g. `singleton_class.attr_accessor` in
-   * `active_record.rb`) and redirected onto `<Module>::Base`. trails ports this
-   * config inconsistently — some flags as Base statics, others in their feature
-   * files (schema-cache.ts, database-tasks.ts, …) — so compare credits the port
-   * wherever it lands in the package, treating it as a move rather than a
-   * false-missing pinned to base.ts. See extract-ruby-api.rb#scan_umbrella_file.
-   */
-  umbrellaConfig?: boolean;
-  /**
    * TS-side only, on `synthesizedMixin` pseudo-modules: the file that actually
    * declares this member, when it is NOT the file the pseudo-module is keyed
    * under. A mixin function returning `typeof Base` drags Base's entire

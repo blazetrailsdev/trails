@@ -878,8 +878,10 @@ extends Association`, whose modules reach `reflection.ts` back through
   `asyncQueryExecutor()` in `abstract-adapter.ts` and
   `ConnectionPool#build_async_executor` left this list.
   Every `ActiveRecord` singleton config seat (`active_record.rb:182-491`'s
-  `singleton_class.attr_*` block) now lives on `active-record.ts` except
-  `ar-config.ts`'s two, so no module reads a seat through this slot.
+  `singleton_class.attr_*` block) and its `def self.` methods live on the
+  `ActiveRecord` module in `active-record.ts`, where `parity:api` records them
+  against `active_record.rb` itself, so no module reads a seat through this
+  slot and `Base` holds none of them.
 - `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
   `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
   (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle
