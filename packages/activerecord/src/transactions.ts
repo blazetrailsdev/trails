@@ -56,7 +56,7 @@ export async function transaction<T>(
   });
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
 export async function savepoint<T>(
   modelClass: typeof Base,
   _name: string,

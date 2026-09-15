@@ -711,7 +711,7 @@ export interface AbstractAdapter {
     name?: string | null,
     kwargs?: { allowRetry?: boolean },
   ): Promise<unknown>;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
@@ -801,6 +801,8 @@ export class AbstractAdapter implements Quoting {
     deprecatedConnectionOptions: unknown = null,
     deprecatedConfig: unknown = null,
   ) {
+    this.resetTransaction();
+
     this._connection = null;
     this._unconfiguredConnection = null;
 
@@ -866,7 +868,7 @@ export class AbstractAdapter implements Quoting {
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;
   protected _advisoryLocksEnabled: unknown = true;
-  _transactionManager: TransactionManager = new TransactionManager(this as any);
+  _transactionManager!: TransactionManager;
 
   _queryCache: Store | null = null;
 

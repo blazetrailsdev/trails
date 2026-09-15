@@ -366,7 +366,7 @@ export interface MismatchedForeignKeyOptions {
 }
 
 export class MismatchedForeignKey extends StatementInvalid {
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   readonly fkDetails: Pick<
     MismatchedForeignKeyOptions,
     "table" | "foreignKey" | "targetTable" | "primaryKey" | "primaryKeyColumn"

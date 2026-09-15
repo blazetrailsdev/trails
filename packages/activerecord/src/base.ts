@@ -242,7 +242,7 @@ import { Query as _Query } from "./attribute-methods/query.js";
 import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
-  toParamClass as _toParamClass,
+  ClassMethods as _IntegrationClassMethods,
   cacheKey as _cacheKey,
   cacheKeyWithVersion as _cacheKeyWithVersion,
   cacheVersion as _cacheVersion,
@@ -1702,7 +1702,7 @@ export class Base extends Model {
   declare static having: typeof Querying.having;
   declare static lock: typeof Querying.lock;
   declare static readonly: typeof Querying.readonly;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   declare static withCte: typeof Querying.withCte;
   declare static with: typeof Querying.withCte;
   declare static withRecursive: typeof Querying.withRecursive;
@@ -1935,7 +1935,7 @@ export class Base extends Model {
   static toParam(): string;
   static toParam(methodName: string): void;
   static toParam(methodName?: string): string | void {
-    return _toParamClass.call(this, methodName);
+    return _IntegrationClassMethods.toParam.call(this, methodName);
   }
 
   declare static collectionCacheKey: typeof _collectionCacheKey;

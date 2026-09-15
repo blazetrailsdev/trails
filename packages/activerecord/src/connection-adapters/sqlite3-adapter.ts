@@ -340,7 +340,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   async executeMutation(
     sql: string,
     binds: unknown[] = [],

@@ -11,9 +11,9 @@ interface MysqlAdapterLike {
 
 export class SchemaDumper extends AbstractSchemaDumper {
   declare protected connection?: MysqlAdapterLike;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   tableCollationCache: Record<string, string | undefined> = Object.create(null);
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
   /** @internal */

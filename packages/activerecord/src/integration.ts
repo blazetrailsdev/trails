@@ -91,28 +91,27 @@ export function cacheKeyWithVersion(this: Identifiable): string {
   return version ? `${base}-${version}` : base;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function toParamClass(
-  this: { name: string; prototype: any },
-  methodName?: string,
-): string | undefined {
-  if (methodName === undefined) {
-    return this.name;
-  }
-  const klass = this;
-  klass.prototype.toParam = function (this: any): string | null {
-    const base: string | null = Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null;
-    if (!base) return base;
-    let member = this[methodName];
-    if (member === undefined && typeof this.readAttribute === "function") {
-      member = this.readAttribute(methodName);
+export const ClassMethods = {
+  toParam(this: { name: string; prototype: any }, methodName?: string): string | undefined {
+    if (methodName === undefined) {
+      return this.name;
     }
-    const raw: string = String((typeof member === "function" ? member.call(this) : member) ?? "");
-    const slug = truncate(parameterize(squish(raw)), 20, { separator: /-/, omission: "" });
-    return slug ? `${base}-${slug}` : base;
-  };
-  return undefined;
-}
+    const klass = this;
+    klass.prototype.toParam = function (this: any): string | null {
+      const base: string | null =
+        Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null;
+      if (!base) return base;
+      let member = this[methodName];
+      if (member === undefined && typeof this.readAttribute === "function") {
+        member = this.readAttribute(methodName);
+      }
+      const raw: string = String((typeof member === "function" ? member.call(this) : member) ?? "");
+      const slug = truncate(parameterize(squish(raw)), 20, { separator: /-/, omission: "" });
+      return slug ? `${base}-${slug}` : base;
+    };
+    return undefined;
+  },
+};
 
 export function collectionCacheKey(
   this: { all(): any },

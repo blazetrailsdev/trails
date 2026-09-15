@@ -35,7 +35,7 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   deduplicateKey(): string {
     return JSON.stringify(this.toJSON());
   }
@@ -51,7 +51,7 @@ export class SqlTypeMetadata implements Deduplicable {
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
     const klass = TYPE_METADATA_CLASSES[data.class ?? ""];
     if (klass) return klass.fromJSON(data);

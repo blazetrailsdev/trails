@@ -148,7 +148,7 @@ export class DatabaseTasks {
     return new ctor(config, ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   static clearRegisteredTasks(): void {
     this._registeredTasks = [];
   }
@@ -366,7 +366,7 @@ export class DatabaseTasks {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
   static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
@@ -1011,7 +1011,7 @@ export function isVerbose(): boolean {
   return v !== undefined ? v !== "false" : true;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
 export function metadataTableNames(): Set<string> {
   const base = baseClass();
   const prefix = base.tableNamePrefix;
