@@ -944,9 +944,10 @@ describe("EagerAssociationTest", () => {
     const directDevs = last.association("developers").target;
     const directDevContracts = directDevs?.[directDevs.length - 1]?.association("contracts").target;
 
-    expect(mentorDevContracts.map((c: Base) => c.id)).toEqual(
+    expect([
+      mentorDevContracts.map((c: Base) => c.id),
       directDevContracts.map((c: Base) => c.id),
-    );
+    ]).toEqual([[contract.id], [contract.id]]);
   });
   it("scoping with a circular preload", async () => {
     const rel = (Comment as any).all().preload({ ":post": ":comments" });
