@@ -157,18 +157,19 @@ export class Duration {
   }
 
   plus(other: Duration | Scalar | number): Duration {
-    if (!(other instanceof Duration)) {
+    if (other instanceof Duration) {
+      return new Duration(
+        this.value + other.value,
+        mergeParts(this.parts, this._partKeys, other._parts()),
+        this._variable || other._variable,
+      );
+    } else {
       return new Duration(
         this.value + Number(other),
         mergeParts(this.parts, this._partKeys, { seconds: Number(other) }),
         this._variable,
       );
     }
-    return new Duration(
-      this.value + other.value,
-      mergeParts(this.parts, this._partKeys, other._parts()),
-      this._variable || other._variable,
-    );
   }
 
   minus(other: Duration | Scalar | number): Duration {
