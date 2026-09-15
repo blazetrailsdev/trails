@@ -1373,27 +1373,36 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
 });
 
 describe(
-  "Ruby extractor umbrella module-config scanning",
+  "Ruby extractor umbrella and entry-file scanning",
   { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
   () => {
     const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-    // Lay out a package libPath with a `base.rb` and a sibling umbrella file
-    // one level above it, scan the package then the umbrella, and return the
-    // ActiveRecord::Base / ActiveRecord entries.
-    function scanWithUmbrella(baseSrc: string, umbrellaSrc: string): Record<string, ClassEntry> {
+    // Lay out a package libPath with a `base.rb` and a sibling top-level file
+    // one level above it, walk the package, then either scan the top-level file
+    // as an umbrella or walk it as the package's `libEntryFile`.
+    function scanWith(
+      baseSrc: string,
+      topSrc: string,
+      mode: "umbrella" | "entry",
+    ): Record<string, ClassEntry> {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
       try {
         const libPath = path.join(root, "active_record");
+        const top = path.join(root, "active_record.rb");
         fs.mkdirSync(libPath, { recursive: true });
         fs.writeFileSync(path.join(libPath, "base.rb"), baseSrc);
-        fs.writeFileSync(path.join(root, "active_record.rb"), umbrellaSrc);
+        fs.writeFileSync(top, topSrc);
+        const walkTop =
+          mode === "umbrella"
+            ? `ex.scan_umbrella_file(${JSON.stringify(top)}, ${JSON.stringify(libPath)})`
+            : `ex.process_file(${JSON.stringify(top)}, ${JSON.stringify(root)})`;
         const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
         ex.process_file(File.join(${JSON.stringify(libPath)}, "base.rb"), ${JSON.stringify(libPath)})
-        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)})
+        ${walkTop}
         out = {}
         (ex.classes.merge(ex.modules)).each do |fqn, info|
           out[fqn] = { classMethods: info[:classMethods], instanceMethods: info[:instanceMethods], file: info[:file] }
@@ -1408,7 +1417,7 @@ describe(
     }
 
     interface ClassEntry {
-      classMethods: { name: string; umbrellaConfig?: boolean }[];
+      classMethods: { name: string; file: string }[];
       instanceMethods: { name: string; visibility: string }[];
       file: string;
     }
@@ -1421,109 +1430,39 @@ describe(
     end
   `;
 
-    it("attributes module-level singleton_class config to <Module>::Base, tagged umbrellaConfig", () => {
-      const out = scanWithUmbrella(
-        BASE_SRC,
-        `
+    const CONFIG_SRC = `
       module ActiveRecord
         singleton_class.attr_accessor :example_accessor
-        singleton_class.attr_reader :example_reader
+        class << self
+          attr_reader :example_reader
+        end
         def self.eager_load!; end
       end
-    `,
+    `;
+
+    it("records an entry file's module-level singleton config on the module, at that file", () => {
+      const out = scanWith(BASE_SRC, CONFIG_SRC, "entry");
+      const mod = out["ActiveRecord"].classMethods;
+      expect(mod.map((m) => m.name)).toEqual(
+        expect.arrayContaining([
+          "example_accessor",
+          "example_accessor=",
+          "example_reader",
+          "eager_load!",
+        ]),
       );
-      const base = out["ActiveRecord::Base"];
-      const names = base.classMethods.map((m) => m.name);
-      // accessor → reader + writer; reader-only → reader only.
-      expect(names).toContain("example_accessor");
-      expect(names).toContain("example_accessor=");
-      expect(names).toContain("example_reader");
-      expect(names).not.toContain("example_reader=");
-      // Every redirected entry is tagged so compare can credit the port wherever
-      // it lands in the package.
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("example_accessor"))) {
-        expect(m.umbrellaConfig).toBe(true);
-      }
-      // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
-      expect(names).not.toContain("eager_load!");
+      for (const m of mod) expect(m.file).toBe("active_record.rb");
+      expect(out["ActiveRecord::Base"].classMethods).toEqual([]);
     });
 
-    it("redirects the `class << self; attr_accessor` block form to Base too", () => {
-      // active_record.rb uses the `singleton_class.attr_*` command form today, but
-      // the equivalent `class << self` block form is also module-level config and
-      // must redirect to Base rather than being silently dropped.
-      const out = scanWithUmbrella(
-        BASE_SRC,
-        `
-      module ActiveRecord
-        class << self
-          attr_accessor :example_accessor
-        end
-      end
-    `,
-      );
-      const base = out["ActiveRecord::Base"];
-      const names = base.classMethods.map((m) => m.name);
-      expect(names).toContain("example_accessor");
-      expect(names).toContain("example_accessor=");
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("example_accessor"))) {
-        expect(m.umbrellaConfig).toBe(true);
-      }
+    it("harvests no singleton config or methods from an umbrella scan", () => {
+      const out = scanWith(BASE_SRC, CONFIG_SRC, "umbrella");
+      expect(out["ActiveRecord::Base"].classMethods).toEqual([]);
+      expect(out["ActiveRecord"].classMethods).toEqual([]);
     });
 
-    it("does not leak umbrella config onto the ActiveRecord module's bucket", () => {
-      const out = scanWithUmbrella(
-        BASE_SRC,
-        `
-      module ActiveRecord
-        singleton_class.attr_accessor :example_accessor
-      end
-    `,
-      );
-      const mod = out["ActiveRecord"];
-      const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-      expect(modNames).not.toContain("example_accessor");
-    });
-
-    it("does not redirect a seat that has moved onto the ActiveRecord module", () => {
-      const out = scanWithUmbrella(
-        BASE_SRC,
-        `
-      module ActiveRecord
-        singleton_class.attr_accessor :writing_role
-      end
-    `,
-      );
-      const names = out["ActiveRecord::Base"].classMethods.map((m) => m.name);
-      expect(names).not.toContain("writing_role");
-      expect(names).not.toContain("writing_role=");
-    });
-
-    it("skips umbrella config when the module has no ::Base to redirect to", () => {
-      // `ActiveSupport.error_reporter` lives on a module with no `::Base`; without
-      // a Base to credit it, recording it would leak onto the module's entity-file
-      // bucket as false-missing, so it must be skipped entirely.
-      const out = scanWithUmbrella(
-        `
-      module ActiveSupport
-        class NotBase
-          def call; end
-        end
-      end
-    `,
-        `
-      module ActiveSupport
-        singleton_class.attr_accessor :error_reporter
-      end
-    `,
-      );
-      const mod = out["ActiveSupport"];
-      const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
-      expect(names).not.toContain("error_reporter");
-    });
-
-    it("keeps a config-only umbrella scan free of those definitions", () => {
-      const out = scanWithUmbrella(
+    it("keeps an umbrella scan free of nested definitions", () => {
+      const out = scanWith(
         BASE_SRC,
         `
       module ActiveRecord
@@ -1534,6 +1473,7 @@ describe(
         def self.reserve_key(key); end
       end
     `,
+        "umbrella",
       );
       expect(out["ActiveRecord::Facade"].instanceMethods).toEqual([]);
       expect(out["ActiveRecord"].classMethods).toEqual([]);
