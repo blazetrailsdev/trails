@@ -214,11 +214,14 @@ import {
 // (the port of `rb_hash_has_key`, `vendor/ruby/hash.c:3671`) is that missing
 // call form, so RFC 0129 discharged both entries and the ports call it.
 //
-// The seven that remain are NOT candidates, and ruby-compat cannot make them
+// `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
+// is the call form Ruby's `Kernel#catch` ports onto.
+//
+// The six that remain are NOT candidates, and ruby-compat cannot make them
 // so: each becomes a language CONSTRUCT with no callee, not a call some package
 // could supply. `to_s` / `to_str` are a template literal and implicit String
 // coercion; `each` is a `for…of`; `present?` / `blank?` are truthiness tests;
-// `catch` is a clause, never a callee (see below); and `synchronize` is a mutex
+// and `synchronize` is a mutex
 // acquisition JS has nothing to acquire (see below) — a Ruby `Mutex` is
 // deferred by RFC 0129 and is the only thing that could ever revisit it.
 //
@@ -266,15 +269,7 @@ export const NO_JS_CALL_FORM = new Set([
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
   "synchronize", // the block runs bare — JS has no mutex to acquire
-  "catch", // `try { … } catch (e) { … }` — a clause, never a callee
 ]);
-
-// `catch` qualifies on the same ground as `synchronize`. Ruby's `catch(:tag)`
-// is Kernel's non-local-exit construct, and its faithful port is JS's own
-// non-local-exit construct: a `try` statement with a `catch` CLAUSE that
-// re-raises anything but the sentinel. A clause is syntax, not a call expression, so the
-// TS body emits no callee and no alias could ever match it, however faithfully
-// the catch is spelled at the Rails call site.
 
 // `synchronize` is the strongest member of that set rather than a marginal one.
 // Every Ruby occurrence is a mutex acquisition — `Mutex#synchronize`,

@@ -11,9 +11,7 @@ import { RuntimeError } from "./runtime-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `FrozenError`, which Rails inherits
  * rather than defines.
  */
-export class FrozenError extends RuntimeError {
-  constructor(message: string = "FrozenError") {
-    super(message);
-    this.name = "FrozenError";
-  }
-}
+export class FrozenError extends RuntimeError {}
+
+FrozenError.prototype.name = "FrozenError";
+FrozenError.prototype.message = "FrozenError";

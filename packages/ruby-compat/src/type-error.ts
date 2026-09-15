@@ -10,9 +10,7 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `TypeError`, which Rails inherits
  * rather than defines.
  */
-export class TypeError extends StandardError {
-  constructor(message: string = "TypeError") {
-    super(message);
-    this.name = "TypeError";
-  }
-}
+export class TypeError extends StandardError {}
+
+TypeError.prototype.name = "TypeError";
+TypeError.prototype.message = "TypeError";

@@ -7,9 +7,7 @@
  * @noRailsEquivalent PERMANENT — Ruby core `NotImplementedError`, which Rails
  * inherits rather than defines.
  */
-export class NotImplementedError extends Error {
-  constructor(message: string = "NotImplementedError") {
-    super(message);
-    this.name = "NotImplementedError";
-  }
-}
+export class NotImplementedError extends Error {}
+
+NotImplementedError.prototype.name = "NotImplementedError";
+NotImplementedError.prototype.message = "NotImplementedError";
