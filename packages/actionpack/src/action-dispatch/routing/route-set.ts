@@ -202,7 +202,6 @@ class UrlHelper {
     this.routeName = routeName;
   }
 
-  /** @missingRailsCall url_for — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for */
   call(
     t: UrlHelperContext,
     methodName: string,
@@ -215,8 +214,7 @@ class UrlHelper {
     const hash = this.handlePositionalArgs(controllerOptions, innerOptions ?? {}, args, options, [
       ...this.segmentKeys,
     ]);
-    hash["path"] = t._routes.generate(this.routeName, hash, {}, methodName).path(methodName);
-    return urlStrategy(hash as UrlOptions);
+    return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }
 
   handlePositionalArgs(
@@ -867,7 +865,7 @@ export class RouteSet {
     delete options["originalScriptName"];
     let scriptName = this.findScriptName(options);
 
-    if (originalScriptName != null) {
+    if (originalScriptName != null && (originalScriptName as unknown) !== false) {
       scriptName = originalScriptName + scriptName;
     }
 
