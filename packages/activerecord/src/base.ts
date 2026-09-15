@@ -1,10 +1,7 @@
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
-import {
-  Locator as _Locator,
-  GlobalID as _GlobalIDCtor,
-  SignedGlobalID as _SignedGlobalIDType,
-} from "@blazetrails/globalid";
+import { GlobalID as _GlobalIDCtor } from "@blazetrails/globalid";
+import { Transaction as _UserTransaction } from "./transaction.js";
 
 interface ToSgidOptions {
   app?: string;
@@ -310,7 +307,6 @@ import {
 } from "./scoping.js";
 import {
   transaction as _transaction,
-  currentTransactionPublic as _currentTransactionPublic,
   withTransactionReturningStatus as _withTransactionReturningStatus,
   committedBang as _committedBang,
   rolledbackBang as _rolledbackBang,
@@ -2149,7 +2145,7 @@ export class Base extends Model {
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
     const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor, this);
-    const useSavepoint = _currentTransactionPublic().isOpen();
+    const useSavepoint = ctor.currentTransaction().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
       if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
       let assoc: any;
@@ -2305,23 +2301,6 @@ export class Base extends Model {
 
   toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): SignedGlobalIDType {
     return this.toSgid(options);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-  static findGlobalId(
-    input: string | import("@blazetrails/globalid").GlobalID,
-    options?: import("@blazetrails/globalid").LocateOptions,
-  ): Promise<unknown | null> {
-    return _Locator.locate(input, options);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-  static async findSignedGlobalId(
-    input: string | _SignedGlobalIDType,
-    options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
-  ): Promise<unknown | null> {
-    const verifier = this.signedIdVerifier;
-    return _Locator.locateSigned(input, { ...options, verifier });
   }
 
   declare touch: typeof _Persistence.touch;
@@ -2532,8 +2511,11 @@ export class Base extends Model {
     return _transaction(this, fn, options);
   }
 
-  static currentTransaction() {
-    return _currentTransactionPublic();
+  static currentTransaction(this: typeof Base): _UserTransaction {
+    return (
+      this.connectionPool().activeConnection?.currentTransaction()?.userTransaction ??
+      _UserTransaction.NULL_TRANSACTION
+    );
   }
 
   declare static afterInitialize: <T extends typeof Base>(

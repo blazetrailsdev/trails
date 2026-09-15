@@ -33,13 +33,6 @@ export function currentTransaction(): Transaction | null {
   return IsolatedExecutionState.get<Transaction | null>(CURRENT_TRANSACTION_KEY) ?? null;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function currentTransactionPublic(): PublicTransaction {
-  const internalTx = currentTransaction();
-  if (!internalTx) return PublicTransaction.NULL_TRANSACTION;
-  return (internalTx as any).userTransaction ?? new PublicTransaction(internalTx);
-}
-
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: PublicTransaction) => Promise<T>,
