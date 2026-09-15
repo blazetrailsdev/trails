@@ -1299,9 +1299,9 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
 
 /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
-  return ((this as any)._arel ??= (this as any).model
+  return ((this as any)._arel ??= this.model
     .connectionPool()
-    .withConnectionSync((c: unknown) => this.buildArel(c as never, aliases)));
+    .withConnectionSync((c) => this.buildArel(c, aliases)));
 }
 
 export function constructJoinDependency(
