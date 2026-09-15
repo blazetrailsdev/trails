@@ -543,7 +543,7 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    const before = await Topic.all().count();
+    const before = (await Topic.all().count()) as number;
     await Topic.create({ title: "a" });
     const count = await Topic.all().count();
     expect(count).toBe(before + 1);

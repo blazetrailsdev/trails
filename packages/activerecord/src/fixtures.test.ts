@@ -7,6 +7,7 @@ import {
   assertDifference,
   assertNoDifference,
   assertNotEmpty,
+  assertRaises,
   Notifications,
   Duration,
   Logger,
@@ -306,14 +307,10 @@ describe("FixturesTest", () => {
 
       const stub = stubMaxAllowedPacket(conn, packetSize - mysqlMargin);
       try {
-        const error = await conn.insertFixturesSet(fixtures).then(
-          () => null,
-          (e: unknown) => e,
-        );
-        expect(error).toBeInstanceOf(ActiveRecordError);
-        expect((error as Error).message).toMatch(
-          new RegExp(`Fixtures set is too large ${packetSize}\\.`),
-        );
+        const error = (await assertRaises([ActiveRecordError], {}, () =>
+          conn.insertFixturesSet(fixtures),
+        )) as ActiveRecordError;
+        expect(error.message).toMatch(new RegExp(`Fixtures set is too large ${packetSize}\\.`));
       } finally {
         stub.mockRestore();
       }
@@ -547,6 +544,7 @@ describe("FixturesWithoutInstantiationTest", () => {
     expect(topics("first").title).toBe("The First Topic");
     await Topic.where({ id: topics("first").id }).updateAll({ title: "Fresh Topic!" });
     expect((await topics("first", true)).title).toBe("Fresh Topic!");
+    expect(topics("first").title).toBe("Fresh Topic!");
   });
 });
 
