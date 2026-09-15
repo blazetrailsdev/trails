@@ -14,6 +14,9 @@ import {
   timestampedMigrations,
   verifyForeignKeysForFixtures,
 } from "./active-record.js";
+||||||| parent of e549dae7a9 (fix(activerecord): converge AbstractAdapter#close, NullPool#server_version lock order, and ThreadPoolExecutor options)
+import { asyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
+import { AsyncExecutor } from "./ar-config.js";
 
 describe("ar-config module-level flags", () => {
   it("mirror the ActiveRecord module defaults from active_record.rb", () => {
@@ -73,5 +76,42 @@ describe("ar-config module-level flags", () => {
       Base.belongsToRequiredValidatesForeignKey = true;
       expect(Base.belongsToRequiredValidatesForeignKey).toBe(true);
     });
+  });
+});
+
+describe("AsyncExecutor", () => {
+  it("runs at most maxThreads tasks, queues up to maxQueue, then runs on the caller", async () => {
+    const executor = new AsyncExecutor({
+      minThreads: 0,
+      maxThreads: 2,
+      maxQueue: 1,
+      fallbackPolicy: "caller_runs",
+    });
+    let running = 0;
+    let peak = 0;
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const task = (name: string) => async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      order.push(name);
+      await gate;
+      running -= 1;
+    };
+
+    executor.post(task("a"));
+    executor.post(task("b"));
+    executor.post(task("c"));
+    executor.post(task("d"));
+    expect(order).toEqual(["d"]);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual(["d", "a", "b"]);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(order).toEqual(["d", "a", "b", "c"]);
+    expect(peak).toBe(3);
   });
 });

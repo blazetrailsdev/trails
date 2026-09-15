@@ -1419,12 +1419,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   close(): void | Promise<void> {
-    const pool = this.pool;
-    if (!(pool instanceof NullPool)) {
-      pool.checkin(this);
-    } else if (this.inUse) {
-      this.expire();
-    }
+    this.pool.checkin(this);
   }
 
   requiresReloading(): boolean {

@@ -266,7 +266,12 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
 
 it("scheduleQuery runs each task on its own lease", async () => {
   const pool = makeAmbientPool({ pool: 5 });
-  (pool as unknown as { asyncExecutor: AsyncExecutor }).asyncExecutor = new AsyncExecutor();
+  (pool as unknown as { asyncExecutor: AsyncExecutor }).asyncExecutor = new AsyncExecutor({
+    minThreads: 0,
+    maxThreads: 5,
+    maxQueue: 20,
+    fallbackPolicy: "caller_runs",
+  });
   const leases: unknown[] = [];
   const task = {
     executeOrSkip: () => {

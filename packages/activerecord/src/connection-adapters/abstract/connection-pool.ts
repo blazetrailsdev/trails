@@ -1,4 +1,4 @@
-import { Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
+import { synchronize, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
@@ -62,8 +62,9 @@ export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 
-  private readonly _mutex = new Mutex();
   private _serverVersion: unknown = null;
+  private _serverVersionInFlight: { connection: DatabaseAdapter; fetch: Promise<unknown> } | null =
+    null;
   private _schemaReflection: SchemaReflection | null = null;
 
   declare readonly role: never;
@@ -95,12 +96,20 @@ export class NullPool implements AbstractPool {
   serverVersion(connection: DatabaseAdapter): unknown {
     return (
       this._serverVersion ??
-      connection.lock.synchronize(() =>
-        this._mutex.synchronize(async () => {
-          this._serverVersion ??= await connection.getDatabaseVersion?.();
-          return this._serverVersion;
-        }),
-      )
+      connection.lock.synchronize(async () => {
+        if (this._serverVersion == null && this._serverVersionInFlight?.connection === connection) {
+          throw new ThreadError("deadlock; recursive locking");
+        }
+        if (this._serverVersion != null) return this._serverVersion;
+        const fetch = Promise.resolve(connection.getDatabaseVersion?.());
+        this._serverVersionInFlight = { connection, fetch };
+        try {
+          this._serverVersion ??= await fetch;
+        } finally {
+          if (this._serverVersionInFlight?.fetch === fetch) this._serverVersionInFlight = null;
+        }
+        return this._serverVersion;
+      })
     );
   }
 
@@ -875,14 +884,20 @@ export class ConnectionPool implements ReapablePool {
   }
 
   scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
-    this.asyncExecutor!.post(() => void futureResult.executeOrSkip());
+    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
-  /** @missingRailsArgs new — PERMANENT */
   private buildAsyncExecutor(): AsyncExecutor | null {
     switch (asyncQueryExecutor()) {
       case "multi_thread_pool":
-        return this.dbConfig.maxThreads > 0 ? new AsyncExecutor() : null;
+        return this.dbConfig.maxThreads > 0
+          ? new AsyncExecutor({
+              minThreads: this.dbConfig.minThreads,
+              maxThreads: this.dbConfig.maxThreads,
+              maxQueue: this.dbConfig.maxQueue,
+              fallbackPolicy: "caller_runs",
+            })
+          : null;
       case "global_thread_pool":
         return globalThreadPoolAsyncQueryExecutor();
       default:
