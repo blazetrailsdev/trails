@@ -1,4 +1,4 @@
-import { Temporal, Date as RubyDate } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import * as date from "../date/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -35,10 +35,12 @@ function advance(
     : date.advance(dateOrTime, options);
 }
 
-function toDate(dateOrTime: DateOrTime): Temporal.PlainDate {
+function toDate(dateOrTime: DateOrTime | RubyTime): Temporal.PlainDate {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return time.toDate(dateOrTime);
-  return dateOrTime instanceof RubyDate ? dateOrTime.toDate() : dateOrTime;
+  return dateOrTime instanceof RubyDate || dateOrTime instanceof RubyTime
+    ? dateOrTime.toDate()
+    : dateOrTime;
 }
 
 function wday(dateOrTime: DateOrTime | Temporal.Instant): number {
@@ -163,17 +165,17 @@ export function tomorrow(dateOrTime: DateOrTime): DateOrInstant {
   return advance(dateOrTime, { days: 1 });
 }
 
-export function isToday(dateOrTime: DateOrTime): boolean {
+export function isToday(dateOrTime: DateOrTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(date.current());
 }
 
-export function isTomorrow(dateOrTime: DateOrTime): boolean {
+export function isTomorrow(dateOrTime: DateOrTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(tomorrow(date.current()));
 }
 
 export const isNextDay = isTomorrow;
 
-export function isYesterday(dateOrTime: DateOrTime): boolean {
+export function isYesterday(dateOrTime: DateOrTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(yesterday(date.current()));
 }
 
