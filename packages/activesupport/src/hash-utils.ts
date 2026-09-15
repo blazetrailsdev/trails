@@ -393,47 +393,37 @@ function encodeQueryKey(key: string): string {
   return encodeURIComponent(key).replace(/%20/g, "+");
 }
 
-function buildQueryParts(value: unknown, prefix: string): string[] {
-  if (value === null || value === undefined) {
-    return [`${encodeQueryKey(prefix)}=`];
-  }
+function buildQueryParts(value: unknown, key: string): string {
   if (Array.isArray(value)) {
-    if (value.length === 0) return [];
-    return value.flatMap((v) => buildQueryParts(v, `${prefix}[]`));
+    const prefix = `${key}[]`;
+    if (value.length === 0) return buildQueryParts(null, prefix);
+    return value.map((v) => buildQueryParts(v, prefix)).join("&");
   }
-  if (isPlainObject(value)) {
-    const keys = Object.keys(value as Record<string, unknown>);
-    if (keys.length === 0) return [];
-    const query = keys
-      .map((k) =>
-        buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`).join("&"),
-      )
-      .filter((part) => part !== "");
-    if (!prefix.includes("[]")) query.sort();
-    return query;
-  }
-  return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
+  if (isPlainObject(value) || value instanceof Map) return toQuery(value, key);
+  return `${encodeQueryKey(key)}=${encodeQueryValue(toParam(value))}`;
 }
 
 export function toQuery(
   obj: Record<string, unknown> | Map<unknown, unknown> | unknown[],
   namespace?: string,
 ): string {
-  if (Array.isArray(obj)) {
-    const prefix = `${namespace}[]`;
-    if (obj.length === 0) return buildQueryParts(null, prefix).join("&");
-    return obj.flatMap((value) => buildQueryParts(value, prefix)).join("&");
-  }
-  const entries: [string, unknown][] = (
-    obj instanceof Map ? [...obj.entries()] : Object.entries(obj)
-  ).map(([key, value]) => [String(toParam(key)), value]);
-  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  const parts: string[] = [];
-  for (const [key, value] of entries) {
-    const fullKey = namespace ? `${namespace}[${key}]` : key;
-    parts.push(...buildQueryParts(value, fullKey));
-  }
-  return parts.join("&");
+  if (Array.isArray(obj)) return buildQueryParts(obj, String(namespace));
+  const entries = obj instanceof Map ? [...obj.entries()] : Object.entries(obj);
+  const query = entries
+    .filter(
+      ([, value]) =>
+        !(
+          (isPlainObject(value) || value instanceof Map || Array.isArray(value)) &&
+          (value instanceof Map ? value.size === 0 : Object.keys(value).length === 0)
+        ),
+    )
+    .map(([key, value]) => {
+      const param = String(toParam(key));
+      return buildQueryParts(value, namespace ? `${namespace}[${param}]` : param);
+    });
+
+  if (!String(namespace ?? "").includes("[]")) query.sort();
+  return query.join("&");
 }
 
 export function compact<T extends AnyObject>(obj: T): Partial<T> {
