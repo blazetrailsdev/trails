@@ -472,14 +472,9 @@ describe("RelationScopingTest", () => {
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
       const first = await Author.first();
       expect(first).not.toBeNull();
-      await expect(
-        Author.where({ organization_id: "agency_1" }).scoping(
-          { allQueries: false },
-          async () => {},
-        ),
-      ).rejects.toThrow(
-        "Scoping is set to apply to all queries and cannot be unset in a nested block.",
-      );
+      expect(() =>
+        Author.where({ organization_id: "agency_1" }).scoping({ allQueries: false }, () => {}),
+      ).toThrow("Scoping is set to apply to all queries and cannot be unset in a nested block.");
     });
   });
 });

@@ -15,11 +15,9 @@ import {
   underscore,
   toSentence,
 } from "@blazetrails/activesupport";
-import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
 import { Module, NoMethodError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { _Base } from "../base-slot.js";
-import { _CollectionProxyCtor } from "../associations/collection-proxy-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
@@ -128,7 +126,7 @@ export class GeneratedRelationMethods extends Module {
     if (this.moduleEval((mod) => Object.prototype.hasOwnProperty.call(mod, method))) return;
 
     const fn = function (this: any, ...args: any[]) {
-      return scoping(this, () => this._model[method](...args));
+      return this.scoping(() => this._model[method](...args));
     };
     this.moduleEval((mod) => {
       mod[method] = fn;
@@ -150,7 +148,7 @@ export class ClassSpecificRelation {
         model.generateRelationMethod(method);
       }
 
-      return scoping(this, () => (model as any)[method](...args));
+      return this.scoping(() => (model as any)[method](...args));
     } else {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of ${this.constructor.name}`,
@@ -173,26 +171,6 @@ export function create(
 /** @internal */
 export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCtor {
   return DelegateCache.relationDelegateClass.call(model, this);
-}
-
-function scoping(relation: any, block: () => unknown): unknown {
-  const model = relation._model as typeof Base;
-  const scope =
-    _CollectionProxyCtor && relation instanceof _CollectionProxyCtor ? relation.scope() : relation;
-  const prev = ScopeRegistry.currentScope(model);
-  (model as any).setCurrentScope(scope);
-  let result: unknown;
-  try {
-    result = block();
-  } catch (e) {
-    (model as any).setCurrentScope(prev);
-    throw e;
-  }
-  if (result instanceof Promise) {
-    return result.finally(() => (model as any).setCurrentScope(prev));
-  }
-  (model as any).setCurrentScope(prev);
-  return result;
 }
 
 /**
