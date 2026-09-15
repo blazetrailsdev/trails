@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DateTime as RubyDateTime,
   Temporal,
@@ -28,9 +28,6 @@ import {
   daysInMonth,
   daysInYear,
   allDay,
-  isToday,
-  isTomorrow,
-  isYesterday,
   isPast,
   isFuture,
   nextWeek,
@@ -41,7 +38,19 @@ import {
 } from "../time-ext.js";
 import { toFs, DATE_FORMATS, formattedOffset, xmlschema } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
-import { lastQuarter } from "./date-and-time/calculations.js";
+import {
+  lastQuarter,
+  isNextDay,
+  isPrevDay,
+  isToday,
+  isTomorrow,
+  isYesterday,
+} from "./date-and-time/calculations.js";
+
+function stubDateCurrent(): void {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2000, 0, 1, 12));
+}
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -108,6 +117,7 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
 
 const savedTZ = process.env.TZ;
 afterEach(() => {
+  vi.useRealTimers();
   if (savedTZ === undefined) {
     delete process.env.TZ;
   } else {
@@ -908,49 +918,67 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("today with time local", () => {
-    const t = new Date();
-    expect(isToday(t)).toBe(true);
+    stubDateCurrent();
+    expect(isToday(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isToday(RubyTime.local(2000, 1, 1, 0))).toBe(true);
+    expect(isToday(RubyTime.local(2000, 1, 1, 23, 59, 59))).toBe(true);
+    expect(isToday(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("today with time utc", () => {
-    const t = new Date();
-    expect(isToday(t)).toBe(true);
+    stubDateCurrent();
+    expect(isToday(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isToday(RubyTime.utc(2000, 1, 1, 0))).toBe(true);
+    expect(isToday(RubyTime.utc(2000, 1, 1, 23, 59, 59))).toBe(true);
+    expect(isToday(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("yesterday with time local", () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday(yesterday)).toBe(true);
+    stubDateCurrent();
+    expect(isYesterday(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isYesterday(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isYesterday(RubyTime.local(1999, 12, 31))).toBe(true);
+    expect(isYesterday(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("yesterday with time utc", () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday(yesterday)).toBe(true);
+    stubDateCurrent();
+    expect(isYesterday(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isYesterday(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isYesterday(RubyTime.utc(1999, 12, 31))).toBe(true);
+    expect(isYesterday(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("prev day with time utc", () => {
-    const t = new Date();
-    const result = asDate(prevDay(t));
-    expect(result < t).toBe(true);
+    stubDateCurrent();
+    expect(isPrevDay(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isPrevDay(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isPrevDay(RubyTime.utc(1999, 12, 31))).toBe(true);
+    expect(isPrevDay(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("tomorrow with time local", () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow(tomorrow)).toBe(true);
+    stubDateCurrent();
+    expect(isTomorrow(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isTomorrow(RubyTime.local(2000, 1, 2, 0))).toBe(true);
+    expect(isTomorrow(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isTomorrow(RubyTime.local(2000, 1, 1, 0))).toBe(false);
   });
 
   it("tomorrow with time utc", () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow(tomorrow)).toBe(true);
+    stubDateCurrent();
+    expect(isTomorrow(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isTomorrow(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
+    expect(isTomorrow(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isTomorrow(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
   });
 
   it("next day with time utc", () => {
-    const t = new Date();
-    const result = asDate(nextDay(t));
-    expect(result > t).toBe(true);
+    stubDateCurrent();
+    expect(isNextDay(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isNextDay(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
+    expect(isNextDay(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isNextDay(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
   });
 
   it("past with time current as time local", () => {
@@ -1211,16 +1239,19 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("prev day with time local", () => {
-    const t = new Date();
-    const result = asDate(prevDay(t));
-    expect(result < t).toBe(true);
+    stubDateCurrent();
+    expect(isPrevDay(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isPrevDay(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isPrevDay(RubyTime.local(1999, 12, 31))).toBe(true);
+    expect(isPrevDay(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("next day with time local", () => {
-    const t = d(2005, 6, 15, 12, 0, 0);
-    const result = asDate(nextDay(t));
-    expect(result.getDate()).toBe(16);
-    expect(result.getMonth()).toBe(5);
+    stubDateCurrent();
+    expect(isNextDay(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isNextDay(RubyTime.local(2000, 1, 2, 0))).toBe(true);
+    expect(isNextDay(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isNextDay(RubyTime.local(2000, 1, 1, 0))).toBe(false);
   });
 
   it("prev day", () => {
