@@ -718,10 +718,7 @@ export function _buildAssociationInstance(
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  if (instance.isCollection()) {
-    if (instance.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
-    return;
-  }
+  if (instance.isCollection()) return;
   const cached = this._associationCache(name);
   if (cached === instance) return;
   if (cached !== undefined) {
