@@ -255,6 +255,26 @@ describe("IO", () => {
     });
   });
 
+  it("a bom| mode strips a UTF-8 byte order mark before the read", () => {
+    // vendor/ruby/io.c:7085-7163, 7196
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, Uint8Array.from([0xef, 0xbb, 0xbf, 0x68, 0x69]));
+    File.open(path, "r:bom|utf-8", (file) => {
+      expect(file.read()).toBe("hi");
+    });
+  });
+
+  it("a bom| mode on a file with no mark clears the external half of the pair", () => {
+    // vendor/ruby/io.c:7161 — ruby 3.3 answers EUC-JP and nil.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    File.open(path, "r:bom|utf-8:euc-jp", (file) => {
+      expect(file.externalEncoding()).toBe(Encoding.find("EUC-JP"));
+      expect(file.internalEncoding()).toBeNull();
+      expect(file.read()).toBe("hi");
+    });
+  });
+
   it("a bom| prefix on a non-UTF encoding warns and keeps that encoding", () => {
     // vendor/ruby/io.c:6678 — rb_enc_warn "BOM with non-UTF encoding %s is nonsense".
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");

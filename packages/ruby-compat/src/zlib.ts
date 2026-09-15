@@ -8,9 +8,13 @@ import { getZlib } from "./zlib-adapter.js";
  * to `gzfile_wrap` (`zlib.c:3178`), which closes it on the way out of a block.
  */
 class GzipFile<IO extends { close(): void } = File> {
+  /** `ZSTREAM_FLAG_READY` (`vendor/ruby/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
+  private zstreamReady = true;
+
   constructor(protected io: IO) {}
 
   close(): Promise<void> | void {
+    this.zstreamReady = false;
     this.io.close();
   }
 }
@@ -107,6 +111,13 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 }
 
+/** `gzfile_ensure_close` (`vendor/ruby/ext/zlib/zlib.c:3165-3175`). */
+function gzfileEnsureClose(gz: GzipReader | GzipWriter): Promise<void> | void {
+  if (gz["zstreamReady"]) {
+    return gz.close();
+  }
+}
+
 async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
   gz: G,
   block: (gz: G) => T | Promise<T>,
@@ -114,7 +125,7 @@ async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
   try {
     return await block(gz);
   } finally {
-    await gz.close();
+    await gzfileEnsureClose(gz);
   }
 }
 
