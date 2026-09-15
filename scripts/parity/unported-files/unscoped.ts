@@ -422,7 +422,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "instance test object to construct and run from inside another test, and trails' " +
       "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
       "setup has a counterpart; the `fixtures :all` glob it relies on is still unported " +
-      "(port-test-fixtures-all-glob). The other 3 cases are ported in test-fixtures.test.ts.",
+      "(CONVERGEABLE port-test-fixtures-all-glob). The other 3 cases are ported in test-fixtures.test.ts.",
   },
   {
     pattern: "encryption/encrypted_fixtures.rb",
