@@ -7,7 +7,7 @@ import type {
   SqliteStatement,
 } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
-import { PRAGMA_SETTERS, setPragma } from "../sqlite/pragmas.js";
+import { Pragmas } from "../sqlite/pragmas.js";
 import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -48,7 +48,7 @@ import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
 import { Attribute as ModelAttribute, IntegerType, FloatType } from "@blazetrails/activemodel";
-import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
+import { camelize, isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
@@ -1532,7 +1532,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
     await super.configureConnection();
 
-    const stmts: [string, string][] = [];
     const pragmas = fetch<Record<string, string | number | boolean>>(
       cfg as unknown as Record<string, unknown>,
       "pragmas",
@@ -1542,14 +1541,15 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       ...SQLite3Adapter.DEFAULT_PRAGMAS,
       ...pragmas,
     })) {
-      if (PRAGMA_SETTERS.has(pragma)) {
-        stmts.push([setPragma(pragma, value), `SQLite pragma '${pragma}'`]);
+      const setter = `set${camelize(pragma)}`;
+      if (hasKey(Pragmas, setter)) {
+        await Pragmas[setter as keyof typeof Pragmas].call(
+          { execute: (sql: string) => this._rawConnection!.exec(sql) },
+          value,
+        );
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);
       }
-    }
-    for (const [sql] of stmts) {
-      await this._rawConnection!.pragma(sql);
     }
   }
 
