@@ -800,15 +800,6 @@ export async function findByBang(this: CoreHost, ...args: any[]): Promise<any> {
 
 /** @internal */
 export class InspectionMask extends DelegateClass(String) {
-  inspect(): string {
-    return String(this.__getobj__());
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  toJSON(): string {
-    return String(this.__getobj__());
-  }
-
   prettyPrint(pp: PrettyPrinter): void {
     pp.text(String(this.__getobj__()));
   }
