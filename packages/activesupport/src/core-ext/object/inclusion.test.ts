@@ -7,18 +7,20 @@ import { tomorrow } from "../date/calculations.js";
 
 describe("InTest", () => {
   it("in array", () => {
-    expect(isIn(1, [1, 2, 3])).toBe(true);
-    expect(isIn(4, [1, 2, 3])).toBe(false);
+    expect(isIn(1, [1, 2])).toBeTruthy();
+    expect(isIn(3, [1, 2])).toBeFalsy();
   });
 
   it("in hash", () => {
-    expect(isIn("a", { a: 1, b: 2 })).toBe(true);
-    expect(isIn("c", { a: 1, b: 2 })).toBe(false);
+    const h = { a: 100, b: 200 };
+    expect(isIn("a", h)).toBeTruthy();
+    expect(isIn("z", h)).toBeFalsy();
   });
 
   it("in string", () => {
-    expect(isIn("ell", "hello")).toBe(true);
-    expect(isIn("xyz", "hello")).toBe(false);
+    expect(isIn("lo", "hello")).toBeTruthy();
+    expect(isIn("ol", "hello")).toBeFalsy();
+    expect(isIn("h", "hello")).toBeTruthy();
   });
 
   it("in range", () => {
@@ -27,9 +29,9 @@ describe("InTest", () => {
   });
 
   it("in set", () => {
-    const set = new Set([1, 2, 3]);
-    expect(isIn(2, set)).toBe(true);
-    expect(isIn(4, set)).toBe(false);
+    const s = new Set([1, 2]);
+    expect(isIn(1, s)).toBeTruthy();
+    expect(isIn(3, s)).toBeFalsy();
   });
 
   it("in date range", () => {
@@ -42,7 +44,8 @@ describe("InTest", () => {
   });
 
   it("presence in", () => {
-    expect(presenceIn(2, [1, 2, 3])).toBe(2);
-    expect(presenceIn(4, [1, 2, 3])).toBeNull();
+    expect(presenceIn("stuff", ["lots", "of", "stuff"])).toEqual("stuff");
+    expect(presenceIn("stuff", ["lots", "of", "crap"])).toBeNull();
+    expect(() => presenceIn(1, 1 as never)).toThrow(ArgumentError);
   });
 });

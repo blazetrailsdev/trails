@@ -35,16 +35,10 @@ describe("ObjectInstanceVariableTest", () => {
   });
 
   it("instance exec with frozen obj", () => {
-    const obj = globalThis.Object.freeze({ x: 10 });
-    expect(() => {
-      function instanceExec<T, R>(o: T, fn: (this: T) => R): R {
-        return fn.call(o);
-      }
-      const r = instanceExec(obj, function (this: typeof obj) {
-        return this.x;
-      });
-      expect(r).toBe(10);
-    }).not.toThrow();
+    const reverse = function (this: string, v: string) {
+      return [[...this].reverse().join(""), v];
+    };
+    expect(reverse.call("hello", "goodbye")).toEqual(["olleh", "goodbye"]);
   });
 
   it("instance exec nested", () => {

@@ -8,7 +8,11 @@ export class Object {
       case "date":
         return actsLikeDate(self) || respondTo.call(self, "acts_like_date?");
       case "string":
-        return respondTo.call(self, "acts_like_string?");
+        return (
+          typeof self === "string" ||
+          self instanceof String ||
+          respondTo.call(self, "acts_like_string?")
+        );
       default:
         return respondTo.call(self, `acts_like_${duck}?`);
     }

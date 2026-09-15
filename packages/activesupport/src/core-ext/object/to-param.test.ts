@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { toParam } from "../../index.js";
 
+class CustomString extends String {
+  toParam() {
+    return `custom-${this}`;
+  }
+}
+
 describe("ToParamTest", () => {
   it("object", () => {
     const foo = { toString: () => "foo" };
@@ -18,6 +24,9 @@ describe("ToParamTest", () => {
 
   it("array", () => {
     expect(toParam([])).toBe("");
-    expect(toParam([1, 2, 3, 4])).toBe("1/2/3/4");
+    let array: unknown[] = [1, 2, 3, 4];
+    expect(toParam(array)).toBe("1/2/3/4");
+    array = [1, "3", { a: 1, b: 2 }, null, true, false, new CustomString("object")];
+    expect(toParam(array)).toBe("1/3/a=1&b=2//true/false/custom-object");
   });
 });

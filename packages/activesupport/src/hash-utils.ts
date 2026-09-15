@@ -1,4 +1,4 @@
-import { ArgumentError, isSymbol, valuesAt } from "@blazetrails/ruby-compat";
+import { ArgumentError, Hash, dup, isSymbol, valuesAt } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
@@ -38,6 +38,18 @@ export function deepMergeBang<T extends AnyObject>(target: T, other: AnyObject):
 export function deepDup<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map((item) => deepDup(item)) as T;
+  if (obj instanceof Hash) {
+    const hash = dup(obj);
+    for (const [key, value] of obj) {
+      if (typeof key === "string") {
+        hash.set(key, deepDup(value));
+      } else {
+        hash.delete(key);
+        hash.set(deepDup(key), deepDup(value));
+      }
+    }
+    return hash as T;
+  }
   if (typeof (obj as { deepDup?: unknown }).deepDup === "function") {
     return (obj as unknown as { deepDup(): T }).deepDup();
   }
@@ -389,23 +401,25 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
     if (value.length === 0) return [];
     return value.flatMap((v) => buildQueryParts(v, `${prefix}[]`));
   }
-  if (typeof value === "object") {
-    if (typeof (value as { toParam?: unknown }).toParam === "function") {
-      return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
-    }
+  if (isPlainObject(value)) {
     const keys = Object.keys(value as Record<string, unknown>);
     if (keys.length === 0) return [];
     return keys.flatMap((k) =>
       buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`),
     );
   }
-  return [`${encodeQueryKey(prefix)}=${encodeQueryValue(value)}`];
+  return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
 }
 
 export function toQuery(
-  obj: Record<string, unknown> | Map<unknown, unknown>,
+  obj: Record<string, unknown> | Map<unknown, unknown> | unknown[],
   namespace?: string,
 ): string {
+  if (Array.isArray(obj)) {
+    const prefix = `${namespace}[]`;
+    if (obj.length === 0) return buildQueryParts(null, prefix).join("&");
+    return obj.flatMap((value) => buildQueryParts(value, prefix)).join("&");
+  }
   const entries: [string, unknown][] = (
     obj instanceof Map ? [...obj.entries()] : Object.entries(obj)
   ).map(([key, value]) => [String(toParam(key)), value]);

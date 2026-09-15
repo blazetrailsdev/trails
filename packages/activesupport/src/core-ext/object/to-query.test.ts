@@ -1,68 +1,100 @@
 import { describe, expect, it } from "vitest";
 import { toQuery } from "../../index.js";
+import { htmlSafe } from "../string/output-safety.js";
 
 describe("ToQueryTest", () => {
+  function assertQueryEqual(expected: string, actual: Parameters<typeof toQuery>[0]) {
+    expect(toQuery(actual).split("&")).toEqual(expected.split("&"));
+  }
+
   it("simple conversion", () => {
-    expect(toQuery({ a: 1, b: 2 })).toBe("a=1&b=2");
+    assertQueryEqual("a=10", { a: 10 });
   });
 
   it("cgi escaping", () => {
-    const result = toQuery({ "a b": "c d" });
-    expect(result).toContain("a+b=c+d");
+    assertQueryEqual("a%3Ab=c+d", { "a:b": "c d" });
   });
 
   it("html safe parameter key", () => {
-    const result = toQuery({ "data-value": "test" });
-    expect(result).toContain("data-value=test");
+    assertQueryEqual("a%3Ab=c+d", new Map([[htmlSafe("a:b"), "c d"]]));
   });
 
   it("html safe parameter value", () => {
-    const result = toQuery({ key: "hello world" });
-    expect(result).toContain("key=");
-    expect(result).toContain("hello");
+    assertQueryEqual("a=%5B10%5D", { a: htmlSafe("[10]") });
   });
 
   it("nil parameter value", () => {
-    expect(toQuery({ a: null })).toBe("a=");
+    const empty = new (class {
+      toParam() {
+        return null;
+      }
+    })();
+    assertQueryEqual("a=", { a: empty });
   });
 
   it("nested conversion", () => {
-    expect(toQuery({ a: { b: 1 } })).toBe("a%5Bb%5D=1");
+    assertQueryEqual("person%5Blogin%5D=seckar&person%5Bname%5D=Nicholas", {
+      person: { login: "seckar", name: "Nicholas" },
+    });
   });
 
   it("multiple nested", () => {
-    const result = toQuery({ a: { b: { c: 1 } } });
-    expect(result).toBe("a%5Bb%5D%5Bc%5D=1");
+    assertQueryEqual("account%5Bperson%5D%5Bid%5D=20&person%5Bid%5D=10", {
+      account: { person: { id: 20 } },
+      person: { id: 10 },
+    });
   });
 
   it("array values", () => {
-    expect(toQuery({ a: [1, 2] })).toBe("a%5B%5D=1&a%5B%5D=2");
+    assertQueryEqual("person%5Bid%5D%5B%5D=10&person%5Bid%5D%5B%5D=20", {
+      person: { id: [10, 20] },
+    });
   });
 
   it("array values are not sorted", () => {
-    const result = toQuery({ a: [3, 1, 2] });
-    expect(result).toBe("a%5B%5D=3&a%5B%5D=1&a%5B%5D=2");
+    assertQueryEqual("person%5Bid%5D%5B%5D=20&person%5Bid%5D%5B%5D=10", {
+      person: { id: [20, 10] },
+    });
   });
 
   it("empty array", () => {
-    expect(toQuery({ a: [] })).toBe("");
+    expect(toQuery([], "person")).toEqual("person%5B%5D=");
   });
 
   it("nested empty hash", () => {
-    expect(toQuery({ a: {} })).toBe("");
+    expect(toQuery({})).toEqual("");
+    assertQueryEqual("a=1&b%5Bc%5D=3", { a: 1, b: { c: 3, d: {} } });
+    assertQueryEqual("", { a: { b: { c: {} } } });
+    assertQueryEqual("b%5Bc%5D=false&b%5Be%5D=&b%5Bf%5D=&p=12", {
+      p: 12,
+      b: { c: false, e: null, f: "" },
+    });
+    assertQueryEqual("b%5Bc%5D=3&b%5Bf%5D=", { b: { c: 3, k: {}, f: "" } });
+    assertQueryEqual("b=3", { a: [], b: 3 });
   });
 
   it("hash with namespace", () => {
-    expect(toQuery({ b: 1 }, "ns")).toBe("ns%5Bb%5D=1");
+    const hash = { name: "Nakshay", nationality: "Indian" };
+    expect(toQuery(hash, "user")).toEqual("user%5Bname%5D=Nakshay&user%5Bnationality%5D=Indian");
   });
 
   it("hash sorted lexicographically", () => {
-    const result = toQuery({ z: 1, a: 2, m: 3 });
-    expect(result).toBe("a=2&m=3&z=1");
+    const hash = { type: "human", name: "Nakshay" };
+    expect(toQuery(hash)).toEqual("name=Nakshay&type=human");
   });
 
   it("hash not sorted lexicographically for nested structure", () => {
-    const result = toQuery({ b: [3, 1, 2] });
-    expect(result.indexOf("3")).toBeLessThan(result.indexOf("1"));
+    const params = {
+      foo: {
+        contents: [
+          { name: "gorby", id: "123" },
+          { name: "puff", d: "true" },
+        ],
+      },
+    };
+    const expected =
+      "foo[contents][][name]=gorby&foo[contents][][id]=123&foo[contents][][name]=puff&foo[contents][][d]=true";
+
+    expect(decodeURIComponent(toQuery(params).replace(/\+/g, " "))).toEqual(expected);
   });
 });

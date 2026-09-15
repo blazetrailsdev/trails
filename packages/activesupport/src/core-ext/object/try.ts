@@ -11,6 +11,7 @@ export const Tryable = {
     if (typeof fn === "function") {
       return fn.apply(obj, args);
     }
+    if (args.length === 0) return fn;
     return undefined;
   },
 
@@ -35,10 +36,10 @@ export class Delegator implements Tryable {
   }
 
   try(method: string, ...args: unknown[]): unknown {
-    return Tryable.try(this._delegate, method, ...args);
+    return Tryable.try(method in this ? this : this._delegate, method, ...args);
   }
 
   tryBang(method: string, ...args: unknown[]): unknown {
-    return Tryable.tryBang(this._delegate, method, ...args);
+    return Tryable.tryBang(method in this ? this : this._delegate, method, ...args);
   }
 }

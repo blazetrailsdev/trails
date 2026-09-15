@@ -1,158 +1,144 @@
 import { describe, expect, it } from "vitest";
 import { tryBang, tryCall, tryWith } from "../../try.js";
+import { assertNotRespondTo } from "../../testing/assertions.js";
 import { Tryable, Delegator } from "./try.js";
 
+class PrivateKlass {
+  #privateMethod() {
+    return "private method";
+  }
+  callPrivate() {
+    return this.#privateMethod();
+  }
+}
+
+class Decorator extends Delegator {
+  delegatorMethod() {
+    return "delegator method";
+  }
+
+  reverse() {
+    return "overridden reverse";
+  }
+
+  #privateDelegatorMethod() {
+    return "private delegator method";
+  }
+
+  callPrivate() {
+    return this.#privateDelegatorMethod();
+  }
+}
+
+const reverse = (s: string) => [...s].reverse().join("");
+
 describe("ObjectTryTest", () => {
+  const string = "Hello";
+  const str = string as unknown as object;
+
   it("nonexisting method", () => {
-    const obj = { name: "Alice" };
-    expect(tryCall(obj, "nonexistent")).toBeUndefined();
+    const method = "undefinedMethod";
+    assertNotRespondTo(string, method);
+    expect(tryCall(str, method)).toBeUndefined();
   });
 
   it("nonexisting method with arguments", () => {
-    const obj = { name: "Alice" };
-    expect(tryCall(obj, "nonexistent", "arg")).toBeUndefined();
+    const method = "undefinedMethod";
+    assertNotRespondTo(string, method);
+    expect(tryCall(str, method, "llo", "y")).toBeUndefined();
   });
 
   it("nonexisting method bang", () => {
-    const obj = { name: "Alice" };
-    expect(() => tryBang(obj, "nonexistent")).toThrow();
+    const method = "undefinedMethod";
+    assertNotRespondTo(string, method);
+    expect(() => tryBang(str, method)).toThrow(TypeError);
   });
 
   it("nonexisting method with arguments bang", () => {
-    const obj = { name: "Alice" };
-    expect(() => tryBang(obj, "nonexistent", "arg")).toThrow();
+    const method = "undefinedMethod";
+    assertNotRespondTo(string, method);
+    expect(() => tryBang(str, method, "llo", "y")).toThrow(TypeError);
   });
 
   it("valid method", () => {
-    const obj = {
-      upcase() {
-        return "HELLO";
-      },
-    };
-    expect(tryCall(obj, "upcase")).toBe("HELLO");
+    expect(tryCall(str, "length")).toEqual(5);
   });
 
   it("argument forwarding", () => {
-    const obj = {
-      slice(n: number) {
-        return "hello".slice(0, n);
-      },
-    };
-    expect(tryCall(obj, "slice", 3)).toBe("hel");
+    expect(tryCall(str, "replace", "llo", "y")).toEqual("Hey");
   });
 
   it("block forwarding", () => {
-    const obj = { name: "Alice" };
-    expect(tryWith(obj, (o) => o.name.toUpperCase())).toBe("ALICE");
+    expect(tryCall(str, "replace", "llo", (_match: string) => "y")).toEqual("Hey");
   });
 
   it("nil to type", () => {
-    expect(tryCall(null, "upcase")).toBeUndefined();
-    expect(tryCall(undefined, "upcase")).toBeUndefined();
+    expect(tryCall(null, "toString")).toBeUndefined();
+    expect(tryCall(null, "valueOf")).toBeUndefined();
   });
 
   it("false try", () => {
-    expect(tryCall(false as any, "nonexistent")).toBeUndefined();
+    expect(tryCall(false as unknown as object, "toString")).toEqual("false");
   });
 
   it("try only block", () => {
-    const obj = { val: 42 };
-    expect(tryWith(obj, (o) => o.val)).toBe(42);
+    expect(tryWith(string, reverse)).toEqual(reverse(string));
   });
 
   it("try only block bang", () => {
-    const obj = { val: 99 };
-    expect(tryWith(obj, (o) => o.val)).toBe(99);
+    expect(tryWith(string, reverse)).toEqual(reverse(string));
   });
 
   it("try only block nil", () => {
-    expect(tryWith(null, (o: any) => o.val)).toBeUndefined();
+    let ran = false;
+    tryWith(null, () => {
+      ran = true;
+    });
+    expect(ran).toEqual(false);
   });
 
   it("try with instance eval block", () => {
-    const obj = { x: 10 };
-    const result = tryWith(obj, function (o) {
-      return o.x * 2;
-    });
-    expect(result).toBe(20);
+    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
   });
 
   it("try with instance eval block bang", () => {
-    const obj = { x: 5 };
-    const result = tryWith(obj, (o) => o.x + 1);
-    expect(result).toBe(6);
+    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
   });
 
   it("try with private method bang", () => {
-    const obj = { name: "Alice" };
-    expect(() => tryBang(obj, "nonExistingPrivate")).toThrow();
+    expect(() => tryBang(new PrivateKlass(), "privateMethod")).toThrow(TypeError);
   });
 
   it("try with private method", () => {
-    const obj = { name: "Alice" };
-    expect(tryCall(obj, "name")).toBe("Alice");
+    expect(tryCall(new PrivateKlass(), "privateMethod")).toBeUndefined();
   });
 
   it("try with method on delegator", () => {
-    const obj = {
-      delegate: {
-        value() {
-          return 42;
-        },
-      },
-    };
-    expect(tryCall(obj.delegate, "value")).toBe(42);
+    expect(new Decorator(string).try("delegatorMethod")).toEqual("delegator method");
   });
 
   it("try with method on delegator target", () => {
-    const target = {
-      info() {
-        return "target";
-      },
-    };
-    expect(tryCall(target, "info")).toBe("target");
+    expect(new Decorator(string).try("length")).toEqual(5);
   });
 
   it("try with overridden method on delegator", () => {
-    const obj = {
-      toString() {
-        return "custom";
-      },
-    };
-    expect(tryCall(obj, "toString")).toBe("custom");
+    expect(new Decorator(string).try("reverse")).toEqual("overridden reverse");
   });
 
   it("try with private method on delegator", () => {
-    const obj = {
-      pub() {
-        return "public";
-      },
-    };
-    expect(tryCall(obj, "pub")).toBe("public");
-    expect(tryCall(obj, "priv")).toBeUndefined();
+    expect(new Decorator(string).try("privateDelegatorMethod")).toBeUndefined();
   });
 
   it("try with private method on delegator bang", () => {
-    const obj = {
-      pub() {
-        return "ok";
-      },
-    };
-    expect(() => tryBang(obj, "priv")).toThrow();
+    expect(() => new Decorator(string).tryBang("privateDelegatorMethod")).toThrow(TypeError);
   });
 
   it("try with private method on delegator target", () => {
-    const target = {
-      doIt() {
-        return "done";
-      },
-    };
-    expect(tryCall(target, "doIt")).toBe("done");
+    expect(new Decorator(new PrivateKlass()).try("privateMethod")).toBeUndefined();
   });
 
   it("try with private method on delegator target bang", () => {
-    const target = {};
-    expect(() => tryBang(target, "missing")).toThrow();
+    expect(() => new Decorator(new PrivateKlass()).tryBang("privateMethod")).toThrow(TypeError);
   });
 });
 
