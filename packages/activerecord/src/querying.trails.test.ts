@@ -207,20 +207,22 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("accepts preparable/async/allowRetry opts without error", async () => {
-    vi.spyOn(Topic.connection, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
-    const result = await _queryBySql.call(Topic, "SELECT 1", [], {
-      preparable: true,
-      async: false,
-      allowRetry: true,
+    const result = await Topic.withConnection((c) => {
+      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
+      return _queryBySql.call(Topic, c, "SELECT 1", [], {
+        preparable: true,
+        async: false,
+        allowRetry: true,
+      }) as Promise<Result>;
     });
     expect(result.toArray()).toEqual([]);
   });
 
   it("opts default to empty object — omitting opts still works", async () => {
-    vi.spyOn(Topic.connection, "internalExecQuery").mockResolvedValueOnce(
-      Result.fromRowHashes([{ id: 1 }]),
-    );
-    const result = await _queryBySql.call(Topic, "SELECT 1");
+    const result = await Topic.withConnection((c) => {
+      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([{ id: 1 }]));
+      return _queryBySql.call(Topic, c, "SELECT 1") as Promise<Result>;
+    });
     expect(result.toArray()).toEqual([{ id: 1 }]);
   });
 });

@@ -656,10 +656,10 @@ export class Relation<T extends Base> {
         });
       } else {
         return this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
-          return c.selectAll(this.arel(), `${this.model.name} Load`, [], { async });
+          return this.model._queryBySql(c, this.arel(), [], { async });
         });
       }
-    });
+    }) as Result | Promise<Result> | FutureResult | Complete;
   }
 
   /** @missingRailsCall empty? — PERMANENT */

@@ -122,9 +122,12 @@ export function sanitizeSql(
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
   if (isBlankCondition(condition)) return null;
-  if (typeof condition === "string") return condition;
-  const [template, ...binds] = condition as [string, ...unknown[]];
-  return this.sanitizeSqlArray(template, ...binds);
+  if (Array.isArray(condition)) {
+    const [template, ...binds] = condition;
+    return this.sanitizeSqlArray(template, ...binds);
+  } else {
+    return condition as string;
+  }
 }
 
 /** @internal */
