@@ -239,9 +239,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         stream.end();
         await ended;
       };
-      const finished = readMore();
+      let finished: Promise<void> | null = null;
       return {
         read: async () => {
+          finished ??= readMore();
           await finished;
           if (failure !== null) throw failure;
           const dst = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
