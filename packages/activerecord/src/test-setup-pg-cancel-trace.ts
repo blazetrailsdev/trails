@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { QueryCanceled } from "./errors.js";
+import type { QueryCanceled } from "./errors.js";
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 interface CancelRecord {
@@ -19,10 +19,15 @@ interface TracedAdapter {
   _cancelAnyRunningQuery(...args: unknown[]): Promise<void>;
 }
 
-type TraceGlobal = { [HANDLER_KEY]?: (reason: unknown) => void };
-
-const HANDLER_KEY = Symbol.for("activerecord.pg.cancelTrace");
+const TRACE_KEY = Symbol.for("activerecord.pg.cancelTrace");
+const WRAPPED_KEY = Symbol.for("activerecord.pg.cancelTrace.wrapped");
 const MAX_RECORDS = 50;
+
+interface TraceState {
+  records: CancelRecord[];
+}
+
+type TraceHost = { [TRACE_KEY]?: TraceState };
 
 function now(): string {
   return Temporal.Now.instant().toString();
@@ -37,33 +42,21 @@ function currentTest(): { test: string | undefined; file: string | undefined } {
   }
 }
 
-const traceGlobal = globalThis as TraceGlobal;
-
-if (!traceGlobal[HANDLER_KEY]) {
-  const records: CancelRecord[] = [];
-  const proto = PostgreSQLAdapter.prototype as unknown as TracedAdapter;
-  const original = proto._cancelAnyRunningQuery;
-
-  proto._cancelAnyRunningQuery = function (this: TracedAdapter, ...args: unknown[]) {
-    records.push({
-      at: now(),
-      pid: this._client?.processID,
-      transactionStatus: this._rawConnection == null ? "no raw connection" : this.transactionStatus,
-      ...currentTest(),
-      stack: new Error("cancel issued").stack,
-    });
-    if (records.length > MAX_RECORDS) records.shift();
-    return original.apply(this, args);
-  };
-
-  const handler = (reason: unknown) => {
-    if (!(reason instanceof QueryCanceled)) return;
+function installWorkerTrace(): TraceState {
+  const host = process as unknown as TraceHost;
+  const existing = host[TRACE_KEY];
+  if (existing) return existing;
+  const state: TraceState = { records: [] };
+  host[TRACE_KEY] = state;
+  process.on("unhandledRejection", (reason: unknown) => {
+    if (!(reason instanceof Error) || reason.name !== "ActiveRecord::QueryCanceled") return;
+    const { records } = state;
     console.error(
       [
         "[pg-cancel-trace] unhandled QueryCanceled",
         `  at: ${now()}`,
         `  surfaced during: ${JSON.stringify(currentTest())}`,
-        `  sql: ${reason.sql ?? "(none)"}`,
+        `  sql: ${(reason as QueryCanceled).sql ?? "(none)"}`,
         `  adapter cancels recorded in this worker (${records.length}, oldest first):`,
         ...records.map((r) =>
           [
@@ -79,8 +72,25 @@ if (!traceGlobal[HANDLER_KEY]) {
           : "",
       ].join("\n"),
     );
-  };
+  });
+  return state;
+}
 
-  traceGlobal[HANDLER_KEY] = handler;
-  process.on("unhandledRejection", handler);
+const state = installWorkerTrace();
+const proto = PostgreSQLAdapter.prototype as unknown as TracedAdapter & { [WRAPPED_KEY]?: true };
+
+if (!proto[WRAPPED_KEY]) {
+  const original = proto._cancelAnyRunningQuery;
+  proto[WRAPPED_KEY] = true;
+  proto._cancelAnyRunningQuery = function (this: TracedAdapter, ...args: unknown[]) {
+    state.records.push({
+      at: now(),
+      pid: this._client?.processID,
+      transactionStatus: this._rawConnection == null ? "no raw connection" : this.transactionStatus,
+      ...currentTest(),
+      stack: new Error("cancel issued").stack,
+    });
+    if (state.records.length > MAX_RECORDS) state.records.shift();
+    return original.apply(this, args);
+  };
 }
