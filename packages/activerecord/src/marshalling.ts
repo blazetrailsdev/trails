@@ -88,5 +88,13 @@ function marshalLoad(this: MarshallingHost, state: unknown[]): void {
   }
 }
 
+declare module "./base.js" {
+  interface Base {
+    _marshalDump71(): unknown[];
+    marshalDump?(): unknown[];
+    marshalLoad(state: unknown[]): void;
+  }
+}
+
 export const Methods = new Module();
 Methods.include({ _marshalDump71, marshalLoad });
