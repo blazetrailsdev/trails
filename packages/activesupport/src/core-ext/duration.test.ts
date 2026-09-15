@@ -462,10 +462,23 @@ describe("DurationTest", () => {
     expect(scalar.compareTo("foo")).toBeNull();
   });
 
-  it("scalar plus", () => {
-    expect(Duration.seconds(10).plus(10).inSeconds()).toBe(20);
-    expect(Duration.seconds(10).plus(10) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).plus(Duration.seconds(10)).inSeconds()).toBe(20);
+  it("scalar plus", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(10)[0].plus(scalar).value).toEqual(20);
+    expect(scalar.coerce(10)[0].plus(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.plus(10).value).toEqual(20);
+    expect(scalar.plus(10)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(10).plus(scalar).value).toEqual(20);
+    expect(Duration.seconds(10).plus(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.plus(Duration.seconds(10)).value).toEqual(20);
+    expect(scalar.plus(Duration.seconds(10))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.plus("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar plus parts", () => {
@@ -474,10 +487,26 @@ describe("DurationTest", () => {
     expect(result.parts.seconds).toBe(10);
   });
 
-  it("scalar minus", () => {
-    expect(Duration.seconds(20).minus(Duration.seconds(10)).inSeconds()).toBe(10);
-    expect(Duration.seconds(20).minus(Duration.seconds(10)) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).minus(5).inSeconds()).toBe(5);
+  it("scalar minus", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(20)[0].minus(scalar).value).toEqual(10);
+    expect(scalar.coerce(20)[0].minus(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.minus(5).value).toEqual(5);
+    expect(scalar.minus(5)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(20).minus(scalar).value).toEqual(10);
+    expect(Duration.seconds(20).minus(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.minus(Duration.seconds(5)).value).toEqual(5);
+    expect(scalar.minus(Duration.seconds(5))).toBeInstanceOf(Duration);
+
+    expect(scalar.minus(Duration.day(1))._parts()).toEqual({ days: -1, seconds: 10 });
+    expect(scalar.minus(Duration.day(-1))._parts()).toEqual({ days: 1, seconds: 10 });
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.minus("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar minus parts", () => {
@@ -486,9 +515,23 @@ describe("DurationTest", () => {
     expect(result.parts.seconds).toBe(10);
   });
 
-  it("scalar multiply", () => {
-    expect(Duration.seconds(2).times(5).inSeconds()).toBe(10);
-    expect(Duration.seconds(2).times(5) instanceof Duration).toBe(true);
+  it("scalar multiply", async () => {
+    const scalar = new Scalar(5);
+
+    expect(scalar.coerce(2)[0].times(scalar).value).toEqual(10);
+    expect(scalar.coerce(2)[0].times(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.times(2).value).toEqual(10);
+    expect(scalar.times(2)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(2).times(scalar).value).toEqual(10);
+    expect(Duration.seconds(2).times(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.times(Duration.seconds(2)).value).toEqual(10);
+    expect(scalar.times(Duration.seconds(2))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.times("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar multiply parts", () => {
@@ -500,16 +543,42 @@ describe("DurationTest", () => {
     expect(Math.round(neg.inSeconds())).toBe(-172800);
   });
 
-  it("scalar divide", () => {
-    expect(Math.round(Duration.seconds(100).dividedBy(10).inSeconds())).toBe(10);
-    expect(Duration.seconds(100).dividedBy(10) instanceof Duration).toBe(true);
+  it("scalar divide", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(100)[0].div(scalar).value).toEqual(10);
+    expect(scalar.coerce(100)[0].div(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.div(2).value).toEqual(5);
+    expect(scalar.div(2)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(100).dividedBy(scalar).value).toEqual(10);
+    expect(Duration.seconds(100).dividedBy(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.div(Duration.seconds(2))).toEqual(5);
+    expect(Object(scalar.div(Duration.seconds(2)))).toBeInstanceOf(Number);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.div("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
-  it("scalar modulo", () => {
-    expect(Duration.seconds(31).modulo(10).inSeconds()).toBeCloseTo(1, 5);
-    expect(Duration.seconds(31).modulo(10) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).modulo(Duration.seconds(3)).inSeconds()).toBeCloseTo(1, 5);
-    expect(Duration.seconds(10).modulo(Duration.seconds(3)) instanceof Duration).toBe(true);
+  it("scalar modulo", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(31)[0].modulo(scalar).value).toEqual(1);
+    expect(scalar.coerce(31)[0].modulo(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.modulo(3).value).toEqual(1);
+    expect(scalar.modulo(3)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(31).modulo(scalar).value).toEqual(1);
+    expect(Duration.seconds(31).modulo(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.modulo(Duration.seconds(3)).value).toEqual(1);
+    expect(scalar.modulo(Duration.seconds(3))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.modulo("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar modulo parts", () => {

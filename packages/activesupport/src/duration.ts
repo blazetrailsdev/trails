@@ -164,6 +164,9 @@ export class Duration {
         this._variable || other._variable,
       );
     } else {
+      if (typeof other !== "number" && !(other instanceof Scalar)) {
+        throw new TypeError(`${rbObjClass(other)} can't be coerced into Integer`);
+      }
       return new Duration(
         this.value + Number(other),
         mergeParts(this.parts, this._partKeys, { seconds: Number(other) }),
@@ -623,11 +626,6 @@ export class Scalar {
     return [new Scalar(other as number), this];
   }
 
-  /** @internal */
-  raiseTypeError(other: unknown): never {
-    throw new TypeError(`no implicit conversion of ${rbObjClass(other)} into ${rbObjClass(this)}`);
-  }
-
   isVariable(): boolean {
     return false;
   }
@@ -737,27 +735,30 @@ export class Scalar {
 
   /** @internal */
   private calculate(op: "+" | "-" | "*" | "/" | "%", other: unknown): Scalar {
+    let otherValue: number;
     if (other instanceof Scalar) {
-      return new Scalar(applyOp(this.value, op, other.value));
+      otherValue = other.value;
     } else if (typeof other === "number") {
-      return new Scalar(applyOp(this.value, op, other));
+      otherValue = other;
     } else {
       this.raiseTypeError(other);
     }
+    switch (op) {
+      case "+":
+        return new Scalar(this.value + otherValue);
+      case "-":
+        return new Scalar(this.value - otherValue);
+      case "*":
+        return new Scalar(this.value * otherValue);
+      case "/":
+        return new Scalar(this.value / otherValue);
+      case "%":
+        return new Scalar(this.value % otherValue);
+    }
   }
-}
 
-function applyOp(value: number, op: "+" | "-" | "*" | "/" | "%", other: number): number {
-  switch (op) {
-    case "+":
-      return value + other;
-    case "-":
-      return value - other;
-    case "*":
-      return value * other;
-    case "/":
-      return value / other;
-    case "%":
-      return value % other;
+  /** @internal */
+  private raiseTypeError(other: unknown): never {
+    throw new TypeError(`no implicit conversion of ${rbObjClass(other)} into ${rbObjClass(this)}`);
   }
 }
