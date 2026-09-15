@@ -1,6 +1,6 @@
 import { getCrypto, type CipherAdapter, type DecipherAdapter } from "./crypto-adapter.js";
 import type { Bytes } from "./fs-adapter.js";
-import { Digest, type DigestInstance } from "./digest.js";
+import { DigestClass, type DigestInstance } from "./digest.js";
 import { SecureRandom } from "./secure-random.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
@@ -174,12 +174,18 @@ export const HMAC = {
  * `OpenSSL` (`vendor/ruby/ext/openssl/lib/openssl.rb:16`), so a ported body
  * spells `OpenSSL::HMAC.digest` the way the Ruby does.
  *
- * `OpenSSL::Digest::MD5` / `SHA1` / `SHA256`
- * (`vendor/ruby/ext/openssl/ossl_digest.c:400`) are the same three algorithms
- * `Digest::MD5` / `SHA1` / `SHA256` name, over the same adapter, so the seat
- * holds one pair of constants rather than two.
- *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
  * (`vendor/ruby/ext/openssl/lib/openssl.rb:16`), which no Rails file defines.
  */
-export const OpenSSL = { Cipher, HMAC, Digest };
+export const OpenSSL = {
+  Cipher,
+  HMAC,
+  Digest: {
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    MD5: new DigestClass("md5", "OpenSSL::Digest::MD5"),
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    SHA1: new DigestClass("sha1", "OpenSSL::Digest::SHA1"),
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    SHA256: new DigestClass("sha256", "OpenSSL::Digest::SHA256"),
+  },
+};

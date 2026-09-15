@@ -1,5 +1,6 @@
 import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { Table, UpdateManager } from "@blazetrails/arel";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { Base } from "../index.js";
@@ -176,6 +177,24 @@ export function makeEncryptedBookThatIgnoresCase() {
       this.encrypts("name", { deterministic: true, ignoreCase: true });
     }
   } as any;
+}
+
+export async function createUnencryptedBookIgnoringCase(
+  encryptedBookThatIgnoresCase: any,
+  { name }: { name: string },
+): Promise<any> {
+  const book = await Contexts.withoutEncryption(() =>
+    encryptedBookThatIgnoresCase.createBang({ name }),
+  );
+
+  const encryptedBooks = new Table("encrypted_books");
+  const um = new UpdateManager(encryptedBooks);
+  um.set([[encryptedBooks.get("name"), name]]);
+  um.where(encryptedBooks.get("id").eq(book.id));
+  await (await encryptedBookThatIgnoresCase.leaseConnection()).update(um);
+
+  await book.reload();
+  return book;
 }
 
 export function makeEncryptedAuthor() {

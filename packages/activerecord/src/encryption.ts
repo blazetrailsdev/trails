@@ -1,3 +1,4 @@
+import { extend } from "@blazetrails/activesupport";
 import { registerEncryptionHooks } from "./encryption-hooks.js";
 import { Base } from "./base.js";
 import { type SchemeOptions } from "./encryption/scheme.js";
@@ -11,6 +12,7 @@ import {
   encryptedAttribute,
   encrypts,
   hasEncryptedAttributes,
+  sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -92,6 +94,8 @@ export function defaultContext(value?: Context): Context {
 export function resetDefaultContext(): void {
   Contexts.resetDefaultContext();
 }
+
+extend(Base, { sourceAttributeFromPreservedAttribute });
 
 Base.validate((record: any) => EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record), {
   if: (record: any) => hasEncryptedAttributes.call(record) && Contexts.context.frozenEncryption,

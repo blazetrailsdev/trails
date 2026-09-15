@@ -1,6 +1,5 @@
 import type { PrependModule } from "@blazetrails/ruby-compat";
 import type { ValueType } from "@blazetrails/activemodel";
-import { EncryptableRecord } from "./encryptable-record.js";
 import { Configurable } from "./configurable-slot.js";
 
 type FixtureRow = Record<string, unknown>;
@@ -9,12 +8,11 @@ interface EncryptedFixtureHost {
   cleanValues: Record<string, unknown>;
 }
 
-type FixtureModelClass =
-  | (typeof EncryptableRecord & {
-      encryptedAttributes?: Set<string>;
-      typeForAttribute(name: string): ValueType;
-    })
-  | null;
+type FixtureModelClass = {
+  sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined;
+  encryptedAttributes?: Set<string>;
+  typeForAttribute(name: string): ValueType;
+} | null;
 
 /** @internal */
 function encryptFixtureData(
@@ -41,8 +39,7 @@ function processPreservedOriginalColumns(
   modelClass: FixtureModelClass,
 ): void {
   for (const attributeName of modelClass?.encryptedAttributes ?? []) {
-    const sourceAttributeName =
-      EncryptableRecord.sourceAttributeFromPreservedAttribute(attributeName);
+    const sourceAttributeName = modelClass!.sourceAttributeFromPreservedAttribute(attributeName);
     if (sourceAttributeName !== undefined) {
       const cleanValue = this.cleanValues[sourceAttributeName];
       const type = modelClass!.typeForAttribute(attributeName);

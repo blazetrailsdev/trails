@@ -3,6 +3,9 @@ import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 
+/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/include/ruby/io.h:368`). */
+const FMODE_SETENC_BY_BOM = 0x00100000;
+
 /**
  * `rb_stat` (`vendor/ruby/file.c:1296`), which `fstat`s an open stream and
  * `stat`s a name, answering `< 0` — `null` here — where the call fails.
@@ -352,6 +355,7 @@ export class File extends IO {
     if (vmode.includes("b")) file.binmode();
     if (estr !== null) file.setEncoding(estr);
     else if (opt?.externalEncoding != null) file.setEncoding(opt.externalEncoding);
+    if (file.mode & FMODE_SETENC_BY_BOM) file.ioSetEncodingByBom();
     if (!block) return file;
     let result: T;
     try {

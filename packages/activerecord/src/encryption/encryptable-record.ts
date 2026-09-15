@@ -32,12 +32,6 @@ function schemeFor(options: SchemeOptions): Scheme {
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
 export class EncryptableRecord {
-  static sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined {
-    return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
-      ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
-      : undefined;
-  }
-
   /**
    * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
    * is absent and `supportUnencryptedData` is false — mirrors Rails
@@ -82,54 +76,11 @@ export class EncryptableRecord {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall encrypted_attribute? — PERMANENT
-   * @missingRailsCall include — PERMANENT
-   */
-  static overrideAccessorsToPreserveOriginal(
-    modelClass: any,
-    name: string,
-    originalAttributeName: string,
-  ): void {
-    if (typeof modelClass.beforeSave === "function") {
-      modelClass.beforeSave((record: any) => {
-        const isNew =
-          typeof record.isNewRecord === "function" ? record.isNewRecord() : !record.isPersisted?.();
-        const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
-          ? record.changedAttributeNamesToSave
-          : [];
-        if (!isNew && !changed.includes(name)) return;
-        record.writeAttribute(originalAttributeName, record.readAttribute(name));
-      });
-    }
-    Object.defineProperty(modelClass.prototype, name, {
-      configurable: true,
-      get(this: any) {
-        const originalValue = this.readAttribute(originalAttributeName);
-        if (originalValue != null) return originalValue;
-        return this.readAttribute(name);
-      },
-      set(this: any, value: unknown) {
-        this.writeAttribute(name, value);
-        this.writeAttribute(originalAttributeName, value);
-      },
-    });
-  }
-
   static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
     superFn();
 
     if (Configurable.config.validateColumnSize) {
-      EncryptableRecord.addLengthValidationForEncryptedColumns(this);
-    }
-  }
-
-  /** @internal */
-  static addLengthValidationForEncryptedColumns(modelClass: any): void {
-    const attrs: Set<string> = modelClass.encryptedAttributes ?? new Set<string>();
-    for (const name of attrs) {
-      validateColumnSize.call(modelClass, name);
+      addLengthValidationForEncryptedColumns.call(this);
     }
   }
 
@@ -156,6 +107,43 @@ export class EncryptableRecord {
       }
     }
   }
+}
+
+/** @internal */
+export function addLengthValidationForEncryptedColumns(this: any): void {
+  const attrs: Set<string> = this.encryptedAttributes ?? new Set<string>();
+  for (const name of attrs) {
+    validateColumnSize.call(this, name);
+  }
+}
+
+/**
+ * @internal
+ * @missingRailsCall include — PERMANENT
+ */
+export function overrideAccessorsToPreserveOriginal(
+  this: any,
+  name: string,
+  originalAttributeName: string,
+): void {
+  Object.defineProperty(this.prototype, name, {
+    configurable: true,
+    get(this: any) {
+      const value = this.readAttribute(name);
+      if (
+        (value != null && value !== false && encryptedAttribute.call(this, name)) ||
+        !Configurable.config.supportUnencryptedData
+      ) {
+        return this[originalAttributeName];
+      } else {
+        return value;
+      }
+    },
+    set(this: any, value: unknown) {
+      this[originalAttributeName] = value;
+      this.writeAttribute(name, value);
+    },
+  });
 }
 
 /** @internal */
@@ -198,6 +186,15 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
   }
   this._deterministicEncryptedAttributes = result;
   return result;
+}
+
+export function sourceAttributeFromPreservedAttribute(
+  this: unknown,
+  attributeName: string,
+): string | undefined {
+  return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
+    ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
+    : undefined;
 }
 
 /** @internal */
@@ -328,7 +325,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   }
 
   encrypts.call(this, originalAttributeName);
-  EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
+  overrideAccessorsToPreserveOriginal.call(this, name, originalAttributeName);
 }
 
 registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);

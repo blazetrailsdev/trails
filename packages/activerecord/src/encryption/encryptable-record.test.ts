@@ -9,6 +9,7 @@ import {
   makeEncryptedPost,
   makeEncryptedBook,
   makeEncryptedBookWithDowncaseName,
+  createUnencryptedBookIgnoringCase,
   makeEncryptedBookThatIgnoresCase,
   makeEncryptedAuthor,
   makeBookThatWillFailToEncryptName,
@@ -645,7 +646,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
-    const book = await withoutEncryption(async () => Book.create({ name: "Dune" }));
+    const book = await createUnencryptedBookIgnoringCase(Book, { name: "Dune" });
     expect(book.name).toBe("Dune");
   });
 

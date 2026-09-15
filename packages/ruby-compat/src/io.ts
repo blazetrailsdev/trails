@@ -854,6 +854,102 @@ export class IO {
   }
 
   /**
+   * `rb_io_getbyte` (`vendor/ruby/io.c:5056`) — the next byte, or `nil` at EOF.
+   */
+  private getbyte(): number | null {
+    const buffer = new Uint8Array(1);
+    if (getFs().readSync(this.fd, buffer, 0, 1, this._pos) === 0) return null;
+    this._pos += 1;
+    return buffer[0];
+  }
+
+  /**
+   * `rb_io_ungetbyte` (`vendor/ruby/io.c:5150`). There is no read buffer behind
+   * an `FsAdapter` to push `b` into, so the offset steps back over it instead,
+   * which is the same stream for the byte {@link getbyte} just answered — the
+   * only byte `io_strip_bom` ever ungets.
+   */
+  private ungetbyte(b: number | null): void {
+    if (b === null) return;
+    this._pos -= 1;
+  }
+
+  /** `io_strip_bom` (`vendor/ruby/io.c:7085-7145`). */
+  private ioStripBom(): Encoding | null {
+    let b2: number | null, b3: number | null, b4: number | null;
+    if (!(this.mode & FMODE_READABLE)) return null;
+    const b1 = this.getbyte();
+    if (b1 === null) return null;
+    switch (b1) {
+      case 0xef:
+        if ((b2 = this.getbyte()) === null) break;
+        if (b2 === 0xbb && (b3 = this.getbyte()) !== null) {
+          if (b3 === 0xbf) {
+            return Encoding.UTF_8;
+          }
+          this.ungetbyte(b3);
+        }
+        this.ungetbyte(b2);
+        break;
+
+      case 0xfe:
+        if ((b2 = this.getbyte()) === null) break;
+        if (b2 === 0xff) {
+          return Encoding.find("UTF-16BE");
+        }
+        this.ungetbyte(b2);
+        break;
+
+      case 0xff:
+        if ((b2 = this.getbyte()) === null) break;
+        if (b2 === 0xfe) {
+          b3 = this.getbyte();
+          if (b3 === 0 && (b4 = this.getbyte()) !== null) {
+            if (b4 === 0) {
+              return Encoding.find("UTF-32LE");
+            }
+            this.ungetbyte(b4);
+          }
+          this.ungetbyte(b3);
+          return Encoding.find("UTF-16LE");
+        }
+        this.ungetbyte(b2);
+        break;
+
+      case 0:
+        if ((b2 = this.getbyte()) === null) break;
+        if (b2 === 0 && (b3 = this.getbyte()) !== null) {
+          if (b3 === 0xfe && (b4 = this.getbyte()) !== null) {
+            if (b4 === 0xff) {
+              return Encoding.find("UTF-32BE");
+            }
+            this.ungetbyte(b4);
+          }
+          this.ungetbyte(b3);
+        }
+        this.ungetbyte(b2);
+        break;
+    }
+    this.ungetbyte(b1);
+    return null;
+  }
+
+  /**
+   * `io_set_encoding_by_bom` (`vendor/ruby/io.c:7148-7163`), which
+   * `rb_file_open_generic` runs under `FMODE_SETENC_BY_BOM` (`io.c:7196`).
+   */
+  protected ioSetEncodingByBom(): Encoding | null {
+    const extenc = this.ioStripBom();
+
+    if (extenc) {
+      this.setEncoding(extenc, this.internalEncoding() ?? undefined);
+    } else {
+      this.enc2 = null;
+    }
+    return extenc;
+  }
+
+  /**
    * `io_read_encoding` (`vendor/ruby/io.c:1010`) — the encoding a read tags
    * its String with: the stream's own external encoding, or
    * `Encoding.default_external` where none was recorded.

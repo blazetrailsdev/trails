@@ -65,4 +65,26 @@ describe("Zlib::GzipFile.open", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("does not close again a stream the block closed itself", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const implicit = join(dir, "implicit.gz");
+      const explicit = join(dir, "explicit.gz");
+      await Zlib.GzipWriter.open(implicit, (gz) => {
+        gz.mtime = 0;
+        gz.write('{"version":1}');
+      });
+      await Zlib.GzipWriter.open(explicit, async (gz) => {
+        gz.mtime = 0;
+        gz.write('{"version":1}');
+        await gz.close();
+      });
+
+      expect(File.size(explicit)).toBe(File.size(implicit));
+      expect(await Zlib.GzipReader.open(explicit, (gz) => gz.read())).toBe('{"version":1}');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

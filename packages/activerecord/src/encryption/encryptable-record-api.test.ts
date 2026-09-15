@@ -6,6 +6,7 @@ import {
   restoreEncryptionConfig,
   makeEncryptedPost,
   makeEncryptedBook,
+  createUnencryptedBookIgnoringCase,
   makeEncryptedBookThatIgnoresCase,
   makePlainPost,
   makeEncryptedAuthorWithPreviousSchemes,
@@ -225,8 +226,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
+    expect((await book.reload()).name).toBe("Dune");
   });
 
   it("encrypt won't force encoding for deterministic attributes when option is nil", async () => {
@@ -236,8 +236,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
+    expect((await book.reload()).name).toBe("Dune");
   });
 
   it("encrypt will preserve case when :ignore_case option is used", async () => {
@@ -245,12 +244,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
-    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
-    expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
+    const book = await createUnencryptedBookIgnoringCase(Book, { name: "Dune" });
+    expect(await withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
     expect(book.name).toBe("Dune");
     await book.encrypt();
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
+    expect((await book.reload()).name).toBe("Dune");
   });
 
   it("re-encrypting will preserve case when :ignore_case option is used", async () => {
@@ -258,12 +256,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
-    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
-    expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
+    const book = await createUnencryptedBookIgnoringCase(Book, { name: "Dune" });
+    expect(await withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
     expect(book.name).toBe("Dune");
     await book.encrypt();
     await book.encrypt();
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
+    expect((await book.reload()).name).toBe("Dune");
   });
 });
