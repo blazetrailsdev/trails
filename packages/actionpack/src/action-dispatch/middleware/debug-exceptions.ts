@@ -1,10 +1,11 @@
 import { rbInspect, stderr } from "@blazetrails/ruby-compat";
-import type { BacktraceCleaner } from "@blazetrails/activesupport";
+import { toXml, type BacktraceCleaner } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
-import { MimeType } from "../http/mime-type.js";
+import type { MimeType } from "../http/mime-type.js";
+import { Request } from "../http/request.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -27,6 +28,11 @@ export interface DebugExceptionsOptions {
 }
 
 export type Interceptor = (env: RackEnv, exception: Error) => void;
+
+const API_SERIALIZERS: Record<string, (body: Record<string, unknown>) => string> = {
+  ":json": (body) => JSON.stringify(body),
+  ":xml": (body) => toXml(body),
+};
 
 export class DebugExceptions {
   /** @internal */
@@ -69,15 +75,18 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  renderForApiRequest(wrapper: ExceptionWrapper, contentType?: MimeType): RackResponse {
-    if (contentType?.symbol === ":xml") return this.renderXmlError(wrapper);
-    const body = JSON.stringify({
+  renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
+    const body = {
       status: wrapper.statusCode,
       error: wrapper.statusText,
-      exception: wrapper.exceptionName,
+      exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
-    });
-    return this.render(wrapper.statusCode, body, "application/json");
+    };
+    const serializer = contentType ? API_SERIALIZERS[contentType.symbol ?? ""] : undefined;
+    if (contentType && serializer) {
+      return this.render(wrapper.statusCode, serializer(body), contentType.toString());
+    }
+    return this.render(wrapper.statusCode, JSON.stringify(body), "application/json");
   }
 
   /** @internal */
@@ -157,9 +166,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  isApiRequest(contentType: string | null | undefined): boolean {
-    if (this.responseFormat !== "api") return false;
-    return !contentType || !contentType.includes("text/html");
+  isApiRequest(contentType: MimeType | null | undefined): boolean {
+    return this.responseFormat === "api" && !contentType?.isHtml();
   }
 
   /** @internal */
@@ -205,13 +213,12 @@ export class DebugExceptions {
       throw exception;
     }
 
-    const accept = (request["HTTP_ACCEPT"] as string) ?? "";
     const xhr = request["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
     const contentType = (request["CONTENT_TYPE"] as string) ?? "";
 
-    const format = MimeType.parse(accept || contentType)[0];
-    if (this.isApiRequest(format?.toString())) {
-      return this.renderForApiRequest(wrapper, format);
+    const format = new Request(request).formats[0];
+    if (this.isApiRequest(format)) {
+      return this.renderForApiRequest(format, wrapper);
     }
 
     if (xhr || contentType.includes("text/plain")) {
@@ -232,24 +239,6 @@ export class DebugExceptions {
       wrapper.statusCode,
       { "content-type": "text/plain; charset=utf-8" },
       bodyFromString(body),
-    ];
-  }
-
-  private renderXmlError(wrapper: ExceptionWrapper): RackResponse {
-    const xml = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      "<error>",
-      `  <status>${wrapper.statusCode}</status>`,
-      `  <message>${this.escapeXml(wrapper.statusText)}</message>`,
-      `  <exception>${this.escapeXml(wrapper.exceptionName)}</exception>`,
-      `  <detail>${this.escapeXml(wrapper.message)}</detail>`,
-      "</error>",
-    ].join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "application/xml; charset=utf-8" },
-      bodyFromString(xml),
     ];
   }
 
@@ -298,9 +287,5 @@ export class DebugExceptions {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  }
-
-  private escapeXml(str: string): string {
-    return this.escapeHtml(str);
   }
 }

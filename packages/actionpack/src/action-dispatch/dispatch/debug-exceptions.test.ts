@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
+import { MimeType } from "../http/mime-type.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { RoutingError as RoutingErrorClass } from "../../action-controller/metal/exceptions.js";
@@ -84,15 +85,20 @@ describe("DebugExceptionsTest", () => {
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/xml");
     const xml = await bodyToString(body);
-    expect(xml).toContain("<error>");
-    expect(xml).toContain("<status>500</status>");
+    expect(xml).toContain("<hash>");
+    expect(xml).toMatch(/<status[^>]*>500<\/status>/);
   });
 
   it("rescue with JSON format as fallback if API request format is not supported", async () => {
-    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
-    const [status, headers] = await mw.call(makeEnv({ CONTENT_TYPE: "application/json" }));
-    expect(status).toBe(500);
-    expect(headers["content-type"]).toContain("application/json");
+    MimeType.register("text/wibble", ":wibble");
+    try {
+      const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+      const [status, headers] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/wibble" }));
+      expect(status).toBe(500);
+      expect(headers["content-type"]).toContain("application/json");
+    } finally {
+      MimeType.unregister(":wibble");
+    }
   });
 
   it("sets the HTTP charset parameter", async () => {
@@ -318,13 +324,13 @@ describe("DebugExceptionsTest", () => {
 
   it("isApiRequest is false for HTML accept even when responseFormat is 'api'", () => {
     const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
-    expect(mw.isApiRequest("text/html")).toBe(false);
-    expect(mw.isApiRequest("application/json")).toBe(true);
+    expect(mw.isApiRequest(MimeType.lookup("text/html"))).toBe(false);
+    expect(mw.isApiRequest(MimeType.lookup("application/json"))).toBe(true);
     expect(mw.isApiRequest(null)).toBe(true);
   });
 
   it("isApiRequest is false when responseFormat defaults to 'default'", () => {
     const mw = new DebugExceptions(errorApp);
-    expect(mw.isApiRequest("application/json")).toBe(false);
+    expect(mw.isApiRequest(MimeType.lookup("application/json"))).toBe(false);
   });
 });

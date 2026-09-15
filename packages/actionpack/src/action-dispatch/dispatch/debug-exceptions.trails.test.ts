@@ -38,6 +38,10 @@ describe("DebugExceptions format negotiation", () => {
     expect(await contentTypeFor("application/xml", "api")).toContain("application/xml");
   });
 
+  it("falls back to HTML for a browser-like Accept listing */*, as request.formats does", async () => {
+    expect(await contentTypeFor("application/json,*/*", "api")).toContain("text/html");
+  });
+
   it("decides api_request? from the highest-q format, not the first substring", async () => {
     expect(await contentTypeFor("text/html;q=0.5,application/json", "api")).toContain(
       "application/json",
