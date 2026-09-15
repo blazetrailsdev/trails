@@ -764,7 +764,7 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
-  let queryBuilder: ((c: CalculationConnection) => [string, unknown[]]) | null = null;
+  let queryBuilder: (c: CalculationConnection) => [string, unknown[]];
   let column: unknown = null;
 
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
