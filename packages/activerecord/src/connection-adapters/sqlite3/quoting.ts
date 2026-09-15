@@ -18,7 +18,6 @@ import {
   type QuotedTimeValue,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
@@ -85,11 +84,7 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
 
 export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
-    const obj = value.__getobj__();
-    value =
-      obj instanceof TimeWithZone || obj instanceof RubyTime
-        ? obj
-        : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+    value = value.__getobj__() as TimeWithZone | RubyTime;
   }
   if (value instanceof RubyTime) value = value.toTime().toPlainDateTime();
   value =
