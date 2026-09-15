@@ -4,7 +4,7 @@ import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import { relationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
+import { relationClassFor } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 export class AssociationRelation<T extends Base> extends Relation<T> {
@@ -34,7 +34,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const Ctor = relationClassFor.call(AssociationRelation, this.model);
     const rel = new Ctor(this.model, this._association) as Relation<T>;
     rel.initializeCopy(this);
-    return wrapWithScopeProxy(rel);
+    return rel;
   }
 
   protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
@@ -140,5 +140,5 @@ _registerRelationFamily(
 );
 setAssociationRelationFactory((klass, assoc) => {
   const Ctor = relationClassFor.call(AssociationRelation, klass as typeof Base);
-  return wrapWithScopeProxy(new Ctor(klass as typeof Base, assoc as Association));
+  return new Ctor(klass as typeof Base, assoc as Association);
 });

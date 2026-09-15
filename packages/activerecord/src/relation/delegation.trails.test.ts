@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { delegateArrayMethod, relationClassFor, uncacheableMethods } from "./delegation.js";
+import { relationClassFor, uncacheableMethods } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
@@ -197,23 +197,27 @@ describe("name delegate — property-reader typing invariant", () => {
 });
 
 describe("delegated records operators without an Array.prototype counterpart", () => {
-  const records = () => ["a", "b", "c"];
+  const loaded = (records: unknown[]) =>
+    Object.assign(Comment.all(), { _records: records, _loaded: true }) as unknown as Record<
+      "intersection" | "union" | "difference" | "at" | "concat",
+      (...args: unknown[]) => unknown
+    >;
 
   it("delegates the records operators Array.prototype cannot spell", () => {
-    const dup = () => ["a", "b", "b", "c"];
-    expect(delegateArrayMethod("intersection", dup)!(["b", "c", "d"])).toEqual(["b", "c"]);
-    expect(delegateArrayMethod("union", dup)!(["c", "d"])).toEqual(["a", "b", "c", "d"]);
-    expect(delegateArrayMethod("difference", dup)!(["c"])).toEqual(["a", "b", "b"]);
-    expect(delegateArrayMethod("at", records)!(1)).toBe("b");
-    expect(delegateArrayMethod("concat", records)!(["d"])).toEqual(["a", "b", "c", "d"]);
+    const dup = loaded(["a", "b", "b", "c"]);
+    expect(dup.intersection(["b", "c", "d"])).toEqual(["b", "c"]);
+    expect(dup.union(["c", "d"])).toEqual(["a", "b", "c", "d"]);
+    expect(dup.difference(["c"])).toEqual(["a", "b", "b"]);
+    expect(loaded(["a", "b", "c"]).at(1)).toBe("b");
+    expect(loaded(["a", "b", "c"]).concat(["d"])).toEqual(["a", "b", "c", "d"]);
   });
 
   it("compares records with Core#== rather than object identity", () => {
     const equals = (other: unknown): boolean => (other as { id?: number })?.id === 1;
     const post = { equals, id: 1 };
     const same = { equals, id: 1 };
-    expect(delegateArrayMethod("intersection", () => [post])!([same])).toEqual([post]);
-    expect(delegateArrayMethod("difference", () => [post])!([same])).toEqual([]);
+    expect(loaded([post]).intersection([same])).toEqual([post]);
+    expect(loaded([post]).difference([same])).toEqual([]);
   });
 });
 

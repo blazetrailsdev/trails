@@ -1,6 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
-import { except, Range } from "@blazetrails/ruby-compat";
+import { except, isModuleIncluded, Range } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
@@ -29,8 +29,8 @@ import {
 import * as _qm from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import {
-  wrapWithScopeProxy,
   relationClassFor,
+  ClassSpecificRelation,
   create as _delegationCreate,
   Delegation,
   type ToSentenceOptions,
@@ -337,6 +337,9 @@ export class Relation<T extends Base> {
     predicateBuilder?: PredicateBuilder,
     values: ValuesHash = {},
   ) {
+    if (table) {
+      predicateBuilder ??= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+    }
     this._model = model;
     if (table) {
       this._table = table as Table;
@@ -344,6 +347,33 @@ export class Relation<T extends Base> {
     this._values = values;
     if (predicateBuilder) {
       this._predicateBuilder = predicateBuilder;
+    }
+    if (isModuleIncluded(new.target, ClassSpecificRelation)) {
+      return new Proxy(this, {
+        get(target: any, prop: string | symbol, receiver: any) {
+          const value = Reflect.get(target, prop, receiver);
+          if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
+            return value;
+          }
+          const enumerable = ENUMERABLE_METHODS[prop];
+          if (enumerable) {
+            return (...args: any[]) =>
+              target.isLoaded
+                ? enumerable([...(target.target ?? target._records)], args)
+                : target.records().then((records: T[]) => enumerable([...records], args));
+          }
+          if (target.respondToMissing(prop, false)) {
+            return (...args: any[]) => target.methodMissing(prop, ...args);
+          }
+          return value;
+        },
+        has(target: any, prop: string | symbol) {
+          if (Reflect.has(target, prop)) return true;
+          if (typeof prop === "symbol") return false;
+          if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
+          return target.respondToMissing(prop, false);
+        },
+      });
     }
   }
 
@@ -1446,10 +1476,6 @@ export class Relation<T extends Base> {
     return this._model;
   }
 
-  slice(start?: number, end?: number): T[] | Promise<T[]> {
-    return this.toArray().then((records) => records.slice(start, end));
-  }
-
   get name(): RelationName {
     return this.model.name;
   }
@@ -1742,7 +1768,7 @@ export class Relation<T extends Base> {
     const ctor = relationClassFor.call(Relation, this._model as unknown as typeof Base);
     const rel = new ctor(this._model) as Relation<T>;
     rel.initializeCopy(this);
-    return wrapWithScopeProxy(rel);
+    return rel;
   }
 
   _execScope(...args: unknown[]): unknown {
@@ -2103,6 +2129,7 @@ export interface Relation<T extends Base> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
+  slice(start?: number, end?: number): T[] | Promise<T[]>;
   isIntersect(other: T[]): Promise<boolean>;
   reverse(): Promise<T[]>;
   compact(): Promise<T[]>;
@@ -2131,6 +2158,51 @@ export interface Relation<T extends Base> {
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined>;
   sanitizeSqlLike(value: string, escapeChar?: string): string;
+}
+
+const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
+  partition: (records, [fn]) => {
+    const matched: unknown[] = [];
+    const unmatched: unknown[] = [];
+    records.forEach((record, index) => (fn(record, index) ? matched : unmatched).push(record));
+    return [matched, unmatched];
+  },
+  intersection: (records, [other]) =>
+    uniqRecords(records).filter((record) => includesRecord(other ?? [], record)),
+  union: (records, [other]) => uniqRecords([...records, ...(other ?? [])]),
+  difference: (records, [other]) =>
+    records.filter((record) => !includesRecord(other ?? [], record)),
+};
+for (const name of [
+  "forEach",
+  "at",
+  "indexOf",
+  "lastIndexOf",
+  "concat",
+  "map",
+  "filter",
+  "some",
+  "every",
+  "reduce",
+  "sort",
+  "flatMap",
+]) {
+  ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
+}
+
+function includesRecord(records: unknown[], record: unknown): boolean {
+  return records.some(
+    (candidate) =>
+      candidate === record ||
+      (typeof (candidate as { equals?: unknown } | null)?.equals === "function" &&
+        (candidate as { equals(o: unknown): boolean }).equals(record) === true),
+  );
+}
+
+function uniqRecords<U>(records: U[]): U[] {
+  const uniq: U[] = [];
+  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
+  return uniq;
 }
 
 include(Relation, Delegation);

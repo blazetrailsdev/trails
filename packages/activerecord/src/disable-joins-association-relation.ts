@@ -1,6 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import { relationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
+import { relationClassFor } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
@@ -208,7 +208,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     copy._adoptNormalizedState(this);
     const rel = copy as unknown as Relation<T>;
     rel.initializeCopy(this as unknown as Relation<T>);
-    return wrapWithScopeProxy(rel);
+    return rel;
   }
 
   private _adoptNormalizedState(source: DisableJoinsAssociationRelation<T>): void {

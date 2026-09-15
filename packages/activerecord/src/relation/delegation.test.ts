@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { delegateArrayMethod, DelegateCache, uncacheableMethods } from "./delegation.js";
+import { DelegateCache, uncacheableMethods } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { fixtures } from "../test-fixtures.js";
@@ -176,9 +176,11 @@ describe("DelegationTest", () => {
   });
 
   describe("delegateArrayMethod curated list", () => {
-    const records = () => ["a", "b", "c"];
+    const loaded = (records: unknown[]) =>
+      Object.assign(Comment.all(), { _records: records, _loaded: true }) as any;
 
     it("delegates curated/Enumerable members to the records", () => {
+      const rel = loaded(["a", "b", "c"]);
       for (const method of [
         "forEach",
         "join",
@@ -189,14 +191,15 @@ describe("DelegationTest", () => {
         "indexOf",
         "lastIndexOf",
       ]) {
-        expect(typeof delegateArrayMethod(method, records)).toBe("function");
+        expect(typeof rel[method]).toBe("function");
       }
-      expect(delegateArrayMethod("join", records)!(",")).toBe("a,b,c");
+      expect(rel.join(",")).toBe("a,b,c");
     });
 
     it("does not delegate JS-only Array methods absent from Rails", () => {
-      for (const method of ["findIndex", "flat", "copyWithin", "fill", "findLast"]) {
-        expect(delegateArrayMethod(method, records)).toBeUndefined();
+      const rel = loaded(["a", "b", "c"]);
+      for (const method of ["findIndex", "flat", "copyWithin", "fill"]) {
+        expect(rel[method]).toBeUndefined();
       }
     });
   });

@@ -25,7 +25,6 @@ import { WhereClause } from "./where-clause.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
 import { connectionPool } from "../connection-handling.js";
-import { wrapWithScopeProxy } from "./delegation.js";
 import {
   any,
   compactBlank,
@@ -1139,9 +1138,8 @@ function extendingBang(
       mod(this);
     } else {
       this.extendingValues = [...this.extendingValues, mod];
-      const wrapped = wrapWithScopeProxy(this);
       for (const [name, fn] of Object.entries(mod)) {
-        (this as any)[name] = fn.bind(wrapped);
+        (this as any)[name] = fn.bind(this);
       }
     }
   }
