@@ -133,26 +133,14 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: [
-      "bulk insert",
-      "bulk insert multiple table with a multi statement query",
-      "bulk insert with a multi statement query in a nested transaction",
-      "bulk insert with a multi statement query raises an exception when any insert fails",
       "bulk insert with multi statements disabled",
       "bulk insert with multi statements enabled",
-      "insert fixture set when max allowed packet is bigger than fixtures set size",
-      "insert fixtures set concat total sql into a single packet smaller than max allowed packet",
-      "insert fixtures set raises an error when max allowed packet is smaller than fixtures set size",
-      "insert fixtures set split the total sql into two chunks smaller than max allowed packet",
     ],
     reason:
-      "Multi-statement INSERT batching, gated in Rails on " +
-      "current_adapter?(:Mysql2Adapter, :TrilogyAdapter, :PostgreSQLAdapter) " +
-      "(fixtures_test.rb:87). They assert one INSERT query per load and the " +
-      "max_allowed_packet chunking around it; trails' insertFixturesSet emits per-table " +
-      "batches through executeBatch and carries no packet-size budget, so there is no " +
-      "chunk boundary to assert and no single-query claim to make. CONVERGEABLE " +
-      "port-fixtures-bulk-insert-and-packet-chunking-cases: trails has maxAllowedPacket() " +
-      "and packet-aware MySQL execution, so these ten converge rather than stay excluded.",
+      "Reconnect with flags MULTI_STATEMENTS / [] and assert a two-statement execute succeeds / " +
+      "raises (fixtures_test.rb:156-251). trails' Mysql2Adapter always opens the driver with " +
+      "multipleStatements: true, so there is no disabled connection to observe. CONVERGEABLE " +
+      "mysql2-honour-multi-statements-flag.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -342,18 +330,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Asserts defined?(@first) is false under use_instantiated_fixtures = :no_instances " +
       "(fixtures_test.rb:796-803) — the third value of a flag trails does not have. Same " +
       "missing surface as the two rows above.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesWithoutInstantiationTest",
-    tests: ["accessor methods with multiple args", "reloading fixtures through accessor methods"],
-    reason:
-      "Accessor shapes trails' single-name closure does not have: topics(:first, :second) " +
-      "returning a 2-element collection, and topics(:first, true) forcing a reload, the " +
-      "latter asserted with assert_called on the stored fixture's #find " +
-      "(fixtures_test.rb:781-798). CONVERGEABLE " +
-      "variadic-and-force-reload-fixture-accessor: Rails' accessor takes (*fixture_names, " +
-      "force_reload) at test_fixtures.rb:294-321; this is missing API, not a language limit.",
   },
   {
     testFile: "fixtures_test.rb",
