@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
 import { Chain } from "./chain.js";
@@ -178,6 +179,21 @@ describe("I18nBackendFallbacksTranslateTest", () => {
   it("returns fallback default given missing pluralization data", () => {
     expect(t("missing_bar", { count: 1, default: "default" })).toBe("default");
     expect(t("missing_bar", { count: 0, default: "default" })).toBe("default");
+  });
+
+  it("multi-threaded fallbacks", () => {
+    setFallbacks(["en"]);
+
+    const thread = new Thread(() => {
+      setFallbacks(["de"]);
+    });
+
+    try {
+      thread.value();
+      expect(t(":bar", { locale: "pt-BR" })).toBe("Bar in :en");
+    } finally {
+      setFallbacks(new LocaleFallbacks());
+    }
   });
 });
 

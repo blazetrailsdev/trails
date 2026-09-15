@@ -176,10 +176,11 @@ export function translate(
 export const t = translate;
 
 export function translateBang(
+  this: Pick<typeof I18n, "translate"> | void,
   key: TranslateKey | TranslateKey[],
   options: TranslateOptions = EMPTY_HASH,
 ): unknown {
-  return translate(key, { ...options, raise: true });
+  return (this ?? I18n).translate(key, { ...options, raise: true });
 }
 
 export const tBang = translateBang;

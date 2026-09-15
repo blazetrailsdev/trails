@@ -43,4 +43,18 @@ describe("Thread", () => {
     thread.name = "reaper";
     expect(String(thread)).toMatch(/^#<Worker:0x[0-9a-f]{16}@reaper \S+:\d+ dead>$/);
   });
+
+  it("stores fiber-locals under one id for a symbol or a string key", () => {
+    const thread = new Thread(() => null);
+    expect(thread.set(":greeting", "hi")).toBe("hi");
+    expect(thread.get("greeting")).toBe("hi");
+    expect(thread.get(":greeting")).toBe("hi");
+  });
+
+  it("deletes a fiber-local when assigned nil", () => {
+    const thread = new Thread(() => null);
+    thread.set("greeting", "hi");
+    expect(thread.set(":greeting", null)).toBeNull();
+    expect(thread.get("greeting")).toBeNull();
+  });
 });

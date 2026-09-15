@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
   type AsyncContext,
@@ -8,6 +9,7 @@ let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _locations = new WeakMap<object, string>();
+const _locals = new WeakMap<object, Map<string, unknown>>();
 
 function currentSlot(): AsyncContext<Thread> {
   const adapter = getAsyncContext();
@@ -84,6 +86,30 @@ export class Thread<R = unknown> {
   value(): R {
     if (this.#error) throw this.#error.raised;
     return this.#value;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/thread.c:5408`).
+   */
+  get(key: string): unknown {
+    const id = isSymbol(key) ? symbolToS(key) : key;
+    return _locals.get(this)?.get(id) ?? null;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]=` (`vendor/ruby/thread.c:5409`).
+   */
+  set(key: string, value: unknown): unknown {
+    const id = isSymbol(key) ? symbolToS(key) : key;
+    let locals = _locals.get(this);
+    if (value == null) {
+      if (!locals) return null;
+      locals.delete(id);
+      return null;
+    }
+    if (!locals) _locals.set(this, (locals = new Map()));
+    locals.set(id, value);
+    return value;
   }
 
   /**

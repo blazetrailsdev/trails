@@ -1,4 +1,4 @@
-import { isSymbol, kernelCatch, kernelThrow } from "@blazetrails/ruby-compat";
+import { isSymbol, kernelCatch, kernelThrow, Thread } from "@blazetrails/ruby-compat";
 
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
 import { EMPTY_HASH, translate, type Locale, type TranslationKey } from "../i18n.js";
@@ -13,11 +13,12 @@ let fallbacksStore: FallbacksLike | null | undefined;
 
 export function fallbacks(): FallbacksLike {
   fallbacksStore ??= new LocaleFallbacks();
-  return fallbacksStore;
+  return (Thread.current().get(":i18n_fallbacks") as FallbacksLike | null) ?? fallbacksStore;
 }
 
 export function setFallbacks(fallbacks: FallbacksLike | Locale[] | null): void {
   fallbacksStore = Array.isArray(fallbacks) ? new LocaleFallbacks(...fallbacks) : fallbacks;
+  Thread.current().set(":i18n_fallbacks", fallbacksStore);
 }
 
 function truthy(value: unknown): boolean {
