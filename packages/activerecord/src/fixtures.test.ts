@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import {
   ref,
@@ -34,8 +34,6 @@ import {
 } from "./test-helpers/models/admin/randomly-named-c1.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
-import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
-import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
@@ -684,25 +682,15 @@ describe("FixturesWithoutInstantiationTest", () => {
 });
 
 describe("TransactionalFixturesTest", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  let first: Topic;
-
-  beforeAll(async () => {
-    await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
-  });
-
-  beforeEach(async () => {
-    first = await Topic.find(1);
-  });
+  const { topics } = fixtures(["topics"], { useTransactionalTests: true });
 
   it("destroy", async () => {
-    expect(first).not.toBeNull();
-    await first.destroy();
+    expect(topics("first")).not.toBeNull();
+    await topics("first").destroy();
   });
 
   it("destroy just kidding", () => {
-    expect(first).not.toBeNull();
+    expect(topics("first")).not.toBeNull();
   });
 });
 
