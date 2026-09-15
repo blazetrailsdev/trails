@@ -426,6 +426,9 @@ export default defineConfig({
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
+            ...(process.env.ARCONN === "postgresql"
+              ? ["./packages/activerecord/src/test-setup-pg-cancel-trace.ts"]
+              : []),
             "./packages/activerecord/src/test-setup-dy.ts",
             // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
             ...(process.env.DDL_PROFILE === "1"
