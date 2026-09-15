@@ -5,7 +5,6 @@ import type { Base } from "./base.js";
 
 export { InvalidSignature };
 
-let _tokenForSecret: string | (() => string) | null = null;
 let _assignBootVerifier: ((verifier: MessageVerifier | null) => void) | null = null;
 
 /**
@@ -19,16 +18,7 @@ export function registerGeneratedTokenVerifierSink(
   buildDefaultVerifier();
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function setTokenForSecret(secret: string | (() => string) | null): void {
-  _tokenForSecret = secret;
-  buildDefaultVerifier();
-}
-
 function resolveSecret(): string | null {
-  if (_tokenForSecret) {
-    return typeof _tokenForSecret === "function" ? _tokenForSecret() : _tokenForSecret;
-  }
   const envSecret = getEnv("BLAZETRAILS_SECRET_KEY_BASE") ?? getEnv("BLAZETRAILS_SIGNED_ID_SECRET");
   if (typeof envSecret === "string" && envSecret.length > 0) return envSecret;
   return null;

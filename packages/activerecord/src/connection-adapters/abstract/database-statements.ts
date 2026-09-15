@@ -177,14 +177,6 @@ export interface DatabaseStatementsHost {
   supportsConcurrentConnections?(): boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export class DatabaseStatementsBase {
-  /** @missingRailsCall reset_transaction — PERMANENT */
-  constructor() {
-    (this as any)._transactionManager = new TransactionManager(this as any);
-  }
-}
-
 export function toSql(
   this: DatabaseStatementsHost | void,
   arelOrSqlString: unknown,

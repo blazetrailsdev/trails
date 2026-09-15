@@ -5,9 +5,9 @@ import { User } from "./test-helpers/models/user.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { Room } from "./test-helpers/models/room.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
-import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
+import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { setTokenForSecret } from "./token-for.js";
+import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 
@@ -37,8 +37,10 @@ describe("TokenForTest", () => {
   let user: TokenUser;
   let lookupToken: string;
   let passwordResetToken: string;
+  let originalVerifier: MessageVerifier | null;
   beforeEach(async () => {
-    setTokenForSecret("secret");
+    originalVerifier = Base.generatedTokenVerifier;
+    Base.generatedTokenVerifier = new MessageVerifier("secret");
 
     user = new TokenUser();
     (user as any).password_digest = `$2a$4$${"x".repeat(22)}${"y".repeat(31)}`;
@@ -49,7 +51,7 @@ describe("TokenForTest", () => {
 
   afterEach(async () => {
     travelBack();
-    setTokenForSecret(null);
+    Base.generatedTokenVerifier = originalVerifier;
     await TokenUser.deleteAll();
     await CpkBook.deleteAll();
   });
