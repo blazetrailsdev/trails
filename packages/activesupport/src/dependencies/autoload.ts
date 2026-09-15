@@ -27,6 +27,13 @@ export function autoload(
     this._eagerloadedConstants.push(constName);
   }
 
+  const self = this as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(this, constName)) {
+    if (this._autoloads?.[constName] && self[constName] === undefined) {
+      this._autoloads[constName] = resolvePath;
+    }
+    return;
+  }
   (this._autoloads ??= {})[constName] = resolvePath;
   let value: unknown;
   Object.defineProperty(this, constName, {
