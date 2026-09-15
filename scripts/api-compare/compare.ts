@@ -266,15 +266,7 @@ export const NO_JS_CALL_FORM = new Set([
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
   "synchronize", // the block runs bare — JS has no mutex to acquire
-  "catch", // `try { … } catch (e) { … }` — a clause, never a callee
 ]);
-
-// `catch` qualifies on the same ground as `synchronize`. Ruby's `catch(:tag)`
-// is Kernel's non-local-exit construct, and its faithful port is JS's own
-// non-local-exit construct: a `try` statement with a `catch` CLAUSE that
-// re-raises anything but the sentinel. A clause is syntax, not a call expression, so the
-// TS body emits no callee and no alias could ever match it, however faithfully
-// the catch is spelled at the Rails call site.
 
 // `synchronize` is the strongest member of that set rather than a marginal one.
 // Every Ruby occurrence is a mutex acquisition — `Mutex#synchronize`,

@@ -35,7 +35,8 @@ export class NameError extends StandardError {
 
   constructor(message: string, constantName?: string) {
     super(message);
-    this.name = "NameError";
     this.constantName = constantName;
   }
 }
+
+NameError.prototype.name = "NameError";

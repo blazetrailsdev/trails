@@ -9,9 +9,6 @@ import { NameError } from "./name-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `NoMethodError`, which Rails
  * inherits rather than defines.
  */
-export class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
+export class NoMethodError extends NameError {}
+
+NoMethodError.prototype.name = "NoMethodError";

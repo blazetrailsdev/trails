@@ -16,9 +16,6 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `KeyError`, which Rails inherits
  * rather than defines.
  */
-export class KeyError extends StandardError {
-  constructor(message: string) {
-    super(message);
-    this.name = "KeyError";
-  }
-}
+export class KeyError extends StandardError {}
+
+KeyError.prototype.name = "KeyError";

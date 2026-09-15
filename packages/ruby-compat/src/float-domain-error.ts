@@ -17,9 +17,6 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `FloatDomainError`, which Rails
  * inherits rather than defines.
  */
-export class FloatDomainError extends StandardError {
-  constructor(message: string) {
-    super(message);
-    this.name = "FloatDomainError";
-  }
-}
+export class FloatDomainError extends StandardError {}
+
+FloatDomainError.prototype.name = "FloatDomainError";

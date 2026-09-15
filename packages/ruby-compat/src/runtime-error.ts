@@ -11,9 +11,7 @@ import { StandardError } from "./standard-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `RuntimeError`, which Rails
  * inherits rather than defines.
  */
-export class RuntimeError extends StandardError {
-  constructor(message: string = "RuntimeError") {
-    super(message);
-    this.name = "RuntimeError";
-  }
-}
+export class RuntimeError extends StandardError {}
+
+RuntimeError.prototype.name = "RuntimeError";
+RuntimeError.prototype.message = "RuntimeError";
