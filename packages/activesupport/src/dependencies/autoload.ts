@@ -28,6 +28,15 @@ export function autoload(
   }
 
   (this._autoloads ??= {})[constName] = resolvePath;
+  let value: unknown;
+  Object.defineProperty(this, constName, {
+    get: () => value,
+    set: (seated: unknown) => {
+      value = seated;
+    },
+    configurable: true,
+    enumerable: true,
+  });
 }
 
 export function autoloadUnder(this: Autoload, path: string, block: () => void): void {
@@ -60,6 +69,7 @@ export function eagerAutoload(this: Autoload, block: () => void): void {
   }
 }
 
+/** @missingRailsCall const_get — PERMANENT */
 export async function eagerLoadBang(this: Autoload): Promise<void> {
   if (this._eagerloadedConstants) {
     for (const constName of this._eagerloadedConstants) {
