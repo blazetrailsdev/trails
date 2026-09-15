@@ -366,7 +366,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {
-    return sqliteQuotedTime(value);
+    return sqliteQuotedTime.call(this, value);
   }
 
   override typeCast(value: unknown): unknown {

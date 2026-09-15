@@ -1,6 +1,7 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Value as TimeValue } from "../../type/time.js";
 import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
@@ -114,8 +115,10 @@ describe("typeCast of Temporal bind values", () => {
     expect(bind(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
   });
 
-  it("converts PlainTime to string", () => {
-    expect(bind(Temporal.PlainTime.from("14:23:55.123456"))).toBe("14:23:55.123456");
+  it("converts Time::Value to string", () => {
+    expect(bind(new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456)))).toBe(
+      "14:23:55.123456",
+    );
   });
 
   it("converts ZonedDateTime to UTC instant string", () => {
@@ -159,16 +162,16 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   });
 });
 
-describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for PlainTime", () => {
-  it("wraps PlainTime in 2000-01-01 for sqlite", () => {
-    const v = Temporal.PlainTime.from("14:23:55.123456");
+describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for Time::Value", () => {
+  it("wraps Time::Value in 2000-01-01 for sqlite", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
     expect(typeCastFn.call(quotingHost({ quotedTime: sqliteQuotedTime }), v)).toBe(
       "2000-01-01 14:23:55.123456",
     );
   });
 
   it("returns bare time string for postgres", () => {
-    const v = Temporal.PlainTime.from("14:23:55.123456");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
     expect(typeCast(v)).toBe("14:23:55.123456");
   });
 });
@@ -188,8 +191,10 @@ describe("abstract quote() with Temporal (Postgres path)", () => {
     expect(quote(Temporal.PlainDate.from("2026-04-26"))).toBe("'2026-04-26'");
   });
 
-  it("quotes a PlainTime", () => {
-    expect(quote(Temporal.PlainTime.from("14:23:55.123456"))).toBe("'14:23:55.123456'");
+  it("quotes a Time::Value", () => {
+    expect(quote(new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456)))).toBe(
+      "'14:23:55.123456'",
+    );
   });
 
   it("quotes a ZonedDateTime as its UTC instant", () => {

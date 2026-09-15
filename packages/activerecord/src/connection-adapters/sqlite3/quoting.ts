@@ -12,7 +12,6 @@ import {
   quote as abstractQuote,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   type QuotingHost,
-  quotedDate as abstractQuotedDate,
   typeCast as abstractTypeCast,
   toBytes,
   type QuotedTimeValue,
@@ -80,9 +79,9 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
   return quoteColumnName(attr);
 }
 
-export function quotedTime(value: QuotedTimeValue): string {
+export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
   value = value.change({ year: 2000, month: 1, day: 1 });
-  return abstractQuotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
+  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {
