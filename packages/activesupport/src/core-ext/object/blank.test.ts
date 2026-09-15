@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { isBlank, isPresent, presence, TimeWithZone, TimeZone } from "../../index.js";
+import { assertNotPredicate, assertPredicate } from "../../testing/assertions.js";
 
 const NOW = new Temporal.Instant(1_700_000_000_000_000_000n);
 const TIMES = [
@@ -13,40 +14,51 @@ const TIMES = [
   Temporal.PlainTime.from("12:00:00"),
 ];
 
+class EmptyTrue {
+  isEmpty() {
+    return 0;
+  }
+}
+
+class EmptyFalse {
+  isEmpty() {
+    return null;
+  }
+}
+
+const BLANK = [new EmptyTrue(), null, false, "", "   ", "  \n\t  \r ", "\u3000", "\u00a0", [], {}];
+const NOT = [
+  new EmptyFalse(),
+  new (class {})(),
+  true,
+  0,
+  1,
+  "a",
+  [null],
+  new Map([[null, 0]]),
+  ...TIMES,
+];
+
 describe("BlankTest", () => {
   it("blank", () => {
-    expect(isBlank(null)).toBe(true);
-    expect(isBlank(undefined)).toBe(true);
-    expect(isBlank("")).toBe(true);
-    expect(isBlank("  ")).toBe(true);
-    expect(isBlank([])).toBe(true);
-    expect(isBlank({})).toBe(true);
-    expect(isBlank(false)).toBe(true);
-    expect(isBlank(0)).toBe(false);
-    expect(isBlank("hello")).toBe(false);
-    expect(isBlank([1])).toBe(false);
-    for (const v of TIMES) expect(isBlank(v)).toBe(false);
+    for (const v of BLANK) expect(isBlank(v), `${String(v)} should be blank`).toEqual(true);
+    for (const v of NOT) expect(isBlank(v), `${String(v)} should not be blank`).toEqual(false);
   });
 
   it("blank with bundled string encodings", () => {
-    expect(isBlank("\t\n")).toBe(true);
-    expect(isBlank(" \t\n ")).toBe(true);
-    expect(isBlank("a")).toBe(false);
+    assertPredicate(" ", isBlank);
+    assertNotPredicate("a", isBlank);
   });
 
   it("present", () => {
-    expect(isPresent("hello")).toBe(true);
-    expect(isPresent(42)).toBe(true);
-    expect(isPresent(null)).toBe(false);
-    expect(isPresent("")).toBe(false);
-    for (const v of TIMES) expect(isPresent(v)).toBe(true);
+    for (const v of BLANK)
+      expect(isPresent(v), `${String(v)} should not be present`).toEqual(false);
+    for (const v of NOT) expect(isPresent(v), `${String(v)} should be present`).toEqual(true);
   });
 
   it("presence", () => {
-    expect(presence("hello")).toBe("hello");
-    expect(presence("")).toBeUndefined();
-    expect(presence(null)).toBeUndefined();
-    expect(presence(42)).toBe(42);
-    for (const v of TIMES) expect(presence(v)).toBe(v);
+    for (const v of BLANK)
+      expect(presence(v), `${String(v)}.presence should return nil`).toBeUndefined();
+    for (const v of NOT) expect(presence(v), `${String(v)}.presence should return self`).toEqual(v);
   });
 });

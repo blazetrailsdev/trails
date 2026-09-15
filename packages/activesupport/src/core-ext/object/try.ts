@@ -11,6 +11,7 @@ export const Tryable = {
     if (typeof fn === "function") {
       return fn.apply(obj, args);
     }
+    if (args.length === 0) return fn;
     return undefined;
   },
 
@@ -19,6 +20,7 @@ export const Tryable = {
     const target = obj as Record<string, unknown>;
     const fn = target[method];
     if (typeof fn !== "function") {
+      if (args.length === 0 && method in Object(obj)) return fn;
       throw new TypeError(
         `undefined method '${method}' for ${obj === null ? "nil:NilClass" : String(obj)}`,
       );
@@ -35,10 +37,10 @@ export class Delegator implements Tryable {
   }
 
   try(method: string, ...args: unknown[]): unknown {
-    return Tryable.try(this._delegate, method, ...args);
+    return Tryable.try(method in this ? this : this._delegate, method, ...args);
   }
 
   tryBang(method: string, ...args: unknown[]): unknown {
-    return Tryable.tryBang(this._delegate, method, ...args);
+    return Tryable.tryBang(method in this ? this : this._delegate, method, ...args);
   }
 }

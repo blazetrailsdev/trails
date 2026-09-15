@@ -1,20 +1,23 @@
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import { asJson } from "./json.js";
 
 describe("JsonCherryPickTest", () => {
   it("time as json", () => {
-    const t = new Date("2023-06-15T12:30:00Z");
-    expect(JSON.stringify(t)).toBe('"2023-06-15T12:30:00.000Z"');
-    expect(t.toJSON()).toBe("2023-06-15T12:30:00.000Z");
+    const expected = new Date(2004, 6, 25);
+    const actual = new Date(asJson(expected) as string);
+    expect(actual.getTime()).toEqual(expected.getTime());
   });
 
   it("date as json", () => {
-    const d = new Date("2023-06-15T00:00:00Z");
-    const json = JSON.parse(JSON.stringify({ date: d }));
-    expect(json.date).toContain("2023-06-15");
+    const expected = Temporal.PlainDate.from({ year: 2004, month: 7, day: 25 });
+    const actual = Temporal.PlainDate.from(asJson(expected) as string);
+    expect(actual.toString()).toEqual(expected.toString());
   });
 
   it("datetime as json", () => {
-    const dt = new Date("2023-06-15T14:30:45.123Z");
-    expect(dt.toJSON()).toBe("2023-06-15T14:30:45.123Z");
+    const expected = Temporal.PlainDateTime.from({ year: 2004, month: 7, day: 25 });
+    const actual = Temporal.PlainDateTime.from(asJson(expected) as string);
+    expect(actual.toString()).toEqual(expected.toString());
   });
 });

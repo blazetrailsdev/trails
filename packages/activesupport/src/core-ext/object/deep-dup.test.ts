@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { deepDup } from "../../hash-utils.js";
 
 describe("DeepDupTest", () => {
@@ -35,48 +36,39 @@ describe("DeepDupTest", () => {
   });
 
   it("deep dup initialize", () => {
-    const zeroHash = new Proxy<Record<string, number>>(
-      {},
-      {
-        get(target, prop) {
-          if (typeof prop === "string" && !(prop in target)) return 0;
-          return target[prop as string];
-        },
-      },
-    );
+    const zeroHash = new Hash<number, number>(0);
     const hash = { a: zeroHash };
     const dup = deepDup(hash);
-    expect(dup.a).toBeDefined();
-    expect(dup.a).not.toBe(hash.a);
+    expect(dup.a.get(44)).toEqual(0);
   });
 
   it("object deep dup", () => {
-    const object: Record<string, any> = { existing: true };
+    const object: Record<string, unknown> = {};
     const dup = deepDup(object);
     dup.a = 1;
-    expect(object.a).toBeUndefined();
-    expect(dup.a).toBe(1);
+    expect(Object.hasOwn(object, "a")).toBeFalsy();
+    expect(Object.hasOwn(dup, "a")).toBeTruthy();
   });
 
   it("deep dup with hash class key", () => {
-    const hash: Record<string, number> = { Integer: 1 };
+    const hash = new Hash<unknown, number>();
+    hash.set(Number, 1);
     const dup = deepDup(hash);
-    expect(Object.keys(dup).length).toBe(1);
+    expect([...dup.keys()].length).toEqual(1);
   });
 
   it("deep dup with mutable frozen key", () => {
-    const hash: Record<string, any> = { key: { array: [] } };
+    const key = Object.freeze({ array: [] as string[] });
+    const hash = new Hash<{ array: string[] }, string>();
+    hash.set(key, ":value");
     const dup = deepDup(hash);
-    dup.key.array.push("element");
-    expect(hash.key.array).toEqual([]);
-    expect(dup.key.array).toEqual(["element"]);
+    for (const k of dup.keys()) k.array.push(":array_element");
+    expect([...dup.keys()]).not.toEqual([...hash.keys()]);
   });
 
   it("named modules arent duped", () => {
     const hash = { class: Object, module: Array };
-    const dup = deepDup(hash);
-    expect(dup.class).toBe(hash.class);
-    expect(dup.module).toBe(hash.module);
+    expect(deepDup(hash)).toEqual(hash);
   });
 
   it("anonymous modules are duped", () => {
@@ -84,7 +76,5 @@ describe("DeepDupTest", () => {
     const dup = deepDup(hash);
     expect(dup.class).not.toBe(hash.class);
     expect(dup.module).not.toBe(hash.module);
-    expect(dup.class).toEqual(hash.class);
-    expect(dup.module).toEqual(hash.module);
   });
 });

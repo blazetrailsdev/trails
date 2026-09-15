@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { objectWith } from "./with.js";
+import { assertNotRespondTo } from "../../testing/assertions.js";
 
 class Record {
   publicAttr = "public";
@@ -10,6 +12,12 @@ class Record {
   }
 
   private _mixedAttr = "mixed";
+  #protectedAttr = "protected";
+  #privateAttr = "private";
+
+  inspectHidden() {
+    return [this.#protectedAttr, this.#privateAttr];
+  }
 }
 
 describe("WithTest", () => {
@@ -53,18 +61,28 @@ describe("WithTest", () => {
     expect(object.mixedAttr).toBe("mixed");
 
     expect(() => {
-      objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {});
-    }).toThrow();
+      objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {
+        expect(false).toBeTruthy();
+      });
+    }).toThrow(NoMethodError);
 
     expect(object.publicAttr).toBe("public");
     expect(object.mixedAttr).toBe("mixed");
   });
 
   it("only works with public attributes", () => {
-    const readOnly = Object.freeze({ x: 1 });
     expect(() => {
-      objectWith(readOnly as any, { x: 2 }, () => {});
-    }).toThrow();
+      objectWith(object as any, { privateAttr: "changed" }, () => {});
+    }).toThrow(NoMethodError);
+    expect(() => {
+      objectWith(object as any, { protectedAttr: "changed" }, () => {});
+    }).toThrow(NoMethodError);
+
+    expect(object.mixedAttr).toBe("mixed");
+    expect(() => {
+      objectWith(object as any, { mixedAttr: "changed" }, () => {});
+    }).toThrow(NoMethodError);
+    expect(object.mixedAttr).toBe("mixed");
   });
 
   it("yields the instance to the block", () => {
@@ -73,10 +91,11 @@ describe("WithTest", () => {
   });
 
   it("basic immediates don't respond to #with", () => {
-    expect(typeof (null as any)?.with).toBe("undefined");
-    expect(typeof (true as any).with).toBe("undefined");
-    expect(typeof (false as any).with).toBe("undefined");
-    expect(typeof (1 as any).with).toBe("undefined");
-    expect(typeof (1.0 as any).with).toBe("undefined");
+    assertNotRespondTo(null, "with");
+    assertNotRespondTo(true, "with");
+    assertNotRespondTo(false, "with");
+    assertNotRespondTo(1, "with");
+    assertNotRespondTo(1.0, "with");
+    assertNotRespondTo("sym", "with");
   });
 });
