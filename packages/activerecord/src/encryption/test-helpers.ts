@@ -1,5 +1,6 @@
 import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { Table, UpdateManager } from "@blazetrails/arel";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { Base } from "../index.js";
@@ -186,9 +187,11 @@ export async function createUnencryptedBookIgnoringCase(
     encryptedBookThatIgnoresCase.createBang({ name }),
   );
 
-  const connection = await encryptedBookThatIgnoresCase.leaseConnection();
-  // eslint-disable-next-line blazetrails/no-raw-sql
-  await connection.execute(`UPDATE encrypted_books SET name = '${name}' WHERE id = ${book.id};`);
+  const encryptedBooks = new Table("encrypted_books");
+  const um = new UpdateManager(encryptedBooks);
+  um.set([[encryptedBooks.get("name"), name]]);
+  um.where(encryptedBooks.get("id").eq(book.id));
+  await (await encryptedBookThatIgnoresCase.leaseConnection()).update(um);
 
   await book.reload();
   return book;
