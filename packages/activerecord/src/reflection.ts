@@ -20,6 +20,8 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
 import { modelRegistry, autoloadModel } from "./associations.js";
+import * as Reflection from "./reflection.js";
+import { _setReflection } from "./reflection-slot.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -1972,3 +1974,5 @@ export const ClassMethods = {
   },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
+
+_setReflection(Reflection);

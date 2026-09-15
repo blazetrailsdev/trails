@@ -31,7 +31,11 @@ export class ConnectionUrlResolver {
     const hasAuthority = !!schemeMatch[2];
     const rest = schemeMatch[3];
 
-    this._adapter = protocolAdapters()[scheme] ?? scheme;
+    let adapter = scheme;
+    if (protocolAdapters().get(adapter) != null) {
+      adapter = protocolAdapters().get(adapter) as string;
+    }
+    this._adapter = adapter;
 
     if (hasAuthority) {
       const emptyAuthority = rest.startsWith("/");

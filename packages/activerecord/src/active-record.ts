@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { ActiveSupport, any } from "@blazetrails/activesupport";
+import { ActiveSupport, any, InheritableOptions } from "@blazetrails/activesupport";
 import { AsyncExecutor } from "./ar-config.js";
 import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
@@ -53,11 +53,11 @@ let _useYamlUnsafeLoad = false;
 let _raiseIntWiderThan64bit = true;
 let _yamlColumnPermittedClasses: unknown[] = [Symbol];
 let _generateSecureTokenOn: "create" | "initialize" = "create";
-let _protocolAdapters: Record<string, string> = {
+let _protocolAdapters: InheritableOptions = new InheritableOptions({
   sqlite: "sqlite3",
   mysql: "mysql2",
   postgres: "postgresql",
-};
+});
 
 export function disablePreparedStatements(): boolean {
   return _disablePreparedStatements;
@@ -421,11 +421,11 @@ export function setMarshallingFormatVersion(value: unknown): void {
   Marshalling.setFormatVersion(value);
 }
 
-export function protocolAdapters(): Record<string, string> {
+export function protocolAdapters(): InheritableOptions {
   return _protocolAdapters;
 }
 
-export function setProtocolAdapters(protocolAdapters: Record<string, string>): void {
+export function setProtocolAdapters(protocolAdapters: InheritableOptions): void {
   _protocolAdapters = protocolAdapters;
 }
 

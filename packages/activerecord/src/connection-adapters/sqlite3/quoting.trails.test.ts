@@ -11,7 +11,7 @@ import { DateTime as ARDateTimeType } from "../../type/date-time.js";
 import { TypeMap } from "../../type/type-map.js";
 import { lookupCastType, quotedDate } from "../abstract/quoting.js";
 import { Date as DateType } from "../../type/date.js";
-import { Time as TimeType } from "../../type/time.js";
+import { Time as TimeType, Value as TimeValue } from "../../type/time.js";
 import {
   columnNameMatcher,
   columnNameWithOrderMatcher,
@@ -202,9 +202,11 @@ describe("SQLite3::Quoting", () => {
       expect(() => quote([])).toThrow(TypeError);
     });
 
-    it("dispatches PlainTime through the host quotedTime override", () => {
+    it("dispatches Time::Value through the host quotedTime override", () => {
       const host = quotingHost({ quotedTime: () => "DISPATCHED" });
-      expect(quoteFn.call(host, Temporal.PlainTime.from("14:23:55"))).toBe("'DISPATCHED'");
+      expect(quoteFn.call(host, new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55)))).toBe(
+        "'DISPATCHED'",
+      );
     });
   });
 
@@ -317,8 +319,8 @@ describe("SQLite3::Quoting", () => {
       expect(quote(d)).toBe("'2026-04-18'");
     });
 
-    it("quotes Temporal.PlainTime prefixed with 2000-01-01 sentinel date", () => {
-      const t = Temporal.PlainTime.from("14:23:55.654321");
+    it("quotes Time::Value prefixed with 2000-01-01 sentinel date", () => {
+      const t = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
       expect(quote(t)).toBe("'2000-01-01 14:23:55.654321'");
     });
   });
@@ -339,8 +341,8 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(d)).toBe("2026-04-18");
     });
 
-    it("typeCast Temporal.PlainTime returns prefixed time string", () => {
-      const t = Temporal.PlainTime.from("14:23:55.654321");
+    it("typeCast Time::Value returns prefixed time string", () => {
+      const t = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
       expect(typeCast(t)).toBe("2000-01-01 14:23:55.654321");
     });
   });
@@ -401,8 +403,8 @@ describe("SQLite3::Quoting", () => {
       expect(pd.day).toBe(18);
     });
 
-    it("Temporal.PlainTime with microseconds survives INSERT → SELECT", async () => {
-      const time = Temporal.PlainTime.from("14:23:55.654321");
+    it("Time::Value with microseconds survives INSERT → SELECT", async () => {
+      const time = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
       const rows = (await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`))!;
       const raw = rows[0].t as string;

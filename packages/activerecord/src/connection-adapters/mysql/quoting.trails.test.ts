@@ -14,6 +14,7 @@ import {
 } from "./quoting.js";
 import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
+import { Value as TimeValue } from "../../type/time.js";
 
 const HOST = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
   _escapeState: { noBackslashEscapes: false },
@@ -62,13 +63,13 @@ describe("MySQL quoting — quote dispatches date/time through the adapter", () 
   const proto = AbstractMysqlAdapter.prototype as unknown as { quote(v: unknown): string };
   const host = Object.create(AbstractMysqlAdapter.prototype) as object;
 
-  it("caps PlainTime fractional seconds at microseconds (drops nanoseconds)", () => {
-    const t = new Temporal.PlainTime(12, 0, 0, 123, 456, 789);
+  it("caps Time::Value fractional seconds at microseconds (drops nanoseconds)", () => {
+    const t = new TimeValue(RubyTime.utc(2026, 4, 26, 12, 0, 0, 123456.789));
     expect(proto.quote.call(host, t)).toBe("'12:00:00.123456'");
   });
 
-  it("drops a sub-microsecond PlainTime fraction entirely", () => {
-    const t = new Temporal.PlainTime(12, 0, 0, 0, 0, 1);
+  it("drops a sub-microsecond Time::Value fraction entirely", () => {
+    const t = new TimeValue(RubyTime.utc(2026, 4, 26, 12, 0, 0, 0.001));
     expect(proto.quote.call(host, t)).toBe("'12:00:00'");
   });
 

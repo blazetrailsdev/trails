@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
+import { InheritableOptions } from "@blazetrails/activesupport";
 import { protocolAdapters, setProtocolAdapters } from "../active-record.js";
 
 describe("ConnectionUrlResolver", () => {
@@ -91,13 +92,13 @@ describe("ConnectionUrlResolver", () => {
   });
 
   describe("protocol adapter mapping", () => {
-    const saved = { ...protocolAdapters() };
+    const saved = protocolAdapters();
     afterEach(() => {
       setProtocolAdapters(saved);
     });
 
     it("resolves through a mapping replaced via setProtocolAdapters", () => {
-      setProtocolAdapters({ custom: "postgresql" });
+      setProtocolAdapters(new InheritableOptions({ custom: "postgresql" }));
       const hash = new ConnectionUrlResolver("custom://localhost/db").toHash();
       expect(hash.adapter).toBe("postgresql");
     });
