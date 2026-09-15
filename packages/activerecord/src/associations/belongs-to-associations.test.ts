@@ -65,6 +65,10 @@ import {
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport";
+import {
+  belongsToRequiredValidatesForeignKey,
+  setBelongsToRequiredValidatesForeignKey,
+} from "../active-record.js";
 
 class CarPolymorphicName extends Base {
   declare wheels: AssociationProxy<Wheel>;
@@ -2107,8 +2111,8 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("runs parent presence check if parent has not changed and belongs_to_required_validates_foreign_key is set", async () => {
-    const original = Base.belongsToRequiredValidatesForeignKey;
-    Base.belongsToRequiredValidatesForeignKey = true;
+    const original = belongsToRequiredValidatesForeignKey();
+    setBelongsToRequiredValidatesForeignKey(true);
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -2135,7 +2139,7 @@ describe("BelongsToAssociationsTest", () => {
       });
       expect(ship.name).toBe("Leviathan");
     } finally {
-      Base.belongsToRequiredValidatesForeignKey = original;
+      setBelongsToRequiredValidatesForeignKey(original);
     }
   });
 

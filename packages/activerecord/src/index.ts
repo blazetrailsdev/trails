@@ -253,8 +253,13 @@ export {
   disconnectAllBang,
   dumpSchemaAfterMigration,
   isSchemaCacheIgnoredTable,
+  raiseOnAssignToAttrReadonly,
   schemaFormat,
+  setBelongsToRequiredValidatesForeignKey,
+  setGenerateSecureTokenOn,
   setMaintainTestSchema,
+  setQueues,
+  setRaiseOnAssignToAttrReadonly,
   setSchemaFormat,
 } from "./active-record.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";

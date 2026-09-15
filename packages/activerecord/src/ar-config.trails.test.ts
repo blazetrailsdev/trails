@@ -1,5 +1,4 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Base } from "./base.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import {
   asyncQueryExecutor,
@@ -15,6 +14,19 @@ import {
   verifyForeignKeysForFixtures,
 } from "./active-record.js";
 import { AsyncExecutor } from "./ar-config.js";
+import {
+  applicationRecordClass,
+  belongsToRequiredValidatesForeignKey,
+  generateSecureTokenOn,
+  queues,
+  raiseIntWiderThan64bit,
+  setBelongsToRequiredValidatesForeignKey,
+  setGenerateSecureTokenOn,
+  setQueues,
+  setRaiseIntWiderThan64bit,
+  useYamlUnsafeLoad,
+  yamlColumnPermittedClasses,
+} from "./active-record.js";
 
 describe("ar-config module-level flags", () => {
   it("mirror the ActiveRecord module defaults from active_record.rb", () => {
@@ -24,37 +36,37 @@ describe("ar-config module-level flags", () => {
       sqlite: "sqlite3",
     });
     expect(asyncQueryExecutor()).toBeNull();
-    expect(Base.queues).toEqual({});
+    expect(queues()).toEqual({});
     expect(maintainTestSchema()).toBeNull();
-    expect(Base.applicationRecordClass).toBeNull();
+    expect(applicationRecordClass()).toBeNull();
     expect(errorOnIgnoredOrder()).toBe(false);
     expect(timestampedMigrations()).toBe(true);
     expect(migrationStrategy()).toBe(DefaultStrategy);
     expect(verifyForeignKeysForFixtures()).toBe(false);
-    expect(Base.useYamlUnsafeLoad).toBe(false);
-    expect(Base.raiseIntWiderThan64bit).toBe(true);
-    expect(Base.yamlColumnPermittedClasses).toEqual([Symbol]);
-    expect(Base.generateSecureTokenOn).toBe("create");
+    expect(useYamlUnsafeLoad()).toBe(false);
+    expect(raiseIntWiderThan64bit()).toBe(true);
+    expect(yamlColumnPermittedClasses()).toEqual([Symbol]);
+    expect(generateSecureTokenOn()).toBe("create");
   });
 
   describe("the ActiveRecord module object assigns through to the live value", () => {
     afterEach(() => {
       setAsyncQueryExecutor(null);
-      Base.queues = {};
+      setQueues({});
       setMaintainTestSchema(null);
       setErrorOnIgnoredOrder(false);
       setTimestampedMigrations(true);
-      Base.generateSecureTokenOn = "create";
-      Base.raiseIntWiderThan64bit = true;
-      Base.belongsToRequiredValidatesForeignKey = false;
+      setGenerateSecureTokenOn("create");
+      setRaiseIntWiderThan64bit(true);
+      setBelongsToRequiredValidatesForeignKey(false);
     });
 
     it("round-trip a written value", () => {
       setAsyncQueryExecutor("multi_thread_pool");
       expect(asyncQueryExecutor()).toBe("multi_thread_pool");
 
-      Base.queues = { destroyAssociationAsync: "low" };
-      expect(Base.queues).toEqual({ destroyAssociationAsync: "low" });
+      setQueues({ destroyAssociationAsync: "low" });
+      expect(queues()).toEqual({ destroyAssociationAsync: "low" });
 
       setMaintainTestSchema(true);
       expect(maintainTestSchema()).toBe(true);
@@ -65,14 +77,14 @@ describe("ar-config module-level flags", () => {
       setTimestampedMigrations(false);
       expect(timestampedMigrations()).toBe(false);
 
-      Base.generateSecureTokenOn = "initialize";
-      expect(Base.generateSecureTokenOn).toBe("initialize");
+      setGenerateSecureTokenOn("initialize");
+      expect(generateSecureTokenOn()).toBe("initialize");
 
-      Base.raiseIntWiderThan64bit = false;
-      expect(Base.raiseIntWiderThan64bit).toBe(false);
+      setRaiseIntWiderThan64bit(false);
+      expect(raiseIntWiderThan64bit()).toBe(false);
 
-      Base.belongsToRequiredValidatesForeignKey = true;
-      expect(Base.belongsToRequiredValidatesForeignKey).toBe(true);
+      setBelongsToRequiredValidatesForeignKey(true);
+      expect(belongsToRequiredValidatesForeignKey()).toBe(true);
     });
   });
 });

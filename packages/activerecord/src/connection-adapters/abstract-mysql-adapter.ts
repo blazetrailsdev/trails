@@ -90,7 +90,6 @@ import {
   parameterize,
   presence,
 } from "@blazetrails/activesupport";
-import { _Base } from "../base-slot.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -120,6 +119,7 @@ import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli } from "../active-record.js";
+import { dbWarningsAction } from "../active-record.js";
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
@@ -1187,7 +1187,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
     } | null;
-    const action = _Base!.dbWarningsAction;
+    const action = dbWarningsAction();
     if (action == null || rawConnection == null) return;
     const warningCount = await this.warningCount(rawConnection);
     if (warningCount === 0) return;

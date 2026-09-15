@@ -22,6 +22,7 @@ let _databaseCli: Record<string, string | string[]> = {
 };
 let _defaultTimezone: "utc" | "local" = "utc";
 let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
+let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _writingRole = "writing";
 let _readingRole = "reading";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
@@ -29,7 +30,14 @@ let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _verboseQueryLogs = false;
+let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
+let _raiseOnAssignToAttrReadonly = false;
+let _belongsToRequiredValidatesForeignKey = true;
+let _beforeCommittedOnAllRecords = false;
+let _runAfterTransactionCallbacksInOrderDefined = false;
+let _applicationRecordClass: AnyClass | null = null;
+let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
 let _schemaFormat: SchemaFormat = "ts";
 let _errorOnIgnoredOrder = false;
 let _timestampedMigrations = true;
@@ -39,6 +47,15 @@ let _dumpSchemaAfterMigration = true;
 let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
 let _verifyForeignKeysForFixtures = false;
 let _queryTransformers: QueryTransformer[] = [];
+let _useYamlUnsafeLoad = false;
+let _raiseIntWiderThan64bit = true;
+let _yamlColumnPermittedClasses: unknown[] = [Symbol];
+let _generateSecureTokenOn: "create" | "initialize" = "create";
+let _protocolAdapters: Record<string, string> = {
+  sqlite: "sqlite3",
+  mysql: "mysql2",
+  postgres: "postgresql",
+};
 
 export function disablePreparedStatements(): boolean {
   return _disablePreparedStatements;
@@ -123,6 +140,14 @@ export function setDbWarningsAction(action: DbWarningsAction): void {
   }
 }
 
+export function dbWarningsIgnore(): (string | RegExp)[] {
+  return _dbWarningsIgnore;
+}
+
+export function setDbWarningsIgnore(dbWarningsIgnore: (string | RegExp)[]): void {
+  _dbWarningsIgnore = dbWarningsIgnore;
+}
+
 export function writingRole(): string {
   return _writingRole;
 }
@@ -194,12 +219,74 @@ export function setVerboseQueryLogs(verboseQueryLogs: boolean): void {
   _verboseQueryLogs = verboseQueryLogs;
 }
 
+export function queues(): Record<string, unknown> {
+  return _queues;
+}
+
+export function setQueues(queues: Record<string, unknown>): void {
+  _queues = queues;
+}
+
 export function maintainTestSchema(): boolean | null {
   return _maintainTestSchema;
 }
 
 export function setMaintainTestSchema(maintainTestSchema: boolean | null): void {
   _maintainTestSchema = maintainTestSchema;
+}
+
+export function raiseOnAssignToAttrReadonly(): boolean {
+  return _raiseOnAssignToAttrReadonly;
+}
+
+export function setRaiseOnAssignToAttrReadonly(raiseOnAssignToAttrReadonly: boolean): void {
+  _raiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly;
+}
+
+export function belongsToRequiredValidatesForeignKey(): boolean {
+  return _belongsToRequiredValidatesForeignKey;
+}
+
+export function setBelongsToRequiredValidatesForeignKey(
+  belongsToRequiredValidatesForeignKey: boolean,
+): void {
+  _belongsToRequiredValidatesForeignKey = belongsToRequiredValidatesForeignKey;
+}
+
+export function beforeCommittedOnAllRecords(): boolean {
+  return _beforeCommittedOnAllRecords;
+}
+
+export function setBeforeCommittedOnAllRecords(beforeCommittedOnAllRecords: boolean): void {
+  _beforeCommittedOnAllRecords = beforeCommittedOnAllRecords;
+}
+
+export function runAfterTransactionCallbacksInOrderDefined(): boolean {
+  return _runAfterTransactionCallbacksInOrderDefined;
+}
+
+export function setRunAfterTransactionCallbacksInOrderDefined(
+  runAfterTransactionCallbacksInOrderDefined: boolean,
+): void {
+  _runAfterTransactionCallbacksInOrderDefined = runAfterTransactionCallbacksInOrderDefined;
+}
+
+export function applicationRecordClass(): AnyClass | null {
+  return _applicationRecordClass;
+}
+
+export function setApplicationRecordClass(applicationRecordClass: AnyClass | null): void {
+  _applicationRecordClass = applicationRecordClass;
+}
+
+export function actionOnStrictLoadingViolation(): "raise" | "log" {
+  return _actionOnStrictLoadingViolation;
+}
+
+export function setActionOnStrictLoadingViolation(
+  actionOnStrictLoadingViolation: "raise" | "log",
+): void {
+  _actionOnStrictLoadingViolation = actionOnStrictLoadingViolation;
 }
 
 export function schemaFormat(): SchemaFormat {
@@ -274,12 +361,52 @@ export function setQueryTransformers(queryTransformers: QueryTransformer[]): voi
   _queryTransformers = queryTransformers;
 }
 
+export function useYamlUnsafeLoad(): boolean {
+  return _useYamlUnsafeLoad;
+}
+
+export function setUseYamlUnsafeLoad(useYamlUnsafeLoad: boolean): void {
+  _useYamlUnsafeLoad = useYamlUnsafeLoad;
+}
+
+export function raiseIntWiderThan64bit(): boolean {
+  return _raiseIntWiderThan64bit;
+}
+
+export function setRaiseIntWiderThan64bit(raiseIntWiderThan64bit: boolean): void {
+  _raiseIntWiderThan64bit = raiseIntWiderThan64bit;
+}
+
+export function yamlColumnPermittedClasses(): unknown[] {
+  return _yamlColumnPermittedClasses;
+}
+
+export function setYamlColumnPermittedClasses(yamlColumnPermittedClasses: unknown[]): void {
+  _yamlColumnPermittedClasses = yamlColumnPermittedClasses;
+}
+
+export function generateSecureTokenOn(): "create" | "initialize" {
+  return _generateSecureTokenOn;
+}
+
+export function setGenerateSecureTokenOn(generateSecureTokenOn: "create" | "initialize"): void {
+  _generateSecureTokenOn = generateSecureTokenOn;
+}
+
 export function marshallingFormatVersion(): 6.1 | 7.1 {
   return Marshalling.formatVersion();
 }
 
 export function setMarshallingFormatVersion(value: unknown): void {
   Marshalling.setFormatVersion(value);
+}
+
+export function protocolAdapters(): Record<string, string> {
+  return _protocolAdapters;
+}
+
+export function setProtocolAdapters(protocolAdapters: Record<string, string>): void {
+  _protocolAdapters = protocolAdapters;
 }
 
 export async function eagerLoadBang(): Promise<void> {

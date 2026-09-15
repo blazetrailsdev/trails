@@ -28,6 +28,7 @@ import { Bulb } from "./test-helpers/models/bulb.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 import { Range as ArRange } from "@blazetrails/ruby-compat";
+import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -1089,8 +1090,8 @@ describe("BasicsTest", () => {
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
   it("readonly attributes when configured to not raise", async () => {
-    const prev = Base.raiseOnAssignToAttrReadonly;
-    Base.raiseOnAssignToAttrReadonly = false;
+    const prev = raiseOnAssignToAttrReadonly();
+    setRaiseOnAssignToAttrReadonly(false);
     try {
       class NonRaisingPost extends Base {
         static {
@@ -1128,7 +1129,7 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via update");
     } finally {
-      Base.raiseOnAssignToAttrReadonly = prev;
+      setRaiseOnAssignToAttrReadonly(prev);
     }
   });
   it("readonly attributes on belongs to association", async () => {

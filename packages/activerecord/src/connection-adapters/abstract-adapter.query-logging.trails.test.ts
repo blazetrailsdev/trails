@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
-import { Base } from "../base.js";
 import { Transaction } from "../transaction.js";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { Collectors } from "@blazetrails/arel";
+import { setDbWarningsIgnore } from "../active-record.js";
 
 describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
   describe("translateExceptionClass", () => {
@@ -189,16 +189,16 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
 
     it("matches by string matcher on message", () => {
       const a = new AbstractAdapter({});
-      Base.dbWarningsIgnore = ["deprecated"];
+      setDbWarningsIgnore(["deprecated"]);
       expect(a.isWarningIgnored({ message: "this feature is deprecated" })).toBe(true);
-      Base.dbWarningsIgnore = [];
+      setDbWarningsIgnore([]);
     });
 
     it("matches by RegExp on message", () => {
       const a = new AbstractAdapter({});
-      Base.dbWarningsIgnore = [/W\d+/];
+      setDbWarningsIgnore([/W\d+/]);
       expect(a.isWarningIgnored({ message: "ok", code: "W001" })).toBe(true);
-      Base.dbWarningsIgnore = [];
+      setDbWarningsIgnore([]);
     });
   });
 

@@ -5,6 +5,7 @@ import { Base, transaction, currentTransaction, Rollback, registerModel } from "
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { fixtures } from "./test-fixtures.js";
+import { setRunAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 function defineBehaviourTopic() {
   return class extends Base {
@@ -940,7 +941,7 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
-      Base.runAfterTransactionCallbacksInOrderDefined = false;
+      setRunAfterTransactionCallbacksInOrderDefined(false);
       const Topic = defineBehaviourTopic();
 
       const topic = new Topic() as any;
@@ -1106,11 +1107,11 @@ describe("TransactionCallbacksTest", () => {
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
       let Topic: ReturnType<typeof defineBehaviourTopic>;
-      Base.runAfterTransactionCallbacksInOrderDefined = true;
+      setRunAfterTransactionCallbacksInOrderDefined(true);
       try {
         Topic = defineBehaviourTopic();
       } finally {
-        Base.runAfterTransactionCallbacksInOrderDefined = false;
+        setRunAfterTransactionCallbacksInOrderDefined(false);
       }
 
       const topic = new Topic() as any;

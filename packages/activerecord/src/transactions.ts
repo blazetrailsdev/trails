@@ -16,7 +16,6 @@ import {
   runCallbacks,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { _Base } from "./base-slot.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
@@ -26,6 +25,7 @@ import {
 } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
+import { runAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 type TransactionAction = "create" | "update" | "destroy";
 
@@ -424,7 +424,7 @@ export function hasTransactionalCallbacks(this: Base): boolean {
 
 /** @internal */
 function prependOption(): Record<string, unknown> {
-  if (_Base!.runAfterTransactionCallbacksInOrderDefined) {
+  if (runAfterTransactionCallbacksInOrderDefined()) {
     return { prepend: true };
   } else {
     return {};

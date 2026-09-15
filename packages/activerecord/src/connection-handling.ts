@@ -18,6 +18,7 @@ import {
 import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
 import { _railsEnv, _setDefaultEnv } from "./connection-handling-slot.js";
 import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
+import { permanentConnectionCheckout } from "./active-record.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
@@ -331,7 +332,7 @@ const CONNECTION_DEPRECATION_MSG =
 export function connection(this: typeof Base): DatabaseAdapter {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
-    const setting = _Base!.permanentConnectionCheckout;
+    const setting = permanentConnectionCheckout();
     if (setting === "deprecated") {
       console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
     } else if (setting === "disallowed") {

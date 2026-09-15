@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
-import { Base } from "../base.js";
 import { Temporal } from "@blazetrails/date";
+import { setUseYamlUnsafeLoad } from "../active-record.js";
 
 describe("YAMLColumn round-trip", () => {
   it("dumps and loads a plain hash", () => {
@@ -25,7 +25,7 @@ describe("YAMLColumn round-trip", () => {
   });
 
   describe("safe dump", () => {
-    afterEach(() => (Base.useYamlUnsafeLoad = false));
+    afterEach(() => setUseYamlUnsafeLoad(false));
 
     class Unpermitted {
       secret = "s3cret";
@@ -41,7 +41,7 @@ describe("YAMLColumn round-trip", () => {
     });
 
     it("dumps unpermitted class instances when use_yaml_unsafe_load is set", () => {
-      Base.useYamlUnsafeLoad = true;
+      setUseYamlUnsafeLoad(true);
       const coder = new YAMLColumn("params");
       expect(coder.dump(new Unpermitted())).toContain("s3cret");
     });

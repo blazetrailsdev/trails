@@ -62,7 +62,7 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError, StaleObjectError, type SQLWarning } from "./errors.js";
+import { NotImplementedError, StaleObjectError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -138,13 +138,7 @@ import {
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setBaseResolver as _setBaseResolverWithLogSubscriber } from "./log-subscriber.js";
-import {
-  dbWarningsAction,
-  permanentConnectionCheckout,
-  setDbWarningsAction,
-  setPermanentConnectionCheckout,
-  writingRole,
-} from "./active-record.js";
+import { writingRole } from "./active-record.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
@@ -660,26 +654,6 @@ interface _ConstructorAssociationWriter {
   syncIdsWrite?: (v: unknown[]) => void;
 }
 
-type AnyClass = abstract new (...args: never[]) => object;
-
-let _dbWarningsIgnore: (string | RegExp)[] = [];
-let _queues: Record<string, unknown> = {};
-let _raiseOnAssignToAttrReadonly = false;
-let _belongsToRequiredValidatesForeignKey = true;
-let _beforeCommittedOnAllRecords = false;
-let _runAfterTransactionCallbacksInOrderDefined = false;
-let _applicationRecordClass: AnyClass | null = null;
-let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
-let _useYamlUnsafeLoad = false;
-let _raiseIntWiderThan64bit = true;
-let _yamlColumnPermittedClasses: unknown[] = [Symbol];
-let _generateSecureTokenOn: "create" | "initialize" = "create";
-let _protocolAdapters: Record<string, string> = {
-  sqlite: "sqlite3",
-  mysql: "mysql2",
-  postgres: "postgresql",
-};
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   declare static includeRootInJson: boolean | string;
@@ -716,126 +690,6 @@ export class Base extends Model {
 
   /** @internal */
   declare static _registryKeys: string[];
-
-  static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
-    return dbWarningsAction();
-  }
-
-  static set dbWarningsAction(action: Parameters<typeof setDbWarningsAction>[0]) {
-    setDbWarningsAction(action);
-  }
-
-  static get dbWarningsIgnore(): (string | RegExp)[] {
-    return _dbWarningsIgnore;
-  }
-
-  static set dbWarningsIgnore(value: (string | RegExp)[]) {
-    _dbWarningsIgnore = value;
-  }
-
-  static get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
-    return permanentConnectionCheckout();
-  }
-
-  static set permanentConnectionCheckout(value: true | "deprecated" | "disallowed") {
-    setPermanentConnectionCheckout(value);
-  }
-
-  static get queues(): Record<string, unknown> {
-    return _queues;
-  }
-
-  static set queues(value: Record<string, unknown>) {
-    _queues = value;
-  }
-
-  static get raiseOnAssignToAttrReadonly(): boolean {
-    return _raiseOnAssignToAttrReadonly;
-  }
-
-  static set raiseOnAssignToAttrReadonly(value: boolean) {
-    _raiseOnAssignToAttrReadonly = value;
-  }
-
-  static get belongsToRequiredValidatesForeignKey(): boolean {
-    return _belongsToRequiredValidatesForeignKey;
-  }
-
-  static set belongsToRequiredValidatesForeignKey(value: boolean) {
-    _belongsToRequiredValidatesForeignKey = value;
-  }
-
-  static get beforeCommittedOnAllRecords(): boolean {
-    return _beforeCommittedOnAllRecords;
-  }
-
-  static set beforeCommittedOnAllRecords(value: boolean) {
-    _beforeCommittedOnAllRecords = value;
-  }
-
-  static get runAfterTransactionCallbacksInOrderDefined(): boolean {
-    return _runAfterTransactionCallbacksInOrderDefined;
-  }
-
-  static set runAfterTransactionCallbacksInOrderDefined(value: boolean) {
-    _runAfterTransactionCallbacksInOrderDefined = value;
-  }
-
-  static get applicationRecordClass(): AnyClass | null {
-    return _applicationRecordClass;
-  }
-
-  static set applicationRecordClass(value: AnyClass | null) {
-    _applicationRecordClass = value;
-  }
-
-  static get actionOnStrictLoadingViolation(): "raise" | "log" {
-    return _actionOnStrictLoadingViolation;
-  }
-
-  static set actionOnStrictLoadingViolation(value: "raise" | "log") {
-    _actionOnStrictLoadingViolation = value;
-  }
-
-  static get useYamlUnsafeLoad(): boolean {
-    return _useYamlUnsafeLoad;
-  }
-
-  static set useYamlUnsafeLoad(value: boolean) {
-    _useYamlUnsafeLoad = value;
-  }
-
-  static get raiseIntWiderThan64bit(): boolean {
-    return _raiseIntWiderThan64bit;
-  }
-
-  static set raiseIntWiderThan64bit(value: boolean) {
-    _raiseIntWiderThan64bit = value;
-  }
-
-  static get yamlColumnPermittedClasses(): unknown[] {
-    return _yamlColumnPermittedClasses;
-  }
-
-  static set yamlColumnPermittedClasses(value: unknown[]) {
-    _yamlColumnPermittedClasses = value;
-  }
-
-  static get generateSecureTokenOn(): "create" | "initialize" {
-    return _generateSecureTokenOn;
-  }
-
-  static set generateSecureTokenOn(value: "create" | "initialize") {
-    _generateSecureTokenOn = value;
-  }
-
-  static get protocolAdapters(): Record<string, string> {
-    return _protocolAdapters;
-  }
-
-  static set protocolAdapters(value: Record<string, string>) {
-    _protocolAdapters = value;
-  }
 
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
 

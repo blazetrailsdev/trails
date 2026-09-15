@@ -5,7 +5,6 @@ import {
   type ValueType,
 } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { _Base } from "../../base-slot.js";
 import {
   quote as abstractQuote,
   lookupCastType as abstractLookupCastType,
@@ -23,6 +22,7 @@ import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { format, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import { raiseIntWiderThan64bit } from "../../active-record.js";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -95,7 +95,7 @@ export function quotedBinary(
 
 export function quote(this: QuotingDispatchHost, value: unknown): string | null {
   if (
-    _Base!.raiseIntWiderThan64bit &&
+    raiseIntWiderThan64bit() &&
     (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value)))
   ) {
     checkIntInRange(value);

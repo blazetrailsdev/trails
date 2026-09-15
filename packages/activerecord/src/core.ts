@@ -51,6 +51,7 @@ export interface Core {
 }
 
 import { _Base } from "./base-slot.js";
+import { actionOnStrictLoadingViolation } from "./active-record.js";
 
 interface CoreRecord {
   id: unknown;
@@ -476,7 +477,7 @@ export function strictLoadingViolationBang({
   owner: unknown;
   reflection: { name: string; strictLoadingViolationMessage(owner: unknown): string };
 }): void {
-  switch (_Base!.actionOnStrictLoadingViolation) {
+  switch (actionOnStrictLoadingViolation()) {
     case "raise": {
       const message = reflection.strictLoadingViolationMessage(owner);
       throw new StrictLoadingViolationError(message);

@@ -862,8 +862,7 @@ extends Association`, whose modules reach `reflection.ts` back through
   (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
   The cycle is closed by `base.ts` importing all three, so none of them can
   import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
-  it: bare for `db_warnings_ignore` (`abstract_adapter.rb`, reached only from a
-  live query), and as `_Base?.logger ?? null` in the constructor
+  it as `_Base?.logger ?? null` in the constructor
   (`abstract_adapter.rb:132,140`). That read on a standalone adapter's own
   path is the only guarded slot read, falling back to the value Rails'
   autoloaded `active_record.rb` would hold. An
@@ -878,16 +877,9 @@ extends Association`, whose modules reach `reflection.ts` back through
   `lazilyLoadSchemaCache()` in `ConnectionPool#new_connection`, and
   `asyncQueryExecutor()` in `abstract-adapter.ts` and
   `ConnectionPool#build_async_executor` left this list.
-  It is also the read site for the `ActiveRecord` singleton config seats
-  (`active_record.rb:182-491`'s `singleton_class.attr_accessor` block, which the
-  api manifest flattens onto `base.rb`, so they are `static` accessor pairs on
-  `Base`) that have not yet moved onto `active-record.ts`: every module
-  `base.ts` reaches at load that reads one —
-  `connection-adapters/**`, `transactions.ts`, `inheritance.ts`,
-  `readonly-attributes.ts`, `coders/yaml-column.ts`,
-  `associations/builder/belongs-to.ts`,
-  `database-configurations/connection-url-resolver.ts` — reads it as
-  `_Base!.<seat>`, unguarded like the rest.
+  Every `ActiveRecord` singleton config seat (`active_record.rb:182-491`'s
+  `singleton_class.attr_*` block) now lives on `active-record.ts` except
+  `ar-config.ts`'s two, so no module reads a seat through this slot.
 - `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
   `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
   (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle

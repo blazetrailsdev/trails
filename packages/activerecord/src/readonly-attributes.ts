@@ -1,8 +1,8 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
-import { _Base } from "./base-slot.js";
 import { include } from "@blazetrails/activesupport";
 import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
+import { raiseOnAssignToAttrReadonly } from "./active-record.js";
 
 export class ReadonlyAttributeError extends ActiveRecordError {
   /** @noRailsEquivalent PERMANENT */
@@ -16,7 +16,7 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   (this as any)._attrReadonly = [
     ...new Set([...((this as any)._attrReadonly as string[]), ...attributes.map(String)]),
   ];
-  if (_Base!.raiseOnAssignToAttrReadonly) {
+  if (raiseOnAssignToAttrReadonly()) {
     include(this as unknown as new (...args: any[]) => any, HasReadonlyAttributes);
   }
 }

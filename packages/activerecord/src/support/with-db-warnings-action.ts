@@ -1,5 +1,10 @@
-import { Base } from "../base.js";
 import type { SQLWarning } from "../errors.js";
+import {
+  dbWarningsAction,
+  dbWarningsIgnore,
+  setDbWarningsAction,
+  setDbWarningsIgnore,
+} from "../active-record.js";
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void);
 
@@ -12,14 +17,14 @@ export async function withDbWarningsAction(
     typeof warningsToIgnore === "function" ? warningsToIgnore : fn
   ) as () => Promise<void> | void;
   const ignore = Array.isArray(warningsToIgnore) ? warningsToIgnore : [];
-  const savedAction = Base.dbWarningsAction;
-  const savedIgnore = Base.dbWarningsIgnore;
-  Base.dbWarningsAction = action;
-  Base.dbWarningsIgnore = ignore;
+  const savedAction = dbWarningsAction();
+  const savedIgnore = dbWarningsIgnore();
+  setDbWarningsAction(action);
+  setDbWarningsIgnore(ignore);
   try {
     await body();
   } finally {
-    Base.dbWarningsAction = savedAction ?? "ignore";
-    Base.dbWarningsIgnore = savedIgnore;
+    setDbWarningsAction(savedAction ?? "ignore");
+    setDbWarningsIgnore(savedIgnore);
   }
 }

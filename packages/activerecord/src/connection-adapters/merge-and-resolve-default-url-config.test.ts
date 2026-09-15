@@ -4,8 +4,8 @@ import {
   InvalidConfigurationError,
   type RawConfigurations,
 } from "../database-configurations.js";
-import { Base } from "../base.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { protocolAdapters, setProtocolAdapters } from "../active-record.js";
 
 const DEFAULT_ENV = "default_env";
 
@@ -27,7 +27,7 @@ beforeEach(() => {
     delete process.env[key];
   }
   savedDefaultEnv = DatabaseTasks.env;
-  savedProtocolMapping = { ...Base.protocolAdapters };
+  savedProtocolMapping = { ...protocolAdapters() };
   DatabaseTasks.env = DEFAULT_ENV;
 });
 
@@ -37,7 +37,7 @@ afterEach(() => {
     else delete process.env[key];
   }
   DatabaseTasks.env = savedDefaultEnv;
-  Base.protocolAdapters = savedProtocolMapping;
+  setProtocolAdapters(savedProtocolMapping);
 });
 
 function resolveConfig(
@@ -422,7 +422,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping is used and can be updated", () => {
-    Base.protocolAdapters.potato = "postgresql";
+    protocolAdapters().potato = "postgresql";
     process.env["DATABASE_URL"] = "potato://localhost/exampledb";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
@@ -434,7 +434,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping translates underscores to dashes", () => {
-    Base.protocolAdapters.custom_protocol = "postgresql";
+    protocolAdapters().custom_protocol = "postgresql";
     process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
@@ -446,7 +446,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping handles sqlite3 file urls", () => {
-    Base.protocolAdapters.custom_protocol = "sqlite3";
+    protocolAdapters().custom_protocol = "sqlite3";
     process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});

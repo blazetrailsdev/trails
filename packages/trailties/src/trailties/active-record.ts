@@ -26,6 +26,12 @@ import {
 } from "@blazetrails/activerecord/encryption";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { setRubyClassPath } from "../ruby-class-path-slot.js";
+import {
+  setBelongsToRequiredValidatesForeignKey,
+  setGenerateSecureTokenOn,
+  setQueues,
+  setRaiseOnAssignToAttrReadonly,
+} from "@blazetrails/activerecord";
 
 export type ActiveRecordEncryptionConfig = Parameters<typeof EncryptionConfigurable.configure>[0];
 
@@ -144,10 +150,10 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("active_record.set_configs", () => {
       const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       setMaintainTestSchema(cfg.maintainTestSchema);
-      Base.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
-      Base.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
-      Base.generateSecureTokenOn = cfg.generateSecureTokenOn;
-      Base.queues = cfg.queues;
+      setRaiseOnAssignToAttrReadonly(cfg.raiseOnAssignToAttrReadonly);
+      setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
+      setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
+      setQueues(cfg.queues);
       const partialInserts = cfg.partialInserts;
       if (partialInserts !== undefined) {
         onLoad("active_record", (base: typeof Base) => {

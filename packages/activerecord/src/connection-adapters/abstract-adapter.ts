@@ -153,6 +153,7 @@ import {
   defaultTimezone,
   disablePreparedStatements,
 } from "../active-record.js";
+import { dbWarningsIgnore } from "../active-record.js";
 
 export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
@@ -2218,7 +2219,7 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    return _Base!.dbWarningsIgnore.some((warningMatcher) => {
+    return dbWarningsIgnore().some((warningMatcher) => {
       const matcher =
         typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
       return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
