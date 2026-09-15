@@ -24,7 +24,7 @@ class TokenUser extends User {
   }
 }
 
-const DAY = 24 * 60 * 60 * 1000;
+const DAY = 24 * 60 * 60;
 
 describe("TokenForTest", () => {
   fixtures([], { useTransactionalTests: false });

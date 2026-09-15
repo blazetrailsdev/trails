@@ -124,7 +124,7 @@ describe("TouchLaterTest", () => {
     const previousParentUpdatedAt = (nodes("parent_a") as any).updated_at;
     const previousChildUpdatedAt = (nodes("child_one_of_a") as any).updated_at;
 
-    travel(5000);
+    travel(5);
     try {
       await Node.create({ parent: nodes("child_one_of_a"), tree: trees("root") });
     } finally {

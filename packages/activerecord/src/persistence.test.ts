@@ -707,7 +707,7 @@ describe("PersistenceTest", () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
-    travel(1000);
+    travel(1);
     try {
       await topic.incrementBang("replies_count", 1, { touch: true });
     } finally {
@@ -909,7 +909,7 @@ describe("PersistenceTest", () => {
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
     const previouslyWrittenOn = topic.written_on;
-    travel(1000);
+    travel(1);
     try {
       await topic.incrementBang("replies_count", 1, { touch: "written_on" });
     } finally {
@@ -925,7 +925,7 @@ describe("PersistenceTest", () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
-    travel(1000);
+    travel(1);
     try {
       await topic.decrementBang("replies_count", 1, { touch: true });
     } finally {
@@ -966,7 +966,7 @@ describe("PersistenceTest", () => {
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
     const previouslyWrittenOn = topic.written_on;
-    travel(1000);
+    travel(1);
     try {
       await topic.decrementBang("replies_count", 1, { touch: "written_on" });
     } finally {

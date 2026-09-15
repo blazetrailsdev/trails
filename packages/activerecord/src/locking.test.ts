@@ -495,7 +495,7 @@ describe("OptimisticLockingTest", () => {
 
     let previouslyUpdatedAt = car.updated_at;
     let previouslyWheelsOwnedAt = car.wheels_owned_at;
-    travel(1000);
+    travel(1);
     try {
       await Wheel.createBang({ wheelable: car });
     } finally {
@@ -510,7 +510,7 @@ describe("OptimisticLockingTest", () => {
 
     previouslyUpdatedAt = car.updated_at;
     previouslyWheelsOwnedAt = car.wheels_owned_at;
-    travel(2000);
+    travel(2);
     try {
       await ((await association(car, "wheels").first()) as any).update({ size: 42 });
     } finally {
@@ -525,7 +525,7 @@ describe("OptimisticLockingTest", () => {
 
     previouslyUpdatedAt = car.updated_at;
     previouslyWheelsOwnedAt = car.wheels_owned_at;
-    travel(3000);
+    travel(3);
     try {
       await ((await association(car, "wheels").first()) as any).destroyBang();
     } finally {

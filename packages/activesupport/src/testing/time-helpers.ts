@@ -6,6 +6,8 @@ import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
+import { plusWithDuration } from "../core-ext/time/calculations.js";
+import { toTime } from "../core-ext/time/compatibility.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 class Stub {
@@ -76,12 +78,18 @@ export function travel(
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
-  const ms = duration instanceof Duration ? duration.inSeconds() * 1000 : duration;
-  travelTo(new globalThis.Date(currentTime().getTime() + ms), { withUsec }, block);
+  travelTo(plusWithDuration.call(Time.now(), duration), { withUsec }, block);
 }
 
 export function travelTo(
-  dateOrTime: Temporal.PlainDate | globalThis.Date | Temporal.Instant | Time | string,
+  dateOrTime:
+    | Temporal.PlainDate
+    | Temporal.PlainDateTime
+    | Temporal.ZonedDateTime
+    | globalThis.Date
+    | Temporal.Instant
+    | Time
+    | string,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
@@ -112,7 +120,7 @@ export function travelTo(
     throw new RuntimeError(travelToNestedBlockCall);
   }
 
-  let now: Time;
+  let now: typeof dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDate) {
     now = midnight(dateOrTime).toTime();
   } else if (typeof dateOrTime === "string") {
@@ -121,17 +129,18 @@ export function travelTo(
       ? zone.parse(dateOrTime)!.toTime()
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
-    now =
-      dateOrTime instanceof Time
-        ? dateOrTime
-        : Time.at(
-            new Rational(
-              dateOrTime instanceof globalThis.Date
-                ? BigInt(dateOrTime.getTime()) * 1_000_000n
-                : dateOrTime.epochNanoseconds,
-              1_000_000_000n,
-            ),
-          );
+    now = dateOrTime;
+    if (!(now instanceof Time))
+      now = Time.at(
+        new Rational(
+          now instanceof globalThis.Date
+            ? BigInt(now.getTime()) * 1_000_000n
+            : now instanceof Temporal.Instant
+              ? now.epochNanoseconds
+              : toTime(now).epochNanoseconds,
+          1_000_000_000n,
+        ),
+      );
   }
 
   if (!withUsec) now = change(now, { usec: 0 });
@@ -140,7 +149,9 @@ export function travelTo(
 
   const stubs = simpleStubs();
   const stubbedTime = stubs.stubbing(Time, "now") ? Time.now() : undefined;
-  stubs.stubObject(Time, "now", () => Time.at(now));
+  stubs.stubObject(Time, "now", function (this: typeof Time) {
+    return this.at(now);
+  });
 
   stubs.stubObject(Time, "new", (...args: unknown[]) => {
     if (isEmpty(args)) {
@@ -151,16 +162,18 @@ export function travelTo(
     }
   });
 
-  stubs.stubObject(Date, "today", () => Date.jd(new Date(now.toDate()).jd));
-  stubs.stubObject(DateTime, "now", () =>
-    DateTime.jd(
+  stubs.stubObject(Date, "today", function (this: typeof Date) {
+    return this.jd(new Date(now.toDate()).jd);
+  });
+  stubs.stubObject(DateTime, "now", function (this: typeof DateTime) {
+    return this.jd(
       new Date(now.toDate()).jd,
       now.hour,
       now.min,
       now.sec,
       new Rational(now.utcOffset, 86400),
-    ),
-  );
+    );
+  });
 
   stubs.stubObject(clock, "now", () => now.toTime().toInstant());
 
@@ -190,9 +203,7 @@ export function travelBack(block?: () => void): void {
   }
 }
 
-export function unfreezeTime(block?: () => void): void {
-  travelBack(block);
-}
+export { travelBack as unfreezeTime };
 
 export function freezeTime(
   { withUsec = false }: { withUsec?: boolean } = {},

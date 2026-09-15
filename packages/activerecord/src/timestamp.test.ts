@@ -133,7 +133,7 @@ describe("TimestampTest", () => {
 
   it("touching an attribute updates timestamp", async () => {
     const previousCreatedAt = developer.legacy_created_at as RubyTime;
-    travel(1000);
+    travel(1);
     try {
       await developer.touch("legacy_created_at");
     } finally {
@@ -147,7 +147,7 @@ describe("TimestampTest", () => {
   });
 
   it("touching update at attribute as symbol updates timestamp", async () => {
-    travel(1000);
+    travel(1);
     try {
       await developer.touch("legacy_updated_at");
     } finally {
@@ -263,7 +263,7 @@ describe("TimestampTest", () => {
     const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
     const previousName = dev.name;
 
-    travel(1000);
+    travel(1);
     try {
       await dev.save();
     } finally {
@@ -279,7 +279,7 @@ describe("TimestampTest", () => {
     const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
     const previousName = dev.name;
 
-    travel(1000);
+    travel(1);
     try {
       await dev.save();
     } finally {
@@ -296,7 +296,7 @@ describe("TimestampTest", () => {
     const dev = await NonMutatingUpdateKlass.create({});
     const previousUpdatedAt = dev.legacy_updated_at as RubyTime;
 
-    travel(1000);
+    travel(1);
     try {
       await dev.save();
     } finally {
@@ -313,7 +313,7 @@ describe("TimestampTest", () => {
     const petOwner = await pet.owner;
     const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
-    travel(1000);
+    travel(1);
     try {
       pet.name = "Fluffy the Third";
       await pet.save();
@@ -331,7 +331,7 @@ describe("TimestampTest", () => {
     const petOwner = await pet.owner;
     const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as RubyTime;
 
-    travel(1000);
+    travel(1);
     try {
       await pet.destroy();
     } finally {
@@ -369,7 +369,7 @@ describe("TimestampTest", () => {
     await ownerInst.updateColumns({ happy_at: threeDAgo });
     const previousOwnerUpdatedAt = ownerInst.updated_at as RubyTime;
 
-    travel(1000);
+    travel(1);
     try {
       pet.name = "I'm a parrot";
       await pet.save();

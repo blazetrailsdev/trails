@@ -154,7 +154,7 @@ describe("DelegatedTypeTest", () => {
     const previousEntryUpdatedAt = (entryWithMessage as any).updated_at;
     const previousMessageUpdatedAt = message.updated_at;
 
-    travel(5000);
+    travel(5);
     try {
       await Recipient.create({ message, email_address: "test@test.com" });
     } finally {
