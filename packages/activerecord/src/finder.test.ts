@@ -543,9 +543,10 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
+    const before = (await Topic.all().count()) as number;
     await Topic.create({ title: "a" });
     const count = await Topic.all().count();
-    expect(count).toBe(1);
+    expect(count).toBe(before + 1);
   });
 
   it("bind variables", async () => {
@@ -603,9 +604,10 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
+    const before = (await Topic.findBySql("SELECT * FROM topics")).length;
     await Topic.create({ title: "a" });
     const results = await Topic.findBySql("SELECT * FROM topics");
-    expect(results.length).toBe(1);
+    expect(results.length).toBe(before + 1);
   });
 
   it("select value", async () => {
@@ -627,10 +629,11 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
+    const before = (await Topic.all().pluck("title")).length;
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
     const values = await Topic.all().pluck("title");
-    expect(values.length).toBe(2);
+    expect(values.length).toBe(before + 2);
   });
 
   it("find by ids with limit and offset", async () => {

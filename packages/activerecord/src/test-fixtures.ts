@@ -1,4 +1,4 @@
-import { afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, type TaskContext } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
 import { include, included } from "@blazetrails/ruby-compat";
 import {
@@ -139,6 +139,9 @@ type ResolvedFixtureSet = {
 type ResolvedFixtureMap = Record<string, ResolvedFixtureSet>;
 
 type FixtureAccessor<T extends BaseClass, K extends string> = {
+  (name: K, forceReload: true): Promise<InstanceType<T>>;
+  (...names: [K, K, ...K[]]): InstanceType<T>[];
+  (): InstanceType<T>[];
   (name: K): InstanceType<T>;
   all(): InstanceType<T>[];
 };
@@ -240,10 +243,41 @@ export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[
   [E in T[number] as E["table"]]: JoinTableAccessor<Extract<keyof E["data"], string>>;
 };
 
+let alreadyLoadedFixtures = new Map<unknown, unknown>();
+
+/** @internal */
+async function loadFixturesOnce<T>(
+  fixtureCacheKey: unknown,
+  ctx: TaskContext,
+  adapter: DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
+  loadFixtures: () => Promise<T>,
+): Promise<T> {
+  const runInTransaction =
+    options.useTransactionalTests !== false &&
+    !(options.usesTransaction ?? []).includes(ctx.task.name);
+  const openTransactions =
+    (adapter as { transactionManager?: { openTransactions: number } }).transactionManager
+      ?.openTransactions ?? 0;
+  if (openTransactions > 0) return loadFixtures();
+  if (runInTransaction) {
+    let loaded = alreadyLoadedFixtures.get(fixtureCacheKey) as T | undefined;
+    if (loaded === undefined) {
+      alreadyLoadedFixtures.clear();
+      loaded = await loadFixtures();
+      alreadyLoadedFixtures.set(fixtureCacheKey, loaded);
+    }
+    return loaded;
+  }
+  alreadyLoadedFixtures = new Map();
+  return loadFixtures();
+}
+
 /** @internal */
 function useTablelessFixtures(
   entries: readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
 ): Record<string, unknown> {
   const seenTables = new Set<string>();
   for (const { table } of entries) {
@@ -258,18 +292,20 @@ function useTablelessFixtures(
 
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
+  const fixtureCacheKey = {};
 
-  beforeEach(async () => {
+  beforeEach(async (ctx) => {
     const adapter = getAdapter();
-    const prepared: PreparedFixtureSet[] = [];
-    const tables: string[] = [];
-    for (const { table, data } of entries) {
-      prepared.push(await prepareJoinTableFixtures(adapter, table, data));
-      tables.push(table);
-    }
-    const results = await insertPreparedFixtureSets(adapter, prepared);
+    const loadFixtures = async () => {
+      const prepared: PreparedFixtureSet[] = [];
+      for (const { table, data } of entries) {
+        prepared.push(await prepareJoinTableFixtures(adapter, table, data));
+      }
+      return insertPreparedFixtureSets(adapter, prepared);
+    };
+    const results = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, loadFixtures);
     results.forEach((result, i) => {
-      store[tables[i]] = result;
+      store[keys[i]] = result;
     });
   });
 
@@ -302,18 +338,22 @@ function useTablelessFixtures(
 function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
 ): UseFixturesResult<M>;
 function useFixtures<const N extends FixtureName>(
   names: readonly N[],
   getAdapter: () => DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
 ): UseFixturesByNameResult<N>;
 function useFixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
   getAdapter: () => DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
 ): UseTablelessFixturesResult<T>;
 function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
+  options: WithTransactionalFixturesOptions,
 ): Record<string, unknown> {
   if (
     Array.isArray(fixturesOrNames) &&
@@ -331,7 +371,11 @@ function useFixtures(
         );
       }
     }
-    return useTablelessFixtures(fixturesOrNames as readonly TablelessFixtureEntry[], getAdapter);
+    return useTablelessFixtures(
+      fixturesOrNames as readonly TablelessFixtureEntry[],
+      getAdapter,
+      options,
+    );
   }
   if (
     Array.isArray(fixturesOrNames) &&
@@ -363,8 +407,10 @@ function useFixtures(
       );
 
   const store: Record<string, Record<string, unknown>> = {};
+  const loadedFixtures: Record<string, FixtureSet> = {};
+  const fixtureCacheKey = isNameArray ? JSON.stringify(keys) : {};
 
-  beforeEach(async () => {
+  beforeEach(async (ctx) => {
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
     const fixturesDirectories: Record<string, Record<string, FixtureAttrs>> = {};
     const fixtureClassNames: Record<string, BaseClass | null> = {};
@@ -383,16 +429,19 @@ function useFixtures(
       fixturePool instanceof NullPool
         ? Base
         : ({ connectionPool: () => fixturePool } as unknown as typeof Base);
-    FixtureSet.resetCache();
-    const fixtureSets = await FixtureSet.createFixtures(
-      fixturesDirectories,
-      fixtureSetNames,
-      fixtureClassNames,
-      config,
-    );
+    const fixtureSets = await loadFixturesOnce(fixtureCacheKey, ctx, getAdapter(), options, () => {
+      FixtureSet.resetCache();
+      return FixtureSet.createFixtures(
+        fixturesDirectories,
+        fixtureSetNames,
+        fixtureClassNames,
+        config,
+      );
+    });
     const loaded = Object.keys(fixtures);
     for (let i = 0; i < loaded.length; i++) {
       const fixtureSet = fixtureSets[i];
+      loadedFixtures[loaded[i]] = fixtureSet;
       const set: Record<string, unknown> = {};
       for (const [label, fixture] of Object.entries(fixtureSet.fixtures)) {
         set[label] =
@@ -410,13 +459,30 @@ function useFixtures(
 
   const result: Record<string, unknown> = {};
   for (const key of keys) {
-    const accessor = (name: string) => {
+    const accessor = (...fixtureNames: unknown[]) => {
       const set = store[key];
       if (!set)
         throw new Error(`useFixtures: fixture set "${key}" not loaded — call inside a test`);
-      const instance = set[name];
-      if (!instance) throw new Error(`useFixtures: no fixture named "${name}" in set "${key}"`);
-      return instance;
+      const forceReload = fixtureNames.at(-1) === true || fixtureNames.at(-1) === ":reload";
+      if (forceReload) fixtureNames.pop();
+      const returnSingleRecord = fixtureNames.length === 1;
+      if (fixtureNames.length === 0) fixtureNames = Object.keys(set);
+      const instances = fixtureNames.map((fName) => {
+        if (typeof fName !== "string")
+          throw new Error(`useFixtures: no fixture named "${String(fName)}" in set "${key}"`);
+        if (forceReload) {
+          const fixture = loadedFixtures[key]?.fixtures[fName];
+          if (!fixture) throw new Error(`useFixtures: no fixture named "${fName}" in set "${key}"`);
+          return fixture.find().then((instance: unknown) => (set[fName] = instance));
+        }
+        const instance = set[fName];
+        if (!instance) throw new Error(`useFixtures: no fixture named "${fName}" in set "${key}"`);
+        return instance;
+      });
+      if (forceReload) {
+        return returnSingleRecord ? instances[0] : Promise.all(instances);
+      }
+      return returnSingleRecord ? instances[0] : instances;
     };
     accessor.all = () => {
       const set = store[key];
@@ -470,11 +536,10 @@ export function fixtures(
   const { usesTransaction, useTransactionalTests, connection } = options ?? {};
 
   const getConnection = connection ?? leaseFixtureConnection;
-
+  warmSchemaCacheBeforeFirstTest(getConnection);
+  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection, options ?? {});
   if (useTransactionalTests !== false) {
-    withTransactionalFixtures(getConnection, { usesTransaction });
-  } else {
-    warmSchemaCacheBeforeFirstTest(getConnection);
+    withTransactionalFixtures(getConnection, { usesTransaction, eagerWarmSchemaCache: false });
   }
 
   const fixtureSetNames = Array.isArray(fixturesOrNames)
@@ -485,7 +550,6 @@ export function fixtures(
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.fixtures(fixtureSetNames);
 
-  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection);
   Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
   return result;
 }

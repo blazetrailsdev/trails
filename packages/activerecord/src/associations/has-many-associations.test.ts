@@ -2068,7 +2068,7 @@ describe("HasManyAssociationsTest", () => {
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBe(2);
     const found = await HmAuthor.order("id").detect((a: any) => a.id > 0);
-    expect((found as any).id).toBe(author.id);
+    expect((found as any).id).toBe((await HmAuthor.order("id").first())!.id);
   });
   it("find many with merged options", async () => {
     class MergedAuthor extends Base {
@@ -2188,7 +2188,7 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     registerModel(TakeNotFoundPost);
-    const taken = await TakeNotFoundPost.take();
+    const taken = await TakeNotFoundPost.where({ author_id: -1 }).take();
     expect(taken).toBeNull();
   });
 
@@ -3353,7 +3353,7 @@ describe("HasManyAssociationsTest", () => {
       "Cannot delete record because dependent re locale posts exist",
     );
     expect(await ReLocaleAuthor.findBy({ id: author.id })).not.toBeNull();
-    expect(await ReLocalePost.all().count()).toBe(1);
+    expect(await ReLocalePost.where({ author_id: author.id }).count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
     const greatAuthor = await CpkAuthor.create({ name: "Alice" });

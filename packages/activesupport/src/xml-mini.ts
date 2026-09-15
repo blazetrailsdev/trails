@@ -191,7 +191,7 @@ export async function withBackend<T>(
 }
 
 export interface XmlBuilder {
-  tag(name: string, content?: string | null, attributes?: Record<string, string>): void;
+  tag(name: string, content?: unknown, attributes?: Record<string, string>): void;
   openTag(name: string, attributes?: Record<string, string>): void;
   closeTag(name: string): void;
   instruct(): void;
@@ -438,12 +438,12 @@ function attributeString(attributes: Record<string, string>): string {
 export class XmlStringBuilder implements XmlBuilder {
   private buffer = "";
 
-  tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
+  tag(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
     const attrs = attributeString(attributes);
     if (content == null) {
       this.buffer += `<${name}${attrs}/>`;
     } else {
-      this.buffer += `<${name}${attrs}>${htmlEscape(content).toString()}</${name}>`;
+      this.buffer += `<${name}${attrs}>${htmlEscape(String(content)).toString()}</${name}>`;
     }
   }
 
@@ -481,12 +481,12 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
     return this.indentWidth === 0 ? "" : "\n";
   }
 
-  tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
+  tag(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
     const attrs = attributeString(attributes);
     this.buffer +=
       content == null
         ? `${this.indent()}<${name}${attrs}/>${this.newline()}`
-        : `${this.indent()}<${name}${attrs}>${htmlEscape(content).toString()}</${name}>${this.newline()}`;
+        : `${this.indent()}<${name}${attrs}>${htmlEscape(String(content)).toString()}</${name}>${this.newline()}`;
   }
 
   openTag(name: string, attributes: Record<string, string> = {}): void {

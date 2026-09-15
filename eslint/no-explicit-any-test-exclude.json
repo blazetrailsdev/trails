@@ -177,6 +177,7 @@
   "packages/activerecord/src/explain.test.ts",
   "packages/activerecord/src/finder.test.ts",
   "packages/activerecord/src/fixtures.test.ts",
+  "packages/activerecord/src/fixtures.trails.test.ts",
   "packages/activerecord/src/forbidden-attributes-protection.test.ts",
   "packages/activerecord/src/habtm-destroy-order.test.ts",
   "packages/activerecord/src/inheritance.test.ts",

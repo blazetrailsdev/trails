@@ -592,9 +592,9 @@ describe("DatabaseStatements", () => {
       expect(withYamlFallback(null)).toBeNull();
     });
 
-    it("with yaml fallback converts objects to JSON", () => {
-      expect(withYamlFallback({ a: 1 })).toBe('{"a":1}');
-      expect(withYamlFallback([1, 2])).toBe("[1,2]");
+    it("with yaml fallback converts objects to YAML", () => {
+      expect(withYamlFallback({ a: 1 })).toBe("---\na: 1\n");
+      expect(withYamlFallback([1, 2])).toBe("---\n- 1\n- 2\n");
     });
 
     it("with yaml fallback passes Temporal values through unchanged (not serialized to '{}')", () => {

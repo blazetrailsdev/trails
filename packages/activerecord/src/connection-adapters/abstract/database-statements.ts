@@ -17,6 +17,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
+import { stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { kernelInteger, rbInspect } from "@blazetrails/ruby-compat";
 import {
@@ -673,10 +674,12 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
 }
 
 export function withYamlFallback(value: unknown): unknown {
-  if (Array.isArray(value)) return JSON.stringify(value);
+  if (Array.isArray(value)) return yamlStringify(value, { directives: true });
   if (value !== null && typeof value === "object") {
     const proto = Object.getPrototypeOf(value);
-    if (proto === Object.prototype || proto === null) return JSON.stringify(value);
+    if (proto === Object.prototype || proto === null) {
+      return yamlStringify(value, { directives: true });
+    }
   }
   return value;
 }
