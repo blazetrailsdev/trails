@@ -62,8 +62,8 @@ export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 
-  private _serverVersion: unknown = null;
   private readonly _mutex = new Mutex();
+  private _serverVersion: unknown = null;
   private _serverVersionFetcher: DatabaseAdapter | null = null;
   private _schemaReflection: SchemaReflection | null = null;
 
