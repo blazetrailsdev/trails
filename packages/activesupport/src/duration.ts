@@ -7,12 +7,13 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { cmp, equals as cmpEquals, rbEqual, rubyClass } from "@blazetrails/ruby-compat";
+import { cmp, equals as cmpEquals, rbEqual, rbObjClass, rubyClass } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import { advance as timeAdvance, since as timeSince } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
+import { toSentence } from "./array-utils.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
@@ -155,11 +156,11 @@ export class Duration {
     return Duration.years(n);
   }
 
-  plus(other: Duration | number): Duration {
-    if (typeof other === "number") {
+  plus(other: Duration | Scalar | number): Duration {
+    if (!(other instanceof Duration)) {
       return new Duration(
-        this.value + other,
-        mergeParts(this.parts, this._partKeys, { seconds: other }),
+        this.value + Number(other),
+        mergeParts(this.parts, this._partKeys, { seconds: Number(other) }),
         this._variable,
       );
     }
@@ -170,7 +171,7 @@ export class Duration {
     );
   }
 
-  minus(other: Duration | number): Duration {
+  minus(other: Duration | Scalar | number): Duration {
     if (typeof other === "number") {
       return this.plus(-other);
     }
@@ -323,26 +324,17 @@ export class Duration {
   }
 
   inspect(): string {
-    const activeParts: string[] = [];
+    if (isEmpty(this._partKeys)) return `${this.value} seconds`;
 
-    for (const key of PARTS) {
-      const val = this.parts[key];
-      if (val !== 0) {
-        const abs = Math.abs(val);
-        activeParts.push(`${val} ${abs === 1 ? singular(key) : key}`);
-      }
-    }
-
-    if (activeParts.length === 0) {
-      return "0 seconds";
-    }
-
-    if (activeParts.length === 1) return activeParts[0];
-    if (activeParts.length === 2) return `${activeParts[0]} and ${activeParts[1]}`;
-
-    const last = activeParts[activeParts.length - 1];
-    const rest = activeParts.slice(0, -1).join(", ");
-    return `${rest}, and ${last}`;
+    return toSentence(
+      [...this._partKeys]
+        .sort((a, b) => PARTS.indexOf(a) - PARTS.indexOf(b))
+        .map((unit) => {
+          const val = this.parts[unit];
+          return `${val} ${val === 1 ? unit.slice(0, -1) : unit}`;
+        }),
+      { locale: false },
+    );
   }
 
   equals(other: unknown): boolean {
@@ -507,25 +499,6 @@ export function years(n: number): Duration {
 type DurationReceiver = Date | Temporal.Instant | Temporal.PlainDate | RubyTime;
 type DurationResult = Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
 
-function singular(key: keyof DurationParts): string {
-  switch (key) {
-    case "years":
-      return "year";
-    case "months":
-      return "month";
-    case "weeks":
-      return "week";
-    case "days":
-      return "day";
-    case "hours":
-      return "hour";
-    case "minutes":
-      return "minute";
-    case "seconds":
-      return "second";
-  }
-}
-
 function toDateInput(date: Date | Temporal.Instant): Date {
   if (date instanceof Date) return date;
   if (date instanceof Temporal.Instant) return new Date(date.epochMilliseconds);
@@ -651,9 +624,7 @@ export class Scalar {
 
   /** @internal */
   raiseTypeError(other: unknown): never {
-    throw new TypeError(
-      `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Scalar`,
-    );
+    throw new TypeError(`no implicit conversion of ${rbObjClass(other)} into ${rbObjClass(this)}`);
   }
 
   isVariable(): boolean {
@@ -677,14 +648,36 @@ export class Scalar {
     return this.value;
   }
 
-  plus(other: Scalar | number): Scalar {
-    const otherVal = other instanceof Scalar ? other.value : other;
-    return new Scalar(this.value + otherVal);
+  plus(other: Duration): Duration;
+  plus(other: unknown): Scalar;
+  plus(other: unknown): Scalar | Duration {
+    if (other instanceof Duration) {
+      const seconds = this.value + (other._parts().seconds ?? 0);
+      const newParts = { ...other._parts(), seconds };
+      const newValue = this.value + other.value;
+
+      return new Duration(newValue, newParts, other.isVariable());
+    } else {
+      return this.calculate("+", other);
+    }
   }
 
-  minus(other: Scalar | number): Scalar {
-    const otherVal = other instanceof Scalar ? other.value : other;
-    return new Scalar(this.value - otherVal);
+  minus(other: Duration): Duration;
+  minus(other: unknown): Scalar;
+  minus(other: unknown): Scalar | Duration {
+    if (other instanceof Duration) {
+      const seconds = this.value - (other._parts().seconds ?? 0);
+      let newParts: Partial<DurationParts> = {};
+      for (const [key, v] of Object.entries(other._parts())) {
+        newParts[key as keyof DurationParts] = -v;
+      }
+      newParts = { ...newParts, seconds };
+      const newValue = this.value - other.value;
+
+      return new Duration(newValue, newParts, other.isVariable());
+    } else {
+      return this.calculate("-", other);
+    }
   }
 
   negate(): Scalar {
@@ -705,11 +698,65 @@ export class Scalar {
 
   equals = cmpEquals;
 
-  times(other: number): Scalar {
-    return new Scalar(this.value * other);
+  times(other: Duration): Duration;
+  times(other: unknown): Scalar;
+  times(other: unknown): Scalar | Duration {
+    if (other instanceof Duration) {
+      const newParts: Partial<DurationParts> = {};
+      for (const [key, otherValue] of Object.entries(other._parts())) {
+        newParts[key as keyof DurationParts] = this.value * otherValue;
+      }
+      const newValue = this.value * other.value;
+
+      return new Duration(newValue, newParts, other.isVariable());
+    } else {
+      return this.calculate("*", other);
+    }
   }
 
-  div(other: number): Scalar {
-    return new Scalar(this.value / other);
+  div(other: Duration): number;
+  div(other: unknown): Scalar;
+  div(other: unknown): Scalar | number {
+    if (other instanceof Duration) {
+      return this.value / other.value;
+    } else {
+      return this.calculate("/", other);
+    }
+  }
+
+  modulo(other: Duration): Duration;
+  modulo(other: unknown): Scalar;
+  modulo(other: unknown): Scalar | Duration {
+    if (other instanceof Duration) {
+      return Duration.build(this.value % other.value);
+    } else {
+      return this.calculate("%", other);
+    }
+  }
+
+  /** @internal */
+  private calculate(op: "+" | "-" | "*" | "/" | "%", other: unknown): Scalar {
+    if (other instanceof Scalar) {
+      return new Scalar(applyOp(this.value, op, other.value));
+    } else if (typeof other === "number") {
+      return new Scalar(applyOp(this.value, op, other));
+    } else {
+      this.raiseTypeError(other);
+    }
+  }
+}
+
+function applyOp(value: number, op: "+" | "-" | "*" | "/" | "%", other: number): number {
+  switch (op) {
+    case "+":
+      return value + other;
+    case "-":
+      return value - other;
+    case "*":
+      return value * other;
+    case "/":
+      return value / other;
+    case "%":
+      return value % other;
   }
 }
