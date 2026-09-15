@@ -1,7 +1,8 @@
 import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { StatementInvalid } from "./errors.js";
+import { ActiveRecordError, StatementInvalid } from "./errors.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   camelize,
   OID_NAMESPACE,
@@ -15,6 +16,13 @@ import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
+
+export class FixtureClassNotFound extends ActiveRecordError {
+  constructor(message?: string) {
+    super(message);
+    this.name = "ActiveRecord::FixtureClassNotFound";
+  }
+}
 
 const REF_TAG = Symbol("fixture-ref");
 
@@ -113,6 +121,7 @@ export interface PreparedFixtureSet {
   tables: Record<string, FixtureAttrs[]>;
   serialReset: { table: string; column: string } | null;
   rollback: () => void;
+  rows: Record<string, FixtureAttrs>;
   finalize: () => Promise<Record<string, unknown>>;
 }
 
@@ -374,7 +383,10 @@ export async function prepareModelFixtures(
 
   const serialReset = serialResetCol !== null ? { table: tableName, column: serialResetCol } : null;
 
-  return { tables, serialReset, rollback: () => {}, finalize };
+  const rowsByLabel: Record<string, FixtureAttrs> = {};
+  labels.forEach((label, i) => (rowsByLabel[label] = rows[i]));
+
+  return { tables, serialReset, rollback: () => {}, rows: rowsByLabel, finalize };
 }
 
 /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
@@ -423,14 +435,19 @@ export async function prepareJoinTableFixtures(
     tables: { [tableName]: rows },
     serialReset: null,
     rollback: () => {},
+    rows: resolved,
     finalize: async () => resolved,
   };
 }
 
 const contextClasses = new WeakMap<object, new () => object>();
 
+const allCachedFixtures = new Map<ConnectionPool, Record<string, FixtureSet>>();
+
 export class FixtureSet {
   static readonly MAX_ID = 2 ** 30 - 1;
+
+  static allLoadedFixtures: Record<string, FixtureSet> = {};
 
   static defaultFixtureModelName(fixtureSetName: string, config: typeof Base = Base): string {
     return config.pluralizeTableNames
@@ -440,6 +457,41 @@ export class FixtureSet {
 
   static defaultFixtureTableName(fixtureSetName: string, config: typeof Base = Base): string {
     return `${config.tableNamePrefix}${fixtureSetName.replaceAll("/", "_")}${config.tableNameSuffix}`;
+  }
+
+  static resetCache(): void {
+    allCachedFixtures.clear();
+  }
+
+  static cacheForConnectionPool(connectionPool: ConnectionPool): Record<string, FixtureSet> {
+    let cache = allCachedFixtures.get(connectionPool);
+    if (cache === undefined) allCachedFixtures.set(connectionPool, (cache = {}));
+    return cache;
+  }
+
+  static isFixtureIsCached(
+    connectionPool: ConnectionPool,
+    tableName: string,
+  ): FixtureSet | undefined {
+    return this.cacheForConnectionPool(connectionPool)[tableName];
+  }
+
+  static cachedFixtures(
+    connectionPool: ConnectionPool,
+    keysToFetch: readonly string[] | null = null,
+  ): FixtureSet[] {
+    if (keysToFetch) {
+      return keysToFetch.map((key) => this.cacheForConnectionPool(connectionPool)[key]);
+    } else {
+      return Object.values(this.cacheForConnectionPool(connectionPool));
+    }
+  }
+
+  static cacheFixtures(
+    connectionPool: ConnectionPool,
+    fixturesMap: Record<string, FixtureSet>,
+  ): void {
+    Object.assign(this.cacheForConnectionPool(connectionPool), fixturesMap);
   }
 
   static identify(label: string): number;
@@ -471,12 +523,121 @@ export class FixtureSet {
     return contextClass;
   }
 
-  static async createFixtures<T extends BaseClass, K extends string>(
-    adapter: DatabaseAdapter,
-    ModelClass: T,
-    fixtures: Record<K, FixtureAttrs>,
-  ): Promise<{ [P in K]: InstanceType<T> }> {
-    return defineFixtures(adapter, ModelClass, fixtures);
+  static async createFixtures(
+    fixturesDirectories: Record<string, Record<string, FixtureAttrs>>,
+    fixtureSetNames: string | readonly string[],
+    classNames: Record<string, BaseClass | string | null> = {},
+    config: typeof Base = Base,
+  ): Promise<FixtureSet[]> {
+    const names = (typeof fixtureSetNames === "string" ? [fixtureSetNames] : fixtureSetNames).map(
+      String,
+    );
+
+    const connectionPool = config.connectionPool();
+    const fixtureFilesToRead = names.filter(
+      (fsName) => !this.isFixtureIsCached(connectionPool, fsName),
+    );
+
+    if (fixtureFilesToRead.length > 0) {
+      const fixturesMap = await this.readAndInsert(
+        fixturesDirectories,
+        fixtureFilesToRead,
+        classNames,
+        connectionPool,
+      );
+      this.cacheFixtures(connectionPool, fixturesMap);
+    }
+    return this.cachedFixtures(connectionPool, names);
+  }
+
+  private static async readAndInsert(
+    fixturesDirectories: Record<string, Record<string, FixtureAttrs>>,
+    fixtureFiles: string[],
+    classNames: Record<string, BaseClass | string | null>,
+    connectionPool: ConnectionPool,
+  ): Promise<Record<string, FixtureSet>> {
+    const fixturesMap: Record<string, FixtureSet> = {};
+    const fixtureSets = fixtureFiles.map(
+      (fixtureSetName) =>
+        (fixturesMap[fixtureSetName] = new this(
+          null,
+          fixtureSetName,
+          classNames[fixtureSetName] ?? null,
+          fixturesDirectories[fixtureSetName],
+        )),
+    );
+    this.updateAllLoadedFixtures(fixturesMap);
+
+    await this.insert(fixtureSets, connectionPool);
+
+    return fixturesMap;
+  }
+
+  private static async insert(
+    fixtureSets: FixtureSet[],
+    connectionPool: ConnectionPool,
+  ): Promise<void> {
+    const fixtureSetsByPool = new Map<ConnectionPool, FixtureSet[]>();
+    for (const fixtureSet of fixtureSets) {
+      const pool = fixtureSet.modelClass ? fixtureSet.modelClass.connectionPool() : connectionPool;
+      const group = fixtureSetsByPool.get(pool) ?? [];
+      group.push(fixtureSet);
+      fixtureSetsByPool.set(pool, group);
+    }
+
+    for (const [pool, set] of fixtureSetsByPool) {
+      await pool.withConnection(async (conn) => {
+        const prepared: PreparedFixtureSet[] = [];
+        for (const fixtureSet of set) {
+          for (const ignored of fixtureSet.ignoredFixtures ?? [])
+            delete fixtureSet.fixtures[ignored];
+          const rows =
+            typeof fixtureSet._path === "string"
+              ? Object.fromEntries(
+                  Object.entries(fixtureSet.fixtures).map(([label, f]) => [label, f.toHash()]),
+                )
+              : fixtureSet._path;
+          prepared.push(
+            fixtureSet.modelClass === null
+              ? await prepareJoinTableFixtures(conn, fixtureSet.tableName, rows)
+              : await prepareModelFixtures(conn, fixtureSet.modelClass, rows),
+          );
+        }
+        const tableRowsForConnection: Record<string, FixtureAttrs[]> = {};
+        for (const p of prepared) {
+          for (const [table, rows] of Object.entries(p.tables)) {
+            (tableRowsForConnection[table] ??= []).unshift(...rows);
+          }
+        }
+
+        await insertFixturesSet.call(
+          conn as unknown as ThisParameterType<typeof insertFixturesSet>,
+          tableRowsForConnection,
+          Object.keys(tableRowsForConnection),
+        );
+
+        await checkAllForeignKeysValidBang(conn);
+
+        if ("resetPkSequenceBang" in conn) {
+          for (const p of prepared) {
+            if (p.serialReset) {
+              await resetPkSequence(conn, p.serialReset.table, p.serialReset.column);
+            }
+          }
+        }
+
+        prepared.forEach((p, i) => {
+          for (const [label, row] of Object.entries(p.rows)) {
+            const fixture = set[i].fixtures[label];
+            if (fixture) fixture.fixture = row;
+          }
+        });
+      });
+    }
+  }
+
+  private static updateAllLoadedFixtures(fixturesMap: Record<string, FixtureSet>): void {
+    Object.assign(this.allLoadedFixtures, fixturesMap);
   }
 
   readonly tableName: string;
@@ -485,13 +646,13 @@ export class FixtureSet {
   readonly config: typeof Base;
   private _modelClass: BaseClass | null = null;
   private _ignoredFixtures: string[] | null = null;
-  private _path: string;
+  private _path: string | Record<string, FixtureAttrs>;
 
   constructor(
     _: unknown,
     name: string,
     className: BaseClass | string | null,
-    path: string,
+    path: string | Record<string, FixtureAttrs>,
     config: typeof Base = Base,
   ) {
     this.name = name;
@@ -514,6 +675,23 @@ export class FixtureSet {
     return this._ignoredFixtures;
   }
 
+  get(x: string): Fixture | undefined {
+    return this.fixtures[x];
+  }
+
+  set(k: string, v: Fixture): Fixture {
+    return (this.fixtures[k] = v);
+  }
+
+  each(block: (fixtureName: string, fixture: Fixture) => void): Record<string, Fixture> {
+    for (const [fixtureName, fixture] of Object.entries(this.fixtures)) block(fixtureName, fixture);
+    return this.fixtures;
+  }
+
+  size(): number {
+    return Object.keys(this.fixtures).length;
+  }
+
   tableRows(): Record<string, Record<string, unknown>[]> {
     for (const label of this.ignoredFixtures ?? []) delete this.fixtures[label];
 
@@ -524,7 +702,7 @@ export class FixtureSet {
   }
 
   private setModelClass(className: BaseClass | string | null): void {
-    if (typeof className === "function") {
+    if (className != null && typeof className !== "string") {
       this._modelClass = className;
     } else {
       this._modelClass = className
@@ -543,7 +721,20 @@ export class FixtureSet {
     if (!this._ignoredFixtures.includes("DEFAULTS")) this._ignoredFixtures.push("DEFAULTS");
   }
 
-  private readFixtureFiles(path: string): Record<string, Fixture> {
+  private readFixtureFiles(path: string | Record<string, FixtureAttrs>): Record<string, Fixture> {
+    if (typeof path !== "string") {
+      const { _fixture: configRow, ...rows } = path;
+      const config = configRow as { model_class?: string; ignore?: unknown } | undefined;
+      if (this.modelClass == null && config?.model_class) this.setModelClass(config.model_class);
+      if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
+      if (this.ignoredFixtures == null) this.setIgnoredFixtures(config?.ignore);
+      const fixtures: Record<string, Fixture> = {};
+      for (const [fixtureName, row] of Object.entries(rows)) {
+        fixtures[fixtureName] = new Fixture({ ...row }, this.modelClass);
+      }
+      return fixtures;
+    }
+
     const yamlFiles = Dir.glob(`${path}{.yml,/{**,*}/*.yml}`).filter((f) => RubyFile.isFile(f));
 
     if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
@@ -586,8 +777,32 @@ export class Fixture {
     return this.modelClass ? this.modelClass.name : undefined;
   }
 
+  each(block: (key: string, value: unknown) => void): FixtureAttrs {
+    for (const [key, value] of Object.entries(this.fixture)) block(key, value);
+    return this.fixture;
+  }
+
+  get(key: string): unknown {
+    return key in this.fixture ? this.fixture[key] : null;
+  }
+
   toHash(): FixtureAttrs {
     return this.fixture;
+  }
+
+  async find(): Promise<Base> {
+    if (!this.modelClass) throw new FixtureClassNotFound("No class attached to find.");
+    const modelClass = this.modelClass;
+    const object = await modelClass.unscoped(() => {
+      const pk = modelClass.primaryKey;
+      const pkClauses: FixtureAttrs = {};
+      for (const key of Array.isArray(pk) ? pk : pk == null ? [] : [pk]) {
+        if (key in this.fixture) pkClauses[key] = this.fixture[key];
+      }
+      return modelClass.findByBang(pkClauses);
+    });
+    object._strictLoading = false;
+    return object;
   }
 }
 

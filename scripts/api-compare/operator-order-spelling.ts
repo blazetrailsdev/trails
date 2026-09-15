@@ -54,6 +54,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // connection_pool.rb:179 LeaseRegistry `def [](context)` → connection-pool.ts
   // `LeaseRegistry#get`.
   "ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry": { "[]": ["get"] },
+  // fixtures.rb:724,728 FixtureSet `def [](x)` / `def []=(k, v)` → fixtures.ts
+  // `FixtureSet#get` / `#set`.
+  "ActiveRecord::FixtureSet": { "[]": ["get"], "[]=": ["set"] },
+  // fixtures.rb:830 Fixture `def [](key)` → fixtures.ts `Fixture#get`.
+  "ActiveRecord::Fixture": { "[]": ["get"] },
   // abstract/query_cache.rb:58 Store `def [](key)` → abstract/query-cache.ts `Store#get`.
   "ActiveRecord::ConnectionAdapters::QueryCache::Store": { "[]": ["get"] },
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts

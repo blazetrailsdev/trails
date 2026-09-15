@@ -150,11 +150,11 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   });
 
   itIfSupports("virtual_columns", "build fixture sql", async () => {
-    const created = await FixtureSet.createFixtures(
-      adapter,
-      VirtualColumn,
-      virtualColumnFixtureData,
+    const [fixtures] = await FixtureSet.createFixtures(
+      { virtual_columns: virtualColumnFixtureData },
+      "virtual_columns",
+      { virtual_columns: VirtualColumn },
     );
-    expect(Object.keys(created).length).toBe(2);
+    expect(fixtures.size()).toBe(2);
   });
 });

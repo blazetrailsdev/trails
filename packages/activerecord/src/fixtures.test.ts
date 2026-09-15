@@ -565,10 +565,11 @@ describe("FixturesTest", () => {
   });
 
   it("attributes", async () => {
-    const connection = leaseFixtureConnection();
-    const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
-    expect(topics["first"].title).toBe("The First Topic");
-    expect(topics["second"].author_email_address).toBeNull();
+    const [topics] = await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", {
+      topics: Topic,
+    });
+    expect(topics.get("first")!.get("title")).toBe("The First Topic");
+    expect(topics.get("second")!.get("author_email_address")).toBeNull();
   });
 
   it("no args returns all", () => {
@@ -590,7 +591,7 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+    await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
     const firstRow = await (
       await Base.leaseConnection()
     ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
@@ -603,15 +604,15 @@ describe("FixturesTest", () => {
   });
 
   it("insert with datetime", async () => {
-    const connection = leaseFixtureConnection();
-    await FixtureSet.createFixtures(connection, Task, taskFixtureData);
+    await FixtureSet.createFixtures({ tasks: taskFixtureData }, "tasks", { tasks: Task });
     const first = await Task.find(1);
     expect(first).toBeTruthy();
   });
 
   it("insert with default function", async () => {
-    const connection = leaseFixtureConnection();
-    await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
+    await FixtureSet.createFixtures({ aircrafts: aircraftFixtureData }, "aircrafts", {
+      aircrafts: Aircraft,
+    });
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
     expect(
       Math.abs(Time.now().toF() - (aircraft!.manufactured_at as Time).toF()),
@@ -619,8 +620,9 @@ describe("FixturesTest", () => {
   });
 
   it("insert with default value", async () => {
-    const connection = leaseFixtureConnection();
-    await FixtureSet.createFixtures(connection, Aircraft, aircraftFixtureData);
+    await FixtureSet.createFixtures({ aircrafts: aircraftFixtureData }, "aircrafts", {
+      aircrafts: Aircraft,
+    });
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
     expect(aircraft?.wheels_count).toBe(0);
   });
@@ -631,7 +633,7 @@ describe("FixturesTest", () => {
       Base.logger = new Logger(null);
 
       const level = (Base.logger as Logger).level;
-      await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+      await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
       expect((Base.logger as Logger).level).toBe(level);
     } finally {
       Base.logger = previousLogger;
@@ -639,16 +641,16 @@ describe("FixturesTest", () => {
   });
 
   it("instantiation", async () => {
-    const connection = leaseFixtureConnection();
-    const topics = await FixtureSet.createFixtures(connection, Topic, topicFixtureData);
-    expect(topics["first"]).toBeInstanceOf(Topic);
+    const [topics] = await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", {
+      topics: Topic,
+    });
+    expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
   });
 
   it("yaml file with invalid column", async () => {
-    const connection = leaseFixtureConnection();
-    const e = await FixtureSet.createFixtures(connection, Parrot, nakedYmlParrotsFixtureData).catch(
-      (err: Error) => err,
-    );
+    const e = await FixtureSet.createFixtures({ parrots: nakedYmlParrotsFixtureData }, "parrots", {
+      parrots: Parrot,
+    }).catch((err: Error) => err);
     expect(() => {
       throw e;
     }).toThrow(FixtureError);
@@ -656,8 +658,7 @@ describe("FixturesTest", () => {
   });
 
   it("yaml file with symbol columns", async () => {
-    const connection = leaseFixtureConnection();
-    await FixtureSet.createFixtures(connection, Tree, nakedYmlTreesFixtureData);
+    await FixtureSet.createFixtures({ trees: nakedYmlTreesFixtureData }, "trees", { trees: Tree });
     const root = await Tree.find(1);
     expect(root).toBeTruthy();
   });
@@ -687,7 +688,7 @@ describe("TransactionalFixturesTest", () => {
   let first: Topic;
 
   beforeAll(async () => {
-    await FixtureSet.createFixtures(leaseFixtureConnection(), Topic, topicFixtureData);
+    await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
   });
 
   beforeEach(async () => {
@@ -1191,6 +1192,13 @@ describe("CustomNameForFixtureOrModelTest", () => {
     expect(adminRandomlyNamedB0("second_instance")).toBeInstanceOf(
       AdminClassNameThatDoesNotFollowCONVENTIONS2,
     );
+  });
+
+  it("table name is defined in the model", () => {
+    expect(FixtureSet.allLoadedFixtures["admin/randomlyNamedA9"].tableName).toBe(
+      "randomly_named_table2",
+    );
+    expect(AdminClassNameThatDoesNotFollowCONVENTIONS1.tableName).toBe("randomly_named_table2");
   });
 });
 

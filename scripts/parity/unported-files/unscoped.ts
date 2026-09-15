@@ -185,20 +185,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["empty yaml fixture", "empty yaml fixture with a comment in it"],
     reason:
       "Both assert ActiveRecord::FixtureSet.new(nil, name, Klass, path) is non-nil " +
-      "(fixtures_test.rb:522,526). trails' FixtureSet (fixtures.ts:896) is a static-only " +
-      "class with no instance form: there is no constructor to call and no per-set object " +
-      "to be non-nil. Porting them needs FixtureSet#initialize, which reads the .yml the " +
-      "row above already excludes.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "CustomNameForFixtureOrModelTest",
-    tests: ["table name is defined in the model"],
-    reason:
-      'Reads ActiveRecord::FixtureSet.all_loaded_fixtures["admin/randomly_named_a9"].table_name ' +
-      "(fixtures_test.rb:1521). trails' FixtureSet (fixtures.ts:896) is static-only with no " +
-      "per-set instance and no all_loaded_fixtures registry of them, so there is no table_name " +
-      "to read off a loaded set.",
+      "(fixtures_test.rb:522,526). FixtureSet now has its instance form, but both pass a " +
+      "naked/yml path with no rows; trails has no naked fixture sets, the surface the row " +
+      "above already excludes.",
   },
   {
     testFile: "fixtures_test.rb",
