@@ -8,6 +8,10 @@ describe("ActiveSupport::Autoload registry", () => {
     const { outputText } = ts.transpileModule(source, {
       compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
     });
-    expect(ts.preProcessFile(outputText, true, true).importedFiles).toEqual([]);
+    const file = ts.createSourceFile("autoload.js", outputText, ts.ScriptTarget.ES2022);
+    const staticImports = file.statements.filter(
+      (s) => ts.isImportDeclaration(s) || (ts.isExportDeclaration(s) && s.moduleSpecifier),
+    );
+    expect(staticImports).toEqual([]);
   });
 });

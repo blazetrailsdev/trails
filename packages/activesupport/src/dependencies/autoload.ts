@@ -1,23 +1,25 @@
-export type AutoloadPath = string | (() => Promise<unknown>);
-
-export interface Autoload {
+export type Autoload = {
   name: string;
+  loadPath: Record<string, () => Promise<unknown>>;
   _underPath?: string | null;
-  _atPath?: AutoloadPath | null;
+  _atPath?: string | null;
   _eagerAutoload?: boolean | null;
   _eagerloadedConstants?: string[] | null;
-  _autoloads?: Record<string, AutoloadPath>;
-}
+  _autoloads?: Record<string, () => Promise<string>>;
+};
 
-/** @missingRailsCall underscore — PERMANENT */
 export function autoload(
   this: Autoload,
   constName: string,
-  path: AutoloadPath | null = this._atPath ?? null,
+  path: string | null = this._atPath ?? null,
 ): void {
+  let resolvePath = async () => path!;
   if (path == null) {
     const full = [this.name, this._underPath, constName].filter((x) => x != null).join("::");
-    path = full;
+    resolvePath = async () => {
+      const Inflector = await import("../inflector.js");
+      return Inflector.underscore(full);
+    };
   }
 
   if (this._eagerAutoload) {
@@ -25,7 +27,7 @@ export function autoload(
     this._eagerloadedConstants.push(constName);
   }
 
-  (this._autoloads ??= {})[constName] = path;
+  (this._autoloads ??= {})[constName] = resolvePath;
 }
 
 export function autoloadUnder(this: Autoload, path: string, block: () => void): void {
@@ -38,7 +40,7 @@ export function autoloadUnder(this: Autoload, path: string, block: () => void): 
   }
 }
 
-export function autoloadAt(this: Autoload, path: AutoloadPath, block: () => void): void {
+export function autoloadAt(this: Autoload, path: string, block: () => void): void {
   const oldPath = this._atPath;
   this._atPath = path;
   try {
@@ -61,12 +63,9 @@ export function eagerAutoload(this: Autoload, block: () => void): void {
 export async function eagerLoadBang(this: Autoload): Promise<void> {
   if (this._eagerloadedConstants) {
     for (const constName of this._eagerloadedConstants) {
-      const path = this._autoloads?.[constName];
-      if (
-        (this as unknown as Record<string, unknown>)[constName] === undefined &&
-        typeof path === "function"
-      )
-        await path();
+      if ((this as unknown as Record<string, unknown>)[constName] === undefined) {
+        await this.loadPath[await this._autoloads![constName]()]();
+      }
     }
     this._eagerloadedConstants = null;
   }
