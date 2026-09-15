@@ -39,9 +39,10 @@ export class Notifications {
   }
 
   private static get registry(): Map<Fanout, Instrumenter> {
-    return IsolatedExecutionState.fetch<Map<Fanout, Instrumenter>>(
-      ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY,
-      () => new Map(),
+    return (
+      IsolatedExecutionState.get<Map<Fanout, Instrumenter>>(
+        ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY,
+      ) ?? IsolatedExecutionState.set(ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY, new Map())
     );
   }
 

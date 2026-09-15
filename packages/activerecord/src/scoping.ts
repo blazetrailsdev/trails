@@ -15,7 +15,10 @@ export class ScopeRegistry {
   }
 
   static instance(): ScopeRegistry {
-    return IsolatedExecutionState.fetch(SCOPE_REGISTRY_KEY, () => new ScopeRegistry());
+    return (
+      IsolatedExecutionState.get<ScopeRegistry>(SCOPE_REGISTRY_KEY) ??
+      IsolatedExecutionState.set(SCOPE_REGISTRY_KEY, new ScopeRegistry())
+    );
   }
 
   currentScope(model: object, skipInheritedScope = false): any | null {

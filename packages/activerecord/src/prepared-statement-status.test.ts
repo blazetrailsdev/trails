@@ -1,5 +1,5 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
@@ -31,7 +31,7 @@ describe("PreparedStatementStatusTest", () => {
 
     // eslint-disable-next-line blazetrails/no-conditional-in-test
     if ((await Base.leaseConnection()).preparedStatements) {
-      const t1 = IsolatedExecutionState.run(async () => {
+      const t1 = new Thread(async () => {
         await courseConn.unpreparedStatement(async () => {
           inside.set();
           await preventing.wait;
@@ -39,9 +39,9 @@ describe("PreparedStatementStatusTest", () => {
           expect(entrantConn.preparedStatements).toBe(true);
           finished.set();
         });
-      });
+      }).value();
 
-      const t2 = IsolatedExecutionState.run(async () => {
+      const t2 = new Thread(async () => {
         await entrantConn.unpreparedStatement(async () => {
           await inside.wait;
           expect(courseConn.preparedStatements).toBe(true);
@@ -49,7 +49,7 @@ describe("PreparedStatementStatusTest", () => {
           preventing.set();
           await finished.wait;
         });
-      });
+      }).value();
 
       await t1;
       await t2;

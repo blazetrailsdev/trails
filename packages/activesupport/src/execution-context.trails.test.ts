@@ -1,15 +1,15 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { ExecutionContext } from "./execution-context.js";
-import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 describe("ExecutionContext isolation", () => {
   it("does not leak keys written inside an isolated execution state", () => {
     ExecutionContext.clear();
 
-    IsolatedExecutionState.run(() => {
+    new Thread(() => {
       ExecutionContext.setKey("request_id", "inner");
       expect(ExecutionContext.get("request_id")).toBe("inner");
-    });
+    }).value();
 
     expect(ExecutionContext.get("request_id")).toBeUndefined();
   });
@@ -18,10 +18,10 @@ describe("ExecutionContext isolation", () => {
     ExecutionContext.clear();
     ExecutionContext.setKey("request_id", "outer");
 
-    IsolatedExecutionState.run(() => {
+    new Thread(() => {
       expect(ExecutionContext.get("request_id")).toBeUndefined();
       ExecutionContext.setKey("request_id", "inner");
-    });
+    }).value();
 
     expect(ExecutionContext.get("request_id")).toBe("outer");
   });

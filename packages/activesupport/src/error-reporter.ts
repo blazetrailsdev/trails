@@ -136,9 +136,9 @@ export class ErrorReporter {
   }
 
   disable<T>(subscriber: ErrorSubscriber | ErrorSubscriberClass, fn: () => T): T {
-    const disabledSubscribers = IsolatedExecutionState.fetch<
-      Array<ErrorSubscriber | ErrorSubscriberClass>
-    >(this, () => []);
+    const disabledSubscribers =
+      IsolatedExecutionState.get<Array<ErrorSubscriber | ErrorSubscriberClass>>(this) ??
+      IsolatedExecutionState.set(this, []);
     disabledSubscribers.push(subscriber);
     try {
       return fn();

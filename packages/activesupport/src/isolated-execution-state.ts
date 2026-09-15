@@ -1,55 +1,90 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { ArgumentError, NotImplementedError, Thread } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
 type Store = Map<IsolatedKey, unknown>;
 
-const _states = new WeakMap<Thread, Store>();
+type IsolationLevel = "thread" | "fiber";
 
-function store(): Store {
-  const context = IsolatedExecutionState.context();
-  let state = _states.get(context);
-  if (!state) {
-    state = new Map();
-    _states.set(context, state);
+declare module "@blazetrails/ruby-compat" {
+  interface Thread {
+    activeSupportExecutionState?: Store;
   }
-  return state;
+}
+
+let _isolationLevel: IsolationLevel | null = null;
+let _scope: typeof Thread;
+
+/** @internal */
+function state(): Store {
+  const context = IsolatedExecutionState.context();
+  return (context.activeSupportExecutionState ??= new Map());
 }
 
 export const IsolatedExecutionState = {
+  get isolationLevel(): IsolationLevel | null {
+    return _isolationLevel;
+  },
+  get scope(): typeof Thread {
+    return _scope;
+  },
+  set isolationLevel(level: IsolationLevel) {
+    if (level === _isolationLevel) return;
+
+    if (!["thread", "fiber"].includes(level)) {
+      throw new ArgumentError(
+        `isolation_level must be \`:thread\` or \`:fiber\`, got: \`:${String(level)}\``,
+      );
+    }
+
+    if (level === "fiber")
+      // @nie disposition=TODO rails=activesupport/lib/active_support/isolated_execution_state.rb:23
+      throw new NotImplementedError("Fiber");
+
+    if (_isolationLevel != null) IsolatedExecutionState.clear();
+
+    switch (level) {
+      case "thread":
+        _scope = Thread;
+        break;
+    }
+
+    _isolationLevel = level;
+  },
+  uniqueId(): object {
+    return (
+      IsolatedExecutionState.get<object>("__id__") ??
+      IsolatedExecutionState.set("__id__", new Object())
+    );
+  },
   get<T = unknown>(key: IsolatedKey): T | undefined {
-    return store().get(key) as T | undefined;
+    return state().get(key) as T | undefined;
   },
   set<T>(key: IsolatedKey, value: T): T {
-    store().set(key, value);
+    state().set(key, value);
     return value;
   },
   has(key: IsolatedKey): boolean {
-    return store().has(key);
+    return state().has(key);
   },
   delete<T = unknown>(key: IsolatedKey): T | undefined {
-    const s = store();
+    const s = state();
     const value = s.get(key) as T | undefined;
     s.delete(key);
     return value;
   },
   clear(): void {
-    store().clear();
-  },
-  fetch<T>(key: IsolatedKey, init: () => T): T {
-    const s = store();
-    if (s.has(key)) return s.get(key) as T;
-    const value = init();
-    s.set(key, value);
-    return value;
+    state().clear();
   },
   context(): Thread {
-    return Thread.current();
+    return IsolatedExecutionState.scope.current();
   },
   shareWith(other: Thread): void {
-    _states.set(IsolatedExecutionState.context(), new Map(_states.get(other)));
-  },
-  run<R>(fn: () => R): R {
-    return new Thread(fn).value();
+    const otherState = other.activeSupportExecutionState;
+    IsolatedExecutionState.context().activeSupportExecutionState = otherState
+      ? new Map(otherState)
+      : undefined;
   },
 };
+
+IsolatedExecutionState.isolationLevel = "thread";
