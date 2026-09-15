@@ -1,4 +1,4 @@
-import { isPresent } from "@blazetrails/activesupport";
+import { isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { InvalidURIError, rbInspect, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
@@ -821,7 +821,8 @@ export class RouteSet {
   findScriptName(options: Record<string, unknown>): string {
     const scriptName = options["scriptName"];
     delete options["scriptName"];
-    return (scriptName as string | null | undefined) || this.relativeUrlRoot || "";
+    if (scriptName != null && scriptName !== false) return scriptName as string;
+    return this.relativeUrlRoot ?? "";
   }
 
   pathFor(
@@ -876,7 +877,14 @@ export class RouteSet {
     const routeWithParams = this.generate(routeName, pathOptions, recall);
     let path = routeWithParams.path(methodName ?? undefined);
 
-    if (options["trailingSlash"] && !options["format"] && !path.endsWith("/")) {
+    const trailingSlash = options["trailingSlash"];
+    const format = options["format"];
+    if (
+      trailingSlash != null &&
+      trailingSlash !== false &&
+      (format == null || format === false) &&
+      !path.endsWith("/")
+    ) {
       path += "/";
     }
 
@@ -884,7 +892,7 @@ export class RouteSet {
 
     if (Object.hasOwn(options, "params")) {
       const optParams = options["params"];
-      if (optParams != null && typeof optParams === "object") {
+      if (isPlainObject(optParams)) {
         Object.assign(params, optParams);
       } else {
         params["params"] = optParams;
