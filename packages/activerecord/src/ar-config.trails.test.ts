@@ -14,8 +14,6 @@ import {
   timestampedMigrations,
   verifyForeignKeysForFixtures,
 } from "./active-record.js";
-||||||| parent of e549dae7a9 (fix(activerecord): converge AbstractAdapter#close, NullPool#server_version lock order, and ThreadPoolExecutor options)
-import { asyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
 import { AsyncExecutor } from "./ar-config.js";
 
 describe("ar-config module-level flags", () => {
