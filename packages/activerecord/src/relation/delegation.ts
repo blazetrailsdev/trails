@@ -163,9 +163,7 @@ export function create(
   kwargs: { table?: any; predicateBuilder?: any } = {},
 ): any {
   const { table, predicateBuilder } = kwargs;
-  return wrapWithScopeProxy(
-    new (relationClassFor.call(this, model))(model, table, predicateBuilder),
-  );
+  return new (relationClassFor.call(this, model))(model, table, predicateBuilder);
 }
 
 /** @internal */
@@ -173,151 +171,11 @@ export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCt
   return DelegateCache.relationDelegateClass.call(model, this);
 }
 
-/**
- * The curated set of `Array` methods CollectionProxy/Relation delegate to their
- * loaded records, mapped to JS method names.
- *
- * Rails delegates only a curated list via `delegate ... to: :records`
- * (delegation.rb:101) — `to_xml, encode_with, length, each, join, intersect?,
- * [], &, |, +, -, sample, reverse, rotate, compact, in_groups, in_groups_of,
- * to_sentence, to_fs, to_formatted_s, as_json, shuffle, split, slice, index,
- * rindex` — plus the `Enumerable` methods `Relation` mixes in (`map`, `select`,
- * `find`, `any?`, `all?`, `include?`, `inject`, `sort`, `flat_map`, …). Calls
- * outside that surface fall through to `method_missing` → `super` and raise
- * `NoMethodError`.
- *
- * We mirror that boundary: only JS `Array.prototype` methods whose behavior maps
- * to a Rails-reachable method are delegated (e.g. `index` → `indexOf`,
- * `rindex` → `lastIndexOf`). Ruby-only entries (`sample`, `rotate`, `compact`,
- * `in_groups`, `to_sentence`, …) have no JS analogue and are dropped. JS-only
- * methods absent from Rails (`findIndex`, `flat`, `copyWithin`, `fill`, …) are
- * intentionally excluded so they raise like Rails rather than silently
- * succeeding.
- */
-const DELEGATED_ARRAY_METHODS = new Set<string>([
-  "forEach",
-  "join",
-  "reverse",
-  "slice",
-  "at",
-  "indexOf",
-  "lastIndexOf",
-  "concat",
-  "map",
-  "filter",
-  "find",
-  "some",
-  "every",
-  "includes",
-  "reduce",
-  "sort",
-  "flatMap",
-]);
-
-const DELEGATED_RECORD_SET_OPERATORS: Record<string, (a: unknown[], b: unknown[]) => unknown[]> = {
-  intersection: (a, b) => uniqRecords(a).filter((record) => includesRecord(b, record)),
-  union: (a, b) => uniqRecords([...a, ...b]),
-  difference: (a, b) => a.filter((record) => !includesRecord(b, record)),
-};
-
-function recordsEql(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  const equals = (a as { equals?: (other: unknown) => boolean } | null | undefined)?.equals;
-  return typeof equals === "function" ? equals.call(a, b) === true : false;
-}
-
-function includesRecord(records: unknown[], record: unknown): boolean {
-  return records.some((candidate) => recordsEql(candidate, record));
-}
-
-function uniqRecords(records: unknown[]): unknown[] {
-  const uniq: unknown[] = [];
-  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
-  return uniq;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
-export function delegateArrayMethod(
-  prop: string,
-  records: () => unknown[],
-): ((...args: any[]) => unknown) | undefined {
-  const setOperator = DELEGATED_RECORD_SET_OPERATORS[prop];
-  if (setOperator) return (other: unknown[]) => setOperator(records(), other ?? []);
-  if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
-  const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
-  if (typeof arrayMethod !== "function") return undefined;
-  return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);
-}
-
-function delegateArrayMethodAsync(
-  prop: string,
-  loadRecords: () => Promise<unknown[]>,
-): ((...args: any[]) => Promise<unknown>) | undefined {
-  const setOperator = DELEGATED_RECORD_SET_OPERATORS[prop];
-  if (setOperator) return async (other: unknown[]) => setOperator(await loadRecords(), other ?? []);
-  if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
-  const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
-  if (typeof arrayMethod !== "function") return undefined;
-  return async (...args: any[]) => {
-    const records = await loadRecords();
-    return (arrayMethod as (...a: any[]) => unknown).apply([...records], args);
-  };
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
-export function delegateEnumerableMethod(
-  prop: string,
-  loadRecords: () => Promise<unknown[]>,
-): ((...args: any[]) => unknown) | undefined {
-  if (prop === "partition") {
-    return async (predicate: (value: unknown, index: number) => unknown) => {
-      const matched: unknown[] = [];
-      const unmatched: unknown[] = [];
-      (await loadRecords()).forEach((record, index) => {
-        (predicate(record, index) ? matched : unmatched).push(record);
-      });
-      return [matched, unmatched];
-    };
-  }
-  return delegateArrayMethodAsync(prop, loadRecords);
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
-export function wrapWithScopeProxy<T extends object>(rel: T): T {
-  return new Proxy(rel, {
-    get(target: any, prop: string | symbol, receiver: any) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof prop === "symbol") return value;
-      if (Reflect.has(target, prop)) return value;
-      if (value !== undefined) return value;
-
-      const modelClass = target._model as typeof Base;
-
-      if (target._loaded) {
-        const records = () => target._records ?? [];
-        const arrayDelegate = delegateArrayMethod(prop, records);
-        if (arrayDelegate) return arrayDelegate;
-      }
-
-      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
-      if (enumerableDelegate) return enumerableDelegate;
-
-      if (target.respondToMissing(prop, false)) {
-        return (...args: any[]) => target.methodMissing(prop, ...args);
-      }
-      return value;
-    },
-    has(target: any, prop: string | symbol) {
-      if (Reflect.has(target, prop)) return true;
-      if (typeof prop === "symbol") return false;
-      if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
-      return target.respondToMissing(prop, false);
-    },
-  });
-}
-
 export interface DelegationHost {
   readonly model: typeof Base;
+  readonly isLoaded: boolean;
+  readonly target?: Base[];
+  _records?: Base[];
   records(): Promise<Base[]>;
 }
 
@@ -408,21 +266,6 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
-export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
-  Object.keys(RECORD_DELEGATES),
-);
-
-/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-scope-proxy-and-records-delegates */
-export function delegateRecordMethodSync(
-  prop: string,
-  records: () => Base[],
-): ((...args: any[]) => unknown) | undefined {
-  const fn = RECORD_DELEGATES[prop];
-  if (!fn) return undefined;
-  const delegate = (...args: any[]): unknown => fn(records(), ...args);
-  return prop === "length" ? refuseImplicitCount(delegate) : delegate;
-}
-
 class ImplicitCountError extends globalThis.TypeError {}
 
 /** @noRailsEquivalent PERMANENT */
@@ -458,83 +301,103 @@ export class Delegation {
     return false;
   }
 
-  async length(this: DelegationHost): Promise<number> {
-    return RECORD_DELEGATES.length(await this.records()) as number;
+  length(this: DelegationHost): number | Promise<number> {
+    return withRecords(this, (records) => RECORD_DELEGATES.length(records) as number);
   }
 
-  async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
-    return RECORD_DELEGATES.each(await this.records(), fn) as Base[];
+  each(this: DelegationHost, fn: (record: Base, index: number) => void): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.each(records, fn) as Base[]);
   }
 
-  async join(this: DelegationHost, separator?: string): Promise<string> {
-    return RECORD_DELEGATES.join(await this.records(), separator) as string;
+  join(this: DelegationHost, separator?: string): string | Promise<string> {
+    return withRecords(this, (records) => RECORD_DELEGATES.join(records, separator) as string);
   }
 
-  async isIntersect(this: DelegationHost, other: Base[]): Promise<boolean> {
-    return RECORD_DELEGATES.isIntersect(await this.records(), other) as boolean;
+  isIntersect(this: DelegationHost, other: Base[]): boolean | Promise<boolean> {
+    return withRecords(this, (records) => RECORD_DELEGATES.isIntersect(records, other) as boolean);
   }
 
-  async reverse(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.reverse(await this.records()) as Base[];
+  reverse(this: DelegationHost): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.reverse(records) as Base[]);
   }
 
-  async compact(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.compact(await this.records()) as Base[];
+  compact(this: DelegationHost): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.compact(records) as Base[]);
   }
 
-  async index(this: DelegationHost, v: Base | ((record: Base) => unknown)): Promise<number | null> {
-    return RECORD_DELEGATES.index(await this.records(), v) as number | null;
-  }
-
-  async rindex(
+  index(
     this: DelegationHost,
     v: Base | ((record: Base) => unknown),
-  ): Promise<number | null> {
-    return RECORD_DELEGATES.rindex(await this.records(), v) as number | null;
+  ): number | null | Promise<number | null> {
+    return withRecords(this, (records) => RECORD_DELEGATES.index(records, v) as number | null);
   }
 
-  async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
-    return RECORD_DELEGATES.sample(await this.records(), n) as Base | Base[] | null;
+  rindex(
+    this: DelegationHost,
+    v: Base | ((record: Base) => unknown),
+  ): number | null | Promise<number | null> {
+    return withRecords(this, (records) => RECORD_DELEGATES.rindex(records, v) as number | null);
   }
 
-  async rotate(this: DelegationHost, count = 1): Promise<Base[]> {
-    return RECORD_DELEGATES.rotate(await this.records(), count) as Base[];
+  sample(this: DelegationHost, n?: number): Base | Base[] | null | Promise<Base | Base[] | null> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.sample(records, n) as Base | Base[] | null,
+    );
   }
 
-  async shuffle(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.shuffle(await this.records()) as Base[];
+  rotate(this: DelegationHost, count = 1): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.rotate(records, count) as Base[]);
   }
 
-  async split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Promise<Base[][]> {
-    return RECORD_DELEGATES.split(await this.records(), v) as Base[][];
+  shuffle(this: DelegationHost): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.shuffle(records) as Base[]);
   }
 
-  async inGroups(this: DelegationHost, n: number, fill: GroupFill = null): Promise<GroupedRecords> {
-    return RECORD_DELEGATES.inGroups(await this.records(), n, fill) as GroupedRecords;
+  split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Base[][] | Promise<Base[][]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.split(records, v) as Base[][]);
   }
 
-  async inGroupsOf(
+  inGroups(
     this: DelegationHost,
     n: number,
     fill: GroupFill = null,
-  ): Promise<GroupedRecords> {
-    return RECORD_DELEGATES.inGroupsOf(await this.records(), n, fill) as GroupedRecords;
+  ): GroupedRecords | Promise<GroupedRecords> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.inGroups(records, n, fill) as GroupedRecords,
+    );
   }
 
-  async toSentence(this: DelegationHost, options?: ToSentenceOptions): Promise<string> {
-    return RECORD_DELEGATES.toSentence(await this.records(), options) as string;
+  inGroupsOf(
+    this: DelegationHost,
+    n: number,
+    fill: GroupFill = null,
+  ): GroupedRecords | Promise<GroupedRecords> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.inGroupsOf(records, n, fill) as GroupedRecords,
+    );
   }
 
-  async asJson(this: DelegationHost, options?: SerializeOptions): Promise<unknown[]> {
-    return RECORD_DELEGATES.asJson(await this.records(), options) as unknown[];
+  toSentence(this: DelegationHost, options?: ToSentenceOptions): string | Promise<string> {
+    return withRecords(this, (records) => RECORD_DELEGATES.toSentence(records, options) as string);
   }
 
-  async toFs(this: DelegationHost, format?: string): Promise<string> {
-    return RECORD_DELEGATES.toFs(await this.records(), format) as string;
+  asJson(this: DelegationHost, options?: SerializeOptions): unknown[] | Promise<unknown[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.asJson(records, options) as unknown[]);
   }
 
-  async toFormattedS(this: DelegationHost, format?: string): Promise<string> {
-    return RECORD_DELEGATES.toFormattedS(await this.records(), format) as string;
+  toFs(this: DelegationHost, format?: string): string | Promise<string> {
+    return withRecords(this, (records) => RECORD_DELEGATES.toFs(records, format) as string);
+  }
+
+  toFormattedS(this: DelegationHost, format?: string): string | Promise<string> {
+    return withRecords(this, (records) => RECORD_DELEGATES.toFormattedS(records, format) as string);
+  }
+
+  slice(this: DelegationHost, start?: number, end?: number): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.slice(records, start, end) as Base[]);
   }
 
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
@@ -600,6 +463,11 @@ export class Delegation {
 }
 
 refuseImplicitCount(Delegation.prototype.length);
+
+function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
+  if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
+  return host.records().then((records) => fn([...records]));
+}
 
 function shuffleInPlace<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {

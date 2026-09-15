@@ -5,12 +5,6 @@ import type { Relation } from "./relation.js";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
-import {
-  delegateArrayMethod,
-  delegateEnumerableMethod,
-  DELEGATION_RECORD_METHOD_NAMES,
-  delegateRecordMethodSync,
-} from "./relation/delegation.js";
 import { qualifiedName } from "./inheritance.js";
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
@@ -674,28 +668,13 @@ function wrapCollectionProxy<T extends Base = Base>(
   return new Proxy(proxy, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
-      const preferSyncRecordDelegate =
-        typeof prop === "string" && target.loaded && DELEGATION_RECORD_METHOD_NAMES.has(prop);
       if (typeof prop === "symbol") return value;
-      if (Reflect.has(target, prop) && !preferSyncRecordDelegate) return value;
-      if (value !== undefined && !preferSyncRecordDelegate) return value;
+      if (Reflect.has(target, prop)) return value;
+      if (value !== undefined) return value;
 
-      if (typeof prop === "string" && NUMERIC_INDEX_PATTERN.test(prop)) {
+      if (NUMERIC_INDEX_PATTERN.test(prop)) {
         return target.target[Number(prop)];
       }
-
-      if (target.loaded) {
-        const recordDelegate =
-          typeof prop === "string"
-            ? delegateRecordMethodSync(prop, () => target.target)
-            : undefined;
-        if (recordDelegate) return recordDelegate;
-        const arrayDelegate = delegateArrayMethod(prop, () => target.target);
-        if (arrayDelegate) return arrayDelegate;
-      }
-
-      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
-      if (enumerableDelegate) return enumerableDelegate;
 
       const scope = target.scope();
       const scopeVal = Reflect.get(scope, prop, scope);
@@ -712,7 +691,6 @@ function wrapCollectionProxy<T extends Base = Base>(
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
-      if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return target.respondToMissing(prop, false);
     },
   });

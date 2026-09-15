@@ -10,7 +10,7 @@ import {
   type CallbackHost,
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
-import { relationClassFor, wrapWithScopeProxy } from "../relation/delegation.js";
+import { relationClassFor } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 import { stripThenable } from "../relation/thenable.js";
@@ -204,15 +204,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const extensions = association.extensions;
     if (extensions.length > 0) {
-      const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
       for (const mod of extensions) {
         if (typeof mod === "function") {
-          (mod as (rel: unknown) => void)(wrapped);
+          (mod as (rel: unknown) => void)(this);
         } else {
           for (const [name, fn] of Object.entries(
             mod as Record<string, (...args: unknown[]) => unknown>,
           )) {
-            (this as unknown as Record<string, unknown>)[name] = fn.bind(wrapped);
+            (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
           }
         }
       }
