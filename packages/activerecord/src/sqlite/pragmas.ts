@@ -1,11 +1,6 @@
 import { FloatDomainError, NoMethodError } from "@blazetrails/ruby-compat";
 
-class SQLite3Exception extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SQLite3::Exception";
-  }
-}
+import { Exception } from "./errors.js";
 
 export const SYNCHRONOUS_MODES: (string | number)[][] = [
   ["full", 2],
@@ -142,14 +137,14 @@ function setBooleanPragma(name: string, mode: unknown): string {
         value = "'OFF'";
         break;
       default:
-        throw new SQLite3Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+        throw new Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
     }
   } else if (mode === true || mode === 1) {
     value = "ON";
   } else if (mode === false || mode === 0 || mode == null) {
     value = "OFF";
   } else {
-    throw new SQLite3Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+    throw new Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
   }
   return `${name}=${value}`;
 }
@@ -161,12 +156,12 @@ function setIntPragma(name: string, value: unknown): string {
 function setEnumPragma(name: string, mode: unknown, enums: (string | number)[][]): string {
   const match = enums.find((p) => p.find((i) => toS(i).toLowerCase() === toS(mode).toLowerCase()));
   if (!match) {
-    throw new SQLite3Exception(`unrecognized ${name} ${JSON.stringify(mode)}`);
+    throw new Exception(`unrecognized ${name} ${JSON.stringify(mode)}`);
   }
   return `${name}='${toS(match[0]).toUpperCase()}'`;
 }
 
-/** @noRailsEquivalent CONVERGEABLE gem-ports-score-as-extra-surface */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-pragmas-port-per-pragma-setters */
 export function setPragma(name: string, value: unknown): string {
   const enums = ENUM_PRAGMAS[name];
   if (enums) return setEnumPragma(name, value, enums);

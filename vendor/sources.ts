@@ -243,6 +243,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "sqlite3",
+    origin: {
+      type: "git",
+      url: "https://github.com/sparklemotion/sqlite3-ruby.git",
+      // vendor/rails/Gemfile.lock:603 resolves sqlite3 (2.6.0).
+      ref: "v2.6.0",
+    },
+    packages: [
+      {
+        // The driver-layer gem `SQLite3Adapter` calls into
+        // (`sqlite3_adapter.rb:838-844` reaches `::SQLite3::Pragmas`); its
+        // ports live in `packages/activerecord/src/sqlite/`.
+        name: "sqlite3",
+        libPath: "lib/sqlite3",
+      },
+    ],
+  },
+  {
     name: "date",
     origin: {
       type: "git",

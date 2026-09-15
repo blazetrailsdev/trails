@@ -43,6 +43,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   abstractcontroller: "actionpack",
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
+  sqlite3: "activerecord",
 };
 
 /**
@@ -105,6 +106,7 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
   "activerecord-test-support": "support",
+  sqlite3: "sqlite",
 };
 
 /**
@@ -192,6 +194,7 @@ export const MANIFEST_PACKAGES = [
   "globalid",
   "i18n",
   "did-you-mean",
+  "sqlite3",
 ] as const;
 
 /**

@@ -16,7 +16,6 @@ import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { _Base } from "../base-slot.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
-import { isInMemoryDatabase, isRemoteLibsqlUrl } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -255,15 +254,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       throw new ArgumentError("No database file specified. Missing argument: database");
     } else if (filename === ":memory:") {
       this._memoryDatabase = true;
-    } else if (/^file:/.test(filename) || isRemoteLibsqlUrl(filename)) {
-      this._memoryDatabase = isInMemoryDatabase(filename);
+    } else if (/^file:/.test(filename)) {
     } else {
       filename = File.expandPath(filename, trailsRoot() ?? undefined);
       const dirname = File.dirname(filename);
       if (!File.isDirectory(dirname)) {
         try {
           FileUtils.mkdirP(dirname);
-        } catch {
+        } catch (error) {
+          if (typeof (error as { code?: unknown } | null | undefined)?.code !== "string")
+            throw error;
           throw new NoDatabaseError(undefined, { connectionPool: this.pool });
         }
       }
