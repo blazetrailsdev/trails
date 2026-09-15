@@ -1,16 +1,17 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { setDefaultTimezone } from "./active-record.js";
 
 afterEach(() => {
-  Base.defaultTimezone = "utc";
+  setDefaultTimezone("utc");
 });
 
 describe("DateTimeTest", () => {
   it("default timezone validation", () => {
-    expect(() => (Base.defaultTimezone = "UTC" as "utc")).toThrow(ArgumentError);
-    expect(() => (Base.defaultTimezone = "local")).not.toThrow();
-    expect(() => (Base.defaultTimezone = "utc")).not.toThrow();
+    expect(() => setDefaultTimezone("UTC" as "utc")).toThrow(ArgumentError);
+    expect(() => setDefaultTimezone("local")).not.toThrow();
+    expect(() => setDefaultTimezone("utc")).not.toThrow();
   });
 
   it("high precision current timestamp", () => {

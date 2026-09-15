@@ -5,6 +5,7 @@ import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connectio
 import { SchemaReflection } from "./schema-cache.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { synchronize } from "@blazetrails/activesupport";
+import { _setPoolConfig } from "./pool-config-slot.js";
 
 const INSTANCES = new Set<WeakRef<PoolConfig>>();
 const registry =
@@ -183,6 +184,8 @@ export class PoolConfig {
     }
   }
 }
+
+_setPoolConfig(PoolConfig);
 
 export interface TrailsAdapterOptions {
   statementLimit?: number;

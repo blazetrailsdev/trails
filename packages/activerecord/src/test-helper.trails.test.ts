@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { withTimezoneConfig } from "./test-helper.js";
-import { Base } from "./base.js";
 import { zone, setZone, setZoneDefault, TimeZone } from "@blazetrails/activesupport";
+import { defaultTimezone } from "./active-record.js";
 
 describe("withTimezoneConfig", () => {
   afterEach(() => {
@@ -10,13 +10,13 @@ describe("withTimezoneConfig", () => {
   });
 
   it("temporarily changes defaultTimezone and restores it", async () => {
-    const before = Base.defaultTimezone;
+    const before = defaultTimezone();
     const captured: Array<"utc" | "local"> = [];
     await withTimezoneConfig({ default: "local" }, () => {
-      captured.push(Base.defaultTimezone);
+      captured.push(defaultTimezone());
     });
     expect(captured[0]).toBe("local");
-    expect(Base.defaultTimezone).toBe(before);
+    expect(defaultTimezone()).toBe(before);
   });
 
   it("restores zone to unset state when zone was not explicitly set before", async () => {
@@ -44,12 +44,12 @@ describe("withTimezoneConfig", () => {
   });
 
   it("restores defaultTimezone even if fn throws", async () => {
-    const before = Base.defaultTimezone;
+    const before = defaultTimezone();
     await expect(
       withTimezoneConfig({ default: "local" }, () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
-    expect(Base.defaultTimezone).toBe(before);
+    expect(defaultTimezone()).toBe(before);
   });
 });

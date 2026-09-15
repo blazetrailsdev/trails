@@ -6,13 +6,13 @@ import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { readingRole, setWritingRole, writingRole } from "../active-record.js";
 
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
-  const writingRole = Base.writingRole;
   const managerMap: Map<string, any> = (handlerArg as any)._connectionNameToPoolManager;
   for (const [, poolManager] of managerMap) {
     for (const shardName of poolManager.shardNames as string[]) {
-      const writingPoolConfig = poolManager.getPoolConfig(writingRole, shardName);
+      const writingPoolConfig = poolManager.getPoolConfig(writingRole(), shardName);
       for (const role of poolManager.roleNames as string[]) {
         const poolConfig = poolManager.getPoolConfig(role, shardName);
         if (!poolConfig || poolConfig === writingPoolConfig) continue;
@@ -124,8 +124,8 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("setting writing role while using another named role does not raise", async () => {
-    const oldRole = Base.writingRole;
-    Base.writingRole = "also_writing";
+    const oldRole = writingRole();
+    setWritingRole("also_writing");
     try {
       const localHandler = new ConnectionHandler();
       const config = new HashConfig("development", "primary", {
@@ -144,7 +144,7 @@ describe("ConnectionHandlerTest", () => {
       });
       expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
     } finally {
-      Base.writingRole = oldRole;
+      setWritingRole(oldRole);
     }
   });
 
@@ -435,8 +435,8 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("default handlers are writing and reading", async () => {
-    expect(Base.writingRole).toBe("writing");
-    expect(Base.readingRole).toBe("reading");
+    expect(writingRole()).toBe("writing");
+    expect(readingRole()).toBe("reading");
   });
 
   it.skip("connection pool per pid", () => {});

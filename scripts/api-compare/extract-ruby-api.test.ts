@@ -1426,8 +1426,8 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :writing_role
-        singleton_class.attr_reader :default_timezone
+        singleton_class.attr_accessor :verbose_query_logs
+        singleton_class.attr_reader :db_warnings_action
         def self.eager_load!; end
       end
     `,
@@ -1435,13 +1435,13 @@ describe(
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
       // accessor → reader + writer; reader-only → reader only.
-      expect(names).toContain("writing_role");
-      expect(names).toContain("writing_role=");
-      expect(names).toContain("default_timezone");
-      expect(names).not.toContain("default_timezone=");
+      expect(names).toContain("verbose_query_logs");
+      expect(names).toContain("verbose_query_logs=");
+      expect(names).toContain("db_warnings_action");
+      expect(names).not.toContain("db_warnings_action=");
       // Every redirected entry is tagged so compare can credit the port wherever
       // it lands in the package.
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("verbose_query_logs"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
       // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
@@ -1457,16 +1457,16 @@ describe(
         `
       module ActiveRecord
         class << self
-          attr_accessor :writing_role
+          attr_accessor :verbose_query_logs
         end
       end
     `,
       );
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
-      expect(names).toContain("writing_role");
-      expect(names).toContain("writing_role=");
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+      expect(names).toContain("verbose_query_logs");
+      expect(names).toContain("verbose_query_logs=");
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("verbose_query_logs"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
     });
@@ -1476,13 +1476,27 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :writing_role
+        singleton_class.attr_accessor :verbose_query_logs
       end
     `,
       );
       const mod = out["ActiveRecord"];
       const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-      expect(modNames).not.toContain("writing_role");
+      expect(modNames).not.toContain("verbose_query_logs");
+    });
+
+    it("does not redirect a seat that has moved onto the ActiveRecord module", () => {
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
+      module ActiveRecord
+        singleton_class.attr_accessor :writing_role
+      end
+    `,
+      );
+      const names = out["ActiveRecord::Base"].classMethods.map((m) => m.name);
+      expect(names).not.toContain("writing_role");
+      expect(names).not.toContain("writing_role=");
     });
 
     it("skips umbrella config when the module has no ::Base to redirect to", () => {

@@ -345,6 +345,22 @@ DEPENDENCY_PATTERNS = {
 # methods (`packages/activerecord/src/active-record.ts`), while the umbrella
 # path still credits its `singleton_class.attr_*` seats on `ActiveRecord::Base`.
 
+# `active_record.rb` `singleton_class.attr_*` seats whose trails port has moved
+# off `ActiveRecord::Base` onto the `ActiveRecord` module
+# (`packages/activerecord/src/active-record.ts`), RFC 0130's umbrella-seat
+# batches. The umbrella scan no longer redirects these onto `Base`; the entry
+# walk records them on `active_record.rb` beside the rest of the module. This
+# set only grows, and is deleted with `umbrella_base_redirect` itself.
+UMBRELLA_SEATS_ON_MODULE = {
+  "ActiveRecord" => %w[
+    async_query_executor
+    default_timezone
+    query_transformers
+    reading_role
+    writing_role
+  ].to_set,
+}.freeze
+
 # ---- AST walker ----
 
 class ApiExtractor
@@ -1207,9 +1223,13 @@ class ApiExtractor
     # entity-file bucket as false-missing — so skip it entirely, leaving that
     # surface exactly as it was before the umbrella was scanned.
     return if @scanning_umbrella && !redirect_fqn
+    moved_seats = UMBRELLA_SEATS_ON_MODULE.fetch(fqn, Set.new)
+    if @scanning_umbrella
+      return if extract_symbol_args(args).all? { |n| moved_seats.include?(n) }
+    end
     if @entry_def_writers && (force_class || @in_sclass) && @classes.key?("#{fqn}::Base")
       names = extract_symbol_args(args)
-      return unless names.all? { |n| @entry_def_writers.include?(n) }
+      return unless names.all? { |n| @entry_def_writers.include?(n) || moved_seats.include?(n) }
     end
     target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
     return unless target

@@ -10,6 +10,7 @@ import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
+import { queryTransformers } from "./active-record.js";
 
 type RawAdapter = { execute(sql: string, binds?: unknown[], name?: string): Promise<unknown> };
 function leaseConnection(): RawAdapter {
@@ -23,9 +24,9 @@ describe("QueryLogsTest", () => {
 
   beforeEach(() => {
     ExecutionContext.clear();
-    originalTransformers = [...Base.queryTransformers];
-    Base.queryTransformers.length = 0;
-    Base.queryTransformers.push(queryLogs);
+    originalTransformers = [...queryTransformers()];
+    queryTransformers().length = 0;
+    queryTransformers().push(queryLogs);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.clearCache();
@@ -36,8 +37,8 @@ describe("QueryLogsTest", () => {
   });
 
   afterEach(() => {
-    Base.queryTransformers.length = 0;
-    Base.queryTransformers.push(...originalTransformers);
+    queryTransformers().length = 0;
+    queryTransformers().push(...originalTransformers);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.tags = [];

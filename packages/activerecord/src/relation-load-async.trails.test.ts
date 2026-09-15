@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { FutureResult } from "./future-result.js";
-import { globalThreadPoolAsyncQueryExecutor } from "./active-record.js";
+import { globalThreadPoolAsyncQueryExecutor, setAsyncQueryExecutor } from "./active-record.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -18,7 +18,7 @@ describe("Relation#load_async", () => {
   let tracker: AsynchronousQueriesTracker | undefined;
 
   beforeEach(async () => {
-    Base.asyncQueryExecutor = "global_thread_pool";
+    setAsyncQueryExecutor("global_thread_pool");
     tracker = AsynchronousQueriesTracker.run();
 
     const pool = (await Base.connectionPool()) as unknown as { asyncExecutor: unknown };
@@ -34,7 +34,7 @@ describe("Relation#load_async", () => {
     tracker = undefined;
     restoreExecutor?.();
     restoreExecutor = undefined;
-    Base.asyncQueryExecutor = null;
+    setAsyncQueryExecutor(null);
     vi.restoreAllMocks();
   });
 
@@ -224,7 +224,7 @@ describe("Relation#load_async", () => {
   it("runs the query in the foreground when no executor is configured", async () => {
     restoreExecutor?.();
     restoreExecutor = undefined;
-    Base.asyncQueryExecutor = null;
+    setAsyncQueryExecutor(null);
 
     const connection = Base.connection as unknown as {
       selectAll: (...args: unknown[]) => unknown;

@@ -49,7 +49,7 @@ import {
   type FutureResultConnection,
 } from "../../future-result.js";
 import type { Base } from "../../base.js";
-import { _Base } from "../../base-slot.js";
+import { queryTransformers } from "../../active-record.js";
 
 /** @internal */
 let _base: typeof Base | undefined;
@@ -1103,7 +1103,7 @@ export function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string | null): string | null {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
-  for (const transformer of _Base?.queryTransformers ?? []) {
+  for (const transformer of queryTransformers()) {
     sql = transformer.call(sql as string, this);
   }
 
