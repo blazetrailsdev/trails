@@ -649,9 +649,7 @@ describe("NestedThroughAssociationsTest", () => {
     const groucho = members("groucho");
     const founding = memberTypes("founding");
     const proxy = groucho.association("nestedMemberType") as any;
-    await expect(proxy.writer(founding)).rejects.toThrow(
-      /goes through more than one other association/,
-    );
+    expect(() => proxy.writer(founding)).toThrow(/goes through more than one other association/);
   });
 
   it("nested has many through with conditions on through associations", async () => {
