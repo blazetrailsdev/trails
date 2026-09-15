@@ -2,13 +2,6 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/activesupport";
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function getAggregationCache(record: Base): Map<string, unknown> {
-  const self = record as any;
-  if (!self._aggregationCache) self._aggregationCache = new Map<string, unknown>();
-  return self._aggregationCache as Map<string, unknown>;
-}
-
 /** @internal */
 export function clearAggregationCache(record: Base): void {
   const self = record as any;
@@ -86,7 +79,7 @@ function readerMethod(
   Object.defineProperty(modelClass.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get(this: Base): unknown {
-      const cache = getAggregationCache(this);
+      const cache: Map<string, unknown> = (this as any)._aggregationCache;
       if (
         cache.get(name) == null &&
         (!allowNil || mapping.some(([key]) => this.readAttribute(key) != null))
@@ -144,7 +137,7 @@ function writerMethod(
     get: existing?.get,
     set(this: Base, value: unknown): void {
       const klass = resolveClass(className);
-      const cache = getAggregationCache(this);
+      const cache: Map<string, unknown> = (this as any)._aggregationCache;
       if ((value === null || value === undefined) && allowNil === true) {
         for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
         cache.set(name, null);
@@ -184,12 +177,6 @@ function writerMethod(
   });
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function copyAggregationCacheForDup(this: Base, other: unknown): void {
-  const src = (other as { _aggregationCache?: Map<string, unknown> })?._aggregationCache;
-  if (src) (this as { _aggregationCache?: Map<string, unknown> })._aggregationCache = new Map(src);
-}
-
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
 
@@ -223,7 +210,7 @@ export function includeAggregations(modelClass: typeof Base): void {
   prepend(proto, {
     initInternals,
     initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-      copyAggregationCacheForDup.call(this, other);
+      (this as any)._aggregationCache = new Map((this as any)._aggregationCache);
       super_(other);
     },
   });
