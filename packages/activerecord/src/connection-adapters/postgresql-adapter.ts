@@ -82,7 +82,6 @@ import {
   LockWaitTimeout,
   NoDatabaseError,
   NotNullViolation,
-  PreparedStatementCacheExpired,
   QueryCanceled,
   RangeError as ActiveRecordRangeError,
   RecordNotUnique,
@@ -358,7 +357,6 @@ export class PostgreSQLAdapter
 
   static decodeDates = true;
 
-  private static _spCounter = 0;
   /** @internal */
   get _rawConnection(): pg.Client | null {
     return this._connection as unknown as pg.Client | null;
@@ -420,7 +418,6 @@ export class PostgreSQLAdapter
   private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
-  private _connectionConfigured = false;
   /** @internal */
   declare _statements: StatementPool;
   private _closed = false;
@@ -552,15 +549,6 @@ export class PostgreSQLAdapter
         if (name != null) this._regtypeOids.set(name, oid);
       }
     }
-  }
-
-  private _attachNoticeListener(client: pg.Client): void {
-    if (dbWarningsAction() == null) return;
-    client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
-      this._noticeReceiverSqlWarnings.push(
-        new SQLWarning(msg.message, msg.code ?? null, msg.severity ?? null, undefined, this.pool),
-      );
-    });
   }
 
   static override initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
@@ -789,30 +777,26 @@ export class PostgreSQLAdapter
     return sql.replace(/\?/g, () => `$${++idx}`);
   }
 
-  private async _acquireFreshClient(configure = true): Promise<pg.Client> {
+  private async _acquireFreshClient(): Promise<pg.Client> {
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
-    if (this._rawConnection && (this._connectionConfigured || !configure)) {
+    if (this._rawConnection) {
       return this._rawConnection;
     }
     if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
       const acquireGen = this._acquireGeneration;
-      const acquiring = this._doAcquire(acquireGen, configure).finally(() => {
+      const acquiring = this._doAcquire(acquireGen).finally(() => {
         this._discardedAcquireGenerations.delete(acquireGen);
         if (this._acquiring === acquiring) this._acquiring = null;
       });
       this._acquiring = acquiring;
       this._acquiringGen = acquireGen;
     }
-    const client = await this._acquiring;
-    if (configure && !this._connectionConfigured && this._rawConnection === client) {
-      await this.configureConnection();
-    }
-    return client;
+    return this._acquiring;
   }
 
-  private async _doAcquire(acquireGen: number, configure: boolean): Promise<pg.Client> {
+  private async _doAcquire(acquireGen: number): Promise<pg.Client> {
     let client = this._rawConnection;
     if (client == null) {
       let newClient: pg.Client;
@@ -840,26 +824,10 @@ export class PostgreSQLAdapter
         client = this._rawConnection!;
       } else {
         newClient.on("error", () => {});
-        this._attachNoticeListener(newClient);
         this._attachReadyForQueryListener(newClient);
         this._rawConnection = newClient;
         client = newClient;
       }
-    }
-    if (!configure) return client;
-    try {
-      await this.configureConnection();
-      if (this._closed || this._rawConnection !== client) {
-        throw new Error("PostgreSQLAdapter: connection is closed");
-      }
-    } catch (error) {
-      if (this._rawConnection === client) {
-        this._rawConnection = null;
-        this._connectionConfigured = false;
-        void this._statements.reset();
-      }
-      this._teardownRacedClient(client, acquireGen);
-      throw error;
     }
     return client;
   }
@@ -869,17 +837,6 @@ export class PostgreSQLAdapter
       abandonRawSocket(client);
     } else {
       client.end().catch(() => {});
-    }
-  }
-
-  /** @internal */
-  protected override async awaitRawConnectionReady(): Promise<void> {
-    if (
-      !this._closed &&
-      (this._rawConnection === null || !this._connectionConfigured) &&
-      this._pgClientOptions !== null
-    ) {
-      await this._acquireFreshClient();
     }
   }
 
@@ -901,86 +858,21 @@ export class PostgreSQLAdapter
     name: string | null = "SQL",
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
-    const originalBinds = binds;
-    binds = this.typeCastedBinds(binds) ?? [];
-    const pgSql = this.rewriteBinds(sql, binds);
-    return await this.log(pgSql, name, originalBinds, binds, false, async (payload) => {
-      try {
-        return await this.withRawConnection({}, async (conn) => {
-          const client = conn as unknown as pg.Client;
-          const upper = sql.trimStart().toUpperCase();
-
-          if (
-            this.isUseInsertReturning() &&
-            upper.startsWith("INSERT") &&
-            !upper.includes("RETURNING")
-          ) {
-            const withReturning = `${pgSql} RETURNING id`;
-            const useSavepoint = this.isInTransaction();
-            const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
-            payload.sql = withReturning;
-            try {
-              if (useSavepoint) {
-                await client.query(`SAVEPOINT "${spName}"`);
-              }
-              const result = await this.performQuery(client, withReturning, originalBinds, binds, {
-                prepare: false,
-                notificationPayload: payload,
-              });
-              if (useSavepoint) {
-                await client.query(`RELEASE SAVEPOINT "${spName}"`);
-              }
-              const affected = this.affectedRows(result);
-              payload.row_count = affected;
-              if (result.rows.length > 1) {
-                return affected;
-              }
-              if (result.rows.length > 0) {
-                return (result.rows[0] as unknown[])[0] as number;
-              }
-              return affected;
-            } catch (err) {
-              if (err instanceof PreparedStatementCacheExpired) throw err;
-              if (useSavepoint) {
-                await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
-                await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
-              }
-              payload.sql = pgSql;
-              const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-                prepare: false,
-                notificationPayload: payload,
-              });
-              const affected = this.affectedRows(result);
-              payload.row_count = affected;
-              return affected;
-            }
-          }
-
-          if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-              prepare: false,
-              notificationPayload: payload,
-            });
-            const affected = this.affectedRows(result);
-            payload.row_count = affected;
-            if (result.rows.length > 0) {
-              return (result.rows[0] as unknown[])[0] as number;
-            }
-            return affected;
-          }
-
-          const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-            prepare: false,
-            notificationPayload: payload,
-          });
-          const affected = this.affectedRows(result);
-          payload.row_count = affected;
-          return affected;
-        });
-      } catch (e: any) {
-        throw this.translateExceptionClass(e, pgSql, binds);
-      }
-    });
+    const upper = sql.trimStart().toUpperCase();
+    const isInsert = upper.startsWith("INSERT");
+    if (isInsert && this.isUseInsertReturning() && !upper.includes("RETURNING")) {
+      [sql, binds] = await this.sqlForInsert(sql, null, binds, null);
+    }
+    const result = (await this.rawExecute(
+      this.rewriteBinds(sql, binds),
+      name,
+      binds,
+    )) as pg.QueryResult;
+    const affected = this.affectedRows(result);
+    if (isInsert && result.rows.length === 1) {
+      return (result.rows[0] as unknown[])[0] as number;
+    }
+    return affected;
   }
 
   private static _isConnectionError(err: unknown): boolean {
@@ -1217,7 +1109,7 @@ export class PostgreSQLAdapter
   /** @internal */
   async connect(): Promise<void> {
     try {
-      await this._acquireFreshClient(false);
+      await this._acquireFreshClient();
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1229,7 +1121,6 @@ export class PostgreSQLAdapter
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._client = null;
-    this._connectionConfigured = false;
     void this._statements.reset();
     this._closed = false;
     conn?.end().catch(() => {});
@@ -1254,7 +1145,6 @@ export class PostgreSQLAdapter
       }
       await live.query("DISCARD ALL");
 
-      this._connectionConfigured = false;
       this._client = null;
 
       await super.resetBang();
@@ -1263,14 +1153,12 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async configureConnection(): Promise<void> {
-    if (!this._rawConnection || this._connectionConfigured) return;
-    this._connectionConfigured = true;
     await super.configureConnection();
     this._mappedDefaultTimezone = null;
 
     if (isRubyTruthy(this._config.encoding)) {
-      await this._rawConnection.query(
-        `SET client_encoding TO ${this._rawConnection.escapeLiteral(String(this._config.encoding))}`,
+      await this._rawConnection!.query(
+        `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
       );
     }
 
@@ -1278,6 +1166,21 @@ export class PostgreSQLAdapter
     await this.setSchemaSearchPath(
       (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
     );
+
+    if (dbWarningsAction() != null) {
+      this._rawConnection!.removeAllListeners("notice");
+      this._rawConnection!.on(
+        "notice",
+        (result: { severity?: string; message?: string; code?: string }) => {
+          const message = result.message;
+          const code = result.code ?? null;
+          const level = result.severity ?? null;
+          this._noticeReceiverSqlWarnings.push(
+            new SQLWarning(message, code, level, undefined, this.pool),
+          );
+        },
+      );
+    }
 
     await this.setStandardConformingStrings();
 
@@ -1304,7 +1207,6 @@ export class PostgreSQLAdapter
       await super.disconnectBang();
       const conn = this._rawConnection;
       this._client = null;
-      this._connectionConfigured = false;
       if (this._acquiring) this._acquireGeneration++;
       this._closingDriver = conn?.end().catch(() => {}) ?? null;
       await this._closingDriver;
@@ -1321,7 +1223,6 @@ export class PostgreSQLAdapter
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._client = null;
-    this._connectionConfigured = false;
     void this._statements.reset();
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
