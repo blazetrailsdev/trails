@@ -72,9 +72,9 @@ export class Fiber<R = unknown> {
       this.#status = "terminated";
       throw error;
     }
-    if (value && typeof (value as PromiseLike<unknown>).then === "function") {
+    if (value && typeof (value as unknown as PromiseLike<unknown>).then === "function") {
       const terminate = () => void (this.#status = "terminated");
-      (value as PromiseLike<unknown>).then(terminate, terminate);
+      (value as unknown as PromiseLike<unknown>).then(terminate, terminate);
     } else {
       this.#status = "terminated";
     }
