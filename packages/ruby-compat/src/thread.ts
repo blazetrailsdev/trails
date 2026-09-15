@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
   type AsyncContext,
@@ -91,16 +92,23 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/thread.c:5408`).
    */
   get(key: string): unknown {
-    return _locals.get(this)?.get(key) ?? null;
+    const id = isSymbol(key) ? symbolToS(key) : key;
+    return _locals.get(this)?.get(id) ?? null;
   }
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]=` (`vendor/ruby/thread.c:5409`).
    */
   set(key: string, value: unknown): unknown {
+    const id = isSymbol(key) ? symbolToS(key) : key;
     let locals = _locals.get(this);
+    if (value == null) {
+      if (!locals) return null;
+      locals.delete(id);
+      return null;
+    }
     if (!locals) _locals.set(this, (locals = new Map()));
-    locals.set(key, value);
+    locals.set(id, value);
     return value;
   }
 
