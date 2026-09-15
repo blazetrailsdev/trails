@@ -737,25 +737,26 @@ export class Scalar {
 
   /** @internal */
   private calculate(op: "+" | "-" | "*" | "/" | "%", other: unknown): Scalar {
-    let otherValue: number;
+    const publicSend = (value: number, operator: typeof op, otherValue: number): number => {
+      switch (operator) {
+        case "+":
+          return value + otherValue;
+        case "-":
+          return value - otherValue;
+        case "*":
+          return value * otherValue;
+        case "/":
+          return value / otherValue;
+        case "%":
+          return value % otherValue;
+      }
+    };
     if (other instanceof Scalar) {
-      otherValue = other.value;
+      return new Scalar(publicSend(this.value, op, other.value));
     } else if (typeof other === "number") {
-      otherValue = other;
+      return new Scalar(publicSend(this.value, op, other));
     } else {
       this.raiseTypeError(other);
-    }
-    switch (op) {
-      case "+":
-        return new Scalar(this.value + otherValue);
-      case "-":
-        return new Scalar(this.value - otherValue);
-      case "*":
-        return new Scalar(this.value * otherValue);
-      case "/":
-        return new Scalar(this.value / otherValue);
-      case "%":
-        return new Scalar(this.value % otherValue);
     }
   }
 
