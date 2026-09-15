@@ -4,6 +4,6 @@ describe("RegexpExtAccessTests", () => {
   it("multiline", () => {
     expect(/(?:)/m.multiline).toEqual(true);
     expect(/(?:)/.multiline).toEqual(false);
-    expect(new RegExp("(?:)").multiline).toEqual(false);
+    expect(new RegExp("(?m:)").multiline).toEqual(false);
   });
 });
