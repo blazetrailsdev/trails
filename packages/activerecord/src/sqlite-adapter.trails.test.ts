@@ -210,14 +210,15 @@ describe("SQLite adapter driver binding", () => {
     const driver = asyncDriver(async (config) => {
       const conn = await openVia(config);
       return new Proxy(conn, {
-        get(target, prop, receiver) {
+        get(target, prop) {
           if (prop === "close") {
             return async () => {
               (target.close as () => void)();
               throw new Error("close failed");
             };
           }
-          return Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       });
     });
@@ -404,9 +405,10 @@ describe("SQLite adapter driver binding", () => {
     const poolConfig = await makePoolConfig(
       () =>
         new Proxy(new SQLite3Adapter({ database: ":memory:", driver }), {
-          get(target, prop, receiver) {
+          get(target, prop) {
             if (prop === "requiresReloading") return () => true;
-            return Reflect.get(target, prop, receiver);
+            const value = Reflect.get(target, prop, target);
+            return typeof value === "function" ? value.bind(target) : value;
           },
         }) as unknown as DatabaseAdapter,
     );
@@ -469,12 +471,13 @@ describe("SQLite adapter driver binding", () => {
       await makePoolConfig(
         () =>
           new Proxy(new SQLite3Adapter({ database: ":memory:", driver }), {
-            get(target, prop, receiver) {
+            get(target, prop) {
               if (prop === "cleanBang")
                 return () => {
                   if (failCheckout) throw new Error("checkout boom");
                 };
-              return Reflect.get(target, prop, receiver);
+              const value = Reflect.get(target, prop, target);
+              return typeof value === "function" ? value.bind(target) : value;
             },
           }) as unknown as DatabaseAdapter,
       ),
@@ -529,12 +532,13 @@ describe("SQLite adapter driver binding", () => {
   const asyncPragmaDriver = asyncDriver(async (config) => {
     const conn = await openVia(config);
     return new Proxy(conn, {
-      get(target, prop, receiver) {
+      get(target, prop) {
         if (prop === "pragma") {
           return (source: string, opts?: { simple?: boolean }) =>
             Promise.resolve(target.pragma(source, opts));
         }
-        return Reflect.get(target, prop, receiver);
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
       },
     }) as unknown as SqliteConnection;
   });
@@ -565,12 +569,13 @@ describe("SQLite adapter driver binding", () => {
       const conn = await openVia(config);
       conn.pragma('encoding = "UTF-16le"');
       return new Proxy(conn, {
-        get(target, prop, receiver) {
+        get(target, prop) {
           if (prop === "pragma") {
             return (source: string, opts?: { simple?: boolean }) =>
               Promise.resolve(target.pragma(source, opts));
           }
-          return Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       }) as unknown as SqliteConnection;
     });
