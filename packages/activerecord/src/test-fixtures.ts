@@ -1,7 +1,13 @@
 import { afterEach, beforeEach } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
 import { include, included } from "@blazetrails/ruby-compat";
-import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  extend,
+  isBlank,
+  runLoadHooks,
+  stringifyKeys,
+} from "@blazetrails/activesupport";
 import {
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
@@ -42,8 +48,64 @@ function effectiveFixtureKey(
   return "s:" + String(row[pk] ?? FixtureSet.identify(label));
 }
 
+interface TestFixturesClassHost {
+  name: string;
+  fixturePaths: string[];
+  fixtureTableNames: string[];
+  fixtureClassNames: Record<string, unknown>;
+  fixtureSets: Record<string, string>;
+  _usesTransaction?: string[];
+}
+
+export const ClassMethods = {
+  setFixtureClass(this: TestFixturesClassHost, classNames: Record<string, unknown> = {}): void {
+    this.fixtureClassNames = { ...this.fixtureClassNames, ...stringifyKeys(classNames) };
+  },
+
+  /** @missingRailsCall Dir — CONVERGEABLE port-test-fixtures-all-glob */
+  fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
+    if (fixtureSetNames[0] === ":all") {
+      if (isBlank(this.fixturePaths))
+        throw new Error(`No fixture path found. Please set \`${this.name}.fixturePaths\`.`);
+      fixtureSetNames = [];
+    } else {
+      fixtureSetNames = fixtureSetNames.flat(Infinity).map((n) => String(n));
+    }
+
+    this.fixtureTableNames = [
+      ...new Set([...this.fixtureTableNames, ...(fixtureSetNames as string[])]),
+    ].sort();
+    ClassMethods.setupFixtureAccessors.call(this, fixtureSetNames as string[]);
+  },
+
+  setupFixtureAccessors(
+    this: TestFixturesClassHost,
+    fixtureSetNames: string | string[] | null = null,
+  ): void {
+    fixtureSetNames = [fixtureSetNames ?? this.fixtureTableNames].flat();
+    if (fixtureSetNames.length !== 0) {
+      this.fixtureSets = { ...this.fixtureSets };
+      for (const fsName of fixtureSetNames) {
+        const key = fsName.includes("/") ? fsName.replaceAll("/", "_") : fsName;
+        this.fixtureSets[key] = fsName;
+      }
+    }
+  },
+
+  usesTransaction(this: TestFixturesClassHost, ...methods: unknown[]): void {
+    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    this._usesTransaction!.push(...methods.map((m) => String(m)));
+  },
+
+  isUsesTransaction(this: TestFixturesClassHost, method: unknown): boolean {
+    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    return this._usesTransaction!.includes(String(method));
+  },
+};
+
 export const TestFixtures = {
   [included](base: unknown): void {
+    extend(base as object, ClassMethods);
     classAttribute.call(base, "fixturePaths", { instanceWriter: false, default: [] });
     classAttribute.call(base, "fixtureTableNames", { default: [] });
     classAttribute.call(base, "fixtureClassNames", { default: {} });
@@ -370,7 +432,7 @@ function useFixtures(
 type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
 type SuiteScope = { suite?: SuiteScope };
-type TestCaseClass = (new () => object) & { fixtureTableNames: string[] };
+type TestCaseClass = (new () => object) & TestFixturesClassHost & typeof ClassMethods;
 
 const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
 
@@ -421,7 +483,7 @@ export function fixtures(
       )
     : Object.keys(fixturesOrNames);
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
-  klass.fixtureTableNames = [...new Set([...klass.fixtureTableNames, ...fixtureSetNames])].sort();
+  klass.fixtures(fixtureSetNames);
 
   const result = useFixtures(fixturesOrNames as FixtureMap, getConnection);
   Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
