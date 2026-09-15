@@ -74,6 +74,10 @@
     "total": 0,
     "byFile": {}
   },
+  "sqlite3": {
+    "total": 0,
+    "byFile": {}
+  },
   "trailties": {
     "total": 2,
     "byFile": {

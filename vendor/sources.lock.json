@@ -39,6 +39,10 @@
     "ruby": {
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"
+    },
+    "sqlite3": {
+      "ref": "v2.6.0",
+      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
     }
   }
 }
