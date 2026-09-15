@@ -83,6 +83,20 @@ describe("Zlib::GzipFile.open", () => {
     }
   });
 
+  it("refuses mtime= once the header is written", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      await Zlib.GzipWriter.open(join(dir, "late.gz"), (gz) => {
+        gz.write("x");
+        expect(() => {
+          gz.mtime = 0;
+        }).toThrow("header is already written");
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("closes the stream on the way out of the block", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
     try {

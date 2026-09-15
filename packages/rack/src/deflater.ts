@@ -137,13 +137,13 @@ export class GzipStream {
         let part: string | null;
         while ((part = this.body.read(GzipStream.BUFFER_LENGTH)) != null) {
           gzip.write(Buffer.from(String(part), "binary"));
-          if (this.sync) gzip.flush();
+          if (this.sync) void gzip.flush();
         }
       } else {
         const visit = (part: string) => {
           if (part.length === 0) return;
           gzip.write(Buffer.from(String(part), "binary"));
-          if (this.sync) gzip.flush();
+          if (this.sync) void gzip.flush();
         };
         if (Array.isArray(this.body)) for (const part of this.body) visit(part);
         else this.body.each(visit);

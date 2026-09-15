@@ -8,6 +8,12 @@ import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-ad
  * to `gzfile_wrap` (`zlib.c:3178`), which closes it on the way out of a block.
  */
 class GzipFile<IO extends { close(): void } = File> {
+  /** `cGzError` (`vendor/ruby/ext/zlib/zlib.c:4828`). */
+  static Error = class Error extends globalThis.Error {};
+
+  /** `GZFILE_FLAG_HEADER_FINISHED` (`vendor/ruby/ext/zlib/zlib.c:2369`), set by `gzfile_make_header`. */
+  protected headerFinished = false;
+
   /** `ZSTREAM_FLAG_READY` (`vendor/ruby/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
   protected zstreamReady = true;
 
@@ -74,6 +80,9 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 
   set mtime(mtime: number | null) {
+    if (this.headerFinished) {
+      throw new GzipFile.Error("header is already written");
+    }
     this.z.mtime = mtime;
   }
 
@@ -90,13 +99,15 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 
   write(string: string): number {
+    this.headerFinished = true;
     this.z.write(new TextEncoder().encode(string));
     return new TextEncoder().encode(string).length;
   }
 
   /** `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). */
-  flush(): this {
-    this.z.flush();
+  async flush(): Promise<this> {
+    this.headerFinished = true;
+    await this.z.flush();
     return this;
   }
 
