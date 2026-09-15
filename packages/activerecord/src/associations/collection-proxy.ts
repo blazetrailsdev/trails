@@ -84,12 +84,6 @@ interface ThroughAssociationHandle {
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 
-interface StaleWrapper {
-  isStaleTarget?: () => boolean;
-  resetScope?: () => void;
-  loadedBang?: () => void;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal */
@@ -234,33 +228,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return results;
   }
 
-  private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
-    if (
-      !queryExecutor &&
-      !(this._association as unknown as { findTargetNeeded(): boolean }).findTargetNeeded()
-    ) {
+  private async _findTargetViaAssociation(): Promise<Base[]> {
+    if (!(this._association as unknown as { findTargetNeeded(): boolean }).findTargetNeeded()) {
       return [];
     }
     const assoc = _buildAssociationInstance.call(
       this._association.owner,
       this.reflection,
-    ) as unknown as {
-      _queryExecutor?: () => Promise<Base[]>;
-      findTarget(): Promise<Base[]>;
-    };
-    assoc._queryExecutor = queryExecutor;
+    ) as unknown as { findTarget(): Promise<Base[]> };
     return assoc.findTarget();
   }
 
   protected override async execQueries(): Promise<T[]> {
     return this.loadTarget();
-  }
-
-  private _staleWrapper(): StaleWrapper | undefined {
-    const rec = this._association.owner as unknown as {
-      association?: (n: string) => StaleWrapper;
-    };
-    return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
@@ -452,16 +432,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
   async loadTarget(): Promise<T[]> {
     if (this._targetLoaded) {
-      const wrapper = this._staleWrapper();
-      if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
+      if (!this._association.isStaleTarget()) return this._target;
       this._target = [];
       this._targetLoaded = false;
-      wrapper?.resetScope?.();
+      this._association.resetScope();
     }
     const results = await this._execLoad();
     this._target = this._association.mergeTargetLists(results, this._target) as T[];
-    this._targetLoaded = true;
-    this._staleWrapper()?.loadedBang?.();
+    this._association.loadedBang();
     return this._target;
   }
 

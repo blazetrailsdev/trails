@@ -47,7 +47,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     if (async)
       // @nie disposition=TODO
       throw new NotImplementedError("No async loading for HasManyThroughAssociation yet");
-    if (this._queryExecutor) return super.findTarget();
     if (!this.targetReflectionHasAssociatedRecord()) return [];
     if (this.disableJoins) return this.scope().toArray();
     return super.findTarget();

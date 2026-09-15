@@ -2276,7 +2276,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub1 = (await Subscription.first())!;
     await (book1 as any).subscriptions.push(sub1);
     const subs = await (post as any).subscriptions.toArray();
-    expect(subs.map((s: any) => s.id)).toContain(sub1.id);
+    expect(subs.map((s: any) => s.id)).toEqual([sub1.id]);
 
     const bob = await Author.find(authors("bob").id);
     (post as any).author = bob;
@@ -2285,7 +2285,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub2 = (await Subscription.second())!;
     await (book2 as any).subscriptions.push(sub2);
     const subs2 = await (post as any).subscriptions.toArray();
-    expect(subs2.map((s: any) => s.id)).toContain(sub2.id);
+    expect(subs2.map((s: any) => s.id)).toEqual([sub2.id]);
   });
 
   it("nested has many through association with unpersisted parent instance", async () => {
@@ -2305,7 +2305,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub1 = (await Subscription.first())!;
     await (book1 as any).subscriptions.push(sub1);
     const subs = await (post as any).subscriptions.toArray();
-    expect(subs.map((s: any) => s.id)).toContain(sub1.id);
+    expect(subs.map((s: any) => s.id)).toEqual([sub1.id]);
 
     const bob = await Author.find(authors("bob").id);
     (post as any).author = bob;
@@ -2314,7 +2314,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub2 = (await Subscription.second())!;
     await (book2 as any).subscriptions.push(sub2);
     const subs2 = await (post as any).subscriptions.toArray();
-    expect(subs2.map((s: any) => s.id)).toContain(sub2.id);
+    expect(subs2.map((s: any) => s.id)).toEqual([sub2.id]);
   });
 
   it("child is visible to join model in add association callbacks", async () => {

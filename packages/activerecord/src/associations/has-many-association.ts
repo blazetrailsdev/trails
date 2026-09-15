@@ -45,9 +45,6 @@ export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
   declare deleteCount: (method: string, scope: any) => Promise<number>;
 
-  /** @internal */
-  _queryExecutor?: () => Promise<Base[]>;
-
   protected override difference(a: Base[], b: Base[]): Base[] {
     return setDifference(a, b);
   }
@@ -157,7 +154,6 @@ export class HasManyAssociation extends CollectionAssociation {
       this.owner,
       this.reflection.name,
       this.reflection,
-      this._queryExecutor,
       this.isViolatesStrictLoading(),
     );
     for (const record of records) this.setStrictLoading(record);
@@ -374,25 +370,22 @@ async function findTarget(
   record: Base,
   assocName: string,
   assocDef: AssociationDefinition,
-  queryExecutor?: () => Promise<Base[]>,
   violatesStrictLoading = false,
 ): Promise<Base[]> {
   const options = assocDef.options;
-  if (!queryExecutor) {
-    const cache = record._associationCache(assocName);
-    if (
-      cache &&
-      cache !== record._collectionProxies.get(assocName) &&
-      (cache as unknown) !== (record._associationInstances.get(assocName) as unknown) &&
-      Array.isArray(cache.target) &&
-      !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
-    ) {
-      return cache.target;
-    }
-    const holder = associationInstanceGet.call(record, assocName) as Association | null;
-    if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-      return (holder.target ?? []) as Base[];
-    }
+  const cache = record._associationCache(assocName);
+  if (
+    cache &&
+    cache !== record._collectionProxies.get(assocName) &&
+    (cache as unknown) !== (record._associationInstances.get(assocName) as unknown) &&
+    Array.isArray(cache.target) &&
+    !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
+  ) {
+    return cache.target;
+  }
+  const holder = associationInstanceGet.call(record, assocName) as Association | null;
+  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+    return (holder.target ?? []) as Base[];
   }
 
   if (violatesStrictLoading) {
@@ -401,8 +394,6 @@ async function findTarget(
     if (!reflection) throw new AssociationNotFoundError(record, assocName);
     strictLoadingViolationBang({ owner: ctor, reflection });
   }
-
-  if (queryExecutor) return queryExecutor();
 
   const ctor = record.constructor as typeof Base;
 
