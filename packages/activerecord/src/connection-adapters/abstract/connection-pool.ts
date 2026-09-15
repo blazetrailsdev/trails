@@ -1,4 +1,4 @@
-import { synchronize, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { isMonOwned, Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
@@ -63,8 +63,8 @@ export class NullPool implements AbstractPool {
   static readonly NULL_CONFIG = NULL_CONFIG;
 
   private _serverVersion: unknown = null;
-  private _serverVersionInFlight: { connection: DatabaseAdapter; fetch: Promise<unknown> } | null =
-    null;
+  private readonly _mutex = new Mutex();
+  private _serverVersionFetcher: DatabaseAdapter | null = null;
   private _schemaReflection: SchemaReflection | null = null;
 
   declare readonly role: never;
@@ -94,23 +94,19 @@ export class NullPool implements AbstractPool {
   }
 
   serverVersion(connection: DatabaseAdapter): unknown {
-    return (
-      this._serverVersion ??
-      connection.lock.synchronize(async () => {
-        if (this._serverVersion == null && this._serverVersionInFlight?.connection === connection) {
-          throw new ThreadError("deadlock; recursive locking");
-        }
-        if (this._serverVersion != null) return this._serverVersion;
-        const fetch = Promise.resolve(connection.getDatabaseVersion?.());
-        this._serverVersionInFlight = { connection, fetch };
-        try {
-          this._serverVersion ??= await fetch;
-        } finally {
-          if (this._serverVersionInFlight?.fetch === fetch) this._serverVersionInFlight = null;
-        }
-        return this._serverVersion;
-      })
-    );
+    if (this._serverVersion != null) return this._serverVersion;
+    if (this._serverVersionFetcher !== null && isMonOwned.call(this._serverVersionFetcher.lock)) {
+      return connection.getDatabaseVersion?.();
+    }
+    return this._mutex.synchronize(async () => {
+      this._serverVersionFetcher = connection;
+      try {
+        this._serverVersion ??= await connection.getDatabaseVersion?.();
+      } finally {
+        this._serverVersionFetcher = null;
+      }
+      return this._serverVersion;
+    });
   }
 
   get schemaReflection(): SchemaReflection {

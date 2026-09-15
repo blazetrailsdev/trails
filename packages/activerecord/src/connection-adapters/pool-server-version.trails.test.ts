@@ -103,22 +103,19 @@ describe("ConnectionPool#server_version", () => {
     const connection = {
       lock,
       async getDatabaseVersion(): Promise<Version> {
-        return new Version("8.0.35");
-      },
-    } as unknown as AbstractAdapter;
-    const other = {
-      lock: new Monitor(),
-      async getDatabaseVersion(): Promise<Version> {
-        await lock.synchronize(async () => {});
-        return new Version("8.0.35");
+        return lock.synchronize(async () => new Version("8.0.35"));
       },
     } as unknown as AbstractAdapter;
 
+    let barrierHeld!: () => void;
+    const held = new Promise<void>((resolve) => (barrierHeld = resolve));
     const holder = lock.synchronize(async () => {
+      await held;
       await new Promise((resolve) => setTimeout(resolve, 10));
       return pool.serverVersion(connection);
     });
-    const waiter = pool.serverVersion(other);
+    const waiter = pool.serverVersion(connection);
+    barrierHeld();
 
     const [a, b] = await Promise.all([holder, waiter]);
     expect([String(a), String(b)]).toEqual(["8.0.35", "8.0.35"]);
