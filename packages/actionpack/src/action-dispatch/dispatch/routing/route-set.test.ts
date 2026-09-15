@@ -27,8 +27,8 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/foo", { to: "foo#index", as: "foo" });
     });
-    expect(routes.pathFor("foo")).toBe("/foo");
-    expect(() => routes.pathFor("bar")).toThrow();
+    expect(routes.pathFor({}, "foo")).toBe("/foo");
+    expect(() => routes.pathFor({}, "bar")).toThrow();
   });
 
   it("URL helpers are updated when route is updated", () => {
@@ -36,7 +36,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/bar", { to: "bar#index", as: "bar" });
     });
-    expect(routes.pathFor("bar")).toBe("/bar");
+    expect(routes.pathFor({}, "bar")).toBe("/bar");
   });
 
   it("find a route for the given requirements", () => {
@@ -64,9 +64,9 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/foo", { to: "foo#index", as: "foo" });
     });
-    expect(routes.pathFor("foo")).toBe("/foo");
+    expect(routes.pathFor({}, "foo")).toBe("/foo");
     routes.clear();
-    expect(() => routes.pathFor("foo")).toThrow();
+    expect(() => routes.pathFor({}, "foo")).toThrow();
     expect(routes.getRoutes().length).toBe(0);
   });
 
@@ -75,7 +75,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.urlFor("post", { id: 1 }, { onlyPath: true })).toBe("/posts/1");
+    expect(routes.urlFor({ id: 1, onlyPath: true }, "post")).toBe("/posts/1");
   });
 
   it("only_path: false with *_url and no :host option", () => {
@@ -83,7 +83,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(() => routes.urlFor("post", { id: 1 }, { onlyPath: false })).toThrow(/Missing host/);
+    expect(() => routes.urlFor({ id: 1, onlyPath: false }, "post")).toThrow(/Missing host/);
   });
 
   it("only_path: false with *_url and local :host option", () => {
@@ -91,7 +91,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.urlFor("post", { id: 1 }, { host: "example.com" })).toBe(
+    expect(routes.urlFor({ id: 1, host: "example.com" }, "post")).toBe(
       "http://example.com/posts/1",
     );
   });
@@ -102,7 +102,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.urlFor("post", { id: 1 })).toBe("http://example.org/posts/1");
+    expect(routes.urlFor({ id: 1 }, "post")).toBe("http://example.org/posts/1");
   });
 
   it("explicit keys win over implicit keys", () => {
@@ -110,7 +110,7 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: 42 })).toBe("/posts/42");
+    expect(routes.pathFor({ id: 42 }, "post")).toBe("/posts/42");
   });
 
   it("having an optional scope with resources", () => {
@@ -127,8 +127,8 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: 1 })).toBe("/posts/1");
-    expect(routes.pathFor("post", { id: 1 })).toBe("/posts/1");
+    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
+    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
   });
 
   it("escape new line for dynamic params", () => {
@@ -191,7 +191,7 @@ describe("RouteSetTest", () => {
 
   it("findScriptName, isOptimizeRoutesGeneration, extraKeys", () => {
     const routes = new RouteSet();
-    const opts: Record<string, unknown> = { script_name: "/app", x: 1 };
+    const opts: Record<string, unknown> = { scriptName: "/app", x: 1 };
     expect(routes.findScriptName(opts)).toBe("/app");
     expect(opts).toEqual({ x: 1 });
     expect(routes.isOptimizeRoutesGeneration()).toBe(true);

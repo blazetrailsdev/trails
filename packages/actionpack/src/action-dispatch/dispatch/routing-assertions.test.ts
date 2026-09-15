@@ -7,7 +7,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: 1 })).toBe("/posts/1");
+    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
   });
 
   it("assert recognizes", () => {
@@ -27,7 +27,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: 1 })).toBe("/posts/1");
+    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
     const m = routes.recognize("GET", "/posts/1");
     expect(m!.route.controller).toBe("posts");
   });
@@ -37,8 +37,8 @@ describe("ActionDispatch::Routing::Assertions", () => {
     routes.draw((r) => {
       r.get("/temp", { to: "temp#index", as: "temp" });
     });
-    expect(routes.pathFor("temp")).toBe("/temp");
+    expect(routes.pathFor({}, "temp")).toBe("/temp");
     routes.clear();
-    expect(() => routes.pathFor("temp")).toThrow();
+    expect(() => routes.pathFor({}, "temp")).toThrow();
   });
 });

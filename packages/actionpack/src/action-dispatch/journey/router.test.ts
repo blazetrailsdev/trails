@@ -19,7 +19,7 @@ function _generate(
   options: Record<string, unknown>,
   recall: Record<string, unknown>,
 ): [string, Record<string, string>] {
-  const path = routeSet.generate(routeName, options, recall);
+  const path = routeSet.generate(routeName, options, recall).path();
   const captures = new Set<string>();
   for (const route of routeSet.getRoutes()) {
     for (const name of route.pathParamNames) captures.add(name);

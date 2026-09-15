@@ -94,10 +94,10 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.pathFor("posts", {})).toBe("/posts");
-      expect(routes.pathFor("post", { id: "1" })).toBe("/posts/1");
-      expect(routes.pathFor("new_post", {})).toBe("/posts/new");
-      expect(routes.pathFor("edit_post", { id: "1" })).toBe("/posts/1/edit");
+      expect(routes.pathFor({}, "posts")).toBe("/posts");
+      expect(routes.pathFor({ id: "1" }, "post")).toBe("/posts/1");
+      expect(routes.pathFor({}, "new_post")).toBe("/posts/new");
+      expect(routes.pathFor({ id: "1" }, "edit_post")).toBe("/posts/1/edit");
     });
   });
 
@@ -252,8 +252,8 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      expect(routes.pathFor("post_comments", { post_id: "1" })).toBe("/posts/1/comments");
-      expect(routes.pathFor("post_comment", { post_id: "1", id: "5" })).toBe("/posts/1/comments/5");
+      expect(routes.pathFor({ post_id: "1" }, "post_comments")).toBe("/posts/1/comments");
+      expect(routes.pathFor({ post_id: "1", id: "5" }, "post_comment")).toBe("/posts/1/comments/5");
     });
   });
 
@@ -328,8 +328,8 @@ describe("Resource routing", () => {
           admin.resources("posts");
         });
       });
-      expect(routes.pathFor("admin_posts", {})).toBe("/admin/posts");
-      expect(routes.pathFor("admin_post", { id: "1" })).toBe("/admin/posts/1");
+      expect(routes.pathFor({}, "admin_posts")).toBe("/admin/posts");
+      expect(routes.pathFor({ id: "1" }, "admin_post")).toBe("/admin/posts/1");
     });
   });
 

@@ -110,14 +110,14 @@ describe("assertGenerates", () => {
     );
   });
 
-  it("accepts use_route: Symbol via Symbol#description (Rails parity)", () => {
+  it("accepts useRoute: Symbol via Symbol#description (Rails parity)", () => {
     const host: RoutingAssertionsHost = { routes: new RouteSet() };
     host.routes!.draw((m) => m.get("/items", { to: "items#index", as: "items" }));
     ok(() =>
       assertGenerates.call(host, "/items", {
         controller: "items",
         action: "index",
-        use_route: Symbol("items"),
+        useRoute: Symbol("items"),
       }),
     );
   });

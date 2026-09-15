@@ -67,7 +67,7 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: "5" })).toBe("/posts/5");
+    expect(routes.pathFor({ id: "5" }, "post")).toBe("/posts/5");
   });
 
   it("named route generates full URL", () => {
@@ -76,7 +76,7 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.urlFor("post", { id: "5" })).toBe("http://example.com/posts/5");
+    expect(routes.urlFor({ id: "5" }, "post")).toBe("http://example.com/posts/5");
   });
 
   it("first matching route wins", () => {
@@ -276,7 +276,7 @@ describe("Controller routing integration", () => {
 
   it("pathFor throws on missing named route", () => {
     const routes = new RouteSet();
-    expect(() => routes.pathFor("nonexistent", {})).toThrow();
+    expect(() => routes.pathFor({}, "nonexistent")).toThrow();
   });
 
   it("shallow nested resources", () => {
@@ -334,10 +334,10 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.resources("posts");
     });
-    expect(routes.pathFor("posts", {})).toBe("/posts");
-    expect(routes.pathFor("post", { id: "3" })).toBe("/posts/3");
-    expect(routes.pathFor("new_post", {})).toBe("/posts/new");
-    expect(routes.pathFor("edit_post", { id: "3" })).toBe("/posts/3/edit");
+    expect(routes.pathFor({}, "posts")).toBe("/posts");
+    expect(routes.pathFor({ id: "3" }, "post")).toBe("/posts/3");
+    expect(routes.pathFor({}, "new_post")).toBe("/posts/new");
+    expect(routes.pathFor({ id: "3" }, "edit_post")).toBe("/posts/3/edit");
   });
 
   it("match with multiple verbs", () => {

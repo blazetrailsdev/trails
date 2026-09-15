@@ -51,7 +51,7 @@ describe("LazyRouteSet", () => {
       m.get("/posts", { to: "posts#index", as: "posts" });
     });
     reload.mockClear();
-    routes.generateExtras({ use_route: "posts" });
+    routes.generateExtras({ useRoute: "posts" });
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
