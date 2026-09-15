@@ -177,6 +177,7 @@ export class DebugExceptions {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
+    const request = new Request(env);
     try {
       const response = await this.app(env);
       const [, headers, body] = response;
@@ -198,34 +199,31 @@ export class DebugExceptions {
 
       this.invokeInterceptors(env, exception, wrapper);
       if (!this.showExceptions) throw exception;
-      return this.renderException(env, exception, wrapper);
+      return this.renderException(request, exception, wrapper);
     }
   }
 
   private renderException(
-    request: RackEnv,
+    request: Request,
     exception: Error,
     wrapper: ExceptionWrapper,
   ): RackResponse {
-    this.logError(request, wrapper);
+    this.logError(request.env, wrapper);
 
     if (!this.showDetailedExceptions) {
       throw exception;
     }
 
-    const xhr = request["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
-    const contentType = (request["CONTENT_TYPE"] as string) ?? "";
-
-    const format = new Request(request).formats[0];
-    if (this.isApiRequest(format)) {
-      return this.renderForApiRequest(format, wrapper);
+    const contentType = request.formats[0];
+    if (this.isApiRequest(contentType)) {
+      return this.renderForApiRequest(contentType, wrapper);
     }
 
-    if (xhr || contentType.includes("text/plain")) {
+    if (request.xhr) {
       return this.renderTextError(wrapper);
     }
 
-    return this.renderHtmlError(wrapper, request);
+    return this.renderHtmlError(wrapper, request.env);
   }
 
   private renderTextError(wrapper: ExceptionWrapper): RackResponse {

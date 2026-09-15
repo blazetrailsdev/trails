@@ -48,3 +48,14 @@ describe("DebugExceptions format negotiation", () => {
     );
   });
 });
+
+describe("DebugExceptions browser render", () => {
+  it("renders HTML, not text, for a non-XHR request with a text/plain body", async () => {
+    const [, headers] = await new DebugExceptions(errorApp).call({
+      REQUEST_METHOD: "POST",
+      PATH_INFO: "/test",
+      CONTENT_TYPE: "text/plain",
+    });
+    expect(String(headers["content-type"])).toContain("text/html");
+  });
+});
