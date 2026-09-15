@@ -503,6 +503,20 @@ describe("Application::Configuration", () => {
     expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
   });
 
+  it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
+    const c = new Configuration();
+    expect(c.debugExceptionResponseFormat).toBe("default");
+    c.apiOnly = true;
+    expect(c.debugExceptionResponseFormat).toBe("api");
+  });
+
+  it("config.debug_exception_response_format can be overridden", () => {
+    const c = new Configuration();
+    c.apiOnly = true;
+    c.debugExceptionResponseFormat = "default";
+    expect(c.debugExceptionResponseFormat).toBe("default");
+  });
+
   it("defaults match Rails::Application::Configuration#initialize", () => {
     const c = new Configuration();
     expect(c.considerAllRequestsLocal).toBe(false);
@@ -672,6 +686,15 @@ describe("Application::DefaultMiddlewareStack", () => {
       .buildStack()
       .middlewares.map((m) => m.klass);
   };
+
+  it("passes DebugExceptions the configured response format", () => {
+    const app = buildApp();
+    app.config.apiOnly = true;
+    const mw = new DefaultMiddlewareStack(app, app.config, paths)
+      .buildStack()
+      .middlewares.find((m) => m.klass === DebugExceptions)!;
+    expect(mw.args).toEqual([{ responseFormat: "api" }]);
+  });
 
   it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {
     const k = build();

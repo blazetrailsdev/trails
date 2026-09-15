@@ -51,7 +51,7 @@ export class Configuration extends EngineConfiguration {
   reloadClassesOnlyOnChange = true;
   fileWatcher: unknown = null;
   exceptionsApp: unknown = null;
-  debugExceptionResponseFormat: "default" | "api" | null = null;
+  private _debugExceptionResponseFormat: "default" | "api" | null = null;
   railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
@@ -63,7 +63,7 @@ export class Configuration extends EngineConfiguration {
   disableSandbox = false;
   sandboxByDefault = false;
   encoding = "utf-8";
-  apiOnly = false;
+  private _apiOnly = false;
   eagerLoad: boolean | null = null;
   addAutoloadPathsToLoadPath = true;
   rakeEagerLoad = false;
@@ -415,6 +415,21 @@ export class Configuration extends EngineConfiguration {
   }
   set sessionOptions(value: Record<string, unknown>) {
     this._sessionOptions = value;
+  }
+
+  get apiOnly(): boolean {
+    return this._apiOnly;
+  }
+  set apiOnly(value: boolean) {
+    this._apiOnly = value;
+    this._debugExceptionResponseFormat ??= "api";
+  }
+
+  get debugExceptionResponseFormat(): "default" | "api" {
+    return this._debugExceptionResponseFormat ?? "default";
+  }
+  set debugExceptionResponseFormat(value: "default" | "api" | null) {
+    this._debugExceptionResponseFormat = value;
   }
 
   get enableReloading(): boolean {

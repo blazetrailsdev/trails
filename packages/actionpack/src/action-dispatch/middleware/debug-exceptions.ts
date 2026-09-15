@@ -1,9 +1,11 @@
 import { rbInspect, stderr } from "@blazetrails/ruby-compat";
-import type { BacktraceCleaner } from "@blazetrails/activesupport";
+import { toXml, type BacktraceCleaner } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
+import type { MimeType } from "../http/mime-type.js";
+import { Request } from "../http/request.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -25,7 +27,14 @@ export interface DebugExceptionsOptions {
   responseFormat?: "default" | "api";
 }
 
-export type Interceptor = (env: RackEnv, exception: Error) => void;
+export type Interceptor = (request: Request, exception: Error) => void;
+
+function apiErrorBody(fields: Record<string, unknown>): Record<string, unknown> {
+  return Object.defineProperties(fields, {
+    toJson: { value: () => JSON.stringify(fields) },
+    toXml: { value: () => toXml(fields) },
+  });
+}
 
 export class DebugExceptions {
   /** @internal */
@@ -57,25 +66,31 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  invokeInterceptors(request: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
+  invokeInterceptors(request: Request, exception: Error, wrapper: ExceptionWrapper): void {
     for (const interceptor of this.interceptors) {
       try {
         interceptor(request, exception);
       } catch {
-        this.logError(request, wrapper);
+        this.logError(request.env, wrapper);
       }
     }
   }
 
   /** @internal */
-  renderForApiRequest(wrapper: ExceptionWrapper): RackResponse {
-    const body = JSON.stringify({
+  renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
+    const body = apiErrorBody({
       status: wrapper.statusCode,
       error: wrapper.statusText,
-      exception: wrapper.exceptionName,
+      exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
     });
-    return this.render(wrapper.statusCode, body, "application/json");
+    const symbol = contentType?.symbol?.replace(/^:/, "") ?? "";
+    const toFormat = `to${symbol.charAt(0).toUpperCase()}${symbol.slice(1)}`;
+    const serializer = body[toFormat];
+    if (contentType && typeof serializer === "function") {
+      return this.render(wrapper.statusCode, serializer(), contentType.toString());
+    }
+    return this.render(wrapper.statusCode, (body.toJson as () => string)(), "application/json");
   }
 
   /** @internal */
@@ -155,9 +170,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  isApiRequest(contentType: string | null | undefined): boolean {
-    if (this.responseFormat !== "api") return false;
-    return !contentType || !contentType.includes("text/html");
+  isApiRequest(contentType: MimeType | null | undefined): boolean {
+    return this.responseFormat === "api" && !contentType?.isHtml();
   }
 
   /** @internal */
@@ -181,50 +195,39 @@ export class DebugExceptions {
 
       return response;
     } catch (error) {
+      const request = new Request(env);
       const exception = error instanceof Error ? error : new Error(String(error));
       const backtraceCleaner =
         (env["action_dispatch.backtrace_cleaner"] as BacktraceCleaner | undefined) ?? null;
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
-      this.invokeInterceptors(env, exception, wrapper);
+      this.invokeInterceptors(request, exception, wrapper);
       if (!this.showExceptions) throw exception;
-      return this.renderException(env, exception, wrapper);
+      return this.renderException(request, exception, wrapper);
     }
   }
 
   private renderException(
-    request: RackEnv,
+    request: Request,
     exception: Error,
     wrapper: ExceptionWrapper,
   ): RackResponse {
-    this.logError(request, wrapper);
+    this.logError(request.env, wrapper);
 
     if (!this.showDetailedExceptions) {
       throw exception;
     }
 
-    const accept = (request["HTTP_ACCEPT"] as string) ?? "";
-    const xhr = request["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
-    const contentType = (request["CONTENT_TYPE"] as string) ?? "";
-
-    const negotiated = accept || contentType;
-    if (this.isApiRequest(negotiated)) {
-      return this.renderForApiRequest(wrapper);
+    const contentType = request.formats[0];
+    if (this.isApiRequest(contentType)) {
+      return this.renderForApiRequest(contentType, wrapper);
     }
 
-    if (xhr || contentType.includes("text/plain")) {
+    if (request.xhr) {
       return this.renderTextError(wrapper);
     }
 
-    if (accept.includes("application/json") || contentType.includes("application/json")) {
-      return this.renderJsonError(wrapper, request);
-    }
-
-    if (accept.includes("application/xml") || accept.includes("text/xml")) {
-      return this.renderXmlError(wrapper);
-    }
-
-    return this.renderHtmlError(wrapper, request);
+    return this.renderHtmlError(wrapper, request.env);
   }
 
   private renderTextError(wrapper: ExceptionWrapper): RackResponse {
@@ -238,43 +241,6 @@ export class DebugExceptions {
       wrapper.statusCode,
       { "content-type": "text/plain; charset=utf-8" },
       bodyFromString(body),
-    ];
-  }
-
-  private renderJsonError(wrapper: ExceptionWrapper, env: RackEnv): RackResponse {
-    const json = JSON.stringify({
-      status: wrapper.statusCode,
-      error: wrapper.statusText,
-      exception: wrapper.exceptionName,
-      message: wrapper.message,
-      traces: {
-        "Application Trace": wrapper.applicationTrace.slice(0, 10),
-        "Framework Trace": wrapper.frameworkTrace.slice(0, 10),
-      },
-    });
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "application/json; charset=utf-8" },
-      bodyFromString(json),
-    ];
-  }
-
-  private renderXmlError(wrapper: ExceptionWrapper): RackResponse {
-    const xml = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      "<error>",
-      `  <status>${wrapper.statusCode}</status>`,
-      `  <message>${this.escapeXml(wrapper.statusText)}</message>`,
-      `  <exception>${this.escapeXml(wrapper.exceptionName)}</exception>`,
-      `  <detail>${this.escapeXml(wrapper.message)}</detail>`,
-      "</error>",
-    ].join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "application/xml; charset=utf-8" },
-      bodyFromString(xml),
     ];
   }
 
@@ -323,9 +289,5 @@ export class DebugExceptions {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  }
-
-  private escapeXml(str: string): string {
-    return this.escapeHtml(str);
   }
 }
