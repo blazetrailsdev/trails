@@ -371,7 +371,7 @@ export function applicationRecordClassQ(modelClass: typeof Base): boolean {
 }
 
 export function primaryAbstractClass(modelClass: typeof Base): void {
-  if (applicationRecordClass() && applicationRecordClass() !== modelClass) {
+  if (applicationRecordClass() && applicationRecordClass()!.name !== modelClass.name) {
     throw new ArgumentError(
       `The \`primary_abstract_class\` is already set to ${applicationRecordClass()!.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
