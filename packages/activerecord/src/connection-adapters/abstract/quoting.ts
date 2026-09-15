@@ -41,12 +41,7 @@ export interface QuotingDispatchHost {
   unquotedFalse(): boolean | number;
 }
 
-export type QuotedTimeValue =
-  | TimeValue
-  | Temporal.PlainTime
-  | Temporal.PlainDateTime
-  | TimeWithZone
-  | RubyTime;
+export type QuotedTimeValue = TimeValue | TimeWithZone | RubyTime;
 
 export type TemporalDateLike =
   | TimeWithZone
@@ -84,8 +79,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     return this.quotedBinary(bytes);
   }
-  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return `'${this.quotedTime(value)}'`;
+  if (value instanceof TimeValue) return `'${this.quotedTime(value)}'`;
   if (
     value instanceof TimeWithZone ||
     value instanceof RubyTime ||
@@ -114,8 +108,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
-  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return this.quotedTime(value);
+  if (value instanceof TimeValue) return this.quotedTime(value);
   if (
     value instanceof TimeWithZone ||
     value instanceof RubyTime ||
@@ -319,26 +312,7 @@ export function quotedDate(value: TemporalDateLike): string {
 }
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
-  if (value instanceof TimeValue) {
-    value = value.__getobj__() as TimeWithZone | RubyTime;
-  }
-  if (value instanceof RubyTime) value = value.toTime().toPlainDateTime();
-  value =
-    value instanceof TimeWithZone
-      ? value.change({ year: 2000, month: 1, day: 1 })
-      : value instanceof Temporal.PlainTime
-        ? new Temporal.PlainDateTime(
-            2000,
-            1,
-            1,
-            value.hour,
-            value.minute,
-            value.second,
-            value.millisecond,
-            value.microsecond,
-            value.nanosecond,
-          )
-        : value.with({ year: 2000, month: 1, day: 1 });
+  value = value.change({ year: 2000, month: 1, day: 1 });
   return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 

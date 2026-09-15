@@ -1,7 +1,7 @@
 import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { minutes, BigDecimal } from "@blazetrails/activesupport";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { minutes, BigDecimal, toFs } from "@blazetrails/activesupport";
 import {
   quote as quoteFn,
   quoteString,
@@ -28,7 +28,7 @@ const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, nam
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 const quoteTableNameForAssignment = (table: string, attr: string): string =>
   quoteTableNameForAssignmentFn.call(HOST, table, attr);
-const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
+const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
 import { formatPlainTimeForSql } from "./connection-adapters/abstract/sql-datetime.js";
 import { NotImplementedError } from "./errors.js";
@@ -151,8 +151,14 @@ describe("QuotingTest", () => {
   });
   it("quoted time local", () => {
     setDefaultTimezone("local");
-    const t = Temporal.PlainTime.from("15:30:45");
-    expect(quotedTime(t)).toBe("15:30:45");
+    const t = RubyTime.now().change({ usec: 0 });
+
+    const expected = toFs(t.change({ year: 2000, month: 1, day: 1 }).getlocal(), "db").replace(
+      "2000-01-01 ",
+      "",
+    );
+
+    expect(quotedTime(t)).toBe(expected);
   });
   it("quoted datetime utc", () => {
     const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");

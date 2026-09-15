@@ -2,7 +2,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError, kernelThrow } from "@blazetrails/ruby-compat";
 import { assertValidKeys } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
-import * as Reflection from "../../reflection.js";
+import { _Reflection } from "../../reflection-slot.js";
 
 /** @internal */
 export interface AssociationInstanceHost {
@@ -125,7 +125,7 @@ export class Association {
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    return Reflection.create(macro as any, name, scope, options, model);
+    return _Reflection!.create(macro as any, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {

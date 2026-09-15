@@ -5,6 +5,7 @@ import {
   type RawConfigurations,
 } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { InheritableOptions } from "@blazetrails/activesupport";
 import { protocolAdapters, setProtocolAdapters } from "../active-record.js";
 
 const DEFAULT_ENV = "default_env";
@@ -18,7 +19,7 @@ const ENV_KEYS = [
 ];
 let savedEnv: Record<string, string | undefined>;
 let savedDefaultEnv: string;
-let savedProtocolMapping: Record<string, string>;
+let savedProtocolMapping: InheritableOptions;
 
 beforeEach(() => {
   savedEnv = {};
@@ -27,7 +28,8 @@ beforeEach(() => {
     delete process.env[key];
   }
   savedDefaultEnv = DatabaseTasks.env;
-  savedProtocolMapping = { ...protocolAdapters() };
+  savedProtocolMapping = protocolAdapters();
+  setProtocolAdapters(savedProtocolMapping.inheritableCopy());
   DatabaseTasks.env = DEFAULT_ENV;
 });
 
@@ -422,7 +424,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping is used and can be updated", () => {
-    protocolAdapters().potato = "postgresql";
+    protocolAdapters().set("potato", "postgresql");
     process.env["DATABASE_URL"] = "potato://localhost/exampledb";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
@@ -434,7 +436,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping translates underscores to dashes", () => {
-    protocolAdapters().custom_protocol = "postgresql";
+    protocolAdapters().set("custom_protocol", "postgresql");
     process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
@@ -446,7 +448,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping handles sqlite3 file urls", () => {
-    protocolAdapters().custom_protocol = "sqlite3";
+    protocolAdapters().set("custom_protocol", "sqlite3");
     process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
     DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});

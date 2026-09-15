@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { Value as TimeValue } from "../../type/time.js";
 import {
   quote,
   quoteTableName,
@@ -64,24 +65,24 @@ describe("quotedDate", () => {
 });
 
 describe("quotedTime", () => {
-  it("formats a Temporal.PlainTime stripping the date prefix", () => {
-    const v = Temporal.PlainTime.from("14:23:55");
+  it("formats a Time::Value stripping the date prefix", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
     expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55");
   });
 
-  it("formats a Temporal.PlainDateTime stripping the date", () => {
-    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.123456");
+  it("formats a Time::Value with fractional seconds stripping the date", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
     expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55.123456");
   });
 
   it("normalises the date component to 2000-01-01", () => {
-    const v = Temporal.PlainDateTime.from("2099-12-31T09:00:00");
+    const v = new TimeValue(RubyTime.utc(2099, 12, 31, 9, 0, 0));
     expect(quotedTime.call(quotingHost(), v)).toBe("09:00:00");
   });
 
   it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
     const host = quotingHost({ quotedDate: () => "2000-01-01 11:22:33" });
-    const v = Temporal.PlainTime.from("11:22:33");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 11, 22, 33));
     expect(quotedTime.call(host, v)).toBe("11:22:33");
   });
 });
@@ -93,9 +94,9 @@ describe("quote dispatches through quoted_date/quoted_time", () => {
     expect(quote.call(host, v)).toBe("'DISPATCHED'");
   });
 
-  it("routes Time::Value (PlainTime) through this.quotedTime", () => {
+  it("routes Time::Value through this.quotedTime", () => {
     const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
-    const v = Temporal.PlainTime.from("14:23:55");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
     expect(quote.call(host, v)).toBe("'DISPATCHED_TIME'");
   });
 
@@ -105,7 +106,7 @@ describe("quote dispatches through quoted_date/quoted_time", () => {
   });
 
   it("uses the abstract quoted_time on a receiver that does not override it", () => {
-    const v = Temporal.PlainTime.from("14:23:55");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
     expect(quote.call(quotingHost(), v)).toBe("'14:23:55'");
   });
 });
@@ -182,9 +183,9 @@ describe("type_cast dispatches through quoted_date/quoted_time", () => {
     expect(typeCast.call(host, v)).toBe("DISPATCHED");
   });
 
-  it("routes Time::Value (PlainTime) through this.quotedTime", () => {
+  it("routes Time::Value through this.quotedTime", () => {
     const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
-    const v = Temporal.PlainTime.from("14:23:55");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
     expect(typeCast.call(host, v)).toBe("DISPATCHED_TIME");
   });
 
@@ -194,7 +195,7 @@ describe("type_cast dispatches through quoted_date/quoted_time", () => {
   });
 
   it("uses the abstract quoted_time on a receiver that does not override it", () => {
-    const v = Temporal.PlainTime.from("14:23:55");
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
     expect(typeCast.call(quotingHost(), v)).toBe("14:23:55");
   });
 });
