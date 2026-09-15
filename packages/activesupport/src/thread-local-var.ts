@@ -9,7 +9,7 @@ export class ThreadLocalVar<T> {
   }
 
   get value(): T {
-    return IsolatedExecutionState.has(this)
+    return IsolatedExecutionState.isKey(this)
       ? (IsolatedExecutionState.get<T>(this) as T)
       : this._default;
   }

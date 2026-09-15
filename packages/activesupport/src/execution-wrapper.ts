@@ -130,7 +130,7 @@ export class ExecutionWrapper {
   }
 
   static active(): boolean {
-    return IsolatedExecutionState.has(this.activeKey());
+    return IsolatedExecutionState.isKey(this.activeKey());
   }
 
   runBang(): void {
