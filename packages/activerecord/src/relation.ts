@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
+import { extractOptionsBang, hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { except, Range } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
@@ -55,8 +55,8 @@ import { WhereClause } from "./relation/where-clause.js";
 import type { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
   touchAttributesWithTime,
-  parseTouchAllArgs,
   type TouchAllArgs,
+  type TouchAllOptions,
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { Explain } from "./explain.js";
@@ -787,7 +787,8 @@ export class Relation<T extends Base> {
   }
 
   async touchAll(...args: TouchAllArgs): Promise<number> {
-    const { names, time } = parseTouchAllArgs(args);
+    const { time } = extractOptionsBang(args) as TouchAllOptions;
+    const names = args as string[];
 
     return this.updateAll(touchAttributesWithTime.call(this.model, ...names, time));
   }

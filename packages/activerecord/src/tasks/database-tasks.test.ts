@@ -1460,12 +1460,26 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   });
 
   it("check dump filename defaults", () => {
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.ts");
+    expect(
+      DatabaseTasks.schemaDumpPath(
+        new HashConfig("development", "primary", {
+          adapter: "abstract",
+          database: "dev-db",
+        }),
+      ),
+    ).toBe("db/schema.ts");
   });
 
   it("check dump filename with schema env", () => {
     process.env.SCHEMA = "custom.rb";
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom.rb");
+    expect(
+      DatabaseTasks.schemaDumpPath(
+        new HashConfig("development", "primary", {
+          adapter: "abstract",
+          database: "dev-db",
+        }),
+      ),
+    ).toBe("custom.rb");
   });
 
   it("check dump filename defaults for non primary databases", () => {
@@ -1473,7 +1487,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
       adapter: "abstract",
       database: "secondary-dev-db",
     });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/secondary_schema.ts");
+    expect(DatabaseTasks.schemaDumpPath(config)).toBe("db/secondary_schema.ts");
   });
 
   it("setting schema dump to nil", () => {
@@ -1491,7 +1505,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
       adapter: "abstract",
       database: "secondary-dev-db",
     });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
+    expect(DatabaseTasks.schemaDumpPath(config)).toBe("override.rb");
   });
 });
 

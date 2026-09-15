@@ -1,7 +1,8 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
 import { timestampAttributesForUpdateInModel, currentTimeFromProperTimezone } from "./timestamp.js";
-import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
+import { extractOptionsBang } from "@blazetrails/activesupport";
+import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { beforeCommittedBang as transactionsBeforeCommittedBang } from "./transactions.js";
@@ -77,8 +78,11 @@ export async function touch(
 ): Promise<boolean> {
   const self = this as any;
   if (hasDeferTouchAttrs(this)) {
-    const { names, time } = parseTouchArgs(args);
-    const merged: string[] = [...new Set([...names, ...(self._deferTouchAttrs as string[])])];
+    const names = [...args];
+    const { time } = extractOptionsBang(names) as TouchOptions;
+    const merged: string[] = [
+      ...new Set([...(names as string[]), ...(self._deferTouchAttrs as string[])]),
+    ];
     const result = await superFn([...merged, { time }] as TouchArgs);
     self._deferTouchAttrs = null;
     self._touchTime = null;

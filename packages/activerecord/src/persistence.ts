@@ -1,16 +1,16 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   currentTimeFromProperTimezone,
-  parseTouchArgs,
   timestampAttributesForUpdateInModel,
   type TimestampHost,
   type TouchArgs,
+  type TouchOptions,
 } from "./timestamp.js";
 import { Rational } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
-import { runCallbacks } from "@blazetrails/activesupport";
+import { extractOptionsBang, runCallbacks } from "@blazetrails/activesupport";
 import {
   InsertManager,
   UpdateManager,
@@ -1008,7 +1008,8 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  const { names, time: t } = parseTouchArgs(args);
+  const { time: t } = extractOptionsBang(args) as TouchOptions;
+  const names = args as string[];
   const now =
     t == null
       ? currentTimeFromProperTimezone()
