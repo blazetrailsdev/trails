@@ -32,7 +32,7 @@ describe("HotCompatibilityTest", () => {
     klass: typeof Base;
     adapter: DatabaseAdapter;
   }> {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");
       t.string("bar");
@@ -85,7 +85,7 @@ describe("HotCompatibilityTest", () => {
     ddlConnection: DatabaseAdapter,
     staleReload: (model: typeof Base, record: { reload(): Promise<unknown> }) => Promise<unknown>,
   ): Promise<void> {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");
       t.string("bar");
