@@ -413,16 +413,20 @@ export class Relation<T extends Base> {
 
   /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
   loadAsync(): Relation<T> {
-    if (!this.isLoaded) {
-      const result = this.execMainQuery(true);
-      if (result instanceof Result) {
-        this.loadRecords(this.instantiateRecords(result));
-      } else {
-        if (result instanceof Promise) void result.catch(() => {});
-        this._futureResult = result;
+    this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
+      if (!this.isLoaded) {
+        const result = this.execMainQuery(
+          c.asyncEnabled?.() === true && !c.currentTransaction().joinable,
+        );
+        if (result instanceof Result) {
+          this.loadRecords(this.instantiateRecords(result));
+        } else {
+          if (result instanceof Promise) void result.catch(() => {});
+          this._futureResult = result;
+        }
+        this._loaded = true;
       }
-      this._loaded = true;
-    }
+    });
     return this;
   }
 
@@ -640,7 +644,6 @@ export class Relation<T extends Base> {
         return Result.empty();
       } else if (this.isEagerLoading) {
         return this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
-          async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
           return this.applyJoinDependency({}, (relation, joinDependency) => {
             if (relation.isNullRelation()) {
               return Result.empty();
@@ -653,7 +656,6 @@ export class Relation<T extends Base> {
         });
       } else {
         return this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
-          async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
           return c.selectAll(this.arel(), `${this.model.name} Load`, [], { async });
         });
       }
