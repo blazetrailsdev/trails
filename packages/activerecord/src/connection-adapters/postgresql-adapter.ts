@@ -420,7 +420,6 @@ export class PostgreSQLAdapter
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   private _connectionConfigured = false;
-  private _typeMapEagerLoaded = false;
   /** @internal */
   declare _statements: StatementPool;
   private _closed = false;
@@ -856,7 +855,6 @@ export class PostgreSQLAdapter
       if (this._rawConnection === client) {
         this._rawConnection = null;
         this._connectionConfigured = false;
-        this._typeMapEagerLoaded = false;
         void this._statements.reset();
       }
       this._teardownRacedClient(client, acquireGen);
@@ -1231,7 +1229,6 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
     void this._statements.reset();
     this._closed = false;
     conn?.end().catch(() => {});
@@ -1270,6 +1267,13 @@ export class PostgreSQLAdapter
     await super.configureConnection();
     this._mappedDefaultTimezone = null;
 
+    if (isRubyTruthy(this._config.encoding)) {
+      await this.internalExecute(
+        `SET client_encoding TO ${this.quote(this._config.encoding)}`,
+        "SCHEMA",
+      );
+    }
+
     await this.setClientMinMessages(this._minMessages);
     await this.setSchemaSearchPath(
       (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
@@ -1292,11 +1296,7 @@ export class PostgreSQLAdapter
     this.addPgEncoders();
     this.addPgDecoders();
 
-    if (!this._typeMapEagerLoaded) {
-      this._typeMapEagerLoaded = true;
-      this._typeMap = null;
-      await this.reloadTypeMap();
-    }
+    await this.reloadTypeMap();
   }
 
   override async disconnectBang(): Promise<void> {
@@ -1305,7 +1305,6 @@ export class PostgreSQLAdapter
       const conn = this._rawConnection;
       this._client = null;
       this._connectionConfigured = false;
-      this._typeMapEagerLoaded = false;
       if (this._acquiring) this._acquireGeneration++;
       this._closingDriver = conn?.end().catch(() => {}) ?? null;
       await this._closingDriver;
@@ -1323,7 +1322,6 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
     void this._statements.reset();
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);

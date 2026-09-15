@@ -312,13 +312,14 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
   {
     prepare,
     notificationPayload,
+    batch: _batch = false,
   }: {
     prepare: boolean;
-    notificationPayload?: Record<string, unknown>;
+    notificationPayload: Record<string, unknown>;
+    batch?: boolean;
   },
 ): Promise<R> {
   const rowMode = "array";
-  notificationPayload ??= {};
   await this.updateTypemapForDefaultTimezone();
   let raw: pg.QueryResult | pg.QueryResult[];
   if (prepare) {
