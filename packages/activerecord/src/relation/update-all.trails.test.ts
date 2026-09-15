@@ -12,7 +12,11 @@ async function captureUpdate(
   rel: unknown,
   fn: () => Promise<unknown>,
 ): Promise<{ sql: string; binds: unknown[] }> {
-  const conn = (rel as { _conn(): Record<string, Mutator> })._conn();
+  const conn = (
+    rel as { model: { connectionPool(): { withConnectionSync<R>(b: (c: unknown) => R): R } } }
+  ).model
+    .connectionPool()
+    .withConnectionSync((c) => c as Record<string, Mutator>);
   const key = conn.internalExecute ? "internalExecute" : "execute";
   const original = conn[key];
   const calls: { sql: string; binds: unknown[] }[] = [];

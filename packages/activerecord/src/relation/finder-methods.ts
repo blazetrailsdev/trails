@@ -44,8 +44,6 @@ interface FinderRelation {
   where(conditions: unknown, ...rest: unknown[]): any;
   findBy(conditions: unknown): Promise<any>;
   findByBang(conditions: unknown): Promise<any>;
-  /** @internal */
-  _conn(): { isTransactionOpen(): boolean };
   limit(n: number): any;
   order(...args: any[]): any;
   reverseOrder(): any;
