@@ -382,6 +382,7 @@ function getZoneInfo(
 
   const localFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: ianaName,
+    era: "short",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -393,7 +394,8 @@ function getZoneInfo(
   const localParts = localFormatter.formatToParts(roundedDate);
   const get = (type: string) => parseInt(localParts.find((p) => p.type === type)?.value ?? "0", 10);
 
-  const localYear = get("year");
+  const era = localParts.find((p) => p.type === "era")?.value;
+  const localYear = era === "BC" ? 1 - get("year") : get("year");
   const localMonth = get("month");
   const localDay = get("day");
   let localHour = get("hour");
@@ -401,14 +403,9 @@ function getZoneInfo(
   const localMinute = get("minute");
   const localSecond = get("second");
 
-  const localAsUtc = Date.UTC(
-    localYear,
-    localMonth - 1,
-    localDay,
-    localHour,
-    localMinute,
-    localSecond,
-  );
+  const localAsUtcDate = new Date(Date.UTC(2000, 0, 1, localHour, localMinute, localSecond));
+  localAsUtcDate.setUTCFullYear(localYear, localMonth - 1, localDay);
+  const localAsUtc = localAsUtcDate.getTime();
   const utcOffsetSeconds = Math.round((localAsUtc - roundedDate.getTime()) / 1000) || 0;
 
   return { abbreviation, utcOffsetSeconds };

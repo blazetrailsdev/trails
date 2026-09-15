@@ -199,7 +199,7 @@ describe("ToXmlTest", () => {
       ],
       { skipInstruct: true, indent: 0 },
       (builder) => {
-        builder.tag("count", "2");
+        builder.tag("count", 2);
       },
     );
 

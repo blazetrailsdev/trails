@@ -809,7 +809,12 @@ describe("TimeWithZoneTest", () => {
     expect(result.sec).toBe(5);
   });
 
-  it.skip("no limit on times");
+  it("no limit on times", () => {
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);
+    const toA = (t: TimeWithZone) => [t.sec, t.min, t.hour, t.day, t.month, t.year];
+    expect(toA(twz.plus(Duration.years(10_000)))).toEqual([0, 0, 19, 31, 12, 11999]);
+    expect(toA(twz.minus(Duration.years(10_000)))).toEqual([0, 0, 19, 31, 12, -8001]);
+  });
 
   it("plus with invalid argument", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);

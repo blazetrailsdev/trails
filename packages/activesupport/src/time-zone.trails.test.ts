@@ -117,6 +117,11 @@ describe("TimeZoneLocalPeriodsTest", () => {
     expect(zone().periodForLocal(ambiguous, false).isDst()).toBe(false);
   });
 
+  it("periods_for_local returns a period for a BCE local time", () => {
+    const periods = zone().periodsForLocal(Time.utc(-8001, 12, 31, 19));
+    expect(periods.map((period) => period.observedUtcOffset)).toEqual([-17762]);
+  });
+
   it("periods_for_local returns no periods for a nonexistent local time", () => {
     expect(zone().periodsForLocal(Time.utc(2024, 3, 10, 2, 30))).toEqual([]);
   });
