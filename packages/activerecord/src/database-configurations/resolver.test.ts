@@ -21,11 +21,11 @@ describe("PoolConfig", () => {
       DatabaseTasks.env = "development";
     });
 
-    it("url invalid adapter", () => {
+    it("url invalid adapter", async () => {
       const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
       const handler = new ConnectionHandler();
-      expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);
-      expect(() => handler.establishConnection(dbConfig)).toThrow(
+      await expect(handler.establishConnection(dbConfig)).rejects.toThrow(AdapterNotFound);
+      await expect(handler.establishConnection(dbConfig)).rejects.toThrow(
         /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
       );
     });

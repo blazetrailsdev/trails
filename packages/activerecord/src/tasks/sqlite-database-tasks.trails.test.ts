@@ -16,13 +16,13 @@ function tmpDbPath(): string {
 }
 
 function withRestoredConnection(): void {
-  let previous: ReturnType<typeof Base.removeConnection>;
+  let previous: Awaited<ReturnType<typeof Base.removeConnection>>;
   beforeEach(async () => {
-    previous = Base.removeConnection();
+    previous = await Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configurationHash);
   });
   afterEach(async () => {
-    Base.removeConnection();
+    await Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configurationHash);
   });
 }
@@ -184,7 +184,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     database: ":memory:",
   });
 
-  let previous: ReturnType<typeof Base.removeConnection>;
+  let previous: Awaited<ReturnType<typeof Base.removeConnection>>;
 
   const pool = () => {
     const { connectionHandler } = Base;
@@ -198,13 +198,13 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   }
 
   beforeEach(async () => {
-    previous = Base.removeConnection();
+    previous = await Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
   });
 
   afterEach(async () => {
     SchemaDumper.ignoreTables = [];
-    Base.removeConnection();
+    await Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configurationHash);
     for (const file of created) {
       try {

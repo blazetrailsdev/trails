@@ -68,13 +68,13 @@ async function establishMigrationConnection(
     database,
     ...extra,
   });
-  const pool = Base.connectionHandler.establishConnection(config, {
+  const pool = await Base.connectionHandler.establishConnection(config, {
     ownerName: Base,
     clobber: true,
   });
   await pool.leaseConnection();
-  onTestFinished(() => {
-    Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
+  onTestFinished(async () => {
+    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
   });
 }
 
@@ -1327,7 +1327,7 @@ export class CreatePosts extends Migration {
 
   async function disableMetadataTable(adapter: unknown, database?: string): Promise<void> {
     const { Base } = await import("@blazetrails/activerecord");
-    Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
+    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
     await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
 

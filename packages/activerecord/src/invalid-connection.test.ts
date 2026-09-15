@@ -15,8 +15,8 @@ describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {
     });
   });
 
-  afterEach(() => {
-    Bird.removeConnection();
+  afterEach(async () => {
+    await Bird.removeConnection();
   });
 
   it("inspect on Model class does not raise", () => {

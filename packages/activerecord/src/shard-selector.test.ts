@@ -16,12 +16,12 @@ _setActionDispatchRequest(TestRequest);
 describe("ShardSelectorTest", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
-    Base.connectionHandler.removeConnectionPool("ActiveRecord::Base", { shard: "shard_one" });
+    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base", { shard: "shard_one" });
   });
 
-  function setupShards() {
+  async function setupShards() {
     const dbConfig = new HashConfig("test", "Base", ambientPoolConfiguration());
-    Base.connectionHandler.establishConnection(dbConfig, {
+    await Base.connectionHandler.establishConnection(dbConfig, {
       ownerName: "ActiveRecord::Base",
       role: "writing",
       shard: "shard_one",
@@ -36,7 +36,7 @@ describe("ShardSelectorTest", () => {
       },
       () => "shard_one",
     );
-    setupShards();
+    await setupShards();
     expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 
@@ -49,12 +49,12 @@ describe("ShardSelectorTest", () => {
       () => "shard_one",
       { lock: false },
     );
-    setupShards();
+    await setupShards();
     expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 
   it("middleware can change shards", async () => {
-    setupShards();
+    await setupShards();
     const middleware = new ShardSelector(
       async () => {
         expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
@@ -66,7 +66,7 @@ describe("ShardSelectorTest", () => {
   });
 
   it("middleware can handle string shards", async () => {
-    setupShards();
+    await setupShards();
     const middleware = new ShardSelector(
       async () => {
         expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);

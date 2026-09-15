@@ -4,7 +4,7 @@ import type { DatabaseConfigOptions } from "../database-configurations/database-
 export async function runWithoutConnection<T>(
   fn: (configHash: DatabaseConfigOptions) => Promise<T> | T,
 ): Promise<T> {
-  const originalConnection = Base.removeConnection()!;
+  const originalConnection = (await Base.removeConnection())!;
   try {
     return await fn(originalConnection.configurationHash);
   } finally {
@@ -13,6 +13,6 @@ export async function runWithoutConnection<T>(
 }
 
 export async function resetConnection(): Promise<void> {
-  const originalConnection = Base.removeConnection()!;
+  const originalConnection = (await Base.removeConnection())!;
   await Base.establishConnection(originalConnection);
 }

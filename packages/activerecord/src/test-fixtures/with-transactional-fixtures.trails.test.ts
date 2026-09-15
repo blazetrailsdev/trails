@@ -54,12 +54,12 @@ describe("withTransactionalFixtures", () => {
   });
 
   it("pins a connection pool established inside the test body", async () => {
-    const pool = Base.connectionHandler.establishConnection(
+    const pool = await Base.connectionHandler.establishConnection(
       { adapter: "sqlite3", database: ":memory:" },
       { ownerName: "MidTestPool" },
     );
-    onTestFinished(() => {
-      Base.connectionHandler.removeConnectionPool("MidTestPool");
+    onTestFinished(async () => {
+      await Base.connectionHandler.removeConnectionPool("MidTestPool");
     });
     await Promise.resolve();
     await Promise.resolve();

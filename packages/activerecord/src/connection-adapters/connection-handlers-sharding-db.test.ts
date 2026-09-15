@@ -37,13 +37,13 @@ const dbPath = (basename: string) => path.join(dbDir, basename);
 describe("ConnectionHandlersShardingDbTest", () => {
   let baselinePools: Set<unknown>;
 
-  afterAll(() => {
-    Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
+  afterAll(async () => {
+    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
   });
 
   beforeEach(async () => {
     dbDir = await mkdtemp(path.join(os.tmpdir(), "trails-sharding-db-"));
-    Base.connectionHandler.establishConnection(
+    await Base.connectionHandler.establishConnection(
       new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "ActiveRecord::Base" },
     );
@@ -54,7 +54,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await Base.connectionHandler.clearAllConnectionsBang();
     for (const pool of Base.connectionHandler.connectionPoolList("all")) {
       if (baselinePools.has(pool)) continue;
-      Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+      await Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
         role: pool.role,
         shard: pool.shard,
       });
@@ -71,7 +71,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         default_env: { primary: { adapter: "sqlite3", database: primary } },
       },
       async () => {
-        const pools = Base.connectsTo({
+        const pools = await Base.connectsTo({
           shards: { default: { writing: "primary" } },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
@@ -104,7 +104,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         },
       },
       async () => {
-        Base.connectsTo({
+        await Base.connectsTo({
           shards: {
             default: { writing: "primary", reading: "primary" },
             shard_one: { writing: "primary_shard_one", reading: "primary_shard_one" },
@@ -150,7 +150,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         },
       },
       async () => {
-        Base.connectsTo({
+        await Base.connectsTo({
           shards: {
             default: { writing: "primary", reading: "primary_replica" },
             shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
@@ -227,7 +227,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         },
       },
       async () => {
-        Base.connectsTo({
+        await Base.connectsTo({
           shards: {
             default: { writing: "primary", reading: "primary_replica" },
             shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
@@ -291,7 +291,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         },
       },
       async () => {
-        Base.connectsTo({
+        await Base.connectsTo({
           shards: {
             default: { writing: "primary", reading: "primary_replica" },
             shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
@@ -323,12 +323,12 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("connects to raises with a shard and database key", async () => {
-    expect(() =>
+    await expect(
       Base.connectsTo({
         database: { writing: "arunit" },
         shards: { s: { writing: "arunit" } },
       } as any),
-    ).toThrow(/can only accept a `database` or `shards` argument/);
+    ).rejects.toThrow(/can only accept a `database` or `shards` argument/);
   });
 
   it("retrieve connection pool with invalid shard", async () => {
@@ -342,7 +342,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
       async () => {
-        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
         let error: any;
         try {
           await Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
@@ -366,7 +366,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
       async () => {
-        Base.connectsTo({
+        await Base.connectsTo({
           shards: {
             default: { writing: "arunit", reading: "arunit" },
             shard_one: { writing: "arunit", reading: "arunit" },
@@ -395,7 +395,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
       async () => {
-        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
         let error: any;
         try {
           await Base.connectedTo({ shard: "foo" }, async () => {
@@ -422,8 +422,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
           primary_shard_one: { adapter: "sqlite3", database: dbPath("primary_shard_one.sqlite3") },
         },
       },
-      () => {
-        Base.connectsTo({
+      async () => {
+        await Base.connectsTo({
           shards: {
             default: { writing: "primary" },
             shard_one: { writing: "primary_shard_one" },
@@ -449,8 +449,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
           primary_replica: { adapter: "sqlite3", database: primary, replica: true },
         },
       },
-      () => {
-        Base.connectsTo({
+      async () => {
+        await Base.connectsTo({
           shards: { default: { writing: "primary", reading: "primary_replica" } },
         });
 
@@ -472,10 +472,10 @@ describe("ConnectionHandlersShardingDbTest", () => {
       static override abstractClass = true;
     }
     try {
-      SecondaryBase.connectsTo({
+      await SecondaryBase.connectsTo({
         shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
       });
-      SomeOtherBase.connectsTo({
+      await SomeOtherBase.connectsTo({
         database: { writing: { database: ":memory:", adapter: "sqlite3" } },
       });
       expect(SecondaryBase.defaultShard()).toBe("not_default");
@@ -490,7 +490,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       static override abstractClass = true;
     }
     try {
-      ShardedAbstractBase.connectsTo({
+      await ShardedAbstractBase.connectsTo({
         shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
       });
     } finally {
@@ -528,10 +528,10 @@ describe("ConnectionHandlersShardingDbTest", () => {
     }
 
     try {
-      SecondaryBase.connectsTo({
+      await SecondaryBase.connectsTo({
         shards: { one: { writing: { database: ":memory:", adapter: "sqlite3" } } },
       });
-      SomeOtherBase.connectsTo({
+      await SomeOtherBase.connectsTo({
         shards: { one: { writing: { database: ":memory:", adapter: "sqlite3" } } },
       });
 
@@ -577,7 +577,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     }
 
     try {
-      SecondaryBase.connectsTo({
+      await SecondaryBase.connectsTo({
         shards: {
           default: { writing: { database: ":memory:", adapter: "sqlite3" } },
           one: { writing: { database: ":memory:", adapter: "sqlite3" } },

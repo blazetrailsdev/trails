@@ -349,7 +349,7 @@ it("connection notification is called", async () => {
   });
   try {
     const dbConfig = new HashConfig("test", "primary", ambientPoolConfiguration());
-    Base.connectionHandler.establishConnection(dbConfig, { ownerName: ConnectionTestModel });
+    await Base.connectionHandler.establishConnection(dbConfig, { ownerName: ConnectionTestModel });
     expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
     expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);
@@ -357,7 +357,7 @@ it("connection notification is called", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
+    await Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
     await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
@@ -368,7 +368,7 @@ it("connection notification is called for shard", async () => {
     payloads.push(event.payload as Record<string, unknown>);
   });
   try {
-    ConnectionTestModel.connectsTo({
+    await ConnectionTestModel.connectsTo({
       shards: { default: { writing: ambientPoolConfiguration() } },
     });
     expect(payloads).toHaveLength(1);
@@ -378,7 +378,7 @@ it("connection notification is called for shard", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
+    await Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
     await Base.connectionHandler.clearAllConnectionsBang();
   }
 });

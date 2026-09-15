@@ -19,7 +19,7 @@ describe("ShardsKeysTest", () => {
 
   let baselinePools: Set<unknown>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseTasks.env;
@@ -36,8 +36,8 @@ describe("ShardsKeysTest", () => {
     });
     (Base as any)._shardKeys = undefined;
 
-    UnshardedBase.connectsTo({ database: { writing: "primary" } });
-    ShardedBase.connectsTo({
+    await UnshardedBase.connectsTo({ database: { writing: "primary" } });
+    await ShardedBase.connectsTo({
       shards: {
         shard_one: { writing: "shard_one", reading: "shard_one_reading" },
         shard_two: { writing: "shard_two", reading: "shard_two_reading" },
@@ -49,7 +49,7 @@ describe("ShardsKeysTest", () => {
     await Base.connectionHandler.clearAllConnectionsBang();
     for (const pool of Base.connectionHandler.connectionPoolList("all")) {
       if (baselinePools.has(pool)) continue;
-      Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+      await Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
         role: pool.role,
         shard: pool.shard,
       });

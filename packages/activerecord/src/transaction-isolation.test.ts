@@ -57,8 +57,8 @@ describe("TransactionIsolationTest", () => {
     try {
       await Tag.destroyAll();
     } finally {
-      Tag.removeConnection();
-      Tag2.removeConnection();
+      await Tag.removeConnection();
+      await Tag2.removeConnection();
     }
   });
 

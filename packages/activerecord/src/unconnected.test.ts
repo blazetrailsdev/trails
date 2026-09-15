@@ -11,7 +11,7 @@ describe("TestUnconnectedAdapter", () => {
 
   beforeEach(async () => {
     underlying = (await Base.leaseConnection()) as unknown as { active(): Promise<boolean> };
-    connectionName = Base.removeConnection();
+    connectionName = await Base.removeConnection();
   });
 
   afterEach(async () => {

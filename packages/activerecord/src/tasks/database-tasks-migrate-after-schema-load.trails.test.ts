@@ -15,7 +15,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       void 0;
     }
@@ -64,7 +64,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     const schemaFile = join(dir, "schema.js");
     await writeFile(schemaFile, dumped);
 
-    Base.removeConnection();
+    await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
     const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env });
     await DatabaseTasks.loadSchema(fresh, "js", schemaFile);

@@ -52,12 +52,10 @@ export async function arConsole(
 
   return new Promise<number>((res) => {
     replContext.on("exit", () => {
-      try {
-        Base.removeConnection();
-      } catch {
-        /** @empty */
-      }
-      res(0);
+      Base.removeConnection().then(
+        () => res(0),
+        () => res(0),
+      );
     });
   });
 }

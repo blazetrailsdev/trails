@@ -251,7 +251,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   let database: string;
   let configuration: HashConfig;
 
-  let previous: ReturnType<typeof Base.removeConnection>;
+  let previous: Awaited<ReturnType<typeof Base.removeConnection>>;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
   beforeEach(async () => {
@@ -263,7 +263,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
       adapter: "sqlite3",
       database,
     });
-    previous = Base.removeConnection();
+    previous = await Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database });
     previousFlags = DatabaseTasks.structureDumpFlags;
   });
@@ -272,7 +272,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     vi.restoreAllMocks();
     DatabaseTasks.structureDumpFlags = previousFlags;
     SchemaDumper.ignoreTables = [];
-    Base.removeConnection();
+    await Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configurationHash);
     for (const file of created) {
       try {

@@ -43,13 +43,13 @@ function isBaseClass(klass: typeof Base): boolean {
   return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
 }
 
-export function connectsTo(
+export async function connectsTo(
   this: typeof Base,
   options: {
     database?: Record<string, string | Record<string, unknown>>;
     shards?: Record<string, Record<string, string | Record<string, unknown>>>;
   },
-): ConnectionPool[] {
+): Promise<ConnectionPool[]> {
   if (!isBaseClass(this) && !this.abstractClass) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:82 cluster=connection-pool
     throw new NotImplementedError(
@@ -77,7 +77,7 @@ export function connectsTo(
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
-      const pool = this.connectionHandler.establishConnection(dbConfig, {
+      const pool = await this.connectionHandler.establishConnection(dbConfig, {
         ownerName: this.connectionClassForSelf(),
         role,
         shard,
@@ -365,7 +365,7 @@ export function adapterClassSync(
   return adapterClass as new (...args: any[]) => DatabaseAdapter;
 }
 
-export function removeConnection(this: typeof Base): HashConfig | undefined {
+export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
   const name = connectionSpecificationName.call(this);
   if (
     this.connectionHandler.retrieveConnectionPool(name, {
@@ -578,7 +578,7 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
   const role = coreCurrentRole.call(modelClass as any);
   const shard = coreCurrentShard.call(modelClass as any);
 
-  modelClass.connectionHandler.establishConnection(dbConfig, {
+  await modelClass.connectionHandler.establishConnection(dbConfig, {
     ownerName: modelClass.connectionClassForSelf(),
     role,
     shard,

@@ -60,7 +60,7 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
     return 1;
   } finally {
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       /** @empty */
     }

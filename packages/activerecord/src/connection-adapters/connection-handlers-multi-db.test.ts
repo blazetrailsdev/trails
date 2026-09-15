@@ -50,8 +50,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
     handler = new ConnectionHandler();
     const dbConfig = new HashConfig("test", connectionName, sqliteDb("primary"));
-    rwPool = handler.establishConnection(dbConfig, { ownerName: connectionName });
-    roPool = handler.establishConnection(dbConfig, {
+    rwPool = await handler.establishConnection(dbConfig, { ownerName: connectionName });
+    roPool = await handler.establishConnection(dbConfig, {
       ownerName: connectionName,
       role: "reading",
     });
@@ -72,11 +72,11 @@ describe("ConnectionHandlersMultiDbTest", () => {
     }
   });
 
-  function withBaseConfigs(
+  async function withBaseConfigs(
     raw: RawConfigurations,
-    fn: () => void,
+    fn: () => Promise<void>,
     opts: { defaultEnv?: string } = {},
-  ): void {
+  ): Promise<void> {
     const prevConfigs = Base.configurations();
     const prevDefaultEnv = DatabaseTasks.env;
     if (opts.defaultEnv) {
@@ -85,7 +85,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
     }
     Base.configurations(raw);
     try {
-      fn();
+      await fn();
     } finally {
       Base.configurations(prevConfigs);
       DatabaseTasks.env = prevDefaultEnv;
@@ -110,7 +110,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       }
     }
 
-    SecondaryBase.connectsTo({
+    await SecondaryBase.connectsTo({
       database: {
         writing: { database: ":memory:", adapter: "sqlite3" },
         secondary: { database: ":memory:", adapter: "sqlite3" },
@@ -133,19 +133,19 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
     expect((await relation.first())!.readAttribute("connection_role")).toBe("reading");
     await SecondaryBase.removeConnection();
-    Base.connectionHandler.removeConnectionPool("SecondaryBase", { role: "secondary" });
+    await Base.connectionHandler.removeConnectionPool("SecondaryBase", { role: "secondary" });
   });
 
-  it("establish connection using 3 levels config", () => {
-    withBaseConfigs(
+  it("establish connection using 3 levels config", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           readonly: sqliteDb("readonly", { replica: true }),
           default: sqliteDb("primary"),
         },
       },
-      () => {
-        Base.connectsTo({ database: { writing: "default", reading: "readonly" } });
+      async () => {
+        await Base.connectsTo({ database: { writing: "default", reading: "readonly" } });
 
         const writingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
         expect(writingPool).not.toBeNull();
@@ -161,16 +161,16 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
-  it("establish connection using 3 levels config with non default handlers", () => {
-    withBaseConfigs(
+  it("establish connection using 3 levels config with non default handlers", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           readonly: sqliteDb("readonly"),
           primary: sqliteDb("primary"),
         },
       },
-      () => {
-        Base.connectsTo({ database: { default: "primary", readonly: "readonly" } });
+      async () => {
+        await Base.connectsTo({ database: { default: "primary", readonly: "readonly" } });
 
         const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "default",
@@ -188,9 +188,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
-  it("switching connections with database url", () => {
-    withBaseConfigs({}, () => {
-      Base.connectsTo({ database: { writing: "postgresql://localhost/bar" } });
+  it("switching connections with database url", async () => {
+    await withBaseConfigs({}, async () => {
+      await Base.connectsTo({ database: { writing: "postgresql://localhost/bar" } });
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
       const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
@@ -199,9 +199,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     });
   });
 
-  it("switching connections with database config hash", () => {
-    withBaseConfigs({}, () => {
-      Base.connectsTo({ database: { writing: sqliteDb("readonly") } });
+  it("switching connections with database config hash", async () => {
+    await withBaseConfigs({}, async () => {
+      await Base.connectsTo({ database: { writing: sqliteDb("readonly") } });
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
       expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
@@ -212,16 +212,16 @@ describe("ConnectionHandlersMultiDbTest", () => {
     expect(() => Base.connectedTo({}, () => {})).toThrow(/must provide a `shard` and\/or `role`/);
   });
 
-  it("switching connections with database symbol uses default role", () => {
-    withBaseConfigs(
+  it("switching connections with database symbol uses default role", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           animals: sqliteDb("animals"),
           primary: sqliteDb("primary"),
         },
       },
-      () => {
-        Base.connectsTo({ database: { writing: "animals" } });
+      async () => {
+        await Base.connectsTo({ database: { writing: "animals" } });
         expect(currentRole.call(Base as any)).toBe("writing");
         expect(Base.connectedToQ({ role: "writing" })).toBe(true);
         expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
@@ -230,17 +230,17 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
-  it("switching connections with database hash uses passed role and database", () => {
+  it("switching connections with database hash uses passed role and database", async () => {
     const config = {
       default_env: {
         animals: sqliteDb("animals"),
         primary: sqliteDb("primary"),
       },
     };
-    withBaseConfigs(
+    await withBaseConfigs(
       config,
-      () => {
-        Base.connectsTo({ database: { writing: "primary" } });
+      async () => {
+        await Base.connectsTo({ database: { writing: "primary" } });
         expect(currentRole.call(Base as any)).toBe("writing");
         expect(Base.connectedToQ({ role: "writing" })).toBe(true);
 
@@ -256,9 +256,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
-  it("connects to with single configuration", () => {
-    withBaseConfigs({ development: sqliteDb("primary") }, () => {
-      Base.connectsTo({ database: { writing: "development" } });
+  it("connects to with single configuration", async () => {
+    await withBaseConfigs({ development: sqliteDb("primary") }, async () => {
+      await Base.connectsTo({ database: { writing: "development" } });
       expect(Base.connectionHandler).toBe(Base.connectionHandler);
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
@@ -267,14 +267,16 @@ describe("ConnectionHandlersMultiDbTest", () => {
     });
   });
 
-  it("connects to using top level key in two level config", () => {
-    withBaseConfigs(
+  it("connects to using top level key in two level config", async () => {
+    await withBaseConfigs(
       {
         development: sqliteDb("primary"),
         development_readonly: sqliteDb("readonly"),
       },
-      () => {
-        Base.connectsTo({ database: { writing: "development", reading: "development_readonly" } });
+      async () => {
+        await Base.connectsTo({
+          database: { writing: "development", reading: "development_readonly" },
+        });
         const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "reading",
         });
@@ -283,14 +285,14 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
-  it("connects to returns array of established connections", () => {
-    withBaseConfigs(
+  it("connects to returns array of established connections", async () => {
+    await withBaseConfigs(
       {
         development: sqliteDb("primary"),
         development_readonly: sqliteDb("readonly"),
       },
-      () => {
-        const result = Base.connectsTo({
+      async () => {
+        const result = await Base.connectsTo({
           database: { writing: "development", reading: "development_readonly" },
         });
         expect(result).toEqual([

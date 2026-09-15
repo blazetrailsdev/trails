@@ -107,7 +107,7 @@ describe("PrimaryClassTest", () => {
     async () => {
       (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
       try {
-        const pools = ApplicationRecord.connectsTo({
+        const pools = await ApplicationRecord.connectsTo({
           database: { writing: "arunit", reading: "arunit" },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
@@ -116,7 +116,7 @@ describe("PrimaryClassTest", () => {
         expect(ApplicationRecord.applicationRecordClassQ()).toBe(true);
         expect(await ApplicationRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {
-        ApplicationRecord.removeConnection();
+        await ApplicationRecord.removeConnection();
         await Base.establishConnection("arunit");
       }
     },
@@ -127,7 +127,7 @@ describe("PrimaryClassTest", () => {
     async () => {
       PrimaryAppRecord.primaryAbstractClass();
       try {
-        const pools = PrimaryAppRecord.connectsTo({
+        const pools = await PrimaryAppRecord.connectsTo({
           database: { writing: "arunit", reading: "arunit" },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
@@ -137,7 +137,7 @@ describe("PrimaryClassTest", () => {
         expect(PrimaryAppRecord.abstractClass).toBe(true);
         expect(await PrimaryAppRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {
-        PrimaryAppRecord.removeConnection();
+        await PrimaryAppRecord.removeConnection();
         await Base.establishConnection("arunit");
       }
     },
