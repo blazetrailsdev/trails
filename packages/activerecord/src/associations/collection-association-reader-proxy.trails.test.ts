@@ -4,10 +4,11 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
 interface CollectionAssociationLike {
-  reader: Promise<Post[]>;
+  reader: unknown;
   isStaleTarget(): boolean;
   reload(): Promise<unknown>;
-  resetScope?(): void;
+  reset(): void;
+  resetScope(): void;
 }
 
 const postsAssociation = (author: Author): CollectionAssociationLike =>
@@ -24,11 +25,15 @@ describe("CollectionAssociation#reader", () => {
     await association.reader;
 
     vi.spyOn(association, "isStaleTarget").mockReturnValue(true);
-    const reload = vi.spyOn(association, "reload");
+    const reset = vi.spyOn(association, "reset");
+    const resetScope = vi.spyOn(association, "resetScope");
 
-    await association.reader;
+    const proxy = association.reader as { toArray(): Promise<Post[]> };
+    vi.mocked(association.isStaleTarget).mockRestore();
 
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(resetScope).toHaveBeenCalledTimes(1);
+    expect((await proxy.toArray()).length).toBeGreaterThan(0);
   });
 
   it("does not reload a fresh target", async () => {
