@@ -293,10 +293,10 @@ export class Association {
     });
   }
 
-  async asyncLoadTarget(): Promise<Base | Base[] | null> {
-    const result = await this.loadTarget();
+  async asyncLoadTarget(): Promise<null> {
+    await this.loadTarget();
     this._loadedViaAsync = true;
-    return result;
+    return null;
   }
 
   /** @missingRailsCall map — PERMANENT */

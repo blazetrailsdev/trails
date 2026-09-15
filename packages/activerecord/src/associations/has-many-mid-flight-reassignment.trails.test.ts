@@ -21,6 +21,23 @@ describe("has_many mid-flight reassignment", () => {
     expect(firm.association("clients").isLoaded()).toBe(true);
   });
 
+  it("replace racing an in-flight load diffs against the loaded rows and its records win", async () => {
+    const firm = (await Firm.first()) as Firm;
+    const persisted = await Client.where({ firm_id: firm.id });
+    expect(persisted.length).toBeGreaterThan(0);
+    const other = (await Client.all()).find((c) => c.firm_id !== firm.id) as Client;
+
+    const inFlight = firm.association("clients").loadTarget();
+    const holder = firm.association("clients") as unknown as {
+      replace(r: Base[]): Promise<unknown>;
+    };
+    await holder.replace([other]);
+    await inFlight;
+
+    expect(firm.association("clients").target).toEqual([other]);
+    expect((await Client.where({ firm_id: firm.id })).map((c) => c.id)).toEqual([other.id]);
+  });
+
   it("assigning after the load has settled is allowed", async () => {
     const firm = (await Firm.first()) as Firm;
     const other = (await Client.first()) as Client;
