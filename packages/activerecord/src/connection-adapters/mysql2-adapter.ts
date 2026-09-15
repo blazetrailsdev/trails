@@ -383,26 +383,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string | null = "SQL",
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
-    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-    return await this.log(sql, name, binds, typeCastedBinds, false, (payload) =>
-      this.withRawConnection({}, async (conn) => {
-        const mysqlConn = conn as unknown as mysql.Connection;
-        const raw = await this.performQuery(mysqlConn, sql, binds, typeCastedBinds, {
-          prepare: false,
-          notificationPayload: payload,
-        });
-        const affected = this.affectedRows(raw);
+    const raw = (await this.rawExecute(sql, name, binds)) as Mysql2RawResult;
+    const affected = this.affectedRows(raw);
 
-        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-          if (affected > 1) {
-            return affected;
-          }
-          return raw.insertId ?? 0;
-        }
-
+    if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+      if (affected > 1) {
         return affected;
-      }),
-    );
+      }
+      return raw.insertId ?? 0;
+    }
+
+    return affected;
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
