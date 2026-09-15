@@ -4,6 +4,7 @@ import { Hash } from "./hash.js";
 import { KeyError } from "./key-error.js";
 import { kernelFloat } from "./kernel-float.js";
 import { kernelInteger } from "./kernel-integer.js";
+import { Rational } from "./rational.js";
 import { rbBuiltinClassName, rbInspect, rbObjAsString } from "./object.js";
 import { TypeError as RbTypeError } from "./type-error.js";
 
@@ -565,7 +566,9 @@ function roundAt(digits: string, exp: number, keep: number): { digits: string; e
 }
 
 /**
- * The `'f'` conversion (`vendor/ruby/sprintf.c:790`) and the `'e'`/`'E'`/
+ * The `'f'` conversion (`vendor/ruby/sprintf.c:790`), whose Integer and
+ * Rational arm stays exact in `bigint` and rounds half-up on the rational
+ * (`sprintf.c:817-820`), and the `'e'`/`'E'`/
  * `'g'`/`'G'`/`'a'`/`'A'` ones MRI hands to `BSD_vfprintf`
  * (`vendor/ruby/sprintf.c:884`).
  *
@@ -581,6 +584,54 @@ function formatFloat(
   width: number,
   prec: number,
 ): string {
+  float: if (conv === "f") {
+    let num: bigint, den: bigint;
+    let sign = flags & FPLUS ? 1 : 0;
+    let zero = 0;
+    if (
+      typeof val === "bigint" ||
+      (typeof val === "number" && Number.isInteger(val) && !Object.is(val, -0))
+    ) {
+      den = 1n;
+      num = BigInt(val);
+    } else if (val instanceof Rational) {
+      den = val.denominator;
+      num = val.numerator;
+    } else {
+      break float;
+    }
+    if (!(flags & FPREC)) prec = DEFAULT_FLOAT_PRECISION;
+    if (num < 0n) {
+      num = -num;
+      sign = -1;
+    }
+    if (den !== 1n) {
+      num = num * 10n ** BigInt(prec);
+      num = num + den / 2n;
+      num = num / den;
+    } else if (prec >= 0) {
+      zero = prec;
+    }
+    const t = num.toString(10);
+    let len = t.length + zero;
+    if (prec >= len) len = prec + 1;
+    if (sign || flags & FSPACE) ++len;
+    if (prec > 0) ++len;
+    const fill = width > len ? width - len : 0;
+    let buf = "";
+    if (fill && !(flags & (FMINUS | FZERO))) buf += " ".repeat(fill);
+    if (sign || flags & FSPACE) buf += sign > 0 ? "+" : sign < 0 ? "-" : " ";
+    if (fill && (flags & (FMINUS | FZERO)) === FZERO) buf += "0".repeat(fill);
+    len = t.length + zero;
+    if (len > prec) buf += t.slice(0, len - prec);
+    else buf += "0";
+    if (prec > 0) buf += ".";
+    if (zero) buf += "0".repeat(zero);
+    else if (prec > len) buf += "0".repeat(prec - len) + t;
+    else if (prec > 0) buf += t.slice(len - prec);
+    if (fill && flags & FMINUS) buf += " ".repeat(fill);
+    return buf;
+  }
   const fval = typeof val === "bigint" ? Number(val) : kernelFloat(val);
   let sc = "";
   if (fval < 0 || Object.is(fval, -0)) sc = "-";

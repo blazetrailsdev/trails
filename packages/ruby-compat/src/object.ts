@@ -155,7 +155,8 @@ let nextObjAddress = 0x7f0000000000;
 function inspectValue(value: unknown, recursing: Set<object>): string {
   if (value == null) return "nil";
   if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "number") return floToS(value);
+  if (typeof value === "bigint") return String(value);
   if (isSymbol(value)) return value;
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
@@ -229,5 +230,36 @@ export function rbObjAsString(value: unknown): string {
   if (value == null) return "";
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
+  if (typeof value === "number") return floToS(value);
   return String(value);
+}
+
+/**
+ * `flo_to_s` (`vendor/ruby/numeric.c:1059`), `Float#to_s`: always a decimal
+ * point, and the exponent form outside `1e-4 ... 1e16`.
+ *
+ * JS has one `number` where Ruby has Integer and Float, and `1.0 === 1`, so the
+ * seat cannot be recovered from the value. A whole-valued `number` is read as
+ * an Integer and renders without a point: it is what nearly every caller hands
+ * over (ids, counts, sizes), and a `bigint` is not what those seats hold in
+ * trails. `-0` is the one whole value no Integer can be, so it stays a Float.
+ */
+function floToS(value: number): string {
+  if (Number.isInteger(value) && !Object.is(value, -0)) return String(value);
+  if (!Number.isFinite(value)) {
+    return Number.isNaN(value) ? "NaN" : value > 0 ? "Infinity" : "-Infinity";
+  }
+  const [mant, e] = Math.abs(value).toExponential().split("e");
+  let buf = mant.replace(".", "");
+  if (value === 0) buf = "0";
+  const digs = buf.length;
+  const decpt = value === 0 ? 1 : Number(e) + 1;
+  const s = value < 0 || Object.is(value, -0) ? "-" : "";
+  if (decpt > 0) {
+    if (decpt < digs) return `${s}${buf.slice(0, decpt)}.${buf.slice(decpt)}`;
+    if (decpt <= 15) return `${s}${buf}${"0".repeat(decpt - digs)}.0`;
+  } else if (decpt > -4) {
+    return `${s}0.${"0".repeat(-decpt)}${buf}`;
+  }
+  return `${s}${buf[0]}.${digs > 1 ? buf.slice(1) : "0"}e${decpt - 1 < 0 ? "-" : "+"}${String(Math.abs(decpt - 1)).padStart(2, "0")}`;
 }

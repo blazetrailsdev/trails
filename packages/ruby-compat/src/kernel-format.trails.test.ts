@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { KeyError } from "./key-error.js";
+import { Rational } from "./rational.js";
 import { Hash } from "./hash.js";
 import { format, sprintf } from "./kernel-format.js";
 import { TypeError } from "./type-error.js";
@@ -61,7 +62,20 @@ const CASES: [args: [string, ...unknown[]], expected: string][] = [
   [["%08.2f", -1.5], "-0001.50"],
   [["%-8.2f", 1.5], "1.50    "],
   [["%+.2f", 1.5], "+1.50"],
-  [["%#.0f", 1.0], "1."],
+  [["%#.0f", 1.25], "1."],
+  [["%#.0f", 1], "1"],
+  [["%.20f", new Rational(1n, 3n)], "0.33333333333333333333"],
+  [["%.2f", 10n ** 30n], "1000000000000000000000000000000.00"],
+  [["%.0f", new Rational(5n, 2n)], "3"],
+  [["%.0f", 2.5], "2"],
+  [["%.0f", new Rational(-1n, 2n)], "-1"],
+  [["%08.3f", new Rational(-1n, 3n)], "-000.333"],
+  [["%-10.2f|", new Rational(22n, 7n)], "3.14      |"],
+  [["%s", 1.5], "1.5"],
+  [["%s", 0.00001], "1.0e-05"],
+  [["%p", -0.0001], "-0.0001"],
+  [["%s", -0.0], "-0.0"],
+  [["%p", 1.5e300], "1.5e+300"],
   [["%e", 1234.5678], "1.234568e+03"],
   [["%.2e", 0.0001234], "1.23e-04"],
   [["%e", 0.0], "0.000000e+00"],
