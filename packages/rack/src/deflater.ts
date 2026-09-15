@@ -148,10 +148,13 @@ export class GzipStream {
         if (Array.isArray(this.body)) for (const part of this.body) await visit(part);
         else {
           let pending = Promise.resolve();
-          this.body.each((part: string) => {
-            pending = pending.then(() => visit(part));
-          });
-          await pending;
+          try {
+            this.body.each((part: string) => {
+              pending = pending.then(() => visit(part));
+            });
+          } finally {
+            await pending;
+          }
         }
       }
     } finally {
