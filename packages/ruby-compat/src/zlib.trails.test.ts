@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { File } from "./file.js";
 import { Zlib } from "./zlib.js";
+import { GzipWriter } from "./zlib-adapter.js";
 
 /**
  * Expected values are MRI's, from
@@ -90,8 +91,14 @@ describe("Zlib::GzipFile.open", () => {
         gz.write("x");
         expect(() => {
           gz.mtime = 0;
-        }).toThrow("header is already written");
+        }).toThrow(Zlib.GzipFile.Error);
       });
+      const seam = new GzipWriter({ write() {} });
+      seam.write(new Uint8Array([120]));
+      expect(() => {
+        seam.mtime = 0;
+      }).toThrow("header is already written");
+      await seam.finish();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

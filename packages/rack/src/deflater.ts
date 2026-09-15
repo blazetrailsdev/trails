@@ -137,16 +137,22 @@ export class GzipStream {
         let part: string | null;
         while ((part = this.body.read(GzipStream.BUFFER_LENGTH)) != null) {
           gzip.write(Buffer.from(String(part), "binary"));
-          if (this.sync) void gzip.flush();
+          if (this.sync) await gzip.flush();
         }
       } else {
-        const visit = (part: string) => {
+        const visit = async (part: string) => {
           if (part.length === 0) return;
           gzip.write(Buffer.from(String(part), "binary"));
-          if (this.sync) void gzip.flush();
+          if (this.sync) await gzip.flush();
         };
-        if (Array.isArray(this.body)) for (const part of this.body) visit(part);
-        else this.body.each(visit);
+        if (Array.isArray(this.body)) for (const part of this.body) await visit(part);
+        else {
+          let pending = Promise.resolve();
+          this.body.each((part: string) => {
+            pending = pending.then(() => visit(part));
+          });
+          await pending;
+        }
       }
     } finally {
       await gzip.finish();

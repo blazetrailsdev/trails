@@ -171,6 +171,13 @@ export const Zlib = {
   DEFAULT_STRATEGY: 0,
 
   /**
+   * `vendor/ruby/ext/zlib/zlib.c:4827` `cGzipFile`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipFile`.
+   */
+  GzipFile,
+
+  /**
    * `vendor/ruby/ext/zlib/zlib.c:4877` `rb_cGzipReader`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipReader`.

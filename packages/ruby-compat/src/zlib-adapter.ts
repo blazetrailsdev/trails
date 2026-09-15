@@ -1,3 +1,5 @@
+import { Zlib } from "./zlib.js";
+
 /**
  * The compression seam. `zlib` is a C extension in MRI and a builtin in Node,
  * so like `fs`, `os` and `crypto` it is reached through a registry rather than
@@ -71,6 +73,7 @@ export interface GzipReaderHandle {
  */
 export class GzipWriter implements GzipWriterHandle {
   private readonly handle: GzipWriterHandle;
+  private headerFinished = false;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(io: GzipWriterIO) {
@@ -84,16 +87,21 @@ export class GzipWriter implements GzipWriterHandle {
 
   /** @noRailsEquivalent PERMANENT */
   set mtime(value: number | null) {
+    if (this.headerFinished) {
+      throw new Zlib.GzipFile.Error("header is already written");
+    }
     this.handle.mtime = value;
   }
 
   /** @noRailsEquivalent PERMANENT */
   write(data: Uint8Array): void {
+    this.headerFinished = true;
     this.handle.write(data);
   }
 
   /** @noRailsEquivalent PERMANENT */
   async flush(): Promise<void> {
+    this.headerFinished = true;
     await this.handle.flush();
   }
 
