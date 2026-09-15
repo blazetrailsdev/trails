@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
-import { assertValidKeys, throwAbort } from "@blazetrails/activesupport";
+import { NotImplementedError, kernelThrow } from "@blazetrails/ruby-compat";
+import { assertValidKeys } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 
@@ -237,7 +237,7 @@ export class Association {
       } catch (e) {
         if (e instanceof RecordNotDestroyed) {
           record._associationDestroyException = e;
-          throwAbort();
+          kernelThrow(":abort");
         }
         throw e;
       }

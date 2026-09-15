@@ -1,8 +1,8 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { OrderedTag } from "./tag.js";
 import type { Tag } from "./tag.js";
 import { Base } from "../../base.js";
-import { throwAbort } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Tagging extends Base {
@@ -53,6 +53,6 @@ export interface Tagging {
 
 export class IndestructibleTagging extends Tagging {
   static {
-    this.beforeDestroy(() => throwAbort());
+    this.beforeDestroy(() => kernelThrow(":abort"));
   }
 }

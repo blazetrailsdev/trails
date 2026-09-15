@@ -1,11 +1,6 @@
+import { kernelCatch } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
-import {
-  underscore,
-  isAbortSignal,
-  compactBlank,
-  indexBy,
-  valuesAt,
-} from "@blazetrails/activesupport";
+import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
@@ -659,10 +654,12 @@ export abstract class CollectionAssociation extends Association {
     records: Base[],
     method: string,
   ): Promise<boolean> | boolean {
-    try {
-      for (const record of records) this.callback("beforeRemove", record);
-    } catch (e) {
-      if (!isAbortSignal(e)) throw e;
+    if (
+      kernelCatch(":abort", () => {
+        for (const record of records) this.callback("beforeRemove", record);
+        return records;
+      }) == null
+    ) {
       this._lastRemoveAborted = true;
       return false;
     }
@@ -842,13 +839,14 @@ export abstract class CollectionAssociation extends Association {
 
     let yielded = false;
     try {
-      if (!skipCallbacks) {
-        try {
+      if (
+        !skipCallbacks &&
+        kernelCatch(":abort", () => {
           this.callback("beforeAdd", record);
-        } catch (e) {
-          if (!isAbortSignal(e)) throw e;
-          return null;
-        }
+          return true;
+        }) == null
+      ) {
+        return null;
       }
       this.setInverseInstance(record);
       this._wasLoaded = true;

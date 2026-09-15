@@ -1,5 +1,5 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { _setHasManyAssociation } from "./association-class-slots.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -83,7 +83,7 @@ export class HasManyAssociation extends CollectionAssociation {
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
           owner.errors.add("base", ":restrict_dependent_destroy.has_many", { record });
-          throwAbort();
+          kernelThrow(":abort");
         }
         break;
       }

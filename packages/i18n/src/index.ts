@@ -78,6 +78,5 @@ export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
 export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
 export type { FallbackMappings } from "./locale.js";
-export { ThrownException, catchException, throwException } from "./throw-catch.js";
 export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";
 export type { TranslationData } from "./utils.js";

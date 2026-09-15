@@ -1,5 +1,5 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
@@ -45,7 +45,7 @@ export class CpkBook extends Base {
     this.belongsTo("author", { className: "CpkAuthor" });
     this.hasMany("chapters", { className: "CpkChapter", foreignKey: ["author_id", "book_id"] });
     this.beforeDestroy(function (this: CpkBook) {
-      if (this.failDestroy) throwAbort();
+      if (this.failDestroy) kernelThrow(":abort");
     });
   }
 }

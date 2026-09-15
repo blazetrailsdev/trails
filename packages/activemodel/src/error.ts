@@ -1,6 +1,6 @@
 import { humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
-import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
+import { except, kernelCatch } from "@blazetrails/ruby-compat";
+import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
 type ModelBase = object | null;
@@ -154,7 +154,7 @@ export class Error {
       defaults.push(`:${i18nScope}.errors.messages.${typeName}`);
 
       if (options.message == null || options.message === false) {
-        const translation = catchException(() =>
+        const translation = kernelCatch(":exception", () =>
           I18n.translate(defaults[0] as TranslateKey, {
             ...options,
             default: defaults.slice(1),

@@ -1,7 +1,7 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import {
   ActiveRecord,
@@ -1696,7 +1696,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
         this.beforeSave(function () {
-          throwAbort();
+          kernelThrow(":abort");
         });
       }
     }
@@ -2243,7 +2243,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
         this.beforeSave(function () {
-          throwAbort();
+          kernelThrow(":abort");
         });
       }
     }
@@ -4455,7 +4455,7 @@ describe("should update children when autosave is true and parent is new but chi
         this.attribute("name", "string");
         this.attribute("author_id", "integer");
         this.beforeSave(function (record: any) {
-          if (record.name === "cancel") throwAbort();
+          if (record.name === "cancel") kernelThrow(":abort");
         });
       }
     }

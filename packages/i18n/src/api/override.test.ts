@@ -1,10 +1,10 @@
+import { kernelCatch } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Simple } from "../backend/simple.js";
 import { resetClassConfig } from "../config.js";
 import * as I18n from "../i18n.js";
 import { config, resetConfig } from "../i18n.js";
-import { catchException } from "../throw-catch.js";
 import type { MissingTranslation } from "../exceptions.js";
 
 type I18nModule = Omit<typeof I18n, "translate" | "t"> & {
@@ -31,7 +31,7 @@ describe("I18nOverrideTest", () => {
   });
 
   it("make sure modules can overwrite I18n signature", () => {
-    const exception = catchException(() =>
+    const exception = kernelCatch(":exception", () =>
       dupI18n.t("Hello", { tokenize: true, throw: true }),
     ) as MissingTranslation;
     expect(exception.message).toBeTruthy();

@@ -272,8 +272,7 @@ export const NO_JS_CALL_FORM = new Set([
 // `catch` qualifies on the same ground as `synchronize`. Ruby's `catch(:tag)`
 // is Kernel's non-local-exit construct, and its faithful port is JS's own
 // non-local-exit construct: a `try` statement with a `catch` CLAUSE that
-// re-raises anything but the sentinel (`isAbortSignal(e)` — activesupport's
-// port of `throw :abort`). A clause is syntax, not a call expression, so the
+// re-raises anything but the sentinel. A clause is syntax, not a call expression, so the
 // TS body emits no callee and no alias could ever match it, however faithfully
 // the catch is spelled at the Rails call site.
 
@@ -330,30 +329,13 @@ const CONSTRUCT_SKELETON_NAMES = new Map([
 ]);
 
 /**
- * trails' names for Ruby's `Kernel#throw` / `Kernel#catch`, one per tag the
- * repo has a settled helper for: `throw(:abort)` is `throwAbort()`
- * (`activesupport/src/callbacks.ts:10`, the port of the callback-halt idiom) and
- * `throw(:exception, …)` / `catch(:exception)` are `throwException(…)` /
- * `catchException(…)` (`i18n/src/throw-catch.ts`, against
- * `i18n/lib/i18n/backend/base.rb:47,54`).
- *
- * The Ruby side already folds `ref:throw` onto the `throw` construct
- * ({@link CONSTRUCT_SKELETON_NAMES}); without this mirror the helper CALL reads
- * as an ordinary `ref:` reach and the port scores a missing `throw` for
- * spelling the halt exactly as this repo settled it. That is one of the two
- * lowering-artefact classes the RFC 0113 noise-floor audit found under the
- * missing-`throw` stratum, and it is suppressed here — at the source — rather
- * than baselined into the ratchet that stratum now carries.
- *
- * The audit's other artefact class is NOT folded: a `throw(:abort)` whose port
- * `return false`s for its caller to convert
- * (`associations/builder/association.ts:233`) emits no token at all, so there
- * is nothing to fold it onto.
+ * trails' names for Ruby's `Kernel#throw` / `Kernel#catch`: `kernelThrow` /
+ * `kernelCatch` (`ruby-compat/src/kernel-catch.ts`). The Ruby side already
+ * folds `ref:throw` / `ref:catch` onto the constructs
+ * ({@link CONSTRUCT_SKELETON_NAMES}); without this mirror the call reads as an
+ * ordinary `ref:` reach and a faithful port scores a missing `throw`.
  */
 const TS_CONSTRUCT_SKELETON_NAMES = new Map([
-  ["throwAbort", "throw"],
-  ["throwException", "throw"],
-  ["catchException", "try"],
   ["kernelThrow", "throw"],
   ["kernelCatch", "try"],
 ]);

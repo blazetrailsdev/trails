@@ -1,6 +1,7 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { Notifications, throwAbort } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
@@ -6319,7 +6320,7 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "posts";
         this.beforeDestroy(function () {
-          throwAbort();
+          kernelThrow(":abort");
         });
       }
     }
@@ -6352,7 +6353,7 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "posts";
         this.beforeDestroy(function () {
-          throwAbort();
+          kernelThrow(":abort");
         });
       }
     }
@@ -6398,7 +6399,7 @@ describe("HasManyAssociationsTest", () => {
         this._tableName = "comments";
         this.attribute("body", "string");
         this.beforeDestroy(function (this: any) {
-          if (this._readAttribute("body") === "keep") throwAbort();
+          if (this._readAttribute("body") === "keep") kernelThrow(":abort");
         });
       }
     }

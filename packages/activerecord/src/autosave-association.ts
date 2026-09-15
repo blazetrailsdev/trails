@@ -1,10 +1,11 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
 import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { throwAbort, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
 const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor");
@@ -633,7 +634,7 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
   } else {
     defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
       if ((await Promise.resolve(saveBelongsToAssociation.call(this, reflection))) === false) {
-        throwAbort();
+        kernelThrow(":abort");
       }
     });
     this.beforeSave(saveMethod);

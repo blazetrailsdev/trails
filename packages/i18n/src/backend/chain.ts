@@ -1,6 +1,6 @@
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat";
 import { MissingTranslation } from "../exceptions.js";
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
-import { throwException, catchException } from "../throw-catch.js";
 import { deepMergeBang, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
@@ -68,7 +68,7 @@ export class Chain {
 
     for (const backend of this.backends) {
       let returned: { value: unknown } | undefined;
-      catchException(() => {
+      kernelCatch(":exception", () => {
         if (backend === this.backends[this.backends.length - 1]) options = defaultOptions;
         const translation = backend.translate(locale, key, options);
         if (this.namespaceLookup(translation, options)) {
@@ -81,7 +81,10 @@ export class Chain {
     }
 
     if (truthy(namespace)) return namespace;
-    throwException(new MissingTranslation(locale as Locale, key as TranslationKey, options));
+    kernelThrow(
+      ":exception",
+      new MissingTranslation(locale as Locale, key as TranslationKey, options),
+    );
   }
 
   exists(locale: Locale, key: TranslationKey, options: TranslateOptions = EMPTY_HASH): boolean {
@@ -96,13 +99,13 @@ export class Chain {
   ): unknown {
     for (const backend of this.backends) {
       let returned: { value: unknown } | undefined;
-      catchException(() => {
+      kernelCatch(":exception", () => {
         const result = backend.localize(locale, object, format, options);
         if (truthy(result)) returned = { value: result };
       });
       if (returned) return returned.value;
     }
-    throwException(new MissingTranslation(locale, format as TranslationKey, options));
+    kernelThrow(":exception", new MissingTranslation(locale, format as TranslationKey, options));
   }
 
   protected initTranslations(): void {

@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -19,7 +20,6 @@ import type { SpecialCategory } from "./category.js";
 import type { SpecialComment } from "./comment.js";
 import type { Tag } from "./tag.js";
 import type { VerySpecialComment } from "./comment.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { ModelName, type ModelLike } from "@blazetrails/activemodel";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
@@ -808,7 +808,7 @@ export class PostWithDestroyCallback extends Base {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
     this.beforeDestroy(function (this: any) {
-      if (Number(this.id) === 1) throwAbort();
+      if (Number(this.id) === 1) kernelThrow(":abort");
     });
   }
 }

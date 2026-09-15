@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
@@ -5,7 +6,6 @@ import {
   registerModel,
   registerSubclass,
 } from "../index.js";
-import { throwAbort } from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
@@ -265,7 +265,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("before add throwing abort prevents add", async () => {
     const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: () => throwAbort(),
+      beforeAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
     const proxy = association(author, "posts");
@@ -383,7 +383,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("before add abort prevents create from saving", async () => {
     const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: () => throwAbort(),
+      beforeAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
     const proxy = association(author, "posts");
@@ -394,7 +394,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks halt execution when abort is trown when adding to association", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({ beforeAdd: () => throwAbort() });
+    const { Author, Post } = makeAuthorWithCallbacks({ beforeAdd: () => kernelThrow(":abort") });
     const author = await Author.create({ name: "David" });
     const proxy = association(author, "posts");
     const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
@@ -403,7 +403,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks halt execution when abort is trown when removing from association", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({ beforeRemove: () => throwAbort() });
+    const { Author, Post } = makeAuthorWithCallbacks({ beforeRemove: () => kernelThrow(":abort") });
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
@@ -416,7 +416,7 @@ describe("AssociationCallbacksTest", () => {
   it("before_remove abort halts the whole removal, not just the current record", async () => {
     const { Author, Post } = makeAuthorWithCallbacks({
       beforeRemove: (_owner: any, record: any) => {
-        if (record.title === "keep") throwAbort();
+        if (record.title === "keep") kernelThrow(":abort");
       },
     });
     const author = await Author.create({ name: "David" });
@@ -486,7 +486,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("after_add callback throwing abort propagates (not swallowed)", async () => {
     const { Author, Post } = makeAuthorWithCallbacks({
-      afterAdd: () => throwAbort(),
+      afterAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
     const proxy = association(author, "posts");

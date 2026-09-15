@@ -1,8 +1,8 @@
+import { kernelCatch } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingInterpolationArgument, MissingTranslationData, inspect } from "../exceptions.js";
 import { config, l, resetConfig, setBackend, t } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { catchException } from "../throw-catch.js";
 import { Simple } from "./simple.js";
 
 const timeNow = {
@@ -21,7 +21,9 @@ describe("I18nBackendExceptionsTest", () => {
   });
 
   it("throw message: MissingTranslation message from #translate includes the given scope and full key", () => {
-    const exception = catchException(() => t("baz.missing", { scope: "foo.bar", throw: true }));
+    const exception = kernelCatch(":exception", () =>
+      t("baz.missing", { scope: "foo.bar", throw: true }),
+    );
     expect((exception as Error).message).toBe("Translation missing: en.foo.bar.baz.missing");
   });
 

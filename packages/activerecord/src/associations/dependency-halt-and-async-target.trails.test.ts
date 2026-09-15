@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isAbortSignal } from "@blazetrails/activesupport";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, kernelCatch } from "@blazetrails/ruby-compat";
 import { HasOneAssociation } from "./has-one-association.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
@@ -17,35 +16,35 @@ function restrictWithErrorHost(extra: Record<string, unknown>) {
   };
 }
 
-async function abortOf(p: Promise<unknown>): Promise<boolean> {
-  try {
-    await p;
-    return false;
-  } catch (e) {
-    return isAbortSignal(e);
-  }
+async function abortOf(block: () => Promise<unknown>): Promise<boolean> {
+  return (
+    (await kernelCatch(":abort", async () => {
+      await block();
+      return false;
+    })) !== false
+  );
 }
 
 describe("dependent: :restrict_with_error halts with throw(:abort)", () => {
   it("HasOneAssociation#handle_dependency throws abort when a target exists", async () => {
     const host = restrictWithErrorHost({ loadTarget: async () => ({}) });
-    expect(await abortOf(HasOneAssociation.prototype.handleDependency.call(host as never))).toBe(
-      true,
-    );
+    expect(
+      await abortOf(() => HasOneAssociation.prototype.handleDependency.call(host as never)),
+    ).toBe(true);
   });
 
   it("HasManyAssociation#handle_dependency throws abort when the collection is not empty", async () => {
     const host = restrictWithErrorHost({ isEmpty: async () => false });
-    expect(await abortOf(HasManyAssociation.prototype.handleDependency.call(host as never))).toBe(
-      true,
-    );
+    expect(
+      await abortOf(() => HasManyAssociation.prototype.handleDependency.call(host as never)),
+    ).toBe(true);
   });
 
   it("HasOneAssociation#delete throws abort when the destroyed target was not destroyed", async () => {
     const target = { destroy: async () => false, isDestroyed: () => false };
     const host = { reflection: { options: {} }, loadTarget: async () => target, target };
     const del = HasOneAssociation.prototype.delete;
-    expect(await abortOf(del.call(host as never, "destroy"))).toBe(true);
+    expect(await abortOf(() => del.call(host as never, "destroy"))).toBe(true);
   });
 });
 

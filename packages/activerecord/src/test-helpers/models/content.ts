@@ -1,5 +1,5 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { throwAbort } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Content extends Base {
@@ -34,7 +34,7 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     this.beforeDestroy((record: ContentWhichRequiresTwoDestroyCalls) => {
       record.destroyCount++;
       if (record.destroyCount === 1) {
-        throwAbort();
+        kernelThrow(":abort");
       }
     });
   }

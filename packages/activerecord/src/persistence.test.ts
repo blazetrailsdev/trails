@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
@@ -10,7 +11,7 @@ function isTemporalDatetime(v: unknown): boolean {
   return v instanceof RubyTime;
 }
 import { describe, it, expect, beforeAll } from "vitest";
-import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
+import { travel, travelBack } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   Base,
@@ -304,7 +305,7 @@ describe("PersistenceTest", () => {
     class Klass extends Topic {
       static name = "Topic";
       static {
-        this.beforeUpdate(() => throwAbort());
+        this.beforeUpdate(() => kernelThrow(":abort"));
       }
     }
     const t = await Klass.create({ title: "New Topic", author_name: "Not David" });

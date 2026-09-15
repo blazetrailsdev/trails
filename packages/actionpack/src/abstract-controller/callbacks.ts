@@ -1,9 +1,9 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import {
   defineCallbacks as asDefineCallbacks,
   setCallback as asSetCallback,
   runCallbacks as asRunCallbacks,
   getCallbackChains,
-  throwAbort,
   type CallbackKind,
   type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
@@ -165,7 +165,7 @@ interface WrappedBefore {
 function _wrapBefore(callback: ActionCallback): WrappedBefore {
   const wrapped = async (target: object): Promise<unknown> => {
     const result = await callback(target as AbstractController);
-    if ((target as AbstractController).performed) throwAbort();
+    if ((target as AbstractController).performed) kernelThrow(":abort");
     return result;
   };
   (wrapped as WrappedBefore).__originalCb = callback;

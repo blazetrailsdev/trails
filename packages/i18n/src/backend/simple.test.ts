@@ -1,10 +1,10 @@
+import { kernelCatch } from "@blazetrails/ruby-compat";
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
 import { config, resetConfig, type TranslationKey } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { UnknownFileType } from "../exceptions.js";
-import { catchException } from "../throw-catch.js";
 import {
   preloadTranslationFiles,
   registerFileReader,
@@ -59,7 +59,7 @@ describe("I18nBackendSimpleTest", () => {
   }
 
   function t(key: TranslationKey | null, options: TranslateOptions = {}): unknown {
-    return catchException(() => backend.translate("en", key, options));
+    return kernelCatch(":exception", () => backend.translate("en", key, options));
   }
 
   it("simple backend translate: given nil as a key it still interpolations the default value", () => {
