@@ -1,8 +1,26 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { ActionableError, NonActionable } from "./actionable-error.js";
+import { assertChanges, assertPredicate, assertRaises } from "./testing/assertions.js";
 
 class TestError extends ActionableError {
   static override _actions: Record<string, () => void> = {};
+}
+
+class NonActionableError extends Error {}
+
+class DispatchableError extends ActionableError {
+  static flip1 = false;
+  static flip2 = false;
+
+  static {
+    this.action("Flip 1", () => {
+      this.flip1 = true;
+    });
+
+    this.action("Flip 2", () => {
+      this.flip2 = true;
+    });
+  }
 }
 
 class SiblingError extends ActionableError {
@@ -16,32 +34,35 @@ describe("ActionableErrorTest", () => {
   });
 
   it("returns all action of an actionable error", () => {
-    let called = false;
-    TestError.action("Do something", () => {
-      called = true;
-    });
-    const actions = ActionableError.actions(new TestError());
-    expect(Object.keys(actions)).toContain("Do something");
+    expect(Object.keys(ActionableError.actions(DispatchableError))).toEqual(["Flip 1", "Flip 2"]);
+    expect(Object.keys(ActionableError.actions(new DispatchableError()))).toEqual([
+      "Flip 1",
+      "Flip 2",
+    ]);
   });
 
   it("returns no actions for non-actionable errors", () => {
-    const actions = ActionableError.actions(new Error("plain"));
-    expect(Object.keys(actions)).toHaveLength(0);
+    assertPredicate(ActionableError.actions(Error), (a) => Object.keys(a).length === 0);
+    assertPredicate(ActionableError.actions(new Error()), (a) => Object.keys(a).length === 0);
   });
 
-  it("dispatches actions from error and name", () => {
-    let dispatched = false;
-    TestError.action("Fix it", () => {
-      dispatched = true;
+  it("dispatches actions from error and name", async () => {
+    await assertChanges(
+      () => DispatchableError.flip1,
+      null,
+      { from: false, to: true },
+      () => {
+        ActionableError.dispatch(DispatchableError, "Flip 1");
+      },
+    );
+  });
+
+  it("cannot dispatch missing actions", async () => {
+    const err = await assertRaises([NonActionable], {}, () => {
+      ActionableError.dispatch(NonActionableError, "action");
     });
-    ActionableError.dispatch(new TestError(), "Fix it");
-    expect(dispatched).toBe(true);
-  });
 
-  it("cannot dispatch missing actions", () => {
-    expect(() => {
-      ActionableError.dispatch(new TestError(), "Nonexistent");
-    }).toThrow(NonActionable);
+    expect(err.message).toEqual('Cannot find action "action"');
   });
 
   it("returns all action of an actionable error class", () => {

@@ -1,55 +1,103 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { benchmark as benchmarkFn, type BenchmarkOptions } from "./benchmarkable.js";
+import { Logger } from "./logger.js";
+import { assertDifference, assertEmpty, assertRaise } from "./testing/assertions.js";
 
 describe("BenchmarkableTest", () => {
-  function benchmark<T>(label: string, fn: () => T): { result: T; ms: number; label: string } {
-    const start = performance.now();
-    const result = fn();
-    const ms = performance.now() - start;
-    return { result, ms, label };
+  class Buffer {
+    lines: string[] = [];
+    write(x: string): void {
+      this.lines.push(x);
+    }
+    close(): void {}
+    last(): string | undefined {
+      return this.lines.at(-1);
+    }
+    get size(): number {
+      return this.lines.length;
+    }
+    count(): number {
+      return this.lines.length;
+    }
   }
 
-  it("without block", () => {
-    const start = performance.now();
-    const ms = performance.now() - start;
-    expect(ms).toBeGreaterThanOrEqual(0);
+  let buffer: Buffer;
+  let logger: Logger;
+
+  function benchmark(...args: unknown[]): unknown {
+    return (benchmarkFn as (...a: unknown[]) => unknown).apply({ logger }, args);
+  }
+
+  function assertLastLogged(message = "Benchmarking"): void {
+    expect(buffer.last()).toMatch(new RegExp(`^${message} \\(.*\\)\\n?$`));
+  }
+
+  beforeEach(() => {
+    buffer = new Buffer();
+    logger = new Logger(buffer);
+  });
+
+  it("without block", async () => {
+    await assertRaise([TypeError], {}, () => benchmark());
+    assertEmpty(buffer);
   });
 
   it("defaults", () => {
-    const result = benchmark("test", () => 1 + 1);
-    expect(result.result).toBe(2);
-    expect(result.ms).toBeGreaterThanOrEqual(0);
+    let iWasRun = false;
+    benchmark(() => {
+      iWasRun = true;
+    });
+    expect(iWasRun).toBeTruthy();
+    assertLastLogged();
   });
 
   it("with message", () => {
-    const result = benchmark("my operation", () => "done");
-    expect(result.label).toBe("my operation");
-    expect(result.result).toBe("done");
+    let iWasRun = false;
+    benchmark("test_run", () => {
+      iWasRun = true;
+    });
+    expect(iWasRun).toBeTruthy();
+    assertLastLogged("test_run");
   });
 
-  it("with silence", () => {
-    const result = benchmark("silent", () => 42);
-    expect(result.result).toBe(42);
+  it("with silence", async () => {
+    await assertDifference(
+      () => buffer.count(),
+      +2,
+      null,
+      () => {
+        benchmark("test_run", () => {
+          logger.info("SOMETHING");
+        });
+      },
+    );
+
+    await assertDifference(
+      () => buffer.count(),
+      +1,
+      null,
+      () => {
+        benchmark("test_run", { silence: true } satisfies BenchmarkOptions, () => {
+          logger.info("NOTHING");
+        });
+      },
+    );
   });
 
   it("within level", () => {
-    const logs: string[] = [];
-    function benchmarkLog(label: string, level: string, fn: () => unknown) {
-      const result = fn();
-      if (level === "debug") logs.push(`${label}: completed`);
-      return result;
-    }
-    benchmarkLog("operation", "debug", () => "done");
-    expect(logs[0]).toContain("operation");
+    logger.level = Logger.DEBUG;
+    benchmark("included_debug_run", { level: "debug" }, () => {});
+    assertLastLogged("included_debug_run");
   });
 
   it("outside level", () => {
-    const logs: string[] = [];
-    function benchmarkLog(label: string, level: string, fn: () => unknown) {
-      const result = fn();
-      if (level === "debug") logs.push(label);
-      return result;
+    try {
+      logger.level = Logger.ERROR;
+      benchmark("skipped_debug_run", { level: "debug" }, () => {});
+      expect(buffer.last() ?? "").not.toMatch(/skipped_debug_run/);
+    } finally {
+      logger.level = Logger.DEBUG;
     }
-    benchmarkLog("operation", "info", () => "done");
-    expect(logs.length).toBe(0);
   });
 });

@@ -82,13 +82,13 @@ describe("ExecutorTest", () => {
   });
 
   it("callbacks share state", () => {
-    let result = false;
+    let result: boolean | undefined = false;
     executor.toRun((target: object) => ((target as { foo?: boolean }).foo = true));
-    executor.toComplete((target: object) => (result = (target as { foo?: boolean }).foo === true));
+    executor.toComplete((target: object) => (result = (target as { foo?: boolean }).foo));
 
     executor.wrap(() => {});
 
-    expect(result).toBe(true);
+    expect(result).toBeTruthy();
   });
 
   it("separated calls invoke callbacks", () => {

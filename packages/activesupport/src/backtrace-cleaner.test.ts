@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
@@ -65,81 +65,88 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
 });
 
 describe("BacktraceCleanerFilterTest", () => {
+  let bc: BacktraceCleaner;
+
+  beforeEach(() => {
+    bc = new BacktraceCleaner();
+    bc.addFilter((line) => line.replaceAll("/my/prefix", ""));
+  });
+
   it("backtrace should filter all lines in a backtrace, removing prefixes", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/usr/local/lib/", ""));
-    const bt = ["/usr/local/lib/ruby/foo.rb", "/usr/local/lib/ruby/bar.rb"];
-    expect(cleaner.clean(bt)).toEqual(["ruby/foo.rb", "ruby/bar.rb"]);
+    expect(bc.clean(["/my/prefix/my/class.rb", "/my/prefix/my/module.rb"])).toEqual([
+      "/my/class.rb",
+      "/my/module.rb",
+    ]);
   });
 
   it("backtrace cleaner should allow removing filters", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/usr/local/", ""));
-    cleaner.removeFilters();
-    const bt = ["/usr/local/lib/foo.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/usr/local/lib/foo.rb"]);
+    bc.removeFilters();
+    expect(bc.clean(["/my/prefix/my/class.rb"])[0]).toEqual("/my/prefix/my/class.rb");
   });
 
   it("backtrace should contain unaltered lines if they don't match a filter", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/gems/", "GEM:"));
-    const bt = ["/gems/foo.rb", "/app/bar.rb"];
-    const cleaned = cleaner.clean(bt);
-    expect(cleaned[0]).toBe("GEM:foo.rb");
-    expect(cleaned[1]).toBe("/app/bar.rb");
+    expect(bc.clean(["/my/other_prefix/my/class.rb"])[0]).toEqual("/my/other_prefix/my/class.rb");
   });
 
   it("#dup also copy filters", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/usr/", ""));
-    const duped = cleaner.dup();
-    const bt = ["/usr/local/foo.rb"];
-    expect(duped.clean(bt)).toEqual(["local/foo.rb"]);
+    const copy = bc.dup();
+    bc.addFilter((line) => line.replaceAll("/other/prefix/", ""));
+
+    expect(bc.clean(["/other/prefix/my/class.rb"])[0]).toEqual("my/class.rb");
+    expect(copy.clean(["/other/prefix/my/class.rb"])[0]).toEqual("/other/prefix/my/class.rb");
   });
 });
 
 describe("BacktraceCleanerSilencerTest", () => {
+  let bc: BacktraceCleaner;
+
+  beforeEach(() => {
+    bc = new BacktraceCleaner();
+    bc.addSilencer((line) => line.includes("mongrel"));
+  });
+
   it("backtrace should not contain lines that match the silencer", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("/gems/"));
-    const bt = ["/app/foo.rb", "/gems/activesupport/bar.rb", "/app/baz.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/app/foo.rb", "/app/baz.rb"]);
+    expect(bc.clean(["/mongrel/class.rb", "/other/class.rb", "/mongrel/stuff.rb"])).toEqual([
+      "/other/class.rb",
+    ]);
   });
 
   it("backtrace cleaner should allow removing silencer", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("/gems/"));
-    cleaner.removeSilencers();
-    const bt = ["/gems/foo.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/gems/foo.rb"]);
+    bc.removeSilencers();
+    expect(bc.clean(["/mongrel/stuff.rb"])).toEqual(["/mongrel/stuff.rb"]);
   });
 
   it("#dup also copy silencers", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("vendor"));
-    const duped = cleaner.dup();
-    const bt = ["/vendor/foo.rb", "/app/bar.rb"];
-    expect(duped.clean(bt)).toEqual(["/app/bar.rb"]);
+    const copy = bc.dup();
+
+    bc.addSilencer((line) => line.includes("puma"));
+    expect(bc.clean(["/puma/stuff.rb"])).toEqual([]);
+    expect(copy.clean(["/puma/stuff.rb"])).toEqual(["/puma/stuff.rb"]);
   });
 });
 
 describe("BacktraceCleanerMultipleSilencersTest", () => {
+  let bc: BacktraceCleaner;
+
+  beforeEach(() => {
+    bc = new BacktraceCleaner();
+    bc.addSilencer((line) => line.includes("mongrel"));
+    bc.addSilencer((line) => line.includes("yolo"));
+  });
+
   it("backtrace should not contain lines that match the silencers", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line: string) => line.includes("vendor"));
-    const bt = ["/app/user.rb", "/vendor/gems/foo.rb", "/app/post.rb"];
-    const cleaned = cleaner.clean(bt);
-    expect(cleaned).not.toContain("/vendor/gems/foo.rb");
-    expect(cleaned).toContain("/app/user.rb");
+    expect(
+      bc.clean(["/mongrel/class.rb", "/other/class.rb", "/mongrel/stuff.rb", "/other/yolo.rb"]),
+    ).toEqual(["/other/class.rb"]);
   });
 
   it("backtrace should only contain lines that match the silencers", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line: string) => line.replace("/app", ""));
-    const bt = ["/app/user.rb", "/app/post.rb"];
-    const cleaned = cleaner.clean(bt);
-    expect(cleaned[0]).toBe("/user.rb");
-    expect(cleaned[1]).toBe("/post.rb");
+    expect(
+      bc.clean(
+        ["/mongrel/class.rb", "/other/class.rb", "/mongrel/stuff.rb", "/other/yolo.rb"],
+        "noise",
+      ),
+    ).toEqual(["/mongrel/class.rb", "/mongrel/stuff.rb", "/other/yolo.rb"]);
   });
 });
 

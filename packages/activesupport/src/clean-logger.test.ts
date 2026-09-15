@@ -6,8 +6,8 @@ describe("CleanLoggerTest", () => {
   it("format message", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
-    logger.info("Hello World");
-    expect(lines.some((l) => l.includes("Hello World"))).toBe(true);
+    logger.error("error");
+    expect(lines.join("")).toEqual("error\n");
   });
 
   it("datetime format", () => {
