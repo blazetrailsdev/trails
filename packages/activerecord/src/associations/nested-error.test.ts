@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ActiveRecord, Base, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
+import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "../active-record.js";
 import { NestedError } from "./nested-error.js";
 import { fixtures } from "../test-fixtures.js";
 import type { AssociationProxy } from "./collection-proxy.js";
@@ -110,8 +111,8 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     registerModel("NestedErrorPetOwner", PetOwner);
 
     it("no index when singular association", async () => {
-      const oldAttributeConfig = ActiveRecord.indexNestedAttributeErrors;
-      ActiveRecord.indexNestedAttributeErrors = true;
+      const oldAttributeConfig = indexNestedAttributeErrors();
+      setIndexNestedAttributeErrors(true);
       try {
         const owner = new PetOwner({ petAttributes: { name: null } });
         await owner.isValid();
@@ -126,7 +127,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         expect(error.message).toBe("can't be blank");
         expect(error.base).toBe(owner);
       } finally {
-        ActiveRecord.indexNestedAttributeErrors = oldAttributeConfig;
+        setIndexNestedAttributeErrors(oldAttributeConfig);
       }
     });
   });

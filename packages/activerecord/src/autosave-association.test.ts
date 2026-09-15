@@ -1,15 +1,10 @@
+import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
-import {
-  ActiveRecord,
-  Base,
-  registerModel,
-  acceptsNestedAttributesFor,
-  RecordInvalid,
-} from "./index.js";
+import { Base, registerModel, acceptsNestedAttributesFor, RecordInvalid } from "./index.js";
 import { Associations, collectionProxyFor as association } from "./associations.js";
 
 import {
@@ -2371,8 +2366,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {
-    const old = ActiveRecord.indexNestedAttributeErrors;
-    ActiveRecord.indexNestedAttributeErrors = true;
+    const old = indexNestedAttributeErrors();
+    setIndexNestedAttributeErrors(true);
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
@@ -2381,7 +2376,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(parent.errors.where("children[1].name")).toHaveLength(1);
       expect(parent.errors.where("children.name")).toHaveLength(0);
     } finally {
-      ActiveRecord.indexNestedAttributeErrors = old;
+      setIndexNestedAttributeErrors(old);
     }
   });
   it("errors details should be indexed when passed as array", async () => {
@@ -2552,8 +2547,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     }
   });
   it("errors details should be indexed when global flag is set", async () => {
-    const old = ActiveRecord.indexNestedAttributeErrors;
-    ActiveRecord.indexNestedAttributeErrors = true;
+    const old = indexNestedAttributeErrors();
+    setIndexNestedAttributeErrors(true);
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
@@ -2562,7 +2557,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
       expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
     } finally {
-      ActiveRecord.indexNestedAttributeErrors = old;
+      setIndexNestedAttributeErrors(old);
     }
   });
 });

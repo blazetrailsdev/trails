@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any } from "@blazetrails/activesupport";
-import { ActiveRecord, AsyncExecutor } from "./ar-config.js";
+import { AsyncExecutor } from "./ar-config.js";
 import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
@@ -15,6 +15,7 @@ type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWa
 
 let _disablePreparedStatements = false;
 let _lazilyLoadSchemaCache = false;
+let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 let _databaseCli: Record<string, string | string[]> = {
   postgresql: "psql",
   mysql: ["mysql", "mysql5"],
@@ -29,6 +30,7 @@ let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = nul
 let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+let _indexNestedAttributeErrors = false;
 let _verboseQueryLogs = false;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
@@ -73,8 +75,18 @@ export function setLazilyLoadSchemaCache(lazilyLoadSchemaCache: boolean): void {
   _lazilyLoadSchemaCache = lazilyLoadSchemaCache;
 }
 
+export function schemaCacheIgnoredTables(): ReadonlyArray<string | RegExp> {
+  return _schemaCacheIgnoredTables;
+}
+
+export function setSchemaCacheIgnoredTables(
+  schemaCacheIgnoredTables: ReadonlyArray<string | RegExp>,
+): void {
+  _schemaCacheIgnoredTables = schemaCacheIgnoredTables;
+}
+
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  return any(ActiveRecord.schemaCacheIgnoredTables, (ignored) => {
+  return any(schemaCacheIgnoredTables(), (ignored) => {
     if (ignored instanceof RegExp) {
       ignored.lastIndex = 0;
       return ignored.test(tableName);
@@ -209,6 +221,14 @@ export function setPermanentConnectionCheckout(value: true | "deprecated" | "dis
     );
   }
   _permanentConnectionCheckout = value;
+}
+
+export function indexNestedAttributeErrors(): boolean {
+  return _indexNestedAttributeErrors;
+}
+
+export function setIndexNestedAttributeErrors(indexNestedAttributeErrors: boolean): void {
+  _indexNestedAttributeErrors = indexNestedAttributeErrors;
 }
 
 export function verboseQueryLogs(): boolean {

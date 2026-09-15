@@ -367,6 +367,7 @@ UMBRELLA_SEATS_ON_MODULE = {
     dump_schemas
     error_on_ignored_order
     generate_secure_token_on
+    index_nested_attribute_errors
     lazily_load_schema_cache
     maintain_test_schema
     migration_strategy
@@ -378,6 +379,7 @@ UMBRELLA_SEATS_ON_MODULE = {
     raise_on_assign_to_attr_readonly
     reading_role
     run_after_transaction_callbacks_in_order_defined
+    schema_cache_ignored_tables
     schema_format
     timestamped_migrations
     use_yaml_unsafe_load

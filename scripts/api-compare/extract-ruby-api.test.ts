@@ -1426,7 +1426,7 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :index_nested_attribute_errors
+        singleton_class.attr_accessor :example_accessor
         singleton_class.attr_reader :example_reader
         def self.eager_load!; end
       end
@@ -1435,15 +1435,13 @@ describe(
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
       // accessor → reader + writer; reader-only → reader only.
-      expect(names).toContain("index_nested_attribute_errors");
-      expect(names).toContain("index_nested_attribute_errors=");
+      expect(names).toContain("example_accessor");
+      expect(names).toContain("example_accessor=");
       expect(names).toContain("example_reader");
       expect(names).not.toContain("example_reader=");
       // Every redirected entry is tagged so compare can credit the port wherever
       // it lands in the package.
-      for (const m of base.classMethods.filter((m) =>
-        m.name.startsWith("index_nested_attribute_errors"),
-      )) {
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("example_accessor"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
       // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
@@ -1459,18 +1457,16 @@ describe(
         `
       module ActiveRecord
         class << self
-          attr_accessor :index_nested_attribute_errors
+          attr_accessor :example_accessor
         end
       end
     `,
       );
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
-      expect(names).toContain("index_nested_attribute_errors");
-      expect(names).toContain("index_nested_attribute_errors=");
-      for (const m of base.classMethods.filter((m) =>
-        m.name.startsWith("index_nested_attribute_errors"),
-      )) {
+      expect(names).toContain("example_accessor");
+      expect(names).toContain("example_accessor=");
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("example_accessor"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
     });
@@ -1480,13 +1476,13 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :index_nested_attribute_errors
+        singleton_class.attr_accessor :example_accessor
       end
     `,
       );
       const mod = out["ActiveRecord"];
       const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-      expect(modNames).not.toContain("index_nested_attribute_errors");
+      expect(modNames).not.toContain("example_accessor");
     });
 
     it("does not redirect a seat that has moved onto the ActiveRecord module", () => {
