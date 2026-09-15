@@ -110,7 +110,7 @@ describe("SignedIdTest", () => {
 
   it("fail to find signed record within expiration duration", async () => {
     const signedId = (account as any).signedId({ expiresIn: MINUTE });
-    travel(2 * MINUTE * 1000);
+    travel(2 * MINUTE);
     expect(await Account.findSigned(signedId)).toBeNull();
   });
 
@@ -134,7 +134,7 @@ describe("SignedIdTest", () => {
     const signedId = (account as any).signedId({
       expiresAt: Temporal.Now.instant().add({ minutes: 1 }),
     });
-    travel(2 * MINUTE * 1000);
+    travel(2 * MINUTE);
     expect(await Account.findSigned(signedId)).toBeNull();
   });
 
@@ -165,7 +165,7 @@ describe("SignedIdTest", () => {
 
   it("finding signed record outside expiration duration raises on the bang", async () => {
     const signedId = (account as any).signedId({ expiresIn: MINUTE });
-    travel(2 * MINUTE * 1000);
+    travel(2 * MINUTE);
 
     await expect(Account.findSignedBang(signedId)).rejects.toThrow();
   });

@@ -1,12 +1,51 @@
 import { describe, it, expect, afterEach } from "vitest";
 
-import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import {
+  DateTime,
+  Date as RubyDate,
+  Temporal,
+  Time,
+  resetLocalTimeZoneId,
+} from "@blazetrails/date";
+import { TimeZone } from "./values/time-zone.js";
+import { setZone, zone } from "./time-zone-config.js";
 import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
 import { Duration } from "./duration.js";
 import { toFs } from "./core-ext/time/conversions.js";
 import { toFs as dateTimeToFs, usec as dateTimeUsec } from "./core-ext/date-time/conversions.js";
+import { advance as dateTimeAdvance } from "./core-ext/date-time/calculations.js";
 import { travelTo, travelBack, travel, freezeTime, unfreezeTime } from "./testing/time-helpers.js";
 import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "./time-travel.js";
+
+function withEnvTz<T>(newTz: string, fn: () => T): T {
+  const oldTz = process.env.TZ;
+  process.env.TZ = newTz;
+  resetLocalTimeZoneId();
+  try {
+    return fn();
+  } finally {
+    if (oldTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = oldTz;
+    }
+    resetLocalTimeZoneId();
+  }
+}
+
+function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
+  const oldTz = zone();
+  setZone(tz);
+  try {
+    return fn();
+  } finally {
+    setZone(oldTz);
+  }
+}
+
+function sleep(seconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
+}
 
 function instantOf(time: Time): bigint {
   return time.toTime().epochNanoseconds;
@@ -93,10 +132,14 @@ describe("TimeTravelTest", () => {
   it.skip("time helper travel to with string for time zone");
 
   it("time helper travel to with string and milliseconds", () => {
-    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44);
+    withEnvTz("US/Eastern", () => {
+      withTzDefault(TimeZone.find("UTC"), () => {
+        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
-      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+        travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
+          expect(zone()!.now().toF()).toEqual(expectedTime.toF());
+        });
+      });
     });
   });
 
@@ -207,7 +250,7 @@ describe("TimeTravelTest", () => {
 
       expect(Time.now().toF()).toEqual(expectedTime.toF());
 
-      travel(Duration.seconds(0.5), { withUsec: true });
+      travel(0.5, { withUsec: true });
 
       expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
 
@@ -216,29 +259,43 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel to with datetime and usec", () => {
-    const traveledTime = Time.new("2004-11-24 01:04:44.1 -05:00");
-    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44);
+    withEnvTz("US/Eastern", () => {
+      withTzDefault(TimeZone.find("UTC"), () => {
+        const durationUsec = Duration.seconds(0.1);
+        const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
+          seconds: durationUsec.inSeconds(),
+        });
+        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    expect(() => {
-      travelTo(traveledTime);
+        expect(() => {
+          travelTo(traveledTime);
 
-      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+          expect(zone()!.now().toF()).toEqual(expectedTime.toF());
 
-      travelBack();
-    }).not.toThrow();
+          travelBack();
+        }).not.toThrow();
+      });
+    });
   });
 
   it("time helper travel to with datetime and usec true", () => {
-    const traveledTime = Time.new("2004-11-24 01:04:44.1 -05:00");
-    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44).plus(new Rational(1, 10));
+    withEnvTz("US/Eastern", () => {
+      withTzDefault(TimeZone.find("UTC"), () => {
+        const durationUsec = Duration.seconds(0.1);
+        const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
+          seconds: durationUsec.inSeconds(),
+        });
+        const expectedTime = durationUsec.since(Time.new(2004, 11, 24, 1, 4, 44));
 
-    expect(() => {
-      travelTo(traveledTime, { withUsec: true });
+        expect(() => {
+          travelTo(traveledTime, { withUsec: true });
 
-      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+          expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
 
-      travelBack();
-    }).not.toThrow();
+          travelBack();
+        }).not.toThrow();
+      });
+    });
   });
 
   it("time helper travel to with string and usec", () => {
@@ -261,7 +318,7 @@ describe("TimeTravelTest", () => {
 
       expect(Time.now().toF()).toEqual(expectedTime.toF());
 
-      travel(Duration.seconds(0.5), { withUsec: true });
+      travel(0.5, { withUsec: true });
 
       expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
 
@@ -310,18 +367,20 @@ describe("TimeTravelTest", () => {
   it("time helper freeze time", () => {
     const expectedTime = Time.now();
     freezeTime();
+    sleep(1);
 
     expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
   });
 
-  it("time helper freeze time with block", async () => {
+  it("time helper freeze time with block", () => {
     const expectedTime = Time.now();
 
     freezeTime({}, () => {
+      sleep(1);
+
       expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
     expect(toFs(expectedTime, "db").localeCompare(toFs(Time.now(), "db"))).toBeLessThan(0);
   });
 

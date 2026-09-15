@@ -6,6 +6,8 @@ import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
+import { plusWithDuration } from "../core-ext/time/calculations.js";
+import { toTime } from "../core-ext/time/compatibility.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 class Stub {
@@ -76,12 +78,18 @@ export function travel(
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
-  const ms = duration instanceof Duration ? duration.inSeconds() * 1000 : duration;
-  travelTo(new globalThis.Date(currentTime().getTime() + ms), { withUsec }, block);
+  travelTo(plusWithDuration.call(Time.now(), duration), { withUsec }, block);
 }
 
 export function travelTo(
-  dateOrTime: Temporal.PlainDate | globalThis.Date | Temporal.Instant | Time | string,
+  dateOrTime:
+    | Temporal.PlainDate
+    | Temporal.PlainDateTime
+    | Temporal.ZonedDateTime
+    | globalThis.Date
+    | Temporal.Instant
+    | Time
+    | string,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
@@ -121,14 +129,18 @@ export function travelTo(
       ? zone.parse(dateOrTime)!.toTime()
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
+    const nowNotTime =
+      dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime
+        ? toTime(dateOrTime)
+        : dateOrTime;
     now =
-      dateOrTime instanceof Time
-        ? dateOrTime
+      nowNotTime instanceof Time
+        ? nowNotTime
         : Time.at(
             new Rational(
-              dateOrTime instanceof globalThis.Date
-                ? BigInt(dateOrTime.getTime()) * 1_000_000n
-                : dateOrTime.epochNanoseconds,
+              nowNotTime instanceof globalThis.Date
+                ? BigInt(nowNotTime.getTime()) * 1_000_000n
+                : nowNotTime.epochNanoseconds,
               1_000_000_000n,
             ),
           );
