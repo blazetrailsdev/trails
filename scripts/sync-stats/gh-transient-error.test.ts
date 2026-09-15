@@ -11,6 +11,14 @@ describe("isTransientGhError", () => {
     expect(isTransientGhError(msg)).toBe(true);
   });
 
+  it("matches the empty response body that broke the 2026-09-15 sync", () => {
+    const msg = [
+      "Command failed: gh pr list --repo blazetrailsdev/trails --state all --limit 1000",
+      "unexpected end of JSON input",
+    ].join("\n");
+    expect(isTransientGhError(msg)).toBe(true);
+  });
+
   it.each([
     "read tcp 10.0.0.1:443: connection reset by peer",
     "unexpected EOF",
