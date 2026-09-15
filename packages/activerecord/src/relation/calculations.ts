@@ -184,50 +184,6 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
   );
 }
 
-function needsBigintCast(c: CalculationConnection): boolean {
-  return c.adapterName === "SQLite";
-}
-
-function wrapBigintAgg(
-  innerSql: string,
-  groupAliases: string[] | null = null,
-  aggAlias = "val",
-): string {
-  if (groupAliases) {
-    const keys = groupAliases.map((a) => `"${a}"`).join(", ");
-    return `SELECT ${keys}, CAST("${aggAlias}" AS TEXT) AS "${aggAlias}" FROM (${innerSql}) AS "_bigint_agg"`;
-  }
-  return `SELECT CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
-}
-
-function typeCastCalcBind(b: unknown): unknown {
-  if (b !== null && typeof b === "object" && "valueForDatabase" in b) {
-    return (b as { valueForDatabase: unknown }).valueForDatabase;
-  }
-  return b;
-}
-
-function compileManagerWithBinds(c: CalculationConnection, manager: any): [string, unknown[]] {
-  const conn = c as unknown as {
-    toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
-  };
-  const [sql, binds] = conn.toSqlAndBinds(manager);
-  return [sql, binds.map(typeCastCalcBind)];
-}
-
-function isBigintColumn(
-  rel: CalculationRelation,
-  fn: AggFn,
-  column: string | Nodes.Node | number | null,
-): boolean {
-  if (fn === "count" || fn === "average" || column == null || column === "*") return false;
-  if (column instanceof Nodes.Node) return false;
-  const table = rel._model.arelTable as {
-    typeForAttribute?(col: string): unknown;
-  };
-  return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
-}
-
 export async function count(
   this: CalculationRelation,
   columnName?: string | Nodes.Node,
@@ -764,7 +720,7 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
-  let queryBuilder: (c: CalculationConnection) => [string, unknown[]];
+  let queryBuilder: unknown;
   let column: unknown = null;
 
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
@@ -775,7 +731,7 @@ export async function executeSimpleCalculation(
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
-    queryBuilder = (c) => compileManagerWithBinds(c, subquery);
+    queryBuilder = subquery;
   } else {
     let joined = rel;
     if (rel.isEagerLoading) {
@@ -793,14 +749,9 @@ export async function executeSimpleCalculation(
     ) as Nodes.Node & { distinct: boolean; as(alias: string): Nodes.Node };
     if (operation === "sum" && distinct) selectValue.distinct = true;
 
-    const target = aggregateTarget(columnName);
-    const bigintColumn = isBigintColumn(relation, operation.toLowerCase() as AggFn, target);
-    queryBuilder = (c) => {
-      const castsBigint = bigintColumn && needsBigintCast(c);
-      relation.selectValues = [castsBigint ? selectValue.as("val") : selectValue];
-      const [rawSql, binds] = compileManagerWithBinds(c, relation.arel());
-      return [castsBigint ? wrapBigintAgg(rawSql) : rawSql, binds];
-    };
+    relation.selectValues = [selectValue];
+
+    queryBuilder = relation.arel();
   }
 
   const queryResult = rel.whereClause.isContradiction()
@@ -808,14 +759,12 @@ export async function executeSimpleCalculation(
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
-        rel.withConnection((c) => {
-          const [sql, binds] = queryBuilder(c);
-          return c.selectAll(
-            sql,
+        rel.withConnection((c) =>
+          c.selectAll(
+            queryBuilder as never,
             `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
-            binds,
-          );
-        }),
+          ),
+        ),
       );
 
   let type: unknown;
@@ -899,16 +848,11 @@ export async function executeGroupedCalculation(
     relation.groupValues = groupNodes;
     relation.selectValues = selectValues as (string | Nodes.Node)[];
 
-    const [rawSql, binds] = compileManagerWithBinds(connection, relation.arel());
-    const sql =
-      isBigintColumn(rel, fn, columnName) && needsBigintCast(connection)
-        ? wrapBigintAgg(rawSql, groupAliases, columnAlias)
-        : rawSql;
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
     const calculatedData = await (
       rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
     ).skipQueryCacheIfNecessary(() =>
-      connection.selectAll(sql, `${rel.model.name} ${opName}`, binds),
+      connection.selectAll(relation.arel() as never, `${rel.model.name} ${opName}`),
     );
     const rows = calculatedData.toArray();
 
