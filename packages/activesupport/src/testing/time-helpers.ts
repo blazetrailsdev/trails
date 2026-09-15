@@ -120,7 +120,7 @@ export function travelTo(
     throw new RuntimeError(travelToNestedBlockCall);
   }
 
-  let now: Time;
+  let now: typeof dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDate) {
     now = midnight(dateOrTime).toTime();
   } else if (typeof dateOrTime === "string") {
@@ -129,21 +129,18 @@ export function travelTo(
       ? zone.parse(dateOrTime)!.toTime()
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
-    const nowNotTime =
-      dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime
-        ? toTime(dateOrTime)
-        : dateOrTime;
-    now =
-      nowNotTime instanceof Time
-        ? nowNotTime
-        : Time.at(
-            new Rational(
-              nowNotTime instanceof globalThis.Date
-                ? BigInt(nowNotTime.getTime()) * 1_000_000n
-                : nowNotTime.epochNanoseconds,
-              1_000_000_000n,
-            ),
-          );
+    now = dateOrTime;
+    if (!(now instanceof Time))
+      now = Time.at(
+        new Rational(
+          now instanceof globalThis.Date
+            ? BigInt(now.getTime()) * 1_000_000n
+            : now instanceof Temporal.Instant
+              ? now.epochNanoseconds
+              : toTime(now).epochNanoseconds,
+          1_000_000_000n,
+        ),
+      );
   }
 
   if (!withUsec) now = change(now, { usec: 0 });
