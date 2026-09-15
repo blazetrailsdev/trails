@@ -28,7 +28,6 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     expect((translated as MismatchedForeignKey).message).toContain(
       "There is a mismatch between the foreign key and primary key column types",
     );
-    expect((translated as MismatchedForeignKey).fkDetails.targetTable).toBeUndefined();
     await adapter.disconnectBang();
   });
 
@@ -41,13 +40,9 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     ) as MismatchedForeignKey;
     const rebuilt = (await sqlLess.setQuery(FK_SQL, [])) as MismatchedForeignKey;
     expect(rebuilt).toBeInstanceOf(MismatchedForeignKey);
-    expect(rebuilt.fkDetails).toMatchObject({
-      table: "wheels",
-      foreignKey: "wheelable_id",
-      targetTable: "vehicles",
-      primaryKey: "id",
-      primaryKeyColumn: BIGINT_ID,
-    });
+    expect(rebuilt.message).toContain(
+      "Column `wheelable_id` on table `wheels` does not match column `id` on `vehicles`",
+    );
     expect(rebuilt.sql).toBe(FK_SQL);
     expect(rebuilt.stack).toBe(sqlLess.stack);
     await adapter.disconnectBang();

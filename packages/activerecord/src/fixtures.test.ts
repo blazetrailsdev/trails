@@ -505,17 +505,6 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
   });
 });
 
-describe("HABTM fixture reflection walking (trails)", () => {
-  it("throughJoinTableNames pulls in the anonymous HABTM join tables", async () => {
-    const { throughJoinTableNames } = await import("./fixtures.js");
-    const { Developer } = await import("./test-helpers/models/developer.js");
-
-    const names = throughJoinTableNames(Developer as never);
-    expect(names).toContain("developers_projects");
-    expect(names).toContain("computers_developers");
-  });
-});
-
 describe("FixtureSet (trails)", () => {
   it("identify returns the crc32 identifier for a label", () => {
     expect(FixtureSet.identify("dhh")).toBe(FixtureSet.identify("dhh"));

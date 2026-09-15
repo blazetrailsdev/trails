@@ -374,12 +374,6 @@ export interface MismatchedForeignKeyOptions {
 }
 
 export class MismatchedForeignKey extends StatementInvalid {
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-  readonly fkDetails: Pick<
-    MismatchedForeignKeyOptions,
-    "table" | "foreignKey" | "targetTable" | "primaryKey" | "primaryKeyColumn"
-  >;
-
   private readonly _originalMessage?: string;
   private readonly _queryParser?: MismatchedForeignKeyOptions["queryParser"];
 
@@ -417,7 +411,6 @@ export class MismatchedForeignKey extends StatementInvalid {
     this.name = "ActiveRecord::MismatchedForeignKey";
     this._originalMessage = originalMessage;
     this._queryParser = queryParser;
-    this.fkDetails = { table, foreignKey, targetTable, primaryKey, primaryKeyColumn };
   }
 
   override setQuery(sql: string, binds: unknown[]): StatementInvalid | Promise<StatementInvalid> {

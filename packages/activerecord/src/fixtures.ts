@@ -68,26 +68,6 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function throughJoinTableNames(ModelClass: BaseClass): string[] {
-  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
-  const names: string[] = [];
-  for (const refl of Object.values(reflections)) {
-    const r = refl as {
-      parentReflection?: { macro?: string } | null;
-      throughReflection?: { tableName?: string };
-    };
-    if (r.parentReflection?.macro !== "hasAndBelongsToMany") continue;
-    try {
-      const joinTable = r.throughReflection?.tableName;
-      if (typeof joinTable === "string") names.push(joinTable);
-    } catch {
-      continue;
-    }
-  }
-  return names;
-}
-
 interface PolymorphicBelongsTo {
   typeColumn: string;
   idColumn: string;
