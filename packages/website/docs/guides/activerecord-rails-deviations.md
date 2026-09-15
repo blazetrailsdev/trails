@@ -399,7 +399,7 @@ import {
   CollectionProxy,
   AssociationProxy,
   Relation,
-  association,
+  collectionProxyFor,
 } from "@blazetrails/activerecord";
 import { defineEnum } from "@blazetrails/activerecord/enum";
 
@@ -417,7 +417,7 @@ class Post extends Base {
   // hasMany reader — chainable (`.where(...)`), awaitable
   // (`await post.comments` → `Comment[]`), and array-shaped over the
   // loaded target (`for...of`, `.length`, `.map`, `[0]`). Same object
-  // as what `association(post, "comments")` returns. Collections have
+  // as what `collectionProxyFor(post, "comments")` returns. Collections have
   // no explicit loader — `await post.comments` IS the load.
   declare isDraft: () => boolean; // enum predicate
   declare draft: () => void; // enum in-memory setter (defineEnum only)
