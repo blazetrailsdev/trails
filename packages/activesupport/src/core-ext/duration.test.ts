@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { Duration, days } from "../duration.js";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Duration, Scalar, days } from "../duration.js";
+import { rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { assertNothingRaised, assertRaise, assertRaises } from "../testing/assertions.js";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
+import { plusWithDuration as timePlusWithDuration } from "./time/calculations.js";
 import { ArgumentError } from "../hash-utils.js";
 import { current, minusWithDuration, plusWithDuration } from "./date/calculations.js";
 
@@ -13,28 +18,34 @@ describe("DurationTest", () => {
     new Temporal.PlainDate(year, month, day);
 
   it("is a", () => {
-    const d = Duration.days(1);
-    expect(d instanceof Duration).toBe(true);
-    expect(d instanceof Duration).toBe(true);
-    expect(d instanceof Duration).toBe(true);
-    expect(d instanceof Map).toBe(false);
+    const d = Duration.day(1);
+    expect(d.isA(Duration)).toBeTruthy();
+    expect(d).toBeInstanceOf(Duration);
+    expect(Object(d.value)).toBeInstanceOf(Number);
+    expect(Object(d.toI())).toBeInstanceOf(Number);
+    expect(d.isA(Map)).toBeFalsy();
+
+    const k = class {};
+    expect(d.isA(k)).toBeFalsy();
   });
 
   it("instance of", () => {
-    expect(Duration.minutes(1) instanceof Duration).toBe(true);
-    expect(Duration.days(2) instanceof Duration).toBe(true);
+    expect(Number.isInteger(Duration.minute(1).value)).toBeTruthy();
+    expect(Duration.days(2).constructor === Duration).toBeTruthy();
+    expect((Duration.second(3).constructor as unknown) === Number).toBeFalsy();
   });
 
   it("threequals", () => {
-    expect(Duration.days(1) instanceof Duration).toBe(true);
-    expect(typeof Duration.days(1).inSeconds() === "number").toBe(true);
-    expect(("foo" as any) instanceof Duration).toBe(false);
+    expect(Duration.day(1) instanceof Duration).toBeTruthy();
+    expect((Duration.day(1).toI() as unknown) instanceof Duration).toBeFalsy();
+    expect(("foo" as unknown) instanceof Duration).toBeFalsy();
   });
 
   it("equals", () => {
-    expect(Duration.days(1).isEqualTo(Duration.days(1))).toBe(true);
-    expect(Duration.days(1).compareTo(86400)).toBe(0);
-    expect(isNaN(Duration.days(1).compareTo("foo"))).toBe(true);
+    expect(Duration.day(1).equals(Duration.day(1))).toBeTruthy();
+    expect(Duration.day(1).equals(Duration.day(1).toI())).toBeTruthy();
+    expect(rbEqual(Duration.day(1).toI(), Duration.day(1).value)).toBeTruthy();
+    expect(Duration.day(1).equals("foo")).toBeFalsy();
   });
 
   it("to s", () => {
@@ -42,8 +53,8 @@ describe("DurationTest", () => {
   });
 
   it("in seconds", () => {
-    expect(Duration.days(1).inSeconds()).toBeCloseTo(86400, 0);
-    expect(Duration.weeks(1).inSeconds()).toBeCloseTo(604800, 0);
+    expect(Duration.day(1).inSeconds()).toEqual(86400.0);
+    expect(Duration.week(1).inSeconds()).toEqual(Duration.week(1).toI());
   });
 
   it("in minutes", () => {
@@ -77,29 +88,41 @@ describe("DurationTest", () => {
   });
 
   it("eql", () => {
-    expect(Duration.minutes(1).eql(Duration.minutes(1))).toBe(true);
-    expect(Duration.minutes(1).eql(Duration.seconds(60))).toBe(true);
-    expect(Duration.days(2).eql(Duration.hours(48))).toBe(true);
-    expect(Duration.seconds(1).eql(1)).toBe(false);
-    expect(Duration.minutes(1).eql(Duration.seconds(180).minus(Duration.minutes(2)))).toBe(true);
-    expect(Duration.minutes(1).eql(60)).toBe(false);
-    expect(Duration.minutes(1).eql("foo")).toBe(false);
+    expect(Duration.minute(1).eql(Duration.minute(1))).toBeTruthy();
+    expect(Duration.minute(1).eql(Duration.seconds(60))).toBeTruthy();
+    expect(Duration.days(2).eql(Duration.hours(48))).toBeTruthy();
+    expect(Duration.second(1).eql(1)).toBeFalsy();
+    expect(Object.is(1, Duration.second(1))).toBeFalsy();
+    expect(Duration.minute(1).eql(Duration.seconds(180).minus(Duration.minutes(2)))).toBeTruthy();
+    expect(Duration.minute(1).eql(60)).toBeFalsy();
+    expect(Duration.minute(1).eql("foo")).toBeFalsy();
   });
 
   it("inspect", () => {
-    expect(new Duration(0, { seconds: 0 }).inspect()).toBe("0 seconds");
-    expect(new Duration(0, { days: 0 }).inspect()).toBe("0 seconds");
-    expect(Duration.months(1).inspect()).toBe("1 month");
-    expect(Duration.months(1).plus(Duration.days(1)).inspect()).toBe("1 month and 1 day");
-    expect(Duration.months(6).minus(Duration.days(2)).inspect()).toBe("6 months and -2 days");
-    expect(Duration.seconds(10).inspect()).toBe("10 seconds");
-    expect(Duration.years(10).plus(Duration.months(2)).plus(Duration.days(1)).inspect()).toBe(
+    expect(Duration.seconds(0).inspect()).toEqual("0 seconds");
+    expect(Duration.days(0).inspect()).toEqual("0 days");
+    expect(Duration.month(1).inspect()).toEqual("1 month");
+    expect(Duration.month(1).plus(Duration.day(1)).inspect()).toEqual("1 month and 1 day");
+    expect(Duration.months(6).minus(Duration.days(2)).inspect()).toEqual("6 months and -2 days");
+    expect(Duration.seconds(10).inspect()).toEqual("10 seconds");
+    expect(Duration.years(10).plus(Duration.months(2)).plus(Duration.day(1)).inspect()).toEqual(
       "10 years, 2 months, and 1 day",
     );
-    expect(Duration.days(7).inspect()).toBe("7 days");
-    expect(Duration.weeks(1).inspect()).toBe("1 week");
-    expect(Duration.weeks(2).inspect()).toBe("2 weeks");
-    expect(Duration.minutes(10).plus(Duration.seconds(0)).inspect()).toBe("10 minutes");
+    expect(
+      Duration.years(10)
+        .plus(Duration.month(1))
+        .plus(Duration.day(1))
+        .plus(Duration.month(1))
+        .inspect(),
+    ).toEqual("10 years, 2 months, and 1 day");
+    expect(Duration.day(1).plus(Duration.years(10)).plus(Duration.months(2)).inspect()).toEqual(
+      "10 years, 2 months, and 1 day",
+    );
+    expect(Duration.days(7).inspect()).toEqual("7 days");
+    expect(Duration.week(1).inspect()).toEqual("1 week");
+    expect(Duration.fortnight(1).inspect()).toEqual("2 weeks");
+    expect(new Scalar(10).modulo(Duration.seconds(5)).inspect()).toEqual("0 seconds");
+    expect(Duration.minutes(10).plus(Duration.seconds(0)).inspect()).toEqual("10 minutes");
   });
 
   it("inspect ignores locale", () => {
@@ -108,54 +131,78 @@ describe("DurationTest", () => {
     );
   });
 
-  it("minus with duration does not break subtraction of date from date", () => {
-    const today = current();
-    expect(() => minusWithDuration(today, today)).not.toThrow();
-    expect(minusWithDuration(today, today)).toBe(0);
+  it("minus with duration does not break subtraction of date from date", async () => {
+    await assertNothingRaised(() => minusWithDuration(current(), current()));
   });
 
   it("unary plus", () => {
-    const d = Duration.seconds(1);
-    expect(d.plus(Duration.seconds(0)).isEqualTo(d)).toBe(true);
-    expect(d instanceof Duration).toBe(true);
+    expect(Duration.second(1)).toEqual(Duration.second(1));
+    expect(Duration.second(1)).toBeInstanceOf(Duration);
   });
 
   it("plus", () => {
-    expect(Duration.seconds(1).plus(Duration.seconds(1)).eql(Duration.seconds(2))).toBe(true);
-    expect(Duration.seconds(1).plus(Duration.seconds(1)) instanceof Duration).toBe(true);
-    expect(Duration.seconds(1).plus(1).eql(Duration.seconds(2))).toBe(true);
-    expect(Duration.seconds(1).plus(1) instanceof Duration).toBe(true);
+    expect(Duration.second(1).plus(Duration.second(1))).toEqual(Duration.seconds(2));
+    expect(Duration.second(1).plus(Duration.second(1))).toBeInstanceOf(Duration);
+    expect(Duration.second(1).plus(1)).toEqual(Duration.seconds(2));
+    expect(Duration.second(1).plus(1)).toBeInstanceOf(Duration);
   });
 
   it("minus", () => {
-    expect(Duration.seconds(2).minus(Duration.seconds(1)).eql(Duration.seconds(1))).toBe(true);
-    expect(Duration.seconds(2).minus(Duration.seconds(1)) instanceof Duration).toBe(true);
-    expect(Duration.seconds(2).minus(1).eql(Duration.seconds(1))).toBe(true);
-    expect(Duration.seconds(2).minus(1) instanceof Duration).toBe(true);
+    expect(Duration.seconds(2).minus(Duration.second(1))).toEqual(Duration.second(1));
+    expect(Duration.seconds(2).minus(Duration.second(1))).toBeInstanceOf(Duration);
+    expect(Duration.seconds(2).minus(1)).toEqual(Duration.second(1));
+    expect(Duration.seconds(2).minus(1)).toBeInstanceOf(Duration);
+    expect(new Scalar(2).minus(Duration.second(1))).toEqual(Duration.second(1));
+    expect(Duration.seconds(2).minus(1)).toBeInstanceOf(Duration);
   });
 
   it("multiply", () => {
-    expect(Duration.days(1).times(7).eql(Duration.days(7))).toBe(true);
-    expect(Duration.days(1).times(7) instanceof Duration).toBe(true);
-    expect(Duration.days(1).inSeconds() * Duration.seconds(1).inSeconds()).toBe(86400);
+    expect(Duration.day(1).times(7)).toEqual(Duration.days(7));
+    expect(Duration.day(1).times(7)).toBeInstanceOf(Duration);
+    expect(Duration.day(1).times(Duration.second(1)).value).toEqual(86400);
   });
 
   it("divide", () => {
-    expect(Duration.days(7).dividedBy(7).isEqualTo(Duration.days(1))).toBe(true);
-    expect(Duration.days(7).dividedBy(7) instanceof Duration).toBe(true);
-    expect(Math.round(Duration.days(7).dividedBy(7).inSeconds())).toBe(86400);
-    expect(Math.round(Duration.days(1).dividedBy(24).inSeconds())).toBe(3600);
-    expect(Math.round(86400 / Duration.hours(1).inSeconds())).toBe(24);
-    expect(Math.round(Duration.days(1).inSeconds() / Duration.hours(1).inSeconds())).toBe(24);
-    expect(Math.round(Duration.days(1).inSeconds() / Duration.days(1).inSeconds())).toBe(1);
+    expect(Duration.days(7).dividedBy(7)).toEqual(Duration.day(1));
+    expect(Duration.days(7).dividedBy(7)).toBeInstanceOf(Duration);
+
+    expect(Duration.day(1).dividedBy(24).value).toEqual(Duration.hour(1).value);
+    expect(Duration.day(1).dividedBy(24)).toBeInstanceOf(Duration);
+
+    expect(new Scalar(86400).div(Duration.hour(1))).toEqual(24);
+    expect(Object(new Scalar(86400).div(Duration.hour(1)))).toBeInstanceOf(Number);
+
+    expect(Duration.day(1).dividedBy(Duration.hour(1))).toEqual(24);
+    expect(Object(Duration.day(1).dividedBy(Duration.hour(1)))).toBeInstanceOf(Number);
+
+    expect(Duration.day(1).dividedBy(Duration.day(1))).toEqual(1);
+    expect(Object(Duration.day(1).dividedBy(Duration.hour(1)))).toBeInstanceOf(Number);
   });
 
   it("modulo", () => {
-    expect(Duration.minutes(5).modulo(120).eql(Duration.minutes(1))).toBe(true);
-    expect(Duration.minutes(5).modulo(120) instanceof Duration).toBe(true);
-    expect(Duration.minutes(5).modulo(Duration.minutes(2)).eql(Duration.minutes(1))).toBe(true);
-    expect(Duration.minutes(5).modulo(Duration.hours(1)).eql(Duration.minutes(5))).toBe(true);
-    expect(Duration.days(36).modulo(Duration.days(7)).eql(Duration.days(1))).toBe(true);
+    expect(Duration.minutes(5).modulo(120)).toEqual(Duration.minute(1));
+    expect(Duration.minutes(5).modulo(120)).toBeInstanceOf(Duration);
+
+    expect(Duration.minutes(5).modulo(Duration.minutes(2))).toEqual(Duration.minute(1));
+    expect(Duration.minutes(5).modulo(Duration.minutes(2))).toBeInstanceOf(Duration);
+
+    expect(Duration.minutes(5).modulo(Duration.seconds(120))).toEqual(Duration.minute(1));
+    expect(Duration.minutes(5).modulo(Duration.seconds(120))).toBeInstanceOf(Duration);
+
+    expect(Duration.minutes(5).modulo(Duration.hour(1))).toEqual(Duration.minutes(5));
+    expect(Duration.minutes(5).modulo(Duration.hour(1))).toBeInstanceOf(Duration);
+
+    expect(Duration.days(36).modulo(604800)).toEqual(Duration.day(1));
+    expect(Duration.days(36).modulo(604800)).toBeInstanceOf(Duration);
+
+    expect(Duration.days(36).modulo(Duration.days(7))).toEqual(Duration.day(1));
+    expect(Duration.days(36).modulo(Duration.days(7))).toBeInstanceOf(Duration);
+
+    expect(new Scalar(8000).modulo(Duration.hour(1)).value).toEqual(Duration.seconds(800).value);
+    expect(new Scalar(8000).modulo(Duration.hour(1))).toBeInstanceOf(Duration);
+
+    expect(Duration.months(13).modulo(Duration.year(1))).toEqual(Duration.month(1));
+    expect(Duration.months(13).modulo(Duration.year(1))).toBeInstanceOf(Duration);
   });
 
   it("date added with zero days", () => {
@@ -196,41 +243,35 @@ describe("DurationTest", () => {
   });
 
   it("time plus duration returns same time datatype", () => {
-    const now = new Date();
-    for (const unit of [
-      "seconds",
-      "minutes",
-      "hours",
-      "days",
-      "weeks",
-      "months",
-      "years",
-    ] as const) {
-      const dur = Duration[unit](1);
-      const result = dur.since(now);
-      expect(result).toBeInstanceOf(Temporal.Instant);
+    const twz = new TimeWithZone(null, TimeZone.find("Moscow")!, RubyTime.utc(2016, 4, 28, 0, 45));
+    const now = RubyTime.now().getutc();
+    for (const unit of ["second", "minute", "hour", "day", "week", "month", "year"] as const) {
+      expect(timePlusWithDuration.call(now, Duration[unit](1)).constructor).toEqual(RubyTime);
+      expect(twz.plus(Duration[unit](1)).constructor).toEqual(TimeWithZone);
     }
   });
 
-  it("argument error", () => {
-    expect(() => Duration.seconds(1).ago("" as any)).toThrow(ArgumentError);
-    expect(() => Duration.seconds(1).ago("" as any)).toThrow('expected a time or date, got ""');
+  it("argument error", async () => {
+    const e = await assertRaise([ArgumentError], {}, () => Duration.second(1).ago("" as any));
+    expect(e.message).toEqual('expected a time or date, got ""');
   });
 
   it("fractional weeks", () => {
-    expect(Duration.weeks(1.5).inSeconds()).toBeCloseTo(86400 * 7 * 1.5, 1);
-    expect(Duration.weeks(1.7).inSeconds()).toBeCloseTo(86400 * 7 * 1.7, 1);
+    expect(Duration.weeks(1.5).value).toEqual(86400 * 7 * 1.5);
+    expect(Duration.weeks(1.7).value).toEqual(86400 * 7 * 1.7);
   });
 
   it("fractional days", () => {
-    expect(Duration.days(1.5).inSeconds()).toBeCloseTo(86400 * 1.5, 1);
-    expect(Duration.days(1.7).inSeconds()).toBeCloseTo(86400 * 1.7, 1);
+    expect(Duration.days(1.5).value).toEqual(86400 * 1.5);
+    expect(Duration.days(1.7).value).toEqual(86400 * 1.7);
   });
 
   it("since and ago", () => {
-    const t = new Date(2000, 0, 1, 0, 0, 0, 0);
-    expect(Duration.seconds(1).since(t).epochMilliseconds).toBe(t.getTime() + 1000);
-    expect(Duration.seconds(1).ago(t).epochMilliseconds).toBe(t.getTime() - 1000);
+    const t = RubyTime.local(2000);
+    expect(Duration.second(1).since(t)).toEqual(t.plus(1));
+    expect(Duration.minute(1).dividedBy(60).since(t)).toEqual(t.plus(1));
+    expect(Duration.second(1).ago(t)).toEqual(t.minus(1));
+    expect(Duration.minute(1).dividedBy(60).ago(t)).toEqual(t.minus(1));
   });
 
   it("since and ago preserve sub-millisecond precision of Temporal.Instant inputs", () => {
@@ -253,27 +294,50 @@ describe("DurationTest", () => {
   });
 
   it("since and ago without argument", () => {
-    const before = new Date();
-    const result = Duration.seconds(1).since();
-    expect(result.epochMilliseconds).toBeGreaterThanOrEqual(before.getTime() + 1000 - 50);
+    let now = Temporal.Now.instant();
+    expect(
+      Temporal.Instant.compare(Duration.second(1).since(), now.add({ seconds: 1 })) >= 0,
+    ).toBeTruthy();
+    now = Temporal.Now.instant();
+    expect(
+      Temporal.Instant.compare(Duration.second(1).ago(), now.subtract({ seconds: 1 })) >= 0,
+    ).toBeTruthy();
   });
 
   it("since and ago with fractional days", () => {
-    const t = new Date(2000, 0, 1);
-    const via36h = Duration.hours(36).since(t);
-    const via15days = Duration.days(1.5).since(t);
-    expect(Math.abs(via36h.epochMilliseconds - via15days.epochMilliseconds)).toBeLessThan(1000);
-
-    const ago36h = Duration.hours(36).ago(t);
-    const ago15days = Duration.days(1.5).ago(t);
-    expect(Math.abs(ago36h.epochMilliseconds - ago15days.epochMilliseconds)).toBeLessThan(1000);
+    const t = RubyTime.local(2000);
+    expect(Duration.days(1.5).since(t)).toEqual(Duration.hours(36).since(t));
+    expect(Duration.days(1.7).since(t).toF()).toBeCloseTo(
+      Duration.hours(24 * 1.7)
+        .since(t)
+        .toF(),
+      -0.3,
+    );
+    expect(Duration.days(1.5).ago(t)).toEqual(Duration.hours(36).ago(t));
+    expect(Duration.days(1.7).ago(t).toF()).toBeCloseTo(
+      Duration.hours(24 * 1.7)
+        .ago(t)
+        .toF(),
+      -0.3,
+    );
   });
 
   it("since and ago with fractional weeks", () => {
-    const t = new Date(2000, 0, 1);
-    const via252h = Duration.hours(7 * 36).since(t);
-    const via15weeks = Duration.weeks(1.5).since(t);
-    expect(Math.abs(via252h.epochMilliseconds - via15weeks.epochMilliseconds)).toBeLessThan(1000);
+    const t = RubyTime.local(2000);
+    expect(Duration.weeks(1.5).since(t)).toEqual(Duration.hours(7 * 36).since(t));
+    expect(Duration.weeks(1.7).since(t).toF()).toBeCloseTo(
+      Duration.hours(7 * 24 * 1.7)
+        .since(t)
+        .toF(),
+      -0.3,
+    );
+    expect(Duration.weeks(1.5).ago(t)).toEqual(Duration.hours(7 * 36).ago(t));
+    expect(Duration.weeks(1.7).ago(t).toF()).toBeCloseTo(
+      Duration.hours(7 * 24 * 1.7)
+        .ago(t)
+        .toF(),
+      -0.3,
+    );
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
@@ -306,17 +370,17 @@ describe("DurationTest", () => {
   });
 
   it("adding day across dst boundary", () => {
-    const base = new Date(2009, 2, 29, 0, 0, 0);
-    const result = Duration.days(1).since(base);
-    expect(asDate(result).getDate()).toBe(30);
-    expect(asDate(result).getMonth()).toBe(2);
+    expect(
+      timePlusWithDuration.call(RubyTime.local(2009, 3, 29, 0, 0, 0), Duration.day(1)),
+    ).toEqual(RubyTime.local(2009, 3, 30, 0, 0, 0));
   });
 
-  it("delegation with block works", () => {
+  it("delegation with block works", async () => {
     let counter = 0;
-    const count = Math.round(Duration.minutes(1).inSeconds());
-    for (let i = 0; i < count; i++) counter++;
-    expect(counter).toBe(60);
+    await assertNothingRaised(() => {
+      for (let i = 0; i < Duration.minute(1).value; i++) counter += 1;
+    });
+    expect(counter).toEqual(60);
   });
 
   it("as json", () => {
@@ -328,8 +392,12 @@ describe("DurationTest", () => {
   });
 
   it("case when", () => {
-    const d = Duration.days(1);
-    expect(d instanceof Duration).toBe(true);
+    let cased: string | undefined;
+    switch (true) {
+      case Duration.day(1).equals(Duration.day(1)):
+        cased = "ok";
+    }
+    expect(cased).toEqual("ok");
   });
 
   it("respond to", () => {
@@ -343,111 +411,206 @@ describe("DurationTest", () => {
   });
 
   it("comparable", () => {
-    expect(Duration.seconds(0).compareTo(Duration.seconds(1))).toBe(-1);
-    expect(Duration.seconds(1).compareTo(Duration.minutes(1))).toBe(-1);
-    expect(Duration.seconds(0).compareTo(Duration.seconds(0))).toBe(0);
-    expect(Duration.seconds(1).compareTo(Duration.seconds(1))).toBe(0);
-    expect(Duration.seconds(1).compareTo(Duration.seconds(0))).toBe(1);
-    expect(Duration.minutes(1).compareTo(Duration.seconds(1))).toBe(1);
+    expect(Duration.seconds(0).compareTo(Duration.second(1))).toEqual(-1);
+    expect(Duration.second(1).compareTo(Duration.minute(1))).toEqual(-1);
+    expect(new Scalar(1).compareTo(Duration.minute(1))).toEqual(-1);
+    expect(Duration.seconds(0).compareTo(Duration.seconds(0))).toEqual(0);
+    expect(Duration.seconds(0).compareTo(Duration.minutes(0))).toEqual(0);
+    expect(Duration.second(1).compareTo(Duration.second(1))).toEqual(0);
+    expect(Duration.second(1).compareTo(Duration.second(0))).toEqual(1);
+    expect(Duration.minute(1).compareTo(Duration.second(1))).toEqual(1);
+    expect(new Scalar(61).compareTo(Duration.minute(1))).toEqual(1);
   });
 
   it("implicit coercion", () => {
-    expect(Duration.days(1).times(2).eql(Duration.days(2))).toBe(true);
-    expect(Duration.days(1).times(2) instanceof Duration).toBe(true);
+    expect(new Scalar(2).times(Duration.day(1))).toEqual(Duration.days(2));
+    expect(new Scalar(2).times(Duration.day(1))).toBeInstanceOf(Duration);
+    expect(
+      timePlusWithDuration.call(RubyTime.utc(2017, 1, 1), new Scalar(2).times(Duration.day(1))),
+    ).toEqual(RubyTime.utc(2017, 1, 3));
+    expect(plusWithDuration(civil(2017, 1, 1), new Scalar(2).times(Duration.day(1)))).toEqual(
+      civil(2017, 1, 3),
+    );
   });
 
   it("scalar coerce", () => {
-    expect(Duration.seconds(10).plus(Duration.seconds(0)) instanceof Duration).toBe(true);
+    const scalar = new Scalar(10);
+    expect(scalar.coerce(10)[0].plus(scalar)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(10).plus(scalar)).toBeInstanceOf(Duration);
   });
 
   it("scalar delegations", () => {
-    expect(typeof Duration.seconds(10).inSeconds()).toBe("number");
-    expect(typeof Math.round(Duration.seconds(10).inSeconds())).toBe("number");
-    expect(typeof Duration.seconds(10).toString()).toBe("string");
+    const scalar = new Scalar(10);
+    expect(Object(scalar.toF())).toBeInstanceOf(Number);
+    expect(Object(scalar.toI())).toBeInstanceOf(Number);
+    expect(Object(scalar.toString())).toBeInstanceOf(String);
   });
 
   it("scalar unary minus", () => {
-    expect(Duration.seconds(10).negate().inSeconds()).toBe(-10);
-    expect(Duration.seconds(10).negate() instanceof Duration).toBe(true);
+    const scalar = new Scalar(10);
+
+    expect(scalar.negate().value).toEqual(-10);
+    expect(scalar.negate()).toBeInstanceOf(Scalar);
   });
 
   it("scalar compare", () => {
-    const d = Duration.seconds(10);
-    expect(d.compareTo(5)).toBe(1);
-    expect(d.compareTo(10)).toBe(0);
-    expect(d.compareTo(15)).toBe(-1);
+    const scalar = new Scalar(10);
+
+    expect(scalar.compareTo(5)).toEqual(1);
+    expect(scalar.compareTo(10)).toEqual(0);
+    expect(scalar.compareTo(15)).toEqual(-1);
+    expect(scalar.compareTo("foo")).toBeNull();
   });
 
-  it("scalar plus", () => {
-    expect(Duration.seconds(10).plus(10).inSeconds()).toBe(20);
-    expect(Duration.seconds(10).plus(10) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).plus(Duration.seconds(10)).inSeconds()).toBe(20);
+  it("scalar plus", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(10)[0].plus(scalar).value).toEqual(20);
+    expect(scalar.coerce(10)[0].plus(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.plus(10).value).toEqual(20);
+    expect(scalar.plus(10)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(10).plus(scalar).value).toEqual(20);
+    expect(Duration.seconds(10).plus(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.plus(Duration.seconds(10)).value).toEqual(20);
+    expect(scalar.plus(Duration.seconds(10))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.plus("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar plus parts", () => {
-    const result = Duration.seconds(10).plus(Duration.days(1));
-    expect(result.parts.days).toBe(1);
-    expect(result.parts.seconds).toBe(10);
+    const scalar = new Scalar(10);
+
+    expect(scalar.plus(Duration.day(1))._parts()).toEqual({ days: 1, seconds: 10 });
+    expect(scalar.plus(Duration.day(-1))._parts()).toEqual({ days: -1, seconds: 10 });
   });
 
-  it("scalar minus", () => {
-    expect(Duration.seconds(20).minus(Duration.seconds(10)).inSeconds()).toBe(10);
-    expect(Duration.seconds(20).minus(Duration.seconds(10)) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).minus(5).inSeconds()).toBe(5);
+  it("scalar minus", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(20)[0].minus(scalar).value).toEqual(10);
+    expect(scalar.coerce(20)[0].minus(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.minus(5).value).toEqual(5);
+    expect(scalar.minus(5)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(20).minus(scalar).value).toEqual(10);
+    expect(Duration.seconds(20).minus(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.minus(Duration.seconds(5)).value).toEqual(5);
+    expect(scalar.minus(Duration.seconds(5))).toBeInstanceOf(Duration);
+
+    expect(scalar.minus(Duration.day(1))._parts()).toEqual({ days: -1, seconds: 10 });
+    expect(scalar.minus(Duration.day(-1))._parts()).toEqual({ days: 1, seconds: 10 });
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.minus("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar minus parts", () => {
-    const result = Duration.seconds(10).minus(Duration.days(1));
-    expect(result.parts.days).toBe(-1);
-    expect(result.parts.seconds).toBe(10);
+    const scalar = new Scalar(10);
+
+    expect(scalar.minus(Duration.day(1))._parts()).toEqual({ days: -1, seconds: 10 });
+    expect(scalar.minus(Duration.day(-1))._parts()).toEqual({ days: 1, seconds: 10 });
   });
 
-  it("scalar multiply", () => {
-    expect(Duration.seconds(2).times(5).inSeconds()).toBe(10);
-    expect(Duration.seconds(2).times(5) instanceof Duration).toBe(true);
+  it("scalar multiply", async () => {
+    const scalar = new Scalar(5);
+
+    expect(scalar.coerce(2)[0].times(scalar).value).toEqual(10);
+    expect(scalar.coerce(2)[0].times(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.times(2).value).toEqual(10);
+    expect(scalar.times(2)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(2).times(scalar).value).toEqual(10);
+    expect(Duration.seconds(2).times(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.times(Duration.seconds(2)).value).toEqual(10);
+    expect(scalar.times(Duration.seconds(2))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.times("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar multiply parts", () => {
-    const result = Duration.days(2).times(1);
-    expect(result.parts.days).toBe(2);
-    expect(Math.round(result.inSeconds())).toBe(172800);
-    const neg = Duration.days(-2).times(1);
-    expect(neg.parts.days).toBe(-2);
-    expect(Math.round(neg.inSeconds())).toBe(-172800);
+    const scalar = new Scalar(1);
+    expect(scalar.times(Duration.days(2))._parts()).toEqual({ days: 2 });
+    expect(scalar.times(Duration.days(2)).value).toEqual(172800);
+    expect(scalar.times(Duration.days(-2))._parts()).toEqual({ days: -2 });
+    expect(scalar.times(Duration.days(-2)).value).toEqual(-172800);
   });
 
-  it("scalar divide", () => {
-    expect(Math.round(Duration.seconds(100).dividedBy(10).inSeconds())).toBe(10);
-    expect(Duration.seconds(100).dividedBy(10) instanceof Duration).toBe(true);
+  it("scalar divide", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(100)[0].div(scalar).value).toEqual(10);
+    expect(scalar.coerce(100)[0].div(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.div(2).value).toEqual(5);
+    expect(scalar.div(2)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(100).dividedBy(scalar).value).toEqual(10);
+    expect(Duration.seconds(100).dividedBy(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.div(Duration.seconds(2))).toEqual(5);
+    expect(Object(scalar.div(Duration.seconds(2)))).toBeInstanceOf(Number);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.div("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
-  it("scalar modulo", () => {
-    expect(Duration.seconds(31).modulo(10).inSeconds()).toBeCloseTo(1, 5);
-    expect(Duration.seconds(31).modulo(10) instanceof Duration).toBe(true);
-    expect(Duration.seconds(10).modulo(Duration.seconds(3)).inSeconds()).toBeCloseTo(1, 5);
-    expect(Duration.seconds(10).modulo(Duration.seconds(3)) instanceof Duration).toBe(true);
+  it("scalar modulo", async () => {
+    const scalar = new Scalar(10);
+
+    expect(scalar.coerce(31)[0].modulo(scalar).value).toEqual(1);
+    expect(scalar.coerce(31)[0].modulo(scalar)).toBeInstanceOf(Scalar);
+    expect(scalar.modulo(3).value).toEqual(1);
+    expect(scalar.modulo(3)).toBeInstanceOf(Scalar);
+    expect(Duration.seconds(31).modulo(scalar).value).toEqual(1);
+    expect(Duration.seconds(31).modulo(scalar)).toBeInstanceOf(Duration);
+    expect(scalar.modulo(Duration.seconds(3)).value).toEqual(1);
+    expect(scalar.modulo(Duration.seconds(3))).toBeInstanceOf(Duration);
+
+    const exception = await assertRaises([TypeError], {}, () => scalar.modulo("foo"));
+
+    expect(exception.message).toEqual(
+      "no implicit conversion of String into ActiveSupport::Duration::Scalar",
+    );
   });
 
   it("scalar modulo parts", () => {
-    const result = Duration.seconds(82800).modulo(Duration.hours(2));
-    expect(Math.round(result.inSeconds())).toBe(3600);
+    const scalar = new Scalar(82800);
+    expect(scalar.modulo(Duration.hours(2))._parts()).toEqual({ hours: 1 });
+    expect(scalar.modulo(Duration.hours(2)).value).toEqual(3600);
   });
 
   it("twelve months equals one year", () => {
-    const twelveMonths = Duration.months(12).inSeconds();
-    const oneYear = Duration.years(1).inSeconds();
-    expect(Math.abs(twelveMonths - oneYear) / oneYear).toBeLessThan(0.01);
+    expect(Duration.year(1).value).toEqual(Duration.months(12).value);
   });
 
   it("thirty days does not equal one month", () => {
-    expect(Duration.days(30).eql(Duration.months(1))).toBe(false);
+    expect(Duration.month(1).value).not.toEqual(Duration.days(30).value);
   });
 
   it("adding one month maintains day of month", () => {
-    const jan14 = new Date(2016, 0, 14);
-    const feb14 = Duration.months(1).since(jan14);
-    expect(asDate(feb14).getMonth()).toBe(1);
-    expect(asDate(feb14).getDate()).toBe(14);
+    for (let month = 1; month <= 11; month++) {
+      for (const day of [1, 14, 28]) {
+        expect(plusWithDuration(civil(2016, month, day), Duration.month(1))).toEqual(
+          civil(2016, month + 1, day),
+        );
+      }
+    }
+
+    expect(plusWithDuration(civil(2016, 12, 1), Duration.month(1))).toEqual(civil(2017, 1, 1));
+    expect(plusWithDuration(civil(2016, 12, 14), Duration.month(1))).toEqual(civil(2017, 1, 14));
+    expect(plusWithDuration(civil(2016, 12, 28), Duration.month(1))).toEqual(civil(2017, 1, 28));
+
+    expect(plusWithDuration(civil(2015, 1, 31), Duration.month(1))).toEqual(civil(2015, 2, 28));
+    expect(plusWithDuration(civil(2016, 1, 31), Duration.month(1))).toEqual(civil(2016, 2, 29));
   });
 
   it("iso8601 parsing wrong patterns with raise", () => {
@@ -487,44 +650,64 @@ describe("DurationTest", () => {
   });
 
   it("iso8601 output", () => {
-    expect(Duration.years(1).iso8601()).toBe("P1Y");
-    expect(Duration.weeks(1).iso8601()).toBe("P1W");
-    expect(Duration.weeks(4).iso8601()).toBe("P4W");
-    expect(Duration.years(1).plus(Duration.weeks(1)).iso8601()).toBe("P1Y7D");
-    expect(Duration.years(1).plus(Duration.months(1)).plus(Duration.weeks(3)).iso8601()).toBe(
-      "P1Y1M21D",
-    );
-    expect(Duration.years(-1).minus(Duration.days(1)).iso8601()).toBe("P-1Y-1D");
-    expect(Duration.seconds(1.4).iso8601()).toBe("PT1.4S");
-    expect(Duration.seconds(-0.2).iso8601()).toBe("PT-0.2S");
-    expect(Duration.seconds(1000000).iso8601()).toBe("PT1000000S");
-    expect(Duration.seconds(1).iso8601()).toBe("PT1S");
-    expect(Duration.minutes(0).iso8601()).toBe("PT0S");
-    expect(Duration.years(1).plus(Duration.months(1)).iso8601()).toBe("P1Y1M");
-    expect(Duration.years(1).plus(Duration.months(1)).plus(Duration.days(1)).iso8601()).toBe(
-      "P1Y1M1D",
-    );
+    const expectations: [string, Duration][] = [
+      ["P1Y", Duration.year(1)],
+      ["P1W", Duration.week(1)],
+      ["P4W", Duration.week(4)],
+      ["P1Y7D", Duration.year(1).plus(Duration.week(1))],
+      ["P1Y1M21D", Duration.year(1).plus(Duration.month(1)).plus(Duration.week(3))],
+      ["P1Y1M", Duration.year(1).plus(Duration.month(1))],
+      ["P1Y1M1D", Duration.year(1).plus(Duration.month(1)).plus(Duration.day(1))],
+      ["P-1Y-1D", Duration.year(-1).minus(Duration.day(1))],
+      ["P1Y-1DT-1S", Duration.year(1).minus(Duration.day(1)).minus(Duration.second(1))],
+      ["PT1S", Duration.second(1)],
+      ["PT1.4S", Duration.seconds(1.4)],
+      [
+        "P1Y1M1DT1H",
+        Duration.year(1).plus(Duration.month(1)).plus(Duration.day(1)).plus(Duration.hour(1)),
+      ],
+      ["PT0S", Duration.minutes(0)],
+      ["PT-0.2S", Duration.seconds(-0.2)],
+      ["PT1000000S", Duration.seconds(1_000_000)],
+    ];
+    for (const [expectedOutput, duration] of expectations) {
+      expect(duration.iso8601(), inspect(expectedOutput)).toEqual(expectedOutput);
+    }
   });
 
   it("iso8601 output precision", () => {
-    const d = Duration.seconds(8.55).plus(Duration.years(1)).plus(Duration.months(1));
-    expect(d.iso8601()).toBe("P1Y1MT8.55S");
-    expect(d.iso8601({ precision: 0 })).toBe("P1Y1MT9S");
-    expect(d.iso8601({ precision: 1 })).toBe("P1Y1MT8.6S");
-    expect(d.iso8601({ precision: 2 })).toBe("P1Y1MT8.55S");
-    expect(d.iso8601({ precision: 3 })).toBe("P1Y1MT8.550S");
-    expect(Duration.seconds(1).iso8601({ precision: 2 })).toBe("PT1.00S");
-    expect(Duration.seconds(1.4).iso8601({ precision: 0 })).toBe("PT1S");
-    expect(Duration.seconds(1.4).iso8601({ precision: 5 })).toBe("PT1.40000S");
+    const expectations: [number | null, string, Duration][] = [
+      [null, "P1Y1MT8.55S", Duration.year(1).plus(Duration.month(1)).plus(Duration.seconds(8.55))],
+      [0, "P1Y1MT9S", Duration.year(1).plus(Duration.month(1)).plus(Duration.seconds(8.55))],
+      [1, "P1Y1MT8.6S", Duration.year(1).plus(Duration.month(1)).plus(Duration.seconds(8.55))],
+      [2, "P1Y1MT8.55S", Duration.year(1).plus(Duration.month(1)).plus(Duration.seconds(8.55))],
+      [3, "P1Y1MT8.550S", Duration.year(1).plus(Duration.month(1)).plus(Duration.seconds(8.55))],
+      [null, "PT1S", Duration.second(1)],
+      [2, "PT1.00S", Duration.second(1)],
+      [null, "PT1.4S", Duration.seconds(1.4)],
+      [0, "PT1S", Duration.seconds(1.4)],
+      [1, "PT1.4S", Duration.seconds(1.4)],
+      [5, "PT1.40000S", Duration.seconds(1.4)],
+    ];
+    for (const [precision, expectedOutput, duration] of expectations) {
+      expect(duration.iso8601({ precision }), inspect(expectedOutput)).toEqual(expectedOutput);
+    }
   });
 
   it("iso8601 output and reparsing", () => {
-    const d = Duration.years(1).plus(Duration.months(1)).plus(Duration.days(1));
-    const reparsed = Duration.parse(d.iso8601());
-    const now = new Date();
-    expect(
-      Math.abs(d.since(now).epochMilliseconds - reparsed.since(now).epochMilliseconds),
-    ).toBeLessThan(1000);
+    const patterns = `
+      P1Y P0.5Y P0,5Y P1Y1M P1Y0.5M P1Y0,5M P1Y1M1D P1Y1M0.5D P1Y1M0,5D P1Y1M1DT1H P1Y1M1DT0.5H P1Y1M1DT0,5H P1W +P1Y -P1Y P-1Y
+      P1Y1M1DT1H1M P1Y1M1DT1H0.5M P1Y1M1DT1H0,5M P1Y1M1DT1H1M1S P1Y1M1DT1H1M1.0S P1Y1M1DT1H1M1,0S P-1Y-2M3DT-4H-5M-6S
+    `
+      .trim()
+      .split(/\s+/);
+    const time = Temporal.Now.instant();
+    for (const pattern of patterns) {
+      const duration = Duration.parse(pattern);
+      expect(Duration.parse(duration.iso8601()).since(time), inspect(pattern)).toEqual(
+        duration.since(time),
+      );
+    }
   });
 
   it("iso8601 parsing across spring dst boundary", () => {
@@ -538,8 +721,14 @@ describe("DurationTest", () => {
   });
 
   it("iso8601 parsing equivalence with numeric extensions over long periods", () => {
-    expect(Duration.parse("P3M").eql(Duration.months(3))).toBe(true);
-    expect(Duration.parse("P3Y").eql(Duration.years(3))).toBe(true);
+    expect(Duration.parse("P3M")).toEqual(Duration.months(3));
+    expect(Duration.parse("P3M").toI()).toEqual(Duration.months(3).toI());
+    expect(Duration.parse("P10M")).toEqual(Duration.months(10));
+    expect(Duration.parse("P10M").toI()).toEqual(Duration.months(10).toI());
+    expect(Duration.parse("P3Y")).toEqual(Duration.years(3));
+    expect(Duration.parse("P3Y").toI()).toEqual(Duration.years(3).toI());
+    expect(Duration.parse("P10Y")).toEqual(Duration.years(10));
+    expect(Duration.parse("P10Y").toI()).toEqual(Duration.years(10).toI());
   });
 
   it("adding durations do not hold prior states", () => {
@@ -550,10 +739,10 @@ describe("DurationTest", () => {
   });
 
   it("durations survive yaml serialization", () => {
-    const d = Duration.minutes(10);
-    const json = JSON.stringify({ seconds: d.inSeconds() });
-    const parsed = JSON.parse(json);
-    expect(parsed.seconds).toBeCloseTo(600, 0);
+    const payload = JSON.stringify(Duration.minutes(10).asJson());
+    const d1 = Duration.build(JSON.parse(payload));
+    expect(d1.toI()).toEqual(600);
+    expect(d1.plus(60).toI()).toEqual(660);
   });
 
   it("build", () => {
@@ -572,32 +761,42 @@ describe("DurationTest", () => {
     expect(Duration.minutes(5).modulo(60)._parts()).toEqual({ seconds: 0 });
   });
 
-  it("string build raises error", () => {
-    expect(() => Duration.build("9" as any)).toThrow(TypeError);
-    expect(() => Duration.build("9" as any)).toThrow("String");
+  it("string build raises error", async () => {
+    const error = await assertRaises([TypeError], {}, () => Duration.build("9"));
+
+    expect(error.message).toEqual("can't build an ActiveSupport::Duration from a String");
   });
 
-  it("non numeric build raises error", () => {
-    expect(() => Duration.build(null as any)).toThrow(TypeError);
-    expect(() => Duration.build(null as any)).toThrow("NilClass");
+  it("non numeric build raises error", async () => {
+    const error = await assertRaises([TypeError], {}, () => Duration.build(null));
+
+    expect(error.message).toEqual("can't build an ActiveSupport::Duration from a NilClass");
   });
 
   it("variable", () => {
-    expect(Duration.seconds(12).isVariable()).toBe(false);
-    expect(Duration.minutes(12).isVariable()).toBe(false);
-    expect(Duration.hours(12).isVariable()).toBe(false);
-    expect(Duration.days(12).isVariable()).toBe(true);
-    expect(Duration.weeks(12).isVariable()).toBe(true);
-    expect(Duration.months(12).isVariable()).toBe(true);
-    expect(Duration.years(12).isVariable()).toBe(true);
-    expect(Duration.hours(12).plus(Duration.minutes(12)).isVariable()).toBe(false);
-    expect(Duration.hours(12).plus(Duration.days(1)).isVariable()).toBe(true);
+    expect(Duration.seconds(12).isVariable()).toBeFalsy();
+    expect(Duration.minutes(12).isVariable()).toBeFalsy();
+    expect(Duration.hours(12).isVariable()).toBeFalsy();
+
+    expect(Duration.days(12).isVariable()).toBeTruthy();
+    expect(Duration.weeks(12).isVariable()).toBeTruthy();
+    expect(Duration.months(12).isVariable()).toBeTruthy();
+    expect(Duration.years(12).isVariable()).toBeTruthy();
+
+    expect(Duration.hours(12).plus(Duration.minutes(12)).isVariable()).toBeFalsy();
+
+    expect(Duration.hours(12).plus(Duration.day(1)).isVariable()).toBeTruthy();
+    expect(Duration.day(1).plus(Duration.hours(12)).isVariable()).toBeTruthy();
   });
 
   it("duration symmetry", () => {
-    const time = new Date("Dec 7, 2021");
-    const expected = new Date("2021-12-06T23:59:59");
-    const d = Duration.seconds(1);
-    expect(d.negate().since(time).epochMilliseconds).toBeCloseTo(expected.getTime(), -3);
+    const time = RubyTime.parse("Dec 7, 2021");
+    const expectedTime = RubyTime.parse("2021-12-06 23:59:59");
+
+    expect(timePlusWithDuration.call(time, Duration.second(-1))).toEqual(expectedTime);
+    expect(timePlusWithDuration.call(time, Duration.build(1).times(-1))).toEqual(expectedTime);
+    expect(timePlusWithDuration.call(time, Duration.build(1).negate())).toEqual(expectedTime);
+    expect(timePlusWithDuration.call(time, new Scalar(-1).value)).toEqual(expectedTime);
+    expect(timePlusWithDuration.call(time, Duration.build(-1))).toEqual(expectedTime);
   });
 });
