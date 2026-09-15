@@ -467,7 +467,7 @@ export class SchemaCache {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
         block(zipper);
-        zipper.flush();
+        await zipper.flush();
         await zipper.close();
       } else {
         file.setEncoding(Encoding.UTF_8);

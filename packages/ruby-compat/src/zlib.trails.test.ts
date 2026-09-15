@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { File } from "./file.js";
 import { Zlib } from "./zlib.js";
+import { GzipWriter } from "./zlib-adapter.js";
 
 /**
  * Expected values are MRI's, from
@@ -48,6 +49,56 @@ describe("Zlib::GzipFile.open", () => {
       await Zlib.GzipWriter.open(filename, (gz) => gz.write('{"version":1}'));
 
       expect(await Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe('{"version":1}');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("streams a payload spanning many writes and read chunks", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "large.gz");
+      const lines = Array.from({ length: 5000 }, (_, i) => `line ${i} ${Math.sin(i)}\n`);
+      await Zlib.GzipWriter.open(filename, (gz) => {
+        for (const line of lines) gz.write(line);
+      });
+
+      expect(File.size(filename) > 2048).toBe(true);
+      expect(await Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe(lines.join(""));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers an empty string once the stream is read to the end", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "twice.gz");
+      await Zlib.GzipWriter.open(filename, (gz) => gz.write("once"));
+
+      expect(
+        await Zlib.GzipReader.open(filename, async (gz) => [await gz.read(), await gz.read()]),
+      ).toEqual(["once", ""]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses mtime= once the header is written", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      await Zlib.GzipWriter.open(join(dir, "late.gz"), (gz) => {
+        gz.write("x");
+        expect(() => {
+          gz.mtime = 0;
+        }).toThrow(Zlib.GzipFile.Error);
+      });
+      const seam = new GzipWriter({ write() {} });
+      seam.write(new Uint8Array([120]));
+      expect(() => {
+        seam.mtime = 0;
+      }).toThrow("header is already written");
+      await seam.finish();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

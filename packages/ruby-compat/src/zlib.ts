@@ -1,6 +1,6 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
-import { getZlib } from "./zlib-adapter.js";
+import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -8,6 +8,12 @@ import { getZlib } from "./zlib-adapter.js";
  * to `gzfile_wrap` (`zlib.c:3178`), which closes it on the way out of a block.
  */
 class GzipFile<IO extends { close(): void } = File> {
+  /** `cGzError` (`vendor/ruby/ext/zlib/zlib.c:4828`). */
+  static Error = class Error extends globalThis.Error {};
+
+  /** `GZFILE_FLAG_HEADER_FINISHED` (`vendor/ruby/ext/zlib/zlib.c:2369`), set by `gzfile_make_header`. */
+  protected headerFinished = false;
+
   /** `ZSTREAM_FLAG_READY` (`vendor/ruby/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
   protected zstreamReady = true;
 
@@ -27,6 +33,13 @@ class GzipFile<IO extends { close(): void } = File> {
  * `gzfile_s_open(argc, argv, klass, "rb")` (`zlib.c:3871`).
  */
 class GzipReader extends GzipFile<File> {
+  private readonly z: GzipReaderHandle;
+
+  constructor(io: File) {
+    super(io);
+    this.z = getZlib().gzipReader(io);
+  }
+
   static open(filename: string): GzipReader;
   static open<T>(filename: string, block: (gz: GzipReader) => T | Promise<T>): Promise<T>;
   static open<T>(
@@ -40,34 +53,21 @@ class GzipReader extends GzipFile<File> {
   }
 
   async read(): Promise<string> {
-    const raw = this.io.read();
-    const bytes = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xff;
-    return new TextDecoder().decode(getZlib().gunzip(bytes));
+    return new TextDecoder().decode(await this.z.read());
   }
 }
 
 /**
- * `gzfile_make_header` writes the mtime as a 4-byte little-endian field at
- * offset 4 of the 10-byte gzip header (`vendor/ruby/ext/zlib/zlib.c:2648,2672`).
- */
-const GZIP_HEADER_LENGTH = 10;
-
-function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
-  header[4] = mtime & 0xff;
-  header[5] = (mtime >>> 8) & 0xff;
-  header[6] = (mtime >>> 16) & 0xff;
-  header[7] = (mtime >>> 24) & 0xff;
-}
-
-/**
  * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`); `open` is
- * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`). The `ZlibAdapter`
- * seam is one-shot rather than streaming, so the deflate stream is finished
- * into the associated IO at `close` (`rb_gzfile_close`, `zlib.c:3524`).
+ * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`).
  */
 class GzipWriter extends GzipFile<File | Tempfile> {
-  private buffer = "";
+  private readonly z: GzipWriterHandle;
+
+  constructor(io: File | Tempfile) {
+    super(io);
+    this.z = getZlib().gzipWriter(io);
+  }
 
   /**
    * `rb_gzfile_mtime` / `rb_gzfile_set_mtime`
@@ -75,7 +75,16 @@ class GzipWriter extends GzipFile<File | Tempfile> {
    * header, which `SchemaCache#open` zeroes so two dumps of the same cache are
    * byte-identical (`schema_cache.rb:468`).
    */
-  mtime: number | null = null;
+  get mtime(): number | null {
+    return this.z.mtime;
+  }
+
+  set mtime(mtime: number | null) {
+    if (this.headerFinished) {
+      throw new GzipFile.Error("header is already written");
+    }
+    this.z.mtime = mtime;
+  }
 
   static open(filename: string): GzipWriter;
   static open<T>(filename: string, block: (gz: GzipWriter) => T | Promise<T>): Promise<T>;
@@ -90,16 +99,15 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 
   write(string: string): number {
-    this.buffer += string;
+    this.headerFinished = true;
+    this.z.write(new TextEncoder().encode(string));
     return new TextEncoder().encode(string).length;
   }
 
-  /**
-   * `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). The `ZlibAdapter`
-   * seam is one-shot rather than streaming, so there is no partial deflate
-   * output to push and the whole buffer is written at {@link close}.
-   */
-  flush(): this {
+  /** `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). */
+  async flush(): Promise<this> {
+    this.headerFinished = true;
+    await this.z.flush();
     return this;
   }
 
@@ -107,12 +115,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     if (!this.zstreamReady) {
       return;
     }
-    const bytes = new TextEncoder().encode(this.buffer);
-    const gzipped = getZlib().gzip(bytes, Zlib.DEFAULT_COMPRESSION, Zlib.DEFAULT_STRATEGY);
-    if (this.mtime !== null && gzipped.length >= GZIP_HEADER_LENGTH) {
-      setGzipHeaderMtime(gzipped, this.mtime);
-    }
-    this.io.write(gzipped);
+    await this.z.finish();
     await super.close();
   }
 }
@@ -166,6 +169,13 @@ export const Zlib = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_STRATEGY`.
    */
   DEFAULT_STRATEGY: 0,
+
+  /**
+   * `vendor/ruby/ext/zlib/zlib.c:4827` `cGzipFile`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipFile`.
+   */
+  GzipFile,
 
   /**
    * `vendor/ruby/ext/zlib/zlib.c:4877` `rb_cGzipReader`.
