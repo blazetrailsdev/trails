@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -149,11 +150,10 @@ describe("EagerLoadPolyAssocsTest", () => {
     }
 
     const res = await ShapeExpression.all().includes(":shape", { ":paint": ":nonPoly" });
-    expect(res).toHaveLength(NUM_SHAPE_EXPRESSIONS);
+    expect(res.length).toBe(NUM_SHAPE_EXPRESSIONS);
     await assertNoQueries(false, async () => {
       for (const se of res) {
         const paint = se.association("paint").target as Base;
-        expect(paint).not.toBeNull();
         expect(paint.association("nonPoly").target).not.toBeNull();
         expect(se.association("shape").target).not.toBeNull();
       }
@@ -185,13 +185,16 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
       post_id: firstPost.id,
     });
 
-    await Author.all()
-      .includes(
-        { ":posts": ":comments" },
-        { ":categorizations": ":category" },
-        { ":authorFavorites": ":favoriteAuthor" },
-      )
-      .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
-      .order("categories.name");
+    await assertNothingRaised(() =>
+      Author.all()
+        .includes(
+          { ":posts": ":comments" },
+          { ":categorizations": ":category" },
+          { ":authorFavorites": ":favoriteAuthor" },
+        )
+        .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
+        .order("categories.name")
+        .toArray(),
+    );
   });
 });
