@@ -37,6 +37,10 @@ export const IsolatedExecutionState = {
       );
     }
 
+    if (level === "fiber")
+      // @nie disposition=TODO
+      throw new NotImplementedError("Fiber");
+
     if (_isolationLevel != null) IsolatedExecutionState.clear();
 
     switch (level) {
