@@ -214,11 +214,14 @@ import {
 // (the port of `rb_hash_has_key`, `vendor/ruby/hash.c:3671`) is that missing
 // call form, so RFC 0129 discharged both entries and the ports call it.
 //
-// The seven that remain are NOT candidates, and ruby-compat cannot make them
+// `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
+// is the call form Ruby's `Kernel#catch` ports onto.
+//
+// The six that remain are NOT candidates, and ruby-compat cannot make them
 // so: each becomes a language CONSTRUCT with no callee, not a call some package
 // could supply. `to_s` / `to_str` are a template literal and implicit String
 // coercion; `each` is a `for…of`; `present?` / `blank?` are truthiness tests;
-// `catch` is a clause, never a callee (see below); and `synchronize` is a mutex
+// and `synchronize` is a mutex
 // acquisition JS has nothing to acquire (see below) — a Ruby `Mutex` is
 // deferred by RFC 0129 and is the only thing that could ever revisit it.
 //
