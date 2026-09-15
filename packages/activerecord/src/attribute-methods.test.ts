@@ -756,10 +756,20 @@ describe("AttributeMethodsTest", () => {
     const updated = await Post.findBy({ title: "bulk" });
     expect(updated?.legacy_comments_count).toBe(5);
   });
-  it("#undefine_attribute_methods undefines alias attribute methods", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "undef_alias" });
-    expect(p.title).toBe("undef_alias");
+  it("#undefine_attribute_methods undefines alias attribute methods", () => {
+    class topicClass extends Base {
+      static {
+        this.tableName = "topics";
+
+        this.aliasAttribute("subject_to_be_undefined", "title");
+      }
+    }
+
+    const topic = new topicClass({ title: "New topic" }) as any;
+    expect(topic.subject_to_be_undefined).toBe("New topic");
+    expect("subject_to_be_undefined" in topicClass.prototype).toBe(true);
+    topicClass.undefineAttributeMethods();
+    expect("subject_to_be_undefined" in topicClass.prototype).toBe(false);
   });
   it("#define_attribute_methods brings back undefined aliases", () => {
     class topicClass extends Base {
