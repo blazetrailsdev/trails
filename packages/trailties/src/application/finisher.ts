@@ -94,9 +94,9 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 });
 
 /**
- * @missingRailsCall eager_load_all — CONVERGEABLE port-eager-load-autoloader-arms
- * @missingRailsCall eager_load! — CONVERGEABLE port-eager-load-autoloader-arms
- * @missingRailsCall after_class_unload — CONVERGEABLE port-eager-load-autoloader-arms
+ * @missingRailsCall eager_load_all — PERMANENT
+ * @missingRailsCall eager_load! — PERMANENT
+ * @missingRailsCall after_class_unload — PERMANENT
  */
 Finisher.initializer("eager_load!", function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
