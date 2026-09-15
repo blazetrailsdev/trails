@@ -342,18 +342,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._connectingPromise;
   }
 
-  private async getConn(): Promise<mysql.Connection> {
-    await this.awaitRawConnectionReady();
-    return this._ensureClient();
-  }
-
-  /** @internal */
-  protected override async awaitRawConnectionReady(): Promise<void> {
-    if (this._rawConnection === null && !this._isFakeConnection) {
-      await this.connectBang();
-    }
-  }
-
   /** @internal */
   executeBatch = mysql2ExecuteBatch;
 
