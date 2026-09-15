@@ -150,6 +150,10 @@ export class GzipStream {
           let pending = Promise.resolve();
           try {
             this.body.each((part: string) => {
+              if (!this.sync) {
+                if (part.length > 0) gzip.write(Buffer.from(String(part), "binary"));
+                return;
+              }
               pending = pending.then(() => visit(part));
             });
           } finally {
