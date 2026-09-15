@@ -1,28 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 import { Logger } from "./logger.js";
+import { assertEmpty, assertPredicate } from "./testing/assertions.js";
 
 describe("LoggerSilenceTest", () => {
   it("#silence silences the log", () => {
-    const lines: string[] = [];
-    const logger = new Logger({ write: (s) => lines.push(s) });
-    logger.level = Logger.DEBUG;
+    const io: string[] = [];
+    const logger = new Logger({ write: (s) => io.push(s) });
     logger.silence(Logger.ERROR, () => {
-      logger.debug("suppressed");
-      logger.info("also suppressed");
-      logger.error("shown");
+      logger.info("Foo");
     });
-    expect(lines.some((l) => l.includes("shown"))).toBe(true);
-    expect(lines.filter((l) => l.includes("suppressed")).length).toBe(0);
+
+    assertEmpty(io.join(""));
   });
 
   it("#debug? is true when setting the temporary level to Logger::DEBUG", () => {
     const logger = new Logger(null);
-    logger.level = Logger.WARN;
-    expect(logger["debug?"]).toBe(false);
-    logger.logAt(Logger.DEBUG, () => {
-      expect(logger["debug?"]).toBe(true);
+    logger.level = Logger.INFO;
+
+    logger.silence(Logger.DEBUG, () => {
+      assertPredicate(logger, (l) => l["debug?"]);
     });
-    expect(logger["debug?"]).toBe(false);
+
+    assertPredicate(logger, (l) => l["info?"]);
   });
 });

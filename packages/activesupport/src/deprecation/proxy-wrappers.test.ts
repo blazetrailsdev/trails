@@ -7,6 +7,7 @@ import {
 } from "./proxy-wrappers.js";
 import { extend, include, prepend } from "@blazetrails/ruby-compat/include";
 import { registerConstant } from "../inflector.js";
+import { assertPredicate } from "../testing/assertions.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 
 describe("ProxyWrappersTest", () => {
@@ -47,7 +48,7 @@ describe("ProxyWrappersTest", () => {
     await assertDeprecated("OldWaffleModule", deprecator, () => {
       include(klass, proxy as never);
     });
-    expect((new klass() as unknown as typeof WaffleModule).isWaffle()).toBe(true);
+    assertPredicate(new klass() as unknown as typeof WaffleModule, (o) => o.isWaffle());
   });
 
   it("prepending proxy module", async () => {
@@ -60,7 +61,7 @@ describe("ProxyWrappersTest", () => {
     await assertDeprecated("OldWaffleModule", deprecator, () => {
       prepend(klass, proxy as never);
     });
-    expect(new klass().isWaffle()).toBe(true);
+    assertPredicate(new klass(), (o) => o.isWaffle());
   });
 
   it("proxy delegates respond_to? and hash to target without warning", async () => {
@@ -81,6 +82,6 @@ describe("ProxyWrappersTest", () => {
     await assertDeprecated("OldWaffleModule", deprecator, () => {
       extend(obj, proxy as never);
     });
-    expect((obj as typeof WaffleModule).isWaffle()).toBe(true);
+    assertPredicate(obj as typeof WaffleModule, (o) => o.isWaffle());
   });
 });

@@ -1,45 +1,91 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 
 import { Notifications } from "./notifications.js";
+import { Event } from "./notifications/instrumenter.js";
+import { Subscriber } from "./subscriber.js";
+
+class TestSubscriber extends Subscriber {
+  static events: Event[] = [];
+
+  static clear(): void {
+    TestSubscriber.events = [];
+  }
+
+  openParty(event: Event): void {
+    TestSubscriber.events.push(event);
+  }
+
+  anotherOpenParty(event: Event): void {
+    TestSubscriber.events.push(event);
+  }
+
+  private _privateParty(event: Event): void {
+    TestSubscriber.events.push(event);
+  }
+}
+
+class PartySubscriber extends TestSubscriber {
+  override anotherOpenParty(event: Event): void {
+    event.payload["processing_class"] = this.constructor;
+    TestSubscriber.events.push(event);
+  }
+}
 
 describe("SubscriberTest", () => {
+  beforeEach(() => {
+    TestSubscriber.clear();
+  });
+
   it("attaches subscribers", () => {
-    const events: string[] = [];
-    const sub = Notifications.subscribe("test.action", (e) => events.push(e.name));
-    Notifications.instrument("test.action");
-    Notifications.unsubscribe(sub);
-    expect(events).toContain("test.action");
+    try {
+      TestSubscriber.attachTo("doodle");
+
+      Notifications.instrument("open_party.doodle");
+
+      expect(TestSubscriber.events[0].name).toEqual("open_party.doodle");
+    } finally {
+      TestSubscriber.detachFrom("doodle");
+    }
   });
 
   it("attaches subscribers with inherit all option", () => {
-    const events: string[] = [];
-    const sub = Notifications.subscribe(null, (e) => events.push(e.name));
-    Notifications.instrument("any.event");
-    Notifications.instrument("another.event");
-    Notifications.unsubscribe(sub);
-    expect(events).toContain("any.event");
-    expect(events).toContain("another.event");
+    try {
+      PartySubscriber.attachTo("doodle", undefined, Notifications, { inheritAll: true });
+
+      Notifications.instrument("open_party.doodle");
+
+      expect(PartySubscriber.events[0].name).toEqual("open_party.doodle");
+    } finally {
+      PartySubscriber.detachFrom("doodle");
+    }
   });
 
   it("attaches subscribers with inherit all option replaces original behavior", () => {
-    const events: string[] = [];
-    const sub = Notifications.subscribe(/\.test$/, (e) => events.push(e.name));
-    Notifications.instrument("foo.test");
-    Notifications.instrument("bar.test");
-    Notifications.instrument("foo.other");
-    Notifications.unsubscribe(sub);
-    expect(events).toContain("foo.test");
-    expect(events).toContain("bar.test");
-    expect(events).not.toContain("foo.other");
+    try {
+      PartySubscriber.attachTo("doodle", undefined, Notifications, { inheritAll: true });
+
+      Notifications.instrument("another_open_party.doodle");
+
+      expect(PartySubscriber.events.length).toEqual(1);
+
+      const event = PartySubscriber.events[0];
+      expect(event.name).toEqual("another_open_party.doodle");
+      expect(event.payload["processing_class"]).toEqual(PartySubscriber);
+    } finally {
+      PartySubscriber.detachFrom("doodle");
+    }
   });
 
   it("attaches only one subscriber", () => {
-    const events: string[] = [];
-    const handler = (e: { name: string }) => events.push(e.name);
-    const sub = Notifications.subscribe("single.test", handler);
-    Notifications.instrument("single.test");
-    Notifications.unsubscribe(sub);
-    expect(events).toHaveLength(1);
+    try {
+      TestSubscriber.attachTo("doodle");
+
+      Notifications.instrument("open_party.doodle");
+
+      expect(TestSubscriber.events.length).toEqual(1);
+    } finally {
+      TestSubscriber.detachFrom("doodle");
+    }
   });
 
   it("does not attach private methods", () => {
@@ -51,39 +97,61 @@ describe("SubscriberTest", () => {
   });
 
   it("detaches subscribers", () => {
-    const events: string[] = [];
-    const sub = Notifications.subscribe("detach.test", (e) => events.push(e.name));
-    Notifications.instrument("detach.test");
-    Notifications.unsubscribe(sub);
-    Notifications.instrument("detach.test");
-    expect(events).toHaveLength(1);
+    TestSubscriber.attachTo("doodle");
+    TestSubscriber.detachFrom("doodle");
+
+    Notifications.instrument("open_party.doodle");
+
+    expect(TestSubscriber.events).toEqual([]);
   });
 
   it("detaches subscribers from inherited methods", () => {
-    const events: string[] = [];
-    const sub = Notifications.subscribe("inherited.test", (e) => events.push(e.name));
-    Notifications.instrument("inherited.test");
-    Notifications.unsubscribe(sub);
-    Notifications.instrument("inherited.test");
-    expect(events).toHaveLength(1);
+    PartySubscriber.attachTo("doodle");
+    PartySubscriber.detachFrom("doodle");
+
+    Notifications.instrument("open_party.doodle");
+
+    expect(TestSubscriber.events).toEqual([]);
   });
 
   it("supports publish event", () => {
-    const events: { name: string; payload: Record<string, unknown> }[] = [];
-    const sub = Notifications.subscribe("publish.test", (e) =>
-      events.push({ name: e.name, payload: e.payload }),
-    );
-    Notifications.instrument("publish.test", { message: "hello" });
-    Notifications.unsubscribe(sub);
-    expect(events[0].name).toBe("publish.test");
-    expect(events[0].payload.message).toBe("hello");
+    try {
+      TestSubscriber.attachTo("doodle");
+
+      const originalEvent = new Event("open_party.doodle", 0, 10, "id", { foo: "bar" });
+
+      Notifications.publishEvent(originalEvent);
+
+      expect(TestSubscriber.events[0]).toEqual(originalEvent);
+    } finally {
+      TestSubscriber.detachFrom("doodle");
+    }
   });
 
-  it("publish event preserve units", () => {
-    const events: { name: string }[] = [];
-    const sub = Notifications.subscribe("units.test", (e) => events.push({ name: e.name }));
-    Notifications.instrument("units.test", { value: 42, unit: "ms" });
-    Notifications.unsubscribe(sub);
-    expect(events[0].name).toBe("units.test");
+  it("publish event preserve units", async () => {
+    const event = new Event("publish_event.test", null, null, "42", {});
+    event.record(() => {});
+
+    let computedDuration: number | null = null;
+    const callback = (_: unknown, start: number, finish: number) => {
+      computedDuration = finish - start;
+    };
+
+    await Notifications.subscribed(callback as never, "publish_event.test", () => {
+      Notifications.publishEvent(event);
+    });
+
+    expect(computedDuration).toBeCloseTo(event.duration / 1_000.0, 1);
+
+    await Notifications.subscribed(
+      callback as never,
+      "publish_event.test",
+      () => {
+        Notifications.publishEvent(event);
+      },
+      { monotonic: true },
+    );
+
+    expect(computedDuration).toBeCloseTo(event.duration / 1_000.0, 1);
   });
 });

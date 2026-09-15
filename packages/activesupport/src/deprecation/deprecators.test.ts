@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Deprecation } from "../deprecation.js";
+import { assertNotPredicate, assertPredicate } from "../testing/assertions.js";
 import { Deprecators } from "./deprecators.js";
 
 describe("DeprecationTest", () => {
@@ -39,29 +41,32 @@ describe("DeprecationTest", () => {
   });
 
   it("#each without block returns an Enumerator", () => {
-    const gemNames: (string | undefined)[] = [];
-    deprecators.each((deprecator) => gemNames.push(deprecator.gemName));
-    expect(gemNames.sort()).toEqual([...deprecatorNames].sort());
+    expect(deprecators.each()).toBeInstanceOf(
+      (globalThis as unknown as { Iterator: abstract new () => unknown }).Iterator,
+    );
+    expect(Array.from(deprecators.each(), (deprecator) => deprecator.gemName).sort()).toEqual(
+      [...deprecatorNames].sort(),
+    );
   });
 
   it("#silenced= applies to each deprecator", () => {
-    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(false));
+    deprecators.each((deprecator) => assertNotPredicate(deprecator, (d) => d.silenced));
 
     deprecators.setSilenced(true);
-    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(true));
+    deprecators.each((deprecator) => assertPredicate(deprecator, (d) => d.silenced));
 
     deprecators.setSilenced(false);
-    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(false));
+    deprecators.each((deprecator) => assertNotPredicate(deprecator, (d) => d.silenced));
   });
 
   it("#debug= applies to each deprecator", () => {
-    deprecators.each((deprecator) => expect(deprecator.debug).toBe(false));
+    deprecators.each((deprecator) => assertNotPredicate(deprecator, (d) => d.debug));
 
     deprecators.setDebug(true);
-    deprecators.each((deprecator) => expect(deprecator.debug).toBe(true));
+    deprecators.each((deprecator) => assertPredicate(deprecator, (d) => d.debug));
 
     deprecators.setDebug(false);
-    deprecators.each((deprecator) => expect(deprecator.debug).toBe(false));
+    deprecators.each((deprecator) => assertNotPredicate(deprecator, (d) => d.debug));
   });
 
   it("#behavior= applies to each deprecator", () => {
@@ -126,8 +131,18 @@ describe("DeprecationTest", () => {
   it("#silence only affects the current thread", () => {
     deprecators.silence(() => {
       deprecators.each((deprecator) => assertSilencing(deprecator, true));
-    });
 
-    deprecators.each((deprecator) => assertSilencing(deprecator, false));
+      new Thread(() => {
+        deprecators.each((deprecator) => assertSilencing(deprecator, false));
+
+        deprecators.silence(() => {
+          deprecators.each((deprecator) => assertSilencing(deprecator, true));
+        });
+
+        deprecators.each((deprecator) => assertSilencing(deprecator, false));
+      }).value();
+
+      deprecators.each((deprecator) => assertSilencing(deprecator, true));
+    });
   });
 });

@@ -20,7 +20,10 @@ export class Deprecators {
     this._deprecators.set(name, deprecator);
   }
 
-  each(block: (deprecator: Deprecation) => void): void {
+  each(): IterableIterator<Deprecation>;
+  each(block: (deprecator: Deprecation) => void): void;
+  each(block?: (deprecator: Deprecation) => void): IterableIterator<Deprecation> | void {
+    if (!block) return this._deprecators.values();
     for (const deprecator of this._deprecators.values()) block(deprecator);
   }
 
