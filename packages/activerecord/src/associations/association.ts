@@ -1,13 +1,13 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { associationInstanceGet, _associateRecordsToOwner } from "../associations.js";
+import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { ThroughAssociation } from "./through-association.js";
 import { camelize, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { except, hasKey } from "@blazetrails/ruby-compat";
-import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
+import { AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 export class Association {
@@ -52,8 +52,6 @@ export class Association {
   }
 
   _loadedViaAsync = false;
-  /** @internal */
-  _loaderWritebackSuppressed = 0;
 
   /** @internal */
   protected _skipStrictLoading = false;
@@ -121,22 +119,7 @@ export class Association {
   }
 
   setTarget(target: Base | Base[] | null): void {
-    this.raiseIfLoadInFlight();
-    this._setTargetFromLoader(target);
-  }
-
-  /** @internal */
-  _setTargetFromLoader(target: Base | Base[] | null): void {
     this.target = target;
-  }
-
-  /** @internal */
-  protected raiseIfLoadInFlight(): void {
-    if (!this._loaderWritebackSuppressed) return;
-    throw new AssociationTargetReplacedDuringLoad(
-      `Cannot replace the target of association \`${this.reflection.name}\` while a load for it is still in flight. ` +
-        `Await the load (or the reader) before assigning.`,
-    );
   }
 
   /** @missingRailsCall create — PERMANENT */
@@ -303,25 +286,17 @@ export class Association {
     return this.findTarget().then((result) => {
       if (result !== undefined) {
         if (result !== null) this.setStrictLoading(result as Base);
-        if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
+        if (this.loaded && (!this.isStaleTarget() || this.staleState() !== staleStateBeforeLoad))
+          return;
         this._writeTargetStore(result);
       }
     });
   }
 
-  async asyncLoadTarget(): Promise<Base | Base[] | null> {
-    const result = await this.loadTarget();
+  async asyncLoadTarget(): Promise<null> {
+    await this.loadTarget();
     this._loadedViaAsync = true;
-    const name = this.reflection.name;
-    const proxy = this.owner._collectionProxies.get(name) as
-      | { loaded?: boolean; proxyAssociation?: Association }
-      | undefined;
-    const association = proxy && !proxy.loaded ? proxy.proxyAssociation : undefined;
-    if (association) {
-      const records = Array.isArray(result) ? result : result != null ? [result] : [];
-      _associateRecordsToOwner(association, records);
-    }
-    return result;
+    return null;
   }
 
   /** @missingRailsCall map — PERMANENT */

@@ -390,7 +390,6 @@ export abstract class CollectionAssociation extends Association {
   }
 
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
-    this.raiseIfLoadInFlight();
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
       if (this.owner.isNewRecord()) {
@@ -463,7 +462,9 @@ export abstract class CollectionAssociation extends Association {
     };
     if (this.findTargetNeeded()) {
       return Promise.resolve(this.findTarget()).then((findTarget) => {
-        this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
+        if (!this.isLoaded()) {
+          this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
+        }
         return loaded();
       });
     }
@@ -735,11 +736,6 @@ export abstract class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  _mergeLoaderResults(rows: Base[]): void {
-    this._targetStore = this.mergeTargetLists(rows, this.target);
-    this.loadedBang();
-  }
-
   /** @internal */
   mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
     if (memory.length === 0) return persisted;
@@ -962,5 +958,5 @@ export function callbacksFor(this: CallbackHost, callbackName: string): unknown[
 
 function arraysEqual(a: Base[], b: Base[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((r, i) => r === b[i]);
+  return a.every((r, i) => r.equals(b[i]));
 }
