@@ -1,12 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
+
+import { assert, assertNot } from "../testing/assertions.js";
 
 describe("SymbolStartsEndsWithTest", () => {
   it("starts ends with alias", () => {
-    const sym = Symbol.for("hello_world");
-    const str = sym.toString().replace(/^Symbol\(|\)$/g, "");
-    expect(str.startsWith("hello")).toBe(true);
-    expect(str.endsWith("world")).toBe(true);
-    expect(str.startsWith("world")).toBe(false);
-    expect(str.endsWith("hello")).toBe(false);
+    const s = "hello";
+    const startsWith = (...prefixes: string[]) => prefixes.some((p) => s.startsWith(p));
+    const endsWith = (...suffixes: string[]) => suffixes.some((p) => s.endsWith(p));
+    assert(startsWith("h"));
+    assert(startsWith("hel"));
+    assertNot(startsWith("el"));
+    assert(startsWith("he", "lo"));
+    assertNot(startsWith("el", "lo"));
+
+    assert(endsWith("o"));
+    assert(endsWith("lo"));
+    assertNot(endsWith("el"));
+    assert(endsWith("he", "lo"));
+    assertNot(endsWith("he", "ll"));
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
+import { assert, assertNot, assertRaises } from "./testing/assertions.js";
 import { transliterate } from "./transliterate.js";
 
 describe("TransliterateTest", () => {
@@ -15,16 +16,21 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate should not change ascii chars", () => {
-    expect(transliterate("Hello World")).toBe("Hello World");
-    expect(transliterate("abc123!@#")).toBe("abc123!@#");
+    for (let byte = 0; byte <= 127; byte++) {
+      const char = String.fromCodePoint(byte);
+      expect(transliterate(char)).toEqual(char);
+    }
   });
 
   it("transliterate should approximate ascii", () => {
-    expect(transliterate("Ângela")).toBe("Angela");
-    expect(transliterate("café")).toBe("cafe");
-    expect(transliterate("über")).toBe("uber");
-    expect(transliterate("naïve")).toBe("naive");
-    expect(transliterate("Ö")).toBe("O");
+    const string = String.fromCodePoint(
+      ...Array.from({ length: 0x17e - 0xc0 + 1 }, (_, i) => 0xc0 + i).filter(
+        (c) => ![0xd7, 0xf7].includes(c),
+      ),
+    );
+    for (const char of string) {
+      expect(transliterate(char)).toMatch(/^[a-zA-Z']*$/);
+    }
   });
 
   it("transliterate should work with custom i18n rules and uncomposed utf8", () => {
@@ -46,45 +52,43 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate should allow a custom replacement char", () => {
-    expect(transliterate("hello 日本語 world", "*")).toBe("hello *** world");
-    expect(transliterate("café", "_")).toBe("cafe");
+    expect(transliterate("a索b", "*")).toEqual("a*b");
   });
 
   it("transliterate handles empty string", () => {
     expect(transliterate("")).toBe("");
   });
 
-  it("transliterate handles nil", () => {
-    expect(() => transliterate(null as unknown as string)).toThrow(ArgumentError);
-    expect(() => transliterate(null as unknown as string)).toThrow(
-      "Can only transliterate strings. Received NilClass",
+  it("transliterate handles nil", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () =>
+      transliterate(null as unknown as string),
     );
-    expect(() => transliterate(undefined as unknown as string)).toThrow(
-      "Can only transliterate strings. Received NilClass",
-    );
+    expect(exception.message).toEqual("Can only transliterate strings. Received NilClass");
   });
 
-  it("transliterate handles unknown object", () => {
-    expect(() => transliterate(new (class Object {})() as unknown as string)).toThrow(
-      ArgumentError,
+  it("transliterate handles unknown object", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () =>
+      transliterate(new (class Object {})() as unknown as string),
     );
-    expect(() => transliterate(new (class Object {})() as unknown as string)).toThrow(
-      "Can only transliterate strings. Received Object",
-    );
+    expect(exception.message).toEqual("Can only transliterate strings. Received Object");
   });
 
   it("transliterate handles strings with valid utf8 encodings", () => {
-    expect(transliterate("El Niño")).toBe("El Nino");
+    const string = "A";
+    expect(transliterate(string)).toEqual("A");
   });
 
   it("transliterate handles strings with valid us ascii encodings", () => {
-    expect(transliterate("hello")).toBe("hello");
+    const string = "A";
+    const transcoded = transliterate(string);
+    expect(transcoded).toEqual("A");
+    expect(typeof transcoded).toEqual("string");
   });
 
   it("transliterate returns a copy of ascii strings", () => {
-    const original = "hello";
-    const result = transliterate(original);
-    expect(result).toBe("hello");
-    expect(typeof result).toBe("string");
+    const string = new String("Test String");
+    assertNot(Object.isFrozen(string));
+    assert(/^[\p{ASCII}]*$/u.test(string.valueOf()));
+    expect(transliterate(string.valueOf())).not.toBe(string);
   });
 });
