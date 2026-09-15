@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { PGResult } from "./pg-result.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -87,19 +88,11 @@ export async function execute(
   sql: string | null,
   name: string | null = null,
   { allowRetry = false }: { allowRetry?: boolean } = {},
-): Promise<Record<string, unknown>[]> {
+): Promise<PGResult> {
   try {
-    const result = (await AbstractAdapter.prototype.execute.call(this, sql, name, {
+    return (await AbstractAdapter.prototype.execute.call(this, sql, name, {
       allowRetry,
-    })) as pg.QueryResult;
-    const rows = new Result(
-      (result.fields ?? []).map((f) => f.name),
-      (result.rows ?? []) as unknown[][],
-    ).toArray();
-    for (const [key, value] of Object.entries(result)) {
-      Object.defineProperty(rows, key, { value, writable: true, configurable: true });
-    }
-    return rows;
+    })) as PGResult;
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }
@@ -303,7 +296,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
 }
 
 /** @internal */
-export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
+export async function performQuery(
   this: PerformQueryHost,
   rawConnection: pg.Client,
   sql: string | null,
@@ -318,7 +311,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
     notificationPayload: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<R> {
+): Promise<PGResult> {
   const rowMode = "array";
   await this.updateTypemapForDefaultTimezone();
   let raw: pg.QueryResult | pg.QueryResult[];
@@ -355,36 +348,38 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
     raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
   }
 
-  const result = (Array.isArray(raw) ? raw[raw.length - 1] : raw) as R;
+  const result = new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
   this.verifiedBang();
   this.handleWarnings(result);
-  notificationPayload.row_count = result?.rows?.length ?? 0;
+  notificationPayload.row_count = result.length;
   return result;
 }
 
 /** @internal */
-export async function castResult(this: CastResultHost, result: pg.QueryResult): Promise<Result> {
-  const fields = result.fields ?? [];
-  if (isEmpty(fields)) {
+export async function castResult(this: CastResultHost, result: PGResult): Promise<Result> {
+  if (isEmpty(result.fields)) {
+    result.clear();
     return Result.empty();
   }
 
-  const columnNames = fields.map((f) => f.name);
-  const columnTypes: Record<string | number, ValueType> = {};
+  const types: Record<string | number, ValueType> = {};
+  const fields = result.fields;
   for (let i = 0; i < fields.length; i++) {
-    const f = fields[i];
-    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
-    columnTypes[i] = type;
-    if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
+    const fname = fields[i];
+    const ftype = result.ftype(i);
+    const fmod = result.fmod(i);
+    types[fname] = types[i] = await this.getOidType(ftype, fmod, fname);
   }
-
-  const rows = (result.rows ?? []) as unknown[][];
-  return new Result(columnNames, rows, columnTypes as Record<string, ValueType>);
+  const arResult = new Result(fields, result.values(), types as Record<string, ValueType>);
+  result.clear();
+  return arResult;
 }
 
 /** @internal */
-export function affectedRows(result: pg.QueryResult): number {
-  return result.rowCount ?? 0;
+export function affectedRows(result: PGResult): number {
+  const affectedRows = result.cmdTuples();
+  result.clear();
+  return affectedRows;
 }
 
 /** @internal */
