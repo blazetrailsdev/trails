@@ -188,7 +188,7 @@ describe("Migration#createTable id option type", () => {
       expect(migration.executionStrategy).toBe(migration.executionStrategy);
     });
 
-    it("uses the class configured on migrationStrategy()", () => {
+    it("uses the class configured on Base.migrationStrategy", () => {
       class CustomStrategy extends DefaultStrategy {}
       const previous = migrationStrategy();
       setMigrationStrategy(CustomStrategy);

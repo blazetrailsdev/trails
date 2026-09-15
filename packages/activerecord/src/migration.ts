@@ -62,7 +62,7 @@ import type { Base } from "./base.js";
 import {
   maintainTestSchema,
   migrationStrategy,
-  schemaFormat,
+  schemaFormat as _schemaFormat,
   timestampedMigrations,
   validateMigrationTimestamps,
 } from "./active-record.js";
@@ -1230,7 +1230,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const databaseTasks = migrationArConfig()!.databaseTasks();
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
-      if (!(await databaseTasks.schemaUpToDate(dbConfig, schemaFormat()))) return true;
+      if (!(await databaseTasks.schemaUpToDate(dbConfig, _schemaFormat()))) return true;
     }
     return false;
   }
@@ -1277,8 +1277,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
       const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      const format = (getEnv("SCHEMA_FORMAT") ?? schemaFormat()) as SchemaFormat;
-      await databaseTasks.loadSchema(dbConfig, format);
+      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? _schemaFormat()) as SchemaFormat;
+      await databaseTasks.loadSchema(dbConfig, schemaFormat);
     });
   }
 }
