@@ -1,4 +1,4 @@
-import { isMonOwned, Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, isMonOwned, Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
@@ -148,20 +148,20 @@ export class NullPool implements AbstractPool {
 }
 
 export class WeakThreadKeyMap<V> {
-  private _map = new Map<Thread, V>();
+  private _map = new Map<Thread | Fiber, V>();
 
   clear(): void {
     this._map.clear();
   }
 
-  get(key: Thread): V | undefined {
+  get(key: Thread | Fiber): V | undefined {
     return this._map.get(key);
   }
 
   /** @missingRailsCall select! — PERMANENT */
-  set(key: Thread, value: V): void {
+  set(key: Thread | Fiber, value: V): void {
     for (const c of [...this._map.keys()]) {
-      if (c.status === "dead") this._map.delete(c);
+      if (!c?.isAlive()) this._map.delete(c);
     }
     this._map.set(key, value);
   }

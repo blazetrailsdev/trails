@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ExecutorHooks, WeakThreadKeyMap } from "./connection-pool.js";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Fiber, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -98,7 +98,7 @@ export class QueryCacheRegistry {
   private _map = new WeakThreadKeyMap<Store>();
 
   /** @missingRailsCall synchronize — PERMANENT */
-  computeIfAbsent(context: Thread, create: () => Store): Store {
+  computeIfAbsent(context: Thread | Fiber, create: () => Store): Store {
     let cache = this._map.get(context);
     if (!cache) {
       cache = create();

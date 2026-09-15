@@ -89,6 +89,13 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#alive?` (`vendor/ruby/thread.c:5420`).
+   */
+  isAlive(): boolean {
+    return this.status !== "dead";
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/thread.c:5408`).
    */
   get(key: string): unknown {
