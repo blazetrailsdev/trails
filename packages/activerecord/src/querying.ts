@@ -46,12 +46,21 @@ export async function asyncFindBySql<T extends typeof Base>(
     | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  return findBySql.call<T, Parameters<typeof findBySql<T>>, Promise<InstanceType<T>[]>>(
-    this,
-    sql,
-    binds,
-    opts as any,
-    block,
+  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
+  const resolvedBlock = typeof opts === "function" ? opts : block;
+  return this.withConnection(
+    (c) =>
+      _queryBySql.call(this, c, sql, binds, {
+        preparable: resolvedOpts.preparable,
+        allowRetry: resolvedOpts.allowRetry,
+        async: true,
+      }) as Promise<Result>,
+  ).then((result) =>
+    _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
+      this,
+      result,
+      resolvedBlock,
+    ),
   );
 }
 
