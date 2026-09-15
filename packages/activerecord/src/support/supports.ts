@@ -1,6 +1,12 @@
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
 import { adapterType } from "../test-adapter.js";
-import { inMemoryDb } from "./adapter-helper.js";
+import {
+  inMemoryDb,
+  supportsDefaultExpression,
+  supportsNonUniqueConstraintName,
+  supportsSqlStandardDropConstraint,
+  supportsTextColumnWithDefault,
+} from "./adapter-helper.js";
 
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
@@ -13,10 +19,6 @@ const mysql =
         supportsJson: false,
         supportsOptimizerHints: false,
         supportsInsertReturning: false,
-        supportsTextColumnWithDefault: false,
-        supportsNonUniqueConstraintName: false,
-        supportsSqlStandardDropConstraint: false,
-        supportsDefaultExpression: false,
         supportsCheckConstraints: false,
         supportsRenameIndex: false,
       };
@@ -49,10 +51,10 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   partitioned_indexes: ["postgres"],
   pgcrypto_uuid: ["postgres"],
   insert_returning: withMysql(["postgres", "sqlite"], mysql.supportsInsertReturning),
-  text_column_with_default: withMysql(["postgres", "sqlite"], mysql.supportsTextColumnWithDefault),
-  non_unique_constraint_name: withMysql([], mysql.supportsNonUniqueConstraintName),
+  text_column_with_default: supportsTextColumnWithDefault() ? ALL : [],
+  non_unique_constraint_name: supportsNonUniqueConstraintName() ? ALL : [],
   rename_index: withMysql([], mysql.supportsRenameIndex),
-  sql_standard_drop_constraint: withMysql(["postgres"], mysql.supportsSqlStandardDropConstraint),
+  sql_standard_drop_constraint: supportsSqlStandardDropConstraint() ? ALL : [],
   common_table_expressions: ALL,
   insert_on_duplicate_skip: ALL,
   insert_on_duplicate_update: ALL,
@@ -61,7 +63,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   datetime_with_precision: ALL,
   virtual_columns: ALL,
   foreign_tables: ["postgres"] as readonly Backend[],
-  default_expression: withMysql(["postgres"], mysql.supportsDefaultExpression),
+  default_expression: supportsDefaultExpression() ? ALL : [],
   optimizer_hints: withMysql([], mysql.supportsOptimizerHints),
   transaction_isolation: ALL,
 };

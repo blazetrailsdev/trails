@@ -772,26 +772,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "AdapterHelper's four hand-written capability predicates are rendered by " +
-      "packages/activerecord/src/support/supports.ts as entries in one " +
-      "feature-keyed table (`default_expression`, `non_unique_constraint_name`, " +
-      "`text_column_with_default`, `sql_standard_drop_constraint`) rather than " +
-      "as four exports on adapter-helper.ts, exactly as the ~15 predicates " +
-      "`adapter_helper.rb` itself generates with `define_method` are. The table " +
-      "keys are the `supports_<key>?` names, so the pairing is checkable; " +
-      "duplicating them as free functions here would give two sources of truth " +
-      "for the same capability. Scoped to adapter_helper.rb, the only Ruby file " +
-      "in the tree that defines these names.",
-    names: [
-      "supports_default_expression?",
-      "supports_non_unique_constraint_name?",
-      "supports_text_column_with_default?",
-      "supports_sql_standard_drop_constraint?",
-    ],
-    rubyFiles: ["adapter_helper.rb"],
-  },
-  {
-    reason:
       "`config` / `config_file` / `read_config` are the memoized read of " +
       "test/config.yml; trails ships no config.yml — the `connections:` hash " +
       "is expressed directly as the CONNECTIONS table in " +
@@ -1201,6 +1181,20 @@ export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string
     }
   }
   return null;
+}
+
+/**
+ * The candidates a scoped skip's `tsMirrorName` spellings contribute. A port
+ * spread over several declarations is credited only when EVERY spelling is
+ * declared; otherwise the undeclared ones are the candidates, so the method
+ * reports missing under a name that is really absent.
+ */
+export function scopedSkipMirrorCandidates(
+  tsMirrorNames: string[],
+  tsMethods: ReadonlySet<string>,
+): string[] {
+  const absent = tsMirrorNames.filter((n) => !tsMethods.has(n));
+  return absent.length === 0 ? tsMirrorNames : absent;
 }
 
 /**

@@ -109,6 +109,7 @@ import {
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
+  scopedSkipMirrorCandidates,
   scopedSkipMirrorName,
   rubyFileToTs,
   rubyMethodToTs,
@@ -2841,20 +2842,6 @@ export function dedupeRubyMethodInto(
       definedInFile: rm.file,
     });
   }
-}
-
-/**
- * The candidates a scoped skip's `tsMirrorName` spellings contribute. A port
- * spread over several declarations is credited only when EVERY spelling is
- * declared; otherwise the undeclared ones are the candidates, so the method
- * reports missing under a name that is really absent.
- */
-export function scopedSkipMirrorCandidates(
-  tsMirrorNames: string[],
-  tsMethods: ReadonlySet<string>,
-): string[] {
-  const absent = tsMirrorNames.filter((n) => !tsMethods.has(n));
-  return absent.length === 0 ? tsMirrorNames : absent;
 }
 
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */

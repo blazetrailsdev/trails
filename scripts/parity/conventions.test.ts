@@ -17,6 +17,7 @@ import {
   isArityOverridden,
   RUBY_ONLY_CLASSES,
   SCOPED_SKIP_GROUPS,
+  scopedSkipMirrorCandidates,
   scopedSkipMirrorName,
   isRubyOnlyClass,
   isScopedSkip,
@@ -632,6 +633,22 @@ describe("SCOPED_SKIP_GROUPS", () => {
       scopedSkipMirrorName("attr_internal_define", "core_ext/module/attr_internal.rb"),
     ).toBeNull();
     expect(isScopedSkip("attr_internal_define", "core_ext/module/attr_internal.rb")).toBe(true);
+  });
+
+  describe("scopedSkipMirrorCandidates", () => {
+    const names = ["getAttrInternalNamingFormat", "setAttrInternalNamingFormat"];
+
+    it("credits a multi-name port only when every spelling is declared", () => {
+      expect(scopedSkipMirrorCandidates(names, new Set(names))).toEqual(names);
+    });
+
+    it("reports the undeclared spelling when the names only partially match", () => {
+      const candidates = scopedSkipMirrorCandidates(
+        names,
+        new Set(["setAttrInternalNamingFormat"]),
+      );
+      expect(candidates).toEqual(["getAttrInternalNamingFormat"]);
+    });
   });
 
   it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {
