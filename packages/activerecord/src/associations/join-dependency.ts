@@ -632,7 +632,7 @@ export class JoinDependency {
           proxy.target.push(child);
         }
       } else {
-        proxy._setTargetFromLoader(child);
+        proxy.target = child;
       }
       proxy.loadedBang();
       if (typeof proxy.setInverseInstance === "function") {
@@ -662,7 +662,7 @@ export class JoinDependency {
       const proxy = parent.association((node.reflection as any).name);
       if (!proxy || proxy.loaded) return;
       const isCollection = node.reflection.isCollection();
-      proxy._setTargetFromLoader(isCollection ? [] : null);
+      proxy.target = isCollection ? [] : null;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }

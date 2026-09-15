@@ -184,7 +184,6 @@ export {
   QueryCanceled,
   RangeError,
   AssociationTypeMismatch,
-  AssociationTargetReplacedDuringLoad,
   TableNotSpecified,
   AsynchronousQueryInsideTransactionError,
 } from "./errors.js";

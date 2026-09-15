@@ -11,7 +11,6 @@ import {
   _scopeForAssociation,
   applyAssociationScope,
   resolveAssocClass,
-  syncToAssociationInstance,
 } from "../associations.js";
 import { strictLoadingViolationBang } from "../core.js";
 import {
@@ -154,20 +153,15 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   protected override async findTarget(): Promise<Base[]> {
-    this._loaderWritebackSuppressed++;
-    try {
-      const records = await findTarget(
-        this.owner,
-        this.reflection.name,
-        this.reflection,
-        this._queryExecutor,
-        this.isViolatesStrictLoading(),
-      );
-      for (const record of records) this.setStrictLoading(record);
-      return records;
-    } finally {
-      this._loaderWritebackSuppressed--;
-    }
+    const records = await findTarget(
+      this.owner,
+      this.reflection.name,
+      this.reflection,
+      this._queryExecutor,
+      this.isViolatesStrictLoading(),
+    );
+    for (const record of records) this.setStrictLoading(record);
+    return records;
   }
 
   protected override computeNullifiedOwnerAttributes(): Record<string, null> {
@@ -421,7 +415,6 @@ async function findTarget(
   };
   const results: Base[] = await rel.toArray();
 
-  syncToAssociationInstance(record, assocName, results);
   return results;
 }
 

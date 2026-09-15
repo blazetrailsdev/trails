@@ -538,27 +538,6 @@ export async function _loadSingularViaStatementCache(
   return records[0] ?? null;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
-  const holder = record._associationInstances.get(assocName) as
-    | {
-        _setTargetFromLoader(t: Base | Base[] | null): void;
-        _loaderWritebackSuppressed?: number;
-        isCollection(): boolean;
-        _mergeLoaderResults(rows: Base[]): void;
-      }
-    | undefined;
-  if (!holder || holder._loaderWritebackSuppressed) return;
-  if (holder.isCollection()) {
-    holder._mergeLoaderResults((result ?? []) as Base[]);
-    return;
-  }
-  holder._setTargetFromLoader(result as Base | Base[] | null);
-}
-
 /** @internal */
 export function _inlineOwnerKey(
   ctor: typeof Base,
@@ -650,39 +629,13 @@ export function _inlinePolymorphicKeys(
   return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
 }
 
-/** @internal */
-export function _associateRecordsToOwner(association: AssociationInstance, records: Base[]): void {
-  if (association.isCollection()) {
-    const target = association.target;
-    const notPersistedRecords = (Array.isArray(target) ? target : []).filter(
-      (r) => !r.isPersisted(),
-    );
-    association.target = [...records, ...notPersistedRecords];
-  } else {
-    association.target = records[0] ?? null;
-  }
-}
-
 /** @noRailsEquivalent CONVERGEABLE disambiguate-association-vs-collection-proxy-accessor */
 export function collectionProxyFor<T extends Base = Base>(
   record: Base,
   assocName: string,
 ): AssociationProxy<T> {
   const existing = record._collectionProxies.get(assocName) as AssociationProxy<T> | undefined;
-  if (existing) {
-    if (!existing.loaded) {
-      const holder = associationInstanceGet.call(record, assocName) as AssociationInstance | null;
-      const preloaded =
-        holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())
-          ? holder.target
-          : null;
-      if (preloaded != null) {
-        const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-        _associateRecordsToOwner(existing.proxyAssociation, records as T[]);
-      }
-    }
-    return existing;
-  }
+  if (existing) return existing;
 
   const ctor = record.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation(assocName) as unknown as AssociationDefinition | null;
@@ -712,16 +665,6 @@ export function collectionProxyFor<T extends Base = Base>(
       _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
     }
   )._create(record, assocName, assocDef);
-
-  const holder = associationInstanceGet.call(record, assocName) as AssociationInstance | null;
-  const preloaded =
-    holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())
-      ? holder.target
-      : null;
-  if (preloaded != null) {
-    const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-    _associateRecordsToOwner(proxy.proxyAssociation, records as T[]);
-  }
 
   const wrapped = wrapCollectionProxy<T>(proxy);
   (proxy as any)._proxySelf = wrapped;
@@ -813,13 +756,13 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
     if (instance.isLoaded()) {
       instance._writeTargetStore((cached.target as Base | Base[] | null) ?? null);
     } else {
-      instance._setTargetFromLoader((cached.target as Base | Base[] | null) ?? null);
+      instance.target = (cached.target as Base | Base[] | null) ?? null;
     }
     return;
   }
   const holder = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    instance._setTargetFromLoader((holder.target ?? null) as any);
+    instance.target = (holder.target ?? null) as any;
   }
 }
 

@@ -193,7 +193,7 @@ export class Association {
         const owner = owners[i];
         try {
           const association = (owner as any).association(this.reflection.name);
-          association._setTargetFromLoader(record);
+          association.target = record;
           if (i === 0) {
             association.setInverseInstance(record);
           }
@@ -218,9 +218,9 @@ export class Association {
     if (isCollection) {
       const currentTarget: Base[] = Array.isArray(association.target) ? association.target : [];
       const notPersistedRecords = currentTarget.filter((r) => !(r as any).isPersisted());
-      association._setTargetFromLoader([...records, ...notPersistedRecords]);
+      association.target = [...records, ...notPersistedRecords];
     } else {
-      association._setTargetFromLoader(records[0] ?? null);
+      association.target = records[0] ?? null;
     }
   }
 

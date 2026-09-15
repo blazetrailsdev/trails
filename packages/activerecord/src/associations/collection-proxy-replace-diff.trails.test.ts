@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -34,6 +34,26 @@ describe("collection replace diffs instead of clearing", () => {
     await author.postsWithCallbacks.replace(kept);
 
     expect(author.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
+  });
+
+  it("an equal-by-id set of distinct instances compares equal and opens no transaction", async () => {
+    const author = await Author.find(authors("david").id);
+    const current = await author.postsWithCallbacks;
+    expect(current.length).toBeGreaterThan(1);
+    const fresh = await Post.where({ author_id: author.id });
+    const replacement = current.map((post) => fresh.find((f) => f.id === post.id)!);
+    expect(replacement[0]).not.toBe(current[0]);
+
+    const association = author.association("postsWithCallbacks") as unknown as {
+      transaction(fn: () => unknown): unknown;
+    };
+    const transaction = vi.spyOn(association, "transaction");
+    author.postLog = [];
+    const result = await author.postsWithCallbacks.replace(replacement);
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(result).toBe(replacement);
+    expect(author.postLog).toEqual([]);
   });
 
   it("diffs an unloaded persisted collection against the loaded baseline", async () => {

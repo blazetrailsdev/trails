@@ -163,14 +163,6 @@ export class RecordNotFound extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export class AssociationTargetReplacedDuringLoad extends ActiveRecordError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "AssociationTargetReplacedDuringLoad";
-  }
-}
-
 export class RecordNotSaved extends ActiveRecordError {
   readonly record?: object;
 
