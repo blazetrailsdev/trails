@@ -173,6 +173,10 @@ describe("Tryable namespace", () => {
 });
 
 describe("Delegator", () => {
+  it("tryBang reads a zero-arg reader on the delegate", () => {
+    expect(new Decorator("Hello").tryBang("length")).toEqual(5);
+  });
+
   it("try forwards to delegate", () => {
     const d = new Delegator({ greet: () => "hello" });
     expect(d.try("greet")).toBe("hello");

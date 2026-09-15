@@ -20,6 +20,7 @@ export const Tryable = {
     const target = obj as Record<string, unknown>;
     const fn = target[method];
     if (typeof fn !== "function") {
+      if (args.length === 0 && method in Object(obj)) return fn;
       throw new TypeError(
         `undefined method '${method}' for ${obj === null ? "nil:NilClass" : String(obj)}`,
       );

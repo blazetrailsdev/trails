@@ -11,12 +11,22 @@ export function objectWith<T extends object, R>(
     for (const [key, value] of Object.entries(attributes)) {
       if (!(key in target)) throw new NoMethodError(`undefined method '${key}'`);
       oldValues[key] = target[key];
-      target[key] = value;
+      publicSendWriter(target, key, value);
     }
     return fn(obj);
   } finally {
     for (const [key, oldValue] of Object.entries(oldValues)) {
-      target[key] = oldValue;
+      publicSendWriter(target, key, oldValue);
     }
   }
+}
+
+function publicSendWriter(target: Record<string, unknown>, key: string, value: unknown): void {
+  for (let o: object | null = target; o; o = Object.getPrototypeOf(o)) {
+    const descriptor = Object.getOwnPropertyDescriptor(o, key);
+    if (!descriptor) continue;
+    if (descriptor.get && !descriptor.set) throw new NoMethodError(`undefined method '${key}='`);
+    break;
+  }
+  target[key] = value;
 }

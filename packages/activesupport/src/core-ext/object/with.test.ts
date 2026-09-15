@@ -64,7 +64,7 @@ describe("WithTest", () => {
       objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {
         expect(false).toBeTruthy();
       });
-    }).toThrow(TypeError);
+    }).toThrow(NoMethodError);
 
     expect(object.publicAttr).toBe("public");
     expect(object.mixedAttr).toBe("mixed");
@@ -81,7 +81,7 @@ describe("WithTest", () => {
     expect(object.mixedAttr).toBe("mixed");
     expect(() => {
       objectWith(object as any, { mixedAttr: "changed" }, () => {});
-    }).toThrow(TypeError);
+    }).toThrow(NoMethodError);
     expect(object.mixedAttr).toBe("mixed");
   });
 

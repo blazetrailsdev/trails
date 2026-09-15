@@ -404,9 +404,13 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
   if (isPlainObject(value)) {
     const keys = Object.keys(value as Record<string, unknown>);
     if (keys.length === 0) return [];
-    return keys.flatMap((k) =>
-      buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`),
-    );
+    const query = keys
+      .map((k) =>
+        buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`).join("&"),
+      )
+      .filter((part) => part !== "");
+    if (!prefix.includes("[]")) query.sort();
+    return query;
   }
   return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
 }
