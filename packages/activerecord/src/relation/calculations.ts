@@ -734,13 +734,7 @@ export async function executeSimpleCalculation(
       distinct === true,
     );
   } else {
-    let joined = rel;
-    if (rel.isEagerLoading) {
-      await rel.applyJoinDependency({ eagerLoading: rel.groupValues.length === 0 }, (r) => {
-        joined = r;
-      });
-    }
-    relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
+    relation = rel.unscope("order").distinctBang(false) as CalculationRelation;
 
     column = aggregateColumn(relation, aggregateTarget(columnName));
     const selectValue = operationOverAggregateColumn(
@@ -760,7 +754,7 @@ export async function executeSimpleCalculation(
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
-        rel.withConnection((c) =>
+        rel.model.withConnection((c) =>
           c.selectAll(
             queryBuilder,
             `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
@@ -805,16 +799,10 @@ export async function executeGroupedCalculation(
         : [association.foreignKey as string];
     }
   }
-  let joined = rel;
-  if (rel.isEagerLoading) {
-    await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
-      joined = r;
-    });
-  }
-  const relation = joined.except("group").distinctBang(false) as CalculationRelation;
+  const relation = rel.except("group").distinctBang(false) as CalculationRelation;
   const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
 
-  return rel.withConnection(async (connection) => {
+  return rel.model.withConnection(async (connection) => {
     const columnAliasTracker = new ColumnAliasTracker(connection);
 
     const groupAliases = groupNodes.map((field) =>
