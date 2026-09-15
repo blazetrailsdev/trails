@@ -52,6 +52,22 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     expect(second).toBe(2);
   });
 
+  it("executeMutation emits one sql.active_record for an INSERT into a table without a primary key", async () => {
+    await adapter.execute(`CREATE TABLE pq_ddl (nick character varying(255))`);
+    const subscriber = new SQLSubscriber();
+    subscriber.start();
+    try {
+      await adapter.transaction(async () => {
+        expect(await adapter.executeMutation(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBe(1);
+      });
+      const inserts = subscriber.logged.filter(([sql]) => sql.startsWith("INSERT"));
+      expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "SQL", []]]);
+    } finally {
+      subscriber.stop();
+      await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);
+    }
+  });
+
   it("executeMutation returns the inserted id for an explicit INSERT ... RETURNING", async () => {
     const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a') RETURNING id`);
     expect(id).toBe(1);
@@ -74,7 +90,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   it("re-applies the session timezone on a reconnected session", async () => {
     await adapter.execute(`SELECT 1`);
     const spy = vi.spyOn(adapter, "reconfigureConnectionTimezone");
-    await adapter.reconnect();
+    await adapter.reconnectBang();
     await adapter.execute(`SELECT 1`);
     expect(spy).toHaveBeenCalled();
   });
@@ -111,10 +127,10 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
 
   it("reconfigureConnectionTimezone issues its SET once through rawExecute as SCHEMA", async () => {
     await adapter.execute(`SELECT 1`);
-    await adapter.reconnect();
     const subscriber = new SQLSubscriber();
     subscriber.start();
     try {
+      await adapter.reconnectBang();
       await adapter.execute(`SELECT 1`);
       const sets = subscriber.logged.filter(([sql]) => sql.startsWith("SET SESSION timezone"));
       expect(sets).toHaveLength(1);

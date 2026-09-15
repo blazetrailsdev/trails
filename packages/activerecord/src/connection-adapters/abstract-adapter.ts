@@ -652,6 +652,13 @@ export interface AbstractAdapter {
   /** @internal */
   buildTruncateStatement(tableName: string): string;
   /** @internal */
+  sqlForInsert(
+    sql: string,
+    pk: string | false | null | undefined,
+    binds: unknown[],
+    returning: string[] | null | undefined,
+  ): Promise<[string, unknown[]]>;
+  /** @internal */
   rawExecute(
     sql: string,
     name?: string | null,

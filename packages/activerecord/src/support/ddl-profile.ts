@@ -179,7 +179,6 @@ export async function install(): Promise<void> {
   for (const klass of [PostgreSQLAdapter, Mysql2Adapter, SQLite3Adapter]) {
     wrap(klass.prototype as unknown as Record<string, unknown>, "rawExecute", 0);
   }
-  wrap(PostgreSQLAdapter.prototype as unknown as Record<string, unknown>, "executeMutation", 0);
 
   if (process.env.DDL_PROFILE_DEBUG === "1") {
     console.error(`[DDL_PROFILE] installed patches in pid ${process.pid}`);

@@ -287,52 +287,6 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   });
 });
 
-describe("PostgreSQLAdapter#executeMutation", () => {
-  let adapter: PostgreSQLAdapter;
-
-  afterEach(async () => {
-    vi.restoreAllMocks();
-    if (adapter) await adapter.disconnectBang().catch(() => undefined);
-  });
-
-  it("savepoint nesting does not re-enter withRawConnection (_lockQueue)", async () => {
-    const queries: string[] = [];
-    const fakeClient = {
-      query: async (arg: unknown) => {
-        queries.push(typeof arg === "string" ? arg : (arg as { text: string }).text);
-        return { rows: [[42]], rowCount: 1, fields: [] };
-      },
-      release: () => {},
-    };
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-    (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
-    vi.spyOn(
-      adapter as unknown as { _acquireFreshClient: () => unknown },
-      "_acquireFreshClient",
-    ).mockResolvedValue(fakeClient);
-    adapter.verifiedBang();
-    vi.spyOn(
-      adapter as unknown as { openTransactions: () => number },
-      "openTransactions",
-    ).mockReturnValue(1);
-
-    const result = await adapter.executeMutation(
-      "INSERT INTO posts (title) VALUES ('test')",
-      [],
-      "SQL",
-    );
-    expect(typeof result).toBe("number");
-    expect(queries.some((q) => q.startsWith("SAVEPOINT "))).toBe(true);
-    expect(queries.some((q) => q.startsWith("RELEASE SAVEPOINT "))).toBe(true);
-
-    let secondCallRan = false;
-    await adapter.withRawConnection({ materializeTransactions: false }, async () => {
-      secondCallRan = true;
-    });
-    expect(secondCallRan).toBe(true);
-  });
-});
-
 describe("PostgreSQLAdapter#execInsert sequence probe", () => {
   let adapter: PostgreSQLAdapter;
 

@@ -170,12 +170,12 @@ interface TransactionHost {
 }
 
 export async function beginDbTransaction(this: TransactionHost): Promise<void> {
-  this._client = await this._acquireFreshClient();
   try {
     await this.internalExecute("BEGIN", "TRANSACTION", [], {
       materializeTransactions: false,
       allowRetry: true,
     });
+    this._client = await this._acquireFreshClient();
   } catch (error) {
     this._client = null;
     if (this.constructor._isConnectionError(error)) this._discardRawConnection();
@@ -189,12 +189,12 @@ export async function beginIsolatedDbTransaction(
   isolation: string,
 ): Promise<void> {
   const level = fetch<string>(transactionIsolationLevels(), isolation);
-  this._client = await this._acquireFreshClient();
   try {
     await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
       materializeTransactions: false,
       allowRetry: true,
     });
+    this._client = await this._acquireFreshClient();
   } catch (error) {
     this._client = null;
     if (this.constructor._isConnectionError(error)) this._discardRawConnection();
