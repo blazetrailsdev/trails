@@ -427,16 +427,16 @@ describe("FixturesTest", () => {
   });
 
   it("no args returns all", () => {
-    const allTopics = topics.all();
+    const allTopics = topics();
     expect(allTopics.length).toBe(5);
     expect(allTopics[0].title).toBe("The First Topic");
     expect(allTopics[allTopics.length - 1].id).toBe(5);
   });
 
   it("no args record returns all without array", () => {
-    const allBinaries = binaries.all();
+    const allBinaries = binaries();
     expect(allBinaries).toBeInstanceOf(Array);
-    expect(binaries.all().length).toBe(2);
+    expect(binaries().length).toBe(2);
   });
 
   it("nil raises", () => {

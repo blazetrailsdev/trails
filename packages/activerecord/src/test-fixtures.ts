@@ -141,6 +141,7 @@ type ResolvedFixtureMap = Record<string, ResolvedFixtureSet>;
 type FixtureAccessor<T extends BaseClass, K extends string> = {
   (name: K, forceReload: true): Promise<InstanceType<T>>;
   (...names: [K, K, ...K[]]): InstanceType<T>[];
+  (): InstanceType<T>[];
   (name: K): InstanceType<T>;
   all(): InstanceType<T>[];
 };
@@ -242,11 +243,11 @@ export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[
   [E in T[number] as E["table"]]: JoinTableAccessor<Extract<keyof E["data"], string>>;
 };
 
-let alreadyLoadedFixtures = new Map<object, unknown>();
+let alreadyLoadedFixtures = new Map<unknown, unknown>();
 
 /** @internal */
 async function loadFixturesOnce<T>(
-  fixtureCacheKey: object,
+  fixtureCacheKey: unknown,
   ctx: TaskContext,
   adapter: DatabaseAdapter,
   options: WithTransactionalFixturesOptions,
@@ -268,6 +269,7 @@ async function loadFixturesOnce<T>(
     }
     return loaded;
   }
+  FixtureSet.resetCache();
   alreadyLoadedFixtures = new Map();
   return loadFixtures();
 }
@@ -407,7 +409,7 @@ function useFixtures(
 
   const store: Record<string, Record<string, unknown>> = {};
   const loadedFixtures: Record<string, FixtureSet> = {};
-  const fixtureCacheKey = {};
+  const fixtureCacheKey = isNameArray ? JSON.stringify(keys) : {};
 
   beforeEach(async (ctx) => {
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
@@ -465,6 +467,7 @@ function useFixtures(
       const forceReload = fixtureNames.at(-1) === true || fixtureNames.at(-1) === ":reload";
       if (forceReload) fixtureNames.pop();
       const returnSingleRecord = fixtureNames.length === 1;
+      if (fixtureNames.length === 0) fixtureNames = Object.keys(set);
       const instances = fixtureNames.map((fName) => {
         if (typeof fName !== "string")
           throw new Error(`useFixtures: no fixture named "${String(fName)}" in set "${key}"`);
