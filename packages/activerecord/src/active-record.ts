@@ -4,7 +4,6 @@ import { ActiveRecord, AsyncExecutor } from "./ar-config.js";
 import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
-import { _PoolConfig } from "./connection-adapters/pool-config-slot.js";
 import type { QueryTransformer } from "./query-transformers.js";
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
@@ -154,7 +153,8 @@ export async function eagerLoadBang(): Promise<void> {
 }
 
 export async function disconnectAllBang(): Promise<void> {
-  await _PoolConfig!.disconnectAllBang();
+  const { PoolConfig } = await import("./connection-adapters/pool-config.js");
+  await PoolConfig.disconnectAllBang();
 }
 
 export function afterAllTransactionsCommit(

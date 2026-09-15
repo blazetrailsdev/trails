@@ -797,7 +797,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Sixteen instances exist and are the only ones:
+where Ruby resolves the constant. Fifteen instances exist and are the only ones:
 
 - `activerecord/src/associations/association-class-slots.ts` — the six
   concrete association ctors `AssociationReflection#association_class` returns,
@@ -891,13 +891,6 @@ extends Association`, whose modules reach `reflection.ts` back through
   `associations/builder/belongs-to.ts`,
   `database-configurations/connection-url-resolver.ts` — reads it as
   `_Base!.<seat>`, unguarded like the rest.
-- `activerecord/src/connection-adapters/pool-config-slot.ts` — the
-  `PoolConfig` ctor, read by `active-record.ts` for `ActiveRecord.disconnect_all!`
-  (`active_record.rb:510-512` names `ConnectionAdapters::PoolConfig` at call
-  time). The cycle is `active-record.ts -> pool-config.ts ->
-abstract/connection-pool.ts -> ... -> abstract-adapter.ts`, whose module-scope
-  `include(AbstractAdapter, DatabaseStatements)` would read `DatabaseStatements`
-  in TDZ once an adapter mixin reads a seat off `active-record.ts`.
 - `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
   `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
   (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle
