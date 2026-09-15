@@ -8,6 +8,6 @@ describe("TimeZoneConverterTest", () => {
     const valueFromCache = new TimeZoneConverter(new DateTime());
 
     expect(value.equals(valueFromCache)).toBe(true);
-    expect(value.equals("foo" as any)).toBe(false);
+    expect(value.equals("foo" as any)).not.toBe(true);
   });
 });
