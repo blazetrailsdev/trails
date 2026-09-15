@@ -69,7 +69,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  renderForApiRequest(wrapper: ExceptionWrapper): RackResponse {
+  renderForApiRequest(wrapper: ExceptionWrapper, contentType?: MimeType): RackResponse {
+    if (contentType?.symbol === ":xml") return this.renderXmlError(wrapper);
     const body = JSON.stringify({
       status: wrapper.statusCode,
       error: wrapper.statusText,
@@ -208,22 +209,13 @@ export class DebugExceptions {
     const xhr = request["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
     const contentType = (request["CONTENT_TYPE"] as string) ?? "";
 
-    const negotiated = accept || contentType;
-    if (this.isApiRequest(negotiated)) {
-      return this.renderForApiRequest(wrapper);
+    const format = MimeType.parse(accept || contentType)[0];
+    if (this.isApiRequest(format?.toString())) {
+      return this.renderForApiRequest(wrapper, format);
     }
 
     if (xhr || contentType.includes("text/plain")) {
       return this.renderTextError(wrapper);
-    }
-
-    const format = accept ? MimeType.parse(accept)[0]?.symbol : undefined;
-    if (format === ":json" || (!accept && contentType.includes("application/json"))) {
-      return this.renderJsonError(wrapper, request);
-    }
-
-    if (format === ":xml") {
-      return this.renderXmlError(wrapper);
     }
 
     return this.renderHtmlError(wrapper, request);
@@ -240,25 +232,6 @@ export class DebugExceptions {
       wrapper.statusCode,
       { "content-type": "text/plain; charset=utf-8" },
       bodyFromString(body),
-    ];
-  }
-
-  private renderJsonError(wrapper: ExceptionWrapper, env: RackEnv): RackResponse {
-    const json = JSON.stringify({
-      status: wrapper.statusCode,
-      error: wrapper.statusText,
-      exception: wrapper.exceptionName,
-      message: wrapper.message,
-      traces: {
-        "Application Trace": wrapper.applicationTrace.slice(0, 10),
-        "Framework Trace": wrapper.frameworkTrace.slice(0, 10),
-      },
-    });
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "application/json; charset=utf-8" },
-      bodyFromString(json),
     ];
   }
 

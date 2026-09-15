@@ -59,14 +59,14 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("rescue with JSON error for JSON API request", async () => {
-    const mw = new DebugExceptions(errorApp);
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
     const json = JSON.parse(await bodyToString(body));
     expect(json.status).toBe(500);
     expect(json.error).toBe("Internal Server Error");
-    expect(json.message).toBe("Something went wrong");
+    expect(json.exception).toBeDefined();
   });
 
   it("rescue with HTML format for HTML API request", async () => {
@@ -79,7 +79,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("rescue with XML format for XML API requests", async () => {
-    const mw = new DebugExceptions(errorApp);
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/xml" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/xml");
@@ -89,7 +89,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("rescue with JSON format as fallback if API request format is not supported", async () => {
-    const mw = new DebugExceptions(errorApp);
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
     const [status, headers] = await mw.call(makeEnv({ CONTENT_TYPE: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
@@ -282,7 +282,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("json error includes traces", async () => {
-    const mw = new DebugExceptions(errorApp);
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
     const [, , body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     const json = JSON.parse(await bodyToString(body));
     expect(json.traces).toBeTruthy();
@@ -298,7 +298,7 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("xml error includes exception name", async () => {
-    const mw = new DebugExceptions(routingErrorApp);
+    const mw = new DebugExceptions(routingErrorApp, { responseFormat: "api" });
     const [, , body] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/xml" }));
     const xml = await bodyToString(body);
     expect(xml).toContain("RoutingError");

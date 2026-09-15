@@ -673,6 +673,25 @@ describe("Application::DefaultMiddlewareStack", () => {
       .middlewares.map((m) => m.klass);
   };
 
+  it("passes DebugExceptions its response format, api for an api-only app", () => {
+    const formatFor = (mutate: (c: Configuration) => void) => {
+      const app = buildApp();
+      mutate(app.config);
+      const mw = new DefaultMiddlewareStack(app, app.config, paths)
+        .buildStack()
+        .middlewares.find((m) => m.klass === DebugExceptions)!;
+      return mw.args;
+    };
+    expect(formatFor(() => {})).toEqual([{ responseFormat: "default" }]);
+    expect(formatFor((c) => (c.apiOnly = true))).toEqual([{ responseFormat: "api" }]);
+    expect(
+      formatFor((c) => {
+        c.apiOnly = true;
+        c.debugExceptionResponseFormat = "default";
+      }),
+    ).toEqual([{ responseFormat: "default" }]);
+  });
+
   it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {
     const k = build();
     expect(k).toEqual(
