@@ -211,39 +211,50 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       });
       return handle;
     },
-    gzipReader: (io) => ({
-      read: async () => {
-        const stream = zlib.createGunzip();
-        const chunks: Uint8Array[] = [];
-        let failure: Error | null = null;
-        stream.on("data", (chunk) => chunks.push(chunk as Uint8Array));
-        const ended = new Promise<void>((res) => {
-          stream.on("end", () => res());
-          stream.on("error", (err) => {
-            failure = err as Error;
-            res();
-          });
+    gzipReader: (io) => {
+      const stream = zlib.createGunzip();
+      let chunks: Uint8Array[] = [];
+      let failure: Error | null = null;
+      stream.on("data", (chunk) => chunks.push(chunk as Uint8Array));
+      const ended = new Promise<void>((res) => {
+        stream.on("end", () => res());
+        stream.on("error", (err) => {
+          failure = err as Error;
+          res();
         });
+      });
+      const readMore = async (): Promise<void> => {
         let str: string | null;
-        while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
+        while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null) {
+          if (str.length === 0) continue;
           const bytes = new Uint8Array(str.length);
           for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
-          if (!stream.write(bytes)) await new Promise<void>((res) => stream.once("drain", res));
+          if (!stream.write(bytes)) {
+            await new Promise<void>((res) => {
+              stream.once("drain", res);
+              void ended.then(res);
+            });
+          }
         }
         stream.end();
         await ended;
-        if (failure !== null) throw failure;
-        let length = 0;
-        for (const chunk of chunks) length += chunk.length;
-        const dst = new Uint8Array(length);
-        let offset = 0;
-        for (const chunk of chunks) {
-          dst.set(chunk, offset);
-          offset += chunk.length;
-        }
-        return dst;
-      },
-    }),
+      };
+      const finished = readMore();
+      return {
+        read: async () => {
+          await finished;
+          if (failure !== null) throw failure;
+          const dst = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
+          let offset = 0;
+          for (const chunk of chunks) {
+            dst.set(chunk, offset);
+            offset += chunk.length;
+          }
+          chunks = [];
+          return dst;
+        },
+      };
+    },
   };
 }
 

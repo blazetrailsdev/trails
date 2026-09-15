@@ -69,6 +69,20 @@ describe("Zlib::GzipFile.open", () => {
     }
   });
 
+  it("answers an empty string once the stream is read to the end", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "twice.gz");
+      await Zlib.GzipWriter.open(filename, (gz) => gz.write("once"));
+
+      expect(
+        await Zlib.GzipReader.open(filename, async (gz) => [await gz.read(), await gz.read()]),
+      ).toEqual(["once", ""]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("closes the stream on the way out of the block", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
     try {
