@@ -3,9 +3,9 @@ import { isPresent } from "@blazetrails/activesupport";
 import { Module, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 
-let _formatVersion: unknown = 6.1;
+let _formatVersion: 6.1 | 7.1 = 6.1;
 
-export function formatVersion(): unknown {
+export function formatVersion(): 6.1 | 7.1 {
   return _formatVersion;
 }
 

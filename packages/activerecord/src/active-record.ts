@@ -271,7 +271,7 @@ export function setQueryTransformers(queryTransformers: QueryTransformer[]): voi
   _queryTransformers = queryTransformers;
 }
 
-export function marshallingFormatVersion(): unknown {
+export function marshallingFormatVersion(): 6.1 | 7.1 {
   return Marshalling.formatVersion();
 }
 
