@@ -36,6 +36,7 @@ export class Fiber<R = unknown> {
 
   readonly #thread: Thread = Thread.current();
   readonly #block: () => R;
+  #terminated = false;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/cont.c:3539`).
@@ -48,6 +49,17 @@ export class Fiber<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber#resume` (`vendor/ruby/cont.c:3543`).
    */
   resume(): R {
-    return currentSlot().run(this as Fiber, this.#block);
+    try {
+      return currentSlot().run(this as Fiber, this.#block);
+    } finally {
+      this.#terminated = true;
+    }
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#alive?` (`vendor/ruby/cont.c:3551`).
+   */
+  isAlive(): boolean {
+    return !this.#terminated;
   }
 }

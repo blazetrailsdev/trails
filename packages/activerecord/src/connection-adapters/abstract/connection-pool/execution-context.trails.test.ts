@@ -21,7 +21,7 @@ describe("execution context per IsolatedExecutionState.run", () => {
     ]);
 
     expect(a).not.toBe(b);
-    expect(IsolatedExecutionState.context().id).toBe(0);
+    expect(Thread.current().id).toBe(0);
     expect(lease()).not.toBe(a);
     expect(lease()).toBe(lease());
   });

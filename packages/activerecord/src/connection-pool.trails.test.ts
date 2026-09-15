@@ -1,6 +1,5 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { Thread } from "@blazetrails/ruby-compat";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
@@ -1090,7 +1089,7 @@ describe("ConnectionPool#newConnection", () => {
 
 describe("execution context at Rails thread-spawn sites", () => {
   it("unscoped top-level code resolves to ROOT_CONTEXT", () => {
-    expect(IsolatedExecutionState.context().id).toBe(0);
+    expect(Thread.current().id).toBe(0);
   });
 
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
@@ -1098,7 +1097,7 @@ describe("execution context at Rails thread-spawn sites", () => {
     const pools = [0.01, 0.02].map((frequency) => ({
       reap: () => {
         const ids = seen.get(frequency) ?? [];
-        ids.push(IsolatedExecutionState.context().id);
+        ids.push(Thread.current().id);
         seen.set(frequency, ids);
       },
     }));

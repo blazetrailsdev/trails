@@ -25,12 +25,14 @@ import {
   NullLock,
 } from "@blazetrails/activesupport";
 import {
+  Fiber,
   File,
   Process,
   RbConfig,
   abort,
   env,
   rbObjAsString as toS,
+  Thread,
 } from "@blazetrails/ruby-compat";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
@@ -851,7 +853,7 @@ export class AbstractAdapter implements Quoting {
 
   protected _visitor!: Visitors.ToSql;
   protected _connection: AbstractAdapter | null = null;
-  private _owner: { readonly id: number } | null = null;
+  private _owner: Thread | Fiber | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -1002,11 +1004,11 @@ export class AbstractAdapter implements Quoting {
     clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
   }
 
-  get inUse(): { readonly id: number } | null {
+  get inUse(): Thread | Fiber | null {
     return this.owner;
   }
 
-  get owner(): { readonly id: number } | null {
+  get owner(): Thread | Fiber | null {
     return this._owner;
   }
 
