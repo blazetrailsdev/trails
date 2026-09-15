@@ -10,7 +10,7 @@ export class Exception extends Error {
   constructor(message?: string) {
     super(message);
     this.name = "SQLite3::Exception";
-    this.#message = this.message;
+    this.#message = message ?? this.name;
     delete (this as { message?: string }).message;
   }
 
