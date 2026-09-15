@@ -594,8 +594,13 @@ export interface ScopedSkipGroup {
    *
    * Leave unset for a genuinely-absent surface — then a TS declaration of the
    * name stays flagged.
+   *
+   * An array names a port spread over several TS declarations — a Ruby
+   * `attr_reader` + `name=` pair ported as a `getX`/`setX` accessor pair. The
+   * method comparison credits the Ruby name only when ALL of them are declared, and
+   * extra-surface allows every one of them.
    */
-  tsMirrorName?: string;
+  tsMirrorName?: string | string[];
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
@@ -711,10 +716,20 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`@_%s` template it interpolates. trails' `attrInternal*` helpers assign the " +
       "underlying property directly rather than generating methods from a name " +
       "template, so there is no format string to expose and no define_method " +
-      "back end to name; the naming format is reachable as " +
-      "`getAttrInternalNamingFormat`/`setAttrInternalNamingFormat`.",
-    names: ["attr_internal_define", "attr_internal_naming_format"],
+      "back end to name.",
+    names: ["attr_internal_define"],
     rubyFiles: ["core_ext/module/attr_internal.rb"],
+  },
+  {
+    reason:
+      "`attr_internal_naming_format` is a `class << self` `attr_reader` beside a " +
+      "hand-written `attr_internal_naming_format=` (core_ext/module/attr_internal.rb:22-35). " +
+      "A module-level binding has no accessor syntax in TS, so the pair is " +
+      "ported as `getAttrInternalNamingFormat`/`setAttrInternalNamingFormat` " +
+      "(module-ext.ts).",
+    names: ["attr_internal_naming_format"],
+    rubyFiles: ["core_ext/module/attr_internal.rb"],
+    tsMirrorName: ["getAttrInternalNamingFormat", "setAttrInternalNamingFormat"],
   },
   {
     reason:
@@ -754,26 +769,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "connection_adapters/mysql/type_metadata.rb",
       "connection_adapters/postgresql/type_metadata.rb",
     ],
-  },
-  {
-    reason:
-      "AdapterHelper's four hand-written capability predicates are rendered by " +
-      "packages/activerecord/src/support/supports.ts as entries in one " +
-      "feature-keyed table (`default_expression`, `non_unique_constraint_name`, " +
-      "`text_column_with_default`, `sql_standard_drop_constraint`) rather than " +
-      "as four exports on adapter-helper.ts, exactly as the ~15 predicates " +
-      "`adapter_helper.rb` itself generates with `define_method` are. The table " +
-      "keys are the `supports_<key>?` names, so the pairing is checkable; " +
-      "duplicating them as free functions here would give two sources of truth " +
-      "for the same capability. Scoped to adapter_helper.rb, the only Ruby file " +
-      "in the tree that defines these names.",
-    names: [
-      "supports_default_expression?",
-      "supports_non_unique_constraint_name?",
-      "supports_text_column_with_default?",
-      "supports_sql_standard_drop_constraint?",
-    ],
-    rubyFiles: ["adapter_helper.rb"],
   },
   {
     reason:
@@ -1174,15 +1169,32 @@ export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
 }
 
 /**
- * {@link ScopedSkipGroup.tsMirrorName} for `rubyName` in `rubyFile`, or null
- * when the scoped skip declares no faithful TS spelling (or doesn't apply).
+ * {@link ScopedSkipGroup.tsMirrorName} for `rubyName` in `rubyFile`, always as
+ * a list, or null when the scoped skip declares no faithful TS spelling (or
+ * doesn't apply).
  */
-export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string | null {
+export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string[] | null {
   for (const g of SCOPED_SKIP_GROUPS) {
     if (g.tsMirrorName === undefined) continue;
-    if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) return g.tsMirrorName;
+    if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) {
+      return typeof g.tsMirrorName === "string" ? [g.tsMirrorName] : g.tsMirrorName;
+    }
   }
   return null;
+}
+
+/**
+ * The candidates a scoped skip's `tsMirrorName` spellings contribute. A port
+ * spread over several declarations is credited only when EVERY spelling is
+ * declared; otherwise the undeclared ones are the candidates, so the method
+ * reports missing under a name that is really absent.
+ */
+export function scopedSkipMirrorCandidates(
+  tsMirrorNames: string[],
+  tsMethods: ReadonlySet<string>,
+): string[] {
+  const absent = tsMirrorNames.filter((n) => !tsMethods.has(n));
+  return absent.length === 0 ? tsMirrorNames : absent;
 }
 
 /**
@@ -1679,7 +1691,13 @@ export function explainConventions(): string {
   const scopedSkipSections = SCOPED_SKIP_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     const files = g.rubyFiles.map((f) => `\`${f}\``).join(", ");
-    const mirror = g.tsMirrorName === undefined ? "" : `; ported in TS as \`${g.tsMirrorName}\``;
+    const mirror =
+      g.tsMirrorName === undefined
+        ? ""
+        : `; ported in TS as ${[g.tsMirrorName]
+            .flat()
+            .map((n) => `\`${n}\``)
+            .join(" / ")}`;
     return `- ${g.reason}\n  - ${names} (only in: ${files}${mirror})`;
   }).join("\n");
 

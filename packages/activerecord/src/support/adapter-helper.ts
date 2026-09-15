@@ -42,6 +42,54 @@ export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
   return (await connection.showVariable("enforce_gtid_consistency")) === "ON";
 }
 
+const mysqlServer = adapterType === "mysql" ? await import("./mysql-server-version.js") : undefined;
+
+export function supportsDefaultExpression(): boolean | undefined {
+  if (currentAdapter("PostgreSQLAdapter")) {
+    return true;
+  } else if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+    const conn = mysqlServer!;
+    return (
+      (conn.isMariaDb && (conn.serverVersion?.compare("10.2.1") ?? -1) >= 0) ||
+      (!conn.isMariaDb && (conn.serverVersion?.compare("8.0.13") ?? -1) >= 0)
+    );
+  }
+  return undefined;
+}
+
+export function supportsNonUniqueConstraintName(): boolean {
+  if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+    const conn = mysqlServer!;
+    return conn.isMariaDb;
+  } else {
+    return false;
+  }
+}
+
+export function supportsTextColumnWithDefault(): boolean {
+  if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+    const conn = mysqlServer!;
+    return conn.isMariaDb && (conn.serverVersion?.compare("10.2.1") ?? -1) >= 0;
+  } else {
+    return true;
+  }
+}
+
+export function supportsSqlStandardDropConstraint(): boolean {
+  if (currentAdapter("SQLite3Adapter")) {
+    return false;
+  } else if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+    const conn = mysqlServer!;
+    if (conn.isMariaDb) {
+      return (conn.serverVersion?.compare("10.3.13") ?? -1) >= 0;
+    } else {
+      return (conn.serverVersion?.compare("8.0.19") ?? -1) >= 0;
+    }
+  } else {
+    return true;
+  }
+}
+
 type ExtensionConnection = {
   supportsExtensions(): boolean;
   extensionEnabled(name: string): Promise<boolean>;

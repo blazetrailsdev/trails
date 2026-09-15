@@ -1756,6 +1756,17 @@ describe("dedupeRubyMethodInto", () => {
       definedInFile: "x.rb",
     });
   });
+  it("expects a scoped skip that names its TS spellings, keeping a bare scoped skip dropped", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    const file = "core_ext/module/attr_internal.rb";
+    dedupeRubyMethodInto(seen, rm("attr_internal_naming_format"), "Module", file);
+    dedupeRubyMethodInto(seen, rm("attr_internal_define"), "Module", file);
+    expect([...seen.keys()]).toEqual(["attr_internal_naming_format"]);
+    expect(seen.get("attr_internal_naming_format")!.tsMirrorNames).toEqual([
+      "getAttrInternalNamingFormat",
+      "setAttrInternalNamingFormat",
+    ]);
+  });
 });
 
 describe("rubyFileHasTsCounterpart", () => {

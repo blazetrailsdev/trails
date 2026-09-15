@@ -1,5 +1,5 @@
 import { TypeError } from "@blazetrails/ruby-compat";
-import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
@@ -14,6 +14,7 @@ import {
   buildJoinDependencies,
   eachJoinDependencies,
 } from "./query-methods.js";
+import { ONE_AS_ONE } from "./finder-methods.js";
 
 export class ColumnAliasTracker {
   private connection: AliasingConnection;
@@ -106,7 +107,7 @@ interface CalculationRelation {
   unscope(...args: unknown[]): CalculationRelation;
   except(...skips: string[]): CalculationRelation;
   arel(): SelectManager;
-  buildSubquery(subqueryAlias: string, selectValue: unknown): SelectManager;
+  buildSubquery(subqueryAlias: string | Nodes.SqlLiteral, selectValue: unknown): SelectManager;
   spawn(): CalculationRelation;
   _values: Record<string, unknown>;
   groupValues: Array<string | Nodes.Node>;
@@ -734,17 +735,17 @@ function buildCountSubquery(
   const isAll = columnName === ":all";
   let columnAlias: Nodes.SqlLiteral;
   if (isAll) {
-    columnAlias = new Nodes.SqlLiteral("*");
-    if (!distinct) relation.selectValues = [new Nodes.SqlLiteral("1 AS one")];
+    columnAlias = star();
+    if (!distinct) relation.selectValues = [sql(ONE_AS_ONE)];
   } else {
-    columnAlias = new Nodes.SqlLiteral("count_column");
+    columnAlias = sql("count_column");
     const column = aggregateColumn(relation, columnName) as Nodes.Node & {
       as(alias: Nodes.SqlLiteral): Nodes.Node;
     };
     relation.selectValues = [column.as(columnAlias)];
   }
 
-  const subqueryAlias = "subquery_for_count";
+  const subqueryAlias = sql("subquery_for_count", { retryable: true });
   const selectValue = operationOverAggregateColumn(columnAlias, "count", false);
 
   return isAll

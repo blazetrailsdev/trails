@@ -109,6 +109,8 @@ import {
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
+  scopedSkipMirrorCandidates,
+  scopedSkipMirrorName,
   rubyFileToTs,
   rubyMethodToTs,
 } from "@blazetrails/parity/conventions";
@@ -2826,10 +2828,12 @@ export function dedupeRubyMethodInto(
 ): void {
   if (rubyMethodToTsForFqn(itemFqn, rm.name) === null) return;
   if (isRubyOnlyClass(itemFqn)) return;
-  if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
+  const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
   if (!seen.has(key)) {
     seen.set(key, {
+      ...(tsMirrorNames === null ? {} : { tsMirrorNames }),
       rubyName: rm.name,
       rubyModule: itemFqn,
       umbrellaConfig: rm.umbrellaConfig,
@@ -2851,6 +2855,8 @@ export interface SeenRubyMethod {
   mixinFile?: string;
   /** The Ruby file that actually defines it — see `reopeningMethodCreditedToOwnFile`. */
   definedInFile?: string;
+  /** A scoped skip's `tsMirrorName` spellings, which replace the mapped candidates. */
+  tsMirrorNames?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -4501,11 +4507,14 @@ export function main() {
 
       for (const [
         _dedupeKey,
-        { rubyName, rubyModule, umbrellaConfig, notes, mixinFile, definedInFile },
+        { rubyName, rubyModule, umbrellaConfig, notes, mixinFile, definedInFile, tsMirrorNames },
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
-        const tsCandidates = rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames);
+        const tsCandidates =
+          tsMirrorNames === undefined
+            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames)
+            : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (tsCandidates === null) continue;
 
         // Check direct match first — find which candidate matched
