@@ -173,6 +173,9 @@ export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCt
 
 export interface DelegationHost {
   readonly model: typeof Base;
+  readonly isLoaded: boolean;
+  readonly target?: Base[];
+  _records?: Base[];
   records(): Promise<Base[]>;
 }
 
@@ -462,8 +465,7 @@ export class Delegation {
 refuseImplicitCount(Delegation.prototype.length);
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
-  const loaded = host as unknown as { isLoaded: boolean; target?: Base[]; _records?: Base[] };
-  if (loaded.isLoaded) return fn([...(loaded.target ?? loaded._records ?? [])]);
+  if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
   return host.records().then((records) => fn([...records]));
 }
 
