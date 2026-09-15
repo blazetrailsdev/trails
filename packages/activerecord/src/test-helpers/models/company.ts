@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -8,7 +9,6 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -432,7 +432,7 @@ export class Client extends Company {
       if (this.raiseOnSave) throw new Client.RaisedOnSave();
     });
     this.beforeSave(async function (this: Client) {
-      if (this.throwOnSave) throwAbort();
+      if (this.throwOnSave) kernelThrow(":abort");
     });
     this.afterSave(async function (this: Client) {
       if (this.rollbackOnSave) throw new Rollback();

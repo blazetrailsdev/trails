@@ -1,19 +1,9 @@
-import { NoMethodError, RuntimeError } from "@blazetrails/ruby-compat";
+import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
 
 export type CallbackKind = "before" | "after" | "around";
-
-const ABORT = Symbol("blazetrails.activesupport.callbacks.abort");
-
-export function throwAbort(): never {
-  throw ABORT;
-}
-
-export function isAbortSignal(e: unknown): boolean {
-  return e === ABORT;
-}
 
 export type CallbackCondition<T extends object = object> =
   | ((target: T, value?: unknown) => boolean)
@@ -353,36 +343,38 @@ export class Before {
         throw new RuntimeError(
           `Async before callback on chain "${chainName}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
-            `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
+            `Use the default terminator (halt via throw(:abort)) or make all before callbacks synchronous.`,
         );
       }
       if (halt) this.halt(env);
       return env;
     }
 
-    let cbResult: unknown;
-    try {
-      cbResult = resultLambda();
-    } catch (e) {
-      if (!isAbortSignal(e)) throw e;
-      this.halt(env);
-      return env;
-    }
-    if (!isThenable(cbResult)) return env;
-    if (opts?.strict === "sync") {
-      swallowRejection(cbResult);
-      throw new RuntimeError(
-        `Async callback on sync chain "${chainName}" — before returned a Promise`,
-      );
-    }
-    return Promise.resolve(cbResult).then(
-      () => env,
-      (e) => {
-        if (!isAbortSignal(e)) throw e;
-        this.halt(env);
+    let terminate = true;
+    const caught = kernelCatch(":abort", () => {
+      const cbResult = resultLambda();
+      if (!isThenable(cbResult)) {
+        terminate = false;
+        return;
+      }
+      if (opts?.strict === "sync") {
+        swallowRejection(cbResult);
+        throw new RuntimeError(
+          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+        );
+      }
+      return Promise.resolve(cbResult).then(() => {
+        terminate = false;
+      });
+    });
+    if (isThenable(caught)) {
+      return Promise.resolve(caught).then(() => {
+        if (terminate) this.halt(env);
         return env;
-      },
-    );
+      });
+    }
+    if (terminate) this.halt(env);
+    return env;
   }
 
   private halt(env: FilterEnvironment): void {
@@ -406,13 +398,12 @@ export class Before {
         return true;
       }
       if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
-      try {
+      let terminate = true;
+      kernelCatch(":abort", () => {
         cb.call(target, target);
-        return true;
-      } catch (e) {
-        if (isAbortSignal(e)) return false;
-        throw e;
-      }
+        terminate = false;
+      });
+      return !terminate;
     };
   }
 }

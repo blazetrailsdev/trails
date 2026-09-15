@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
@@ -7,7 +8,6 @@ import {
   Callbacks as ASCallbacks,
   extend,
   runCallbacks,
-  throwAbort,
   withOptions,
   include,
 } from "@blazetrails/activesupport";
@@ -614,7 +614,7 @@ describe("unified sync/async runner", () => {
         this.beforeValidation(async () => {
           await Promise.resolve();
           order.push("before");
-          throwAbort();
+          kernelThrow(":abort");
         });
         this.validate(() => {
           order.push("validate");
@@ -711,7 +711,7 @@ describe("Callbacks", () => {
         this.attribute("name", "string");
         generated(this).beforeSave(() => {
           order.push("before");
-          throwAbort();
+          kernelThrow(":abort");
         });
         generated(this).afterSave(() => {
           order.push("after");
@@ -741,7 +741,7 @@ describe("Callbacks", () => {
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.beforeValidation(() => throwAbort());
+        this.beforeValidation(() => kernelThrow(":abort"));
       }
     }
     interface NoValidate extends Attributes {}

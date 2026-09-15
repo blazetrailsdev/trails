@@ -1,4 +1,4 @@
-import { throwAbort } from "@blazetrails/activesupport";
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
@@ -45,7 +45,7 @@ export class Ship extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throwAbort();
+    kernelThrow(":abort");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

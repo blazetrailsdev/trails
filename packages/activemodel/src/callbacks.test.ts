@@ -1,9 +1,10 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { runCallbacks, throwAbort, include } from "@blazetrails/activesupport";
+import { runCallbacks, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { type CallbackConditions } from "./callbacks.js";
@@ -177,7 +178,7 @@ describe("CallbacksTest", () => {
         });
         generated(this).beforeSave(() => {
           order.push("halt");
-          throwAbort();
+          kernelThrow(":abort");
         });
         generated(this).beforeSave(() => {
           order.push("never");

@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, kernelThrow } from "@blazetrails/ruby-compat";
 
 type HistoryEntry = [string, string];
 
@@ -58,7 +57,7 @@ class CallbackDeveloperWithHaltedValidation extends CallbackDeveloper {
   static {
     this.beforeValidation((model: CallbackDeveloperWithHaltedValidation) => {
       model.history.push(["before_validation", "throwing_abort"]);
-      throwAbort();
+      kernelThrow(":abort");
     });
     this.beforeValidation((model: CallbackDeveloperWithHaltedValidation) => {
       model.history.push(["before_validation", "should_never_get_here"]);
@@ -112,7 +111,7 @@ class DeveloperWithCanceledCallbacks extends Base {
   }
 
   private cancel(): void {
-    throwAbort();
+    kernelThrow(":abort");
   }
 }
 
@@ -170,16 +169,16 @@ class CallbackHaltedDeveloper extends Base {
     this.attribute("salary", "integer");
 
     this.beforeSave((r: CallbackHaltedDeveloper) => {
-      if (r.cancelBeforeSave !== undefined) throwAbort();
+      if (r.cancelBeforeSave !== undefined) kernelThrow(":abort");
     });
     this.beforeCreate((r: CallbackHaltedDeveloper) => {
-      if (r.cancelBeforeCreate) throwAbort();
+      if (r.cancelBeforeCreate) kernelThrow(":abort");
     });
     this.beforeUpdate((r: CallbackHaltedDeveloper) => {
-      if (r.cancelBeforeUpdate) throwAbort();
+      if (r.cancelBeforeUpdate) kernelThrow(":abort");
     });
     this.beforeDestroy((r: CallbackHaltedDeveloper) => {
-      if (r.cancelBeforeDestroy) throwAbort();
+      if (r.cancelBeforeDestroy) kernelThrow(":abort");
     });
 
     this.afterSave((r: CallbackHaltedDeveloper) => {

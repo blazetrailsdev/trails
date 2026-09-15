@@ -1,5 +1,5 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
@@ -44,7 +44,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       static {
         this._tableName = "faces";
         this.beforeSave(function () {
-          throwAbort();
+          kernelThrow(":abort");
         });
       }
     }

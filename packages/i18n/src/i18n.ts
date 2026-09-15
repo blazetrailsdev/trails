@@ -1,10 +1,10 @@
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat";
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
 import type { TranslateOptions } from "./backend/base.js";
-import { throwException, catchException } from "./throw-catch.js";
 
 export type Locale = string;
 export type TranslationKey = string | number | boolean;
@@ -340,7 +340,7 @@ function translateKey(
   backend: Base,
   options: TranslateOptions,
 ): unknown {
-  const result = catchException(() => backend.translate(locale, key, options));
+  const result = kernelCatch(":exception", () => backend.translate(locale, key, options));
 
   if (result instanceof MissingTranslation) {
     return handleException(
@@ -367,7 +367,7 @@ function handleException(
     case "raise":
       throw exception instanceof MissingTranslation ? exception.toException() : exception;
     case "throw":
-      return throwException(exception);
+      return kernelThrow(":exception", exception);
     default: {
       const handler = truthy(options.exceptionHandler)
         ? (options.exceptionHandler as ExceptionHandlerLike)

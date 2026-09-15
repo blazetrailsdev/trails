@@ -1,3 +1,4 @@
+import { kernelCatch, UncaughtThrowError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Simple } from "./simple.js";
@@ -10,7 +11,6 @@ import {
   MissingTranslation,
   ReservedInterpolationKey,
 } from "../exceptions.js";
-import { ThrownException, catchException } from "../throw-catch.js";
 import type { TranslateOptions } from "./base.js";
 
 describe("I18n::Backend::Base", () => {
@@ -37,9 +37,9 @@ describe("I18n::Backend::Base", () => {
   });
 
   it("throws MissingTranslation when the key is missing", () => {
-    expect(() => translate("missing")).toThrow(ThrownException);
+    expect(() => translate("missing")).toThrow(UncaughtThrowError);
 
-    const thrown = catchException(() => translate("missing.key")) as MissingTranslation;
+    const thrown = kernelCatch(":exception", () => translate("missing.key")) as MissingTranslation;
     expect(thrown).toBeInstanceOf(MissingTranslation);
     expect(thrown.message).toBe("Translation missing: en.missing.key");
   });

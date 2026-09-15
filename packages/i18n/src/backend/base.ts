@@ -21,10 +21,15 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { NotImplementedError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  isSymbol,
+  symbolToS,
+  kernelCatch,
+  kernelThrow,
+} from "@blazetrails/ruby-compat";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
-import { throwException, catchException } from "../throw-catch.js";
 import {
   transliterate,
   type HashTransliterator,
@@ -250,14 +255,14 @@ export abstract class Base {
 
     if (isNil(entry) && (this.subtrees() || !truthy(count))) {
       if (("default" in options && options.default != null) || !("default" in options)) {
-        throwException(new MissingTranslation(locale!, key as TranslationKey, options));
+        kernelThrow(":exception", new MissingTranslation(locale!, key as TranslationKey, options));
       }
     }
 
     if (truthy(count)) entry = this.pluralize(locale!, entry, count);
 
     if (isNil(entry) && !this.subtrees()) {
-      throwException(new MissingTranslation(locale!, key as TranslationKey, options));
+      kernelThrow(":exception", new MissingTranslation(locale!, key as TranslationKey, options));
     }
 
     const deepInterpolation = options.deepInterpolation;
@@ -361,7 +366,7 @@ export abstract class Base {
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (options.resolve === false) return subject;
-    const result = catchException(() => {
+    const result = kernelCatch(":exception", () => {
       if (isSymbol(subject)) {
         return translate(subject, {
           ...options,

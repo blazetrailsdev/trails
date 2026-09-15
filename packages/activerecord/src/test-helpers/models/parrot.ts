@@ -1,4 +1,4 @@
-import { throwAbort } from "@blazetrails/activesupport";
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -58,7 +58,7 @@ export class Parrot extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throwAbort();
+    kernelThrow(":abort");
   }
 
   incrementUpdatedCount() {

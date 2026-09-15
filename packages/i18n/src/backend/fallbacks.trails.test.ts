@@ -1,10 +1,10 @@
+import { kernelCatch } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks, setFallbacks } from "./fallbacks.js";
 import { Simple } from "./simple.js";
 import { config, resetConfig, t, withLocale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { MissingTranslation } from "../exceptions.js";
-import { catchException } from "../throw-catch.js";
 
 class Backend extends Fallbacks(Simple) {}
 
@@ -17,7 +17,7 @@ describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => 
       `activerecord.errors.models.topic.${type}`,
       `activerecord.errors.messages.${type}`,
     ];
-    const translation = catchException(() =>
+    const translation = kernelCatch(":exception", () =>
       t(scoped[0], { default: scoped.slice(1).map((key) => `:${key}`), throw: true }),
     );
     if (!(translation instanceof MissingTranslation) && translation != null) return translation;

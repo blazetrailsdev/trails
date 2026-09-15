@@ -1,4 +1,4 @@
-import { throwAbort } from "@blazetrails/activesupport";
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
@@ -76,7 +76,7 @@ export class FunkyBulb extends Bulb {
 export class FailedBulb extends Bulb {
   static {
     this.beforeDestroy(async function () {
-      throwAbort();
+      kernelThrow(":abort");
     });
   }
 }

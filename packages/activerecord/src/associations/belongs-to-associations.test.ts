@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
 import { describe, it, expect } from "vitest";
@@ -13,7 +14,6 @@ import {
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { throwAbort } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
@@ -122,7 +122,7 @@ class UndestroyableAuthor extends Base {
   static {
     this.hasOne("book", { className: "DestroyableBook", foreignKey: "author_id" });
     this.beforeDestroy(function () {
-      throwAbort();
+      kernelThrow(":abort");
     });
   }
 }

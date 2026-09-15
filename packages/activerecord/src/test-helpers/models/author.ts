@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";
@@ -25,7 +26,6 @@ import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
 import type { Topic } from "./topic.js";
 import type { VerySpecialComment } from "./comment.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
@@ -386,13 +386,13 @@ export class Author extends Base {
     this.hasMany("postsWithThrownCallbacks", {
       className: "Post",
       beforeAdd: (_owner: any, _r: any) => {
-        throwAbort();
+        kernelThrow(":abort");
       },
       afterAdd: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");
       },
       beforeRemove: (_owner: any, _r: any) => {
-        throwAbort();
+        kernelThrow(":abort");
       },
       afterRemove: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");

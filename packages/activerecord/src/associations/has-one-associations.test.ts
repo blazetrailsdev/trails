@@ -1,7 +1,7 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
-import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
   registerModel,
@@ -1129,7 +1129,7 @@ describe("HasOneAssociationsTest", () => {
         this._tableName = "books";
         this.belongsTo("author", { className: "DestroyByParentAuthor" });
         this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) throwAbort();
+          if (!record.destroyedByAssociation) kernelThrow(":abort");
         });
       }
     }
@@ -1157,7 +1157,7 @@ describe("HasOneAssociationsTest", () => {
         this._tableName = "books";
         this.belongsTo("author", { className: "DbaReplAuthor" });
         this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) throwAbort();
+          if (!record.destroyedByAssociation) kernelThrow(":abort");
         });
       }
     }
@@ -1188,7 +1188,7 @@ describe("HasOneAssociationsTest", () => {
       static {
         this._tableName = "books";
         this.belongsTo("author", { className: "DestroyableAuthor" });
-        this.beforeDestroy(() => throwAbort());
+        this.beforeDestroy(() => kernelThrow(":abort"));
       }
     }
     class DestroyableAuthor extends Base {

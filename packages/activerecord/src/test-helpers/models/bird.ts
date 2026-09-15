@@ -1,4 +1,4 @@
-import { throwAbort } from "@blazetrails/activesupport";
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
@@ -40,7 +40,7 @@ export class Bird extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throwAbort();
+    kernelThrow(":abort");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

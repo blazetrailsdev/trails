@@ -1,8 +1,9 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { _setHasOneAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { throwAbort, underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
+import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
@@ -44,7 +45,7 @@ export class HasOneAssociation extends SingularAssociation {
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
           owner.errors.add("base", ":restrict_dependent_destroy.has_one", { record });
-          throwAbort();
+          kernelThrow(":abort");
         }
         break;
 
@@ -74,7 +75,7 @@ export class HasOneAssociation extends SingularAssociation {
           await (target as any).destroy();
         }
         if (typeof (target as any).isDestroyed === "function" && !(target as any).isDestroyed()) {
-          throwAbort();
+          kernelThrow(":abort");
         }
         break;
 

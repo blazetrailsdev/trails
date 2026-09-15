@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   Value,
@@ -8,7 +9,6 @@ import {
   runCallbacks,
   CallbacksMixin,
   CallTemplate,
-  throwAbort,
 } from "./callbacks.js";
 
 describe("Callbacks", () => {
@@ -178,7 +178,7 @@ describe("Callbacks", () => {
       defineCallbacks(target, "save");
       setCallback(target, "save", "before", (t: any) => {
         t.log.push("before1");
-        throwAbort();
+        kernelThrow(":abort");
       });
       setCallback(target, "save", "before", (t: any) => {
         t.log.push("should-not-run");
@@ -215,7 +215,7 @@ describe("Callbacks", () => {
       defineCallbacks(target, "save");
       setCallback(target, "save", "before", async (t: any) => {
         t.log.push("before1");
-        throwAbort();
+        kernelThrow(":abort");
       });
       setCallback(target, "save", "before", (t: any) => {
         t.log.push("should-not-run");
@@ -247,7 +247,7 @@ describe("Callbacks", () => {
     it("does not swallow the abort sentinel when terminator is disabled", () => {
       const target = {};
       defineCallbacks(target, "save", { terminator: false });
-      setCallback(target, "save", "before", () => throwAbort());
+      setCallback(target, "save", "before", () => kernelThrow(":abort"));
 
       expect(() => runCallbacks(target, "save", () => {})).toThrow();
     });
@@ -257,7 +257,7 @@ describe("Callbacks", () => {
       defineCallbacks(target, "save", {
         terminator: (_t, fn) => fn() === false,
       });
-      setCallback(target, "save", "before", () => throwAbort());
+      setCallback(target, "save", "before", () => kernelThrow(":abort"));
 
       expect(() => runCallbacks(target, "save", () => {})).toThrow();
     });
@@ -1504,7 +1504,7 @@ describe("CallbackDefaultTerminatorTest", () => {
   it("default termination", () => {
     const target = { ran: false };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => throwAbort());
+    setCallback(target, "save", "before", () => kernelThrow(":abort"));
     runCallbacks(target, "save", () => {
       target.ran = true;
     });
@@ -1513,7 +1513,7 @@ describe("CallbackDefaultTerminatorTest", () => {
   it("default termination invokes hook", () => {
     const second = (t: any) => {
       t.count++;
-      throwAbort();
+      kernelThrow(":abort");
     };
     const target = {
       count: 0,
@@ -1529,7 +1529,7 @@ describe("CallbackDefaultTerminatorTest", () => {
     expect(target.halted).toBe(second);
   });
   it("default termination invokes hook through around chain", () => {
-    const second = () => throwAbort();
+    const second = () => kernelThrow(":abort");
     const target = {
       log: [] as string[],
       halted: undefined as unknown,
@@ -1552,7 +1552,7 @@ describe("CallbackDefaultTerminatorTest", () => {
   it("async termination invokes hook through around chain", async () => {
     const second = async () => {
       await Promise.resolve();
-      throwAbort();
+      kernelThrow(":abort");
     };
     const target = {
       halted: undefined as unknown,
@@ -1569,7 +1569,7 @@ describe("CallbackDefaultTerminatorTest", () => {
   it("block never called if abort is thrown", () => {
     const target = { ran: false };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => throwAbort());
+    setCallback(target, "save", "before", () => kernelThrow(":abort"));
     runCallbacks(target, "save", () => {
       target.ran = true;
     });
@@ -1798,7 +1798,7 @@ describe("skipAfterCallbacksIfTerminated", () => {
     const log: string[] = [];
     const target = { log };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => throwAbort());
+    setCallback(target, "save", "before", () => kernelThrow(":abort"));
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     const result = runCallbacks(target, "save");
     expect(result).toBe(false);
@@ -1809,7 +1809,7 @@ describe("skipAfterCallbacksIfTerminated", () => {
     const log: string[] = [];
     const target = { log };
     defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
-    setCallback(target, "save", "before", () => throwAbort());
+    setCallback(target, "save", "before", () => kernelThrow(":abort"));
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     runCallbacks(target, "save");
     expect(log).not.toContain("after");

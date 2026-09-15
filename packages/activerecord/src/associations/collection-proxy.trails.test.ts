@@ -1,6 +1,6 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
   collectionProxyFor as association,
@@ -398,7 +398,7 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
       this.hasMany("posts", {
         className: "Post",
         foreignKey: "author_id",
-        beforeRemove: () => throwAbort(),
+        beforeRemove: () => kernelThrow(":abort"),
       });
     }
   }
@@ -443,7 +443,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     static {
       this.tableName = "posts";
       this.hasMany("taggings", { as: "taggable" });
-      this.hasMany("tags", { through: "taggings", beforeRemove: () => throwAbort() });
+      this.hasMany("tags", { through: "taggings", beforeRemove: () => kernelThrow(":abort") });
     }
   }
   registerModel("PostWithAbortingTagRemove", PostWithAbortingTagRemove);

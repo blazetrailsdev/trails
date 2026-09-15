@@ -1,3 +1,4 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -9,7 +10,6 @@ import type { Parrot } from "./parrot.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
-import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
@@ -124,7 +124,7 @@ export class Pirate extends Base {
   private _shipLog?: string[];
 
   cancelSaveCallbackMethod() {
-    throwAbort();
+    kernelThrow(":abort");
   }
 
   private log(record: any, callback: string) {

@@ -1,5 +1,5 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
 
@@ -569,7 +569,7 @@ describe("TransactionTest", () => {
 
   it("cancellation from before destroy rollbacks in destroy", async () => {
     first.beforeDestroyForTransaction = () => {
-      throwAbort();
+      kernelThrow(":abort");
     };
     const status = await first.destroy();
     expect(status).toBeFalsy();
@@ -584,7 +584,7 @@ describe("TransactionTest", () => {
     it(`cancellation from before filters rollbacks in ${filter}`, async () => {
       first[hook] = async () => {
         await Book.create({});
-        throwAbort();
+        kernelThrow(":abort");
       };
       const nbooksBeforeSave = await Book.count();
       const originalAuthorName = first.author_name;
@@ -598,7 +598,7 @@ describe("TransactionTest", () => {
     it(`cancellation from before filters rollbacks in ${filter}!`, async () => {
       first[hook] = async () => {
         await Book.create({});
-        throwAbort();
+        kernelThrow(":abort");
       };
       const nbooksBeforeSave = await Book.count();
       const originalAuthorName = first.author_name;

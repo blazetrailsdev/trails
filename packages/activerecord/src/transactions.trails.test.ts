@@ -1,5 +1,6 @@
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
-import { throwAbort, LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
+import { LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
 import { Base, transaction, registerModel } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-fixtures.js";
@@ -457,7 +458,7 @@ describe("aborting before_validation halts before the validators run", () => {
     const reply = newInvalidReply();
     reply.beforeValidationForTransaction = async () => {
       await Promise.resolve();
-      throwAbort();
+      kernelThrow(":abort");
     };
 
     expect(await reply.save()).toBeFalsy();
