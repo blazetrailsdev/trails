@@ -134,8 +134,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._targetLoaded;
   }
 
-  get loaded(): boolean {
-    return this._targetLoaded;
+  override get loaded(): boolean {
+    return this.isLoaded;
   }
 
   get target(): T[] {
@@ -472,7 +472,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /** @internal */
   isFindFromTarget(): boolean {
-    return this._association.isFindFromTarget(this._targetLoaded);
+    return this._association.isFindFromTarget();
   }
 
   // @ts-expect-error async divergence from Relation#inspect — see doc comment.

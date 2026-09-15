@@ -502,9 +502,9 @@ export abstract class CollectionAssociation extends Association {
     return this.owner.isNewRecord() && !this.foreignKeyPresent();
   }
 
-  isFindFromTarget(loaded?: boolean): boolean {
+  isFindFromTarget(): boolean {
     return (
-      (loaded ?? this.isLoaded()) ||
+      this.isLoaded() ||
       (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
       !!this.reflection.options.strictLoading ||
       this.owner.isNewRecord() ||
@@ -516,21 +516,21 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
-  get reader(): Promise<Base[]> {
+  /** @missingRailsCall reload — PERMANENT */
+  get reader(): AssociationProxy {
     this.ensureKlassExists();
 
-    return (async () => {
-      if (this.isStaleTarget()) {
-        await this.reload();
-      }
+    if (this.isStaleTarget()) {
+      this.reset();
+      this.resetScope();
+    }
 
-      const CollectionProxy = _CollectionProxyCtor as unknown as {
-        create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
-      };
-      this._proxy ??= CollectionProxy.create(this.klass, this);
-      this._proxy.resetScope();
-      return this._proxy;
-    })();
+    const CollectionProxy = _CollectionProxyCtor as unknown as {
+      create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
+    };
+    this._proxy ??= CollectionProxy.create(this.klass, this);
+    this._proxy.resetScope();
+    return this._proxy;
   }
 
   private ensureKlassExists(): void {
@@ -633,18 +633,6 @@ export abstract class CollectionAssociation extends Association {
       typeof r === "number" || typeof r === "string" || typeof r === "bigint";
     if (!records.some(isId)) return records as Base[];
     const ids = records.map((r) => (isId(r) ? r : (r as any).id));
-    if (this.reflection.options.through) {
-      const scope = this.scope();
-      return Promise.resolve(this.loadTarget()).then((target) => {
-        const found = ids
-          .map((id) => target.find((r) => String((r as any).id) === String(id)))
-          .filter((record): record is Base => record != null);
-        if (found.length !== ids.length) {
-          scope.raiseRecordNotFoundExceptionBang(ids, found.length, ids.length);
-        }
-        return found;
-      });
-    }
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }
 

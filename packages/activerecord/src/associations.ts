@@ -681,7 +681,6 @@ export function collectionProxyFor<T extends Base = Base>(
         _associateRecordsToOwner(existing.proxyAssociation, records as T[]);
       }
     }
-    (existing as unknown as { resetScope(): unknown }).resetScope();
     return existing;
   }
 
