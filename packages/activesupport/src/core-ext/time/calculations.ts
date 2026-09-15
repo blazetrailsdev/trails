@@ -142,7 +142,7 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
     return RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, newOffset);
   } else if (this.isUtc()) {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
-  } else if (this.zone != null) {
+  } else if (this.isZoneObject) {
     let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, null, {
       in: this.toTime().timeZoneId,
     });
@@ -161,6 +161,19 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
     } else {
       return newTime;
     }
+  } else if (this.zone != null) {
+    return RubyTime.local(
+      newSec,
+      newMin,
+      newHour,
+      newDay,
+      newMonth,
+      newYear,
+      null,
+      null,
+      this.isdst,
+      null,
+    );
   } else {
     return RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, this.utcOffset);
   }

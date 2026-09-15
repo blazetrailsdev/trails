@@ -28,6 +28,7 @@ const DIGIT_SEPARATOR_REGEX = /_/g;
  */
 export function kernelFloat(val: unknown): number {
   if (typeof val === "number") return val;
+  if (val instanceof Number) return val.valueOf();
   if (typeof val === "bigint") return Number(val);
   if (typeof val === "string") {
     const str = val.trim();

@@ -66,7 +66,7 @@ describe("SerializationTest", () => {
     }
     interface Person extends Attributes, Serialization {}
 
-    const friend = { _attributes: new Map([["name", "Joe"]]) };
+    const friend = new Person({ name: "Joe" });
     const friendList: Iterable<unknown> = {
       [Symbol.iterator]: () => [friend][Symbol.iterator](),
     };
@@ -305,9 +305,21 @@ describe("SerializationTest", () => {
 
   interface Post extends Attributes, Serialization {}
 
+  class Comment extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, Serialization);
+      this.attribute("text", "string");
+      this.attribute("author", "string");
+    }
+  }
+  interface Comment extends Attributes, Serialization {}
+
   it("include option with singular association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const comment = { _attributes: new Map([["text", "Great!"]]) };
+    const comment = new Comment({ text: "Great!" });
     setAssociationAccessors(p, { comments: [comment] });
     const result = p.serializableHash({ include: ["comments"] });
     expect(Array.isArray(result.comments)).toBe(true);
@@ -316,12 +328,7 @@ describe("SerializationTest", () => {
 
   it("include with options", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const comment = {
-      _attributes: new Map([
-        ["text", "Great!"],
-        ["author", "Bob"],
-      ]),
-    };
+    const comment = new Comment({ text: "Great!", author: "Bob" });
     setAssociationAccessors(p, { comments: [comment] });
     const result = p.serializableHash({ include: { comments: { only: ["text"] } } });
     expect((result.comments as any[])[0].text).toBe("Great!");

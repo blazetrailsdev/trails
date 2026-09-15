@@ -18,6 +18,7 @@ export function rbObjClass(x: unknown): string {
   if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
   if (typeof x === "bigint") return "Integer";
   if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
+  if (x instanceof Number) return "Float";
   if (typeof x === "string") return "String";
   const branded = (x as Comparable)[rubyClass];
   if (branded != null) return branded;
@@ -155,7 +156,7 @@ let nextObjAddress = 0x7f0000000000;
 function inspectValue(value: unknown, recursing: Set<object>): string {
   if (value == null) return "nil";
   if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") return floToS(value);
+  if (typeof value === "number" || value instanceof Number) return floToS(value);
   if (typeof value === "bigint") return String(value);
   if (isSymbol(value)) return value;
   if (typeof value === "string") return stringInspect(value);
@@ -230,7 +231,7 @@ export function rbObjAsString(value: unknown): string {
   if (value == null) return "";
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
-  if (typeof value === "number") return floToS(value);
+  if (typeof value === "number" || value instanceof Number) return floToS(value);
   return String(value);
 }
 
@@ -243,9 +244,12 @@ export function rbObjAsString(value: unknown): string {
  * an Integer and renders without a point: it is what nearly every caller hands
  * over (ids, counts, sizes), and a `bigint` is not what those seats hold in
  * trails. `-0` is the one whole value no Integer can be, so it stays a Float.
+ * A seat that must stay a Float whatever its value arrives boxed — `new Number(1)`,
+ * JS's own object wrapper — and takes the Float reading before that one.
  */
-function floToS(value: number): string {
-  if (Number.isInteger(value) && !Object.is(value, -0)) return String(value);
+function floToS(flo: number | { valueOf(): number }): string {
+  if (typeof flo === "number" && Number.isInteger(flo) && !Object.is(flo, -0)) return String(flo);
+  const value = flo.valueOf();
   if (!Number.isFinite(value)) {
     return Number.isNaN(value) ? "NaN" : value > 0 ? "Infinity" : "-Infinity";
   }

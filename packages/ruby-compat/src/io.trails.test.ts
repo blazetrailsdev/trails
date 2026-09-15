@@ -162,14 +162,48 @@ describe("IO", () => {
     for (const [name, encoding, bytes] of cases) {
       const path = join(dir, name);
       writeFileSync(path, Uint8Array.from(bytes));
+      // vendor/ruby/io.c:3123-3126 — with no default internal the String is only tagged.
       File.open(path, `rb:${encoding}`, (file) => {
-        expect(file.read()).toBe("hi");
+        expect(file.read()).toBe(String.fromCharCode(...bytes));
+      });
+    }
+    const rawNobom = join(dir, "raw-nobom.bin");
+    writeFileSync(rawNobom, Uint8Array.from([0, 0x68, 0, 0x69]));
+    for (const encoding of ["UTF-16", "UTF-32"]) {
+      File.open(rawNobom, `rb:${encoding}`, (file) => {
+        expect(file.read()).toBe("\x00h\x00i");
       });
     }
 
     const previousInternal = Encoding.defaultInternal;
     Encoding.defaultInternal = "UTF-8";
     try {
+      for (const [name, encoding] of cases) {
+        File.open(join(dir, name), `rb:${encoding}`, (file) => {
+          expect(file.read()).toBe("hi");
+        });
+      }
+
+      // vendor/ruby/transcode.c:2126-2129 econv_incomplete_input — a partial unit after the BOM.
+      const partial16 = join(dir, "partial16.bin");
+      writeFileSync(partial16, Uint8Array.from([0xfe, 0xff, 0x68]));
+      File.open(partial16, "rb:UTF-16", (file) => {
+        let error: unknown;
+        try {
+          file.read();
+        } catch (e) {
+          error = e;
+        }
+        const invalid = error as InvalidByteSequenceError;
+        expect(invalid.message).toBe('incomplete "h" on UTF-16');
+        expect(invalid.errorBytes()).toBe("h");
+        expect(invalid.isIncompleteInput()).toBe(true);
+      });
+      const partial32 = join(dir, "partial32.bin");
+      writeFileSync(partial32, Uint8Array.from([0, 0, 0xfe, 0xff, 0, 0, 0, 0x68, 0]));
+      File.open(partial32, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-32');
+      });
       const nobom = join(dir, "nobom.bin");
       writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
       File.open(nobom, "rb:UTF-16", (file) => {

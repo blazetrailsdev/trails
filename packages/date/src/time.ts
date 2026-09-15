@@ -310,6 +310,7 @@ let seatedTime: {
   instant: Temporal.Instant;
   timeZoneId: string | null;
   tzmodeUtc: boolean;
+  localZone: boolean;
 } | null = null;
 
 /** @noRailsEquivalent PERMANENT */
@@ -352,6 +353,8 @@ export class Time {
   #timeZoneId: string | null;
   /** @internal */
   #tzmodeUtc: boolean;
+  /** @internal */
+  #localZone: boolean;
   /** @internal */
   #utcOffsetMemo: number | null;
 
@@ -429,6 +432,7 @@ export class Time {
       instant,
       timeZoneId: typeof zone === "number" ? null : timeZoneId,
       tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
+      localZone: zone == null,
     };
     return new Time(0);
   }
@@ -438,11 +442,7 @@ export class Time {
       if (microsecondsWithFrac !== undefined) {
         throw new TypeError("can't convert Time into an exact number");
       }
-      return Time.#atInstant(
-        seconds.#instant,
-        seconds.#timeZoneId ?? seconds.#utcOffset,
-        seconds.#tzmodeUtc,
-      );
+      return Time.#atInstant(seconds.#instant, seconds.#zoneArgument(), seconds.#tzmodeUtc);
     }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
@@ -522,7 +522,7 @@ export class Time {
   static #mktimeIsdst(time: Time, isdst: boolean | null): Time {
     if (isdst == null || time.#timeZoneId == null || time.isdst === isdst) return time;
     const earlier = time.#plain.toZonedDateTime(time.#timeZoneId, { disambiguation: "earlier" });
-    const candidate = Time.#atInstant(earlier.toInstant(), time.#timeZoneId, time.#tzmodeUtc);
+    const candidate = Time.#atInstant(earlier.toInstant(), time.#zoneArgument(), time.#tzmodeUtc);
     return candidate.isdst === isdst ? candidate : time;
   }
 
@@ -1117,6 +1117,7 @@ export class Time {
       this.#instant = seat.instant;
       this.#timeZoneId = seat.timeZoneId;
       this.#tzmodeUtc = seat.tzmodeUtc;
+      this.#localZone = seat.localZone;
       return;
     }
     year = obj2vint(year);
@@ -1161,6 +1162,7 @@ export class Time {
       zoneObject ?? (zoneArgument == null ? nowTimeZoneId() : utcOffsetArgument(zoneArgument));
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#tzmodeUtc = zoneArgument != null && this.#timeZoneId === "UTC";
+    this.#localZone = zoneArgument == null;
     const disambiguation =
       zoneObject == null
         ? ({ disambiguation: "later" } as const)
@@ -1236,6 +1238,23 @@ export class Time {
   get zone(): string | null {
     if (this.#timeZoneId == null) return null;
     return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
+  }
+
+  /**
+   * Whether `zone` is a timezone object (`Time.new(..., in: tz)` / `getlocal(tz)`)
+   * rather than the process-local zone's String — MRI's `vtm.zone` is one or the
+   * other (`vendor/ruby/time.c:5020-5037` `time_zone`), where trails' `zone`
+   * answers an abbreviation for both.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get isZoneObject(): boolean {
+    return this.#timeZoneId != null && !this.#localZone;
+  }
+
+  /** @internal */
+  #zoneArgument(): string | number | null {
+    return this.#localZone ? null : (this.#timeZoneId ?? this.#utcOffset);
   }
 
   get utcOffset(): number {
@@ -1378,7 +1397,7 @@ export class Time {
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(
       Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
-      this.#timeZoneId ?? this.#utcOffset,
+      this.#zoneArgument(),
     );
   }
 

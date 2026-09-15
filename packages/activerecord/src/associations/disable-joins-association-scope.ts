@@ -1,4 +1,3 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
 import { any } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
@@ -123,29 +122,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         aliasedTable?: unknown;
       }
     ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable);
-    if (keyCols.length === 1) {
-      scope = (scope as { where: (c: Record<string, unknown>) => unknown }).where({
-        [keyCols[0]]: joinIds,
-      });
-    } else {
-      const arity = keyCols.length;
-      const tuples = joinIds.map((t, i) => {
-        if (!Array.isArray(t)) {
-          throw new ArgumentError(
-            `DisableJoinsAssociationScope: composite joinIds[${i}] must be an array (got ${typeof t})`,
-          );
-        }
-        if (t.length !== arity) {
-          throw new ArgumentError(
-            `DisableJoinsAssociationScope: composite joinIds[${i}] arity ${t.length} does not match key columns [${keyCols.join(", ")}] (arity ${arity})`,
-          );
-        }
-        return t;
-      }) as unknown[][];
-      scope = (scope as { where: (c: Map<string[], unknown[][]>) => unknown }).where(
-        new Map([[keyCols, tuples]]),
-      );
-    }
+    scope = (scope as { where: (c: Map<string[], JoinIds>) => unknown }).where(
+      new Map([[keyCols, joinIds]]),
+    );
 
     const sfa = (
       klass as unknown as { scopeForAssociation?: () => unknown }
