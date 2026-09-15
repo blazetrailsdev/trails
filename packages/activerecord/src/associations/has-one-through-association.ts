@@ -1,12 +1,11 @@
 import { _setHasOneThroughAssociation } from "./association-class-slots.js";
 import type { Base } from "../base.js";
-import { HasOneAssociation, sameRecord } from "./has-one-association.js";
-import { RecordInvalid } from "../validations.js";
+import { HasOneAssociation } from "./has-one-association.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 
 export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
-  declare createThroughRecord: (record: Base | null, save: boolean) => Promise<Base | null>;
+  declare createThroughRecord: (record: Base | null, save: boolean) => void | Promise<void>;
   /** @internal */
   declare transaction: <R>(block: (tx?: any) => Promise<R>) => Promise<R | undefined>;
   /** @internal */
@@ -20,10 +19,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
   declare ensureNotNested: () => void;
 
-  _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
-
-  private _pendingUnloadedThroughReconcile = false;
-
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {
     const throughProxy = this.throughAssociation() as {
@@ -34,26 +29,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   /** @internal */
   protected override async detachDisplacedTarget(): Promise<void> {}
-
-  protected override async _createRecord(
-    attributes?: Record<string, unknown>,
-    raise = false,
-    block?: (record: Base) => void,
-  ): Promise<Base | null> {
-    let record: Base | null;
-    try {
-      record = await super._createRecord(attributes, raise, block);
-    } catch (error) {
-      if (error instanceof RecordInvalid && this._pendingReplace) {
-        await this.persistReplace(false);
-      }
-      throw error;
-    }
-    if (record && this._pendingReplace) {
-      await this.persistReplace(false);
-    }
-    return record;
-  }
 
   protected override setNewRecord(record: Base): void | Promise<void> {
     return this.replace(record, false);
@@ -73,139 +48,56 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return sourceReflection(this);
   }
 
-  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
   protected override replace(record: Base | null, save = true): void | Promise<void> {
-    if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const inMemory = record != null && ((this.owner as any).isNewRecord?.() || !save);
-    if (!inMemory) {
-      const assigningAnother = !sameRecord(this.target, record);
-      const mightNeedDelete = record === null && !this.isLoaded();
-      if (assigningAnother || mightNeedDelete || record?.hasChangesToSave === true) {
-        if (save) {
-          if (this._pendingReplace) {
-            const wasAssignedAnother = !sameRecord(
-              this._pendingReplace.previousTarget,
-              this._pendingReplace.record,
-            );
-            if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
-              this._pendingReplace = null;
-            } else {
-              this._pendingReplace.record = record;
-            }
-          } else {
-            this._pendingReplace = { record, previousTarget: this.target };
-          }
-        }
-      }
+    const created = this.createThroughRecord(record, save);
+    if (created) {
+      return created.then(() => {
+        this.target = record;
+      });
     }
     this.target = record;
-    const assigned = record ? this.constructThroughRecordInMemory(record, save) : undefined;
-    if (save && (this.owner as any).isPersisted?.() && this._pendingReplace) {
-      return assigned ? assigned.then(() => this.persistReplace()) : this.persistReplace();
-    }
-    return assigned;
-  }
-
-  /** @internal */
-  private constructThroughRecordInMemory(record: Base, save: boolean): void | Promise<void> {
-    if (!((this.owner as any).isNewRecord?.() || !save)) return;
-
-    this.ensureNotNested();
-    const throughProxy = this.throughAssociation();
-    if (!throughProxy) return;
-    const attrs = this.constructJoinAttributes(record);
-    const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
-    if (throughRecord) {
-      const assigned: Promise<void> | void = (throughRecord as any).assignAttributes?.(attrs);
-      if ((throughRecord as any).isNewRecord?.()) {
-        if (this._pendingReplace) this._pendingReplace.record = record;
-      } else {
-        if (this._pendingReplace) {
-          this._pendingReplace.record = record;
-        } else {
-          this._pendingReplace = { record, previousTarget: null };
-        }
-      }
-      return assigned;
-    } else {
-      const built = buildThroughProxyRecord(throughProxy, attrs);
-      if (!((this.owner as any).isNewRecord?.() ?? true)) {
-        if (this._pendingReplace) {
-          this._pendingReplace.record = record;
-        } else {
-          this._pendingReplace = { record, previousTarget: null };
-        }
-        this._pendingUnloadedThroughReconcile = true;
-        const tp = throughProxy as {
-          _pendingReplace?: { record: Base | null; previousTarget: Base | null } | null;
-        };
-        if (tp._pendingReplace == null) {
-          tp._pendingReplace = { record: null, previousTarget: null };
-        }
-      }
-      return built;
-    }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async persistReplace(save = true): Promise<void> {
-    const pending = this.loaded ? this._pendingReplace : null;
-    this._pendingReplace = null;
-    if (this._pendingUnloadedThroughReconcile) {
-      this._pendingUnloadedThroughReconcile = false;
-      const tp = this.throughAssociation() as {
-        reset?: () => void;
-        _pendingReplace?: unknown;
-      } | null;
-      tp?.reset?.();
-      if (tp) tp._pendingReplace = null;
-    }
-    if (!pending) return;
-    await this.transaction(async () => {
-      await this.createThroughRecord(pending.record, save);
-    });
   }
 }
 
 /** @internal */
-async function createThroughRecord(
+function createThroughRecord(
   this: HasOneThroughAssociation,
   record: Base | null,
   save: boolean,
-): Promise<Base | null> {
+): void | Promise<void> {
   this.ensureNotNested();
 
   const throughProxy = this.throughAssociation();
-  if (!throughProxy) return null;
+  const loaded = throughProxy.loadTarget();
+  const withThroughRecord = (throughRecord: any): void | Promise<void> => {
+    if (throughRecord && !record) {
+      return throughRecord.destroy();
+    } else if (record) {
+      const attributes = this.constructJoinAttributes(record);
 
-  let throughRecord = await throughProxy.loadTarget?.();
+      const withCurrentThroughRecord = (throughRecord: any): void | Promise<void> => {
+        if (throughRecord) {
+          if (throughRecord.isNewRecord()) {
+            return throughRecord.assignAttributes(attributes);
+          } else {
+            return throughRecord.update(attributes).then(() => {});
+          }
+        } else if ((this.owner as any).isNewRecord() || !save) {
+          return buildThroughProxyRecord(throughProxy, attributes);
+        } else {
+          return throughProxy.create(attributes).then(() => {});
+        }
+      };
 
-  if (throughRecord && throughRecord.isDestroyed?.()) {
-    await throughProxy.reload?.();
-    throughRecord = throughProxy.target ?? null;
-  }
-
-  if (throughRecord && !record) {
-    await throughRecord.destroy?.();
-    return null;
-  }
-
-  if (record) {
-    const attrs = this.constructJoinAttributes(record);
-
-    if (throughRecord) {
-      if (throughRecord.isNewRecord?.()) {
-        await throughRecord.setAttributes?.(attrs);
-      } else {
-        await throughRecord.update?.(attrs);
+      if (throughRecord && throughRecord.isDestroyed()) {
+        return Promise.resolve(throughProxy.reload()).then(() =>
+          withCurrentThroughRecord(throughProxy.target),
+        );
       }
-    } else if ((this.owner as any).isNewRecord?.() || !save) {
-      await buildThroughProxyRecord(throughProxy, attrs);
-    } else {
-      await throughProxy.create?.(attrs);
+      return withCurrentThroughRecord(throughRecord);
     }
-  }
-  return record;
+  };
+  return loaded instanceof Promise ? loaded.then(withThroughRecord) : withThroughRecord(loaded);
 }
 
 /** @internal */

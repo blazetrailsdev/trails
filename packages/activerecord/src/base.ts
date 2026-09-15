@@ -66,7 +66,6 @@ import { NotImplementedError, StaleObjectError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
-  flushPendingReplaces,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
   _registerAssociationBuilderExtension,
@@ -1971,10 +1970,6 @@ export class Base extends Model {
     });
 
     if (!saveOk) return false;
-
-    if (saved) {
-      await flushPendingReplaces(this);
-    }
 
     return saved;
   }

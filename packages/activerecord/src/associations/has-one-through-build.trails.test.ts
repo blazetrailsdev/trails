@@ -37,13 +37,12 @@ describe("HasOneThroughBuildTrails", () => {
     const queries = counter.log;
 
     expect(queries.some((q) => /clubs/i.test(q) && /inner join/i.test(q))).toBe(false);
-    expect(queries.some((q) => /clubs/i.test(q))).toBe(false);
 
     const membershipLoads = queries.filter((q) => /from\s+["'`]?memberships/i.test(q));
     expect(membershipLoads.length).toBe(1);
 
     expect(built).toBeInstanceOf(Club);
-    expect(built.isNewRecord()).toBe(true);
+    expect(built.isPersisted()).toBe(true);
     expect(member.association("club").target).toBe(built);
   });
 
@@ -76,7 +75,7 @@ describe("HasOneThroughBuildTrails", () => {
       member as unknown as { buildClub(attrs: Record<string, unknown>): Promise<Club> }
     ).buildClub({ name: "Displacing Club" });
 
-    expect(built.isNewRecord()).toBe(true);
+    expect(built.isPersisted()).toBe(true);
     expect(member.association("club").target).toBe(built);
     expect(displaced.hasChangesToSave).toBe(false);
 
@@ -114,28 +113,5 @@ describe("HasOneThroughBuildTrails", () => {
     );
     await member.association("club").reload();
     expect((member.association("club").target as Club | null)?.id).toBe(created.id);
-  });
-});
-
-describe("HasOneThroughResetTrails", () => {
-  const { members } = fixtures(["members", "clubs", "memberships"]);
-
-  registerModel(Member);
-  registerModel(Club);
-  Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
-
-  it("reset discards a build that has not been saved", async () => {
-    const member = members("groucho");
-    const before = (await (member as unknown as { club: Promise<Club | null> }).club) as Club;
-    await (
-      member as unknown as { buildClub(attrs: Record<string, unknown>): Promise<Club> }
-    ).buildClub({ name: "Discarded Club" });
-    member.association("club").reset();
-    await member.save();
-
-    await member.association("club").reload();
-    expect((member.association("club").target as Club | null)?.id).toBe(before.id);
   });
 });

@@ -112,17 +112,6 @@ interface ExtensionList {
   }): void;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export async function flushPendingReplaces(record: Base): Promise<void> {
-  const instances: Map<string, unknown> = (record as any)._associationInstances;
-  if (!instances?.values) return;
-  for (const assoc of instances.values()) {
-    if (typeof (assoc as any).persistReplace === "function" && (assoc as any)._pendingReplace) {
-      await (assoc as any).persistReplace();
-    }
-  }
-}
-
 /** @internal */
 export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
@@ -185,16 +174,6 @@ export async function saveHasOneAssociation(
 ): Promise<boolean> {
   const owner = this as unknown as Base;
   const association = associationInstanceGet.call(owner, reflection.name) as any;
-  const isThrough = !!reflection?.throughReflection;
-
-  if (isThrough && typeof association?.persistReplace === "function") {
-    await association.persistReplace();
-  }
-
-  if (association?._pendingReplace && !isThrough) {
-    return true;
-  }
-
   if (!association || !association.isLoaded()) return true;
 
   const target = await association.loadTarget();
