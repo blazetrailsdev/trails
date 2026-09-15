@@ -155,7 +155,8 @@ function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
 
 type NodeGzipStream = {
   on(event: string, listener: (arg?: unknown) => void): void;
-  write(data: Uint8Array): void;
+  write(data: Uint8Array): boolean;
+  once(event: string, listener: () => void): void;
   flush(): void;
   end(): void;
 };
@@ -224,10 +225,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
           });
         });
         let str: string | null;
-        while ((str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
+        while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
           const bytes = new Uint8Array(str.length);
           for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
-          stream.write(bytes);
+          if (!stream.write(bytes)) await new Promise<void>((res) => stream.once("drain", res));
         }
         stream.end();
         await ended;

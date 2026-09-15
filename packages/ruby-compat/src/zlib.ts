@@ -1,6 +1,6 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
-import { getZlib, type GzipWriterHandle } from "./zlib-adapter.js";
+import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -27,6 +27,13 @@ class GzipFile<IO extends { close(): void } = File> {
  * `gzfile_s_open(argc, argv, klass, "rb")` (`zlib.c:3871`).
  */
 class GzipReader extends GzipFile<File> {
+  private readonly z: GzipReaderHandle;
+
+  constructor(io: File) {
+    super(io);
+    this.z = getZlib().gzipReader(io);
+  }
+
   static open(filename: string): GzipReader;
   static open<T>(filename: string, block: (gz: GzipReader) => T | Promise<T>): Promise<T>;
   static open<T>(
@@ -40,7 +47,7 @@ class GzipReader extends GzipFile<File> {
   }
 
   async read(): Promise<string> {
-    return new TextDecoder().decode(await getZlib().gzipReader(this.io).read());
+    return new TextDecoder().decode(await this.z.read());
   }
 }
 

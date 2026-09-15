@@ -53,6 +53,22 @@ describe("Zlib::GzipFile.open", () => {
     }
   });
 
+  it("streams a payload spanning many writes and read chunks", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "large.gz");
+      const lines = Array.from({ length: 5000 }, (_, i) => `line ${i} ${Math.sin(i)}\n`);
+      await Zlib.GzipWriter.open(filename, (gz) => {
+        for (const line of lines) gz.write(line);
+      });
+
+      expect(File.size(filename) > 2048).toBe(true);
+      expect(await Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe(lines.join(""));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("closes the stream on the way out of the block", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
     try {
