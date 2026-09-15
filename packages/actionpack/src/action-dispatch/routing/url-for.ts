@@ -1,3 +1,4 @@
+import { reverseMerge } from "@blazetrails/activesupport";
 import { NO_ROUTES_MESSAGE } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
@@ -68,17 +69,17 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   }
   const asHash = coerceHashOrParameters(options);
   if (asHash) {
-    const hash = { ...asHash };
-    const rawRouteName = hash["use_route"];
-    delete hash["use_route"];
-    const merged = { ...this.urlOptions(), ...hash };
-    const routeName =
-      rawRouteName == null
+    const routeName = asHash["useRoute"];
+    delete asHash["useRoute"];
+    const mergedUrlOptions = reverseMerge({ ...asHash }, this.urlOptions());
+    return requireRoutes(this).urlFor(
+      mergedUrlOptions,
+      routeName == null
         ? null
-        : typeof rawRouteName === "symbol"
-          ? symbolToString(rawRouteName)
-          : String(rawRouteName);
-    return requireRoutes(this).urlFor(merged, routeName);
+        : typeof routeName === "symbol"
+          ? symbolToString(routeName)
+          : String(routeName),
+    );
   }
   const builder = HelperMethodBuilder.url();
   const target = this as unknown as PolymorphicHost;

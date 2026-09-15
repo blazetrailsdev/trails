@@ -1,4 +1,4 @@
-import { isPresent } from "@blazetrails/activesupport";
+import { isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { InvalidURIError, rbInspect, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
@@ -46,7 +46,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { normalizePath } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
-import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
+import type { Formatter as JourneyFormatter, RouteWithParams } from "../journey/formatter.js";
 
 const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
 
@@ -202,7 +202,6 @@ class UrlHelper {
     this.routeName = routeName;
   }
 
-  /** @missingRailsCall url_for — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for */
   call(
     t: UrlHelperContext,
     methodName: string,
@@ -215,8 +214,7 @@ class UrlHelper {
     const hash = this.handlePositionalArgs(controllerOptions, innerOptions ?? {}, args, options, [
       ...this.segmentKeys,
     ]);
-    hash["path"] = t._routes.generate(this.routeName, hash, {}, methodName);
-    return urlStrategy(hash as UrlOptions);
+    return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }
 
   handlePositionalArgs(
@@ -260,6 +258,21 @@ type UrlStrategy = (options: UrlOptions) => string;
 const PATH: UrlStrategy = (options) => URL.pathFor(options);
 
 const UNKNOWN: UrlStrategy = (options) => URL.urlFor(options);
+
+export const RESERVED_OPTIONS: readonly string[] = [
+  "host",
+  "protocol",
+  "port",
+  "subdomain",
+  "domain",
+  "tldLength",
+  "trailingSlash",
+  "anchor",
+  "params",
+  "onlyPath",
+  "scriptName",
+  "originalScriptName",
+];
 
 export interface UrlHelperContext {
   _routes: RouteSet;
@@ -495,14 +508,7 @@ export class RouteSet {
   private _finalized = false;
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
-  _routes: UrlForRoutes = {
-    urlFor: () => {
-      throw new Error(
-        "RouteSet#urlFor needs the Rails-shape (options, routeName?) signature before fullUrlFor can be wired through _routes — see PR b.",
-      );
-    },
-    polymorphicMappings: this.polymorphicMappings,
-  };
+  _routes: UrlForRoutes = this;
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
   /** @internal */
@@ -733,7 +739,7 @@ export class RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
     _methodName?: string | null,
-  ): string {
+  ): Pick<RouteWithParams, "path" | "params"> {
     const opts: Record<string, unknown> = { ...options };
     if (opts["controller"] != null) opts["action"] ??= "index";
     for (const key of ["controller", "action", "id"] as const) {
@@ -752,6 +758,12 @@ export class RouteSet {
       throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
     }
     const parameterizedParts = this.extractParameterizedParts(route, opts, recall);
+    const params: Record<string, unknown> = { ...options };
+    for (const key of Object.keys(params)) {
+      if (Object.hasOwn(parameterizedParts, key) || Object.hasOwn(route.defaults, key)) {
+        delete params[key];
+      }
+    }
 
     const defaults = route.defaults;
     const requiredParts = route.requiredParts;
@@ -766,7 +778,8 @@ export class RouteSet {
       delete parameterizedParts[key];
     }
 
-    return route.pathFor(parameterizedParts as Record<string, string | number>);
+    const path = route.pathFor(parameterizedParts as Record<string, string | number>);
+    return { path: () => path, params };
   }
 
   /** @internal */
@@ -804,12 +817,93 @@ export class RouteSet {
   }
 
   findScriptName(options: Record<string, unknown>): string {
-    if (Object.hasOwn(options, "script_name")) {
-      const v = options["script_name"];
-      delete options["script_name"];
-      if (typeof v === "string") return v;
+    const scriptName = options["scriptName"];
+    delete options["scriptName"];
+    if (scriptName != null && scriptName !== false) return scriptName as string;
+    return this.relativeUrlRoot ?? "";
+  }
+
+  pathFor(
+    options: Record<string, unknown>,
+    routeName: string | null = null,
+    reserved: readonly string[] = RESERVED_OPTIONS,
+  ): string {
+    return this.urlFor(options, routeName, PATH, null, reserved);
+  }
+
+  urlFor(
+    options: Record<string, unknown>,
+    routeName: string | null = null,
+    urlStrategy: UrlStrategy = UNKNOWN,
+    methodName: string | null = null,
+    reserved: readonly string[] = RESERVED_OPTIONS,
+  ): string {
+    options = { ...this.defaultUrlOptions, ...options };
+
+    let user: unknown = null;
+    let password: unknown = null;
+
+    if (
+      options["user"] != null &&
+      options["user"] !== false &&
+      options["password"] != null &&
+      options["password"] !== false
+    ) {
+      user = options["user"];
+      delete options["user"];
+      password = options["password"];
+      delete options["password"];
     }
-    return "";
+
+    const recall = (Object.hasOwn(options, "_recall") ? options["_recall"] : {}) as Record<
+      string,
+      unknown
+    >;
+    delete options["_recall"];
+
+    const originalScriptName = options["originalScriptName"] as string | null | undefined;
+    delete options["originalScriptName"];
+    let scriptName = this.findScriptName(options);
+
+    if (originalScriptName != null && (originalScriptName as unknown) !== false) {
+      scriptName = originalScriptName + scriptName;
+    }
+
+    const pathOptions = { ...options };
+    for (const ro of reserved) delete pathOptions[ro];
+
+    const routeWithParams = this.generate(routeName, pathOptions, recall);
+    let path = routeWithParams.path(methodName ?? undefined);
+
+    const trailingSlash = options["trailingSlash"];
+    const format = options["format"];
+    if (
+      trailingSlash != null &&
+      trailingSlash !== false &&
+      (format == null || format === false) &&
+      !path.endsWith("/")
+    ) {
+      path += "/";
+    }
+
+    const params = routeWithParams.params;
+
+    if (Object.hasOwn(options, "params")) {
+      const optParams = options["params"];
+      if (isPlainObject(optParams)) {
+        Object.assign(params, optParams);
+      } else {
+        params["params"] = optParams;
+      }
+    }
+
+    options["path"] = path;
+    options["scriptName"] = scriptName;
+    options["params"] = params;
+    options["user"] = user;
+    options["password"] = password;
+
+    return urlStrategy(options as UrlOptions);
   }
 
   urlOptions(): Record<string, unknown> {
@@ -950,9 +1044,9 @@ export class RouteSet {
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
     let route: Route | undefined;
-    const useRoute = options["use_route"];
+    const useRoute = options["useRoute"];
     if (typeof useRoute === "string" || typeof useRoute === "symbol") {
-      delete options["use_route"];
+      delete options["useRoute"];
       route = this.namedRoutes.get(
         typeof useRoute === "symbol" ? symbolToString(useRoute) : useRoute,
       );
@@ -983,31 +1077,6 @@ export class RouteSet {
 
   recognize(method: string, path: string): MatchedRoute | null {
     return recognizeViaJourney(this.journeyRouter, method, path);
-  }
-
-  pathFor(routeName: string, params: Record<string, string | number> = {}): string {
-    const route = this.namedRoutes.get(routeName);
-    if (!route) {
-      throw new Error(`No route matches name "${routeName}"`);
-    }
-    return route.pathFor(params);
-  }
-
-  urlFor(
-    routeName: string,
-    params: Record<string, string | number> = {},
-    options: { host?: string; onlyPath?: boolean } = {},
-  ): string {
-    const path = this.pathFor(routeName, params);
-    if (options.onlyPath) return path;
-    const rawHost = options.host ?? this.defaultUrlOptions["host"];
-    const host = typeof rawHost === "string" ? rawHost : undefined;
-    if (!host) {
-      throw new Error(
-        "Missing host to link to! Please provide the :host parameter or set default_url_options[:host]",
-      );
-    }
-    return `http://${host}${path}`;
   }
 
   setDefaultUrlOptions(options: { host?: string }): void {

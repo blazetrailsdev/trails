@@ -79,29 +79,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
-    "rubyName": "path_for",
-    "call": "url_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "url_for",
-    "call": "find_script_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "url_for",
-    "call": "generate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
     "rubyName": "url_for",
     "call": "merge",
-    "reason": "route_set.rb:250 `default_url_options.merge options` — a Hash receiver, but trails' `urlFor` is the positional `(routeName, params, options)` shape (route-set.ts:1003-1018) and never builds Rails' merged options hash, so there is nothing here to merge onto."
+    "reason": "route_set.rb:858 `default_url_options.merge options` is ported as the object spread `{ ...this.defaultUrlOptions, ...options }`, which the call extractor does not read as `merge`."
   }
 ]

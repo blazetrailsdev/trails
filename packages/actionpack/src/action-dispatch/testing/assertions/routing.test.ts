@@ -117,7 +117,7 @@ describe("assertGenerates", () => {
       assertGenerates.call(host, "/items", {
         controller: "items",
         action: "index",
-        use_route: Symbol("items"),
+        useRoute: Symbol("items"),
       }),
     );
   });

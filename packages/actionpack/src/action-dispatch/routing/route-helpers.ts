@@ -41,7 +41,7 @@ function extractParamNames(path: string): string[] {
 function createPathHelper(routeSet: RouteSet, routeName: string, paramNames: string[]): PathHelper {
   return function (...args: any[]): string {
     const params = resolveArgs(paramNames, args);
-    return routeSet.pathFor(routeName, params);
+    return routeSet.pathFor(params, routeName);
   };
 }
 
@@ -56,7 +56,7 @@ function createUrlHelper(
     const host = options.host ?? defaultOptions.host;
     const protocol = options.protocol ?? defaultOptions.protocol ?? "http";
 
-    const path = routeSet.pathFor(routeName, params);
+    const path = routeSet.pathFor(params, routeName);
 
     if (options.onlyPath) return path;
 

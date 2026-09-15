@@ -28,13 +28,13 @@ describe("TestUrlGeneration::WithMountPoint", () => {
 
   function fooPath(options: Record<string, unknown> = {}): string {
     return DispatchURL.pathFor({
-      path: routes.pathFor("foo"),
+      path: routes.pathFor({}, "foo"),
       scriptName: options.scriptName as string | undefined,
     });
   }
 
   function fooUrl(options: Record<string, unknown> = {}): string {
-    const path = routes.pathFor("foo");
+    const path = routes.pathFor({}, "foo");
     const urlOpts: Record<string, unknown> = {
       host: (options.host as string) ?? "www.example.com",
       path,
@@ -62,7 +62,7 @@ describe("TestUrlGeneration::WithMountPoint", () => {
         params = { optional_id: String(paramsOrPositional.optional_id) };
       }
     }
-    const path = routes.pathFor("baz", params);
+    const path = routes.pathFor(params, "baz");
     return DispatchURL.fullUrlFor({ host: "www.example.com", path });
   }
 

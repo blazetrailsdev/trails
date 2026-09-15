@@ -64,22 +64,22 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   it("hash options merge under urlOptions and strip use_route", () => {
     const host = makeHost({ defaultUrlOptions: { host: "example.com" } });
     const routes = host._routes as ReturnType<typeof makeRoutes>;
-    fullUrlFor.call(host, { controller: "posts", use_route: "post" });
+    fullUrlFor.call(host, { controller: "posts", useRoute: "post" });
     const [opts, routeName] = routes.calls[0];
     expect(routeName).toBe("post");
     expect(opts).toEqual({ host: "example.com", controller: "posts" });
-    expect(opts).not.toHaveProperty("use_route");
+    expect(opts).not.toHaveProperty("useRoute");
   });
 
   it("use_route accepts Symbol (Rails parity) → uses description", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
-    fullUrlFor.call(host, { use_route: Symbol("post") });
+    fullUrlFor.call(host, { useRoute: Symbol("post") });
     expect(routes.calls[0][1]).toBe("post");
   });
 
   it("use_route Symbol() without description throws ArgumentError", () => {
-    expect(() => fullUrlFor.call(makeHost(), { use_route: Symbol() })).toThrow(
+    expect(() => fullUrlFor.call(makeHost(), { useRoute: Symbol() })).toThrow(
       /description-less Symbol/,
     );
   });

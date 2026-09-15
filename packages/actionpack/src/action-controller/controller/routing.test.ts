@@ -423,7 +423,7 @@ describe("LegacyRouteSetTests", () => {
     });
 
     expect(() =>
-      urlFor(rs, { controller: "post", action: "show", bad_param: "foo", use_route: "post" }),
+      urlFor(rs, { controller: "post", action: "show", bad_param: "foo", useRoute: "post" }),
     ).toThrow(UrlGenerationError);
   });
 
