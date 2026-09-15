@@ -4,6 +4,7 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
+import { MimeType } from "../http/mime-type.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -216,11 +217,12 @@ export class DebugExceptions {
       return this.renderTextError(wrapper);
     }
 
-    if (accept.includes("application/json") || contentType.includes("application/json")) {
+    const format = accept ? MimeType.parse(accept)[0]?.symbol : undefined;
+    if (format === ":json" || (!accept && contentType.includes("application/json"))) {
       return this.renderJsonError(wrapper, request);
     }
 
-    if (accept.includes("application/xml") || accept.includes("text/xml")) {
+    if (format === ":xml") {
       return this.renderXmlError(wrapper);
     }
 
