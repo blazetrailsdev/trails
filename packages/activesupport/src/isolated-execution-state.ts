@@ -48,7 +48,10 @@ export const IsolatedExecutionState = {
     _isolationLevel = level;
   },
   uniqueId(): object {
-    return IsolatedExecutionState.get<object>("__id__") ?? IsolatedExecutionState.set("__id__", {});
+    return (
+      IsolatedExecutionState.get<object>("__id__") ??
+      IsolatedExecutionState.set("__id__", new Object())
+    );
   },
   get<T = unknown>(key: IsolatedKey): T | undefined {
     return state().get(key) as T | undefined;
