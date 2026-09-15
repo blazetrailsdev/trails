@@ -1,4 +1,4 @@
-import { ArgumentError, NotImplementedError, Thread } from "@blazetrails/ruby-compat";
+import { ArgumentError, Fiber, Thread } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
@@ -10,10 +10,13 @@ declare module "@blazetrails/ruby-compat" {
   interface Thread {
     activeSupportExecutionState?: Store;
   }
+  interface Fiber {
+    activeSupportExecutionState?: Store;
+  }
 }
 
 let _isolationLevel: IsolationLevel | null = null;
-let _scope: typeof Thread;
+let _scope: typeof Thread | typeof Fiber;
 
 /** @internal */
 function state(): Store {
@@ -25,7 +28,7 @@ export const IsolatedExecutionState = {
   get isolationLevel(): IsolationLevel | null {
     return _isolationLevel;
   },
-  get scope(): typeof Thread {
+  get scope(): typeof Thread | typeof Fiber {
     return _scope;
   },
   set isolationLevel(level: IsolationLevel) {
@@ -37,15 +40,14 @@ export const IsolatedExecutionState = {
       );
     }
 
-    if (level === "fiber")
-      // @nie disposition=TODO rails=activesupport/lib/active_support/isolated_execution_state.rb:23
-      throw new NotImplementedError("Fiber");
-
     if (_isolationLevel != null) IsolatedExecutionState.clear();
 
     switch (level) {
       case "thread":
         _scope = Thread;
+        break;
+      case "fiber":
+        _scope = Fiber;
         break;
     }
 
@@ -76,10 +78,10 @@ export const IsolatedExecutionState = {
   clear(): void {
     state().clear();
   },
-  context(): Thread {
+  context(): Thread | Fiber {
     return IsolatedExecutionState.scope.current();
   },
-  shareWith(other: Thread): void {
+  shareWith(other: Thread | Fiber): void {
     const otherState = other.activeSupportExecutionState;
     IsolatedExecutionState.context().activeSupportExecutionState = otherState
       ? new Map(otherState)

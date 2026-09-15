@@ -1,4 +1,4 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Fiber, Thread } from "@blazetrails/ruby-compat";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
@@ -15,7 +15,16 @@ describe("IsolatedExecutionStateTest", () => {
     IsolatedExecutionState.isolationLevel = originalIsolationLevel!;
   });
 
-  it.skip("#[] when isolation level is :fiber");
+  it("#[] when isolation level is :fiber", async () => {
+    IsolatedExecutionState.isolationLevel = "fiber";
+
+    IsolatedExecutionState.set("test", 42);
+    expect(IsolatedExecutionState.get("test")).toBe(42);
+    const enumerator = new Fiber(() => IsolatedExecutionState.get("test"));
+    expect(enumerator.resume()).toBeUndefined();
+
+    expect(await new Thread(() => IsolatedExecutionState.get("test")).value()).toBeUndefined();
+  });
 
   it("#[] when isolation level is :thread", async () => {
     IsolatedExecutionState.isolationLevel = "thread";
