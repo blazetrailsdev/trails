@@ -355,6 +355,9 @@ export class Relation<T extends Base> {
           if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
             return value;
           }
+          if (/^(0|[1-9]\d*)$/.test(prop)) {
+            return (target.target ?? target._records)[Number(prop)];
+          }
           const enumerable = ENUMERABLE_METHODS[prop];
           if (enumerable) {
             return (...args: any[]) =>

@@ -122,7 +122,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private set _replacedOrAddedTargets(value: Set<T>) {
     this._association._replacedOrAddedTargets = value as Set<Base>;
   }
-  private _proxySelf?: this;
 
   override get isLoaded(): boolean {
     return this._targetLoaded;
@@ -292,7 +291,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
     if (this.reflection.options.through) {
       await this._pushThrough(records);
-      return stripThenable(this._proxySelf ?? this);
+      return stripThenable(this);
     }
 
     const assoc = this._association.owner.association(this._assocName) as unknown as {
@@ -300,7 +299,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
     const concatResult = await assoc.concat(...(records as unknown as Base[]));
     if (!concatResult) return false;
-    return stripThenable(this._proxySelf ?? this);
+    return stripThenable(this);
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
@@ -341,7 +340,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   async clear(): Promise<Omit<this, "then">> {
     await this.deleteAll();
-    return stripThenable(this._proxySelf ?? this);
+    return stripThenable(this);
   }
 
   async isInclude(record: T): Promise<boolean> {

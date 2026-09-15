@@ -654,46 +654,8 @@ export function collectionProxyFor<T extends Base = Base>(
     }
   )._create(record, assocName, assocDef);
 
-  const wrapped = wrapCollectionProxy<T>(proxy);
-  (proxy as any)._proxySelf = wrapped;
-  record._collectionProxies.set(assocName, wrapped);
-  return wrapped;
-}
-
-const NUMERIC_INDEX_PATTERN = /^(0|[1-9]\d*)$/;
-
-function wrapCollectionProxy<T extends Base = Base>(
-  proxy: CollectionProxy<T>,
-): AssociationProxy<T> {
-  return new Proxy(proxy, {
-    get(target: any, prop: string | symbol, receiver: any) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof prop === "symbol") return value;
-      if (Reflect.has(target, prop)) return value;
-      if (value !== undefined) return value;
-
-      if (NUMERIC_INDEX_PATTERN.test(prop)) {
-        return target.target[Number(prop)];
-      }
-
-      const scope = target.scope();
-      const scopeVal = Reflect.get(scope, prop, scope);
-      if (typeof scopeVal === "function") {
-        return (...args: any[]) => scopeVal.apply(scope, args);
-      }
-
-      if (target.respondToMissing(prop, false)) {
-        return (...args: any[]) => scope.methodMissing(prop, ...args);
-      }
-
-      return scopeVal;
-    },
-    has(target: any, prop: string | symbol) {
-      if (Reflect.has(target, prop)) return true;
-      if (typeof prop === "symbol") return false;
-      return target.respondToMissing(prop, false);
-    },
-  });
+  record._collectionProxies.set(assocName, proxy);
+  return proxy as AssociationProxy<T>;
 }
 
 /** @internal */
