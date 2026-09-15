@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 
 let _formatVersion: number = 6.1;
@@ -11,10 +12,10 @@ export function formatVersion(): number {
 export function setFormatVersion(version: number): void {
   switch (version) {
     case 6.1:
-      if ("marshalDump" in Methods) delete (Methods as { marshalDump?: unknown }).marshalDump;
+      if (Methods.isMethodDefined("marshalDump")) Methods.undefMethod("marshalDump");
       break;
     case 7.1:
-      (Methods as { marshalDump?: unknown }).marshalDump = Methods._marshalDump71;
+      Methods.defineMethod("marshalDump", Methods.instanceMethod("_marshalDump71")!.value);
       break;
     default:
       throw new ArgumentError(`Unknown marshalling format: ${String(version)}`);
@@ -87,4 +88,5 @@ function marshalLoad(this: MarshallingHost, state: unknown[]): void {
   }
 }
 
-export const Methods = { _marshalDump71, marshalLoad };
+export const Methods = new Module();
+Methods.include({ _marshalDump71, marshalLoad });
