@@ -57,6 +57,13 @@ export class IPAddr {
     return this.family === coerced.family && this._addr === coerced.toI();
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:176`, aliased `===` */
+  includes(other: unknown): boolean {
+    const coerced = this.coerceOther(other);
+    if (coerced.family !== this.family) return false;
+    return this.beginAddr() <= coerced.beginAddr() && this.endAddr() >= coerced.endAddr();
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:184` */
   toI(): bigint {
     return this._addr!;
@@ -139,6 +146,21 @@ export class IPAddr {
       i -= 1;
     }
     return i;
+  }
+
+  protected beginAddr(): bigint {
+    return this._addr! & this._maskAddr!;
+  }
+
+  protected endAddr(): bigint {
+    switch (this.family) {
+      case AF_INET:
+        return this._addr! | (IPAddr.IN4MASK ^ this._maskAddr!);
+      case AF_INET6:
+        return this._addr! | (IPAddr.IN6MASK ^ this._maskAddr!);
+      default:
+        throw new IPAddr.AddressFamilyError("unsupported address family");
+    }
   }
 
   protected set(addr: bigint, ...family: number[]): this {

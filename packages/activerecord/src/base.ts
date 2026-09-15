@@ -221,6 +221,7 @@ import {
 } from "./attribute-methods.js";
 import * as Normalization from "./normalization.js";
 import type { NormalizesArgs } from "./normalization.js";
+import * as Marshalling from "./marshalling.js";
 import {
   toKey as _toKey,
   PrimaryKey as _PrimaryKey,
@@ -2885,6 +2886,7 @@ include(Base, CallbacksInstanceMethods);
 include(Base, TransactionsInstanceMethods);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
+include(Base, Marshalling.Methods);
 extend(Base, {
   enum: _EnumModule.enumMethod,
   _enum: _EnumModule._enum,

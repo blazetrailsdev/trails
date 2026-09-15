@@ -5,6 +5,7 @@ import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
 import type { QueryTransformer } from "./query-transformers.js";
+import * as Marshalling from "./marshalling.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 
@@ -271,6 +272,14 @@ export function queryTransformers(): QueryTransformer[] {
 
 export function setQueryTransformers(queryTransformers: QueryTransformer[]): void {
   _queryTransformers = queryTransformers;
+}
+
+export function marshallingFormatVersion(): 6.1 | 7.1 {
+  return Marshalling.formatVersion();
+}
+
+export function setMarshallingFormatVersion(value: unknown): void {
+  Marshalling.setFormatVersion(value);
 }
 
 export async function eagerLoadBang(): Promise<void> {
