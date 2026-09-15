@@ -1,39 +1,43 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
+
 export interface Deduplicable {
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-  deduplicateKey(): string;
   /** @internal */
   deduplicated(): this;
 }
 
-const registries = new Map<string, WeakRef<object>>();
+const registries = new WeakMap<object, Map<number, WeakRef<object>[]>>();
 const _finalizer =
   typeof FinalizationRegistry !== "undefined"
-    ? new FinalizationRegistry<string>((key) => {
-        if (registries.get(key)?.deref() === undefined) {
-          registries.delete(key);
+    ? new FinalizationRegistry<{ bucket: WeakRef<object>[] }>(({ bucket }) => {
+        for (let i = bucket.length - 1; i >= 0; i--) {
+          if (bucket[i].deref() === undefined) bucket.splice(i, 1);
         }
       })
     : null;
 
-export function registry(): Map<string, WeakRef<object>> {
-  return registries;
+export function registry(this: object): Map<number, WeakRef<object>[]> {
+  let own = registries.get(this);
+  if (!own) {
+    own = new Map<number, WeakRef<object>[]>();
+    registries.set(this, own);
+  }
+  return own;
 }
 
-export function deduplicate<T extends Deduplicable>(obj: T): T {
-  const key = `${obj.constructor.name}:${obj.deduplicateKey()}`;
-  const cached = registry().get(key);
-  if (cached) {
-    const existing = cached.deref();
-    if (existing) return existing as T;
+export function deduplicate<T extends Deduplicable & { hash(): number }>(obj: T): T {
+  const own = registry.call(obj.constructor);
+  const hash = obj.hash();
+  let bucket = own.get(hash);
+  if (!bucket) {
+    bucket = [];
+    own.set(hash, bucket);
+  }
+  for (const ref of bucket) {
+    const existing = ref.deref();
+    if (existing !== undefined && rbEqual(existing, obj)) return existing as T;
   }
   const deduped = obj.deduplicated();
-  const weakRef = new WeakRef(deduped);
-  registry().set(key, weakRef);
-  _finalizer?.register(deduped, key);
+  bucket.push(new WeakRef(deduped));
+  _finalizer?.register(deduped, { bucket });
   return deduped;
-}
-
-/** @internal */
-function deduplicated<T extends object>(obj: T): T {
-  return obj;
 }

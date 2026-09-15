@@ -2,6 +2,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
+import { rbHash } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -53,14 +54,6 @@ export class Column extends BaseColumn {
     return this._identity != null;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  override deduplicateKey(): string {
-    return JSON.stringify([super.deduplicateKey(), this.isIdentity(), this.isSerial()]);
-  }
-
   override isAutoIncrementedByDb(): boolean {
     return this.isSerial() || this.isIdentity();
   }
@@ -91,6 +84,12 @@ export class Column extends BaseColumn {
       super.equals(other) &&
       this.isIdentity() === other.isIdentity() &&
       this.isSerial() === other.isSerial()
+    );
+  }
+
+  override hash(): number {
+    return (
+      rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isIdentity()) ^ rbHash(this.isSerial())
     );
   }
 

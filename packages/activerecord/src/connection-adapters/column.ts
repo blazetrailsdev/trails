@@ -3,6 +3,7 @@ import type { Deduplicable } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
+import { Encoding, rbHash } from "@blazetrails/ruby-compat";
 
 export class Column implements Deduplicable {
   name: string;
@@ -86,6 +87,20 @@ export class Column implements Deduplicable {
     );
   }
 
+  hash(): number {
+    return (
+      rbHash(Column) ^
+      rbHash(this.name) ^
+      rbHash(Encoding.UTF_8) ^
+      rbHash(this.default) ^
+      rbHash(this.sqlTypeMetadata) ^
+      rbHash(this.null) ^
+      rbHash(this.defaultFunction) ^
+      rbHash(this.collation) ^
+      rbHash(this.comment)
+    );
+  }
+
   isVirtual(): boolean {
     return false;
   }
@@ -111,22 +126,6 @@ export class Column implements Deduplicable {
     coder["default_function"] = this.defaultFunction;
     coder["collation"] = this.collation;
     coder["comment"] = this.comment;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  deduplicateKey(): string {
-    return JSON.stringify([
-      this.name,
-      this.default ?? null,
-      this.sqlTypeMetadata?.deduplicateKey() ?? null,
-      this.null,
-      this.defaultFunction,
-      this.collation,
-      this.comment,
-    ]);
   }
 
   deduplicate(): this {

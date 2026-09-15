@@ -33,13 +33,6 @@ export function splitColumnNames(
   return { names: rest as string[], options };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-export function assertSafeMysqlIdentifier(value: string, kind: string): void {
-  if (!/^[A-Za-z0-9_]+$/.test(value)) {
-    throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
-  }
-}
-
 export type ColumnType =
   | "string"
   | "text"
