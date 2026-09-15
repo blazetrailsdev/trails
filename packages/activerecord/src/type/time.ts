@@ -1,15 +1,10 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DelegateClass } from "@blazetrails/ruby-compat";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 
-export class Value {
-  constructor(private readonly obj: Temporal.Instant | TimeWithZone | RubyTime) {}
-
-  __getobj__(): Temporal.Instant | TimeWithZone | RubyTime {
-    return this.obj;
-  }
-}
+export class Value extends DelegateClass(RubyTime) {}
 
 export class Time extends ActiveModelTime {
   static Value = Value;
@@ -27,18 +22,14 @@ export class Time extends ActiveModelTime {
 
   override serialize(value: unknown): Value | null {
     const serialized: unknown = super.serialize(value);
-    return serialized instanceof Temporal.Instant ||
-      serialized instanceof TimeWithZone ||
-      serialized instanceof RubyTime
+    return serialized instanceof RubyTime || serialized instanceof TimeWithZone
       ? new Value(serialized)
       : (serialized as Value | null);
   }
 
   override serializeCastValue(value: TimeWithZone | RubyTime | null): Value | null {
     const serialized: unknown = super.serializeCastValue(value);
-    return value != null
-      ? new Value(serialized as Temporal.Instant | TimeWithZone | RubyTime)
-      : null;
+    return value != null ? new Value(serialized) : null;
   }
 
   protected override castValue(value: unknown): TimeWithZone | RubyTime | null {

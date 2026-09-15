@@ -19,11 +19,7 @@ import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
-import {
-  defaultSqlTimezone,
-  formatPlainDateTimeForSql,
-  formatPlainDateForSql,
-} from "./sql-datetime.js";
+import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
 import { defaultTimezone } from "../../active-record.js";
 
@@ -324,11 +320,7 @@ export function quotedDate(value: TemporalDateLike): string {
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
-    const obj = value.__getobj__();
-    value =
-      obj instanceof TimeWithZone || obj instanceof RubyTime
-        ? obj
-        : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+    value = value.__getobj__() as TimeWithZone | RubyTime;
   }
   if (value instanceof RubyTime) value = value.toTime().toPlainDateTime();
   value =
