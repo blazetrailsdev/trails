@@ -2,6 +2,7 @@ import type { Base } from "./base.js";
 import {
   HashWithIndifferentAccess,
   camelize,
+  underscore,
   isBlank,
   pluralize,
 } from "@blazetrails/activesupport";
@@ -292,10 +293,12 @@ export function _enum(
   detectEnumConflictBang.call(this, name, name);
   detectEnumConflictBang.call(this, name, `${name}=`);
 
-  const prefixStr =
-    options?.prefix === true ? name : typeof options?.prefix === "string" ? options.prefix : "";
-  const suffixStr =
-    options?.suffix === true ? name : typeof options?.suffix === "string" ? options.suffix : "";
+  const prefixStr = underscore(
+    options?.prefix === true ? name : typeof options?.prefix === "string" ? options.prefix : "",
+  );
+  const suffixStr = underscore(
+    options?.suffix === true ? name : typeof options?.suffix === "string" ? options.suffix : "",
+  );
 
   const methodName = (n: string) => {
     if (prefixStr && suffixStr) return `${prefixStr}_${n}_${suffixStr}`;
