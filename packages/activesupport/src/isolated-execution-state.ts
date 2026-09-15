@@ -38,7 +38,7 @@ export const IsolatedExecutionState = {
     }
 
     if (level === "fiber")
-      // @nie disposition=TODO
+      // @nie disposition=TODO rails=activesupport/lib/active_support/isolated_execution_state.rb:23
       throw new NotImplementedError("Fiber");
 
     if (_isolationLevel != null) IsolatedExecutionState.clear();
