@@ -1,4 +1,4 @@
-import { ArgumentError, Thread } from "@blazetrails/ruby-compat";
+import { ArgumentError, NotImplementedError, Thread } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
@@ -43,6 +43,9 @@ export const IsolatedExecutionState = {
       case "thread":
         _scope = Thread;
         break;
+      case "fiber":
+        // @nie disposition=TODO
+        throw new NotImplementedError("Fiber");
     }
 
     _isolationLevel = level;
