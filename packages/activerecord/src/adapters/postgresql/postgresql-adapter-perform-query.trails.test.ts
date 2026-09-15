@@ -78,6 +78,52 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     await adapter.execute(`SELECT 1`);
     expect(spy).toHaveBeenCalled();
   });
+  it("configureConnection re-applies session variables through internalExecute on reset, reconnect and discard", async () => {
+    const live = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { statement_timeout: "4321" },
+    });
+    const subscriber = new SQLSubscriber();
+    subscriber.start();
+    const expectConfigured = async () => {
+      expect(await live.queryValue("SHOW intervalstyle")).toBe("iso_8601");
+      expect(await live.queryValue("SHOW statement_timeout")).toBe("4321ms");
+    };
+    try {
+      await expectConfigured();
+      await live.resetBang();
+      await expectConfigured();
+      await live.reconnectBang();
+      await expectConfigured();
+      await live.disconnectBang();
+      await expectConfigured();
+      expect(subscriber.logged).toContainEqual(["SET intervalstyle = iso_8601", "SCHEMA", []]);
+      expect(subscriber.logged).toContainEqual([
+        "SET SESSION statement_timeout TO '4321'",
+        "SCHEMA",
+        [],
+      ]);
+    } finally {
+      subscriber.stop();
+      await live.disconnectBang();
+    }
+  });
+
+  it("reconfigureConnectionTimezone issues its SET once through rawExecute as SCHEMA", async () => {
+    await adapter.execute(`SELECT 1`);
+    await adapter.reconnect();
+    const subscriber = new SQLSubscriber();
+    subscriber.start();
+    try {
+      await adapter.execute(`SELECT 1`);
+      const sets = subscriber.logged.filter(([sql]) => sql.startsWith("SET SESSION timezone"));
+      expect(sets).toHaveLength(1);
+      expect(sets[0][1]).toBe("SCHEMA");
+    } finally {
+      subscriber.stop();
+    }
+  });
+
   it("internalExecute prepares when prepare is true", async () => {
     const bind = new QueryAttribute("", 1, new Value());
     const subscriber = new SQLSubscriber();

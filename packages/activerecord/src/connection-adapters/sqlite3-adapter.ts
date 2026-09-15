@@ -634,20 +634,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
   }
 
-  /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
-  override getDatabaseVersion(): Version | Promise<Version> {
-    if (this._rawConnection == null && !this._asyncConnectPending) this.connect();
-    const driver = this._rawConnection;
-    if (!driver) return new Version("0.0.0");
-    const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
-    // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled below: an in-process driver answers directly, an async-only one with a Promise.
-    const stmt = driver.prepare("SELECT sqlite_version(*) AS v");
-    if (stmt instanceof Promise) {
-      return stmt.then(async (s) => toVersion(await s.get()));
-    }
-    const row = stmt.get();
-    if (row instanceof Promise) return row.then(toVersion);
-    return toVersion(row);
+  override async getDatabaseVersion(): Promise<Version> {
+    return new Version((await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")) as string);
   }
 
   override async checkVersion(): Promise<void> {

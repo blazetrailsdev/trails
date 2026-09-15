@@ -77,7 +77,7 @@ interface ExecuteHost extends PerformQueryHost {
     block: (raw: unknown) => Promise<T> | T,
   ): Promise<T>;
   /** @internal */
-  _performQuery: typeof performQuery;
+  performQuery: typeof performQuery;
   /** @internal */
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown;
 }
@@ -312,13 +312,14 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
   {
     prepare,
     notificationPayload,
-    rowMode,
+    batch: _batch = false,
   }: {
     prepare: boolean;
     notificationPayload: Record<string, unknown>;
-    rowMode?: "array";
+    batch?: boolean;
   },
 ): Promise<R> {
+  const rowMode = "array";
   await this.updateTypemapForDefaultTimezone();
   let raw: pg.QueryResult | pg.QueryResult[];
   if (prepare) {
@@ -349,7 +350,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
       }
     }
   } else if (binds == null || binds.length === 0) {
-    raw = await query(rawConnection, rowMode && sql != null ? { text: sql, rowMode } : sql);
+    raw = await query(rawConnection, sql != null ? { text: sql, rowMode } : sql);
   } else {
     raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
   }

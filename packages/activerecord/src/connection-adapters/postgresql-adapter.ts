@@ -420,7 +420,6 @@ export class PostgreSQLAdapter
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   private _connectionConfigured = false;
-  private _typeMapEagerLoaded = false;
   /** @internal */
   declare _statements: StatementPool;
   private _closed = false;
@@ -543,29 +542,6 @@ export class PostgreSQLAdapter
         },
       },
     };
-  }
-
-  private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
-    if (this._connectionConfigured) return;
-    await super.configureConnection();
-    this._mappedDefaultTimezone = null;
-    await client.query("SET standard_conforming_strings = on");
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
-    await client.query("SET intervalstyle = iso_8601");
-    await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
-    for (const [key, val] of Object.entries(variables)) {
-      if (val === ":default") {
-        await client.query(`SET SESSION ${key} TO DEFAULT`);
-      } else if (val != null) {
-        await client.query(`SET SESSION ${key} TO ${this.quote(val)}`);
-      }
-    }
-    this._connectionConfigured = true;
-    if (!this._typeMapEagerLoaded) {
-      this._typeMapEagerLoaded = true;
-      this._typeMap = null;
-      await this.reloadTypeMap();
-    }
   }
 
   private _captureRegtypeOids(records: PgTypeRow[]): void {
@@ -812,26 +788,30 @@ export class PostgreSQLAdapter
     return sql.replace(/\?/g, () => `$${++idx}`);
   }
 
-  private async _acquireFreshClient(): Promise<pg.Client> {
+  private async _acquireFreshClient(configure = true): Promise<pg.Client> {
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
-    if (this._rawConnection && this._connectionConfigured) {
+    if (this._rawConnection && (this._connectionConfigured || !configure)) {
       return this._rawConnection;
     }
     if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
       const acquireGen = this._acquireGeneration;
-      const acquiring = this._doAcquire(acquireGen).finally(() => {
+      const acquiring = this._doAcquire(acquireGen, configure).finally(() => {
         this._discardedAcquireGenerations.delete(acquireGen);
         if (this._acquiring === acquiring) this._acquiring = null;
       });
       this._acquiring = acquiring;
       this._acquiringGen = acquireGen;
     }
-    return this._acquiring;
+    const client = await this._acquiring;
+    if (configure && !this._connectionConfigured && this._rawConnection === client) {
+      await this.configureConnection();
+    }
+    return client;
   }
 
-  private async _doAcquire(acquireGen: number): Promise<pg.Client> {
+  private async _doAcquire(acquireGen: number, configure: boolean): Promise<pg.Client> {
     let client = this._rawConnection;
     if (client == null) {
       let newClient: pg.Client;
@@ -865,6 +845,7 @@ export class PostgreSQLAdapter
         client = newClient;
       }
     }
+    if (!configure) return client;
     try {
       await this.configureConnection();
       if (this._closed || this._rawConnection !== client) {
@@ -874,7 +855,6 @@ export class PostgreSQLAdapter
       if (this._rawConnection === client) {
         this._rawConnection = null;
         this._connectionConfigured = false;
-        this._typeMapEagerLoaded = false;
         void this._statements.reset();
       }
       this._teardownRacedClient(client, acquireGen);
@@ -893,22 +873,17 @@ export class PostgreSQLAdapter
 
   /** @internal */
   protected override async awaitRawConnectionReady(): Promise<void> {
-    if (!this._closed && this._rawConnection === null && this._pgClientOptions !== null) {
-      await this.connect();
+    if (
+      !this._closed &&
+      (this._rawConnection === null || !this._connectionConfigured) &&
+      this._pgClientOptions !== null
+    ) {
+      await this._acquireFreshClient();
     }
   }
 
   /** @internal */
-  private _performQuery = pgPerformQuery;
-
-  /** @internal */
-  declare performQuery: (
-    rawConnection: pg.Client,
-    sql: string | null,
-    binds: unknown[],
-    typeCastedBinds: unknown[],
-    options: { prepare: boolean; notificationPayload?: Record<string, unknown> },
-  ) => Promise<pg.QueryResult>;
+  performQuery = pgPerformQuery;
 
   /** @internal */
   declare handleWarnings: (sql: unknown) => void;
@@ -947,7 +922,7 @@ export class PostgreSQLAdapter
               if (useSavepoint) {
                 await client.query(`SAVEPOINT "${spName}"`);
               }
-              const result = await this._performQuery(client, withReturning, originalBinds, binds, {
+              const result = await this.performQuery(client, withReturning, originalBinds, binds, {
                 prepare: false,
                 notificationPayload: payload,
               });
@@ -960,7 +935,7 @@ export class PostgreSQLAdapter
                 return affected;
               }
               if (result.rows.length > 0) {
-                return result.rows[0][Object.keys(result.rows[0])[0]] as number;
+                return (result.rows[0] as unknown[])[0] as number;
               }
               return affected;
             } catch (err) {
@@ -970,7 +945,7 @@ export class PostgreSQLAdapter
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+              const result = await this.performQuery(client, pgSql, originalBinds, binds, {
                 prepare: false,
                 notificationPayload: payload,
               });
@@ -981,19 +956,19 @@ export class PostgreSQLAdapter
           }
 
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+            const result = await this.performQuery(client, pgSql, originalBinds, binds, {
               prepare: false,
               notificationPayload: payload,
             });
             const affected = this.affectedRows(result);
             payload.row_count = affected;
             if (result.rows.length > 0) {
-              return result.rows[0][Object.keys(result.rows[0])[0]] as number;
+              return (result.rows[0] as unknown[])[0] as number;
             }
             return affected;
           }
 
-          const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+          const result = await this.performQuery(client, pgSql, originalBinds, binds, {
             prepare: false,
             notificationPayload: payload,
           });
@@ -1241,7 +1216,7 @@ export class PostgreSQLAdapter
   /** @internal */
   async connect(): Promise<void> {
     try {
-      await this._acquireFreshClient();
+      await this._acquireFreshClient(false);
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1254,7 +1229,6 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
     void this._statements.reset();
     this._closed = false;
     conn?.end().catch(() => {});
@@ -1288,9 +1262,40 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async configureConnection(): Promise<void> {
-    const conn = this._rawConnection;
-    if (!conn) return;
-    return this._maybeConfigureConnection(conn);
+    if (!this._rawConnection || this._connectionConfigured) return;
+    this._connectionConfigured = true;
+    await super.configureConnection();
+    this._mappedDefaultTimezone = null;
+
+    if (isRubyTruthy(this._config.encoding)) {
+      await this._rawConnection.query(
+        `SET client_encoding TO ${this._rawConnection.escapeLiteral(String(this._config.encoding))}`,
+      );
+    }
+
+    await this.setClientMinMessages(this._minMessages);
+    await this.setSchemaSearchPath(
+      (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
+    );
+
+    await this.setStandardConformingStrings();
+
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
+
+    await this.internalExecute("SET intervalstyle = iso_8601", "SCHEMA");
+
+    for (const [k, v] of Object.entries(variables)) {
+      if (v === ":default") {
+        await this.internalExecute(`SET SESSION ${k} TO DEFAULT`, "SCHEMA");
+      } else if (v != null) {
+        await this.internalExecute(`SET SESSION ${k} TO ${this.quote(v)}`, "SCHEMA");
+      }
+    }
+
+    this.addPgEncoders();
+    this.addPgDecoders();
+
+    await this.reloadTypeMap();
   }
 
   override async disconnectBang(): Promise<void> {
@@ -1299,7 +1304,6 @@ export class PostgreSQLAdapter
       const conn = this._rawConnection;
       this._client = null;
       this._connectionConfigured = false;
-      this._typeMapEagerLoaded = false;
       if (this._acquiring) this._acquireGeneration++;
       this._closingDriver = conn?.end().catch(() => {}) ?? null;
       await this._closingDriver;
@@ -1317,7 +1321,6 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
-    this._typeMapEagerLoaded = false;
     void this._statements.reset();
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
@@ -2158,24 +2161,16 @@ export class PostgreSQLAdapter
     return this._statements.get(sqlKey)!.name;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall raw_execute — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
-   */
+  /** @internal */
   async reconfigureConnectionTimezone(): Promise<void> {
     const variables = fetch<SessionVariables>(this._config, "variables", {});
-    if (variables["timezone"]) return;
-    const tz = _Base!.defaultTimezone;
-    const client = await this._acquireFreshClient();
-    try {
-      if (tz === "utc") {
-        await client.query("SET SESSION timezone TO 'UTC'");
-      } else {
-        await client.query("SET SESSION timezone TO DEFAULT");
-      }
-    } catch (error) {
-      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-      throw error;
+
+    if (isRubyTruthy(variables["timezone"])) return;
+
+    if (this.defaultTimezone === "utc") {
+      await this.rawExecute("SET SESSION timezone TO 'UTC'", "SCHEMA");
+    } else {
+      await this.rawExecute("SET SESSION timezone TO DEFAULT", "SCHEMA");
     }
   }
 
@@ -2654,20 +2649,5 @@ Type.register("legacy_point", LegacyPoint, { adapter: "postgresql" });
 Type.register("uuid", Uuid, { adapter: "postgresql" });
 Type.register("vector", Vector, { adapter: "postgresql" });
 Type.register("xml", Xml, { adapter: "postgresql" });
-
-PostgreSQLAdapter.prototype.performQuery = function (
-  this: PostgreSQLAdapter,
-  rawConnection,
-  sql,
-  binds,
-  typeCastedBinds,
-  options,
-) {
-  return pgPerformQuery.call(this as never, rawConnection, sql, binds, typeCastedBinds, {
-    prepare: options.prepare,
-    notificationPayload: options.notificationPayload ?? {},
-    rowMode: "array",
-  });
-};
 
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);

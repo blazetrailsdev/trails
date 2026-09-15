@@ -97,8 +97,8 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     adapter._readyForQueryStatus = "T";
 
     vi.spyOn(
-      adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
-      "_maybeConfigureConnection",
+      adapter as unknown as { configureConnection: () => Promise<void> },
+      "configureConnection",
     ).mockResolvedValue(undefined);
 
     adapter.resetBang();
@@ -136,8 +136,8 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     const pgModule = (await import("pg")).default;
     vi.spyOn(pgModule, "Client" as never).mockImplementation((() => fakeClient) as never);
     vi.spyOn(
-      adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
-      "_maybeConfigureConnection",
+      adapter as unknown as { configureConnection: () => Promise<void> },
+      "configureConnection",
     ).mockResolvedValue(undefined);
 
     const calls = Array.from({ length: 5 }, () => adapter._acquireFreshClient());

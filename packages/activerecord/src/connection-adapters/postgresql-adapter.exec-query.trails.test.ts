@@ -300,7 +300,7 @@ describe("PostgreSQLAdapter#executeMutation", () => {
     const fakeClient = {
       query: async (arg: unknown) => {
         queries.push(typeof arg === "string" ? arg : (arg as { text: string }).text);
-        return { rows: [{ id: 42 }], rowCount: 1, fields: [] };
+        return { rows: [[42]], rowCount: 1, fields: [] };
       },
       release: () => {},
     };
