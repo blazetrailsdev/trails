@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import "../support/canonical-model-index.js";
 import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";

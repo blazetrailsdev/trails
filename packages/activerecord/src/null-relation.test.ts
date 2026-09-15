@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
-import { association, registerModel } from "./associations.js";
+import { collectionProxyFor as association, registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";

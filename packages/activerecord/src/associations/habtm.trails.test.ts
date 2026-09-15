@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";

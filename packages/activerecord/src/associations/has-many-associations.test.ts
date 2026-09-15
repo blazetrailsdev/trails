@@ -6,7 +6,7 @@ import {
   SubclassNotFound,
   Base,
   CollectionProxy,
-  association,
+  collectionProxyFor as association,
   registerModel,
   registerSubclass,
   RecordNotFound,

@@ -1,7 +1,12 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
-import { Base, association, registerModel, RecordNotFound } from "../index.js";
+import {
+  Base,
+  collectionProxyFor as association,
+  registerModel,
+  RecordNotFound,
+} from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";

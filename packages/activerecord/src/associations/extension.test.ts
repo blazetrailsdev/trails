@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Base, CollectionProxy, association, registerModel } from "../index.js";
+import {
+  Base,
+  CollectionProxy,
+  collectionProxyFor as association,
+  registerModel,
+} from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
 import { fixtures } from "../test-fixtures.js";

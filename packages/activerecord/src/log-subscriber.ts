@@ -21,12 +21,20 @@ function byteLength(value: unknown): number {
   return byteLength(String(value));
 }
 
+function unwrapDelegator(v: unknown): unknown {
+  return v instanceof String && "__getobj__" in v
+    ? (v as unknown as { __getobj__(): unknown }).__getobj__()
+    : v;
+}
+
 function safeJsonStringify(value: unknown): string {
-  const probe = JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  const probe = JSON.stringify(value, (_key, v) =>
+    typeof v === "bigint" ? v.toString() : unwrapDelegator(v),
+  );
   let marker = "@bigint@";
   while (probe.includes(marker)) marker += "@";
   const wrapped = JSON.stringify(value, (_key, v) =>
-    typeof v === "bigint" ? `${marker}${v.toString()}${marker}` : v,
+    typeof v === "bigint" ? `${marker}${v.toString()}${marker}` : unwrapDelegator(v),
   );
   const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return wrapped.replace(new RegExp(`"${escaped}(-?\\d+)${escaped}"`, "g"), "$1");

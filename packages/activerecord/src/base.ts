@@ -299,7 +299,12 @@ import {
   defineDelegatedTypeMethods as _defineDelegatedTypeMethods,
 } from "./delegated-type.js";
 import * as _Reflection from "./reflection.js";
-import * as _AssocInstance from "./associations/instance-methods.js";
+import "./associations/belongs-to-association.js";
+import "./associations/belongs-to-polymorphic-association.js";
+import "./associations/has-many-association.js";
+import "./associations/has-many-through-association.js";
+import "./associations/has-one-association.js";
+import "./associations/has-one-through-association.js";
 import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
@@ -350,6 +355,7 @@ import {
   Associations as _Associations,
   isAssociationCached as _isAssociationCached,
   associationInstanceGet as _associationInstanceGet,
+  association as _association,
   associationInstanceSet as _associationInstanceSet,
   initInternals as _associationsInitInternals,
   initializeDup as _associationsInitializeDup,
@@ -3261,7 +3267,7 @@ _registerAssociationBuilderExtension(AssociationBuilder.extensions);
   });
 }
 include(Base, _NestedAttributes.InstanceMethods);
-include(Base, _AssocInstance.InstanceMethods);
+include(Base, { association: _association });
 include(Base, {
   readAttributeForValidation: _Validations.readAttributeForValidation,
   validate: _Validations.validate,

@@ -1,6 +1,6 @@
 import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
-import { association } from "../../associations.js";
+import { collectionProxyFor as association } from "../../associations.js";
 import type { Base } from "../../base.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 

@@ -6,13 +6,15 @@ import {
   camelize,
   OID_NAMESPACE,
   runLoadHooks,
+  safeConstantize,
   singularize,
   uuidV5,
 } from "@blazetrails/activesupport";
-import { Zlib, prepend } from "@blazetrails/ruby-compat";
+import { ArgumentError, Dir, File as RubyFile, Zlib, prepend } from "@blazetrails/ruby-compat";
 import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { _setFixtureError } from "./fixture-error-slot.js";
 import { TableRows } from "./fixture-set/table-rows.js";
+import { File } from "./fixture-set/file.js";
 
 const REF_TAG = Symbol("fixture-ref");
 
@@ -436,6 +438,10 @@ export class FixtureSet {
       : camelize(fixtureSetName);
   }
 
+  static defaultFixtureTableName(fixtureSetName: string, config: typeof Base = Base): string {
+    return `${config.tableNamePrefix}${fixtureSetName.replaceAll("/", "_")}${config.tableNameSuffix}`;
+  }
+
   static identify(label: string): number;
   static identify(label: string, columnType: string): number | string;
   static identify(label: string, columnType: string = ":integer"): number | string {
@@ -471,6 +477,95 @@ export class FixtureSet {
     fixtures: Record<K, FixtureAttrs>,
   ): Promise<{ [P in K]: InstanceType<T> }> {
     return defineFixtures(adapter, ModelClass, fixtures);
+  }
+
+  readonly tableName: string;
+  readonly name: string;
+  readonly fixtures: Record<string, Fixture>;
+  readonly config: typeof Base;
+  private _modelClass: BaseClass | null = null;
+  private _ignoredFixtures: string[] | null = null;
+  private _path: string;
+
+  constructor(
+    _: unknown,
+    name: string,
+    className: BaseClass | string | null,
+    path: string,
+    config: typeof Base = Base,
+  ) {
+    this.name = name;
+    this._path = path;
+    this.config = config;
+
+    this.setModelClass(className);
+    this.fixtures = this.readFixtureFiles(path);
+
+    this.tableName =
+      this.modelClass?.tableName ??
+      (this.constructor as typeof FixtureSet).defaultFixtureTableName(name, config);
+  }
+
+  get modelClass(): BaseClass | null {
+    return this._modelClass;
+  }
+
+  get ignoredFixtures(): string[] | null {
+    return this._ignoredFixtures;
+  }
+
+  tableRows(): Record<string, Record<string, unknown>[]> {
+    for (const label of this.ignoredFixtures ?? []) delete this.fixtures[label];
+
+    return new TableRows(this.tableName, {
+      modelClass: this.modelClass,
+      fixtures: this.fixtures,
+    }).toHash();
+  }
+
+  private setModelClass(className: BaseClass | string | null): void {
+    if (typeof className === "function") {
+      this._modelClass = className;
+    } else {
+      this._modelClass = className
+        ? ((safeConstantize(className) as BaseClass | undefined) ?? null)
+        : null;
+    }
+  }
+
+  private setIgnoredFixtures(base: unknown): void {
+    this._ignoredFixtures = Array.isArray(base)
+      ? (base as string[])
+      : typeof base === "string"
+        ? [base]
+        : [];
+
+    if (!this._ignoredFixtures.includes("DEFAULTS")) this._ignoredFixtures.push("DEFAULTS");
+  }
+
+  private readFixtureFiles(path: string): Record<string, Fixture> {
+    const yamlFiles = Dir.glob(`${path}{.yml,/{**,*}/*.yml}`).filter((f) => RubyFile.isFile(f));
+
+    if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
+
+    return yamlFiles.reduce<Record<string, Fixture>>((fixtures, file) => {
+      File.open(file, (fh) => {
+        if (this.modelClass == null && fh.modelClass) this.setModelClass(fh.modelClass as string);
+        if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
+        if (this.ignoredFixtures == null) this.setIgnoredFixtures(fh.ignoredFixtures);
+        fh.each(([fixtureName, row]) => {
+          fixtures[fixtureName] = new Fixture(row as FixtureAttrs, this.modelClass);
+        });
+      });
+      return fixtures;
+    }, {});
+  }
+
+  private defaultFixtureModelClass(): BaseClass | null {
+    const klass = safeConstantize(FixtureSet.defaultFixtureModelName(this.name, this.config)) as
+      | BaseClass
+      | undefined;
+    return klass && klass.prototype instanceof Base ? klass : null;
   }
 }
 

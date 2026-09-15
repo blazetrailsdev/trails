@@ -19,6 +19,14 @@ import { StatementCache } from "./statement-cache.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
+import {
+  _BelongsToAssociation,
+  _BelongsToPolymorphicAssociation,
+  _HasManyAssociation,
+  _HasManyThroughAssociation,
+  _HasOneAssociation,
+  _HasOneThroughAssociation,
+} from "./associations/association-class-slots.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import {
   constantize,
@@ -46,6 +54,7 @@ export type CollectionCallback<K extends string> =
 export interface AssociationOptions {
   foreignKey?: string | string[];
   className?: string;
+  anonymousClass?: typeof Base;
   primaryKey?: string | string[];
   queryConstraints?: string[];
   dependent?:
@@ -654,7 +663,8 @@ export function _associateRecordsToOwner(association: AssociationInstance, recor
   }
 }
 
-export function association<T extends Base = Base>(
+/** @noRailsEquivalent CONVERGEABLE disambiguate-association-vs-collection-proxy-accessor */
+export function collectionProxyFor<T extends Base = Base>(
   record: Base,
   assocName: string,
 ): AssociationProxy<T> {
@@ -770,6 +780,69 @@ function wrapCollectionProxy<T extends Base = Base>(
       return target.respondToMissing(prop, false);
     },
   });
+}
+
+/** @internal */
+export function _buildAssociationInstance(
+  this: Base,
+  assocDef: AssociationDefinition,
+): AssociationInstance {
+  const opts = (assocDef.options ?? {}) as Record<string, unknown>;
+  switch (assocDef.macro) {
+    case "belongsTo":
+      if (opts.polymorphic) return new _BelongsToPolymorphicAssociation!(this, assocDef as any);
+      return new _BelongsToAssociation!(this, assocDef as any);
+    case "hasOne":
+      if (opts.through) return new _HasOneThroughAssociation!(this, assocDef as any);
+      return new _HasOneAssociation!(this, assocDef as any);
+    case "hasMany":
+      if (opts.through) return new _HasManyThroughAssociation!(this, assocDef as any);
+      return new _HasManyAssociation!(this, assocDef as any);
+    default:
+      return new _HasManyThroughAssociation!(this, assocDef as any);
+  }
+}
+
+function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
+  if (instance.isCollection()) {
+    if (instance.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
+    return;
+  }
+  const cached = this._associationCache(name);
+  if (cached === instance) return;
+  if (cached !== undefined) {
+    if (instance.isLoaded()) {
+      instance._writeTargetStore((cached.target as Base | Base[] | null) ?? null);
+    } else {
+      instance._setTargetFromLoader((cached.target as Base | Base[] | null) ?? null);
+    }
+    return;
+  }
+  const holder = associationInstanceGet.call(this, name) as AssociationInstance | null;
+  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+    instance._setTargetFromLoader((holder.target ?? null) as any);
+  }
+}
+
+export function association(this: Base, name: string): AssociationInstance {
+  const existing = this._associationInstances.get(name);
+  if (existing) {
+    syncAssociationInstance.call(this, name, existing);
+    return existing;
+  }
+
+  const ctor = this.constructor as typeof Base;
+  const assocDef = ctor._reflectOnAssociation?.(name) as unknown as
+    | AssociationDefinition
+    | undefined;
+  if (!assocDef) {
+    throw new AssociationNotFoundError(this, name);
+  }
+
+  const instance = _buildAssociationInstance.call(this, assocDef);
+  this._associationInstances.set(name, instance);
+  syncAssociationInstance.call(this, name, instance);
+  return instance;
 }
 
 /** @internal */

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations, association } from "../associations.js";
+import { Associations, collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 
 class StvAuthor extends Base {

@@ -3,7 +3,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { LineItem } from "./line-item.js";
 import type { ShippingLine } from "./shipping-line.js";
 import { Base } from "../../base.js";
-import { association } from "../../associations.js";
+import { collectionProxyFor as association } from "../../associations.js";
 
 export class Invoice extends Base {
   declare lineItems: AssociationProxy<LineItem>;

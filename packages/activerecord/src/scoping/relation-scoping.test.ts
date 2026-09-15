@@ -15,7 +15,7 @@ import {
 } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Author } from "../test-helpers/models/author.js";
-import { association } from "../associations.js";
+import { collectionProxyFor as association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
 import { BadReference } from "../test-helpers/models/reference.js";
 

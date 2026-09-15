@@ -6,7 +6,7 @@ import {
   GeneratedAttributeMethods,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
-import { formatForInspect } from "./attribute-inspection.js";
+import { formatForInspect } from "./attribute-methods.js";
 import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-fixtures.js";
