@@ -720,18 +720,19 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
+  let relation: CalculationRelation;
   let queryBuilder: unknown;
   let column: unknown = null;
 
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
     if (rel.limitValue === 0) return 0;
 
-    const subquery = buildCountSubquery(
+    relation = rel;
+    queryBuilder = buildCountSubquery(
       rel.spawn(),
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
-    queryBuilder = subquery;
   } else {
     let joined = rel;
     if (rel.isEagerLoading) {
@@ -739,7 +740,7 @@ export async function executeSimpleCalculation(
         joined = r;
       });
     }
-    const relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
+    relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
 
     column = aggregateColumn(relation, aggregateTarget(columnName));
     const selectValue = operationOverAggregateColumn(
@@ -754,14 +755,14 @@ export async function executeSimpleCalculation(
     queryBuilder = relation.arel();
   }
 
-  const queryResult = rel.whereClause.isContradiction()
+  const queryResult = relation.whereClause.isContradiction()
     ? Result.empty()
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
         rel.withConnection((c) =>
           c.selectAll(
-            queryBuilder as never,
+            queryBuilder,
             `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
           ),
         ),
@@ -852,7 +853,7 @@ export async function executeGroupedCalculation(
     const calculatedData = await (
       rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
     ).skipQueryCacheIfNecessary(() =>
-      connection.selectAll(relation.arel() as never, `${rel.model.name} ${opName}`),
+      connection.selectAll(relation.arel(), `${rel.model.name} ${opName}`),
     );
     const rows = calculatedData.toArray();
 
