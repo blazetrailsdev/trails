@@ -181,7 +181,6 @@ export class DebugExceptions {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const request = new Request(env);
     try {
       const response = await this.app(env);
       const [, headers, body] = response;
@@ -196,6 +195,7 @@ export class DebugExceptions {
 
       return response;
     } catch (error) {
+      const request = new Request(env);
       const exception = error instanceof Error ? error : new Error(String(error));
       const backtraceCleaner =
         (env["action_dispatch.backtrace_cleaner"] as BacktraceCleaner | undefined) ?? null;
