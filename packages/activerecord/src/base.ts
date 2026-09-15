@@ -73,6 +73,7 @@ import {
   initInternals as _autosaveInitInternals,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
+import { idsName as _idsName } from "./associations/builder/collection-association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
@@ -163,7 +164,6 @@ import {
   type BenchmarkLogger,
   runLoadHooks,
   type PrependMethod,
-  singularize as _singularize,
   type Included,
   type ParameterFilter,
   peekCallbackChain,
@@ -588,9 +588,7 @@ function _collectionIdsKeyOwner(
 ): _AssociationDefLike | undefined {
   if (!key.endsWith("Ids")) return undefined;
   return defs.find(
-    (a) =>
-      (a.macro === "hasMany" || a.macro === "hasAndBelongsToMany") &&
-      `${_singularize(a.name)}Ids` === key,
+    (a) => (a.macro === "hasMany" || a.macro === "hasAndBelongsToMany") && _idsName(a.name) === key,
   );
 }
 

@@ -555,7 +555,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     const otherAuthor = await Author.create({ name: "Someone Else Three" });
     const theirs = await Post.create({ title: "mine", body: "2", author_id: otherAuthor.id });
 
-    const posts = association<Post>(author, "posts") as any;
+    const posts = (author as any).posts;
     expect(await posts.updateAll({ body: "updated" })).toBe(1);
     expect((await Post.find(mine.id)).body).toBe("updated");
     expect((await Post.find(theirs.id)).body).toBe("2");
@@ -571,7 +571,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     const otherAuthor = await Author.create({ name: "Someone Else Four" });
     await Post.create({ title: "theirs", body: "2", author_id: otherAuthor.id });
 
-    const posts = association<Post>(author, "posts") as any;
+    const posts = (author as any).posts;
     expect(await posts.count()).toBe(1);
     expect(await posts.size()).toBe(1);
   });

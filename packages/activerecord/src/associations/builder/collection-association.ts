@@ -1,8 +1,11 @@
 import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
-import { collectionProxyFor as association } from "../../associations.js";
-import type { Base } from "../../base.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
+
+/** @noRailsEquivalent PERMANENT */
+export function idsName(name: string): string {
+  return `${singularize(name)}Ids`;
+}
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
 
@@ -87,20 +90,11 @@ export class CollectionAssociation extends Association {
   static override defineReaders(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
 
-    const existing = Object.getOwnPropertyDescriptor(mixin, name);
-    if (!existing || existing.configurable) {
-      Object.defineProperty(mixin, name, {
-        get(this: Base) {
-          return association(this, name);
-        },
-        set: existing?.set,
-        configurable: true,
-      });
-    }
+    super.defineReaders(mixin, name);
 
-    const idsName = `${singularize(name)}Ids`;
-    if (!(idsName in mixin)) {
-      Object.defineProperty(mixin, idsName, {
+    const ids = idsName(name);
+    if (!(ids in mixin)) {
+      Object.defineProperty(mixin, ids, {
         get(this: AssociationInstanceHost) {
           return this.association(name).idsReader();
         },
@@ -118,7 +112,7 @@ export class CollectionAssociation extends Association {
       writable: true,
       configurable: true,
     });
-    Object.defineProperty(mixin, `${singularize(name)}Ids=`, {
+    Object.defineProperty(mixin, `${idsName(name)}=`, {
       value(this: AssociationInstanceHost, value: unknown): unknown {
         return this.association(name).idsWriter(value);
       },
