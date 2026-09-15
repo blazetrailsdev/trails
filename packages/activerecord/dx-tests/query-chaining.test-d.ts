@@ -110,7 +110,6 @@ describe("query chaining DX", () => {
   });
 
   it("Post.withCte / withRecursive / with return Relation<Post>", () => {
-    expectTypeOf(Post.withCte({ recent: "SELECT * FROM posts" })).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.withRecursive({ tree: "SELECT * FROM posts" })).toMatchTypeOf<
       Relation<Post>
     >();

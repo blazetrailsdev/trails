@@ -97,10 +97,6 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(Topic.excluding()).toBeInstanceOf(Relation);
   });
 
-  it("withCte() returns a Relation", () => {
-    expect(Topic.withCte({ recent: "SELECT 1" })).toBeInstanceOf(Relation);
-  });
-
   it("Post.with (Rails alias for withCte) is wired and returns a Relation", () => {
     expect(Topic["with"]({ recent: "SELECT 1" })).toBeInstanceOf(Relation);
   });

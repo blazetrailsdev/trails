@@ -1,7 +1,7 @@
 import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { classify, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
-import { metadataTableNames } from "./tasks/database-tasks.js";
+import { _Base } from "./base-slot.js";
 
 export interface IntrospectedTable {
   name: string;
@@ -75,7 +75,11 @@ export function generateModels(
   const { stripPrefix, stripSuffix, noHeader, sourceHint } = opts;
   const now = opts.now ?? Temporal.Now.instant();
 
-  const builtinIgnore = metadataTableNames();
+  const base = _Base!;
+  const builtinIgnore = new Set([
+    `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`,
+    `${base.tableNamePrefix}${base.internalMetadataTableName}${base.tableNameSuffix}`,
+  ]);
   const hasNoPk = (pk: string | string[] | null): boolean =>
     pk === null || (Array.isArray(pk) && pk.length === 0);
   const skipped: Array<{ name: string; reason: string }> = [];

@@ -985,17 +985,6 @@ export function isVerbose(): boolean {
   return v !== undefined ? v !== "false" : true;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function metadataTableNames(): Set<string> {
-  const base = baseClass();
-  const prefix = base.tableNamePrefix;
-  const suffix = base.tableNameSuffix;
-  return new Set([
-    `${prefix}${base.schemaMigrationsTableName}${suffix}`,
-    `${prefix}${base.internalMetadataTableName}${suffix}`,
-  ]);
-}
-
 /** @internal */
 export function eachCurrentEnvironment(environment: string): string[] {
   const envs = [environment];
