@@ -30,6 +30,23 @@ describe("I18nOverrideTest", () => {
     config().backend = new Simple();
   });
 
+  it("make sure modules can overwrite I18n methods", () => {
+    const OverrideInverse = {
+      translate(key: string, options: Record<string, unknown>): unknown {
+        return [...(super.translate(key, options) as string)].reverse().join("");
+      },
+    } as { translate(...args: unknown[]): unknown; t(...args: unknown[]): unknown };
+    OverrideInverse.t = OverrideInverse.translate;
+
+    dupI18n = Object.setPrototypeOf(OverrideInverse, dupI18n) as I18nModule;
+    config().backend.storeTranslations("en", { foo: "bar" });
+
+    expect(dupI18n.translate(":foo", { locale: "en" })).toBe("rab");
+    expect(dupI18n.t(":foo", { locale: "en" })).toBe("rab");
+    expect(dupI18n.translateBang(":foo", { locale: "en" })).toBe("rab");
+    expect(dupI18n.tBang(":foo", { locale: "en" })).toBe("rab");
+  });
+
   it("make sure modules can overwrite I18n signature", () => {
     const exception = kernelCatch(":exception", () =>
       dupI18n.t("Hello", { tokenize: true, throw: true }),
