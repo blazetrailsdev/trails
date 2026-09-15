@@ -1268,9 +1268,8 @@ export class PostgreSQLAdapter
     this._mappedDefaultTimezone = null;
 
     if (isRubyTruthy(this._config.encoding)) {
-      await this.internalExecute(
-        `SET client_encoding TO ${this.quote(this._config.encoding)}`,
-        "SCHEMA",
+      await this._rawConnection.query(
+        `SET client_encoding TO ${this._rawConnection.escapeLiteral(String(this._config.encoding))}`,
       );
     }
 
