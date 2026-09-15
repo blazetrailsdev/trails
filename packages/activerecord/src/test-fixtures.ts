@@ -3,7 +3,6 @@ import { getCurrentSuite } from "vitest/suite";
 import { include, included } from "@blazetrails/ruby-compat";
 import { classAttribute, runLoadHooks } from "@blazetrails/activesupport";
 import {
-  prepareModelFixtures,
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
   FixtureSet,
@@ -26,10 +25,7 @@ import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
-import {
-  leaseFixtureConnection,
-  leaseFixtureConnectionFor,
-} from "./test-fixtures/fixture-connection.js";
+import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 
 function effectiveFixtureKey(
   model: typeof Base,
@@ -307,30 +303,32 @@ function useFixtures(
 
   beforeEach(async () => {
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-    const fixtureConnection = getAdapter();
-    const groups = new Map<DatabaseAdapter, { prepared: PreparedFixtureSet[]; keys: string[] }>();
+    const fixturesDirectories: Record<string, Record<string, FixtureAttrs>> = {};
+    const fixtureClassNames: Record<string, BaseClass | null> = {};
+    const fixtureSetNames: string[] = [];
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
       if (model !== null && "_isActiveRecordBase" in model) {
         registerModel(model);
       }
-      const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
-      let group = groups.get(adapter);
-      if (group === undefined) {
-        group = { prepared: [], keys: [] };
-        groups.set(adapter, group);
-      }
-      group.prepared.push(
-        model === null
-          ? await prepareJoinTableFixtures(adapter, table, data)
-          : await prepareModelFixtures(adapter, model, data),
-      );
-      group.keys.push(key);
+      const fsName = model === null ? table : key;
+      fixturesDirectories[fsName] = data;
+      fixtureClassNames[fsName] = model;
+      fixtureSetNames.push(fsName);
     }
-    for (const [adapter, group] of groups) {
-      const results = await insertPreparedFixtureSets(adapter, group.prepared);
-      results.forEach((result, i) => {
-        store[group.keys[i]] = result;
-      });
+    const fixtureSets = await FixtureSet.createFixtures(
+      fixturesDirectories,
+      fixtureSetNames,
+      fixtureClassNames,
+    );
+    const loaded = Object.keys(fixtures);
+    for (let i = 0; i < loaded.length; i++) {
+      const fixtureSet = fixtureSets[i];
+      const set: Record<string, unknown> = {};
+      for (const [label, fixture] of Object.entries(fixtureSet.fixtures)) {
+        set[label] =
+          fixtureClassNames[fixtureSet.name] === null ? fixture.toHash() : await fixture.find();
+      }
+      store[loaded[i]] = set;
     }
   });
 

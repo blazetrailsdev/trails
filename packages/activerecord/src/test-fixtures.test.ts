@@ -65,14 +65,25 @@ function makeAdapter(): DatabaseAdapter {
   } as unknown as DatabaseAdapter;
 }
 
-function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>>, pk = "id") {
+function mockPool(adapter: DatabaseAdapter) {
+  return { withConnection: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter) };
+}
+
+function makeModel(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  rows: Map<unknown, Record<string, unknown>>,
+  pk = "id",
+) {
   return {
     tableName,
     primaryKey: pk,
+    connectionPool: () => mockPool(adapter),
+    unscoped: (block: () => unknown) => block(),
     loadSchema: async () => {},
     columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
     typeForAttribute: () => ({ type: () => "integer" }),
-    findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
+    findByBang: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
 
@@ -88,7 +99,7 @@ describe("useFixtures", () => {
   const adapter = makeAdapter();
   const topicId = FixtureSet.identify("rails");
   const rows = new Map([[topicId, { id: topicId, title: "Rails" }]]);
-  const Topic = makeModel("topics", rows);
+  const Topic = makeModel(adapter, "topics", rows);
 
   const { topics } = fixtures(
     { topics: [Topic, { rails: { title: "Rails" } }] },
@@ -113,8 +124,8 @@ describe("useFixtures multi-set", () => {
   const postId = FixtureSet.identify("hello");
   const topicRows = new Map([[topicId, { id: topicId, title: "Rails" }]]);
   const postRows = new Map([[postId, { id: postId, title: "Hello" }]]);
-  const Topic = makeModel("topics", topicRows);
-  const Post = makeModel("posts", postRows);
+  const Topic = makeModel(adapter, "topics", topicRows);
+  const Post = makeModel(adapter, "posts", postRows);
 
   const { topics, posts } = fixtures(
     {
@@ -134,7 +145,7 @@ describe("useFixtures slash-keyed fixture sets", () => {
   const adapter = makeAdapter();
   const rowId = FixtureSet.identify("david");
   const rows = new Map([[rowId, { id: rowId, name: "David" }]]);
-  const AccountModel = makeModel("accounts", rows);
+  const AccountModel = makeModel(adapter, "accounts", rows);
 
   const result = fixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
@@ -155,10 +166,10 @@ describe("all/ fixture sets — explicit enumeration", () => {
   const adapter = makeAdapter();
   const rowId = FixtureSet.identify("signals37");
   const rows = new Map([[rowId, { id: rowId, name: "37signals" }]]);
-  const AccountModel = makeModel("accounts", rows);
-  const DevModel = makeModel("developers", new Map());
-  const PersonModel = makeModel("people", new Map());
-  const TaskModel = makeModel("tasks", new Map());
+  const AccountModel = makeModel(adapter, "accounts", rows);
+  const DevModel = makeModel(adapter, "developers", new Map());
+  const PersonModel = makeModel(adapter, "people", new Map());
+  const TaskModel = makeModel(adapter, "tasks", new Map());
 
   const result = fixtures(
     {
@@ -188,14 +199,16 @@ describe("useFixtures type contract", () => {
     declare title: string;
     static {
       this.tableName = "topics";
-      this.findBy = vi.fn(async () => new Topic()) as any;
+      this.findByBang = vi.fn(async () => new Topic()) as any;
+      this.connectionPool = (() => mockPool(makeAdapter())) as any;
     }
   }
   class Post extends Base {
     declare body: string;
     static {
       this.tableName = "posts";
-      this.findBy = vi.fn(async () => new Post()) as any;
+      this.findByBang = vi.fn(async () => new Post()) as any;
+      this.connectionPool = (() => mockPool(makeAdapter())) as any;
     }
   }
 
@@ -777,24 +790,27 @@ describe("FixtureSet.createFixtures", () => {
       [id1, { id: id1, title: "First" }],
       [id2, { id: id2, title: "Second" }],
     ]);
-    const Topic = makeModel("topics", rows);
+    const Topic = makeModel(adapter, "topics", rows);
 
-    const result = await FixtureSet.createFixtures(adapter, Topic, {
-      first: { title: "First" },
-      second: { title: "Second" },
-    });
+    const [result] = await FixtureSet.createFixtures(
+      { topics: { first: { title: "First" }, second: { title: "Second" } } },
+      "topics",
+      { topics: Topic },
+    );
 
-    expect(result.first).toMatchObject({ id: id1 });
-    expect(result.second).toMatchObject({ id: id2 });
+    expect(await result.get("first")!.find()).toMatchObject({ id: id1 });
+    expect(await result.get("second")!.find()).toMatchObject({ id: id2 });
   });
 
   it("emits DELETE before INSERT so rows are replaced (cross-test isolation)", async () => {
     const adapter = makeAdapter();
     const id = FixtureSet.identify("rails");
     const rows = new Map([[id, { id, title: "Rails" }]]);
-    const Topic = makeModel("topics", rows);
+    const Topic = makeModel(adapter, "topics", rows);
 
-    await FixtureSet.createFixtures(adapter, Topic, { rails: { title: "Rails" } });
+    await FixtureSet.createFixtures({ topics: { rails: { title: "Rails" } } }, "topics", {
+      topics: Topic,
+    });
 
     const sqls = (
       (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
