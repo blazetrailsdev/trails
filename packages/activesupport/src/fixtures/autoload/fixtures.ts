@@ -3,9 +3,17 @@ import * as Autoload from "../../dependencies/autoload.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
+export const LOADED_FEATURES: string[] = [];
+
 const loadPath: Record<string, () => Promise<unknown>> = {
-  "fixtures/autoload/some_class": () => import("./some-class.js"),
-  "fixtures/autoload/another_class": () => import("./another-class.js"),
+  "fixtures/autoload/some_class": async () => {
+    LOADED_FEATURES.push("fixtures/autoload/some_class");
+    return import("./some-class.js");
+  },
+  "fixtures/autoload/another_class": async () => {
+    LOADED_FEATURES.push("fixtures/autoload/another_class");
+    return import("./another-class.js");
+  },
 };
 
 const FixturesAutoload = { name: "Fixtures::Autoload", loadPath } as AutoloadModule & {
