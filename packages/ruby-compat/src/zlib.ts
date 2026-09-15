@@ -9,11 +9,14 @@ import { getZlib } from "./zlib-adapter.js";
  */
 class GzipFile<IO extends { close(): void } = File> {
   /** `ZSTREAM_FLAG_READY` (`vendor/ruby/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
-  private zstreamReady = true;
+  protected zstreamReady = true;
 
   constructor(protected io: IO) {}
 
   close(): Promise<void> | void {
+    if (!this.zstreamReady) {
+      return;
+    }
     this.zstreamReady = false;
     this.io.close();
   }
@@ -101,6 +104,9 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 
   async close(): Promise<void> {
+    if (!this.zstreamReady) {
+      return;
+    }
     const bytes = new TextEncoder().encode(this.buffer);
     const gzipped = getZlib().gzip(bytes, Zlib.DEFAULT_COMPRESSION, Zlib.DEFAULT_STRATEGY);
     if (this.mtime !== null && gzipped.length >= GZIP_HEADER_LENGTH) {

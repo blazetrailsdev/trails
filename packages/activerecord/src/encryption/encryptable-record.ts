@@ -119,7 +119,6 @@ export function addLengthValidationForEncryptedColumns(this: any): void {
 
 /**
  * @internal
- * @missingRailsCall encrypted_attribute? — PERMANENT
  * @missingRailsCall include — PERMANENT
  */
 export function overrideAccessorsToPreserveOriginal(
@@ -127,28 +126,22 @@ export function overrideAccessorsToPreserveOriginal(
   name: string,
   originalAttributeName: string,
 ): void {
-  const modelClass = this;
-  if (typeof modelClass.beforeSave === "function") {
-    modelClass.beforeSave((record: any) => {
-      const isNew =
-        typeof record.isNewRecord === "function" ? record.isNewRecord() : !record.isPersisted?.();
-      const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
-        ? record.changedAttributeNamesToSave
-        : [];
-      if (!isNew && !changed.includes(name)) return;
-      record.writeAttribute(originalAttributeName, record.readAttribute(name));
-    });
-  }
-  Object.defineProperty(modelClass.prototype, name, {
+  Object.defineProperty(this.prototype, name, {
     configurable: true,
     get(this: any) {
-      const originalValue = this.readAttribute(originalAttributeName);
-      if (originalValue != null) return originalValue;
-      return this.readAttribute(name);
+      const value = this.readAttribute(name);
+      if (
+        (value != null && value !== false && encryptedAttribute.call(this, name)) ||
+        !Configurable.config.supportUnencryptedData
+      ) {
+        return this[originalAttributeName];
+      } else {
+        return value;
+      }
     },
     set(this: any, value: unknown) {
+      this[originalAttributeName] = value;
       this.writeAttribute(name, value);
-      this.writeAttribute(originalAttributeName, value);
     },
   });
 }

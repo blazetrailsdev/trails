@@ -178,6 +178,22 @@ export function makeEncryptedBookThatIgnoresCase() {
   } as any;
 }
 
+export async function createUnencryptedBookIgnoringCase(
+  encryptedBookThatIgnoresCase: any,
+  { name }: { name: string },
+): Promise<any> {
+  const book = await Contexts.withoutEncryption(() =>
+    encryptedBookThatIgnoresCase.createBang({ name }),
+  );
+
+  const connection = await encryptedBookThatIgnoresCase.leaseConnection();
+  // eslint-disable-next-line blazetrails/no-raw-sql
+  await connection.execute(`UPDATE encrypted_books SET name = '${name}' WHERE id = ${book.id};`);
+
+  await book.reload();
+  return book;
+}
+
 export function makeEncryptedAuthor() {
   return class EncryptedAuthor extends Base {
     static {
