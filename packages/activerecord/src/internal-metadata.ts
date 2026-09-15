@@ -54,19 +54,13 @@ export class InternalMetadata {
     this.arelTable = new Table(this.tableName);
   }
 
-  private async _withConnection<T>(
-    fn: (connection: DatabaseAdapter) => T | Promise<T>,
-  ): Promise<T> {
-    return await this._pool.withConnection(fn);
-  }
-
   get enabled(): boolean | null | undefined {
     return this._pool.dbConfig.useMetadataTable;
   }
 
   async createTable(): Promise<void> {
     if (!this.enabled) return;
-    await this._withConnection(async (connection) => {
+    await this._pool.withConnection(async (connection) => {
       if (await connection.tableExists(this.tableName)) return;
       await connection.createTable(this.tableName, { id: false }, (t) => {
         t.string("key", connection.internalStringOptionsForPrimaryKey());
@@ -78,7 +72,7 @@ export class InternalMetadata {
 
   async createTableAndSetFlags(environment: string, schemaSha1?: string): Promise<void> {
     if (!this.enabled) return;
-    await this._withConnection(async (connection) => {
+    await this._pool.withConnection(async (connection) => {
       await this.createTable();
       await this.updateOrCreateEntry(connection, "environment", environment);
       if (schemaSha1 !== undefined) {
@@ -89,14 +83,14 @@ export class InternalMetadata {
 
   async dropTable(): Promise<void> {
     if (!this.enabled) return;
-    await this._withConnection((connection) =>
+    await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }
 
   async get(key: string): Promise<string | null> {
     if (!this.enabled) return null;
-    return await this._withConnection(async (connection) => {
+    return await this._pool.withConnection(async (connection) => {
       const entry = await this.selectEntry(connection, key);
       if (!entry) return null;
       const value = entry[this.valueKey];
@@ -109,7 +103,9 @@ export class InternalMetadata {
     if (!this.enabled) {
       throw new EnvironmentStorageError();
     }
-    await this._withConnection((connection) => this.updateOrCreateEntry(connection, key, value));
+    await this._pool.withConnection((connection) =>
+      this.updateOrCreateEntry(connection, key, value),
+    );
   }
 
   /** @internal */
@@ -130,7 +126,7 @@ export class InternalMetadata {
 
   async deleteAllEntries(): Promise<void> {
     const dm = new DeleteManager(this.arelTable);
-    await this._withConnection((connection) =>
+    await this._pool.withConnection((connection) =>
       connection.delete(dm, `${this.constructor.name} Destroy`),
     );
   }
@@ -138,7 +134,7 @@ export class InternalMetadata {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.Count([star()]));
-    const values = await this._withConnection((connection) =>
+    const values = await this._pool.withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
     return first(values) as number;

@@ -411,6 +411,7 @@ export class Relation<T extends Base> {
     return this._records;
   }
 
+  /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
   loadAsync(): Relation<T> {
     if (!this.isLoaded) {
       const result = this.execMainQuery(true);
@@ -624,6 +625,7 @@ export class Relation<T extends Base> {
     });
   }
 
+  /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
   private execMainQuery(async = false): Result | Promise<Result> | FutureResult | Complete {
     if (this._isNone) {
       if (async) {
@@ -633,22 +635,28 @@ export class Relation<T extends Base> {
       }
     }
 
-    const c = this._conn();
-    async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
-
     return this.skipQueryCacheIfNecessary(() => {
-      if (this.whereClause.isContradiction()) return Result.empty();
-
-      if (this.isEagerLoading) {
-        return this.applyJoinDependency({}, (relation, joinDependency) => {
-          if (relation.isNullRelation()) return Result.empty();
-          joinDependency.applyColumnAliases(relation);
-          this._joinDependency = joinDependency;
-          return this._conn().selectAll(relation.arel(), "SQL", [], { async });
+      if (this.whereClause.isContradiction()) {
+        return Result.empty();
+      } else if (this.isEagerLoading) {
+        return this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
+          async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+          return this.applyJoinDependency({}, (relation, joinDependency) => {
+            if (relation.isNullRelation()) {
+              return Result.empty();
+            } else {
+              joinDependency.applyColumnAliases(relation);
+              this._joinDependency = joinDependency;
+              return c.selectAll(relation.arel(), "SQL", [], { async });
+            }
+          });
+        });
+      } else {
+        return this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
+          async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+          return c.selectAll(this.arel(), `${this.model.name} Load`, [], { async });
         });
       }
-
-      return c.selectAll(this.arel(), `${this.model.name} Load`, [], { async });
     });
   }
 
@@ -939,7 +947,10 @@ export class Relation<T extends Base> {
     return this.whereClause.toH(relationTableName);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   */
   applyJoinDependency<R>(
     { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
     block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
@@ -974,7 +985,7 @@ export class Relation<T extends Base> {
     ) {
       return Promise.resolve(
         this.skipQueryCacheIfNecessary(() =>
-          this.model.withConnection((c: DatabaseAdapter) =>
+          this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
             (
               c as unknown as {
                 distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
@@ -1022,7 +1033,7 @@ export class Relation<T extends Base> {
       Nodes.OuterJoin,
     );
     if (jd.reflections.length === 0) return [];
-    return this.withConnection(() => this._materializeLimitedIds(jd, basePk));
+    return this.withConnection((c) => this._materializeLimitedIds(c, jd, basePk));
   }
 
   /** @internal */
@@ -1155,11 +1166,12 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private async _materializeLimitedIds(
+    c: DatabaseAdapter,
     jd: JoinDependency,
     basePk: string | string[],
   ): Promise<unknown[]> {
-    const distinctSelect = this._distinctSelectForLimitedIds(basePk);
-    const idResult = await this._conn().selectAll(
+    const distinctSelect = this._distinctSelectForLimitedIds(c, basePk);
+    const idResult = await c.selectAll(
       this._limitedDistinctRelation(jd, basePk, distinctSelect).arel(),
       "SQL",
     );
@@ -1168,13 +1180,13 @@ export class Relation<T extends Base> {
     return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
 
-  private _distinctSelectForLimitedIds(basePk: string | string[]): string {
+  private _distinctSelectForLimitedIds(c: DatabaseAdapter, basePk: string | string[]): string {
     const table = this.table;
     const pkColumns = (Array.isArray(basePk) ? basePk : [basePk]).map((column) =>
-      this._conn().toSql(table.get(column)),
+      c.toSql(table.get(column)),
     );
     const pkSql = pkColumns.length === 1 ? pkColumns[0] : pkColumns;
-    const adapter = this._conn() as unknown as {
+    const adapter = c as unknown as {
       columnsForDistinct?: (
         cols: string | string[],
         orders: (string | Nodes.Node)[],
@@ -1214,7 +1226,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private _conn(): DatabaseAdapter {
-    return this._model.connectionPool().activeConnection ?? this._model.connection;
+    return this._model.connectionPool().withConnectionSync((c) => c);
   }
 
   async preloadAssociations(records: T[]): Promise<void> {

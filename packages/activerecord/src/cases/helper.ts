@@ -16,6 +16,7 @@ import {
 } from "../encryption/extended-deterministic-uniqueness-validator.js";
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
+import { setPermanentConnectionCheckout } from "../active-record.js";
 import { UniquenessValidator } from "../validations.js";
 
 registerFakeAdapter();
@@ -29,6 +30,8 @@ Base.automaticallyInvertPluralAssociations = true;
 Base.raiseOnAssignToAttrReadonly = true;
 
 Base.belongsToRequiredValidatesForeignKey = false;
+
+setPermanentConnectionCheckout("disallowed");
 
 export const TEST_PRIMARY_KEY = "test master key";
 export const TEST_DETERMINISTIC_KEY = "test deterministic key";
