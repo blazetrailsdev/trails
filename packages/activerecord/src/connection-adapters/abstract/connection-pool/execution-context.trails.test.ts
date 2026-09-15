@@ -13,11 +13,11 @@ describe("execution context per IsolatedExecutionState.run", () => {
     const lease = () => (pool as unknown as { connectionLease(): object }).connectionLease();
 
     const [a, b] = await Promise.all([
-      IsolatedExecutionState.run(async () => {
+      new Thread(async () => {
         await Promise.resolve();
         return lease();
-      }),
-      IsolatedExecutionState.run(async () => lease()),
+      }).value(),
+      new Thread(async () => lease()).value(),
     ]);
 
     expect(a).not.toBe(b);

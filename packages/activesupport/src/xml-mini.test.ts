@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   backend,
@@ -10,7 +11,6 @@ import {
   type ToTagOptions,
   type XmlMiniBackend,
 } from "./xml-mini.js";
-import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { Temporal, Date as RubyDate } from "@blazetrails/date";
 import { Duration } from "./duration.js";
@@ -385,12 +385,12 @@ describe("ThreadSafetyTest", () => {
     let release!: () => void;
     const entered = new Promise<void>((resolve) => (signalEntered = resolve));
     const sleep = new Promise<void>((resolve) => (release = resolve));
-    const thread = IsolatedExecutionState.run(() =>
+    const thread = new Thread(() =>
       withBackend(name, () => {
         signalEntered();
         return sleep;
       }),
-    );
+    ).value();
     return {
       entered,
       join: async () => {

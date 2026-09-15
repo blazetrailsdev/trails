@@ -360,7 +360,14 @@ const CONNECTED_TO_STACK_KEY = Symbol.for("ar_connected_to_stack");
 
 /** @missingRailsCall new — PERMANENT */
 export function connectedToStack(): ConnectedToEntry[] {
-  return IsolatedExecutionState.fetch<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY, () => []);
+  let connectedToStack = IsolatedExecutionState.get<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY);
+  if (connectedToStack != null) {
+    return connectedToStack;
+  } else {
+    connectedToStack = [];
+    IsolatedExecutionState.set(CONNECTED_TO_STACK_KEY, connectedToStack);
+    return connectedToStack;
+  }
 }
 
 function isBase(klass: any): boolean {
@@ -450,9 +457,9 @@ export function connectionClassForSelf(this: CoreHost): CoreHost {
 }
 
 export function asynchronousQueriesTracker(): AsynchronousQueriesTracker {
-  return IsolatedExecutionState.fetch<AsynchronousQueriesTracker>(
-    ASYNCHRONOUS_QUERIES_TRACKER_KEY,
-    () => new AsynchronousQueriesTracker(),
+  return (
+    IsolatedExecutionState.get<AsynchronousQueriesTracker>(ASYNCHRONOUS_QUERIES_TRACKER_KEY) ??
+    IsolatedExecutionState.set(ASYNCHRONOUS_QUERIES_TRACKER_KEY, new AsynchronousQueriesTracker())
   );
 }
 

@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
@@ -11,7 +12,6 @@ import { connectedToStack, currentRole, currentShard, currentPreventingWrites } 
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 describe("ConnectionHandlingTest", () => {
   fixtures(["posts"], {
@@ -354,13 +354,13 @@ describe("ConnectionHandlingTest", () => {
     let innerRoleBeforeAwait: string | undefined;
     let innerRoleAfterAwait: string | undefined;
 
-    await IsolatedExecutionState.run(async () => {
+    await new Thread(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         innerRoleBeforeAwait = currentRole.call(Base);
         await Promise.resolve();
         innerRoleAfterAwait = currentRole.call(Base);
       });
-    });
+    }).value();
 
     const outerRole = currentRole.call(Base);
 
@@ -379,20 +379,20 @@ describe("ConnectionHandlingTest", () => {
     let prohibitedAfterAwait: boolean | undefined;
     let concurrentProhibited: boolean | undefined;
 
-    const prohibitedTask = IsolatedExecutionState.run(async () => {
+    const prohibitedTask = new Thread(async () => {
       await Base.prohibitShardSwapping(async () => {
         prohibitedBeforeAwait = Base.isShardSwappingProhibited();
         await Promise.resolve();
         prohibitedAfterAwait = Base.isShardSwappingProhibited();
         await overlap;
       });
-    });
+    }).value();
 
-    const concurrentTask = IsolatedExecutionState.run(async () => {
+    const concurrentTask = new Thread(async () => {
       await Promise.resolve();
       concurrentProhibited = Base.isShardSwappingProhibited();
       resolveOverlap();
-    });
+    }).value();
 
     await Promise.all([prohibitedTask, concurrentTask]);
 
@@ -413,23 +413,23 @@ describe("ConnectionHandlingTest", () => {
     });
     const results: string[] = [];
 
-    const task1 = IsolatedExecutionState.run(async () => {
+    const task1 = new Thread(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         await Promise.resolve();
         results.push(`task1: ${currentRole.call(Base)}`);
         resolveTask2();
         await task1Gate;
       });
-    });
+    }).value();
 
-    const task2 = IsolatedExecutionState.run(async () => {
+    const task2 = new Thread(async () => {
       await task2Gate;
       await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
         await Promise.resolve();
         results.push(`task2: ${currentRole.call(Base)}`);
         resolveTask1();
       });
-    });
+    }).value();
 
     await Promise.all([task1, task2]);
 

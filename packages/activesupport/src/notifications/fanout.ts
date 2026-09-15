@@ -271,7 +271,10 @@ export class Fanout {
   private readonly _handleStackKey = Symbol("as_fanout_handle_stack");
 
   private handleStack(): Handle[] {
-    return IsolatedExecutionState.fetch<Handle[]>(this._handleStackKey, () => []);
+    return (
+      IsolatedExecutionState.get<Handle[]>(this._handleStackKey) ??
+      IsolatedExecutionState.set(this._handleStackKey, [])
+    );
   }
 
   subscribe(

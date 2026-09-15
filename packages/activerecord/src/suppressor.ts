@@ -4,9 +4,12 @@ import type { Base } from "./base.js";
 const SUPPRESSOR_REGISTRY_KEY = Symbol.for("ar_suppressor_registry");
 
 export function registry(): Record<string, true | undefined> {
-  return IsolatedExecutionState.fetch(
-    SUPPRESSOR_REGISTRY_KEY,
-    () => Object.create(null) as Record<string, true | undefined>,
+  return (
+    IsolatedExecutionState.get<Record<string, true | undefined>>(SUPPRESSOR_REGISTRY_KEY) ??
+    IsolatedExecutionState.set(
+      SUPPRESSOR_REGISTRY_KEY,
+      Object.create(null) as Record<string, true | undefined>,
+    )
   );
 }
 

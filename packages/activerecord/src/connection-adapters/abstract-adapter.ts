@@ -1467,9 +1467,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   get preparedStatementsDisabledCache(): Set<unknown> {
-    return IsolatedExecutionState.fetch(
-      "active_record_prepared_statements_disabled_cache",
-      () => new Set<unknown>(),
+    return (
+      IsolatedExecutionState.get<Set<unknown>>(
+        "active_record_prepared_statements_disabled_cache",
+      ) ??
+      IsolatedExecutionState.set(
+        "active_record_prepared_statements_disabled_cache",
+        new Set<unknown>(),
+      )
     );
   }
 
@@ -2133,9 +2138,9 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   get instrumenter(): AdapterInstrumenter {
-    return IsolatedExecutionState.fetch<AdapterInstrumenter>(
-      ACTIVE_RECORD_INSTRUMENTER,
-      () => Notifications.instrumenter,
+    return (
+      IsolatedExecutionState.get<AdapterInstrumenter>(ACTIVE_RECORD_INSTRUMENTER) ??
+      IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, Notifications.instrumenter)
     );
   }
 

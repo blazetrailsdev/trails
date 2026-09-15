@@ -4,9 +4,9 @@ const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
 
 /** @internal */
 function store(): Map<string, unknown> {
-  return IsolatedExecutionState.fetch(
-    ACTIVE_SUPPORT_EXECUTION_CONTEXT,
-    () => new Map<string, unknown>(),
+  return (
+    IsolatedExecutionState.get<Map<string, unknown>>(ACTIVE_SUPPORT_EXECUTION_CONTEXT) ??
+    IsolatedExecutionState.set(ACTIVE_SUPPORT_EXECUTION_CONTEXT, new Map<string, unknown>())
   );
 }
 

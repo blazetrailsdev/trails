@@ -152,9 +152,9 @@ export abstract class CurrentAttributes {
 
   /** @internal */
   private static currentInstances(): Map<string, CurrentAttributes> {
-    return IsolatedExecutionState.fetch(
-      CURRENT_ATTRIBUTES_INSTANCES,
-      () => new Map<string, CurrentAttributes>(),
+    return (
+      IsolatedExecutionState.get<Map<string, CurrentAttributes>>(CURRENT_ATTRIBUTES_INSTANCES) ??
+      IsolatedExecutionState.set(CURRENT_ATTRIBUTES_INSTANCES, new Map<string, CurrentAttributes>())
     );
   }
 

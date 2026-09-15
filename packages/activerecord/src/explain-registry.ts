@@ -46,5 +46,8 @@ export class ExplainRegistry {
 
 /** @internal */
 export function instance(): ExplainRegistry {
-  return IsolatedExecutionState.fetch(REGISTRY_KEY, () => new ExplainRegistry());
+  return (
+    IsolatedExecutionState.get<ExplainRegistry>(REGISTRY_KEY) ??
+    IsolatedExecutionState.set(REGISTRY_KEY, new ExplainRegistry())
+  );
 }

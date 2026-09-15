@@ -1,14 +1,45 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 describe("IsolatedExecutionStateTest", () => {
-  beforeEach(() => IsolatedExecutionState.clear());
+  let originalIsolationLevel: typeof IsolatedExecutionState.isolationLevel;
+
+  beforeEach(() => {
+    IsolatedExecutionState.clear();
+    originalIsolationLevel = IsolatedExecutionState.isolationLevel;
+  });
+
+  afterEach(() => {
+    IsolatedExecutionState.clear();
+    IsolatedExecutionState.isolationLevel = originalIsolationLevel!;
+  });
 
   it.skip("#[] when isolation level is :fiber");
 
-  it.skip("#[] when isolation level is :thread");
+  it("#[] when isolation level is :thread", async () => {
+    IsolatedExecutionState.isolationLevel = "thread";
 
-  it.skip("changing the isolation level clear the old store");
+    IsolatedExecutionState.set("test", 42);
+    expect(IsolatedExecutionState.get("test")).toBe(42);
+
+    expect(await new Thread(() => IsolatedExecutionState.get("test")).value()).toBeUndefined();
+  });
+
+  it("changing the isolation level clear the old store", () => {
+    const original = IsolatedExecutionState.isolationLevel!;
+    const other = IsolatedExecutionState.isolationLevel === "fiber" ? "thread" : "fiber";
+
+    IsolatedExecutionState.set("test", 42);
+    IsolatedExecutionState.isolationLevel = original;
+    expect(IsolatedExecutionState.get("test")).toBe(42);
+
+    IsolatedExecutionState.isolationLevel = other;
+    expect(IsolatedExecutionState.get("test")).toBeUndefined();
+
+    IsolatedExecutionState.isolationLevel = original;
+    expect(IsolatedExecutionState.get("test")).toBeUndefined();
+  });
 
   it("get/set/has/delete on the fallback (no scope)", () => {
     expect(IsolatedExecutionState.has("k")).toBe(false);
@@ -26,36 +57,13 @@ describe("IsolatedExecutionStateTest", () => {
     expect(IsolatedExecutionState.delete("never-set")).toBeUndefined();
   });
 
-  it("fetch initializes once", () => {
-    let n = 0;
-    const a = IsolatedExecutionState.fetch("singleton", () => ++n);
-    const b = IsolatedExecutionState.fetch("singleton", () => ++n);
-    expect(a).toBe(1);
-    expect(b).toBe(1);
-  });
-
-  it("fetch caches an explicit undefined", () => {
-    let n = 0;
-    const a = IsolatedExecutionState.fetch<undefined>("nullable", () => {
-      n++;
-      return undefined;
-    });
-    const b = IsolatedExecutionState.fetch<undefined>("nullable", () => {
-      n++;
-      return undefined;
-    });
-    expect(a).toBeUndefined();
-    expect(b).toBeUndefined();
-    expect(n).toBe(1);
-  });
-
   it("run isolates state from outer context", async () => {
     IsolatedExecutionState.set("outer", "A");
-    await IsolatedExecutionState.run(async () => {
+    await new Thread(async () => {
       expect(IsolatedExecutionState.get("outer")).toBeUndefined();
       IsolatedExecutionState.set("inner", "B");
       expect(IsolatedExecutionState.get("inner")).toBe("B");
-    });
+    }).value();
     expect(IsolatedExecutionState.get("outer")).toBe("A");
     expect(IsolatedExecutionState.get("inner")).toBeUndefined();
   });

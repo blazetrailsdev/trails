@@ -449,10 +449,10 @@ function instrumentedDeferredPool(outcome: Result) {
     ): Promise<T> {
       return fn({
         rawExecQuery: async (sql, name, binds) => {
-          const instrumenter = IsolatedExecutionState.fetch(
-            ACTIVE_RECORD_INSTRUMENTER,
-            () => Notifications.instrumenter,
-          );
+          const instrumenter =
+            IsolatedExecutionState.get<typeof Notifications.instrumenter>(
+              ACTIVE_RECORD_INSTRUMENTER,
+            ) ?? IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, Notifications.instrumenter);
           return instrumenter.instrument(
             "sql.active_record",
             { sql, name, binds, async: true },
