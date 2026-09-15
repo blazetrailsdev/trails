@@ -264,23 +264,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "is nothing for the trails port to answer these against.",
   },
   {
-    testFile: "autoload_test.rb",
-    tests: [
-      "the autoload module works like normal autoload",
-      "when specifying an :eager constant it still works like normal autoload by default",
-      "the location of autoloaded constants defaults to :name.underscore",
-      "the location of :eager autoloaded constants defaults to :name.underscore",
-      "a directory for a block of autoloads can be specified",
-      "a path for a block of autoloads can be specified",
-    ],
-    reason:
-      "ActiveSupport::Autoload registers `Module#autoload` entries and the cases assert " +
-      "them through `autoload?`/`const_get` — a constant that resolves to a file on first " +
-      "reference (dependencies/autoload.rb:30-42). JS has no lazily-resolved binding: an `import` is " +
-      "eager and a namespace object exposes no autoload table, so `autoload?` has no " +
-      "counterpart to assert against.",
-  },
-  {
     testFile: "transliterate_test.rb",
     tests: [
       "transliterate handles strings with valid gb18030 encodings",
