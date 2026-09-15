@@ -177,7 +177,6 @@ export function deconstantize(path: string): string {
 }
 
 const _constants = new Map<string, unknown>();
-const _privateConstants = new Set<string>();
 
 /** @noRailsEquivalent PERMANENT */
 export function registerConstant(name: string, value: unknown): void {
@@ -188,12 +187,6 @@ export function registerConstant(name: string, value: unknown): void {
 export function unregisterConstant(name: string, expected: unknown): void {
   if (_constants.get(name) !== expected) return;
   _constants.delete(name);
-  _privateConstants.delete(name);
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function privateConstant(name: string): void {
-  _privateConstants.add(name);
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -207,7 +200,6 @@ export function registeredConstantName(value: unknown): string | undefined {
 /** @internal */
 export function _resetConstants(): void {
   _constants.clear();
-  _privateConstants.clear();
 }
 
 /** @internal */

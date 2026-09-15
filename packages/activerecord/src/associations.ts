@@ -28,12 +28,7 @@ import {
   _HasOneThroughAssociation,
 } from "./associations/association-class-slots.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import {
-  constantize,
-  registerConstant,
-  unregisterConstant,
-  privateConstant,
-} from "@blazetrails/activesupport";
+import { constantize, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -340,7 +335,6 @@ export class Associations {
 
     const registryKey = `${self.name}::${joinModel.name}`;
     modelRegistry.set(registryKey, joinModel);
-    privateConstant(registryKey);
 
     const middleReflection = builder.middleReflection(joinModel);
     const middleName = middleReflection.name;
