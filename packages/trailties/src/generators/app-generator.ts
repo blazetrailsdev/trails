@@ -625,10 +625,8 @@ export const filterParameters = [
     this.createFile(
       "app/models/application-record.ts",
       tsModule({
-        imports: [{ from: "@blazetrails/activerecord", named: { ActiveRecord: "named" } }],
-        declarations: [
-          tsClass({ name: "ApplicationRecord", extends: ref("ActiveRecord.Base"), body: [] }),
-        ],
+        imports: [{ from: "@blazetrails/activerecord", named: { Base: "named" } }],
+        declarations: [tsClass({ name: "ApplicationRecord", extends: ref("Base"), body: [] })],
       }),
     );
 
