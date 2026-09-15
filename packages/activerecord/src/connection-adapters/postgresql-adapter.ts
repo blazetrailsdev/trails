@@ -178,7 +178,7 @@ import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
-import { defaultTimezone } from "../active-record.js";
+import { databaseCli, defaultTimezone } from "../active-record.js";
 
 const OID_JSON = 114;
 const OID_JSONB = 3802;
@@ -272,7 +272,7 @@ export class PostgreSQLAdapter
           .join(" "),
       );
     }
-    return this.findCmdAndExec(_Base!.databaseCli["postgresql"], config.database!);
+    return this.findCmdAndExec(databaseCli()["postgresql"], config.database!);
   }
 
   override async active(): Promise<boolean> {

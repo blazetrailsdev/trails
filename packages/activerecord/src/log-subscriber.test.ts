@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { setVerboseQueryLogs } from "./active-record.js";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -106,7 +107,7 @@ describe("LogSubscriberTest", () => {
   afterEach(() => {
     LogSubscriber.logger = null;
     Base.logger = oldBaseLogger;
-    Base.verboseQueryLogs = false;
+    setVerboseQueryLogs(false);
   });
 
   it("schema statements are ignored", () => {
@@ -290,14 +291,14 @@ describe("LogSubscriberTest", () => {
   });
 
   it("verbose query logs", () => {
-    Base.verboseQueryLogs = true;
+    setVerboseQueryLogs(true);
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
     expect(mockLogger.logged("debug").length).toBe(2);
     expect(mockLogger.logged("debug")[mockLogger.logged("debug").length - 1]).toMatch(/↳/);
   });
 
   it("verbose query with ignored callstack", () => {
-    Base.verboseQueryLogs = true;
+    setVerboseQueryLogs(true);
     const original = (subscriber as any).querySourceLocation;
     (subscriber as any).querySourceLocation = () => null;
     subscriber.sql(makeEvent({ sql: "hi mom!" }));

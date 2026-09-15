@@ -5,9 +5,20 @@ import { _Base } from "./base-slot.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
 import type { QueryTransformer } from "./query-transformers.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
+
+type AnyClass = abstract new (...args: never[]) => object;
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
 
+let _disablePreparedStatements = false;
+let _lazilyLoadSchemaCache = false;
+let _databaseCli: Record<string, string | string[]> = {
+  postgresql: "psql",
+  mysql: ["mysql", "mysql5"],
+  sqlite: "sqlite3",
+};
 let _defaultTimezone: "utc" | "local" = "utc";
 let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _writingRole = "writing";
@@ -16,7 +27,33 @@ let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = nul
 let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+let _verboseQueryLogs = false;
+let _maintainTestSchema: boolean | null = null;
+let _schemaFormat: SchemaFormat = "ts";
+let _errorOnIgnoredOrder = false;
+let _timestampedMigrations = true;
+let _validateMigrationTimestamps = false;
+let _migrationStrategy: AnyClass = DefaultStrategy;
+let _dumpSchemaAfterMigration = true;
+let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
+let _verifyForeignKeysForFixtures = false;
 let _queryTransformers: QueryTransformer[] = [];
+
+export function disablePreparedStatements(): boolean {
+  return _disablePreparedStatements;
+}
+
+export function setDisablePreparedStatements(disablePreparedStatements: boolean): void {
+  _disablePreparedStatements = disablePreparedStatements;
+}
+
+export function lazilyLoadSchemaCache(): boolean {
+  return _lazilyLoadSchemaCache;
+}
+
+export function setLazilyLoadSchemaCache(lazilyLoadSchemaCache: boolean): void {
+  _lazilyLoadSchemaCache = lazilyLoadSchemaCache;
+}
 
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
   return any(ActiveRecord.schemaCacheIgnoredTables, (ignored) => {
@@ -26,6 +63,14 @@ export function isSchemaCacheIgnoredTable(tableName: string): boolean {
     }
     return ignored === tableName;
   });
+}
+
+export function databaseCli(): Record<string, string | string[]> {
+  return _databaseCli;
+}
+
+export function setDatabaseCli(databaseCli: Record<string, string | string[]>): void {
+  _databaseCli = databaseCli;
 }
 
 export function defaultTimezone(): "utc" | "local" {
@@ -135,6 +180,86 @@ export function setPermanentConnectionCheckout(value: true | "deprecated" | "dis
     );
   }
   _permanentConnectionCheckout = value;
+}
+
+export function verboseQueryLogs(): boolean {
+  return _verboseQueryLogs;
+}
+
+export function setVerboseQueryLogs(verboseQueryLogs: boolean): void {
+  _verboseQueryLogs = verboseQueryLogs;
+}
+
+export function maintainTestSchema(): boolean | null {
+  return _maintainTestSchema;
+}
+
+export function setMaintainTestSchema(maintainTestSchema: boolean | null): void {
+  _maintainTestSchema = maintainTestSchema;
+}
+
+export function schemaFormat(): SchemaFormat {
+  return _schemaFormat;
+}
+
+export function setSchemaFormat(schemaFormat: SchemaFormat): void {
+  _schemaFormat = schemaFormat;
+}
+
+export function errorOnIgnoredOrder(): boolean {
+  return _errorOnIgnoredOrder;
+}
+
+export function setErrorOnIgnoredOrder(errorOnIgnoredOrder: boolean): void {
+  _errorOnIgnoredOrder = errorOnIgnoredOrder;
+}
+
+export function timestampedMigrations(): boolean {
+  return _timestampedMigrations;
+}
+
+export function setTimestampedMigrations(timestampedMigrations: boolean): void {
+  _timestampedMigrations = timestampedMigrations;
+}
+
+export function validateMigrationTimestamps(): boolean {
+  return _validateMigrationTimestamps;
+}
+
+export function setValidateMigrationTimestamps(validateMigrationTimestamps: boolean): void {
+  _validateMigrationTimestamps = validateMigrationTimestamps;
+}
+
+export function migrationStrategy(): AnyClass {
+  return _migrationStrategy;
+}
+
+export function setMigrationStrategy(migrationStrategy: AnyClass): void {
+  _migrationStrategy = migrationStrategy;
+}
+
+export function dumpSchemaAfterMigration(): boolean {
+  return _dumpSchemaAfterMigration;
+}
+
+export function setDumpSchemaAfterMigration(dumpSchemaAfterMigration: boolean): void {
+  _dumpSchemaAfterMigration = dumpSchemaAfterMigration;
+}
+
+export function dumpSchemas(): "schema_search_path" | "all" | (string & {}) {
+  return _dumpSchemas;
+}
+
+export function setDumpSchemas(dumpSchemas: "schema_search_path" | "all" | (string & {})): void {
+  _dumpSchemas = dumpSchemas;
+}
+
+export function verifyForeignKeysForFixtures(): boolean {
+  return _verifyForeignKeysForFixtures;
+}
+
+export function setVerifyForeignKeysForFixtures(verifyForeignKeysForFixtures: boolean): void {
+  _verifyForeignKeysForFixtures = verifyForeignKeysForFixtures;
 }
 
 export function queryTransformers(): QueryTransformer[] {

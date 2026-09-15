@@ -23,7 +23,10 @@ import {
   MigrationContext,
   Migrator,
   SchemaMigration,
+  dumpSchemaAfterMigration,
   eachCurrentEnvironment,
+  schemaFormat,
+  setSchemaFormat,
 } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
@@ -259,14 +262,14 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
 }
 
 async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
-  if (!Base.dumpSchemaAfterMigration) return;
+  if (!dumpSchemaAfterMigration()) return;
   const config = hashConfig ?? toDbConfig(raw);
-  const previousFormat = Base.schemaFormat;
+  const previousFormat = schemaFormat();
   try {
-    Base.schemaFormat = await resolveSchemaFormat();
+    setSchemaFormat(await resolveSchemaFormat());
     await DatabaseTasks.dumpSchema(config);
   } finally {
-    Base.schemaFormat = previousFormat;
+    setSchemaFormat(previousFormat);
   }
 }
 
@@ -312,7 +315,7 @@ async function runTestLoadSchema(options: {
     setExitCode(1);
     return;
   }
-  if (Base.schemaFormat === "sql" && !(await structureLoadReachesDatabase(config))) {
+  if (schemaFormat() === "sql" && !(await structureLoadReachesDatabase(config))) {
     console.error(
       `Loading a structure.sql is not meaningful for an in-memory database: ` +
         `the sqlite3 child process loads it into its own throwaway database. ` +
@@ -748,7 +751,7 @@ export function dbCommand(): Command {
 
       const seedTarget = entries[primaryIndex].hashConfig;
       const previousSeedLoader = DatabaseTasks.seedLoader;
-      const previousFormat = Base.schemaFormat;
+      const previousFormat = schemaFormat();
       DatabaseTasks.seedLoader = {
         async loadSeed() {
           await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
@@ -757,7 +760,7 @@ export function dbCommand(): Command {
         },
       };
       try {
-        Base.schemaFormat = await resolveSchemaFormat();
+        setSchemaFormat(await resolveSchemaFormat());
         await withRegisteredConfigurations(
           allEntries.map((entry) => entry.hashConfig),
           envName,
@@ -765,7 +768,7 @@ export function dbCommand(): Command {
         );
       } finally {
         DatabaseTasks.seedLoader = previousSeedLoader;
-        Base.schemaFormat = previousFormat;
+        setSchemaFormat(previousFormat);
       }
     });
 
@@ -869,14 +872,14 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ config, prefix }) => {
-        const previousFormat = Base.schemaFormat;
+        const previousFormat = schemaFormat();
         try {
-          Base.schemaFormat = await resolveSchemaFormat(opts);
+          setSchemaFormat(await resolveSchemaFormat(opts));
           const filename = DatabaseTasks.schemaDumpPath(config);
           await DatabaseTasks.dumpSchema(config);
           console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
         } finally {
-          Base.schemaFormat = previousFormat;
+          setSchemaFormat(previousFormat);
         }
       });
     });
@@ -892,16 +895,16 @@ export function dbCommand(): Command {
       const fs = getFs();
       await forEachDatabase(opts, async ({ config, prefix }) => {
         await runProtectedEnvCheck(config, config.envName);
-        const previousFormat = Base.schemaFormat;
+        const previousFormat = schemaFormat();
         try {
-          Base.schemaFormat = await resolveSchemaFormat(opts);
+          setSchemaFormat(await resolveSchemaFormat(opts));
           const filename = DatabaseTasks.schemaDumpPath(config);
           if (!filename || !(await fs.exists(filename))) {
             console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
             setExitCode(1);
             return;
           }
-          if (Base.schemaFormat === "sql" && !(await structureLoadReachesDatabase(config))) {
+          if (schemaFormat() === "sql" && !(await structureLoadReachesDatabase(config))) {
             console.error(
               `${prefix}Loading a structure.sql is not meaningful for an in-memory database: ` +
                 `the sqlite3 child process loads it into its own throwaway database. ` +
@@ -928,7 +931,7 @@ export function dbCommand(): Command {
             throw error;
           }
         } finally {
-          Base.schemaFormat = previousFormat;
+          setSchemaFormat(previousFormat);
         }
       });
     });

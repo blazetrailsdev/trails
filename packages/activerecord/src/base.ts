@@ -66,7 +66,6 @@ import {
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
 import { NotImplementedError, StaleObjectError, type SQLWarning } from "./errors.js";
-import { DefaultStrategy } from "./migration/default-strategy.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -123,7 +122,6 @@ import {
   type DirtyOptions,
   dirtyInitAttributes,
 } from "@blazetrails/activemodel";
-import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -142,11 +140,7 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import {
-  getVerboseQueryLogs as _getVerboseQueryLogs,
-  setVerboseQueryLogs as _setVerboseQueryLogs,
-  setBaseResolver as _setBaseResolverWithLogSubscriber,
-} from "./log-subscriber.js";
+import { setBaseResolver as _setBaseResolverWithLogSubscriber } from "./log-subscriber.js";
 import {
   dbWarningsAction,
   permanentConnectionCheckout,
@@ -671,30 +665,14 @@ interface _ConstructorAssociationWriter {
 
 type AnyClass = abstract new (...args: never[]) => object;
 
-let _disablePreparedStatements = false;
-let _lazilyLoadSchemaCache = false;
-let _databaseCli: Record<string, string | string[]> = {
-  postgresql: "psql",
-  mysql: ["mysql", "mysql5"],
-  sqlite: "sqlite3",
-};
 let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _queues: Record<string, unknown> = {};
-let _maintainTestSchema: boolean | null = null;
 let _raiseOnAssignToAttrReadonly = false;
 let _belongsToRequiredValidatesForeignKey = true;
 let _beforeCommittedOnAllRecords = false;
 let _runAfterTransactionCallbacksInOrderDefined = false;
 let _applicationRecordClass: AnyClass | null = null;
 let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
-let _errorOnIgnoredOrder = false;
-let _timestampedMigrations = true;
-let _validateMigrationTimestamps = false;
-let _migrationStrategy: AnyClass = DefaultStrategy;
-let _schemaFormat: SchemaFormat = "ts";
-let _dumpSchemaAfterMigration = true;
-let _dumpSchemas: "schema_search_path" | "all" | (string & {}) = "schema_search_path";
-let _verifyForeignKeysForFixtures = false;
 let _useYamlUnsafeLoad = false;
 let _raiseIntWiderThan64bit = true;
 let _yamlColumnPermittedClasses: unknown[] = [Symbol];
@@ -742,30 +720,6 @@ export class Base extends Model {
   /** @internal */
   declare static _registryKeys: string[];
 
-  static get disablePreparedStatements(): boolean {
-    return _disablePreparedStatements;
-  }
-
-  static set disablePreparedStatements(value: boolean) {
-    _disablePreparedStatements = value;
-  }
-
-  static get lazilyLoadSchemaCache(): boolean {
-    return _lazilyLoadSchemaCache;
-  }
-
-  static set lazilyLoadSchemaCache(value: boolean) {
-    _lazilyLoadSchemaCache = value;
-  }
-
-  static get databaseCli(): Record<string, string | string[]> {
-    return _databaseCli;
-  }
-
-  static set databaseCli(value: Record<string, string | string[]>) {
-    _databaseCli = value;
-  }
-
   static get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
     return dbWarningsAction();
   }
@@ -796,14 +750,6 @@ export class Base extends Model {
 
   static set queues(value: Record<string, unknown>) {
     _queues = value;
-  }
-
-  static get maintainTestSchema(): boolean | null {
-    return _maintainTestSchema;
-  }
-
-  static set maintainTestSchema(value: boolean | null) {
-    _maintainTestSchema = value;
   }
 
   static get raiseOnAssignToAttrReadonly(): boolean {
@@ -852,70 +798,6 @@ export class Base extends Model {
 
   static set actionOnStrictLoadingViolation(value: "raise" | "log") {
     _actionOnStrictLoadingViolation = value;
-  }
-
-  static get errorOnIgnoredOrder(): boolean {
-    return _errorOnIgnoredOrder;
-  }
-
-  static set errorOnIgnoredOrder(value: boolean) {
-    _errorOnIgnoredOrder = value;
-  }
-
-  static get timestampedMigrations(): boolean {
-    return _timestampedMigrations;
-  }
-
-  static set timestampedMigrations(value: boolean) {
-    _timestampedMigrations = value;
-  }
-
-  static get validateMigrationTimestamps(): boolean {
-    return _validateMigrationTimestamps;
-  }
-
-  static set validateMigrationTimestamps(value: boolean) {
-    _validateMigrationTimestamps = value;
-  }
-
-  static get migrationStrategy(): AnyClass {
-    return _migrationStrategy;
-  }
-
-  static set migrationStrategy(value: AnyClass) {
-    _migrationStrategy = value;
-  }
-
-  static get schemaFormat(): SchemaFormat {
-    return _schemaFormat;
-  }
-
-  static set schemaFormat(value: SchemaFormat) {
-    _schemaFormat = value;
-  }
-
-  static get dumpSchemaAfterMigration(): boolean {
-    return _dumpSchemaAfterMigration;
-  }
-
-  static set dumpSchemaAfterMigration(value: boolean) {
-    _dumpSchemaAfterMigration = value;
-  }
-
-  static get dumpSchemas(): "schema_search_path" | "all" | (string & {}) {
-    return _dumpSchemas;
-  }
-
-  static set dumpSchemas(value: "schema_search_path" | "all" | (string & {})) {
-    _dumpSchemas = value;
-  }
-
-  static get verifyForeignKeysForFixtures(): boolean {
-    return _verifyForeignKeysForFixtures;
-  }
-
-  static set verifyForeignKeysForFixtures(value: boolean) {
-    _verifyForeignKeysForFixtures = value;
   }
 
   static get useYamlUnsafeLoad(): boolean {
@@ -1445,14 +1327,6 @@ export class Base extends Model {
     options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
   ): void {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
-  }
-
-  static get verboseQueryLogs(): boolean {
-    return _getVerboseQueryLogs();
-  }
-
-  static set verboseQueryLogs(value: boolean) {
-    _setVerboseQueryLogs(value);
   }
 
   declare static tokenDefinitions: _TokenDefinitionsHash;

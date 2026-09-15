@@ -64,6 +64,7 @@ import {
   itemFixtureData,
 } from "./test-helpers/fixtures/index.js";
 import "./relation.js";
+import { setVerifyForeignKeysForFixtures, verifyForeignKeysForFixtures } from "./active-record.js";
 
 for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
   registerModel(model);
@@ -458,12 +459,12 @@ describe("PrimaryKeyErrorTest", () => {
 
 describe("FixturesWithForeignKeyViolationsTest", () => {
   async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
-    const settingWas = Base.verifyForeignKeysForFixtures;
-    Base.verifyForeignKeysForFixtures = true;
+    const settingWas = verifyForeignKeysForFixtures();
+    setVerifyForeignKeysForFixtures(true);
     try {
       await block();
     } finally {
-      Base.verifyForeignKeysForFixtures = settingWas;
+      setVerifyForeignKeysForFixtures(settingWas);
     }
   }
 

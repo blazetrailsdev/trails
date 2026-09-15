@@ -148,7 +148,11 @@ import { Time as TimeType } from "../type/time.js";
 import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
-import { asyncQueryExecutor, defaultTimezone } from "../active-record.js";
+import {
+  asyncQueryExecutor,
+  defaultTimezone,
+  disablePreparedStatements,
+} from "../active-record.js";
 
 export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
@@ -821,7 +825,7 @@ export class AbstractAdapter implements Quoting {
     this._statements = this.buildStatementPool() as StatementPool | null;
 
     this.preparedStatements =
-      !(_Base?.disablePreparedStatements ?? false) &&
+      !disablePreparedStatements() &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
         "preparedStatements" in this._config
           ? this._config.preparedStatements

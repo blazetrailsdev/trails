@@ -1426,7 +1426,7 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :verbose_query_logs
+        singleton_class.attr_accessor :use_yaml_unsafe_load
         singleton_class.attr_reader :db_warnings_action
         def self.eager_load!; end
       end
@@ -1435,13 +1435,13 @@ describe(
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
       // accessor → reader + writer; reader-only → reader only.
-      expect(names).toContain("verbose_query_logs");
-      expect(names).toContain("verbose_query_logs=");
+      expect(names).toContain("use_yaml_unsafe_load");
+      expect(names).toContain("use_yaml_unsafe_load=");
       expect(names).toContain("db_warnings_action");
       expect(names).not.toContain("db_warnings_action=");
       // Every redirected entry is tagged so compare can credit the port wherever
       // it lands in the package.
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("verbose_query_logs"))) {
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("use_yaml_unsafe_load"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
       // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
@@ -1457,16 +1457,16 @@ describe(
         `
       module ActiveRecord
         class << self
-          attr_accessor :verbose_query_logs
+          attr_accessor :use_yaml_unsafe_load
         end
       end
     `,
       );
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
-      expect(names).toContain("verbose_query_logs");
-      expect(names).toContain("verbose_query_logs=");
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("verbose_query_logs"))) {
+      expect(names).toContain("use_yaml_unsafe_load");
+      expect(names).toContain("use_yaml_unsafe_load=");
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("use_yaml_unsafe_load"))) {
         expect(m.umbrellaConfig).toBe(true);
       }
     });
@@ -1476,13 +1476,13 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :verbose_query_logs
+        singleton_class.attr_accessor :use_yaml_unsafe_load
       end
     `,
       );
       const mod = out["ActiveRecord"];
       const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-      expect(modNames).not.toContain("verbose_query_logs");
+      expect(modNames).not.toContain("use_yaml_unsafe_load");
     });
 
     it("does not redirect a seat that has moved onto the ActiveRecord module", () => {

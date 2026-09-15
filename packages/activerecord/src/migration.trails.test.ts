@@ -15,6 +15,7 @@ import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
+import { migrationStrategy, setMigrationStrategy } from "./active-record.js";
 
 describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -189,15 +190,15 @@ describe("Migration#createTable id option type", () => {
 
     it("uses the class configured on Base.migrationStrategy", () => {
       class CustomStrategy extends DefaultStrategy {}
-      const previous = Base.migrationStrategy;
-      Base.migrationStrategy = CustomStrategy;
+      const previous = migrationStrategy();
+      setMigrationStrategy(CustomStrategy);
       try {
         const migration = new StrategyMigration();
         const strategy = migration.executionStrategy as CustomStrategy;
         expect(strategy).toBeInstanceOf(CustomStrategy);
         expect(strategy.methodMissing("createTable")).toBe("hi mom!");
       } finally {
-        Base.migrationStrategy = previous;
+        setMigrationStrategy(previous);
       }
     });
 

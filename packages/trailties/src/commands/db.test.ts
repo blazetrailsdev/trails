@@ -21,8 +21,9 @@ import {
   NullInternalMetadata,
   NullSchemaMigration,
   SchemaMigration,
+  schemaFormat,
+  setSchemaFormat,
 } from "@blazetrails/activerecord";
-import { Base } from "@blazetrails/activerecord";
 import { MigrationProxy } from "@blazetrails/activerecord";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
@@ -2542,12 +2543,12 @@ export class CreateThings extends Migration {
     );
 
     const { DatabaseTasks } = await import("@blazetrails/activerecord");
-    const previousFormat = Base.schemaFormat;
-    Base.schemaFormat = "sql";
+    const previousFormat = schemaFormat();
+    setSchemaFormat("sql");
     try {
       await runDb(["test:prepare"]);
     } finally {
-      Base.schemaFormat = previousFormat;
+      setSchemaFormat(previousFormat);
     }
 
     expect(process.exitCode).toBe(1);

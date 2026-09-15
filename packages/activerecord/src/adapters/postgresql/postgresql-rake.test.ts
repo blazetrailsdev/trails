@@ -13,6 +13,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { ARUNIT_DATABASE } from "../../support/config.js";
 import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
+import { dumpSchemas, setDumpSchemas } from "../../active-record.js";
 
 async function withStubbedConnection(
   connection: unknown,
@@ -345,7 +346,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   let spawnSync: MockInstance<ChildProcessAdapter["spawnSync"]>;
   let filename: string;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
-  let previousDumpSchemas: typeof Base.dumpSchemas;
+  let previousDumpSchemas: ReturnType<typeof dumpSchemas>;
 
   const expectedArgs = ["--schema-only", "--no-privileges", "--no-owner", "--file"];
 
@@ -354,7 +355,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     filename = File.join(os.tmpdir(), "awesome-file.sql");
     File.write(filename, "");
     previousFlags = DatabaseTasks.structureDumpFlags;
-    previousDumpSchemas = Base.dumpSchemas;
+    previousDumpSchemas = dumpSchemas();
     const childProcess = await getChildProcessAsync();
     spawnSync = vi
       .spyOn(childProcess, "spawnSync")
@@ -364,7 +365,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.structureDumpFlags = previousFlags;
-    Base.dumpSchemas = previousDumpSchemas;
+    setDumpSchemas(previousDumpSchemas);
     SchemaDumper.ignoreTables = [];
     FileUtils.rmF(filename);
   });
@@ -525,7 +526,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it("structure dump with schema search path and dump schemas all", async () => {
-    Base.dumpSchemas = "all";
+    setDumpSchemas("all");
 
     await DatabaseTasks.structureDump(
       new HashConfig("default_env", "primary", {
@@ -544,7 +545,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it("structure dump with dump schemas string", async () => {
-    Base.dumpSchemas = "foo,bar";
+    setDumpSchemas("foo,bar");
 
     await DatabaseTasks.structureDump(configuration(), filename);
 

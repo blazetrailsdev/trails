@@ -11,12 +11,17 @@ import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import {
+  setTimestampedMigrations,
+  setValidateMigrationTimestamps,
+  timestampedMigrations,
+} from "./active-record.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
 describe("MigrationContext", () => {
   afterEach(() => {
-    Base.validateMigrationTimestamps = false;
+    setValidateMigrationTimestamps(false);
   });
 
   it("migrations reads this context's migrationsPaths", () => {
@@ -64,7 +69,7 @@ describe("MigrationContext", () => {
   });
 
   it("migrations raises for a migration timestamp in the future", () => {
-    Base.validateMigrationTimestamps = true;
+    setValidateMigrationTimestamps(true);
     const context = new MigrationContext(
       [`${MIGRATIONS_ROOT}/future_timestamp`],
       new NullSchemaMigration(),
@@ -96,9 +101,9 @@ describe("MigrationContext", () => {
   });
 
   it("migrations ignores the timestamp check when timestampedMigrations is off", () => {
-    Base.validateMigrationTimestamps = true;
-    const previous = Base.timestampedMigrations;
-    Base.timestampedMigrations = false;
+    setValidateMigrationTimestamps(true);
+    const previous = timestampedMigrations();
+    setTimestampedMigrations(false);
     try {
       const context = new MigrationContext(
         [`${MIGRATIONS_ROOT}/future_timestamp`],
@@ -107,7 +112,7 @@ describe("MigrationContext", () => {
       );
       expect(context.migrations).toHaveLength(1);
     } finally {
-      Base.timestampedMigrations = previous;
+      setTimestampedMigrations(previous);
     }
   });
 });

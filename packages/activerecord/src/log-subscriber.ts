@@ -5,6 +5,7 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
+import { verboseQueryLogs } from "./active-record.js";
 
 function byteLength(value: unknown): number {
   if (value == null) return 0;
@@ -56,22 +57,6 @@ export function setBaseResolver(resolver: () => any): void {
  */
 export function getBase(): any {
   return _baseResolver?.() ?? null;
-}
-
-let _verboseQueryLogs = false;
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE reads ActiveRecord.verbose_query_logs (active_record.rb:329) through the lazily-wired resolver.
- */
-export function getVerboseQueryLogs(): boolean {
-  return _verboseQueryLogs;
-}
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE writes ActiveRecord.verbose_query_logs (active_record.rb:329) through the same resolver.
- */
-export function setVerboseQueryLogs(value: boolean): void {
-  _verboseQueryLogs = value;
 }
 
 export class LogSubscriber extends BaseLogSubscriber {
@@ -142,7 +127,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (!l) return false;
     const result = l.debug(message);
 
-    if (_verboseQueryLogs) {
+    if (verboseQueryLogs()) {
       this.logQuerySource();
     }
 
@@ -282,7 +267,7 @@ export function debug(subscriber: LogSubscriber, message: string): boolean {
   if (!logger) return false;
   const result = logger.debug(message);
   if (!result) return false;
-  if (getVerboseQueryLogs()) {
+  if (verboseQueryLogs()) {
     const source = subscriber["querySourceLocation"]?.();
     if (source) logger.debug(`  ↳ ${source}`);
   }
