@@ -98,7 +98,6 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export { resetCallbacks } from "./callbacks.js";
-export { ActiveRecord } from "./ar-config.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";
 export { LockingType } from "./locking/optimistic.js";

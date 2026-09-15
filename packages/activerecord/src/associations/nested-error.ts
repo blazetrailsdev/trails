@@ -1,5 +1,5 @@
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
-import { ActiveRecord } from "../ar-config.js";
+import { indexNestedAttributeErrors } from "../active-record.js";
 
 interface AssociationLike {
   owner: object | null;
@@ -62,7 +62,7 @@ function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder
   if (opts && "indexErrors" in opts) {
     return opts["indexErrors"] as boolean | "nestedAttributesOrder";
   }
-  return ActiveRecord.indexNestedAttributeErrors;
+  return indexNestedAttributeErrors();
 }
 
 /** @internal */
