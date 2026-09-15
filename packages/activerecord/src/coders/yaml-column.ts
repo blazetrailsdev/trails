@@ -1,17 +1,13 @@
-import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
+import {
+  DisallowedClass,
+  parse as yamlParse,
+  stringify as yamlStringify,
+} from "@blazetrails/activesupport/yaml";
 import { Hash } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export class DisallowedClass extends globalThis.Error {
-  constructor(action: string, klassName: string) {
-    super(`Tried to ${action} unspecified class: ${klassName}`);
-    this.name = "Psych::DisallowedClass";
-  }
-}
 
 /** @internal */
 class SafeCoder {

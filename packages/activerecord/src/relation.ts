@@ -13,7 +13,14 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import { wrap, any, compactBlank, groupBy, indexBy } from "@blazetrails/activesupport";
+import {
+  wrap,
+  any,
+  compactBlank,
+  extractOptionsBang,
+  groupBy,
+  indexBy,
+} from "@blazetrails/activesupport";
 
 export { Range };
 import {
@@ -55,8 +62,8 @@ import { WhereClause } from "./relation/where-clause.js";
 import type { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
   touchAttributesWithTime,
-  parseTouchAllArgs,
   type TouchAllArgs,
+  type TouchAllOptions,
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { Explain } from "./explain.js";
@@ -819,10 +826,10 @@ export class Relation<T extends Base> {
     });
   }
 
-  async touchAll(...args: TouchAllArgs): Promise<number> {
-    const { names, time } = parseTouchAllArgs(args);
+  async touchAll(...names: TouchAllArgs): Promise<number> {
+    const { time } = extractOptionsBang(names as unknown[]) as TouchAllOptions;
 
-    return this.updateAll(touchAttributesWithTime.call(this.model, ...names, time));
+    return this.updateAll(touchAttributesWithTime.call(this.model, ...(names as string[]), time));
   }
 
   async findOrCreateBy(
@@ -1386,10 +1393,8 @@ export class Relation<T extends Base> {
 
     const touch = touchFromCounters as CounterCacheTouchOption | undefined;
     if (touch) {
-      let names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
-      const last = names[names.length - 1];
-      const options = last !== undefined && typeof last === "object" ? last : {};
-      if (last !== undefined && typeof last === "object") names = names.slice(0, -1);
+      const names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
+      const options = extractOptionsBang(names) as TouchAllOptions;
       const touchUpdates = touchAttributesWithTime.call(
         this.model,
         ...(names as string[]),

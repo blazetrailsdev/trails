@@ -189,7 +189,7 @@ export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T
 
 const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsIncluded");
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
 export function includeAggregations(modelClass: typeof Base): void {
   const proto = modelClass.prototype as Record<string | symbol, any>;
   if (proto[aggregationsIncluded]) return;

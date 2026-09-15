@@ -33,7 +33,7 @@ export function splitColumnNames(
   return { names: rest as string[], options };
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
 export function assertSafeMysqlIdentifier(value: string, kind: string): void {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
@@ -1237,7 +1237,7 @@ export class Table {
   async numeric(...args: unknown[]): Promise<void> {
     await this.definedColumn("decimal", args);
   }
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
   async char(...names: string[]): Promise<void>;
   async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async char(...args: unknown[]): Promise<void> {

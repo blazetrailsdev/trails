@@ -1,16 +1,16 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   currentTimeFromProperTimezone,
-  parseTouchArgs,
   timestampAttributesForUpdateInModel,
   type TimestampHost,
   type TouchArgs,
+  type TouchOptions,
 } from "./timestamp.js";
 import { Rational } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
-import { runCallbacks } from "@blazetrails/activesupport";
+import { extractOptionsBang, runCallbacks } from "@blazetrails/activesupport";
 import {
   InsertManager,
   UpdateManager,
@@ -434,7 +434,7 @@ interface DeleteRecord {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
 export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
@@ -1001,16 +1001,16 @@ export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
 }
 
-export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
+export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
+  const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
   const ctor = this.constructor as typeof Base;
   if (!this.isPersisted()) raiseRecordNotTouchedError();
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  const { names, time } = parseTouchArgs(args);
   const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
-  const resolvedNames = names.map((name) => aliases[name] ?? name);
+  const resolvedNames = (names as string[]).map((name) => aliases[name] ?? name);
 
   const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
     ctor as unknown as TimestampHost,

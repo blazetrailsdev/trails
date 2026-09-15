@@ -1,5 +1,5 @@
 export interface Deduplicable {
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
   deduplicateKey(): string;
   /** @internal */
   deduplicated(): this;

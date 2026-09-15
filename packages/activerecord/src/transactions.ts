@@ -56,15 +56,6 @@ export async function transaction<T>(
   });
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export async function savepoint<T>(
-  modelClass: typeof Base,
-  _name: string,
-  fn: () => Promise<T>,
-): Promise<T | undefined> {
-  return transaction(modelClass, async () => fn(), { requiresNew: true });
-}
-
 type CallbackFn = (...args: any[]) => any;
 
 type TransactionCallbackFilter<T extends typeof Model> =

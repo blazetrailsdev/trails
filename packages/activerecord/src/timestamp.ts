@@ -10,18 +10,6 @@ export interface TouchOptions {
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function parseTouchArgs(args: TouchArgs): {
-  names: string[];
-  time: Date | RubyTime | null | undefined;
-} {
-  const last = args[args.length - 1];
-  if (last !== undefined && typeof last !== "string") {
-    return { names: args.slice(0, -1) as string[], time: last.time };
-  }
-  return { names: args as string[], time: undefined };
-}
-
 const CREATED_ATTRS = ["created_at", "created_on"];
 const UPDATED_ATTRS = ["updated_at", "updated_on"];
 
@@ -50,18 +38,6 @@ export type TouchAllOptions = { time?: RubyTime };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function parseTouchAllArgs(args: TouchAllArgs): {
-  names: string[];
-  time: RubyTime | undefined;
-} {
-  const last = args[args.length - 1];
-  if (last !== undefined && typeof last !== "string") {
-    return { names: args.slice(0, -1) as string[], time: last.time };
-  }
-  return { names: args as string[], time: undefined };
-}
-
 export function touchAttributesWithTime(
   this: TimestampHost,
   ...args: [...names: string[], time: RubyTime | undefined]
@@ -82,20 +58,6 @@ export type CounterCacheTouchOption =
   | string
   | Array<string | { time?: RubyTime }>
   | { time?: RubyTime };
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export function parseCounterCacheTouch(touch: CounterCacheTouchOption): {
-  names: string[];
-  time?: RubyTime;
-} {
-  const wrapped: Array<string | { time?: RubyTime }> =
-    touch === true || touch === false ? [] : Array.isArray(touch) ? touch : [touch];
-  const last = wrapped[wrapped.length - 1];
-  if (last !== undefined && typeof last === "object") {
-    return { names: wrapped.slice(0, -1) as string[], time: last.time };
-  }
-  return { names: wrapped as string[] };
-}
 
 export function timestampAttributesForCreateInModel(this: TimestampHost): string[] {
   if (this._timestampAttributesForCreateInModel) return this._timestampAttributesForCreateInModel;

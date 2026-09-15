@@ -711,7 +711,7 @@ export interface AbstractAdapter {
     name?: string | null,
     kwargs?: { allowRetry?: boolean },
   ): Promise<unknown>;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-execute-mutation-onto-exec-statements */
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
