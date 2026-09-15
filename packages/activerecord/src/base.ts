@@ -1702,7 +1702,7 @@ export class Base extends Model {
   declare static having: typeof Querying.having;
   declare static lock: typeof Querying.lock;
   declare static readonly: typeof Querying.readonly;
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
   declare static withCte: typeof Querying.withCte;
   declare static with: typeof Querying.withCte;
   declare static withRecursive: typeof Querying.withRecursive;

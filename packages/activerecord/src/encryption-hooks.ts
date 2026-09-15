@@ -26,7 +26,7 @@ function notLoaded(method: string): never {
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export const encryptionHooks: EncryptionHooks = {
   encrypts: (klass: any) => notLoaded(`${klass?.name ?? "Model"}.encrypts()`),
   encryptedAttribute: () => false,

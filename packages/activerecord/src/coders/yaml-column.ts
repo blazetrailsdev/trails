@@ -5,7 +5,7 @@ import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export class DisallowedClass extends globalThis.Error {
   constructor(action: string, klassName: string) {
     super(`Tried to ${action} unspecified class: ${klassName}`);

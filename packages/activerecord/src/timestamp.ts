@@ -10,7 +10,7 @@ export interface TouchOptions {
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function parseTouchArgs(args: TouchArgs): {
   names: string[];
   time: Date | RubyTime | null | undefined;
@@ -50,7 +50,7 @@ export type TouchAllOptions = { time?: RubyTime };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function parseTouchAllArgs(args: TouchAllArgs): {
   names: string[];
   time: RubyTime | undefined;
@@ -83,7 +83,7 @@ export type CounterCacheTouchOption =
   | Array<string | { time?: RubyTime }>
   | { time?: RubyTime };
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function parseCounterCacheTouch(touch: CounterCacheTouchOption): {
   names: string[];
   time?: RubyTime;

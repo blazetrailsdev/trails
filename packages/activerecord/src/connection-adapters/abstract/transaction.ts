@@ -228,7 +228,7 @@ export class NullTransaction {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export class TransactionCallback {
   private _event: "before_commit" | "after_commit" | "after_rollback";
   private _callback: () => void | Promise<void>;

@@ -32,7 +32,7 @@ interface PlannedClass {
   leadingComments: string[];
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function unqualify(tableName: string): string {
   const parts: string[] = [];
   let current = "";
@@ -67,7 +67,7 @@ function unquoteIdentifier(id: string): string {
   return id;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder-2 */
+/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
 export function generateModels(
   tables: IntrospectedTable[],
   opts: GenerateModelsOptions = {},
