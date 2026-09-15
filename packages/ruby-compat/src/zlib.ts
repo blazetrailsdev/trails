@@ -1,6 +1,6 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
-import { getZlib } from "./zlib-adapter.js";
+import { getZlib, type GzipWriterHandle } from "./zlib-adapter.js";
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -40,34 +40,21 @@ class GzipReader extends GzipFile<File> {
   }
 
   async read(): Promise<string> {
-    const raw = this.io.read();
-    const bytes = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xff;
-    return new TextDecoder().decode(getZlib().gunzip(bytes));
+    return new TextDecoder().decode(await getZlib().gzipReader(this.io).read());
   }
 }
 
 /**
- * `gzfile_make_header` writes the mtime as a 4-byte little-endian field at
- * offset 4 of the 10-byte gzip header (`vendor/ruby/ext/zlib/zlib.c:2648,2672`).
- */
-const GZIP_HEADER_LENGTH = 10;
-
-function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
-  header[4] = mtime & 0xff;
-  header[5] = (mtime >>> 8) & 0xff;
-  header[6] = (mtime >>> 16) & 0xff;
-  header[7] = (mtime >>> 24) & 0xff;
-}
-
-/**
  * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`); `open` is
- * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`). The `ZlibAdapter`
- * seam is one-shot rather than streaming, so the deflate stream is finished
- * into the associated IO at `close` (`rb_gzfile_close`, `zlib.c:3524`).
+ * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`).
  */
 class GzipWriter extends GzipFile<File | Tempfile> {
-  private buffer = "";
+  private readonly z: GzipWriterHandle;
+
+  constructor(io: File | Tempfile) {
+    super(io);
+    this.z = getZlib().gzipWriter(io);
+  }
 
   /**
    * `rb_gzfile_mtime` / `rb_gzfile_set_mtime`
@@ -75,7 +62,13 @@ class GzipWriter extends GzipFile<File | Tempfile> {
    * header, which `SchemaCache#open` zeroes so two dumps of the same cache are
    * byte-identical (`schema_cache.rb:468`).
    */
-  mtime: number | null = null;
+  get mtime(): number | null {
+    return this.z.mtime;
+  }
+
+  set mtime(mtime: number | null) {
+    this.z.mtime = mtime;
+  }
 
   static open(filename: string): GzipWriter;
   static open<T>(filename: string, block: (gz: GzipWriter) => T | Promise<T>): Promise<T>;
@@ -90,16 +83,13 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 
   write(string: string): number {
-    this.buffer += string;
+    this.z.write(new TextEncoder().encode(string));
     return new TextEncoder().encode(string).length;
   }
 
-  /**
-   * `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). The `ZlibAdapter`
-   * seam is one-shot rather than streaming, so there is no partial deflate
-   * output to push and the whole buffer is written at {@link close}.
-   */
+  /** `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). */
   flush(): this {
+    this.z.flush();
     return this;
   }
 
@@ -107,12 +97,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     if (!this.zstreamReady) {
       return;
     }
-    const bytes = new TextEncoder().encode(this.buffer);
-    const gzipped = getZlib().gzip(bytes, Zlib.DEFAULT_COMPRESSION, Zlib.DEFAULT_STRATEGY);
-    if (this.mtime !== null && gzipped.length >= GZIP_HEADER_LENGTH) {
-      setGzipHeaderMtime(gzipped, this.mtime);
-    }
-    this.io.write(gzipped);
+    await this.z.finish();
     await super.close();
   }
 }

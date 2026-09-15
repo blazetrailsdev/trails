@@ -14,6 +14,7 @@ export interface ZlibAdapter {
   deflate(data: Uint8Array): Uint8Array;
   inflate(data: Uint8Array): Uint8Array;
   gzipWriter(io: GzipWriterIO): GzipWriterHandle;
+  gzipReader(io: GzipReaderIO): GzipReaderHandle;
 }
 
 /**
@@ -32,6 +33,29 @@ export interface GzipWriterHandle {
   write(data: Uint8Array): void;
   flush(): void;
   finish(): Promise<void>;
+}
+
+/**
+ * The object `::Zlib::GzipReader.new` wraps (`vendor/ruby/ext/zlib/zlib.c:3944`
+ * `rb_gzreader_initialize`) — anything that responds to `read(length)`, which
+ * `gzfile_read_raw` pulls `GZFILE_READ_SIZE` bytes at a time from
+ * (`zlib.c:2376,2542`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface GzipReaderIO {
+  read(length: number): string | null;
+}
+
+/**
+ * The inflate half of the streaming pair: `read` feeds the associated IO into
+ * the zstream chunk by chunk (`gzfile_read_more`, `vendor/ruby/ext/zlib/zlib.c:2823`)
+ * and answers what `gzfile_read_all` (`zlib.c:2946`) detaches.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface GzipReaderHandle {
+  read(): Promise<Uint8Array>;
 }
 
 /**
@@ -142,7 +166,10 @@ type NodeZlib = {
   deflateSync: (data: Uint8Array) => Uint8Array;
   inflateSync: (data: Uint8Array) => Uint8Array;
   createGzip: () => NodeGzipStream;
+  createGunzip: () => NodeGzipStream;
 };
+
+const GZFILE_READ_SIZE = 2048;
 
 function wrap(zlib: NodeZlib): ZlibAdapter {
   return {
@@ -183,6 +210,39 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       });
       return handle;
     },
+    gzipReader: (io) => ({
+      read: async () => {
+        const stream = zlib.createGunzip();
+        const chunks: Uint8Array[] = [];
+        let failure: Error | null = null;
+        stream.on("data", (chunk) => chunks.push(chunk as Uint8Array));
+        const ended = new Promise<void>((res) => {
+          stream.on("end", () => res());
+          stream.on("error", (err) => {
+            failure = err as Error;
+            res();
+          });
+        });
+        let str: string | null;
+        while ((str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
+          const bytes = new Uint8Array(str.length);
+          for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
+          stream.write(bytes);
+        }
+        stream.end();
+        await ended;
+        if (failure !== null) throw failure;
+        let length = 0;
+        for (const chunk of chunks) length += chunk.length;
+        const dst = new Uint8Array(length);
+        let offset = 0;
+        for (const chunk of chunks) {
+          dst.set(chunk, offset);
+          offset += chunk.length;
+        }
+        return dst;
+      },
+    }),
   };
 }
 
