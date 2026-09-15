@@ -38,6 +38,14 @@ export function rbHash(value: unknown): number {
     }
     return h >>> 0;
   }
+  if (value instanceof Uint8Array) {
+    let h = 0x811c9dc5;
+    for (const byte of value) {
+      h ^= byte;
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
   const object = value as { hash?: unknown };
   if (typeof object.hash === "function") {
     return (object as { hash(): number }).hash();

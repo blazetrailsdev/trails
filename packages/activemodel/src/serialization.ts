@@ -71,7 +71,14 @@ export function serializableHash(
       safeSet(
         result,
         assocName,
-        items.map((r) => serializableHash(r as SerializationRecord, opts, true)),
+        items.map((a) => {
+          if (!rbObjRespondTo(a, "serializableHash")) {
+            throw new NoMethodError(
+              `undefined method 'serializableHash' for an instance of ${(a as object).constructor.name}`,
+            );
+          }
+          return (a as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts);
+        }),
       );
     } else {
       if (!rbObjRespondTo(records, "serializableHash")) {

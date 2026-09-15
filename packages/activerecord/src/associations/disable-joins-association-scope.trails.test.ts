@@ -234,4 +234,16 @@ describe("DisableJoinsAssociationScope", () => {
     expect((await viaToArray).map((p: any) => p.title)).toEqual(["p2", "p1"]);
     expect(viaToArray.isLoaded).toBe(true);
   });
+  it("a malformed composite join id raises the predicate builder's Array expectation", () => {
+    const reflection = { klass: DjsPost, buildScope: () => DjsPost.all(), constraints: () => [] };
+    expect(() =>
+      (DisableJoinsAssociationScope.create() as any)._addConstraintsDj(
+        reflection,
+        ["djs_author_id", "title"],
+        [1],
+        null,
+        false,
+      ),
+    ).toThrow('Expected corresponding value for ["djs_author_id", "title"] to be an Array');
+  });
 });

@@ -31,6 +31,29 @@ describe("Serialization — trails-only coverage", () => {
   }
   interface Post extends Attributes, SerializersJSON {}
 
+  class Comment extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("text", "string");
+      this.attribute("author", "string");
+    }
+  }
+  interface Comment extends Attributes, SerializersJSON {}
+
+  class Tag extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("name", "string");
+    }
+  }
+  interface Tag extends Attributes, SerializersJSON {}
+
   it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
     const host = {
       attributes: { name: "STALE" },
@@ -197,13 +220,8 @@ describe("Serialization — trails-only coverage", () => {
 
   it("include accepts mixed array of strings and option hashes", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const comment = {
-      _attributes: new Map([
-        ["text", "Great!"],
-        ["author", "Bob"],
-      ]),
-    };
-    const tag = { _attributes: new Map([["name", "rails"]]) };
+    const comment = new Comment({ text: "Great!", author: "Bob" });
+    const tag = new Tag({ name: "rails" });
     setAssociationAccessors(p, { comments: [comment], tags: [tag] });
     const result = p.serializableHash({
       include: ["tags", { comments: { only: ["text"] } }],

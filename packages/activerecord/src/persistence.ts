@@ -1008,13 +1008,7 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  const { names, time: t } = parseTouchArgs(args);
-  const now =
-    t == null
-      ? currentTimeFromProperTimezone()
-      : t instanceof RubyTime
-        ? t
-        : RubyTime.at(new Rational(t.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
+  const { names, time } = parseTouchArgs(args);
   const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 
@@ -1028,7 +1022,7 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const attributeNames = Array.from(new Set([...updateTimestampAttrs, ...resolvedNames]));
 
   if (attributeNames.length > 0) {
-    const affectedRows = await (this as any)._touchRow(attributeNames, now);
+    const affectedRows = await (this as any)._touchRow(attributeNames, time);
     (this as any)._triggerUpdateCallback = affectedRows === 1;
   }
   return true;
@@ -1045,11 +1039,12 @@ function raiseRecordNotTouchedError(): never {
 export function _touchRow(
   this: PersistenceInternalHost,
   attributeNames: string[],
-  time?: RubyTime | null,
+  time?: RubyTime | Date | null,
 ): Promise<number> {
-  const t = time ?? currentTimeFromProperTimezone();
-  for (const attr of attributeNames) {
-    this._writeAttribute(attr, t);
+  time ??= currentTimeFromProperTimezone();
+  if (time instanceof Date) time = RubyTime.at(new Rational(time.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
+  for (const attrName of attributeNames) {
+    this._writeAttribute(attrName, time);
   }
   return (this as any)._updateRow(attributeNames, "touch");
 }

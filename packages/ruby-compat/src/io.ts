@@ -125,27 +125,42 @@ function ioEncStr(
   bytes: Uint8Array,
   length: number,
   enc: Encoding,
-  destination: Encoding = enc,
+  destination: Encoding | null = null,
 ): string {
   if (enc === Encoding.ASCII_8BIT) return binaryString(bytes, length);
   const read = bytes.subarray(0, length);
   if (enc.decoderLabel === null) {
+    if (destination === null && (enc.name === "UTF-16" || enc.name === "UTF-32")) {
+      return binaryString(bytes, length);
+    }
     if (enc.name === "UTF-32BE" || enc.name === "UTF-32LE") {
       return utf32Str(read, enc.name === "UTF-32LE");
     }
     if (enc.name === "UTF-16") {
       const sp = funSiFromUtf16(read);
       if (sp !== 0) {
+        if (read.length % 2 !== 0) {
+          throw invalidByteSequence(read.subarray(read.length - 1), enc, destination!);
+        }
         return new TextDecoder(sp === LE ? "utf-16le" : "utf-16be").decode(read.subarray(2));
       }
       if (read.length === 0) return "";
-      throw invalidByteSequence(read.subarray(0, 2), enc, destination);
+      throw invalidByteSequence(read.subarray(0, 2), enc, destination!);
     }
     if (enc.name === "UTF-32") {
       const sp = funSiFromUtf32(read);
-      if (sp !== 0) return utf32Str(read.subarray(4), sp === LE);
+      if (sp !== 0) {
+        if (read.length % 4 !== 0) {
+          throw invalidByteSequence(
+            read.subarray(read.length - (read.length % 4)),
+            enc,
+            destination!,
+          );
+        }
+        return utf32Str(read.subarray(4), sp === LE);
+      }
       if (read.length === 0) return "";
-      throw invalidByteSequence(read.subarray(0, 4), enc, destination);
+      throw invalidByteSequence(read.subarray(0, 4), enc, destination!);
     }
     throw new ConverterNotFoundError(`code converter not found (${enc} to UTF-8)`);
   }
@@ -850,7 +865,8 @@ export class IO {
       bytes.set(chunk, at);
       at += chunk.length;
     }
-    return ioEncStr(bytes, total, this.enc2 ?? this.ioReadEncoding(), this.ioReadEncoding());
+    if (this.enc2 === null) return ioEncStr(bytes, total, this.ioReadEncoding());
+    return ioEncStr(bytes, total, this.enc2, this.ioReadEncoding());
   }
 
   /**

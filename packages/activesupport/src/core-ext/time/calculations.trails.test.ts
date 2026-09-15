@@ -63,4 +63,18 @@ describe("TimeExtCalculationsTest (trails)", () => {
       );
     });
   });
+
+  it("change picks the occurrence matching the receiver's isdst in the process-local zone", () => {
+    withEnvTz("America/New_York", () => {
+      const edt = RubyTime.at(1225603800);
+      const est = RubyTime.at(1225607400);
+      expect(edt.isZoneObject).toBe(false);
+      expect(edt.change({ min: 45 }).strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2008-11-02 01:45:00 -0400",
+      );
+      expect(est.change({ min: 45 }).strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2008-11-02 01:45:00 -0500",
+      );
+    });
+  });
 });
