@@ -12,7 +12,6 @@ import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import type { TypeMap } from "../type/type-map.js";
-import { _Base } from "../base-slot.js";
 import { Name, Utils } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
@@ -179,6 +178,7 @@ import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
+import { dbWarningsAction } from "../active-record.js";
 
 const OID_JSON = 114;
 const OID_JSONB = 3802;
@@ -555,7 +555,7 @@ export class PostgreSQLAdapter
   }
 
   private _attachNoticeListener(client: pg.Client): void {
-    if (_Base!.dbWarningsAction == null) return;
+    if (dbWarningsAction() == null) return;
     client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
       this._noticeReceiverSqlWarnings.push(
         new SQLWarning(msg.message, msg.code ?? null, msg.severity ?? null, undefined, this.pool),

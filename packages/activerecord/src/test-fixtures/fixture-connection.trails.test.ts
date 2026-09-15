@@ -3,14 +3,15 @@ import { Base } from "../base.js";
 import { leaseFixtureConnection, leaseFixtureConnectionFor } from "./fixture-connection.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
+import { setPermanentConnectionCheckout } from "../active-record.js";
 
 describe("fixture connection source", () => {
   afterEach(() => {
-    Base.permanentConnectionCheckout = true;
+    setPermanentConnectionCheckout(true);
   });
 
   it("leases without tripping permanentConnectionCheckout = disallowed", () => {
-    Base.permanentConnectionCheckout = "disallowed";
+    setPermanentConnectionCheckout("disallowed");
 
     expect(() => leaseFixtureConnection()).not.toThrow();
   });

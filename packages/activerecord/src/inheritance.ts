@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { demodulize } from "@blazetrails/activesupport";
+import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
 function castInheritanceColumnValue(
   modelClass: typeof Base,
@@ -341,7 +342,7 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
 }
 
 export function __resetPrimaryAbstractClass(): void {
-  _Base!.applicationRecordClass = null;
+  setApplicationRecordClass(null);
 }
 
 /**
@@ -349,7 +350,7 @@ export function __resetPrimaryAbstractClass(): void {
  * @noRailsEquivalent CONVERGEABLE resolves the ApplicationRecord constant Ruby names directly (core.rb:121).
  */
 export function getApplicationRecordClass(): typeof Base | null {
-  return _Base!.applicationRecordClass as typeof Base | null;
+  return applicationRecordClass() as typeof Base | null;
 }
 
 /**
@@ -363,21 +364,21 @@ export function getApplicationRecordClass(): typeof Base | null {
  * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) as a free function; it also exists on Base, and one of the two should go.
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
-  if (_Base!.applicationRecordClass) {
-    return modelClass === _Base!.applicationRecordClass;
+  if (applicationRecordClass()) {
+    return modelClass === applicationRecordClass();
   }
   return modelClass === (globalThis as Record<string, unknown>)["ApplicationRecord"];
 }
 
 export function primaryAbstractClass(modelClass: typeof Base): void {
-  if (_Base!.applicationRecordClass && _Base!.applicationRecordClass !== modelClass) {
+  if (applicationRecordClass() && applicationRecordClass() !== modelClass) {
     throw new ArgumentError(
-      `The \`primary_abstract_class\` is already set to ${_Base!.applicationRecordClass.name}. ` +
+      `The \`primary_abstract_class\` is already set to ${applicationRecordClass()!.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
     );
   }
   (modelClass as any).abstractClass = true;
-  _Base!.applicationRecordClass = modelClass;
+  setApplicationRecordClass(modelClass);
 }
 
 export function stiClassFor(modelClass: typeof Base, typeName: string): typeof Base {

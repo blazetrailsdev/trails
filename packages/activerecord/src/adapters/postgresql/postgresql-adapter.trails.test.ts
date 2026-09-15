@@ -3,7 +3,6 @@ import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
-import { Base } from "../../base.js";
 import {
   describeIfPg,
   PostgreSQLAdapter,
@@ -26,6 +25,12 @@ import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { itIfSupports } from "../../support/supports.js";
+import {
+  dbWarningsAction,
+  dbWarningsIgnore,
+  setDbWarningsAction,
+  setDbWarningsIgnore,
+} from "../../active-record.js";
 
 async function withExtensionDisabled(
   adapter: PostgreSQLAdapter,
@@ -852,15 +857,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    let savedWarningsAction: typeof Base.dbWarningsAction;
-    let savedWarningsIgnore: typeof Base.dbWarningsIgnore;
+    let savedWarningsAction: ReturnType<typeof dbWarningsAction>;
+    let savedWarningsIgnore: ReturnType<typeof dbWarningsIgnore>;
     beforeEach(() => {
-      savedWarningsAction = Base.dbWarningsAction;
-      savedWarningsIgnore = Base.dbWarningsIgnore;
+      savedWarningsAction = dbWarningsAction();
+      savedWarningsIgnore = dbWarningsIgnore();
     });
     afterEach(() => {
-      Base.dbWarningsAction = savedWarningsAction ?? "ignore";
-      Base.dbWarningsIgnore = savedWarningsIgnore;
+      setDbWarningsAction(savedWarningsAction ?? "ignore");
+      setDbWarningsIgnore(savedWarningsIgnore);
       vi.restoreAllMocks();
     });
   });

@@ -4,12 +4,12 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
-import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import { Node } from "./test-helpers/models/node.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { setBeforeCommittedOnAllRecords } from "./active-record.js";
 
 const { nodes, trees, owners, pets } = fixtures(["nodes", "trees", "owners", "pets"]);
 
@@ -144,7 +144,7 @@ describe("TouchLaterTest", () => {
   });
 
   it("touching through nested attributes without before committed on all records", async () => {
-    Base.beforeCommittedOnAllRecords = false;
+    setBeforeCommittedOnAllRecords(false);
     try {
       const time = twentyFiveDaysAgo();
       const owner = owners("blackbeard") as any;
@@ -157,12 +157,12 @@ describe("TouchLaterTest", () => {
 
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
     } finally {
-      Base.beforeCommittedOnAllRecords = false;
+      setBeforeCommittedOnAllRecords(false);
     }
   });
 
   it("touching through nested attributes with before committed on all records", async () => {
-    Base.beforeCommittedOnAllRecords = true;
+    setBeforeCommittedOnAllRecords(true);
     try {
       const time = twentyFiveDaysAgo();
       const owner = owners("blackbeard") as any;
@@ -175,7 +175,7 @@ describe("TouchLaterTest", () => {
 
       expect(toI((await owner.reload()).updated_at)).not.toBe(toI(time));
     } finally {
-      Base.beforeCommittedOnAllRecords = false;
+      setBeforeCommittedOnAllRecords(false);
     }
   });
 });

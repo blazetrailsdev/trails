@@ -18,6 +18,10 @@ import { Treasure } from "./test-helpers/models/treasure.js";
 import { StrictZine } from "./test-helpers/models/strict-zine.js";
 import { Zine } from "./test-helpers/models/zine.js";
 import { Interest } from "./test-helpers/models/interest.js";
+import {
+  actionOnStrictLoadingViolation,
+  setActionOnStrictLoadingViolation,
+} from "./active-record.js";
 
 function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
   const holder = (record as any).association(name);
@@ -676,7 +680,7 @@ describe("StrictLoadingTest", () => {
   });
 
   it("strict loading violation raises by default", async () => {
-    expect(Base.actionOnStrictLoadingViolation).toBe("raise");
+    expect(actionOnStrictLoadingViolation()).toBe("raise");
 
     const developer = await Developer.first();
     expect(developer!.isStrictLoading()).toBe(false);
@@ -693,8 +697,8 @@ describe("StrictLoadingTest", () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
 
-    Base.actionOnStrictLoadingViolation = "log";
-    expect(Base.actionOnStrictLoadingViolation).toBe("log");
+    setActionOnStrictLoadingViolation("log");
+    expect(actionOnStrictLoadingViolation()).toBe("log");
     let logged = false;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", () => {
       logged = true;
@@ -704,7 +708,7 @@ describe("StrictLoadingTest", () => {
       expect(logged).toBe(true);
     } finally {
       Notifications.unsubscribe(sub);
-      Base.actionOnStrictLoadingViolation = "raise";
+      setActionOnStrictLoadingViolation("raise");
     }
   });
 
@@ -730,7 +734,7 @@ describe("StrictLoadingTest", () => {
     treasure.strictLoadingBang();
     expect(treasure.isStrictLoading()).toBe(true);
 
-    Base.actionOnStrictLoadingViolation = "log";
+    setActionOnStrictLoadingViolation("log");
     let logged: string | null = null;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", (event: any) => {
       logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
@@ -743,7 +747,7 @@ describe("StrictLoadingTest", () => {
       );
     } finally {
       Notifications.unsubscribe(sub);
-      Base.actionOnStrictLoadingViolation = "raise";
+      setActionOnStrictLoadingViolation("raise");
     }
   });
 });

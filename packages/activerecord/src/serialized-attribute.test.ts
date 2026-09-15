@@ -7,6 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
+import { setUseYamlUnsafeLoad } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -31,8 +32,8 @@ class MyObject {
 describe("SerializedAttributeTest", () => {
   const { topics, posts } = fixtures(["topics", "posts"]);
 
-  beforeEach(() => (Base.useYamlUnsafeLoad = true));
-  afterAll(() => (Base.useYamlUnsafeLoad = false));
+  beforeEach(() => setUseYamlUnsafeLoad(true));
+  afterAll(() => setUseYamlUnsafeLoad(false));
 
   it("serialize does not eagerly load columns", () => {
     const spy = vi.spyOn(Base, "leaseConnection" as any);

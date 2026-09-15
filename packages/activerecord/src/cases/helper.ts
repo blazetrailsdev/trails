@@ -18,6 +18,10 @@ import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.j
 import { Relation } from "../relation.js";
 import { setPermanentConnectionCheckout } from "../active-record.js";
 import { UniquenessValidator } from "../validations.js";
+import {
+  setBelongsToRequiredValidatesForeignKey,
+  setRaiseOnAssignToAttrReadonly,
+} from "../active-record.js";
 
 registerFakeAdapter();
 
@@ -27,9 +31,9 @@ I18n.setEnforceAvailableLocales(false);
 
 Base.automaticallyInvertPluralAssociations = true;
 
-Base.raiseOnAssignToAttrReadonly = true;
+setRaiseOnAssignToAttrReadonly(true);
 
-Base.belongsToRequiredValidatesForeignKey = false;
+setBelongsToRequiredValidatesForeignKey(false);
 
 setPermanentConnectionCheckout("disallowed");
 

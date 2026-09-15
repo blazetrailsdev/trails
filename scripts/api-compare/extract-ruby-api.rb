@@ -353,24 +353,39 @@ DEPENDENCY_PATTERNS = {
 # set only grows, and is deleted with `umbrella_base_redirect` itself.
 UMBRELLA_SEATS_ON_MODULE = {
   "ActiveRecord" => %w[
+    action_on_strict_loading_violation
+    application_record_class
     async_query_executor
+    before_committed_on_all_records
+    belongs_to_required_validates_foreign_key
     database_cli
+    db_warnings_action
+    db_warnings_ignore
     default_timezone
     disable_prepared_statements
     dump_schema_after_migration
     dump_schemas
     error_on_ignored_order
+    generate_secure_token_on
     lazily_load_schema_cache
     maintain_test_schema
     migration_strategy
+    permanent_connection_checkout
+    protocol_adapters
     query_transformers
+    queues
+    raise_int_wider_than_64bit
+    raise_on_assign_to_attr_readonly
     reading_role
+    run_after_transaction_callbacks_in_order_defined
     schema_format
     timestamped_migrations
+    use_yaml_unsafe_load
     validate_migration_timestamps
     verbose_query_logs
     verify_foreign_keys_for_fixtures
     writing_role
+    yaml_column_permitted_classes
   ].to_set,
 }.freeze
 

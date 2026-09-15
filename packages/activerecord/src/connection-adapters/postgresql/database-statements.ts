@@ -1,7 +1,6 @@
 import type pg from "pg";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
-import { _Base } from "../../base-slot.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
 import {
@@ -15,6 +14,7 @@ import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import { b, fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { dbWarningsAction } from "../../active-record.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
   "close",
@@ -483,7 +483,7 @@ export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
     if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
 
     warning.sql = sql;
-    _Base!.dbWarningsAction!.call(this, warning as unknown as SQLWarning);
+    dbWarningsAction()!.call(this, warning as unknown as SQLWarning);
   }
 }
 

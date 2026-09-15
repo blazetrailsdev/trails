@@ -1426,8 +1426,8 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :use_yaml_unsafe_load
-        singleton_class.attr_reader :db_warnings_action
+        singleton_class.attr_accessor :index_nested_attribute_errors
+        singleton_class.attr_reader :example_reader
         def self.eager_load!; end
       end
     `,
@@ -1435,13 +1435,15 @@ describe(
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
       // accessor → reader + writer; reader-only → reader only.
-      expect(names).toContain("use_yaml_unsafe_load");
-      expect(names).toContain("use_yaml_unsafe_load=");
-      expect(names).toContain("db_warnings_action");
-      expect(names).not.toContain("db_warnings_action=");
+      expect(names).toContain("index_nested_attribute_errors");
+      expect(names).toContain("index_nested_attribute_errors=");
+      expect(names).toContain("example_reader");
+      expect(names).not.toContain("example_reader=");
       // Every redirected entry is tagged so compare can credit the port wherever
       // it lands in the package.
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("use_yaml_unsafe_load"))) {
+      for (const m of base.classMethods.filter((m) =>
+        m.name.startsWith("index_nested_attribute_errors"),
+      )) {
         expect(m.umbrellaConfig).toBe(true);
       }
       // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
@@ -1457,16 +1459,18 @@ describe(
         `
       module ActiveRecord
         class << self
-          attr_accessor :use_yaml_unsafe_load
+          attr_accessor :index_nested_attribute_errors
         end
       end
     `,
       );
       const base = out["ActiveRecord::Base"];
       const names = base.classMethods.map((m) => m.name);
-      expect(names).toContain("use_yaml_unsafe_load");
-      expect(names).toContain("use_yaml_unsafe_load=");
-      for (const m of base.classMethods.filter((m) => m.name.startsWith("use_yaml_unsafe_load"))) {
+      expect(names).toContain("index_nested_attribute_errors");
+      expect(names).toContain("index_nested_attribute_errors=");
+      for (const m of base.classMethods.filter((m) =>
+        m.name.startsWith("index_nested_attribute_errors"),
+      )) {
         expect(m.umbrellaConfig).toBe(true);
       }
     });
@@ -1476,13 +1480,13 @@ describe(
         BASE_SRC,
         `
       module ActiveRecord
-        singleton_class.attr_accessor :use_yaml_unsafe_load
+        singleton_class.attr_accessor :index_nested_attribute_errors
       end
     `,
       );
       const mod = out["ActiveRecord"];
       const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-      expect(modNames).not.toContain("use_yaml_unsafe_load");
+      expect(modNames).not.toContain("index_nested_attribute_errors");
     });
 
     it("does not redirect a seat that has moved onto the ActiveRecord module", () => {

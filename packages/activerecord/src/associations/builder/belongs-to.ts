@@ -4,7 +4,7 @@ import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
-import { _Base } from "../../base-slot.js";
+import { belongsToRequiredValidatesForeignKey } from "../../active-record.js";
 
 export class BelongsTo extends SingularAssociation {
   static override macro(): string {
@@ -295,7 +295,7 @@ export class BelongsTo extends SingularAssociation {
             record._readAttribute(attr) == null ||
             (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
         );
-      const railsRuns = _Base!.belongsToRequiredValidatesForeignKey
+      const railsRuns = belongsToRequiredValidatesForeignKey()
         ? () => true
         : (record: any) =>
             needsValidation(record, foreignKeys) ||

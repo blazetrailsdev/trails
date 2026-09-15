@@ -1,5 +1,5 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
-import { _Base } from "../base-slot.js";
+import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {
   private readonly _adapter: string | null;
@@ -31,7 +31,7 @@ export class ConnectionUrlResolver {
     const hasAuthority = !!schemeMatch[2];
     const rest = schemeMatch[3];
 
-    this._adapter = _Base!.protocolAdapters[scheme] ?? scheme;
+    this._adapter = protocolAdapters()[scheme] ?? scheme;
 
     if (hasAuthority) {
       const emptyAuthority = rest.startsWith("/");
