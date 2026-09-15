@@ -416,41 +416,15 @@ export async function updateBang<T extends UpdateRecord>(
   }) as Promise<true | undefined>;
 }
 
-interface DeleteRecord {
-  _destroyed: boolean;
-  _previouslyNewRecord: boolean;
-  id: unknown;
-  idInDatabase: unknown;
-  isPersisted(): boolean;
-  freeze(): unknown;
-  constructor: {
-    arelTable: InstanceType<typeof ArelTable>;
-    _buildQueryConstraintsWhereNode(
-      constraints: Record<string, unknown>,
-    ): Parameters<DeleteManager["where"]>[0];
-    connection: {
-      delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
-    };
-  };
-}
-
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
-  const ctor = this.constructor;
-  if (this.isPersisted()) {
-    const dm = new DeleteManager()
-      .from(ctor.arelTable)
-      .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
-    const adapter =
-      connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection ??
-      ctor.connection;
-    await adapter.delete(dm, "Delete");
-  }
-  this._destroyed = true;
-  this._previouslyNewRecord = false;
+async function delete_<T extends Base>(this: T): Promise<T> {
+  const self = this as unknown as PersistencePrivateHost;
+  if (this.isPersisted()) await _deleteRow.call(self);
+  self._destroyed = true;
+  self._previouslyNewRecord = false;
   this.freeze();
   return this;
 }
+export { delete_ as delete };
 
 interface SaveRecord {
   _destroyed: boolean;

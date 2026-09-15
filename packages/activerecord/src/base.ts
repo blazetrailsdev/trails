@@ -2977,7 +2977,7 @@ include(Base, {
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
-  delete: _Persistence.deleteRow,
+  delete: _Persistence.delete,
   destroyRow: _Persistence.destroyRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,
