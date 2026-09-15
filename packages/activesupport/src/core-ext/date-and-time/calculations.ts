@@ -25,9 +25,13 @@ export const DAYS_INTO_WEEK: Record<string, number> = {
 export const WEEKEND_DAYS = [6, 0];
 
 function advance(
-  dateOrTime: DateOrTime | Temporal.Instant,
+  dateOrTime: DateOrTime | Temporal.Instant | RubyTime,
   options: { years?: number; months?: number; weeks?: number; days?: number },
 ): DateOrInstant {
+  // boundary: `Time#advance` is this module's receiver-side dispatch once Time includes it
+  if (dateOrTime instanceof RubyTime) {
+    return (dateOrTime as unknown as { advance(options: unknown): DateOrInstant }).advance(options);
+  }
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date

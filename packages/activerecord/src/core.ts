@@ -654,7 +654,7 @@ export function clone<T extends CloneRecord>(this: T): T {
   Object.assign(copy, this);
   (copy as unknown as CloneRecord)._attributes = this._attributes;
   (copy as unknown as CloneRecord)._previouslyNewRecord = false;
-  (copy as unknown as { errors: unknown }).errors = new this.errors.constructor(copy);
+  (copy as unknown as { _errors: unknown })._errors = new this.errors.constructor(copy);
   return copy;
 }
 

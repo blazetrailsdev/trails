@@ -2295,7 +2295,7 @@ describe("ValidationsTest (trails)", () => {
       title: string | null = null;
 
       constructor() {
-        this.errors = new Errors(this);
+        this._errors = new Errors(this);
       }
 
       readAttributeForValidation(attribute: string): unknown {

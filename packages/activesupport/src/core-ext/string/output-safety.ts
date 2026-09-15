@@ -120,6 +120,10 @@ export class SafeBuffer {
     }
     return new SafeBuffer(result, this._safe);
   }
+
+  toS(): this {
+    return this;
+  }
 }
 
 export function htmlSafe(str: string): SafeBuffer {

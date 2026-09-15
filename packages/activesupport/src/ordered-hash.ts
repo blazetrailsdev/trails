@@ -45,6 +45,19 @@ export class OrderedHash<K, V> extends Map<K, V> {
     return this.select((k, v) => !block(k, v));
   }
 
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#reject!`
+   * (`vendor/ruby/hash.c:2594`), which `ActiveSupport::OrderedHash` inherits.
+   */
+  rejectBang(...args: [(key: K, value: V) => boolean]): this | null {
+    const block = args[args.length - 1];
+    const n = this.size;
+    if (!n) return null;
+    this.deleteIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
   deleteIf(predicate: (key: K, value: V) => boolean): this {
     for (const [k, v] of this) {
       if (predicate(k, v)) this.delete(k);

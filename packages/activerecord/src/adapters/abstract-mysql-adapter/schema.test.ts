@@ -6,6 +6,7 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { Base } from "../../base.js";
+import { Post } from "../../test-helpers/models/post.js";
 import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -49,12 +50,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       fn: (omgPost: typeof Base, db: string) => Promise<void>,
     ): Promise<void> {
       const db = await adapter.currentDatabase();
-      class OmgPost extends Base {
-        static _tableName = `${db}.posts`;
-        static name = "Post";
-      }
-      OmgPost.inheritanceColumn = "disabled";
-      await fn(OmgPost, db);
+      const table = Post.tableName;
+      const omgpost = class extends Base {};
+      omgpost.inheritanceColumn = "disabled";
+      omgpost.tableName = `${db}.${table}`;
+      Object.defineProperty(omgpost, "name", { value: "Post" });
+      await fn(omgpost, db);
     }
 
     it("schema", async () => {
@@ -65,14 +66,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("primary key", async () => {
       await withOmgPost(async (OmgPost) => {
-        const name = (OmgPost as any)._tableName as string;
+        const name = OmgPost.tableName;
         expect(await adapter.primaryKey(name)).toBe("id");
       });
     });
 
     it("data source exists?", async () => {
       await withOmgPost(async (OmgPost) => {
-        const name = (OmgPost as any)._tableName as string;
+        const name = OmgPost.tableName;
         expect(await adapter.dataSourceExists(name)).toBe(true);
       });
     });

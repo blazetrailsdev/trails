@@ -89,6 +89,30 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#join` (`vendor/ruby/thread.c:1179`),
+   * which waits for the thread to finish, re-raises the exception it died of, and
+   * returns the thread itself.
+   */
+  join(): this | Promise<this> {
+    if (this.#error) throw this.#error.raised;
+    const value = this.#value as unknown;
+    if (value && typeof (value as PromiseLike<unknown>).then === "function") {
+      return (value as PromiseLike<unknown>).then(() => this) as Promise<this>;
+    }
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
+   * (`vendor/ruby/thread.c:2710`), which terminates the thread and returns it.
+   */
+  exit(): this {
+    if (this.status === "dead") return this;
+    this.status = "dead";
+    return this;
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#alive?` (`vendor/ruby/thread.c:5420`).
    */
   isAlive(): boolean {

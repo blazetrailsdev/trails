@@ -189,9 +189,10 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     });
 
     try {
-      thread.value();
+      thread.join();
       expect(t(":bar", { locale: "pt-BR" })).toBe("Bar in :en");
     } finally {
+      thread.exit();
       setFallbacks(new LocaleFallbacks());
     }
   });

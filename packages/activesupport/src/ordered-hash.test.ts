@@ -150,10 +150,11 @@ describe("OrderedHashTest", () => {
     const h = new OrderedHash<string, number>();
     h.set("a", 1);
     h.set("b", 2);
-    h.reject((k, v) => v > 1);
-    h.deleteIf((k, v) => v > 1);
-    expect(h.size).toBe(1);
-    expect(h.has("a")).toBe(true);
+    const copy = new OrderedHash(h);
+    copy.delete("b");
+    h.rejectBang((k, v) => v > 1);
+    expect(h).toEqual(copy);
+    expect([...h.keys()]).not.toContain("b");
   });
 
   it("reject", () => {
