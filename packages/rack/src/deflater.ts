@@ -145,8 +145,9 @@ export class GzipStream {
           gzip.write(Buffer.from(String(part), "binary"));
           if (this.sync) await gzip.flush();
         };
-        if (Array.isArray(this.body)) for (const part of this.body) await visit(part);
-        else {
+        if (Symbol.asyncIterator in this.body || Symbol.iterator in this.body) {
+          for await (const part of this.body) await visit(part);
+        } else {
           let pending = Promise.resolve();
           try {
             this.body.each((part: string) => {

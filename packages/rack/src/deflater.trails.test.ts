@@ -50,3 +50,17 @@ it("takes the streaming branch for a body that answers read but is not a File", 
 
   expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
 });
+
+it("flushes each yielded part before pulling the next under sync", async () => {
+  const written: Uint8Array[] = [];
+  const pulledAfter: number[] = [];
+  async function* body() {
+    yield "one";
+    pulledAfter.push(written.length);
+    yield "two";
+  }
+  await new GzipStream(body(), null, true).each((data) => written.push(data));
+
+  expect(pulledAfter[0]).toBeGreaterThan(0);
+  expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
+});
