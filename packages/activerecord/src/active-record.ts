@@ -148,11 +148,14 @@ export function setAsyncQueryExecutor(
   _asyncQueryExecutor = asyncQueryExecutor;
 }
 
-/** @missingRailsArgs new — PERMANENT */
 export function globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
   const concurrency = globalExecutorConcurrency() ?? 4;
-  void concurrency;
-  return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
+  return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor({
+    minThreads: 0,
+    maxThreads: concurrency,
+    maxQueue: concurrency * 4,
+    fallbackPolicy: "caller_runs",
+  }));
 }
 
 export function setGlobalExecutorConcurrency(globalExecutorConcurrency: number | null): void {

@@ -96,4 +96,28 @@ describe("ConnectionPool#server_version", () => {
     expect([String(a), String(b)]).toEqual(["8.0.35", "8.0.35"]);
     expect(fetches).toBe(1);
   });
+
+  it("resolves while another flow holds the pool's barrier and waits on the adapter lock", async () => {
+    const pool = new NullPool();
+    const lock = new Monitor();
+    const connection = {
+      lock,
+      async getDatabaseVersion(): Promise<Version> {
+        return lock.synchronize(async () => new Version("8.0.35"));
+      },
+    } as unknown as AbstractAdapter;
+
+    let barrierHeld!: () => void;
+    const held = new Promise<void>((resolve) => (barrierHeld = resolve));
+    const holder = lock.synchronize(async () => {
+      await held;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return pool.serverVersion(connection);
+    });
+    const waiter = pool.serverVersion(connection);
+    barrierHeld();
+
+    const [a, b] = await Promise.all([holder, waiter]);
+    expect([String(a), String(b)]).toEqual(["8.0.35", "8.0.35"]);
+  }, 5000);
 });

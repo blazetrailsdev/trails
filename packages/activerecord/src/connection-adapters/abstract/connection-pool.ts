@@ -1,4 +1,4 @@
-import { Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
+import { isMonOwned, Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
@@ -64,6 +64,7 @@ export class NullPool implements AbstractPool {
 
   private readonly _mutex = new Mutex();
   private _serverVersion: unknown = null;
+  private _serverVersionFetcher: DatabaseAdapter | null = null;
   private _schemaReflection: SchemaReflection | null = null;
 
   declare readonly role: never;
@@ -93,15 +94,19 @@ export class NullPool implements AbstractPool {
   }
 
   serverVersion(connection: DatabaseAdapter): unknown {
-    return (
-      this._serverVersion ??
-      connection.lock.synchronize(() =>
-        this._mutex.synchronize(async () => {
-          this._serverVersion ??= await connection.getDatabaseVersion?.();
-          return this._serverVersion;
-        }),
-      )
-    );
+    if (this._serverVersion != null) return this._serverVersion;
+    if (this._serverVersionFetcher !== null && isMonOwned.call(this._serverVersionFetcher.lock)) {
+      return connection.getDatabaseVersion?.();
+    }
+    return this._mutex.synchronize(async () => {
+      this._serverVersionFetcher = connection;
+      try {
+        this._serverVersion ??= await connection.getDatabaseVersion?.();
+      } finally {
+        this._serverVersionFetcher = null;
+      }
+      return this._serverVersion;
+    });
   }
 
   get schemaReflection(): SchemaReflection {
@@ -875,14 +880,20 @@ export class ConnectionPool implements ReapablePool {
   }
 
   scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
-    this.asyncExecutor!.post(() => void futureResult.executeOrSkip());
+    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
-  /** @missingRailsArgs new — PERMANENT */
   private buildAsyncExecutor(): AsyncExecutor | null {
     switch (asyncQueryExecutor()) {
       case "multi_thread_pool":
-        return this.dbConfig.maxThreads > 0 ? new AsyncExecutor() : null;
+        return this.dbConfig.maxThreads > 0
+          ? new AsyncExecutor({
+              minThreads: this.dbConfig.minThreads,
+              maxThreads: this.dbConfig.maxThreads,
+              maxQueue: this.dbConfig.maxQueue,
+              fallbackPolicy: "caller_runs",
+            })
+          : null;
       case "global_thread_pool":
         return globalThreadPoolAsyncQueryExecutor();
       default:

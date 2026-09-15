@@ -28,6 +28,18 @@ function monData(self: object): MonData {
 }
 
 /**
+ * `vendor/ruby/ext/monitor/lib/monitor.rb:191` `mon_owned?`, true when the
+ * current execution context holds the monitor.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_owned?`
+ * (`vendor/ruby/ext/monitor/lib/monitor.rb:191`).
+ */
+export function isMonOwned(this: object): boolean {
+  const data = monData(this);
+  return data.owner !== null && data.storage!.getStore() === data.owner;
+}
+
+/**
  * `vendor/ruby/ext/monitor/lib/monitor.rb:200` `mon_synchronize`, aliased
  * `synchronize` at `:203`.
  *
@@ -71,6 +83,7 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
  * (`vendor/ruby/ext/monitor/lib/monitor.rb:91`).
  */
 export interface MonitorMixin {
+  isMonOwned(): boolean;
   synchronize<T>(block: () => T | Promise<T>): Promise<T>;
 }
 
@@ -82,5 +95,6 @@ export interface MonitorMixin {
  * (`vendor/ruby/ext/monitor/lib/monitor.rb:256`).
  */
 export class Monitor implements MonitorMixin {
+  isMonOwned = isMonOwned;
   synchronize = synchronize;
 }

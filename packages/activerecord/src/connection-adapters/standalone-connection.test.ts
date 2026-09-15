@@ -29,7 +29,7 @@ describe("StandaloneConnectionTest", () => {
   });
 
   it("can close", async () => {
-    await connection.disconnectBang();
+    await connection.close();
     assertNot(await connection.active());
   });
 });
