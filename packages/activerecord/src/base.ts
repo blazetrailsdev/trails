@@ -2735,6 +2735,9 @@ _setBase(Base);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
+  _marshalDump71(): unknown[];
+  marshalDump?(): unknown[];
+  marshalLoad(state: unknown[]): void;
   normalizeAttribute(name: string): void;
   /** @internal */
   normalizeChangedInPlaceAttributes(): void;

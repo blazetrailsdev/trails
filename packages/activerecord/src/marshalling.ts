@@ -1,15 +1,15 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { Module, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 
-let _formatVersion: number = 6.1;
+let _formatVersion: unknown = 6.1;
 
-export function formatVersion(): number {
+export function formatVersion(): unknown {
   return _formatVersion;
 }
 
-export function setFormatVersion(version: number): void {
+export function setFormatVersion(version: unknown): void {
   switch (version) {
     case 6.1:
       if (Methods.isMethodDefined("marshalDump")) Methods.undefMethod("marshalDump");
@@ -18,7 +18,7 @@ export function setFormatVersion(version: number): void {
       Methods.defineMethod("marshalDump", Methods.instanceMethod("_marshalDump71")!.value);
       break;
     default:
-      throw new ArgumentError(`Unknown marshalling format: ${String(version)}`);
+      throw new ArgumentError(`Unknown marshalling format: ${rbInspect(version)}`);
   }
   _formatVersion = version;
 }

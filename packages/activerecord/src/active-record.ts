@@ -271,11 +271,11 @@ export function setQueryTransformers(queryTransformers: QueryTransformer[]): voi
   _queryTransformers = queryTransformers;
 }
 
-export function marshallingFormatVersion(): number {
+export function marshallingFormatVersion(): unknown {
   return Marshalling.formatVersion();
 }
 
-export function setMarshallingFormatVersion(value: number): void {
+export function setMarshallingFormatVersion(value: unknown): void {
   Marshalling.setFormatVersion(value);
 }
 

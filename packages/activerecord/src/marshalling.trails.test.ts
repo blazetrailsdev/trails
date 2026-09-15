@@ -24,6 +24,7 @@ describe("ActiveRecord.marshalling_format_version", () => {
 
   it("raises ArgumentError for an unknown format", () => {
     expect(() => setMarshallingFormatVersion(5.0)).toThrow("Unknown marshalling format: 5");
+    expect(() => setMarshallingFormatVersion("7.1")).toThrow('Unknown marshalling format: "7.1"');
     expect(marshallingFormatVersion()).toBe(6.1);
   });
 });
