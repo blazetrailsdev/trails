@@ -331,10 +331,7 @@ DEPENDENCY_PATTERNS = {
 # `vendor/i18n/lib/i18n.rb` is where `I18n::Base` — the gem's whole public
 # facade — is actually defined: 19 `def`s plus 3 aliases. The config-only scan
 # sees only the aliases, so the ported facade is measured against a denominator
-# of 3. Rails' umbrella files stay on the config-only path: `active_record.rb`
-# and its siblings are autoload manifests whose only method bodies are
-# `def self.` boot helpers no trails file ports, and walking them attributes
-# those to the umbrella module's junk-drawer entity file as false-missing.
+# of 3.
 #
 # `activerecord/lib/arel.rb` is the same shape as i18n's: `Arel.sql`,
 # `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute` are defined there
@@ -344,8 +341,9 @@ DEPENDENCY_PATTERNS = {
 # Both are now declared as `libEntryFile` in vendor/sources.ts and walked as
 # ordinary package files instead — which is also what gives them a sane
 # `file:` (`arel.rb`, not the umbrella scan's `../arel.rb`, which maps to no TS
-# file at all). The umbrella path keeps handling the config-only Rails
-# framework entry files.
+# file at all). `active_record.rb` is walked the same way for its `def self.`
+# methods (`packages/activerecord/src/active-record.ts`), while the umbrella
+# path still credits its `singleton_class.attr_*` seats on `ActiveRecord::Base`.
 
 # ---- AST walker ----
 
@@ -486,6 +484,18 @@ class ApiExtractor
     process_file(filepath, package_root)
   ensure
     @scanning_umbrella = false
+  end
+
+  # Walk a package's `libEntryFile` as an ordinary file. A module-level
+  # singleton accessor there that `scan_umbrella_file` redirects onto
+  # `<Module>::Base` is skipped, so it is not recorded twice — unless the file
+  # also defines its writer as `def self.<name>=` (`active_record.rb`'s
+  # `default_timezone`), in which case the accessor lives beside that writer.
+  def process_entry_file(entry_file)
+    @entry_def_writers = File.read(entry_file).scan(/^\s*def self\.(\w+)=/).flatten.to_set
+    process_file(entry_file, File.dirname(entry_file))
+  ensure
+    @entry_def_writers = nil
   end
 
   def extract_const_set_classes(source)
@@ -1197,6 +1207,10 @@ class ApiExtractor
     # entity-file bucket as false-missing — so skip it entirely, leaving that
     # surface exactly as it was before the umbrella was scanned.
     return if @scanning_umbrella && !redirect_fqn
+    if @entry_def_writers && (force_class || @in_sclass) && @classes.key?("#{fqn}::Base")
+      names = extract_symbol_args(args)
+      return unless names.all? { |n| @entry_def_writers.include?(n) }
+    end
     target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
     return unless target
 
@@ -4287,10 +4301,14 @@ def run
       # path `packages/arel/src/arel.ts` maps onto — rather than the umbrella
       # scan's `../arel.rb`, which matches no TS file.
       abort "Entry file for #{pkg_name} not found at #{entry_file}." unless File.file?(entry_file)
-      extractor.process_file(entry_file, File.dirname(entry_file))
-    else
-      umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
-      extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
+      extractor.process_entry_file(entry_file)
+    end
+    umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
+    # An entry file's module-level seats still credit on `<Module>::Base`
+    # (`active_record.rb`); one with no such Base has nothing left to harvest.
+    umbrella_module = File.file?(umbrella_file) && File.read(umbrella_file)[/^module (\w+)/, 1]
+    if File.file?(umbrella_file) && (!entry_file || extractor.classes.key?("#{umbrella_module}::Base"))
+      extractor.scan_umbrella_file(umbrella_file, pkg_dir)
     end
 
     # Replay `CONST.each` codegen loops whose constant lives in a file that

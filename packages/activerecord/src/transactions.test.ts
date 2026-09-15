@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
-import { afterAllTransactionsCommit } from "./transactions.js";
+import { afterAllTransactionsCommit } from "./active-record.js";
 
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./support/supports.js";
