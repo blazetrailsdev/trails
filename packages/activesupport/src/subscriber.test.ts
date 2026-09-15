@@ -31,6 +31,11 @@ class PartySubscriber extends TestSubscriber {
   }
 }
 
+TestSubscriber.prototype.openParty = function (event: Event): void {
+  TestSubscriber.events.push(event);
+};
+TestSubscriber.methodAdded("openParty");
+
 describe("SubscriberTest", () => {
   beforeEach(() => {
     TestSubscriber.clear();
@@ -130,7 +135,10 @@ describe("SubscriberTest", () => {
 
   it("publish event preserve units", async () => {
     const event = new Event("publish_event.test", null, null, "42", {});
-    event.record(() => {});
+    event.record(() => {
+      const start = Date.now();
+      while (Date.now() - start < 100);
+    });
 
     let computedDuration: number | null = null;
     const callback = (_: unknown, start: number, finish: number) => {
