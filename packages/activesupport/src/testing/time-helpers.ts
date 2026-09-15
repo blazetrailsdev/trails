@@ -140,7 +140,9 @@ export function travelTo(
 
   const stubs = simpleStubs();
   const stubbedTime = stubs.stubbing(Time, "now") ? Time.now() : undefined;
-  stubs.stubObject(Time, "now", () => Time.at(now));
+  stubs.stubObject(Time, "now", function (this: typeof Time) {
+    return this.at(now);
+  });
 
   stubs.stubObject(Time, "new", (...args: unknown[]) => {
     if (isEmpty(args)) {
@@ -151,16 +153,18 @@ export function travelTo(
     }
   });
 
-  stubs.stubObject(Date, "today", () => Date.jd(new Date(now.toDate()).jd));
-  stubs.stubObject(DateTime, "now", () =>
-    DateTime.jd(
+  stubs.stubObject(Date, "today", function (this: typeof Date) {
+    return this.jd(new Date(now.toDate()).jd);
+  });
+  stubs.stubObject(DateTime, "now", function (this: typeof DateTime) {
+    return this.jd(
       new Date(now.toDate()).jd,
       now.hour,
       now.min,
       now.sec,
       new Rational(now.utcOffset, 86400),
-    ),
-  );
+    );
+  });
 
   stubs.stubObject(clock, "now", () => now.toTime().toInstant());
 
@@ -190,9 +194,7 @@ export function travelBack(block?: () => void): void {
   }
 }
 
-export function unfreezeTime(block?: () => void): void {
-  travelBack(block);
-}
+export { travelBack as unfreezeTime };
 
 export function freezeTime(
   { withUsec = false }: { withUsec?: boolean } = {},

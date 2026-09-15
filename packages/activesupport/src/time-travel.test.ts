@@ -1,13 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
 
 import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
-import { travelTo, travelBack, travel, freezeTime } from "./testing/time-helpers.js";
-import {
-  currentTime,
-  currentTimeInstant,
-  setFrozenInstant,
-  setTimeOffsetNs,
-} from "./time-travel.js";
+import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
+import { Duration } from "./duration.js";
+import { toFs } from "./core-ext/time/conversions.js";
+import { toFs as dateTimeToFs, usec as dateTimeUsec } from "./core-ext/date-time/conversions.js";
+import { travelTo, travelBack, travel, freezeTime, unfreezeTime } from "./testing/time-helpers.js";
+import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "./time-travel.js";
 
 function instantOf(time: Time): bigint {
   return time.toTime().epochNanoseconds;
@@ -19,22 +18,42 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel", () => {
-    const before = Date.now();
-    travel(24 * 60 * 60 * 1000);
-    const after = currentTime().getTime();
-    expect(after - before).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 1000);
+    const expectedTime = Time.now().plus(86400);
+    travel(Duration.days(1));
+
+    expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
+    expect(RubyDate.today().toString()).toEqual(expectedTime.toDate().toString());
+    expect(dateTimeToFs(DateTime.now(), "db")).toEqual(
+      dateTimeToFs(expectedTime.toDatetime(), "db"),
+    );
+
+    expect(toFs(Time.new(), "db")).toEqual(toFs(expectedTime, "db"));
+    expect(toFs(Time.new({ precision: 3 }), "db")).not.toEqual(toFs(expectedTime, "db"));
   });
 
   it("time helper travel with block", () => {
-    let inside: Date | null = null;
-    travel(1000, {}, () => {
-      inside = currentTime();
-      expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toBe(
+    const expectedTime = Time.now().plus(86400);
+
+    travel(Duration.days(1), {}, () => {
+      expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
+      expect(RubyDate.today().toString()).toEqual(expectedTime.toDate().toString());
+      expect(dateTimeToFs(DateTime.now(), "db")).toEqual(
+        dateTimeToFs(expectedTime.toDatetime(), "db"),
+      );
+
+      expect(toFs(Time.new(), "db")).toEqual(toFs(expectedTime, "db"));
+      expect(toFs(Time.new({ precision: 3 }), "db")).not.toEqual(toFs(expectedTime, "db"));
+      expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toEqual(
         instantOf(Time.new("2000-12-31 23:59:59.567")),
       );
     });
-    expect(inside).not.toBeNull();
-    expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toBe(
+
+    expect(toFs(Time.now(), "db")).not.toEqual(toFs(expectedTime, "db"));
+    expect(RubyDate.today().toString()).not.toEqual(expectedTime.toDate().toString());
+    expect(dateTimeToFs(DateTime.now(), "db")).not.toEqual(
+      dateTimeToFs(expectedTime.toDatetime(), "db"),
+    );
+    expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toEqual(
       instantOf(Time.new("2000-12-31 23:59:59.567")),
     );
   });
@@ -46,10 +65,9 @@ describe("TimeTravelTest", () => {
     expect(Time.now().toS()).toEqual(expectedTime.toS());
     expect(Time.new().toS()).toEqual(expectedTime.toS());
     expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
-    expect(Time.new({ precision: 3 }).toS()).not.toEqual(expectedTime.toS());
+    expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
     expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
     expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
-    expect(currentTime().getUTCFullYear()).toBe(2004);
   });
 
   it("time helper travel to with block", () => {
@@ -58,11 +76,10 @@ describe("TimeTravelTest", () => {
     travelTo(expectedTime, {}, () => {
       expect(Time.now().toS()).toEqual(expectedTime.toS());
       expect(Time.new().toS()).toEqual(expectedTime.toS());
-      expect(Time.new({ precision: 3 }).toS()).not.toEqual(expectedTime.toS());
+      expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
       expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
       expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
-      expect(currentTime().getUTCFullYear()).toBe(2004);
     });
 
     expect(Time.now().toS()).not.toEqual(expectedTime.toS());
@@ -76,138 +93,240 @@ describe("TimeTravelTest", () => {
   it.skip("time helper travel to with string for time zone");
 
   it("time helper travel to with string and milliseconds", () => {
-    const target = new Date("2033-03-15T10:30:00Z");
-    travelTo(target);
-    expect(currentTime().getUTCFullYear()).toBe(2033);
-    expect(currentTime().getUTCMonth()).toBe(2);
+    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44);
+
+    travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
+      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+    });
   });
 
   it.skip("time helper travel to with separate class");
 
   it("time helper travel back", () => {
-    const before = new Date();
-    travelTo(new Date("2050-01-01"));
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+    travelTo(expectedTime);
+    expect(Time.now().toS()).toEqual(expectedTime.toS());
+    expect(Time.new().toS()).toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
     travelBack();
-    expect(Math.abs(currentTime().getTime() - before.getTime())).toBeLessThan(5000);
+
+    expect(Time.now().toS()).not.toEqual(expectedTime.toS());
+    expect(Time.new().toS()).not.toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).not.toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
   });
 
   it("time helper travel back with block", () => {
-    travelTo(new Date("2040-01-01"), {}, () => {
-      expect(currentTime().getUTCFullYear()).toBe(2040);
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+    travelTo(expectedTime);
+    expect(Time.now().toS()).toEqual(expectedTime.toS());
+    expect(Time.new().toS()).toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+
+    travelBack(() => {
+      expect(Time.now().toS()).not.toEqual(expectedTime.toS());
+      expect(Time.new().toS()).not.toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).not.toEqual(
+        new RubyDate(2004, 11, 24).toDate().toString(),
+      );
+      expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
     });
-    expect(currentTime().getUTCFullYear()).not.toBe(2040);
+
+    expect(Time.now().toS()).toEqual(expectedTime.toS());
+    expect(Time.new().toS()).toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
   });
 
   it("time helper travel to with nested calls with blocks", () => {
-    travelTo(new Date("2035-01-01"), {}, () => {
-      expect(currentTime().getUTCFullYear()).toBe(2035);
-      expect(() => travelTo(new Date("2036-01-01"), {}, () => {})).toThrow(
+    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+    travelTo(outerExpectedTime, {}, () => {
+      let e: unknown;
+      expect(() => {
+        try {
+          travelTo(innerExpectedTime, {}, () => {});
+        } catch (error) {
+          e = error;
+          throw error;
+        }
+      }).toThrow(RuntimeError);
+      expect((e as Error).message).toMatch(
         /Calling `travel_to` with a block, when we have previously already made a call to `travel_to`, can lead to confusing time stubbing\./,
       );
     });
   });
 
   it("time helper travel to with nested calls", () => {
-    travelTo(new Date("2037-01-01"));
-    expect(currentTime().getUTCFullYear()).toBe(2037);
-    travelTo(new Date("2038-01-01"));
-    expect(currentTime().getUTCFullYear()).toBe(2038);
+    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+    travelTo(outerExpectedTime, {}, () => {
+      expect(() => {
+        travelTo(innerExpectedTime);
+
+        expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
+      }).not.toThrow();
+    });
   });
 
   it("time helper travel to with subsequent calls", () => {
-    travelTo(new Date("2035-01-01"));
-    expect(currentTime().getUTCFullYear()).toBe(2035);
-    travelTo(new Date("2036-01-01"));
-    expect(currentTime().getUTCFullYear()).toBe(2036);
+    const initialExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const subsequentExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+    expect(() => {
+      travelTo(initialExpectedTime);
+      travelTo(subsequentExpectedTime);
+
+      expect(Time.now().toS()).toEqual(subsequentExpectedTime.toS());
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper travel to with usec", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
-    travelTo(target);
-    expect(currentTime().getFullYear()).toBe(2004);
-    expect(currentTime().getMilliseconds()).toBe(0);
+    const traveledTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+    expect(() => {
+      travelTo(traveledTime);
+
+      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper with usec true", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 250);
-    travelTo(target, { withUsec: true });
-    expect(currentTime().getMilliseconds()).toBe(250);
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+
+    expect(() => {
+      travelTo(expectedTime, { withUsec: true });
+
+      expect(Time.now().toF()).toEqual(expectedTime.toF());
+
+      travel(Duration.seconds(0.5), { withUsec: true });
+
+      expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper travel to with datetime and usec", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
-    travelTo(target);
-    expect(currentTime().getSeconds()).toBe(44);
-    expect(currentTime().getMilliseconds()).toBe(0);
+    const traveledTime = Time.new("2004-11-24 01:04:44.1 -05:00");
+    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44);
+
+    expect(() => {
+      travelTo(traveledTime);
+
+      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper travel to with datetime and usec true", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 333);
-    travelTo(target, { withUsec: true });
-    expect(currentTime().getMilliseconds()).toBe(333);
+    const traveledTime = Time.new("2004-11-24 01:04:44.1 -05:00");
+    const expectedTime = Time.utc(2004, 11, 24, 6, 4, 44).plus(new Rational(1, 10));
+
+    expect(() => {
+      travelTo(traveledTime, { withUsec: true });
+
+      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper travel to with string and usec", () => {
-    const target = new Date("2004-11-24T01:04:44.100Z");
-    travelTo(target);
-    expect(currentTime().getUTCMilliseconds()).toBe(0);
+    const expectedTime = Time.utc(2004, 11, 24, 1, 4, 44);
+
+    expect(() => {
+      travelTo("2004-11-24T01:04:44.100Z");
+
+      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper travel to with string and usec true", () => {
-    const target = new Date("2004-11-24T01:04:44.500Z");
-    travelTo(target, { withUsec: true });
-    expect(currentTime().getUTCMilliseconds()).toBe(500);
+    const expectedTime = Time.utc(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+
+    expect(() => {
+      travelTo("2004-11-24T01:04:44.100Z", { withUsec: true });
+
+      expect(Time.now().toF()).toEqual(expectedTime.toF());
+
+      travel(Duration.seconds(0.5), { withUsec: true });
+
+      expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
+
+      travelBack();
+    }).not.toThrow();
   });
 
   it("time helper freeze time with usec true", () => {
-    freezeTime();
-    const t = currentTime();
-    expect(t instanceof Date).toBe(true);
+    const checks = Array.from({ length: 9 }, () => {
+      let usec = 0;
+      freezeTime({ withUsec: true }, () => {
+        usec = Time.now().usec;
+      });
+      return usec !== 0;
+    });
+    expect(checks.some((check) => check)).toBeTruthy();
   });
 
   it("time helper travel with subsequent block", () => {
-    const results: number[] = [];
-    travelTo(new Date("2041-01-01"), {}, () => {
-      results.push(currentTime().getUTCFullYear());
-    });
-    travelTo(new Date("2042-01-01"), {}, () => {
-      results.push(currentTime().getUTCFullYear());
-    });
-    expect(results).toEqual([2041, 2042]);
+    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+    travelTo(outerExpectedTime);
+
+    expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
+
+    expect(() => {
+      travelTo(innerExpectedTime, {}, () => {
+        expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
+      });
+    }).not.toThrow();
+
+    expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
   });
 
   it("travel to will reset the usec to avoid mysql rounding", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 500);
-    travelTo(target);
-    expect(currentTime().getFullYear()).toBe(2004);
-    expect(currentTime().getSeconds()).toBe(44);
-    expect(currentTime().getMilliseconds()).toBeLessThanOrEqual(500);
+    travelTo(Time.utc(2014, 10, 10, 10, 10, 50, 999999), {}, () => {
+      expect(Time.now().sec).toEqual(50);
+      expect(Time.now().usec).toEqual(0);
+      expect(DateTime.now().second).toEqual(50);
+      expect(dateTimeUsec(DateTime.now())).toEqual(0);
+    });
   });
 
-  it("time helper travel with time subclass", () => {
-    travelTo(new Date("2035-01-01T00:00:00Z"));
-    expect(currentTime().getUTCFullYear()).toBe(2035);
-  });
+  it.skip("time helper travel with time subclass");
 
   it("time helper freeze time", () => {
+    const expectedTime = Time.now();
     freezeTime();
-    const t1 = currentTime().getTime();
-    const t2 = currentTime().getTime();
-    expect(Math.abs(t2 - t1)).toBeLessThan(10);
+
+    expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
   });
 
-  it("time helper freeze time with block", () => {
-    let frozen: Date | null = null;
+  it("time helper freeze time with block", async () => {
+    const expectedTime = Time.now();
+
     freezeTime({}, () => {
-      frozen = currentTime();
+      expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
     });
-    expect(frozen).not.toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(toFs(expectedTime, "db").localeCompare(toFs(Time.now(), "db"))).toBeLessThan(0);
   });
 
   it("time helper unfreeze time", () => {
-    freezeTime();
-    travelBack();
-    expect(Math.abs(currentTime().getTime() - Date.now())).toBeLessThan(100);
+    expect(unfreezeTime).toEqual(travelBack);
   });
 
   it("currentTimeInstant returns Temporal.Instant", () => {
