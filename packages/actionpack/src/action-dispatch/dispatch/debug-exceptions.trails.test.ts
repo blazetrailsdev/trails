@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
+import { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
@@ -57,5 +58,15 @@ describe("DebugExceptions browser render", () => {
       CONTENT_TYPE: "text/plain",
     });
     expect(String(headers["content-type"])).toContain("text/html");
+  });
+});
+
+describe("DebugExceptions interceptors", () => {
+  it("receives the ActionDispatch::Request call built, not the Rack env", async () => {
+    let received: unknown;
+    await new DebugExceptions(errorApp, {
+      interceptors: [(request) => (received = request)],
+    }).call({ REQUEST_METHOD: "GET", PATH_INFO: "/test" });
+    expect(received).toBeInstanceOf(Request);
   });
 });

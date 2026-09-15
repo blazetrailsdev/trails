@@ -27,12 +27,14 @@ export interface DebugExceptionsOptions {
   responseFormat?: "default" | "api";
 }
 
-export type Interceptor = (env: RackEnv, exception: Error) => void;
+export type Interceptor = (request: Request, exception: Error) => void;
 
-const API_SERIALIZERS: Record<string, (body: Record<string, unknown>) => string> = {
-  ":json": (body) => JSON.stringify(body),
-  ":xml": (body) => toXml(body),
-};
+function apiErrorBody(fields: Record<string, unknown>): Record<string, unknown> {
+  return Object.defineProperties(fields, {
+    toJson: { value: () => JSON.stringify(fields) },
+    toXml: { value: () => toXml(fields) },
+  });
+}
 
 export class DebugExceptions {
   /** @internal */
@@ -64,29 +66,31 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  invokeInterceptors(request: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
+  invokeInterceptors(request: Request, exception: Error, wrapper: ExceptionWrapper): void {
     for (const interceptor of this.interceptors) {
       try {
         interceptor(request, exception);
       } catch {
-        this.logError(request, wrapper);
+        this.logError(request.env, wrapper);
       }
     }
   }
 
   /** @internal */
   renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
-    const body = {
+    const body = apiErrorBody({
       status: wrapper.statusCode,
       error: wrapper.statusText,
       exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
-    };
-    const serializer = contentType ? API_SERIALIZERS[contentType.symbol ?? ""] : undefined;
-    if (contentType && serializer) {
-      return this.render(wrapper.statusCode, serializer(body), contentType.toString());
+    });
+    const symbol = contentType?.symbol?.replace(/^:/, "") ?? "";
+    const toFormat = `to${symbol.charAt(0).toUpperCase()}${symbol.slice(1)}`;
+    const serializer = body[toFormat];
+    if (contentType && typeof serializer === "function") {
+      return this.render(wrapper.statusCode, serializer(), contentType.toString());
     }
-    return this.render(wrapper.statusCode, JSON.stringify(body), "application/json");
+    return this.render(wrapper.statusCode, (body.toJson as () => string)(), "application/json");
   }
 
   /** @internal */
@@ -197,7 +201,7 @@ export class DebugExceptions {
         (env["action_dispatch.backtrace_cleaner"] as BacktraceCleaner | undefined) ?? null;
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
-      this.invokeInterceptors(env, exception, wrapper);
+      this.invokeInterceptors(request, exception, wrapper);
       if (!this.showExceptions) throw exception;
       return this.renderException(request, exception, wrapper);
     }
