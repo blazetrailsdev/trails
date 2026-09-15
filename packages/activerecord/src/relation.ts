@@ -1551,18 +1551,15 @@ export class Relation<T extends Base> {
     return block(attr, bind);
   }
 
-  async scoping<R>(callback: () => R | Promise<R>): Promise<R>;
-  async scoping<R>(
-    options: { allQueries?: boolean | null },
-    callback: () => R | Promise<R>,
-  ): Promise<R>;
-  async scoping<R>(
-    optionsOrCallback: { allQueries?: boolean | null } | (() => R | Promise<R>),
-    maybeCallback?: () => R | Promise<R>,
-  ): Promise<R> {
+  scoping<R>(callback: () => R): R;
+  scoping<R>(options: { allQueries?: boolean | null }, callback: () => R): R;
+  scoping<R>(
+    optionsOrCallback: { allQueries?: boolean | null } | (() => R),
+    maybeCallback?: () => R,
+  ): R {
     const callback = (
       typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback
-    ) as () => R | Promise<R>;
+    ) as () => R;
     const allQueries =
       typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
 
@@ -1572,13 +1569,11 @@ export class Relation<T extends Base> {
       throw new ArgumentError(
         "Scoping is set to apply to all queries and cannot be unset in a nested block.",
       );
+    } else if (this.isAlreadyInScope(registry)) {
+      return callback();
+    } else {
+      return this._scoping(this as any, registry, allQueries, callback);
     }
-
-    if (this.isAlreadyInScope(registry)) {
-      return await callback();
-    }
-
-    return await this._scoping(this as any, registry, allQueries, async () => await callback());
   }
 
   async findSigned(token: string, options?: { purpose?: string }): Promise<T | null> {

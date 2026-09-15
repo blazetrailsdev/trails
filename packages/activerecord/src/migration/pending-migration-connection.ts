@@ -15,11 +15,11 @@ export class PendingMigrationConnection {
     dbConfig: DatabaseConfig,
     block: (pool: ConnectionPool) => Promise<T> | T,
   ): Promise<T> {
-    const pool = connectionHandler().establishConnection(dbConfig, { ownerName: this });
+    const pool = await connectionHandler().establishConnection(dbConfig, { ownerName: this });
     try {
       return await block(pool);
     } finally {
-      connectionHandler().removeConnectionPool(this.name);
+      await connectionHandler().removeConnectionPool(this.name);
     }
   }
 

@@ -130,7 +130,7 @@ export class ConnectionHandler {
     }
   }
 
-  establishConnection(
+  async establishConnection(
     config: DatabaseConfig | string | Record<string, unknown>,
     options: {
       ownerName?: string | ConnectionOwner;
@@ -138,7 +138,7 @@ export class ConnectionHandler {
       shard?: string;
       clobber?: boolean;
     } = {},
-  ): ConnectionPool {
+  ): Promise<ConnectionPool> {
     const ownerName =
       this.determineOwnerName(options.ownerName ?? _base, config) ??
       (config instanceof DatabaseConfig
@@ -169,7 +169,7 @@ export class ConnectionHandler {
     }
 
     if (existingPoolConfig) {
-      this.disconnectPoolFromPoolManager(poolManager, role, shard);
+      await this.disconnectPoolFromPoolManager(poolManager, role, shard);
     }
 
     poolManager.setPoolConfig(role, shard, poolConfig);
@@ -251,15 +251,15 @@ export class ConnectionHandler {
     return pool != null && pool.isConnected();
   }
 
-  removeConnectionPool(
+  async removeConnectionPool(
     connectionName: string,
     options?: { role?: string; shard?: string },
-  ): HashConfig | undefined {
+  ): Promise<HashConfig | undefined> {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
     const poolManager = this.getPoolManager(connectionName);
     if (poolManager) {
-      const dbConfig = this.disconnectPoolFromPoolManager(poolManager, role, shard);
+      const dbConfig = await this.disconnectPoolFromPoolManager(poolManager, role, shard);
       if (poolManager.roleNames.length === 0) {
         this._connectionNameToPoolManager.delete(connectionName);
       }
@@ -323,14 +323,14 @@ export class ConnectionHandler {
   }
 
   /** @internal */
-  private disconnectPoolFromPoolManager(
+  private async disconnectPoolFromPoolManager(
     poolManager: PoolManager,
     role: string,
     shard: string,
-  ): HashConfig | undefined {
+  ): Promise<HashConfig | undefined> {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
-      void poolConfig.disconnectBang();
+      await poolConfig.disconnectBang();
       return poolConfig.dbConfig;
     }
     return undefined;

@@ -13,10 +13,10 @@ describe("databaseConfiguration", () => {
 
   const originalConfigurations = Base.configurations();
 
-  afterEach(() => {
+  afterEach(async () => {
     setTrailsRoot(null);
     Base.configurations(originalConfigurations);
-    RootConfigModel.removeConnection();
+    await RootConfigModel.removeConnection();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

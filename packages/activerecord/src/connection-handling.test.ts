@@ -293,12 +293,12 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connectsTo rejects both database and shards", async () => {
-    expect(() =>
+    await expect(
       Base.connectsTo({
         database: { writing: "primary" },
         shards: { default: { writing: "primary" } },
       }),
-    ).toThrow(
+    ).rejects.toThrow(
       "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
     );
   });
@@ -339,15 +339,15 @@ describe("ConnectionHandlingTest", () => {
   it("remove_connection removes the pool", async () => {
     const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
-    const removed = Base.removeConnection();
+    const removed = await Base.removeConnection();
     expect(removed).toBe(ambientDbConfig);
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
     await restoreWorkerConnection();
   });
 
   it("remove_connection returns undefined when no pool exists", async () => {
-    Base.removeConnection();
-    expect(Base.removeConnection()).toBeUndefined();
+    await Base.removeConnection();
+    expect(await Base.removeConnection()).toBeUndefined();
     await restoreWorkerConnection();
   });
 
@@ -495,7 +495,7 @@ describe("ConnectionHandlingTest", () => {
       expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
       expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
-      InMemoryModel.removeConnection();
+      await InMemoryModel.removeConnection();
       Base.configurations(priorConfigs);
     }
   });
@@ -546,7 +546,7 @@ describe("ConnectionHandlingTest", () => {
       expect(dbConfig.configurationHash).toEqual(configurationHash);
       expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
     } finally {
-      BackfillModel.removeConnection();
+      await BackfillModel.removeConnection();
     }
 
     const resolved = new DatabaseConfigurations({}).resolve(configurationHash as any);
@@ -623,7 +623,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
   afterEach(async () => {
     connectedToStack().length = 0;
     for (const name of ["UnrelatedAbstract", "AnimalsRecord", "MealsRecord"]) {
-      Base.connectionHandler.removeConnectionPool(name);
+      await Base.connectionHandler.removeConnectionPool(name);
     }
   });
 
@@ -634,7 +634,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         this.connectionClass = true;
       }
     }
-    const pool = Base.connectionHandler.establishConnection(
+    const pool = await Base.connectionHandler.establishConnection(
       new HashConfig("test", "UnrelatedAbstract", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "UnrelatedAbstract", role: "writing" },
     );
@@ -660,11 +660,11 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         this.connectionClass = true;
       }
     }
-    const animalsPool = Base.connectionHandler.establishConnection(
+    const animalsPool = await Base.connectionHandler.establishConnection(
       new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "AnimalsRecord", role: "writing" },
     );
-    const mealsPool = Base.connectionHandler.establishConnection(
+    const mealsPool = await Base.connectionHandler.establishConnection(
       new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "MealsRecord", role: "writing" },
     );
@@ -688,11 +688,11 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       }
     }
     const handler = new ConnectionHandler();
-    const appPool = handler.establishConnection(
+    const appPool = await handler.establishConnection(
       new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: ApplicationRecord, role: "writing" },
     );
-    const otherPool = handler.establishConnection(
+    const otherPool = await handler.establishConnection(
       new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "OtherAbstract", role: "writing" },
     );
@@ -763,10 +763,10 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
       });
 
-      AppRecord.connectsTo({ database: { writing: "primary" } });
+      await AppRecord.connectsTo({ database: { writing: "primary" } });
       expect((AppRecord as any)._connectionSpecificationName).toBe("ActiveRecord::Base");
 
-      SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
+      await SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
       expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");
     } finally {
       await SecondaryAbstract.removeConnection();
@@ -781,7 +781,7 @@ describe("establish_connection accepts a DatabaseConfig", () => {
   class CapturedConfigModel extends Base {}
 
   afterEach(async () => {
-    CapturedConfigModel.removeConnection();
+    await CapturedConfigModel.removeConnection();
   });
 
   it("re-establishes the connection from the captured DatabaseConfig object", async () => {
@@ -791,10 +791,10 @@ describe("establish_connection accepts a DatabaseConfig", () => {
       pool: 5,
       reapingFrequency: null,
     });
-    Base.connectionHandler.establishConnection(config, { ownerName: "CapturedConfigModel" });
+    await Base.connectionHandler.establishConnection(config, { ownerName: "CapturedConfigModel" });
     CapturedConfigModel.connectionSpecificationName = "CapturedConfigModel";
 
-    const captured = CapturedConfigModel.removeConnection()!;
+    const captured = (await CapturedConfigModel.removeConnection())!;
     expect(captured).toBeInstanceOf(HashConfig);
 
     await CapturedConfigModel.establishConnection(captured);

@@ -516,7 +516,7 @@ describe("QueryCacheTest", () => {
 
   it.skipIf(inMemoryDb())("cache is available when using a not connected connection", async () => {
     const dbConfig = Base.connectionDbConfig();
-    const originalConnection = Base.removeConnection();
+    const originalConnection = await Base.removeConnection();
 
     await Base.establishConnection(dbConfig);
     expect(Task.connectedQ()).toBe(false);

@@ -11,20 +11,20 @@ describe("ConnectionHandler selector defaults (trails)", () => {
     handler = new ConnectionHandler();
   });
 
-  it("establish_connection defaults role to Base.current_role", () => {
+  it("establish_connection defaults role to Base.current_role", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    Base.connectedTo({ role: "reading" }, () => {
-      handler.establishConnection(config, { ownerName: "primary" });
+    await Base.connectedTo({ role: "reading" }, async () => {
+      await handler.establishConnection(config, { ownerName: "primary" });
     });
 
     expect(handler.retrieveConnectionPool("primary", { role: "reading" })).toBeTruthy();
     expect(handler.retrieveConnectionPool("primary", { role: "writing" })).toBeUndefined();
   });
 
-  it("establish_connection defaults shard to Base.current_shard", () => {
+  it("establish_connection defaults shard to Base.current_shard", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    Base.connectedTo({ shard: "shard_one" }, () => {
-      handler.establishConnection(config, { ownerName: "primary" });
+    await Base.connectedTo({ shard: "shard_one" }, async () => {
+      await handler.establishConnection(config, { ownerName: "primary" });
     });
 
     expect(handler.retrieveConnectionPool("primary", { shard: "shard_one" })).toBeTruthy();
@@ -33,7 +33,7 @@ describe("ConnectionHandler selector defaults (trails)", () => {
 
   it("connected? and retrieve_connection read the current role", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary", role: "reading" });
+    await handler.establishConnection(config, { ownerName: "primary", role: "reading" });
 
     expect(handler.isConnected("primary")).toBe(false);
 

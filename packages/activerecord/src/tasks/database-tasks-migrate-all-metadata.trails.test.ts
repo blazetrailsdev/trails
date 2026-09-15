@@ -15,7 +15,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
   afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       void 0;
     }

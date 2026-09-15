@@ -14,7 +14,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   const created: string[] = [];
   let database: string;
   let configuration: HashConfig;
-  let previous: ReturnType<typeof Base.removeConnection>;
+  let previous: Awaited<ReturnType<typeof Base.removeConnection>>;
 
   beforeEach(async () => {
     database = path.join(os.tmpdir(), `db_create-${randomUUID()}.sqlite3`);
@@ -30,13 +30,13 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
       adapter: "sqlite3",
       database,
     });
-    previous = Base.removeConnection();
+    previous = await Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database });
   });
 
   afterEach(async () => {
     SchemaDumper.ignoreTables = [];
-    Base.removeConnection();
+    await Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configurationHash);
     for (const file of created) {
       try {

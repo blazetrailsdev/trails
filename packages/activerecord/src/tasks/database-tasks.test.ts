@@ -333,7 +333,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
     } finally {
       DatabaseTasks.dbDir = prevDbDir;
       try {
-        Base.removeConnection();
+        await Base.removeConnection();
       } catch {}
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
@@ -360,7 +360,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
     } finally {
       DatabaseTasks.dbDir = prevDbDir;
       try {
-        Base.removeConnection();
+        await Base.removeConnection();
       } catch {}
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
@@ -912,7 +912,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.clearRegisteredTasks();
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {}
     if (!skipMigrationTestCase) await Base.establishConnection("arunit");
   });
@@ -1100,7 +1100,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       if (originalVersion === undefined) delete process.env.VERSION;
       else process.env.VERSION = originalVersion;
       try {
-        Base.removeConnection();
+        await Base.removeConnection();
       } catch {}
       DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();

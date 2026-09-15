@@ -37,7 +37,7 @@ export async function establishConnectionTo(
       connection.expire();
     } catch {}
     (connection as unknown as { pool: unknown }).pool = originalPool;
-    klass.removeConnection();
+    await klass.removeConnection();
     klass.connectionClass = wasConnectionClass;
     (klass as unknown as { resetColumnInformation(): void }).resetColumnInformation();
   };

@@ -18,9 +18,9 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
     await handler.clearAllConnectionsBang();
   });
 
-  it("establish connection with pool configs", () => {
-    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
-    handler.establishConnection(primaryConfig(), {
+  it("establish connection with pool configs", async () => {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
       ownerName: "primary",
       shard: "pool_config_two",
     });
@@ -34,14 +34,14 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
     expect(handler.retrieveConnectionPool("primary")).toBe(defaultPool);
   });
 
-  it("remove connection", () => {
-    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
-    handler.establishConnection(primaryConfig(), {
+  it("remove connection", async () => {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
       ownerName: "primary",
       shard: "pool_config_two",
     });
 
-    handler.removeConnectionPool("primary");
+    await handler.removeConnectionPool("primary");
 
     expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
     expect(
@@ -50,8 +50,8 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   });
 
   it("connected?", async () => {
-    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
-    handler.establishConnection(primaryConfig(), {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
       ownerName: "primary",
       shard: "pool_config_two",
     });

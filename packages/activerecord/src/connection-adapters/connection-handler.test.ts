@@ -55,9 +55,9 @@ describe("ConnectionHandlerTest", () => {
     Base.configurations(config);
 
     try {
-      handler.establishConnection("common");
-      handler.establishConnection("primary");
-      handler.establishConnection("readonly");
+      await handler.establishConnection("common");
+      await handler.establishConnection("primary");
+      await handler.establishConnection("readonly");
 
       const readonlyPool = handler.retrieveConnectionPool("readonly");
       expect(readonlyPool).toBeTruthy();
@@ -96,12 +96,12 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    localHandler.establishConnection(config, {
+    await localHandler.establishConnection(config, {
       ownerName: "ActiveRecord::Base",
       role: "also_writing",
       shard: "default",
     });
-    localHandler.establishConnection(config, {
+    await localHandler.establishConnection(config, {
       ownerName: "ActiveRecord::Base",
       role: "also_writing",
       shard: "one",
@@ -115,8 +115,14 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "writing" });
-    localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "reading" });
+    await localHandler.establishConnection(config, {
+      ownerName: "ActiveRecord::Base",
+      role: "writing",
+    });
+    await localHandler.establishConnection(config, {
+      ownerName: "ActiveRecord::Base",
+      role: "reading",
+    });
     expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
     const rwPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "writing" })!;
     const roPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "reading" })!;
@@ -132,12 +138,12 @@ describe("ConnectionHandlerTest", () => {
         adapter: "sqlite3",
         database: "test/db/primary.sqlite3",
       });
-      localHandler.establishConnection(config, {
+      await localHandler.establishConnection(config, {
         ownerName: "ActiveRecord::Base",
         role: "also_writing",
         shard: "default",
       });
-      localHandler.establishConnection(config, {
+      await localHandler.establishConnection(config, {
         ownerName: "ActiveRecord::Base",
         role: "also_writing",
         shard: "one",
@@ -153,7 +159,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool = handler.establishConnection(config);
+    const pool = await handler.establishConnection(config);
     expect(pool.dbConfig.name).toBe("primary");
   });
 
@@ -162,7 +168,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool = handler.establishConnection(config);
+    const pool = await handler.establishConnection(config);
     expect(pool.dbConfig.envName).toBe("development");
     expect(pool.dbConfig.name).toBe("primary");
   });
@@ -172,7 +178,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool = handler.establishConnection(config);
+    const pool = await handler.establishConnection(config);
     expect(pool.dbConfig.envName).toBe("development");
   });
 
@@ -181,7 +187,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool = handler.establishConnection(config);
+    const pool = await handler.establishConnection(config);
     expect(pool.dbConfig.database).toBe("test/db/primary.sqlite3");
   });
 
@@ -191,7 +197,7 @@ describe("ConnectionHandlerTest", () => {
       development_readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
     });
     const config = configs.configsFor({ envName: "development_readonly" })[0];
-    const pool = handler.establishConnection(config);
+    const pool = await handler.establishConnection(config);
     expect(pool).toBeTruthy();
     expect(pool.dbConfig.database).toBe("test/db/readonly.sqlite3");
   });
@@ -201,7 +207,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "MyModel" });
+    await handler.establishConnection(config, { ownerName: "MyModel" });
     const pool = handler.retrieveConnectionPool("MyModel");
     expect(pool).toBeTruthy();
   });
@@ -230,7 +236,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary");
     expect(pool).toBeTruthy();
   });
@@ -238,7 +244,7 @@ describe("ConnectionHandlerTest", () => {
   it("active connections?", async () => {
     expect(handler.activeConnectionsQ()).toBe(false);
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
     expect(handler.activeConnectionsQ()).toBe(true);
@@ -250,7 +256,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary");
     expect(pool).toBeTruthy();
     expect(pool!.dbConfig.database).toBe("test/db/primary.sqlite3");
@@ -270,8 +276,8 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/common.sqlite3",
     });
-    handler.establishConnection(config1, { ownerName: "primary" });
-    handler.establishConnection(config2, { ownerName: "animals" });
+    await handler.establishConnection(config1, { ownerName: "primary" });
+    await handler.establishConnection(config2, { ownerName: "animals" });
     expect(handler.connectionPools).toHaveLength(2);
   });
 
@@ -285,7 +291,7 @@ describe("ConnectionHandlerTest", () => {
       const baseConfig = new HashConfig("development", "primary", ambientPoolConfiguration());
       const ownConfig = new HashConfig("development", "Klass2", ambientPoolConfiguration());
 
-      const basePool = freshHandler.establishConnection(baseConfig, {
+      const basePool = await freshHandler.establishConnection(baseConfig, {
         ownerName: "ActiveRecord::Base",
         role: "writing",
       });
@@ -296,7 +302,7 @@ describe("ConnectionHandlerTest", () => {
         }),
       ).toBe(basePool);
 
-      const ownPool = freshHandler.establishConnection(ownConfig, {
+      const ownPool = await freshHandler.establishConnection(ownConfig, {
         ownerName: Klass2,
         role: "writing",
       });
@@ -309,7 +315,7 @@ describe("ConnectionHandlerTest", () => {
       ).toBe(ownPool);
       expect(ownPool).not.toBe(basePool);
 
-      Klass2.removeConnection();
+      await Klass2.removeConnection();
 
       expect(
         freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
@@ -343,9 +349,9 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/readonly.sqlite3",
     });
-    handler.establishConnection(config1, { ownerName: "primary" });
-    handler.establishConnection(config2, { ownerName: "child" });
-    handler.removeConnectionPool("child");
+    await handler.establishConnection(config1, { ownerName: "primary" });
+    await handler.establishConnection(config2, { ownerName: "child" });
+    await handler.removeConnectionPool("child");
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
     expect(handler.retrieveConnectionPool("child")).toBeUndefined();
   });
@@ -355,7 +361,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool1 = handler.establishConnection(config, {
+    const pool1 = await handler.establishConnection(config, {
       ownerName: "primary",
     });
     const pool2 = handler.retrieveConnectionPool("primary");
@@ -371,11 +377,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/readonly.sqlite3",
     });
-    handler.establishConnection(writing, {
+    await handler.establishConnection(writing, {
       ownerName: "primary",
       role: "writing",
     });
-    handler.establishConnection(reading, {
+    await handler.establishConnection(reading, {
       ownerName: "primary",
       role: "reading",
     });
@@ -397,11 +403,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/readonly.sqlite3",
     });
-    handler.establishConnection(shard1, {
+    await handler.establishConnection(shard1, {
       ownerName: "primary",
       shard: "one",
     });
-    handler.establishConnection(shard2, {
+    await handler.establishConnection(shard2, {
       ownerName: "primary",
       shard: "two",
     });
@@ -421,11 +427,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/readonly.sqlite3",
     });
-    const oldPool = handler.establishConnection(config1, {
+    const oldPool = await handler.establishConnection(config1, {
       ownerName: "primary",
     });
     const disconnectSpy = vi.spyOn(oldPool, "disconnect");
-    const newPool = handler.establishConnection(config2, {
+    const newPool = await handler.establishConnection(config2, {
       ownerName: "primary",
     });
     expect(disconnectSpy).toHaveBeenCalled();
@@ -454,7 +460,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     expect(handler.connectionPoolNames()).toContain("primary");
   });
 
@@ -463,7 +469,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pools: unknown[] = [];
     handler.eachConnectionPool(null, (pool) => pools.push(pool));
     expect(pools).toHaveLength(1);
@@ -471,7 +477,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("clear active connections bang", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
     expect(pool.activeConnection).toBeTruthy();
@@ -481,7 +487,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("clear all connections bang", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
     await handler.clearAllConnectionsBang();
@@ -497,7 +503,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("retrieve connection returns a connection", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const conn = await handler.retrieveConnection("primary");
     expect(conn).toBeTruthy();
     expect(conn.adapterName).toBeTruthy();
@@ -511,7 +517,7 @@ describe("ConnectionHandlerTest", () => {
   it("is connected", async () => {
     expect(handler.isConnected("primary")).toBe(false);
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await (await pool.leaseConnection()).verifyBang();
     expect(handler.isConnected("primary")).toBe(true);
@@ -523,15 +529,15 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
-    handler.removeConnectionPool("primary");
+    await handler.removeConnectionPool("primary");
     expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
   });
 
   it("flush idle connections bang", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
     pool.releaseConnection();
@@ -549,11 +555,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/readonly.sqlite3",
     });
-    handler.establishConnection(config1, {
+    await handler.establishConnection(config1, {
       ownerName: "primary",
       role: "writing",
     });
-    handler.establishConnection(config2, {
+    await handler.establishConnection(config2, {
       ownerName: "primary",
       role: "reading",
     });
@@ -565,7 +571,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("active connections filtered by role", async () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    handler.establishConnection(config, {
+    await handler.establishConnection(config, {
       ownerName: "primary",
       role: "writing",
     });
@@ -591,7 +597,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, { ownerName: "primary" });
+    await handler.establishConnection(config, { ownerName: "primary" });
     const pools: unknown[] = [];
     handler.eachConnectionPool(null, (pool) => pools.push(pool));
     expect(pools).toHaveLength(1);
@@ -602,11 +608,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool1 = handler.establishConnection(config, {
+    const pool1 = await handler.establishConnection(config, {
       ownerName: "primary",
     });
     const disconnectSpy = vi.spyOn(pool1, "disconnect");
-    const pool2 = handler.establishConnection(config, {
+    const pool2 = await handler.establishConnection(config, {
       ownerName: "primary",
     });
     expect(disconnectSpy).not.toHaveBeenCalled();
@@ -618,11 +624,11 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    const pool1 = handler.establishConnection(config, {
+    const pool1 = await handler.establishConnection(config, {
       ownerName: "primary",
     });
     const disconnectSpy = vi.spyOn(pool1, "disconnect");
-    const pool2 = handler.establishConnection(config, {
+    const pool2 = await handler.establishConnection(config, {
       ownerName: "primary",
       clobber: true,
     });
@@ -647,7 +653,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    handler.establishConnection(config, {
+    await handler.establishConnection(config, {
       ownerName: "primary",
       role: "writing",
     });

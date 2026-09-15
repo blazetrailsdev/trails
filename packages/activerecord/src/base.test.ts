@@ -1664,10 +1664,12 @@ describe("BasicsTest", () => {
       Base.protectedEnvironments = original;
     }
   });
-  it("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => {
+  it("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", async () => {
     class Bird extends Base {}
-    expect(() => Bird.connectsTo({ database: { writing: "arunit" } })).toThrow(NotImplementedError);
-    expect(() => Bird.connectsTo({ database: { writing: "arunit" } })).toThrow(
+    await expect(Bird.connectsTo({ database: { writing: "arunit" } })).rejects.toThrow(
+      NotImplementedError,
+    );
+    await expect(Bird.connectsTo({ database: { writing: "arunit" } })).rejects.toThrow(
       "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
     );
   });

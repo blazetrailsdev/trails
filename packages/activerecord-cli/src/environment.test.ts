@@ -26,9 +26,9 @@ function installConfig(
 }
 
 describe("ArEnvironmentTest", () => {
-  afterEach(() => {
+  afterEach(async () => {
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       /** @empty */
     }

@@ -35,7 +35,7 @@ describe("DatabaseTasksRollbackTest", () => {
     delete (globalThis as Record<string, unknown>)[REVERT_LOG];
     DatabaseTasks.databaseConfiguration = null;
     try {
-      Base.removeConnection();
+      await Base.removeConnection();
     } catch {
       void 0;
     }
