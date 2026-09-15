@@ -482,9 +482,10 @@ describe("DurationTest", () => {
   });
 
   it("scalar plus parts", () => {
-    const result = Duration.seconds(10).plus(Duration.days(1));
-    expect(result.parts.days).toBe(1);
-    expect(result.parts.seconds).toBe(10);
+    const scalar = new Scalar(10);
+
+    expect(scalar.plus(Duration.day(1))._parts()).toEqual({ days: 1, seconds: 10 });
+    expect(scalar.plus(Duration.day(-1))._parts()).toEqual({ days: -1, seconds: 10 });
   });
 
   it("scalar minus", async () => {
@@ -510,9 +511,10 @@ describe("DurationTest", () => {
   });
 
   it("scalar minus parts", () => {
-    const result = Duration.seconds(10).minus(Duration.days(1));
-    expect(result.parts.days).toBe(-1);
-    expect(result.parts.seconds).toBe(10);
+    const scalar = new Scalar(10);
+
+    expect(scalar.minus(Duration.day(1))._parts()).toEqual({ days: -1, seconds: 10 });
+    expect(scalar.minus(Duration.day(-1))._parts()).toEqual({ days: 1, seconds: 10 });
   });
 
   it("scalar multiply", async () => {
@@ -535,12 +537,11 @@ describe("DurationTest", () => {
   });
 
   it("scalar multiply parts", () => {
-    const result = Duration.days(2).times(1);
-    expect(result.parts.days).toBe(2);
-    expect(Math.round(result.inSeconds())).toBe(172800);
-    const neg = Duration.days(-2).times(1);
-    expect(neg.parts.days).toBe(-2);
-    expect(Math.round(neg.inSeconds())).toBe(-172800);
+    const scalar = new Scalar(1);
+    expect(scalar.times(Duration.days(2))._parts()).toEqual({ days: 2 });
+    expect(scalar.times(Duration.days(2)).value).toEqual(172800);
+    expect(scalar.times(Duration.days(-2))._parts()).toEqual({ days: -2 });
+    expect(scalar.times(Duration.days(-2)).value).toEqual(-172800);
   });
 
   it("scalar divide", async () => {

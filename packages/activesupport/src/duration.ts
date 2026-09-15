@@ -165,7 +165,9 @@ export class Duration {
       );
     } else {
       if (typeof other !== "number" && !(other instanceof Scalar)) {
-        throw new TypeError(`${rbObjClass(other)} can't be coerced into Integer`);
+        throw new TypeError(
+          `${rbObjClass(other)} can't be coerced into ${rbObjClass(this._parts().seconds ?? 0)}`,
+        );
       }
       return new Duration(
         this.value + Number(other),
