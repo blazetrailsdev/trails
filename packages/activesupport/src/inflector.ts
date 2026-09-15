@@ -43,32 +43,33 @@ export function camelize(
   term: string,
   uppercaseFirstLetter: boolean | "upper" | "lower" = true,
 ): string {
-  if (uppercaseFirstLetter === "upper") uppercaseFirstLetter = true;
-  else if (uppercaseFirstLetter === "lower") uppercaseFirstLetter = false;
-  else if (typeof uppercaseFirstLetter === "string") {
-    throw new Error("Invalid option, use either :upper or :lower.");
-  }
-  let result = term;
-
-  if (uppercaseFirstLetter) {
-    result = result.replace(/^[a-z\d]*/, (match) => {
-      const acronym = inflections().acronyms.get(match);
-      if (acronym) return acronym;
-      return match.charAt(0).toUpperCase() + match.slice(1);
-    });
+  let string = String(term);
+  if (
+    uppercaseFirstLetter == null ||
+    uppercaseFirstLetter === false ||
+    uppercaseFirstLetter === "lower"
+  ) {
+    string = string.replace(inflections().acronymsCamelizeRegex, (match) => match.toLowerCase());
+  } else if (/^[a-z\d]*$/.test(string)) {
+    return (
+      inflections().acronyms.get(string) ??
+      string.charAt(0).toUpperCase() + string.slice(1).toLowerCase()
+    );
   } else {
-    result = result.replace(inflections().acronymsCamelizeRegex, (match) => match.toLowerCase());
+    string = string.replace(
+      /^[a-z\d]*/,
+      (match) =>
+        inflections().acronyms.get(match) ??
+        match.charAt(0).toUpperCase() + match.slice(1).toLowerCase(),
+    );
   }
-
-  result = result.replace(/(?:_|(\/))([a-z\d]*)/gi, (_match, slash, rest) => {
-    const acronym = inflections().acronyms.get(rest);
-    const replacement = acronym || rest.charAt(0).toUpperCase() + rest.slice(1);
-    return (slash || "") + replacement;
+  string = string.replace(/(?:_|(\/))([a-z\d]*)/gi, (_match, slash, word) => {
+    const substituted =
+      inflections().acronyms.get(word) ??
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    return slash ? `::${substituted}` : substituted;
   });
-
-  result = result.replace(/\//g, "::");
-
-  return result;
+  return string;
 }
 
 export function underscore(camelCasedWord: string): string {
@@ -96,12 +97,12 @@ export function humanize(
   options: { capitalize?: boolean; keepIdSuffix?: boolean } = {},
 ): string {
   const { capitalize: cap = true, keepIdSuffix = false } = options;
-  let result = lowerCaseAndUnderscoredWord;
+  let result = String(lowerCaseAndUnderscoredWord ?? "");
 
   for (const { rule, replacement } of inflections().humans) {
     if (typeof rule === "string") {
-      if (result === rule) {
-        result = replacement;
+      if (result.includes(rule)) {
+        result = result.replace(rule, replacement);
         break;
       }
     } else {
@@ -112,14 +113,15 @@ export function humanize(
     }
   }
 
-  if (!keepIdSuffix) {
-    result = result.replace(/_id$/, "");
+  result = result.replaceAll("_", " ");
+  result = result.replace(/^\s+/, "");
+  if (!keepIdSuffix && lowerCaseAndUnderscoredWord?.endsWith("_id")) {
+    if (result.endsWith(" id")) result = result.slice(0, -" id".length);
   }
-  result = result.replace(/_/g, " ");
 
-  result = result.replace(/([a-z\d]*)/gi, (match) => {
-    const acronym = inflections().acronyms.get(match.toLowerCase());
-    return acronym || match.toLowerCase();
+  result = result.replace(/([a-z\d]+)/gi, (match) => {
+    match = match.toLowerCase();
+    return inflections().acronyms.get(match) ?? match;
   });
 
   if (cap) {

@@ -8,7 +8,11 @@ import {
   runSafeConstantizeTestsOn,
 } from "../constantize-test-cases.js";
 
-import { pluralize as stringPluralize } from "../core-ext/string/inflections.js";
+import {
+  camelize as stringCamelize,
+  pluralize as stringPluralize,
+} from "../core-ext/string/inflections.js";
+import { assertRaise } from "../testing/assertions.js";
 import { htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
@@ -552,8 +556,11 @@ describe("StringInflectionsTest", () => {
     expect(camelize("active_record", "upper")).toBe("ActiveRecord");
   });
 
-  it("camelize invalid option", () => {
-    expect(() => camelize("foo", "invalid" as any)).toThrow("Invalid option");
+  it("camelize invalid option", async () => {
+    const e = await assertRaise([ArgumentError], {}, () =>
+      stringCamelize("Capital", null as unknown as "upper"),
+    );
+    expect(e.message).toEqual("Invalid option, use either :upper or :lower.");
   });
 
   it("dasherize", () => {

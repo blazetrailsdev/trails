@@ -22,7 +22,13 @@ import {
 } from "./index.js";
 import { Inflections, Uncountables, inflections } from "./inflector/inflections.js";
 import { I18n } from "./i18n.js";
-import { assertEmpty, assertNotEmpty } from "./testing/assertions.js";
+import {
+  assert,
+  assertEmpty,
+  assertNot,
+  assertNotEmpty,
+  assertNothingRaised,
+} from "./testing/assertions.js";
 import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
@@ -142,6 +148,81 @@ const SingularToPlural: Record<string, string> = {
   police: "police",
 };
 
+const CamelToUnderscore: Record<string, string> = {
+  Product: "product",
+  SpecialGuest: "special_guest",
+  ApplicationController: "application_controller",
+  Area51Controller: "area51_controller",
+  AppCDir: "app_c_dir",
+  Accountsv2N2Test: "accountsv2_n2_test",
+};
+
+const UnderscoreToLowerCamel: Record<string, string> = {
+  product: "product",
+  special_guest: "specialGuest",
+  application_controller: "applicationController",
+  area51_controller: "area51Controller",
+};
+
+const SymbolToLowerCamel: Record<string, string> = {
+  product: "product",
+  special_guest: "specialGuest",
+  application_controller: "applicationController",
+  area51_controller: "area51Controller",
+};
+
+const CamelToUnderscoreWithoutReverse: Record<string, string> = {
+  HTMLTidy: "html_tidy",
+  HTMLTidyGenerator: "html_tidy_generator",
+  FreeBSD: "free_bsd",
+  HTML: "html",
+  ForceXMLController: "force_xml_controller",
+  product: "product",
+};
+
+const CamelWithModuleToUnderscoreWithSlash: Record<string, string> = {
+  "Admin::Product": "admin/product",
+  "Users::Commission::Department": "users/commission/department",
+  "UsersSection::CommissionDepartment": "users_section/commission_department",
+};
+
+const ClassNameToForeignKeyWithUnderscore: Record<string, string> = {
+  Person: "person_id",
+  "MyApplication::Billing::Account": "account_id",
+};
+
+const ClassNameToForeignKeyWithoutUnderscore: Record<string, string> = {
+  Person: "personid",
+  "MyApplication::Billing::Account": "accountid",
+};
+
+const ClassNameToTableName: Record<string, string> = {
+  PrimarySpokesman: "primary_spokesmen",
+  NodeChild: "node_children",
+  Calculu: "calculus",
+};
+
+const StringToParameterized: Record<string, string> = {
+  "Donald E. Knuth": "donald-e-knuth",
+  "Random text with *(bad)* characters": "random-text-with-bad-characters",
+  Allow_Under_Scores: "allow_under_scores",
+  "Trailing bad characters!@#": "trailing-bad-characters",
+  "!@#Leading bad characters": "leading-bad-characters",
+  "Squeeze   separators": "squeeze-separators",
+  "Test with + sign": "test-with-sign",
+};
+
+const StringToParameterizeWithUnderscore: Record<string, string> = {
+  "Donald E. Knuth": "donald_e_knuth",
+  "Random text with *(bad)* characters": "random_text_with_bad_characters",
+  "With-some-dashes": "with-some-dashes",
+  Retain_underscore: "retain_underscore",
+  "Trailing bad characters!@#": "trailing_bad_characters",
+  "!@#Leading bad characters": "leading_bad_characters",
+  "Squeeze   separators": "squeeze_separators",
+  "Test with + sign": "test_with_sign",
+};
+
 const StringToParameterizedAndNormalized: Record<string, string> = {
   Malmö: "malmo",
   Garçons: "garcons",
@@ -149,6 +230,103 @@ const StringToParameterizedAndNormalized: Record<string, string> = {
   Ærøskøbing: "aeroskobing",
   Aßlar: "asslar",
   "Japanese: 日本語": "japanese",
+};
+
+const UnderscoreToHuman: Record<string, string> = {
+  employee_salary: "Employee salary",
+  employee_id: "Employee",
+  "employee id": "Employee id",
+  "employee id etc": "Employee id etc",
+  underground: "Underground",
+  _id: "Id",
+  _external_id: "External",
+};
+
+const UnderscoreToHumanWithKeepIdSuffix: Record<string, string> = {
+  this_is_a_string_ending_with_id: "This is a string ending with id",
+  employee_id: "Employee id",
+  employee_id_something_else: "Employee id something else",
+  underground: "Underground",
+  "employee id": "Employee id",
+  "employee id etc": "Employee id etc",
+  _id: "Id",
+  _external_id: "External id",
+};
+
+const UnderscoreToHumanWithoutCapitalize: Record<string, string> = {
+  employee_salary: "employee salary",
+  employee_id: "employee",
+  underground: "underground",
+};
+
+const OrdinalNumbers: Record<string, string> = {
+  "-1": "-1st",
+  "-2": "-2nd",
+  "-3": "-3rd",
+  "-4": "-4th",
+  "-5": "-5th",
+  "-6": "-6th",
+  "-7": "-7th",
+  "-8": "-8th",
+  "-9": "-9th",
+  "-10": "-10th",
+  "-11": "-11th",
+  "-12": "-12th",
+  "-13": "-13th",
+  "-14": "-14th",
+  "-20": "-20th",
+  "-21": "-21st",
+  "-22": "-22nd",
+  "-23": "-23rd",
+  "-24": "-24th",
+  "-100": "-100th",
+  "-101": "-101st",
+  "-102": "-102nd",
+  "-103": "-103rd",
+  "-104": "-104th",
+  "-110": "-110th",
+  "-111": "-111th",
+  "-112": "-112th",
+  "-113": "-113th",
+  "-1000": "-1000th",
+  "-1001": "-1001st",
+  "0": "0th",
+  "1": "1st",
+  "2": "2nd",
+  "3": "3rd",
+  "4": "4th",
+  "5": "5th",
+  "6": "6th",
+  "7": "7th",
+  "8": "8th",
+  "9": "9th",
+  "10": "10th",
+  "11": "11th",
+  "12": "12th",
+  "13": "13th",
+  "14": "14th",
+  "20": "20th",
+  "21": "21st",
+  "22": "22nd",
+  "23": "23rd",
+  "24": "24th",
+  "100": "100th",
+  "101": "101st",
+  "102": "102nd",
+  "103": "103rd",
+  "104": "104th",
+  "110": "110th",
+  "111": "111th",
+  "112": "112th",
+  "113": "113th",
+  "1000": "1000th",
+  "1001": "1001st",
+};
+
+const UnderscoresToDashes: Record<string, string> = {
+  street: "street",
+  street_address: "street-address",
+  person_street_address: "person-street-address",
 };
 
 function withInflections(fn: (inflect: Inflections) => void): void {
@@ -199,7 +377,8 @@ describe("InflectorTest", () => {
   });
 
   it("pluralize plurals", () => {
-    expect(pluralize("plurals")).toBe("plurals");
+    expect(pluralize("plurals")).toEqual("plurals");
+    expect(pluralize("Plurals")).toEqual("Plurals");
   });
 
   it("pluralize empty string", () => {
@@ -260,10 +439,9 @@ describe("InflectorTest", () => {
   });
 
   it("camelize", () => {
-    expect(camelize("product")).toBe("Product");
-    expect(camelize("special_guest")).toBe("SpecialGuest");
-    expect(camelize("application_controller")).toBe("ApplicationController");
-    expect(camelize("area51_controller")).toBe("Area51Controller");
+    for (const [camel, underscore] of Object.entries(CamelToUnderscore)) {
+      expect(camelize(underscore)).toEqual(camel);
+    }
   });
 
   it("camelize with true upcases the first letter", () => {
@@ -292,8 +470,12 @@ describe("InflectorTest", () => {
   });
 
   it("camelize with any other arg upcases the first letter", () => {
-    expect(camelize("Capital", true)).toBe("Capital");
-    expect(camelize("capital", true)).toBe("Capital");
+    expect(camelize("capital", "true" as never)).toEqual("Capital");
+    expect(camelize("Capital", "true" as never)).toEqual("Capital");
+    expect(camelize("capital", "false" as never)).toEqual("Capital");
+    expect(camelize("capital", "foo" as never)).toEqual("Capital");
+    expect(camelize("capital", 42 as never)).toEqual("Capital");
+    expect(camelize("capital")).toEqual("Capital");
   });
 
   it("camelize with underscores", () => {
@@ -337,13 +519,20 @@ describe("InflectorTest", () => {
       ];
 
       for (const [camel, under, human, title] of cases) {
-        expect(camelize(under)).toBe(camel);
-        expect(camelize(camel)).toBe(camel);
-        expect(underscore(under)).toBe(under);
-        expect(underscore(camel)).toBe(under);
-        expect(titleize(under)).toBe(title);
-        expect(titleize(camel)).toBe(title);
-        expect(humanize(under)).toBe(human);
+        expect(camelize(under)).toEqual(camel);
+        expect(camelize(camel)).toEqual(camel);
+        assertNot(Object.isFrozen(Object(camelize(under))));
+        assertNot(Object.isFrozen(Object(camelize(camel))));
+        expect(underscore(under)).toEqual(under);
+        expect(underscore(camel)).toEqual(under);
+        assertNot(Object.isFrozen(Object(underscore(under))));
+        assertNot(Object.isFrozen(Object(underscore(camel))));
+        expect(titleize(under)).toEqual(title);
+        expect(titleize(camel)).toEqual(title);
+        assertNot(Object.isFrozen(Object(titleize(under))));
+        assertNot(Object.isFrozen(Object(titleize(camel))));
+        expect(humanize(under)).toEqual(human);
+        assertNot(Object.isFrozen(Object(humanize(camel))));
       }
     });
   });
@@ -382,24 +571,24 @@ describe("InflectorTest", () => {
   });
 
   it("underscore", () => {
-    expect(underscore("HTMLTidy")).toBe("html_tidy");
-    expect(underscore("HTMLTidyGenerator")).toBe("html_tidy_generator");
-    expect(underscore("FreeBSD")).toBe("free_bsd");
-    expect(underscore("HTML")).toBe("html");
-    expect(underscore("ForceXMLController")).toBe("force_xml_controller");
+    for (const [camel, underscore_] of Object.entries(CamelToUnderscore)) {
+      expect(underscore(camel)).toEqual(underscore_);
+    }
+    for (const [camel, underscore_] of Object.entries(CamelToUnderscoreWithoutReverse)) {
+      expect(underscore(camel)).toEqual(underscore_);
+    }
   });
 
   it("camelize with module", () => {
-    expect(camelize("admin/product")).toBe("Admin::Product");
-    expect(camelize("users/commission/department")).toBe("Users::Commission::Department");
+    for (const [camel, underscore] of Object.entries(CamelWithModuleToUnderscoreWithSlash)) {
+      expect(camelize(underscore)).toEqual(camel);
+    }
   });
 
   it("underscore with slashes", () => {
-    expect(underscore("Admin::Product")).toBe("admin/product");
-    expect(underscore("Users::Commission::Department")).toBe("users/commission/department");
-    expect(underscore("UsersSection::CommissionDepartment")).toBe(
-      "users_section/commission_department",
-    );
+    for (const [camel, underscore_] of Object.entries(CamelWithModuleToUnderscoreWithSlash)) {
+      expect(underscore(camel)).toEqual(underscore_);
+    }
   });
 
   it("demodulize", () => {
@@ -420,26 +609,24 @@ describe("InflectorTest", () => {
   });
 
   it("foreign key", () => {
-    expect(foreignKey("Person")).toBe("person_id");
-    expect(foreignKey("MyApplication::Billing::Account")).toBe("account_id");
-    expect(foreignKey("Person", false)).toBe("personid");
-    expect(foreignKey("MyApplication::Billing::Account", false)).toBe("accountid");
+    for (const [klass, foreignKey_] of Object.entries(ClassNameToForeignKeyWithUnderscore)) {
+      expect(foreignKey(klass)).toEqual(foreignKey_);
+    }
+    for (const [klass, foreignKey_] of Object.entries(ClassNameToForeignKeyWithoutUnderscore)) {
+      expect(foreignKey(klass, false)).toEqual(foreignKey_);
+    }
   });
 
   it("tableize", () => {
-    expect(tableize("PrimarySpokesman")).toBe("primary_spokesmen");
-    expect(tableize("NodeChild")).toBe("node_children");
+    for (const [className, tableName] of Object.entries(ClassNameToTableName)) {
+      expect(tableize(className)).toEqual(tableName);
+    }
   });
 
   it("parameterize", () => {
-    expect(parameterize("Random text with *(bad)* characters")).toBe(
-      "random-text-with-bad-characters",
-    );
-    expect(parameterize("Allow_Under_Scores")).toBe("allow_under_scores");
-    expect(parameterize("Trailing bad characters!@#")).toBe("trailing-bad-characters");
-    expect(parameterize("!@#Leading bad characters")).toBe("leading-bad-characters");
-    expect(parameterize("Squeeze   separators")).toBe("squeeze-separators");
-    expect(parameterize("Test with + sign")).toBe("test-with-sign");
+    for (const [someString, parameterizedString] of Object.entries(StringToParameterized)) {
+      expect(parameterize(someString)).toEqual(parameterizedString);
+    }
   });
 
   it("parameterize and normalize", () => {
@@ -451,23 +638,19 @@ describe("InflectorTest", () => {
   });
 
   it("parameterize with custom separator", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
-    expect(parameterize("Random text with *(bad)* characters", { separator: "_" })).toBe(
-      "random_text_with_bad_characters",
-    );
-    expect(parameterize("Trailing bad characters!@#", { separator: "_" })).toBe(
-      "trailing_bad_characters",
-    );
-    expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
+    for (const [someString, parameterizedString] of Object.entries(
+      StringToParameterizeWithUnderscore,
+    )) {
+      expect(parameterize(someString, { separator: "_" })).toEqual(parameterizedString);
+    }
   });
 
   it("parameterize with multi character separator", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "__sep__" })).toBe(
-      "donald__sep__e__sep__knuth",
-    );
-    expect(parameterize("Random text with *(bad)* characters", { separator: "__sep__" })).toBe(
-      "random__sep__text__sep__with__sep__bad__sep__characters",
-    );
+    for (const [someString, parameterizedString] of Object.entries(StringToParameterized)) {
+      expect(parameterize(someString, { separator: "__sep__" })).toEqual(
+        parameterizedString.replaceAll("-", "__sep__"),
+      );
+    }
   });
 
   it("parameterize with locale", () => {
@@ -481,8 +664,10 @@ describe("InflectorTest", () => {
     expect(classify("node_children")).toBe("NodeChild");
   });
 
-  it("classify with symbol", () => {
-    expect(classify("foo_bars")).toBe("FooBar");
+  it("classify with symbol", async () => {
+    await assertNothingRaised(() => {
+      expect(classify("foo_bars")).toEqual("FooBar");
+    });
   });
 
   it("classify with leading schema name", () => {
@@ -490,10 +675,9 @@ describe("InflectorTest", () => {
   });
 
   it("humanize", () => {
-    expect(humanize("employee_salary")).toBe("Employee salary");
-    expect(humanize("employee_id")).toBe("Employee");
-    expect(humanize("underground")).toBe("Underground");
-    expect(humanize("author_id")).toBe("Author");
+    for (const [underscore, human] of Object.entries(UnderscoreToHuman)) {
+      expect(humanize(underscore)).toEqual(human);
+    }
   });
 
   it("humanize nil", () => {
@@ -501,14 +685,15 @@ describe("InflectorTest", () => {
   });
 
   it("humanize without capitalize", () => {
-    expect(humanize("employee_salary", { capitalize: false })).toBe("employee salary");
-    expect(humanize("employee_id", { capitalize: false })).toBe("employee");
-    expect(humanize("underground", { capitalize: false })).toBe("underground");
+    for (const [underscore, human] of Object.entries(UnderscoreToHumanWithoutCapitalize)) {
+      expect(humanize(underscore, { capitalize: false })).toEqual(human);
+    }
   });
 
   it("humanize with keep id suffix", () => {
-    expect(humanize("employee_id", { keepIdSuffix: true })).toBe("Employee id");
-    expect(humanize("author_id", { keepIdSuffix: true })).toBe("Author id");
+    for (const [underscore, human] of Object.entries(UnderscoreToHumanWithKeepIdSuffix)) {
+      expect(humanize(underscore, { keepIdSuffix: true })).toEqual(human);
+    }
   });
 
   it("humanize by rule", () => {
@@ -542,69 +727,45 @@ describe("InflectorTest", () => {
   });
 
   it("ordinal", () => {
-    expect(ordinal(0)).toBe("th");
-    expect(ordinal(1)).toBe("st");
-    expect(ordinal(2)).toBe("nd");
-    expect(ordinal(3)).toBe("rd");
-    expect(ordinal(4)).toBe("th");
-    expect(ordinal(5)).toBe("th");
-    expect(ordinal(10)).toBe("th");
-    expect(ordinal(11)).toBe("th");
-    expect(ordinal(12)).toBe("th");
-    expect(ordinal(13)).toBe("th");
-    expect(ordinal(14)).toBe("th");
-    expect(ordinal(20)).toBe("th");
-    expect(ordinal(21)).toBe("st");
-    expect(ordinal(100)).toBe("th");
-    expect(ordinal(101)).toBe("st");
-    expect(ordinal(102)).toBe("nd");
-    expect(ordinal(103)).toBe("rd");
-    expect(ordinal(1000)).toBe("th");
+    for (const [number, ordinalized] of Object.entries(OrdinalNumbers)) {
+      expect(number + ordinal(Number(number))).toEqual(ordinalized);
+    }
   });
 
   it("ordinalize", () => {
-    expect(ordinalize(0)).toBe("0th");
-    expect(ordinalize(1)).toBe("1st");
-    expect(ordinalize(2)).toBe("2nd");
-    expect(ordinalize(3)).toBe("3rd");
-    expect(ordinalize(11)).toBe("11th");
-    expect(ordinalize(12)).toBe("12th");
-    expect(ordinalize(13)).toBe("13th");
-    expect(ordinalize(21)).toBe("21st");
-    expect(ordinalize(100)).toBe("100th");
-    expect(ordinalize(101)).toBe("101st");
-    expect(ordinalize(102)).toBe("102nd");
-    expect(ordinalize(103)).toBe("103rd");
-    expect(ordinalize(1001)).toBe("1001st");
+    for (const [number, ordinalized] of Object.entries(OrdinalNumbers)) {
+      expect(ordinalize(Number(number))).toEqual(ordinalized);
+    }
   });
 
   it("dasherize", () => {
-    expect(dasherize("street")).toBe("street");
-    expect(dasherize("street_address")).toBe("street-address");
-    expect(dasherize("person_street_address")).toBe("person-street-address");
+    for (const [underscored, dasherized] of Object.entries(UnderscoresToDashes)) {
+      expect(dasherize(underscored)).toEqual(dasherized);
+    }
   });
 
   it("underscore as reverse of dasherize", () => {
-    expect(underscore(dasherize("street"))).toBe("street");
-    expect(underscore(dasherize("street_address"))).toBe("street_address");
-    expect(underscore(dasherize("person_street_address"))).toBe("person_street_address");
+    for (const underscored of Object.keys(UnderscoresToDashes)) {
+      expect(underscore(dasherize(underscored))).toEqual(underscored);
+    }
   });
 
   it("underscore to lower camel", () => {
-    expect(camelize("product", false)).toBe("product");
-    expect(camelize("special_guest", false)).toBe("specialGuest");
-    expect(camelize("application_controller", false)).toBe("applicationController");
-    expect(camelize("area51_controller", false)).toBe("area51Controller");
+    for (const [underscored, lowerCamel] of Object.entries(UnderscoreToLowerCamel)) {
+      expect(camelize(underscored, false)).toEqual(lowerCamel);
+    }
   });
 
   it("symbol to lower camel", () => {
-    expect(camelize("html_parser", false)).toBe("htmlParser");
+    for (const [symbol, lowerCamel] of Object.entries(SymbolToLowerCamel)) {
+      expect(camelize(symbol, false)).toEqual(lowerCamel);
+    }
   });
 
   it("clear acronyms resets to reusable state", () => {
     withInflections((inflect) => {
       inflect.clear("acronyms");
-      expect(inflect.acronyms.size).toBe(0);
+      assertEmpty(inflect.acronyms);
 
       inflect.acronym("HTML");
       expect(titleize("html")).toBe("HTML");
@@ -657,11 +818,11 @@ describe("InflectorTest", () => {
 
       inflect.clear("all");
 
-      expect(inflect.plurals).toEqual([]);
-      expect(inflect.singulars).toEqual([]);
-      expect(inflect.uncountables.length).toBe(0);
-      expect(inflect.humans).toEqual([]);
-      expect(inflect.acronyms.size).toBe(0);
+      assertEmpty(inflect.plurals);
+      assertEmpty(inflect.singulars);
+      assertEmpty(inflect.uncountables);
+      assertEmpty(inflect.humans);
+      assertEmpty(inflect.acronyms);
     });
   });
 
@@ -675,11 +836,11 @@ describe("InflectorTest", () => {
 
       inflect.clear();
 
-      expect(inflect.plurals).toEqual([]);
-      expect(inflect.singulars).toEqual([]);
-      expect(inflect.uncountables.length).toBe(0);
-      expect(inflect.humans).toEqual([]);
-      expect(inflect.acronyms.size).toBe(0);
+      assertEmpty(inflect.plurals);
+      assertEmpty(inflect.singulars);
+      assertEmpty(inflect.uncountables);
+      assertEmpty(inflect.humans);
+      assertEmpty(inflect.acronyms);
     });
   });
 
@@ -691,7 +852,7 @@ describe("InflectorTest", () => {
 
       inflect.clear("all");
 
-      expect(inflect.acronyms.size).toBe(0);
+      assertEmpty(inflect.acronyms);
       expect(underscore("HTTPS")).toBe("https");
       expect(camelize("https")).toBe("Https");
     });
@@ -705,9 +866,9 @@ describe("InflectorTest", () => {
   });
 
   it("output is not frozen even if input is frozen", () => {
-    const input = "word";
-    const result = pluralize(input);
-    expect(result).toBe("words");
+    const input = Object.freeze(new String("plurals"));
+    assert(Object.isFrozen(input));
+    assertNot(Object.isFrozen(Object(pluralize(input.valueOf()))));
   });
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();

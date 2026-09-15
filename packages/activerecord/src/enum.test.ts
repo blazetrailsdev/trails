@@ -1006,7 +1006,7 @@ describe("EnumTest", () => {
         this.enum("timezone", ["Etc/GMT+1", "Etc/GMT-1"]);
       }
     }
-    const computer = (Klass as any)["etc::GMT+1"]().build();
+    const computer = (Klass as any)["etc::Gmt+1"]().build();
     expect(computer["isEtc/GMT+1"]()).toBe(true);
     expect(computer["isEtc/GMT-1"]()).toBe(false);
   });
