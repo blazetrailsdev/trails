@@ -21,6 +21,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { NameError } from "./name-error.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -62,7 +63,9 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
-    return block(carrierOf(this));
+    const result = block(carrierOf(this));
+    relinkIncluders(this);
+    return result;
   }
 
   include(mod: ModuleObject): void {
@@ -76,6 +79,7 @@ export class Module {
         configurable: true,
       });
     }
+    relinkIncluders(this);
   }
 
   /**
@@ -90,6 +94,7 @@ export class Module {
       writable: true,
       configurable: true,
     });
+    relinkIncluders(this);
   }
 
   /**
@@ -118,6 +123,27 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's Module#remove_method — vendor/ruby/vm_method.c:1728
+   * `rb_mod_remove_method`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  removeMethod(...names: string[]): this {
+    const carrier = carrierOf(this);
+    try {
+      for (const name of names) {
+        if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
+          throw new NameError(`method '${name}' not defined in #<Module>`, name);
+        }
+        delete carrier[name];
+      }
+    } finally {
+      relinkIncluders(this);
+    }
+    return this;
+  }
+
+  /**
    * Mirrors: Ruby's Module#undef_method — vendor/ruby/vm_method.c:1973
    * `rb_mod_undef_method`.
    *
@@ -126,6 +152,23 @@ export class Module {
   undefMethod(...names: string[]): void {
     const carrier = carrierOf(this);
     for (const name of names) delete carrier[name];
+    relinkIncluders(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#alias_method — vendor/ruby/vm_method.c:2366
+   * `rb_mod_alias_method`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  aliasMethod(newName: string, oldName: string): string {
+    const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
+    if (!descriptor) {
+      throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
+    }
+    Object.defineProperty(carrierOf(this), newName, descriptor);
+    relinkIncluders(this);
+    return newName;
   }
 
   /**
@@ -148,6 +191,19 @@ function carrierOf(mod: Module): Record<string, unknown> {
     carriers.set(mod, carrier);
   }
   return carrier;
+}
+
+const includerCarriers = new WeakMap<Module, object[]>();
+
+function relinkIncluders(mod: Module): void {
+  const table = carrierOf(mod);
+  for (const link of includerCarriers.get(mod) ?? []) {
+    for (const name of Object.getOwnPropertyNames(link)) {
+      if (!Object.prototype.hasOwnProperty.call(table, name))
+        delete (link as Record<string, unknown>)[name];
+    }
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(table));
+  }
 }
 
 /**
@@ -436,8 +492,8 @@ function assertSectionsDisjoint(sections: ModuleVisibility): void {
  * `#`-private field and a `defineModule` section are visible here; enforcement
  * of the rest is a compare-time gate rather than this runtime walk.
  *
- * `includeSuper` is inert on a `Module`, whose carrier `include()` copies into
- * rather than links behind, so its own and inherited methods are one flat table.
+ * `includeSuper` is inert on a `Module`, whose method table is one flat table
+ * of its own methods.
  */
 export function publicInstanceMethods(
   mod: ModuleObject | AnyClass | Module,
@@ -505,10 +561,12 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
   }
   if (mod instanceof Module) {
     const proto = klass.prototype as object;
-    const carrier = Object.create(Object.getPrototypeOf(proto)) as Record<string, unknown>;
-    Object.defineProperties(carrier, Object.getOwnPropertyDescriptors(carrierOf(mod)));
-    carriers.set(mod, carrier);
-    Object.setPrototypeOf(proto, carrier);
+    const link = Object.create(Object.getPrototypeOf(proto)) as object;
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(mod)));
+    let links = includerCarriers.get(mod);
+    if (!links) includerCarriers.set(mod, (links = []));
+    links.push(link);
+    Object.setPrototypeOf(proto, link);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
     }

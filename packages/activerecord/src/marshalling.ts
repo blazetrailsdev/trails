@@ -12,10 +12,10 @@ export function formatVersion(): 6.1 | 7.1 {
 export function setFormatVersion(version: unknown): void {
   switch (version) {
     case 6.1:
-      if (Methods.isMethodDefined("marshalDump")) Methods.undefMethod("marshalDump");
+      if (Methods.isMethodDefined("marshalDump")) Methods.removeMethod("marshalDump");
       break;
     case 7.1:
-      Methods.defineMethod("marshalDump", Methods.instanceMethod("_marshalDump71")!.value);
+      Methods.aliasMethod("marshalDump", "_marshalDump71");
       break;
     default:
       throw new ArgumentError(`Unknown marshalling format: ${rbInspect(version)}`);
