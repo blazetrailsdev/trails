@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../duration.js";
 import { rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
@@ -356,11 +356,14 @@ describe("DurationTest", () => {
   });
 
   it("before and after without argument", () => {
-    const now = new Date();
-    const after = Duration.seconds(1).after();
-    const before = Duration.seconds(1).before();
-    expect(after.epochMilliseconds).toBeGreaterThan(now.getTime());
-    expect(before.epochMilliseconds).toBeLessThan(now.getTime());
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2000, 0, 1));
+      expect(Duration.second(1).before().epochMilliseconds).toEqual(Date.now() - 1000);
+      expect(Duration.second(1).after().epochMilliseconds).toEqual(Date.now() + 1000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("adding hours across dst boundary", () => {

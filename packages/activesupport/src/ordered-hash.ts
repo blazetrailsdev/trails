@@ -54,6 +54,10 @@ export class OrderedHash<K, V> extends Map<K, V> {
     return this;
   }
 
+  isExtractableOptions(): boolean {
+    return true;
+  }
+
   deleteIf(predicate: (key: K, value: V) => boolean): this {
     for (const [k, v] of this) {
       if (predicate(k, v)) this.delete(k);
