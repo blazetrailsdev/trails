@@ -30,8 +30,11 @@ export function deepMergeBang<T extends AnyObject>(
   other: AnyObject,
   block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
 ): T {
-  for (const key of Object.keys(other)) {
-    const otherVal = other[key];
+  const entries: [string, unknown][] =
+    (other as unknown) instanceof Hash
+      ? ([...(other as unknown as Hash<string, unknown>)] as [string, unknown][])
+      : Object.entries(other);
+  for (const [key, otherVal] of entries) {
     if (!Object.prototype.hasOwnProperty.call(target, key)) {
       (target as AnyObject)[key] = otherVal;
       continue;

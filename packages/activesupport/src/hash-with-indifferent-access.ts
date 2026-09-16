@@ -56,6 +56,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     let hash: AnyObject | Hash<unknown, unknown>;
     if (args.length === 1 && (isPlainObject(args[0]) || args[0] instanceof Hash)) {
       hash = args[0] as AnyObject | Hash<unknown, unknown>;
+    } else if (args.length === 1 && Array.isArray(args[0])) {
+      hash = new Hash<unknown, unknown>();
+      for (const [key, value] of args[0] as [unknown, unknown][]) hash.set(key, value);
     } else {
       if (args.length % 2 !== 0) throw new ArgumentError("odd number of arguments for Hash");
       hash = new Hash<unknown, unknown>();
