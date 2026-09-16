@@ -4,6 +4,7 @@ import {
   dup,
   hashDelete,
   isSymbol,
+  rbObjRespondTo,
   symbolToS,
   valuesAt,
 } from "@blazetrails/ruby-compat";
@@ -51,7 +52,9 @@ export function deepDup<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map((item) => deepDup(item)) as T;
   if (obj instanceof Hash) {
-    const hash = dup(obj);
+    const hash = rbObjRespondTo(obj, "dup")
+      ? (obj as unknown as { dup(): Hash<unknown, unknown> }).dup()
+      : dup(obj);
     for (const [key, value] of obj) {
       if (typeof key === "string") {
         hash.set(key, deepDup(value));

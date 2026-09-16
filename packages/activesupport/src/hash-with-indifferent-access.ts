@@ -6,7 +6,10 @@ import {
   KeyError,
   TypeError,
   eachPair,
+  isSymbol,
   rbObjClass,
+  rbObjRespondTo,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
@@ -16,20 +19,29 @@ type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
 
 type DefaultBlock<V> = (key: string) => V;
 
+type ToHash = { toHash(): AnyObject | Hash<unknown, unknown> };
+
 export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   constructor(
     constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<string, V> | NoInfer<V>,
   ) {
     super();
-    if (constructor instanceof HashWithIndifferentAccess || isPlainObject(constructor)) {
-      this.update(constructor);
+    if (
+      isPlainObject(constructor) ||
+      constructor instanceof Hash ||
+      rbObjRespondTo(constructor, "toHash")
+    ) {
+      this.update(constructor as AnyObject);
 
-      const hash = constructor;
-      if (hash instanceof HashWithIndifferentAccess) {
-        if (hash.default() != null && (hash.default() as unknown) !== false) {
-          this.setDefault(hash.default());
+      const hash =
+        isPlainObject(constructor) || constructor instanceof Hash
+          ? constructor
+          : (constructor as ToHash).toHash();
+      if (hash instanceof Hash) {
+        if (hash.default() != null && hash.default() !== false) {
+          this.setDefault(hash.default() as V);
         }
-        if (hash.defaultProc()) this.setDefaultProc(hash.defaultProc());
+        if (hash.defaultProc()) this.setDefaultProc(hash.defaultProc() as DefaultProc<string, V>);
       }
     } else if (constructor == null) {
     } else if (typeof constructor === "function") {
@@ -37,6 +49,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     } else {
       this.setDefault(constructor as V);
     }
+  }
+
+  static get<V = unknown>(...args: unknown[]): HashWithIndifferentAccess<V> {
+    const hash: AnyObject = {};
+    for (let i = 0; i < args.length; i += 2) hash[args[i] as string] = args[i + 1];
+    return new this<V>().mergeBang(hash);
   }
 
   isExtractableOptions(): boolean {
@@ -158,17 +176,26 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     if (otherHash instanceof HashWithIndifferentAccess) {
       this.regularUpdate(otherHash, block);
     } else {
-      eachPair(otherHash as Record<string, V>, (key, value) => {
+      const hash =
+        isPlainObject(otherHash) || (otherHash as unknown) instanceof Hash
+          ? otherHash
+          : (otherHash as unknown as ToHash).toHash();
+      const eachPairBlock = (key: string, value: V) => {
         if (block && this.key(key)) {
           value = block(this.convertKey(key), this.get(key)!, value);
         }
         this.regularWriter(this.convertKey(key), this.convertValue(value));
-      });
+      };
+      if (hash instanceof Map) {
+        for (const [key, value] of hash) eachPairBlock(key as string, value as V);
+      } else {
+        eachPair(hash as Record<string, V>, eachPairBlock);
+      }
     }
   }
 
   dup(): HashWithIndifferentAccess<V> {
-    const newHash = new HashWithIndifferentAccess<V>(this);
+    const newHash = new (this.constructor as typeof HashWithIndifferentAccess<V>)(this);
     this.setDefaults(newHash);
     return newHash;
   }
@@ -194,16 +221,30 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.update(new HashWithIndifferentAccess<V>(otherHash));
   }
 
-  deepMerge(other: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
-    return this.dup().update(other, (_key, thisVal, otherVal) => {
+  deepMerge(
+    other: AnyObject | HashWithIndifferentAccess<V>,
+    block?: BlockFn<V>,
+  ): HashWithIndifferentAccess<V> {
+    return this.dup().deepMergeBang(other, block);
+  }
+
+  deepMergeBang(other: AnyObject | HashWithIndifferentAccess<V>, block?: BlockFn<V>): this {
+    return this.mergeBang(other, (key: string, thisVal: V, otherVal: V) => {
       if (
         thisVal instanceof HashWithIndifferentAccess &&
-        (isPlainObject(otherVal) || otherVal instanceof HashWithIndifferentAccess)
+        this.isDeepMerge.call(thisVal, otherVal)
       ) {
-        return thisVal.deepMerge(otherVal as AnyObject) as V;
+        return thisVal.deepMerge(otherVal as AnyObject, block) as V;
+      } else if (block) {
+        return block(key, thisVal, otherVal);
+      } else {
+        return otherVal;
       }
-      return otherVal;
     });
+  }
+
+  isDeepMerge(other: unknown): boolean {
+    return isPlainObject(other) || other instanceof Hash;
   }
 
   slice(...keys: string[]): HashWithIndifferentAccess<V> {
@@ -242,18 +283,31 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 
   select(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
     const block = args[args.length - 1];
-    const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this) {
-      if (block(k, v)) {
-        result.set(k, v);
+    const hash = this.dup();
+    hash.selectBang(block);
+    return hash;
+  }
+
+  selectBang(block: (key: string, value: V) => boolean): this | null {
+    let changed = false;
+    for (const [k, v] of [...this]) {
+      if (!block(k, v)) {
+        super.delete(k);
+        changed = true;
       }
     }
-    return result;
+    return changed ? this : null;
   }
 
   reject(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
     const block = args[args.length - 1];
-    return this.select((k, v) => !block(k, v));
+    const hash = this.dup();
+    hash.rejectBang(block);
+    return hash;
+  }
+
+  rejectBang(block: (key: string, value: V) => boolean): this | null {
+    return this.selectBang((k, v) => !block(k, v));
   }
 
   transformKeys(block: (key: string) => string): HashWithIndifferentAccess<V>;
@@ -296,22 +350,47 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  transformValues<W = V>(fn: (value: V) => W): HashWithIndifferentAccess<W> {
-    const result = new HashWithIndifferentAccess<W>();
-    for (const [k, v] of this) {
-      result.set(k, fn(v));
-    }
-    return result;
+  transformValues<W = V>(block: (value: V) => W): HashWithIndifferentAccess<W> {
+    const hash = this.dup() as unknown as HashWithIndifferentAccess<W>;
+    (hash as unknown as HashWithIndifferentAccess<V>).transformValuesBang(block as never);
+    return hash;
+  }
+
+  transformValuesBang(block: (value: V) => V): this {
+    for (const [k, v] of [...this]) super.set(k, block(v));
+    return this;
   }
 
   compact(): HashWithIndifferentAccess<NonNullable<V>> {
-    const result = new HashWithIndifferentAccess<NonNullable<V>>();
-    for (const [k, v] of this) {
-      if (v !== null && v !== undefined) {
-        result.set(k, v as NonNullable<V>);
-      }
-    }
+    const hash = this.dup();
+    hash.compactBang();
+    return hash as HashWithIndifferentAccess<NonNullable<V>>;
+  }
+
+  compactBang(): this | null {
+    return this.rejectBang((_k, v) => v == null);
+  }
+
+  extractBang(...keys: string[]): HashWithIndifferentAccess<V> {
+    const result = new (this.constructor as typeof HashWithIndifferentAccess<V>)();
+    for (const key of keys) if (this.hasKey(key)) result.set(key, this.delete(key));
     return result;
+  }
+
+  deepTransformKeys(block: (key: string) => string): HashWithIndifferentAccess<V> {
+    return this._deepTransformKeysInObject(this, block) as HashWithIndifferentAccess<V>;
+  }
+
+  deepTransformKeysBang(block: (key: string) => string): this {
+    return this._deepTransformKeysInObjectBang(this, block) as this;
+  }
+
+  deepStringifyKeys(): HashWithIndifferentAccess<V> {
+    return this.deepTransformKeys((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
+  }
+
+  deepStringifyKeysBang(): this {
+    return this.deepTransformKeysBang((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
   }
 
   any(fn?: (pair: [string, V]) => boolean): boolean {
@@ -433,7 +512,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   stringifyKeys(): HashWithIndifferentAccess<V> {
-    return this.transformKeys((key) => String(key));
+    return this.transformKeys((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
+  }
+
+  stringifyKeysBang(): this {
+    return this.transformKeysBang((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
   }
 
   symbolizeKeys(): Hash<string, unknown> {
@@ -472,13 +555,47 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return (key: string) => this.get(key);
   }
 
+  private _deepTransformKeysInObject(object: unknown, block: (key: string) => string): unknown {
+    if (object instanceof Hash) {
+      const result = new (this.constructor as typeof HashWithIndifferentAccess<unknown>)();
+      for (const [key, value] of object) {
+        result.set(block(key as string), this._deepTransformKeysInObject(value, block));
+      }
+      return result;
+    } else if (Array.isArray(object)) {
+      return object.map((e) => this._deepTransformKeysInObject(e, block));
+    } else {
+      return object;
+    }
+  }
+
+  private _deepTransformKeysInObjectBang(object: unknown, block: (key: string) => string): unknown {
+    if (object instanceof Hash) {
+      for (const key of [...object.keys()]) {
+        const value = object.get(key);
+        object.delete(key);
+        object.set(block(key as string), this._deepTransformKeysInObjectBang(value, block));
+      }
+      return object;
+    } else if (Array.isArray(object)) {
+      object.forEach((e, i) => (object[i] = this._deepTransformKeysInObjectBang(e, block)));
+      return object;
+    } else {
+      return object;
+    }
+  }
+
   private convertKey(key: unknown): string {
     return typeof key === "string" && key.startsWith(":") ? key.slice(1) : (key as string);
   }
 
   private convertValue(value: V, conversion?: string): V {
-    if (value instanceof HashWithIndifferentAccess) {
-      return value.nestedUnderIndifferentAccess() as V;
+    if (value instanceof Hash && rbObjRespondTo(value, "nestedUnderIndifferentAccess")) {
+      return (
+        value as unknown as { nestedUnderIndifferentAccess(): V }
+      ).nestedUnderIndifferentAccess();
+    } else if (value instanceof Hash) {
+      return new HashWithIndifferentAccess(value) as V;
     } else if (isPlainObject(value)) {
       return nestedUnderIndifferentAccess(value) as V;
     } else if (Array.isArray(value)) {
