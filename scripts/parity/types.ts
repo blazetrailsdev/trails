@@ -141,6 +141,9 @@ export interface MethodInfo {
    * missing-rails-args-tags.ts.
    */
   missingRailsArgs?: string[];
+  /** TS-side only (RFC 0153): the Ruby identifiers this declaration receipts
+   *  as permanent `naming` rows, via `@missingRailsName`. */
+  missingRailsNames?: string[];
   /**
    * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
    * suppression above, keyed by Ruby call. Carried so a receipt's permanence

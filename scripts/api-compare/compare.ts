@@ -148,6 +148,7 @@ import {
   type CallArgSkipReason,
 } from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
+import { refName } from "./naming-taxonomy.js";
 import {
   compareDefaults,
   compareLiteral,
@@ -2089,6 +2090,9 @@ interface CallArgMismatch {
   class: CallArgClass;
   rubyArgs: string[];
   tsArgs: string[];
+  /** A `naming` row's `@missingRailsName` receipts (RFC 0153): the Ruby
+   *  identifiers of its differing `ref:` pairs that the declaration receipts. */
+  receipts?: string[];
 }
 
 interface CallArgsResult {
@@ -2105,6 +2109,8 @@ interface CallArgsResult {
   /** The mismatches those tags DID suppress, each with its reason — the
    *  permanence report's population (RFC 0099). */
   suppressed: SuppressedCall[];
+  /** `@missingRailsName` tags on a COMPARED pair that matched no naming row. */
+  staleNameTags: StaleCallTag[];
 }
 
 function emptySkipTally(): Record<CallArgSkipReason, number> {
@@ -3313,6 +3319,10 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
+    const tsMissingNameTagsByFileName = new Map<
+      string,
+      Map<string, Map<string, Map<string, string>>>
+    >();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
@@ -3455,6 +3465,17 @@ export function main() {
           owner,
           m.missingRailsArgs,
           m.missingRailsArgsReasons,
+          scope,
+        );
+      }
+      if (m.missingRailsNames !== undefined) {
+        recordTaggedCalls(
+          tsMissingNameTagsByFileName,
+          file,
+          m.name,
+          owner,
+          m.missingRailsNames,
+          undefined,
           scope,
         );
       }
@@ -3764,6 +3785,7 @@ export function main() {
     // The same, for the call-ARGUMENT tags: a tag that never suppressed a
     // mismatch is STALE, the only-shrink half `@missingRailsCall` already has.
     const argTagsUsed = new Map<string, Set<string>>();
+    const nameTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
     // The call-ARGUMENT twin, reported in that artifact for the same reason:
     // its receipts carry a permanence claim and are a population of their own.
@@ -4266,6 +4288,11 @@ export function main() {
         );
         if (rubySites.length === 0) return;
         const argTags = tagsForOwner(tsMissingArgTagsByFileName.get(tsFile)?.get(tsName), tsClass);
+        const nameTags = tagsForOwner(
+          tsMissingNameTagsByFileName.get(tsFile)?.get(tsName),
+          tsClass,
+        );
+        const nameTagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
             ruby,
@@ -4279,6 +4306,7 @@ export function main() {
             continue;
           }
           callArgsCompared++;
+          if (nameTags && !nameTagsUsed.has(nameTagKey)) nameTagsUsed.set(nameTagKey, new Set());
           if (result.verdict !== "mismatch") continue;
           // A call-site receipt (`@missingRailsArgs <call> — <reason>`) takes
           // this deviation off the baseline: the reason is reviewed in the diff
@@ -4299,6 +4327,17 @@ export function main() {
             });
             continue;
           }
+          const receipts =
+            result.class === "naming" && nameTags
+              ? result.rubyArgs.flatMap((arg, i) => {
+                  const r = refName(arg);
+                  const t = refName(result.tsArgs[i] ?? "");
+                  return r !== undefined && t !== undefined && r !== t && nameTags.has(r)
+                    ? [r]
+                    : [];
+                })
+              : [];
+          for (const r of receipts) nameTagsUsed.get(nameTagKey)!.add(r);
           callArgMismatches.push({
             rubyFile,
             tsFile,
@@ -4308,6 +4347,7 @@ export function main() {
             class: result.class,
             rubyArgs: result.rubyArgs,
             tsArgs: result.tsArgs,
+            ...(receipts.length > 0 ? { receipts: [...new Set(receipts)] } : {}),
           });
         }
       };
@@ -4954,6 +4994,11 @@ export function main() {
           tsDeclFileByFileNameOwner,
         ),
         suppressed: suppressedArgCalls,
+        staleNameTags: staleCallTags(
+          tsMissingNameTagsByFileName,
+          nameTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
       },
       bodyHashes: bodyHashRecords,
     });
@@ -5142,12 +5187,15 @@ export function main() {
     const suppressedArgsFlat = results.flatMap((r) =>
       r.callArgs.suppressed.map((c) => ({ package: r.package, ...c })),
     );
+    const staleNameTagsFlat = results.flatMap((r) =>
+      r.callArgs.staleNameTags.map((t) => ({ package: r.package, ...t })),
+    );
     fs.writeFileSync(
       callArgsPath,
       JSON.stringify(
         {
           generatedAt: new Date().toISOString(),
-          note: "Arguments a matched TS call site passes vs the Ruby one, normalized (identifiers camelized, literals through literals.ts). `shape` = count/order/value/kwarg-key difference, gated by lint-call-args.ts; `naming` = a ref: identifier spelled differently, report-only (RFC 0096).",
+          note: "Arguments a matched TS call site passes vs the Ruby one, normalized (identifiers camelized, literals through literals.ts). `shape` = count/order/value/kwarg-key difference, gated by lint-call-args.ts; `naming` = a ref: identifier spelled differently, gated in NAMING_ENROLLED_PACKAGES (RFC 0153).",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           compared: results.reduce((n, r) => n + r.callArgs.compared, 0),
           mismatched: callArgsFlat.length,
@@ -5160,6 +5208,7 @@ export function main() {
           mismatches: callArgsFlat,
           staleTags: staleArgTagsFlat,
           suppressed: suppressedArgsFlat,
+          staleNameTags: staleNameTagsFlat,
         },
         null,
         2,

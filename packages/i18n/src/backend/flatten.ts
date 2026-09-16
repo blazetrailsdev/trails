@@ -134,7 +134,10 @@ export function storeLink(this: FlattenHost, locale: string, key: string, link: 
   return value;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName gsub — PERMANENT
+ */
 export function resolveLink(this: FlattenHost, locale: string, key: string): string {
   [key, locale] = [String(key), toSym(locale).slice(1)];
   const localeLinks = this.links().get(locale) ?? new Map<string, string>();

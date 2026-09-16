@@ -9,7 +9,7 @@
  * So this rule deletes comments and KEEPS exactly two kinds:
  *
  *   1. The repo's own JSDoc flags — `@internal`, `@noRailsEquivalent`,
- *      `@missingRailsCall`, `@missingRailsArgs` — together with the reason
+ *      `@missingRailsCall`, `@missingRailsArgs`, `@missingRailsName` — together with the reason
  *      argument each requires. `parity:api:extra` and
  *      `lint-missing-rails-call-reasons` read those reasons and they are
  *      reviewed, so they are arguments, not prose.
@@ -105,7 +105,7 @@ const DIRECTIVE_RE =
  * them and they are English by construction.
  */
 const KEPT_TAG_NAMES =
-  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated";
+  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|empty|deprecated";
 
 const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
 
@@ -152,7 +152,12 @@ const STORY_ID_RE = /^[\s:—-]*\(?(?:story\s+)?([a-z0-9]+(?:-[a-z0-9]+){2,})\)?
 const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:[^.]*\.?/u;
 
 /** Tags whose permanence claim the extractors switch on. */
-const REQUIRES_PERMANENCE = new Set(["noRailsEquivalent", "missingRailsCall", "missingRailsArgs"]);
+const REQUIRES_PERMANENCE = new Set([
+  "noRailsEquivalent",
+  "missingRailsCall",
+  "missingRailsArgs",
+  "missingRailsName",
+]);
 
 /**
  * A contiguous run of `//` comments is one human comment that happens to wrap,
@@ -269,7 +274,8 @@ function keptLines(comment) {
  */
 function renderTag({ name, text }) {
   const [subject, rest = ""] = text.split(/\s+—\s+/u, 2);
-  const takesSubject = name === "missingRailsCall" || name === "missingRailsArgs";
+  const takesSubject =
+    name === "missingRailsCall" || name === "missingRailsArgs" || name === "missingRailsName";
   const rubyCall = takesSubject ? subject.trim() : "";
   const permanence = PERMANENCE_RE.exec(takesSubject ? rest : text);
   // A tag whose required argument is missing cannot be reduced to data: a bare

@@ -535,7 +535,10 @@ export abstract class Base {
     return Base.prototype.loadYml.call(this, filename);
   }
 
-  /** @missingRailsCall load_file — PERMANENT */
+  /**
+   * @missingRailsCall load_file — PERMANENT
+   * @missingRailsName read — PERMANENT
+   */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
       return [deepFreeze(JSON.parse(readFile(filename))), true];

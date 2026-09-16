@@ -151,6 +151,7 @@ export async function eagerLoadBang(): Promise<void> {
 
 export type TranslateKey = TranslationKey | null;
 
+/** @missingRailsName throw — PERMANENT */
 export function translate(
   key: TranslateKey | TranslateKey[] = null,
   {
