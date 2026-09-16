@@ -36,7 +36,6 @@ function advance(
   if (dateOrTime instanceof RubyTime) {
     return (dateOrTime as unknown as { advance(options: unknown): DateOrInstant }).advance(options);
   }
-  // boundary: DateTime defines `advance` itself (date_time/calculations.rb:82), so a DateTime receiver answers it the way Ruby's method resolution does.
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.advance(dateOrTime, options) as never;
   dateOrTime = receiver(dateOrTime);
