@@ -105,7 +105,7 @@ export class Association {
     options: Record<string, unknown>,
   ): any {
     if (typeof name !== "string") {
-      throw new Error("association names must be a string");
+      throw new ArgumentError("association names must be a Symbol");
     }
 
     this.validateOptions(options);

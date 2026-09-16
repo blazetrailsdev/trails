@@ -232,8 +232,8 @@ export class Association {
   }
 
   private convertKey(key: unknown): unknown {
+    if (this.isKeyConversionRequired()) return key == null ? "" : String(key);
     if (key == null) return key;
-    if (this.isKeyConversionRequired()) return String(key);
     if (typeof key === "bigint") {
       return key >= MIN_SAFE_BIGINT && key <= MAX_SAFE_BIGINT ? Number(key) : key.toString();
     }
