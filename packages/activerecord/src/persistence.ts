@@ -180,8 +180,8 @@ export async function _insertRecord(
   const ctor = this as any;
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
-  if (ctor.isPrefetchPrimaryKey?.() && primaryKey && !Array.isArray(primaryKey)) {
-    if (values[primaryKey] == null) {
+  if (ctor.isPrefetchPrimaryKey?.() && primaryKey) {
+    if (values[primaryKey] == null || values[primaryKey] === false) {
       primaryKeyValue = ctor.nextSequenceValue?.();
       values[primaryKey] = ctor
         ._defaultAttributes()
