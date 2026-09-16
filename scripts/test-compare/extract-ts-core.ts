@@ -161,8 +161,9 @@ function countAssertions(
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
       const name = n.expression.text;
       const def = resolveHelper(helpers, name, n.pos);
-      if (def && isInlineDef(def, rootStart, rootEnd)) {
-        // counted lexically at its declaration; see isInlineDef
+      const inline = def !== null && isInlineDef(def, rootStart, rootEnd);
+      if (inline) {
+        /* counted lexically at its declaration — see isInlineDef */
       } else if (isAssertionCallee(name)) {
         count++;
       } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
@@ -307,8 +308,9 @@ function collectAssertionKinds(
       } else if (ts.isIdentifier(n.expression)) {
         const name = n.expression.text;
         const def = resolveHelper(helpers, name, n.pos);
-        if (def && isInlineDef(def, rootStart, rootEnd)) {
-          // counted lexically at its declaration; see isInlineDef
+        const inline = def !== null && isInlineDef(def, rootStart, rootEnd);
+        if (inline) {
+          /* counted lexically at its declaration — see isInlineDef */
         } else if (isAssertionCallee(name)) {
           // Bare `expect(...)` is recorded via its matcher chain above; a helper
           // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.

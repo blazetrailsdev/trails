@@ -721,11 +721,6 @@
     "reason": "Method-table surgery to silence redefinition warnings; JS reassignment is silent."
   },
   {
-    "pattern": "starts_ends_with.rb",
-    "package": "activesupport",
-    "reason": "Aliases `start_with?`/`end_with?` for Symbol and String; both are native JS."
-  },
-  {
     "pattern": "core_ext/string/multibyte.rb",
     "package": "activesupport",
     "reason": "`mb_chars` returns a Multibyte::Chars proxy and `is_utf8?` reports a Ruby Encoding; JS strings carry no encoding tag and are already Unicode."

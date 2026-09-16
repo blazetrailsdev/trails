@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 
 import { assert, assertNot } from "../testing/assertions.js";
-import { endsWith, startsWith } from "./string/starts-ends-with.js";
+import { endsWith, startsWith } from "./symbol/starts-ends-with.js";
 
 describe("SymbolStartsEndsWithTest", () => {
   it("starts ends with alias", () => {
