@@ -1,6 +1,9 @@
-export class OrderedHash<K, V> extends Map<K, V> {
+import { Hash } from "@blazetrails/ruby-compat";
+
+export class OrderedHash<K, V> extends Hash<K, V> {
   constructor(entries?: Iterable<readonly [K, V]>) {
-    super(entries);
+    super();
+    if (entries) for (const [k, v] of entries) this.set(k, v);
   }
 
   static from<K, V>(pairs: [K, V][]): OrderedHash<K, V> {
@@ -115,5 +118,54 @@ export class OrderedHash<K, V> extends Map<K, V> {
   inspect(): string {
     const parts = [...this.entries()].map(([k, v]) => `${JSON.stringify(k)}=>${JSON.stringify(v)}`);
     return `{${parts.join(", ")}}`;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/hash.c:3060`), inherited by `OrderedHash < ::Hash`.
+   */
+  eachValue(): MapIterator<V>;
+  eachValue(block: (value: V) => void): this;
+  eachValue(block?: (value: V) => void): this | MapIterator<V> {
+    const values = Map.prototype.values.call(this) as MapIterator<V>;
+    if (block === undefined) return values;
+    for (const value of values) block(value);
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/hash.c:3098`), inherited by `OrderedHash < ::Hash`.
+   */
+  eachKey(): MapIterator<K>;
+  eachKey(block: (key: K) => void): this;
+  eachKey(block?: (key: K) => void): this | MapIterator<K> {
+    const keys = Map.prototype.keys.call(this) as MapIterator<K>;
+    if (block === undefined) return keys;
+    for (const key of keys) block(key);
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/hash.c:3149`), inherited by `OrderedHash < ::Hash`.
+   */
+  eachPair(): MapIterator<[K, V]>;
+  eachPair(block: (key: K, value: V) => void): this;
+  eachPair(block?: (key: K, value: V) => void): this | MapIterator<[K, V]> {
+    const entries = Map.prototype.entries.call(this) as MapIterator<[K, V]>;
+    if (block === undefined) return entries;
+    for (const [key, value] of entries) block(key, value);
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each`, defined as `rb_hash_each_pair` (`vendor/ruby/hash.c:7219`).
+   */
+  each(): MapIterator<[K, V]>;
+  each(block: (key: K, value: V) => void): this;
+  each(block?: (key: K, value: V) => void): this | MapIterator<[K, V]> {
+    return block === undefined ? this.eachPair() : this.eachPair(block);
+  }
+
+  isExtractableOptions(): boolean {
+    return true;
   }
 }

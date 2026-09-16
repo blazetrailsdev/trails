@@ -1,38 +1,63 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { inspect } from "@blazetrails/ruby-compat";
 import { OrderedHash } from "./ordered-hash.js";
+import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
+import { extractOptionsBang } from "./hash-utils.js";
+
+const Enumerator = (globalThis as unknown as { Iterator: abstract new () => unknown }).Iterator;
 
 describe("OrderedHashTest", () => {
+  let keys: string[];
+  let values: string[];
+  let hash: Map<string, string>;
+  let orderedHash: OrderedHash<string, string>;
+
+  beforeEach(() => {
+    keys = ["blue", "green", "red", "pink", "orange"];
+    values = ["000099", "009900", "aa0000", "cc0066", "cc6633"];
+    hash = new Map();
+    orderedHash = new OrderedHash();
+
+    keys.forEach((key, index) => {
+      hash.set(key, values[index]);
+      orderedHash.set(key, values[index]);
+    });
+  });
+
   it("order", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("b", 2);
-    h.set("a", 1);
-    h.set("c", 3);
-    expect([...h.keys()]).toEqual(["b", "a", "c"]);
+    expect([...orderedHash.keys()]).toEqual(keys);
+    expect([...orderedHash.values()]).toEqual(values);
   });
 
   it("access", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("foo", 42);
-    expect(h.get("foo")).toBe(42);
-    expect(h.get("bar")).toBeUndefined();
+    expect([...hash].every(([k, v]) => orderedHash.get(k) === v)).toBeTruthy();
   });
 
   it("assignment", () => {
-    const h = new OrderedHash<string, string>();
-    h.set("key", "value");
-    expect(h.get("key")).toBe("value");
-    h.set("key", "new_value");
-    expect(h.get("key")).toBe("new_value");
-    expect(h.size).toBe(1);
+    const [key, value] = ["purple", "5422a8"];
+
+    orderedHash.set(key, value);
+    expect(orderedHash.size).toEqual(keys.length + 1);
+    expect([...orderedHash.keys()].at(-1)).toEqual(key);
+    expect([...orderedHash.values()].at(-1)).toEqual(value);
+    expect(orderedHash.get(key)).toEqual(value);
   });
 
   it("delete", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    h.delete("a");
-    expect(h.has("a")).toBe(false);
-    expect(h.size).toBe(1);
+    const [key, value] = ["white", "ffffff"];
+    const badKey = "black";
+
+    orderedHash.set(key, value);
+    expect(orderedHash.size).toEqual(keys.length + 1);
+    expect(orderedHash.size).toEqual([...orderedHash.keys()].length);
+
+    const deleted = orderedHash.get(key);
+    orderedHash.delete(key);
+    expect(deleted).toEqual(value);
+    expect(orderedHash.size).toEqual(keys.length);
+    expect(orderedHash.size).toEqual([...orderedHash.keys()].length);
+
+    expect(orderedHash.get(badKey)).toBeUndefined();
   });
 
   it("to hash", () => {
@@ -43,115 +68,83 @@ describe("OrderedHashTest", () => {
   });
 
   it("to a", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    expect(h.toArray()).toEqual([
-      ["a", 1],
-      ["b", 2],
-    ]);
+    expect(orderedHash.toArray()).toEqual(keys.map((k, i) => [k, values[i]]));
   });
 
   it("has key", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("foo", 1);
-    expect(h.has("foo")).toBe(true);
-    expect(h.has("bar")).toBe(false);
+    expect(orderedHash.has("blue")).toEqual(true);
+    expect(orderedHash.has("blue")).toEqual(true);
+    expect(orderedHash.has("blue")).toEqual(true);
+    expect(orderedHash.has("blue")).toEqual(true);
+
+    expect(orderedHash.has("indigo")).toEqual(false);
+    expect(orderedHash.has("indigo")).toEqual(false);
+    expect(orderedHash.has("indigo")).toEqual(false);
+    expect(orderedHash.has("indigo")).toEqual(false);
   });
 
   it("has value", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("foo", 42);
-    expect(h.hasValue(42)).toBe(true);
-    expect(h.hasValue(99)).toBe(false);
+    expect(orderedHash.hasValue("000099")).toEqual(true);
+    expect(orderedHash.hasValue("000099")).toEqual(true);
+    expect(orderedHash.hasValue("ABCABC")).toEqual(false);
+    expect(orderedHash.hasValue("ABCABC")).toEqual(false);
   });
 
   it("each key", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    const keys: string[] = [];
-    h.forEach((_, k) => keys.push(k));
-    expect(keys).toEqual(["a", "b"]);
+    const eachKeys: string[] = [];
+    expect(orderedHash.eachKey((k) => eachKeys.push(k))).toEqual(orderedHash);
+    expect(eachKeys).toEqual(keys);
+    expect(orderedHash.eachKey()).toBeInstanceOf(Enumerator);
   });
 
   it("each value", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    expect([...h.values()]).toEqual([1, 2]);
+    const eachValues: string[] = [];
+    expect(orderedHash.eachValue((v) => eachValues.push(v))).toEqual(orderedHash);
+    expect(eachValues).toEqual(values);
+    expect(orderedHash.eachValue()).toBeInstanceOf(Enumerator);
   });
 
   it("each", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("x", 10);
-    h.set("y", 20);
-    const entries: [string, number][] = [];
-    for (const [k, v] of h) entries.push([k, v]);
-    expect(entries).toEqual([
-      ["x", 10],
-      ["y", 20],
-    ]);
+    const eachValues: string[] = [];
+    expect(orderedHash.each((_key, value) => eachValues.push(value))).toEqual(orderedHash);
+    expect(eachValues).toEqual(values);
+    expect(orderedHash.each()).toBeInstanceOf(Enumerator);
   });
 
   it("each with index", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    const indexed: [number, string, number][] = [];
-    let i = 0;
-    for (const [k, v] of h) {
-      indexed.push([i++, k, v]);
-    }
-    expect(indexed[0]).toEqual([0, "a", 1]);
-    expect(indexed[1]).toEqual([1, "b", 2]);
+    [...orderedHash].forEach((pair, index) => expect(pair).toEqual([keys[index], values[index]]));
   });
 
   it("each pair", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("p", 5);
-    h.set("q", 6);
-    const pairs: [string, number][] = [];
-    for (const pair of h.entries()) pairs.push(pair);
-    expect(pairs).toEqual([
-      ["p", 5],
-      ["q", 6],
-    ]);
+    const pairValues: string[] = [];
+    const pairKeys: string[] = [];
+    orderedHash.eachPair((key, value) => {
+      pairKeys.push(key);
+      pairValues.push(value);
+    });
+    expect(pairValues).toEqual(values);
+    expect(pairKeys).toEqual(keys);
+    expect(orderedHash.eachPair()).toBeInstanceOf(Enumerator);
   });
 
   it("find all", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    h.set("c", 3);
-    const result = h.select((k, v) => v > 1);
-    expect([...result.keys()]).toEqual(["b", "c"]);
+    expect([...orderedHash.select(() => true)].map((pair) => pair[0])).toEqual(keys);
   });
 
   it("select", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("x", 10);
-    h.set("y", 5);
-    const result = h.select((k, v) => v >= 10);
-    expect(result.size).toBe(1);
-    expect(result.get("x")).toBe(10);
+    const newOrderedHash = orderedHash.select(() => true);
+    expect([...newOrderedHash].map((pair) => pair[0])).toEqual(keys);
+    expect(newOrderedHash).toBeInstanceOf(OrderedHash);
   });
 
   it("delete if", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    h.set("c", 3);
-    h.deleteIf((k, v) => v % 2 === 0);
-    expect([...h.keys()]).toEqual(["a", "c"]);
+    const copy = new OrderedHash(orderedHash);
+    copy.delete("pink");
+    expect(orderedHash.deleteIf((k) => k === "pink")).toEqual(copy);
+    expect([...orderedHash.keys()]).not.toContain("pink");
   });
 
   it("reject!", () => {
-    const keys = ["blue", "green", "red", "pink", "orange"];
-    const values = ["000099", "009900", "aa0000", "cc0066", "cc6633"];
-    const orderedHash = new OrderedHash<string, string>();
-    keys.forEach((key, index) => orderedHash.set(key, values[index]));
-
     const copy = new OrderedHash(orderedHash);
     copy.delete("pink");
     orderedHash.rejectBang((k) => k === "pink");
@@ -160,70 +153,76 @@ describe("OrderedHashTest", () => {
   });
 
   it("reject", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    const result = h.reject((k, v) => v > 1);
-    expect(result.size).toBe(1);
-    expect(result.get("a")).toBe(1);
+    const copy = new OrderedHash(orderedHash);
+    const newOrderedHash = orderedHash.reject((k) => k === "pink");
+    expect(orderedHash).toEqual(copy);
+    expect([...newOrderedHash.keys()]).not.toContain("pink");
+    expect([...orderedHash.keys()]).toContain("pink");
+    expect(newOrderedHash).toBeInstanceOf(OrderedHash);
   });
 
   it("clear", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.clear();
-    expect(h.size).toBe(0);
+    orderedHash.clear();
+    expect([...orderedHash.keys()]).toEqual([]);
   });
 
   it("merge", () => {
-    const h1 = new OrderedHash<string, number>();
-    h1.set("a", 1);
-    const h2 = new OrderedHash<string, number>();
-    h2.set("b", 2);
-    const merged = h1.merge(h2);
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe(2);
+    const otherHash = new OrderedHash<string, string>();
+    otherHash.set("purple", "800080");
+    otherHash.set("violet", "ee82ee");
+    const merged = orderedHash.merge(otherHash);
+    expect(orderedHash.size + otherHash.size).toEqual(merged.size);
+    expect([...merged.keys()]).toEqual([...keys, "purple", "violet"]);
   });
 
   it("merge with block", () => {
-    const h1 = new OrderedHash<string, number>();
-    h1.set("a", 1);
-    const h2 = new OrderedHash<string, number>();
-    h2.set("a", 2);
-    const merged = h1.merge(h2, (k, v1, v2) => v1 + v2);
-    expect(merged.get("a")).toBe(3);
+    const h = new OrderedHash<string, number>();
+    h.set("a", 0);
+    h.set("b", 0);
+    const merged = h.merge(
+      new OrderedHash([
+        ["b", 2],
+        ["c", 7],
+      ]),
+      (_key, _oldValue, newValue) => newValue + 1,
+    );
+
+    expect(merged.get("a")).toEqual(0);
+    expect(merged.get("b")).toEqual(3);
+    expect(merged.get("c")).toEqual(7);
   });
 
   it("merge bang with block", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    const other = new OrderedHash<string, number>();
-    other.set("a", 2);
-    h.mergeInPlace(other, (k, v1, v2) => v1 + v2);
-    expect(h.get("a")).toBe(3);
+    h.set("a", 0);
+    h.set("b", 0);
+    h.mergeInPlace(
+      new OrderedHash([
+        ["a", 1],
+        ["c", 7],
+      ]),
+      (_key, _oldValue, newValue) => newValue + 3,
+    );
+
+    expect(h.get("a")).toEqual(4);
+    expect(h.get("b")).toEqual(0);
+    expect(h.get("c")).toEqual(7);
   });
 
   it("shift", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("first", 1);
-    h.set("second", 2);
-    const pair = h.shift();
-    expect(pair).toEqual(["first", 1]);
-    expect(h.size).toBe(1);
+    const pair = orderedHash.shift()!;
+    expect(pair).toEqual([keys[0], values[0]]);
+    expect([...orderedHash.keys()]).not.toContain(pair[0]);
   });
 
   it("keys", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("z", 3);
-    h.set("a", 1);
-    expect([...h.keys()]).toEqual(["z", "a"]);
+    const original = [...orderedHash.keys()];
+    [...orderedHash.keys()].pop();
+    expect([...orderedHash.keys()]).toEqual(original);
   });
 
   it("inspect", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    expect(h.inspect()).toContain("a");
-    expect(h.inspect()).toContain("1");
+    expect(orderedHash.inspect()).toContain(inspect(hash));
   });
 
   it("json", () => {
@@ -234,20 +233,24 @@ describe("OrderedHashTest", () => {
   });
 
   it("alternate initialization with splat", () => {
-    const h = OrderedHash.from([
-      ["a", 1],
-      ["b", 2],
+    const alternate = OrderedHash.from([
+      [1, 2],
+      [3, 4],
     ]);
-    expect(h.get("a")).toBe(1);
-    expect(h.get("b")).toBe(2);
+    expect(alternate).toBeInstanceOf(OrderedHash);
+    expect([...alternate.keys()]).toEqual([1, 3]);
   });
 
   it("alternate initialization with array", () => {
-    const h = OrderedHash.from([
-      ["x", 10],
-      ["y", 20],
+    const alternate = OrderedHash.from<number | string, number | null>([
+      [1, 2],
+      [3, 4],
+      ["missing value", null],
     ]);
-    expect([...h.keys()]).toEqual(["x", "y"]);
+
+    expect(alternate).toBeInstanceOf(OrderedHash);
+    expect([...alternate.keys()]).toEqual([1, 3, "missing value"]);
+    expect([...alternate.values()]).toEqual([2, 4, null]);
   });
 
   it("alternate initialization raises exception on odd length args", () => {
@@ -255,17 +258,23 @@ describe("OrderedHashTest", () => {
   });
 
   it("replace updates keys", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    h.replace(new OrderedHash<string, number>([["c", 3]]));
-    expect([...h.keys()]).toEqual(["c"]);
+    const otherOrderedHash = OrderedHash.from([
+      ["black", "000000"],
+      ["white", "000000"],
+    ]);
+    const original = orderedHash.replace(otherOrderedHash);
+    expect(original).toBe(orderedHash);
+    expect([...orderedHash.keys()]).toEqual([...otherOrderedHash.keys()]);
   });
 
   it("nested under indifferent access", () => {
-    const h = new OrderedHash<string, unknown>();
-    h.set("data", { nested: true });
-    expect((h.get("data") as any).nested).toBe(true);
+    const flash = withIndifferentAccess({
+      a: OrderedHash.from([
+        ["b", 1],
+        ["c", 2],
+      ]),
+    });
+    expect(flash.get("a")).toBeInstanceOf(OrderedHash);
   });
 
   it("update sets keys", () => {
@@ -287,12 +296,8 @@ describe("OrderedHashTest", () => {
   });
 
   it("extractable", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    const [key, value] = [...h.entries()][0];
-    expect(key).toBe("a");
-    expect(value).toBe(1);
+    orderedHash.set("rails", "snowman");
+    expect(extractOptionsBang([1, 2, orderedHash])).toEqual(orderedHash);
   });
 
   it.skip("each after yaml serialization");

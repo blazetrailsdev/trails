@@ -141,6 +141,7 @@ export abstract class CurrentAttributes {
     return this.instance().set(attributes, block);
   }
 
+  /** @missingRailsCall each_value — PERMANENT */
   static resetAll(): void {
     for (const instance of this.currentInstances().values()) instance.reset();
   }
