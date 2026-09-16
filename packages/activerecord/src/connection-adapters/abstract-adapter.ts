@@ -65,7 +65,7 @@ import {
   disableQueryCacheBang as disableQueryCacheBangMixin,
   clearQueryCache as clearQueryCacheMixin,
   checkVersion as checkVersionMixin,
-  makeCachedSelectAll,
+  selectAll as querySelectAll,
   dirtiesQueryCache,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
@@ -95,7 +95,7 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import { include } from "@blazetrails/activesupport";
+import { include, prepend, type PrependMethod } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -2264,15 +2264,7 @@ include(AbstractAdapter, {
   bindParamsLength,
 });
 
-{
-  const baseSelectAll = AbstractAdapter.prototype.selectAll;
-  Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
-    value: makeCachedSelectAll(baseSelectAll as never),
-    writable: true,
-    configurable: true,
-    enumerable: false,
-  });
-}
+prepend(AbstractAdapter.prototype, { selectAll: querySelectAll as PrependMethod });
 
 dirtiesQueryCache(
   AbstractAdapter,
