@@ -194,20 +194,23 @@ export async function _insertRecord(
   const im = new InsertManager(arelTable);
 
   const entries = Object.entries(values);
-  if (entries.length > 0) {
+  if (entries.length === 0) {
+    im.insert(connection.emptyInsertStatementValue(primaryKey));
+  } else {
     im.insert(entries.map(([col, val]) => [arelTable.get(col), val]));
   }
 
-  const cols = typeof ctor.columns === "function" ? (ctor.columns() as { name: string }[]) : [];
-  const pkExists = cols.length === 0 || cols.some((c) => c.name === primaryKey);
-  const pkArg: string | false =
-    !Array.isArray(primaryKey) && primaryKey && pkExists ? primaryKey : false;
-  if (entries.length === 0) {
-    im.insert(connection.emptyInsertStatementValue(!Array.isArray(primaryKey) ? primaryKey : null));
-  }
-  return connection.insert(im, `${ctor.name} Create`, pkArg, primaryKeyValue, undefined, [], {
-    returning: returning ?? null,
-  });
+  return connection.insert(
+    im,
+    `${ctor.name} Create`,
+    primaryKey || false,
+    primaryKeyValue,
+    undefined,
+    [],
+    {
+      returning: returning ?? null,
+    },
+  );
 }
 
 export async function _updateRecord(
