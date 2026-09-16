@@ -4293,7 +4293,6 @@ export function main() {
           tsClass,
         );
         const nameTagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
-        if (nameTags) nameTagsUsed.set(nameTagKey, nameTagsUsed.get(nameTagKey) ?? new Set());
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
             ruby,
@@ -4307,6 +4306,7 @@ export function main() {
             continue;
           }
           callArgsCompared++;
+          if (nameTags && !nameTagsUsed.has(nameTagKey)) nameTagsUsed.set(nameTagKey, new Set());
           if (result.verdict !== "mismatch") continue;
           // A call-site receipt (`@missingRailsArgs <call> — <reason>`) takes
           // this deviation off the baseline: the reason is reviewed in the diff
