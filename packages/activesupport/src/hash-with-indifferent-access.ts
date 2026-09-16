@@ -1,6 +1,13 @@
 import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
-import { type DefaultProc, Hash, KeyError, TypeError, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  type DefaultProc,
+  Hash,
+  KeyError,
+  TypeError,
+  eachPair,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 
@@ -143,6 +150,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.update(...args);
   }
 
+  /** @missingRailsArgs each_pair — PERMANENT */
   private updateWithSingleArgument(
     otherHash: AnyObject | HashWithIndifferentAccess<V>,
     block?: BlockFn<V>,
@@ -150,13 +158,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     if (otherHash instanceof HashWithIndifferentAccess) {
       this.regularUpdate(otherHash, block);
     } else {
-      for (const [key, given] of Object.entries(otherHash) as [string, V][]) {
-        let value = given;
+      eachPair(otherHash as Record<string, V>, (key, value) => {
         if (block && this.key(key)) {
           value = block(this.convertKey(key), this.get(key)!, value);
         }
         this.regularWriter(this.convertKey(key), this.convertValue(value));
-      }
+      });
     }
   }
 

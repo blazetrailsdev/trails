@@ -20,6 +20,7 @@ export class Deprecators {
     this._deprecators.set(name, deprecator);
   }
 
+  /** @missingRailsCall each_value — PERMANENT */
   each(): IterableIterator<Deprecation>;
   each(block: (deprecator: Deprecation) => void): void;
   each(block?: (deprecator: Deprecation) => void): IterableIterator<Deprecation> | void {

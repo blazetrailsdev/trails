@@ -44,6 +44,7 @@ export class SimpleStubs {
     (object as Record<string, unknown>)[methodName] = block;
   }
 
+  /** @missingRailsCall each_value — PERMANENT */
   unstubAllBang(): void {
     for (const objectStubs of this.stubs.values()) {
       for (const stub of objectStubs.values()) {
