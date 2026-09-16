@@ -13,6 +13,8 @@ import {
   assertRaises,
 } from "../testing/assertions.js";
 import { Duration } from "../duration.js";
+import { setFrozenTime } from "../time-travel.js";
+import { inTimeZone } from "./date-and-time/zones.js";
 import { zone as timeZone, setZone } from "../time-zone-config.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -31,18 +33,18 @@ import {
   toDate,
   daysInMonth,
   daysInYear,
-  isPast,
-  isFuture,
   nextWeek,
   nextMonth,
   prevMonth,
   nextYear,
   prevYear,
 } from "../time-ext.js";
-import { toFs, DATE_FORMATS, formattedOffset, xmlschema } from "./time/conversions.js";
+import { toFs, DATE_FORMATS, formattedOffset } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
 import {
   lastQuarter,
+  isFuture,
+  isPast,
   isNextDay,
   isPrevDay,
   isToday,
@@ -129,6 +131,15 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
       process.env.TZ = orig;
     }
     resetLocalTimeZoneId();
+  }
+}
+
+function withTimeCurrent<T>(current: Date | TimeWithZone, fn: () => T): T {
+  setFrozenTime(current instanceof Date ? current : new Date(current.toI() * 1000));
+  try {
+    return fn();
+  } finally {
+    setFrozenTime(null);
   }
 }
 
@@ -974,7 +985,7 @@ describe("TimeExtCalculationsTest", () => {
     const oneAm1 = zoned("US/Eastern", 2005, 10, 30, 1, 0, 0);
     const oneAm2 = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0).subtract({ seconds: 3600 });
     const twoAm = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0);
-    expect(Temporal.ZonedDateTime.compare(oneAm1, oneAm2)).toBe(-1);
+    expect(oneAm1.epochNanoseconds).toBeLessThan(oneAm2.epochNanoseconds);
 
     expect(change(midnight, { hour: 1 }).equals(oneAm1)).toBe(true);
     expect(change(midnight, { hour: 2 }).equals(twoAm)).toBe(true);
@@ -1039,7 +1050,7 @@ describe("TimeExtCalculationsTest", () => {
     const one30Am1 = zoned(tz, 2005, 3, 27, 1, 30, 0);
     const one30Am2 = zoned(tz, 2005, 3, 27, 2, 0, 0).subtract({ seconds: 1800 });
     const twoAm = zoned(tz, 2005, 3, 27, 2, 0, 0);
-    expect(Temporal.ZonedDateTime.compare(one30Am1, one30Am2)).toBe(-1);
+    expect(one30Am1.epochNanoseconds).toBeLessThan(one30Am2.epochNanoseconds);
 
     expect(change(oneAm, { min: 30 }).equals(one30Am1)).toBe(true);
     expect(change(oneAm, { hour: 2 }).equals(twoAm)).toBe(true);
@@ -1437,17 +1448,14 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("rfc3339 with fractional seconds", () => {
-    const t = new Date(1999, 11, 31, 19, 0, 0, 125);
-    const result = xmlschema(t);
-    expect(result).toContain(".125");
+    const time = RubyTime.new(1999, 12, 31, 19, 0, new Rational(1, 8), -18000);
+    expect(time.xmlschema(3)).toBe("1999-12-31T19:00:00.125-05:00");
   });
 
   it("to date", () => {
-    const t = d(2005, 2, 21, 17, 44, 30);
-    const result = toDate(t);
-    expect(result.year).toBe(2005);
-    expect(result.month).toBe(2);
-    expect(result.day).toBe(21);
+    expect(toDate(d(2005, 2, 21, 17, 44, 30)).equals(new Temporal.PlainDate(2005, 2, 21))).toBe(
+      true,
+    );
   });
 
   it("to datetime", () => {
@@ -1483,9 +1491,15 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to time", () => {
-    const t = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
-    const result = toTime(t);
-    expect(result.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+    withEnvTz("US/Eastern", () => {
+      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30)).constructor).toBe(RubyTime);
+      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30))).toEqual(
+        RubyTime.local(2005, 2, 21, 17, 44, 30),
+      );
+      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30)).utcOffset).toBe(
+        RubyTime.local(2005, 2, 21, 17, 44, 30).utcOffset,
+      );
+    });
   });
 
   it("fp inaccuracy ticket 1836", () => {
@@ -1604,27 +1618,63 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("past with time current as time local", () => {
-    const past = new Date(Date.now() - 10000);
-    expect(isPast(past)).toBe(true);
-    const future = new Date(Date.now() + 100000);
-    expect(isPast(future)).toBe(false);
+    withEnvTz("US/Eastern", () => {
+      withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
+        expect(isPast(d(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast(d(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast(d(2005, 2, 10, 15, 30, 46))).toBe(false);
+        expect(isPast(utc(2005, 2, 10, 20, 30, 44))).toBe(true);
+        expect(isPast(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isPast(utc(2005, 2, 10, 20, 30, 46))).toBe(false);
+      });
+    });
   });
 
   it("past with time current as time with zone", () => {
-    const past = new Date(Date.now() - 10000);
-    expect(isPast(past)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const twz = inTimeZone(
+        RubyTime.utc(2005, 2, 10, 15, 30, 45),
+        "Central Time (US & Canada)",
+      ) as TimeWithZone;
+      withTimeCurrent(twz, () => {
+        expect(isPast(d(2005, 2, 10, 10, 30, 44))).toBe(true);
+        expect(isPast(d(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isPast(d(2005, 2, 10, 10, 30, 46))).toBe(false);
+        expect(isPast(utc(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast(utc(2005, 2, 10, 15, 30, 46))).toBe(false);
+      });
+    });
   });
 
   it("future with time current as time local", () => {
-    const future = new Date(Date.now() + 10000);
-    expect(isFuture(future)).toBe(true);
-    const past = new Date(Date.now() - 100000);
-    expect(isFuture(past)).toBe(false);
+    withEnvTz("US/Eastern", () => {
+      withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
+        expect(isFuture(d(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture(d(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture(d(2005, 2, 10, 15, 30, 46))).toBe(true);
+        expect(isFuture(utc(2005, 2, 10, 20, 30, 44))).toBe(false);
+        expect(isFuture(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isFuture(utc(2005, 2, 10, 20, 30, 46))).toBe(true);
+      });
+    });
   });
 
   it("future with time current as time with zone", () => {
-    const future = new Date(Date.now() + 10000);
-    expect(isFuture(future)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const twz = inTimeZone(
+        RubyTime.utc(2005, 2, 10, 15, 30, 45),
+        "Central Time (US & Canada)",
+      ) as TimeWithZone;
+      withTimeCurrent(twz, () => {
+        expect(isFuture(d(2005, 2, 10, 10, 30, 44))).toBe(false);
+        expect(isFuture(d(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isFuture(d(2005, 2, 10, 10, 30, 46))).toBe(true);
+        expect(isFuture(utc(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture(utc(2005, 2, 10, 15, 30, 46))).toBe(true);
+      });
+    });
   });
 
   it("acts like time", () => {
@@ -1690,8 +1740,11 @@ describe("TimeExtCalculationsTest", () => {
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
 
-    expect(() => RubyTime.at(RubyTime.now(), 0)).toThrow(TypeError);
-    expect(() => RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0), 0)).toThrow(TypeError);
+    expect(() =>
+      expect(RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0), 0)).toEqual(
+        RubyTime.utc(2000, 1, 1, 0, 0, 0),
+      ),
+    ).toThrow(TypeError);
   });
 
   it("at with datetime returns local time", () => {
@@ -1718,8 +1771,9 @@ describe("TimeExtCalculationsTest", () => {
       RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString(),
     );
 
-    expect(() => RubyTime.at(RubyTime.now(), 0)).toThrow(TypeError);
-    expect(() => RubyTime.at(twz, 0)).toThrow(TypeError);
+    expect(() => expect(RubyTime.at(twz, 0)).toEqual(RubyTime.utc(2000, 1, 1, 0, 0, 0))).toThrow(
+      TypeError,
+    );
   });
 
   it("at with in option", () => {
