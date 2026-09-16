@@ -54,6 +54,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
+import { College } from "./test-helpers/models/college.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company } from "./test-helpers/models/company.js";
@@ -785,6 +786,7 @@ describe("FixtureNameIsNotTableNameMultipleFixturesTest", () => {
 });
 
 describe("CustomConnectionFixturesTest", () => {
+  registerModel(College);
   const { courses } = fixtures(
     { courses: [Course, courseFixtureData] },
     { useTransactionalTests: false },
@@ -802,6 +804,7 @@ describe("CustomConnectionFixturesTest", () => {
 });
 
 describe("TransactionalFixturesOnCustomConnectionTest", () => {
+  registerModel(College);
   const { courses } = fixtures({ courses: [Course, courseFixtureData] });
 
   it("leaky destroy", async () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
+import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -136,6 +136,29 @@ describe("schemaCheck", () => {
     const out = schemaCheck("authors", { david: { id: 1, name: "D", bogus: 1 } }, schema, notes);
     expect(out).toEqual({ ported: true, extras: 1 });
     expect(notes[0]).toMatch(/^schema-extra-col: david\.bogus/);
+  });
+  it("keys belongs_to associations by fully qualified class and follows inheritance", () => {
+    const klass = (qualifiedName: string, parent: string, belongsTo: string[] = []) => ({ name: qualifiedName.split("::").pop()!, qualifiedName, parent, tableName: null, associations: belongsTo.map((name) => ({ kind: "belongs_to", name, options: {} })), validations: [], scopes: [], callbacks: [], attributes: [] }); // prettier-ignore
+    const map = belongsToAssociationsByClass([
+      { file: "test/models/user.rb", classes: [klass("User", "ActiveRecord::Base")] },
+      {
+        file: "test/models/admin/user.rb",
+        classes: [klass("Admin::User", "ActiveRecord::Base", ["account"])],
+      },
+      {
+        file: "test/models/parrot.rb",
+        classes: [klass("Parrot", "ActiveRecord::Base"), klass("DeadParrot", "Parrot", ["killer"])],
+      },
+    ]);
+    expect([...map.get("User")!]).toEqual([]);
+    expect([...map.get("Admin::User")!]).toEqual(["account"]);
+    expect([...map.get("Parrot")!]).toEqual(["killer"]);
+  });
+  it("allows a belongs_to association label only when the association is known", () => {
+    const withFk: Schema = { users: { account_id: "integer" } };
+    const rows = { david: { id: 1, account: "signals37", accountant: "x" } };
+    expect(schemaCheck("users", rows, withFk, [], new Set(["account"])).extras).toBe(1);
+    expect(schemaCheck("users", rows, withFk, []).extras).toBe(2);
   });
   it("reads columns from the WrappedTableSchema shape; composite PK suppresses implicit `id`", () => {
     // define-schema.ts sets createOpts.id = false for both primaryKey:false
@@ -621,6 +644,7 @@ describe("canonicalizeRailsRow + FK_OVERRIDES", () => {
 
 const emptyClass = (): RubyClass => ({
   name: "Foo",
+  qualifiedName: "Foo",
   parent: "ActiveRecord::Base",
   tableName: null,
   associations: [],

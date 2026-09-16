@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
-import { FixtureSet, isFixtureRef } from "../../fixtures.js";
+import { FixtureSet } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
 import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";
@@ -496,17 +496,12 @@ describe("admin/users (slash-keyed subdir fixture)", () => {
 
   it("david has correct name and account_id ref to admin_accounts", () => {
     expect(adminUsersFixtureData.david.name).toBe("David");
-    const acctRef = adminUsersFixtureData.david.account_id;
-    expect(isFixtureRef(acctRef)).toBe(true);
-    expect(acctRef.tableName).toBe("admin_accounts");
-    expect(acctRef.fixtureName).toBe("signals37");
+    expect(adminUsersFixtureData.david.account).toBe("signals37");
   });
 
   it("jamis has settings with symbol key and account_id ref", () => {
     expect(adminUsersFixtureData.jamis.name).toBe("Jamis");
-    const acctRef = adminUsersFixtureData.jamis.account_id;
-    expect(isFixtureRef(acctRef)).toBe(true);
-    expect(acctRef.fixtureName).toBe("signals37");
+    expect(adminUsersFixtureData.jamis.account).toBe("signals37");
     expect((adminUsersFixtureData.jamis.settings as Record<string, string>).symbol).toBe("symbol");
   });
 });

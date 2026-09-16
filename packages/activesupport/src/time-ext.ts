@@ -419,33 +419,6 @@ export function onWeekend(date: Date): boolean {
   return !onWeekday(date);
 }
 
-export function isToday(date: Date): boolean {
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
-
-export function isTomorrow(date: Date): boolean {
-  const tomorrow = new Date(nextDay(new Date()).epochMilliseconds);
-  return (
-    date.getFullYear() === tomorrow.getFullYear() &&
-    date.getMonth() === tomorrow.getMonth() &&
-    date.getDate() === tomorrow.getDate()
-  );
-}
-
-export function isYesterday(date: Date): boolean {
-  const yesterday = new Date(prevDay(new Date()).epochMilliseconds);
-  return (
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate()
-  );
-}
-
 export function isPast(date: Date | Temporal.Instant): boolean {
   const instant = date instanceof Date ? instantFrom(date) : date;
   return Temporal.Instant.compare(instant, Temporal.Now.instant()) < 0;

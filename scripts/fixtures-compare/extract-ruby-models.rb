@@ -44,6 +44,7 @@ def parse_file(path)
   lines = File.readlines(path, chomp: true)
   classes = []
   stack = []   # [{cls:, depth:}]
+  modules = [] # [{name:, depth:}]
   depth = 0    # simple brace/do/end depth approximation
 
   lines.each do |raw|
@@ -60,12 +61,21 @@ def parse_file(path)
     # Cancel the `def` from opens (not closes) so net delta stays 0.
     opens -= 1 if line =~ /^\s*def\s+\w[\w?!]*\s*=/ && !line.include?(" end")
 
+    if (m = line.match(/^module\s+(\w+(?:::\w+)*)\s*$/))
+      depth += 1
+      modules << { name: m[1], depth: depth }
+      depth += (opens - 1) - closes
+      modules.pop while modules.last && depth < modules.last[:depth]
+      next
+    end
+
     if (m = line.match(/^class\s+(\w+(?:::\w+)*)(?:\s*<\s*([\w:]+))?/))
       # Enter the class body at depth+1, then apply remaining tokens on this line.
       # `class` itself counted in opens; remaining opens = opens-1, closes = closes.
       # e.g. `class Foo; end` → depth+1, then -1 → back to parent depth, stack popped.
       depth += 1
-      cls = { name: m[1], parent: m[2], tableName: nil,
+      namespace = modules.map { |mod| mod[:name] }.join("::")
+      cls = { name: m[1], qualifiedName: namespace.empty? ? m[1] : "#{namespace}::#{m[1]}", parent: m[2], tableName: nil,
               associations: [], validations: [], scopes: [], callbacks: [], attributes: [] }
       stack << { cls: cls, depth: depth }
       classes << cls
@@ -78,6 +88,7 @@ def parse_file(path)
 
     # Pop classes whose depth we've left.
     stack.pop while stack.last && depth < stack.last[:depth]
+    modules.pop while modules.last && depth < modules.last[:depth]
 
     next if stack.empty?
     cls = stack.last[:cls]

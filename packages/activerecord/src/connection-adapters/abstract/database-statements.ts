@@ -1171,6 +1171,8 @@ type BuildFixtureHost = DatabaseStatementsHost &
     supportsVirtualColumns?(): Promise<boolean> | boolean;
     defaultInsertValue?(column: unknown): unknown;
     lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
+    typeMap?: unknown;
+    verifyBang?(): Promise<void>;
   };
 
 /** @internal */
@@ -1179,6 +1181,7 @@ export async function buildFixtureSql(
   fixtures: Record<string, unknown>[],
   tableName: string,
 ): Promise<string> {
+  if (this.typeMap == null) await this.verifyBang?.();
   const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
   const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
     ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),

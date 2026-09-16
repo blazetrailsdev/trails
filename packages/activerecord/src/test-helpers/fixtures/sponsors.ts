@@ -1,18 +1,16 @@
-import { ref } from "../../fixtures.js";
-
 export const sponsorFixtureData = {
   moustache_club_sponsor_for_groucho: {
-    club_id: ref("clubs", "moustache_club"),
+    sponsorClub: "moustache_club",
     sponsorable_id: 1,
     sponsorable_type: "Member",
   },
   boring_club_sponsor_for_groucho: {
-    club_id: ref("clubs", "boring_club"),
+    sponsorClub: "boring_club",
     sponsorable_id: 2,
     sponsorable_type: "Member",
   },
   outrageous_club_sponsor_for_groucho: {
-    club_id: ref("clubs", "outrageous_club"),
+    sponsorClub: "outrageous_club",
     sponsorable_id: 3,
     sponsorable_type: "Member",
   },

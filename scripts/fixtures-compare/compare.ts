@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { camelize, singularize } from "../../packages/activesupport/src/index.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Schema, TableSchema } from "../../packages/activerecord/src/support/schema-types.js";
 import {
@@ -139,7 +140,7 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // + 4 all/ fixtures ported in Phase 9 (missing: 5 → 1).
 // + Phase 10 (primary_key_error/) — missing: 1 → 0; diff: 9 → 10 (intentional: negative-
 //   assertion fixture omits ownedEssay column by design, not a data parity gap).
-const CI_BASELINE = { match: 135, diff: 8, missing: 0 } as const;
+const CI_BASELINE = { match: 137, diff: 6, missing: 0 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
@@ -589,11 +590,46 @@ export function withoutIgnoredFixtures(rows: FixtureMap): FixtureMap {
   return Object.fromEntries(Object.entries(rows).filter(([label]) => !ignored.has(label)));
 }
 
+export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
+  const classes = new Map<string, RubyClass>();
+  for (const entry of manifest)
+    for (const klass of entry.classes) classes.set(klass.qualifiedName, klass);
+  const parentOf = (klass: RubyClass): RubyClass | undefined => {
+    if (!klass.parent) return undefined;
+    const namespace = klass.qualifiedName.split("::").slice(0, -1);
+    for (let i = namespace.length; i >= 0; i--) {
+      const candidate = classes.get([...namespace.slice(0, i), klass.parent].join("::"));
+      if (candidate) return candidate;
+    }
+    return undefined;
+  };
+  const ancestors = (klass: RubyClass): RubyClass[] => {
+    const chain: RubyClass[] = [];
+    for (let c: RubyClass | undefined = klass; c && !chain.includes(c); c = parentOf(c))
+      chain.push(c);
+    return chain;
+  };
+  const out = new Map<string, Set<string>>();
+  for (const [name, klass] of classes) {
+    const names = new Set<string>();
+    for (const other of classes.values()) {
+      if (!ancestors(klass).includes(other) && !ancestors(other).includes(klass)) continue;
+      for (const a of other.associations) {
+        if (a.kind === "belongs_to")
+          names.add(a.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()));
+      }
+    }
+    out.set(name, names);
+  }
+  return out;
+}
+
 export function schemaCheck(
   snake: string,
   tsRows: FixtureMap,
   schema: Schema,
   notes: string[],
+  belongsTo: ReadonlySet<string> = new Set(),
 ): { ported: boolean; extras: number } {
   const table = schema[snake];
   if (!table) return { ported: false, extras: 0 };
@@ -613,6 +649,7 @@ export function schemaCheck(
       // the fixture loader materializes it into a join table (see HABTM_LABEL_ATTRS).
       if (labelAttrs?.has(attr)) continue;
       if (COMPOSITE_FK_LABEL_ATTRS[snake]?.has(attr)) continue;
+      if (belongsTo.has(attr)) continue;
       notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
       extras++;
     }
@@ -635,7 +672,7 @@ export function schemaCheck(
  * column list AND the `_id` form is missing do we drop the key as HABTM-like.
  */
 // prettier-ignore
-export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = ""): Row {
+export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = "", belongsTo: ReadonlySet<string> = new Set()): Row {
   const out: Row = {};
   const overrides: Readonly<Record<string, string>> = FK_OVERRIDES[table] ?? {};
   // Use Object.hasOwn for the schemaless tsRow probe so prototype keys
@@ -650,6 +687,8 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
     // `id` column — normalize before column matching, as the value side does.
     const k = normalizeSymbolKey(rawKey);
     if (known(k) || COMPOSITE_FK_LABEL_ATTRS[table]?.has(k)) { out[k] = v; continue; } // prettier-ignore
+    const assocKey = k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    if (belongsTo.has(assocKey) && Object.hasOwn(tsRow, assocKey)) { out[assocKey] = v; continue; } // prettier-ignore
     // Rails' `replace_belongs_to_keys` also handles polymorphic shorthand —
     // `assoc: label (Type)` splits into `<col>` + `<assoc>_type`. Shared
     // between the convention path and FK_OVERRIDES so an override on a
@@ -681,7 +720,7 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
 }
 
 // prettier-ignore
-export async function compareFile(yamlPath: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = TEST_SCHEMA): Promise<FileResult> {
+export async function compareFile(yamlPath: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = TEST_SCHEMA, associations: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Promise<FileResult> {
   const snake = yamlPath.replace(/\.yml$/, "");
   // Derive the DB table name for schema/FK lookups from the fixture path.
   // Two conventions:
@@ -726,7 +765,10 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
     r.notes.push(keys.length > 1 ? `${tsBase} exports ${keys.length} *FixtureData symbols (expected 1)` : `no *FixtureData export in ${tsBase}`); // prettier-ignore
     return r;
   }
-  const sc = schemaCheck(tableSnake, tsRows, schema, r.notes);
+  const yamlFile = path.join(YML_DIR, yamlPath);
+  const modelClass = (existsSync(yamlFile) ? /^_fixture:\s*\n\s+model_class:\s*(\S+)/m.exec(readFileSync(yamlFile, "utf8"))?.[1] : undefined) ?? snake.split("/").map((segment, i, all) => camelize(i === all.length - 1 ? singularize(segment) : segment)).join("::");
+  const belongsTo = associations.get(modelClass) ?? new Set<string>();
+  const sc = schemaCheck(tableSnake, tsRows, schema, r.notes, belongsTo);
   r.schemaPorted = sc.ported;
   r.schemaExtras = sc.extras;
   let anyDiff = sc.extras > 0;
@@ -744,7 +786,7 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
       anyDiff = true;
       continue;
     }
-    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols, tableSnake);
+    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols, tableSnake, belongsTo);
     r.rowsMatched++;
     if ("id" in railsRow && (!("id" in tsRow) || tsRow.id !== railsRow.id)) {
       r.notes.push(`id-divergence: ${rowName} ts=${String(tsRow.id)} rails=${String(railsRow.id)}`);
@@ -873,11 +915,14 @@ async function main(): Promise<void> {
     }
   }
   const idIndex = buildIdIndex(yamlByTableName);
+  const associations = belongsToAssociationsByClass(loadRubyModelsManifest());
 
   const results: FileResult[] = [];
   for (const f of yamlFiles) {
     const snake = f.replace(/\.yml$/, "");
-    results.push(await compareFile(f, yamlByTable, idIndex, prelim.get(snake)));
+    results.push(
+      await compareFile(f, yamlByTable, idIndex, prelim.get(snake), TEST_SCHEMA, associations),
+    );
   }
 
   for (const r of results) {
@@ -982,6 +1027,7 @@ interface RubyAttr {
 }
 export interface RubyClass {
   name: string;
+  qualifiedName: string;
   parent: string | null;
   tableName: string | null;
   associations: RubyAssoc[];

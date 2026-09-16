@@ -362,10 +362,10 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "The `included do` block and ClassMethods (set_fixture_class, fixtures, " +
       "setup_fixture_accessors, uses_transaction) are ported in test-fixtures.ts. " +
-      "Still unported: the `fixtures :all` .yml glob, before_setup/after_teardown, " +
+      "Still unported: before_setup/after_teardown, " +
       "setup_fixtures/teardown_fixtures and the transactional/shared-pool helpers, " +
       "whose trails counterpart is with-transactional-fixtures.ts under trails names. " +
-      "CONVERGEABLE port-test-fixtures-all-glob.",
+      "CONVERGEABLE port-test-fixtures-transactional-setup.",
   },
   {
     testFile: "test_fixtures_test.rb",
@@ -377,8 +377,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "the result passed? (test_fixtures_test.rb:33-72). Vitest has no runnable-per-" +
       "instance test object to construct and run from inside another test, and trails' " +
       "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
-      "setup has a counterpart; the `fixtures :all` glob it relies on is still unported " +
-      "(CONVERGEABLE port-test-fixtures-all-glob). The other 3 cases are ported in test-fixtures.test.ts.",
+      "setup has a counterpart. The other 3 cases are ported in test-fixtures.test.ts.",
   },
   {
     pattern: "encryption/encrypted_fixtures.rb",

@@ -1,4 +1,4 @@
-import { ref } from "../../fixtures.js";
+import { FixtureSet } from "../../fixtures.js";
 
 export const cpkReviewFixtureData = {
   first_book_review: {
@@ -8,7 +8,7 @@ export const cpkReviewFixtureData = {
   },
   second_book_review_for_book_with_partial_pk_defined: {
     book: "cpk_great_author_first_book",
-    author_id: ref("cpk_authors", "cpk_great_author"),
+    author_id: FixtureSet.identify("cpk_great_author"),
     rating: 5,
     comment: "The first book was alright.",
   },

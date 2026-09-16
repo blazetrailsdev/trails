@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, type TaskContext } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
-import { include, included } from "@blazetrails/ruby-compat";
+import { Dir, File as RubyFile, include, included } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   extend,
@@ -8,12 +8,8 @@ import {
   runLoadHooks,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import {
-  prepareJoinTableFixtures,
-  insertPreparedFixtureSets,
-  FixtureSet,
-  type PreparedFixtureSet,
-} from "./fixtures.js";
+import { FixtureSet, checkAllForeignKeysValidBang } from "./fixtures.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import {
   fixtureRegistry,
   isJoinTableEntry,
@@ -51,6 +47,7 @@ function effectiveFixtureKey(
 interface TestFixturesClassHost {
   name: string;
   fixturePaths: string[];
+  fileFixturePath?: unknown;
   fixtureTableNames: string[];
   fixtureClassNames: Record<string, unknown>;
   fixtureSets: Record<string, string>;
@@ -62,12 +59,20 @@ export const ClassMethods = {
     this.fixtureClassNames = { ...this.fixtureClassNames, ...stringifyKeys(classNames) };
   },
 
-  /** @missingRailsCall Dir — CONVERGEABLE port-test-fixtures-all-glob */
   fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
     if (fixtureSetNames[0] === ":all") {
       if (isBlank(this.fixturePaths))
         throw new Error(`No fixture path found. Please set \`${this.name}.fixturePaths\`.`);
-      fixtureSetNames = [];
+      fixtureSetNames = [
+        ...new Set(
+          this.fixturePaths.flatMap((path) => {
+            let names = [...new Set(Dir.glob(RubyFile.join(path, "{**,*}/*.{yml}")))];
+            if (this.fileFixturePath)
+              names = names.filter((f) => !f.startsWith(String(this.fileFixturePath)));
+            return names.map((f) => f.slice(String(path).length, -4).replace(/^\//, ""));
+          }),
+        ),
+      ];
     } else {
       fixtureSetNames = fixtureSetNames.flat(Infinity).map((n) => String(n));
     }
@@ -177,8 +182,8 @@ export interface FixturesConnectionOpts {
  * Two requested sets backed by the same table (e.g. `deadParrots`/`liveParrots`
  * → `parrots`, `dogs`/`otherDogs` → `dogs`) load together in one call: the
  * loader prepares every set, MERGES their rows per table, and issues a single
- * `insertFixturesSet` that deletes each table once and inserts all rows together
- * (see {@link insertPreparedFixtureSets}), mirroring how Rails loads multiple
+ * `insertFixturesSet` that deletes each table once and inserts all rows together,
+ * mirroring how Rails loads multiple
  * same-table fixture files (fixtures.rb groups by table then unshifts all rows).
  * The only rejected case is genuinely-conflicting rows: two same-table sets whose
  * rows resolve to the same primary key. A row's key is resolved the way the loader
@@ -297,11 +302,24 @@ function useTablelessFixtures(
   beforeEach(async (ctx) => {
     const adapter = getAdapter();
     const loadFixtures = async () => {
-      const prepared: PreparedFixtureSet[] = [];
-      for (const { table, data } of entries) {
-        prepared.push(await prepareJoinTableFixtures(adapter, table, data));
+      const fixtureSets = entries.map(({ table, data }) => new FixtureSet(null, table, null, data));
+      const tableRowsForConnection: Record<string, Record<string, unknown>[]> = {};
+      for (const fixtureSet of fixtureSets) {
+        for (const [table, rows] of Object.entries(fixtureSet.tableRows())) {
+          (tableRowsForConnection[table] ??= []).unshift(...rows);
+        }
       }
-      return insertPreparedFixtureSets(adapter, prepared);
+      await insertFixturesSet.call(
+        adapter as unknown as ThisParameterType<typeof insertFixturesSet>,
+        tableRowsForConnection,
+        Object.keys(tableRowsForConnection),
+      );
+      await checkAllForeignKeysValidBang(adapter);
+      return fixtureSets.map((fixtureSet) =>
+        Object.fromEntries(
+          Object.entries(fixtureSet.fixtures).map(([label, fixture]) => [label, fixture.toHash()]),
+        ),
+      );
     };
     const results = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, loadFixtures);
     results.forEach((result, i) => {

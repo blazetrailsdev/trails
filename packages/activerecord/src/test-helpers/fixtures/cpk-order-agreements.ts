@@ -1,4 +1,5 @@
-import { ref } from "../../fixtures.js";
+import { FixtureSet } from "../../fixtures.js";
+import { CpkOrder } from "../models/cpk.js";
 
 export const cpkOrderAgreementFixtureData = {
   order_agreement_one: {
@@ -8,7 +9,8 @@ export const cpkOrderAgreementFixtureData = {
     signature: "xyz789",
   },
   order_agreement_three: {
-    order_id: ref("cpk_orders", "cpk_groceries_order_2"),
+    order_id: FixtureSet.compositeIdentify("cpk_groceries_order_2", CpkOrder.primaryKey as string[])
+      .id,
     signature: "def321",
   },
 };

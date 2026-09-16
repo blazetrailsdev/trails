@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { ref, isFixtureRef, resolveModelForTable, FixtureSet } from "./fixtures.js";
+import { FixtureSet } from "./fixtures.js";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Base } from "./base.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
@@ -93,20 +92,6 @@ describe("fixtureId", () => {
   });
 });
 
-describe("ref", () => {
-  it("returns a FixtureRef detected by isFixtureRef", () => {
-    const r = ref("users", "david");
-    expect(isFixtureRef(r)).toBe(true);
-    expect(r.tableName).toBe("users");
-    expect(r.fixtureName).toBe("david");
-  });
-
-  it("non-ref objects are not detected as refs", () => {
-    expect(isFixtureRef({ tableName: "users", fixtureName: "david" })).toBe(false);
-    expect(isFixtureRef(null)).toBe(false);
-  });
-});
-
 describe("createFixtures", () => {
   it("inserts fixtures and returns keyed accessor", async () => {
     const adapter = makeAdapter();
@@ -125,39 +110,6 @@ describe("createFixtures", () => {
     expect(users.mary).toEqual({ id: FixtureSet.identify("mary"), name: "Mary" });
     const deleteSql = executedStatements(adapter).find((s) => s.includes("DELETE FROM"));
     expect(deleteSql).toContain('"users"');
-  });
-
-  it("ref() resolves to the referenced fixture's deterministic ID", async () => {
-    const adapter = makeAdapter();
-    const welcomeRow = {
-      id: FixtureSet.identify("welcome"),
-      title: "Welcome",
-      author_id: FixtureSet.identify("david"),
-    };
-    const rows = new Map([[FixtureSet.identify("welcome"), welcomeRow]]);
-    const Post = makeModel("posts", rows);
-
-    await createFixtures(adapter, Post, {
-      welcome: { title: "Welcome", author_id: ref("users", "david") },
-    });
-
-    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
-    expect(insertSql).toContain(String(FixtureSet.identify("david")));
-  });
-
-  it("direct model instance is resolved to its PK value", async () => {
-    const adapter = makeAdapter();
-    const welcomeRow = { id: FixtureSet.identify("welcome"), title: "Welcome" };
-    const rows = new Map([[FixtureSet.identify("welcome"), welcomeRow]]);
-    const Post = makeModel("posts", rows);
-
-    const davidInstance = { id: FixtureSet.identify("david"), name: "David" };
-    await createFixtures(adapter, Post, {
-      welcome: { title: "Welcome", author: davidInstance },
-    });
-
-    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
-    expect(insertSql).toContain(String(FixtureSet.identify("david")));
   });
 
   it("deterministic IDs are stable across multiple createFixtures calls", async () => {
@@ -239,67 +191,6 @@ describe("createFixtures", () => {
     expect(joinInsert).toContain(String(FixtureSet.identify("welcome")));
   });
 
-  it("tableName registry: resolveModelForTable returns the model after createFixtures", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([[FixtureSet.identify("david"), { id: FixtureSet.identify("david") }]]);
-    const User = makeModel("users", rows);
-
-    expect(resolveModelForTable(adapter, "users")).toBeUndefined();
-    await createFixtures(adapter, User, { david: {} });
-    expect(resolveModelForTable(adapter, "users")).toBe(User);
-  });
-
-  it("tableName registry: each adapter has its own isolated registry", async () => {
-    const adapter1 = makeAdapter();
-    const adapter2 = makeAdapter();
-    const rows = new Map([[FixtureSet.identify("david"), { id: FixtureSet.identify("david") }]]);
-    const User = makeModel("users", rows);
-
-    await createFixtures(adapter1, User, { david: {} });
-    expect(resolveModelForTable(adapter1, "users")).toBe(User);
-    expect(resolveModelForTable(adapter2, "users")).toBeUndefined();
-  });
-
-  it("polymorphic ref: { taggable: instance } expands to taggable_type + taggable_id", async () => {
-    const adapter = makeAdapter();
-
-    const postId = FixtureSet.identify("welcome");
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-      }
-    }
-    const postInstance = new Post();
-    (postInstance as any).id = postId;
-
-    const taggingId = FixtureSet.identify("welcome_tag");
-    const taggingRow = {
-      id: taggingId,
-      taggable_type: "Post",
-      taggable_id: postId,
-    };
-    const rows = new Map([[taggingId, taggingRow]]);
-    const Tagging = makeModel("taggings", rows);
-    Tagging._reflections = {
-      taggable: {
-        macro: "belongsTo",
-        isPolymorphic: () => true,
-      },
-    };
-
-    await createFixtures(adapter, Tagging, {
-      welcome_tag: { taggable: postInstance as any },
-    });
-
-    const insertSql = executedStatements(adapter).find(
-      (s) => s.includes("INSERT INTO") && s.includes("taggings"),
-    );
-    expect(insertSql).toContain("taggable_type");
-    expect(insertSql).toContain("Post");
-    expect(insertSql).toContain(String(postId));
-  });
-
   it("polymorphic ref: explicit taggable_type/taggable_id pass through without expansion", async () => {
     const adapter = makeAdapter();
     const rows = new Map([
@@ -319,19 +210,6 @@ describe("createFixtures", () => {
     );
     expect(insertSql).toContain("CustomPost");
     expect(insertSql).toContain("999");
-  });
-
-  it("polymorphic ref: ref() on a poly key throws instead of inserting spurious column", async () => {
-    const adapter = makeAdapter();
-    const rows = new Map([[FixtureSet.identify("bad"), { id: FixtureSet.identify("bad") }]]);
-    const Tagging = makeModel("taggings", rows);
-    Tagging._reflections = {
-      taggable: { macro: "belongsTo", isPolymorphic: () => true },
-    };
-
-    await expect(
-      createFixtures(adapter, Tagging, { bad: { taggable: ref("posts", "welcome") as any } }),
-    ).rejects.toThrow(/polymorphic association.*model instance/);
   });
 
   it("uses a string declared primary key verbatim", async () => {
