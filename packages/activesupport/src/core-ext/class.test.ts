@@ -40,7 +40,7 @@ describe("ClassTest", () => {
   });
 
   it("descendants excludes singleton classes", () => {
-    const klass = Object.getPrototypeOf(new Parent()).constructor;
+    const klass = class extends Parent {};
     assertNot(
       DescendantsTracker.descendants(Parent).includes(klass),
       "descendants should not include singleton classes",
@@ -48,7 +48,7 @@ describe("ClassTest", () => {
   });
 
   it("subclasses excludes singleton classes", () => {
-    const klass = Object.getPrototypeOf(new Parent()).constructor;
+    const klass = class extends Parent {};
     assertNot(
       DescendantsTracker.subclasses(Parent).includes(klass),
       "subclasses should not include singleton classes",
