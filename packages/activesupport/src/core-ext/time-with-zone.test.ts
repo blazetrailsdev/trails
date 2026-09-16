@@ -20,6 +20,7 @@ import { inTimeZone as stringInTimeZone } from "./string/zones.js";
 import { toTime as stringToTime } from "./string/conversions.js";
 import { toTime as dateToTime } from "./date/conversions.js";
 import { current } from "../time-ext.js";
+import "./time/calculations.js";
 import { setPreserveTimezone } from "./date-and-time/compatibility.js";
 import { Rational, rational } from "@blazetrails/ruby-compat";
 import { assertDeprecated } from "../testing/deprecation.js";
@@ -34,6 +35,12 @@ import {
 } from "../testing/assertions.js";
 import { Object as ObjectExt } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
+
+type MethodMissing = TimeWithZone &
+  Record<
+    "yearsSince" | "yearsAgo" | "monthsSince" | "monthsAgo" | "weeksSince" | "weeksAgo",
+    (n: number) => TimeWithZone
+  >;
 
 function withEnvTz<T>(newTz: string, fn: () => T): T {
   const oldTz = process.env.TZ;
@@ -679,6 +686,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 year from leap day", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2004, 2, 29));
     expect(twz.advance({ years: 1 }).inspect()).toEqual("2005-02-28 00:00:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
     expect(twz.since(Duration.years(1)).inspect()).toEqual(
       "2005-02-28 00:00:00.000000000 EST -05:00",
     );
@@ -691,6 +701,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 month from last day of january", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2005, 1, 31));
     expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
       "2005-02-28 00:00:00.000000000 EST -05:00",
     );
     expect(twz.since(Duration.months(1)).inspect()).toEqual(
@@ -707,6 +720,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 month from last day of january during leap year", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2000, 1, 31));
     expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
       "2000-02-29 00:00:00.000000000 EST -05:00",
     );
     expect(twz.since(Duration.months(1)).inspect()).toEqual(
@@ -789,6 +805,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 week across spring dst transition", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
     expect(twz.advance({ weeks: 1 }).inspect()).toEqual("2006-04-08 10:30:00.000000000 EDT -04:00");
+    expect((twz as MethodMissing).weeksSince(1).inspect()).toEqual(
+      "2006-04-08 10:30:00.000000000 EDT -04:00",
+    );
     expect(twz.since(Duration.weeks(1)).inspect()).toEqual(
       "2006-04-08 10:30:00.000000000 EDT -04:00",
     );
@@ -803,6 +822,9 @@ describe("TimeWithZoneTest", () => {
     expect(twz.advance({ weeks: -1 }).inspect()).toEqual(
       "2006-04-01 10:30:00.000000000 EST -05:00",
     );
+    expect((twz as MethodMissing).weeksAgo(1).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
     expect(twz.ago(Duration.weeks(1)).inspect()).toEqual(
       "2006-04-01 10:30:00.000000000 EST -05:00",
     );
@@ -814,6 +836,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 week across fall dst transition", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
     expect(twz.advance({ weeks: 1 }).inspect()).toEqual("2006-11-04 10:30:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).weeksSince(1).inspect()).toEqual(
+      "2006-11-04 10:30:00.000000000 EST -05:00",
+    );
     expect(twz.since(Duration.weeks(1)).inspect()).toEqual(
       "2006-11-04 10:30:00.000000000 EST -05:00",
     );
@@ -828,6 +853,9 @@ describe("TimeWithZoneTest", () => {
     expect(twz.advance({ weeks: -1 }).inspect()).toEqual(
       "2006-10-28 10:30:00.000000000 EDT -04:00",
     );
+    expect((twz as MethodMissing).weeksAgo(1).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
     expect(twz.ago(Duration.weeks(1)).inspect()).toEqual(
       "2006-10-28 10:30:00.000000000 EDT -04:00",
     );
@@ -839,6 +867,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 month across spring dst transition", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
     expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
       "2006-05-01 10:30:00.000000000 EDT -04:00",
     );
     expect(twz.since(Duration.months(1)).inspect()).toEqual(
@@ -857,6 +888,9 @@ describe("TimeWithZoneTest", () => {
     expect(twz.advance({ months: -1 }).inspect()).toEqual(
       "2006-04-01 10:30:00.000000000 EST -05:00",
     );
+    expect((twz as MethodMissing).monthsAgo(1).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
     expect(twz.ago(Duration.months(1)).inspect()).toEqual(
       "2006-04-01 10:30:00.000000000 EST -05:00",
     );
@@ -868,6 +902,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 month across fall dst transition", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
     expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
       "2006-11-28 10:30:00.000000000 EST -05:00",
     );
     expect(twz.since(Duration.months(1)).inspect()).toEqual(
@@ -886,6 +923,9 @@ describe("TimeWithZoneTest", () => {
     expect(twz.advance({ months: -1 }).inspect()).toEqual(
       "2006-10-28 10:30:00.000000000 EDT -04:00",
     );
+    expect((twz as MethodMissing).monthsAgo(1).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
     expect(twz.ago(Duration.months(1)).inspect()).toEqual(
       "2006-10-28 10:30:00.000000000 EDT -04:00",
     );
@@ -897,6 +937,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 year", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2008, 2, 15, 10, 30));
     expect(twz.advance({ years: 1 }).inspect()).toEqual("2009-02-15 10:30:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2009-02-15 10:30:00.000000000 EST -05:00",
+    );
     expect(twz.since(Duration.years(1)).inspect()).toEqual(
       "2009-02-15 10:30:00.000000000 EST -05:00",
     );
@@ -907,6 +950,9 @@ describe("TimeWithZoneTest", () => {
     expect(twz.advance({ years: -1 }).inspect()).toEqual(
       "2007-02-15 10:30:00.000000000 EST -05:00",
     );
+    expect((twz as MethodMissing).yearsAgo(1).inspect()).toEqual(
+      "2007-02-15 10:30:00.000000000 EST -05:00",
+    );
     expect(twz.minus(Duration.years(1)).inspect()).toEqual(
       "2007-02-15 10:30:00.000000000 EST -05:00",
     );
@@ -915,6 +961,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 year during dst", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2008, 7, 15, 10, 30));
     expect(twz.advance({ years: 1 }).inspect()).toEqual("2009-07-15 10:30:00.000000000 EDT -04:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2009-07-15 10:30:00.000000000 EDT -04:00",
+    );
     expect(twz.since(Duration.years(1)).inspect()).toEqual(
       "2009-07-15 10:30:00.000000000 EDT -04:00",
     );
@@ -923,6 +972,9 @@ describe("TimeWithZoneTest", () => {
       "2009-07-15 10:30:00.000000000 EDT -04:00",
     );
     expect(twz.advance({ years: -1 }).inspect()).toEqual(
+      "2007-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).yearsAgo(1).inspect()).toEqual(
       "2007-07-15 10:30:00.000000000 EDT -04:00",
     );
     expect(twz.minus(Duration.years(1)).inspect()).toEqual(
@@ -1082,12 +1134,8 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("method missing with time return value", () => {
-    const twz = maketwz();
-    const result = twz.advance({ months: 1 });
-    expect(result).toBeInstanceOf(TimeWithZone);
-    expect(result.month).toBe(1);
-    expect(result.day).toBe(31);
-    expect(result.hour).toBe(19);
+    expect((twz as MethodMissing).monthsSince(1)).toBeInstanceOf(TimeWithZone);
+    expect((twz as MethodMissing).monthsSince(1).time).toEqual(RubyTime.utc(2000, 1, 31, 19, 0, 0));
   });
 
   it("marshal dump and load", () => {
@@ -1263,6 +1311,9 @@ describe("TimeWithZoneTest", () => {
   it("advance 1 month into spring dst gap", () => {
     const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 3, 2, 2));
     expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
       "2006-04-02 03:00:00.000000000 EDT -04:00",
     );
     expect(twz.since(Duration.months(1)).inspect()).toEqual(
