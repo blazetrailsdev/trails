@@ -5,7 +5,7 @@ import {
   Time as RubyTime,
   resetLocalTimeZoneId,
 } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Range, Rational } from "@blazetrails/ruby-compat";
 import {
   assertNothingRaised,
   assertPredicate,
@@ -49,6 +49,12 @@ import {
   isTomorrow,
   isYesterday,
 } from "./date-and-time/calculations.js";
+
+type CalculationsTime = RubyTime & {
+  tomorrow(): RubyTime;
+  yesterday(): RubyTime;
+  lastWeek(startDay?: string): RubyTime;
+};
 
 expect.addEqualityTesters([
   (a: unknown, b: unknown) => {
@@ -655,39 +661,47 @@ describe("TimeExtCalculationsTest", () => {
 
   it("daylight savings time crossings forward start tomorrow", () => {
     withEnvTz("US/Eastern", () => {
-      expect(RubyTime.local(2005, 4, 2, 19, 27, 0).tomorrow(), "st+1.day=>dt").toEqual(
-        RubyTime.local(2005, 4, 3, 19, 27, 0),
-      );
-      expect(RubyTime.local(2005, 4, 3, 19, 27, 0).tomorrow(), "dt+1.day=>dt").toEqual(
-        RubyTime.local(2005, 4, 4, 19, 27, 0),
-      );
+      expect(
+        (RubyTime.local(2005, 4, 2, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 19, 27, 0));
+      expect(
+        (RubyTime.local(2005, 4, 3, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 4, 19, 27, 0));
     });
     withEnvTz("NZ", () => {
-      expect(RubyTime.local(2006, 9, 30, 19, 27, 0).tomorrow(), "st+1.day=>dt").toEqual(
-        RubyTime.local(2006, 10, 1, 19, 27, 0),
-      );
-      expect(RubyTime.local(2006, 10, 1, 19, 27, 0).tomorrow(), "dt+1.day=>dt").toEqual(
-        RubyTime.local(2006, 10, 2, 19, 27, 0),
-      );
+      expect(
+        (RubyTime.local(2006, 9, 30, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 19, 27, 0));
+      expect(
+        (RubyTime.local(2006, 10, 1, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 2, 19, 27, 0));
     });
   });
 
   it("daylight savings time crossings backward start yesterday", () => {
     withEnvTz("US/Eastern", () => {
-      expect(RubyTime.local(2005, 4, 3, 19, 27, 0).yesterday(), "dt-1.day=>st").toEqual(
-        RubyTime.local(2005, 4, 2, 19, 27, 0),
-      );
-      expect(RubyTime.local(2005, 4, 4, 19, 27, 0).yesterday(), "dt-1.day=>dt").toEqual(
-        RubyTime.local(2005, 4, 3, 19, 27, 0),
-      );
+      expect(
+        (RubyTime.local(2005, 4, 3, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>st",
+      ).toEqual(RubyTime.local(2005, 4, 2, 19, 27, 0));
+      expect(
+        (RubyTime.local(2005, 4, 4, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 19, 27, 0));
     });
     withEnvTz("NZ", () => {
-      expect(RubyTime.local(2006, 10, 1, 19, 27, 0).yesterday(), "dt-1.day=>st").toEqual(
-        RubyTime.local(2006, 9, 30, 19, 27, 0),
-      );
-      expect(RubyTime.local(2006, 10, 2, 19, 27, 0).yesterday(), "dt-1.day=>dt").toEqual(
-        RubyTime.local(2006, 10, 1, 19, 27, 0),
-      );
+      expect(
+        (RubyTime.local(2006, 10, 1, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>st",
+      ).toEqual(RubyTime.local(2006, 9, 30, 19, 27, 0));
+      expect(
+        (RubyTime.local(2006, 10, 2, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 19, 27, 0));
     });
   });
 
@@ -765,39 +779,47 @@ describe("TimeExtCalculationsTest", () => {
 
   it("daylight savings time crossings forward end tomorrow", () => {
     withEnvTz("US/Eastern", () => {
-      expect(RubyTime.local(2005, 10, 30, 0, 45, 0).tomorrow(), "dt+1.day=>st").toEqual(
-        RubyTime.local(2005, 10, 31, 0, 45, 0),
-      );
-      expect(RubyTime.local(2005, 10, 31, 0, 45, 0).tomorrow(), "st+1.day=>st").toEqual(
-        RubyTime.local(2005, 11, 1, 0, 45, 0),
-      );
+      expect(
+        (RubyTime.local(2005, 10, 30, 0, 45, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 10, 31, 0, 45, 0));
+      expect(
+        (RubyTime.local(2005, 10, 31, 0, 45, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 11, 1, 0, 45, 0));
     });
     withEnvTz("NZ", () => {
-      expect(RubyTime.local(2006, 3, 19, 1, 45, 0).tomorrow(), "dt+1.day=>st").toEqual(
-        RubyTime.local(2006, 3, 20, 1, 45, 0),
-      );
-      expect(RubyTime.local(2006, 3, 20, 1, 45, 0).tomorrow(), "st+1.day=>st").toEqual(
-        RubyTime.local(2006, 3, 21, 1, 45, 0),
-      );
+      expect(
+        (RubyTime.local(2006, 3, 19, 1, 45, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 1, 45, 0));
+      expect(
+        (RubyTime.local(2006, 3, 20, 1, 45, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 21, 1, 45, 0));
     });
   });
 
   it("daylight savings time crossings backward end yesterday", () => {
     withEnvTz("US/Eastern", () => {
-      expect(RubyTime.local(2005, 10, 31, 0, 45, 0).yesterday(), "st-1.day=>dt").toEqual(
-        RubyTime.local(2005, 10, 30, 0, 45, 0),
-      );
-      expect(RubyTime.local(2005, 11, 1, 0, 45, 0).yesterday(), "st-1.day=>st").toEqual(
-        RubyTime.local(2005, 10, 31, 0, 45, 0),
-      );
+      expect(
+        (RubyTime.local(2005, 10, 31, 0, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 30, 0, 45, 0));
+      expect(
+        (RubyTime.local(2005, 11, 1, 0, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>st",
+      ).toEqual(RubyTime.local(2005, 10, 31, 0, 45, 0));
     });
     withEnvTz("NZ", () => {
-      expect(RubyTime.local(2006, 3, 20, 1, 45, 0).yesterday(), "st-1.day=>dt").toEqual(
-        RubyTime.local(2006, 3, 19, 1, 45, 0),
-      );
-      expect(RubyTime.local(2006, 3, 21, 1, 45, 0).yesterday(), "st-1.day=>st").toEqual(
-        RubyTime.local(2006, 3, 20, 1, 45, 0),
-      );
+      expect(
+        (RubyTime.local(2006, 3, 20, 1, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 19, 1, 45, 0));
+      expect(
+        (RubyTime.local(2006, 3, 21, 1, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 1, 45, 0));
     });
   });
 
@@ -1325,19 +1347,21 @@ describe("TimeExtCalculationsTest", () => {
 
   it("last week", () => {
     withEnvTz("US/Eastern", () => {
-      expect(RubyTime.local(2005, 3, 1, 15, 15, 10).lastWeek()).toEqual(
+      expect((RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek()).toEqual(
         RubyTime.local(2005, 2, 21),
       );
-      expect(RubyTime.local(2005, 3, 1, 15, 15, 10).lastWeek(":tuesday")).toEqual(
-        RubyTime.local(2005, 2, 22),
+      expect(
+        (RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek(":tuesday"),
+      ).toEqual(RubyTime.local(2005, 2, 22));
+      expect(
+        (RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek(":friday"),
+      ).toEqual(RubyTime.local(2005, 2, 25));
+      expect((RubyTime.local(2006, 11, 6, 0, 0, 0) as CalculationsTime).lastWeek()).toEqual(
+        RubyTime.local(2006, 10, 30),
       );
-      expect(RubyTime.local(2005, 3, 1, 15, 15, 10).lastWeek(":friday")).toEqual(
-        RubyTime.local(2005, 2, 25),
-      );
-      expect(RubyTime.local(2006, 11, 6, 0, 0, 0).lastWeek()).toEqual(RubyTime.local(2006, 10, 30));
-      expect(RubyTime.local(2006, 11, 23, 0, 0, 0).lastWeek(":wednesday")).toEqual(
-        RubyTime.local(2006, 11, 15),
-      );
+      expect(
+        (RubyTime.local(2006, 11, 23, 0, 0, 0) as CalculationsTime).lastWeek(":wednesday"),
+      ).toEqual(RubyTime.local(2006, 11, 15));
     });
   });
 
@@ -1799,12 +1823,20 @@ describe("TimeExtCalculationsTest", () => {
       RubyTime.local(2011, 6, 7, 23, 59, 59, new Rational(999999999, 1000)),
     );
     expect(
-      new TimeWithZone(RubyTime.local(2011, 6, 7, 10, 10, 10), TimeZone.find("Hawaii")!).allDay()
-        .begin,
+      (
+        new TimeWithZone(
+          RubyTime.local(2011, 6, 7, 10, 10, 10),
+          TimeZone.find("Hawaii")!,
+        ) as TimeWithZone & { allDay(): Range<TimeWithZone> }
+      ).allDay().begin,
     ).toEqual(beginningOfDay);
     expect(
-      new TimeWithZone(RubyTime.local(2011, 6, 7, 10, 10, 10), TimeZone.find("Hawaii")!).allDay()
-        .end,
+      (
+        new TimeWithZone(
+          RubyTime.local(2011, 6, 7, 10, 10, 10),
+          TimeZone.find("Hawaii")!,
+        ) as TimeWithZone & { allDay(): Range<TimeWithZone> }
+      ).allDay().end,
     ).toEqual(endOfDay);
   });
 

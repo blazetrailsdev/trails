@@ -211,7 +211,7 @@ export function ago(this: RubyTime, seconds: number | Duration): RubyTime {
 }
 
 export function since(this: RubyTime, seconds: number | Duration): RubyTime {
-  return this.plus(seconds);
+  return plusWithDuration.call(this, seconds);
 }
 
 export function beginningOfDay(this: RubyTime): RubyTime {
