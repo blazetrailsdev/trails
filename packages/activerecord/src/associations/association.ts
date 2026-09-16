@@ -578,13 +578,12 @@ export class Association {
   }
 
   protected isForeignKeyFor(record: Base): boolean {
-    const fk = this.reflection.foreignKey() ?? (this.reflection.options as any).foreignKey();
-    const fkArr = Array.isArray(fk) ? fk : [fk];
+    const fk = this.reflection.foreignKey();
+    const foreignKey = Array.isArray(fk) ? fk : [fk];
     const hasAttr = (record as any)._hasAttribute as ((k: string) => boolean) | undefined;
-    return fkArr.every((key) => {
-      if (key == null) return false;
-      return typeof hasAttr === "function" ? hasAttr.call(record, String(key)) : false;
-    });
+    return foreignKey.every((key) =>
+      typeof hasAttr === "function" ? hasAttr.call(record, String(key)) : false,
+    );
   }
 
   /** @missingRailsCall any? — PERMANENT */
