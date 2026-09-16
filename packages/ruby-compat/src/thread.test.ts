@@ -37,6 +37,36 @@ describe("Thread", () => {
     expect(() => thread.value()).toThrow("boom");
   });
 
+  it("join returns the thread, and awaits an async block", async () => {
+    const thread = new Thread(() => null);
+    expect(thread.join()).toBe(thread);
+
+    let ran = false;
+    const asyncThread = new Thread(async () => {
+      await Promise.resolve();
+      ran = true;
+    });
+    expect(await asyncThread.join()).toBe(asyncThread);
+    expect(ran).toBe(true);
+  });
+
+  it("join re-raises the exception that terminated the thread", () => {
+    const thread = new Thread(() => {
+      throw new Error("boom");
+    });
+    expect(() => thread.join()).toThrow("boom");
+  });
+
+  it("exit terminates the thread and returns it", () => {
+    const thread = new Thread(async () => {
+      await new Promise(() => {});
+    });
+    expect(thread.isAlive()).toBe(true);
+    expect(thread.exit()).toBe(thread);
+    expect(thread.status).toBe("dead");
+    expect(thread.exit()).toBe(thread);
+  });
+
   it("to_s names the runtime class and the thread name", () => {
     class Worker extends Thread {}
     const thread = new Worker(() => null);

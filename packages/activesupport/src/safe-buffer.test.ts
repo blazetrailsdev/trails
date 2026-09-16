@@ -45,8 +45,8 @@ describe("SafeBufferTest", () => {
 
   it("Should return a safe buffer when calling to_s", () => {
     const buf = htmlSafe("test");
-    expect(buf.toString()).toBe("test");
-    expect(isHtmlSafe(buf)).toBe(true);
+    const newBuffer = buf.toS();
+    expect(newBuffer).toBeInstanceOf(SafeBuffer);
   });
 
   it("Should escape dirty buffers on add", () => {

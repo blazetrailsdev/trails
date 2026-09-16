@@ -147,13 +147,16 @@ describe("OrderedHashTest", () => {
   });
 
   it("reject!", () => {
-    const h = new OrderedHash<string, number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    h.reject((k, v) => v > 1);
-    h.deleteIf((k, v) => v > 1);
-    expect(h.size).toBe(1);
-    expect(h.has("a")).toBe(true);
+    const keys = ["blue", "green", "red", "pink", "orange"];
+    const values = ["000099", "009900", "aa0000", "cc0066", "cc6633"];
+    const orderedHash = new OrderedHash<string, string>();
+    keys.forEach((key, index) => orderedHash.set(key, values[index]));
+
+    const copy = new OrderedHash(orderedHash);
+    copy.delete("pink");
+    orderedHash.rejectBang((k) => k === "pink");
+    expect(orderedHash).toEqual(copy);
+    expect([...orderedHash.keys()]).not.toContain("pink");
   });
 
   it("reject", () => {

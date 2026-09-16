@@ -83,10 +83,6 @@ export class Validations {
     return (this._errors ??= new Errors(this));
   }
 
-  set errors(value: Errors<this>) {
-    this._errors = value;
-  }
-
   /** @internal */
   declare contextForValidation: () => ValidationContext;
   /** @internal */

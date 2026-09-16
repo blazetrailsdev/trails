@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readFile } from "fs/promises";
 import { include } from "@blazetrails/ruby-compat";
 import { defineFixtures, FixtureSet, FixtureError } from "./fixtures.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
@@ -196,6 +197,8 @@ describe("FixturesTest", () => {
     ],
     { useTransactionalTests: false },
   );
+
+  const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
 
   it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
     "bulk insert",
@@ -519,6 +522,26 @@ describe("FixturesTest", () => {
 
   it("erb in fixtures", () => {
     expect(developers("dev_5").name).toBe("fixture_5");
+  });
+
+  it("empty yaml fixture", () => {
+    expect(
+      new FixtureSet(null, "accounts", Account, FIXTURES_ROOT + "/naked/yml/accounts"),
+    ).not.toBeNull();
+  });
+
+  it("empty yaml fixture with a comment in it", () => {
+    expect(
+      new FixtureSet(null, "companies", Company, FIXTURES_ROOT + "/naked/yml/companies"),
+    ).not.toBeNull();
+  });
+
+  it("binary in fixtures", async () => {
+    const data = new Uint8Array(
+      await readFile(new URL("./test-helpers/assets/flowers.jpg", import.meta.url)),
+    );
+    expect(new Uint8Array(binaries("flowers").data)).toEqual(data);
+    expect(new Uint8Array(binaries("binary_helper").data)).toEqual(data);
   });
 
   it("serialized fixtures", () => {

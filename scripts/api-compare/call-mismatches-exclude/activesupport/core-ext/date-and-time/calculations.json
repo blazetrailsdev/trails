@@ -22,6 +22,17 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "days_since",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{days=ref:days}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "end_of_quarter",
     "call": "end_of_month",
     "kind": "args",
@@ -36,6 +47,28 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "core_ext/date_and_time/calculations.rb:304 calls `end_of_month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "months_since",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{months=ref:months}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "next_occurring",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{days=ref:fromNow}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
   },
   {
     "package": "activesupport",
@@ -113,11 +146,55 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "tomorrow",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{days=num:1}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "tomorrow?",
     "call": "tomorrow",
     "kind": "args",
     "rubyArgs": [],
     "reason": "core_ext/date_and_time/calculations.rb:35 calls `tomorrow` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "weeks_since",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{weeks=ref:weeks}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "years_since",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{years=ref:years}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/calculations.ts",
+    "rubyName": "yesterday",
+    "call": "advance",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{days=num:-1}"
+    ],
+    "reason": "core_ext/date_and_time/calculations.rb calls `advance` on implicit self; DateAndTime::Calculations is ported as free functions taking the receiver as argument 1, the same class the rows above carry. CONVERGEABLE converge-date-and-time-calculations-to-this-typed-mixin."
   },
   {
     "package": "activesupport",

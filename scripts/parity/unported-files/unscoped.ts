@@ -169,16 +169,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: ["empty yaml fixture", "empty yaml fixture with a comment in it"],
-    reason:
-      "Both assert ActiveRecord::FixtureSet.new(nil, name, Klass, path) is non-nil " +
-      "(fixtures_test.rb:522,526). FixtureSet now has its instance form, but both pass a " +
-      "naked/yml path with no rows; trails has no naked fixture sets, the surface the row " +
-      "above already excludes.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "NilFixturePathTest",
     tests: ["raises an error when all fixtures loaded"],
     reason:
@@ -355,16 +345,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "(fixtures_test.rb:713-716,740-745); trails' FixtureSet has no instance form, " +
       "fixture-set cache or reset_cache. " +
       "CONVERGEABLE fixture-set-instance-form-and-all-loaded-fixtures.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: ["binary in fixtures"],
-    reason:
-      "test-helpers/fixtures/binaries.ts carries only the two ids; binaries.yml:3,137 fill " +
-      '`data` from a `!binary` literal and `<%= binary(ASSETS_ROOT + "/flowers.jpg") %>`, ' +
-      "which the TS fixture module has no async asset read for. " +
-      "CONVERGEABLE binaries-fixture-data-from-flowers-asset.",
   },
   {
     testFile: "fixture_set/file_test.rb",

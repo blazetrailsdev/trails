@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
+import * as Querying from "../querying.js";
 import { DelegateCache, uncacheableMethods } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
@@ -147,10 +148,27 @@ describe("DelegationTest", () => {
       "isMany",
       "isOne",
       "isNone",
+      "findSoleBy",
+      "destroy",
+      "delete",
+      "calculate",
+      "createWith",
+      "except",
+      "extractAssociated",
+      "asyncCount",
+      "asyncAverage",
+      "asyncMinimum",
+      "asyncMaximum",
+      "asyncSum",
+      "asyncPluck",
+      "asyncPick",
     ] as const;
 
     it("delegate querying methods", () => {
       const relation = Post.all();
+
+      expect([...QUERYING_METHODS].sort()).toEqual([...Querying.QUERYING_METHODS].sort());
+
       for (const method of QUERYING_METHODS) {
         expect(typeof (relation as any)[method]).toBe("function");
         expect(typeof (Post as any)[method]).toBe("function");
