@@ -169,6 +169,7 @@ export {
   assertValidKeys,
   withIndifferentAccess,
   deepTransformValues,
+  deepTransformValuesBang,
   stringifyKeysBang,
   symbolizeKeysBang,
   toOptions,

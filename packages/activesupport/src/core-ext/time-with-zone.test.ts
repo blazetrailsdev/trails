@@ -1514,9 +1514,7 @@ describe("TimeWithZoneTest", () => {
 
   it("plus two time instances raises deprecation warning", async () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);
-    await assertDeprecated(null, deprecator(), () =>
-      twz.plus(RubyTime.at(new Rational(Duration.days(10).ago().epochNanoseconds, 1_000_000_000n))),
-    );
+    await assertDeprecated(null, deprecator(), () => twz.plus(Duration.days(10).ago() as RubyTime));
   });
 });
 

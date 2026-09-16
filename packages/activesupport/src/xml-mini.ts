@@ -3,8 +3,9 @@ import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { LoadError, StringIO } from "@blazetrails/ruby-compat";
-import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
+import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
 import { ArgumentError } from "./hash-utils.js";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
@@ -87,8 +88,6 @@ function formatDateTime(value: unknown): string {
   return String(value);
 }
 
-const XMLSCHEMA = /^(-?\d+)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)?$/;
-
 export const PARSING: Record<
   string,
   (value: unknown, entity?: Record<string, string | undefined>) => unknown
@@ -100,16 +99,9 @@ export const PARSING: Record<
   date: (date) => RubyDate.parse(date as string),
   datetime: (time) => {
     try {
-      const s = String(time).trim();
-      if (!XMLSCHEMA.test(s)) {
-        throw new ArgumentError(`invalid xmlschema format: ${JSON.stringify(s)}`);
-      }
-      return Temporal.Instant.from(/(Z|[+-]\d\d:\d\d)$/.test(s) ? s : `${s}Z`);
+      return RubyTime.xmlschema(time as string).getutc();
     } catch {
-      const parsed = DateTime.parse(String(time));
-      return parsed instanceof Temporal.ZonedDateTime
-        ? parsed.toInstant()
-        : parsed.toZonedDateTime("UTC").toInstant();
+      return dateTimeUtc(DateTime.parse(time as string));
     }
   },
   duration: (duration) => Duration.parse(String(duration)),

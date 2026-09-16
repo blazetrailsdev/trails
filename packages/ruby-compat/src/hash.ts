@@ -172,6 +172,9 @@ export function hashDelete<T, U = null>(
   key: string,
   block?: (key: string) => U,
 ): T | U | null {
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`);
+  }
   if (Object.hasOwn(hash, key)) {
     const val = hash[key];
     delete hash[key];

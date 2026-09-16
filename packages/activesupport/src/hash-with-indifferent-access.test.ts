@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { Hash, KeyError } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  KeyError,
+  TypeError,
+  rbInspect as inspect,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
+import { assertRaises } from "./testing/assertions.js";
+import { deepDup } from "./hash-utils.js";
 
 const plainly = (hash: Hash<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(
@@ -8,6 +16,39 @@ const plainly = (hash: Hash<string, unknown>): Record<string, unknown> =>
   );
 
 describe("HashWithIndifferentAccessTest", () => {
+  class IndifferentHash<V = unknown> extends HashWithIndifferentAccess<V> {}
+  class SubclassingHash extends Hash<string, unknown> {}
+  class NonIndifferentHash extends Hash<string, unknown> {
+    nestedUnderIndifferentAccess(): this {
+      return this;
+    }
+  }
+  class HashByConversion {
+    constructor(private hash: Record<string, unknown> | Hash<unknown, unknown>) {}
+    toHash() {
+      return this.hash;
+    }
+  }
+  const hashOf = (entries: [unknown, unknown][]) => {
+    const h = new Hash<unknown, unknown>();
+    for (const [k, v] of entries) h.set(k, v);
+    return h;
+  };
+  const wia = (h: unknown) => new HashWithIndifferentAccess<unknown>(h as never);
+  const strings = () => ({ a: 1, b: 2 });
+  const nestedStrings = () => ({ a: { b: { c: 3 } } });
+  const symbols = () => ({ ":a": 1, ":b": 2 });
+  const nestedSymbols = () => ({ ":a": { ":b": { ":c": 3 } } });
+  const mixed = () => ({ ":a": 1, b: 2 });
+  const nestedMixed = () => ({ a: { ":b": { c: 3 } } });
+  const integers = () =>
+    hashOf([
+      [0, 1],
+      [1, 2],
+    ]);
+  const nestedIntegers = () => hashOf([[0, hashOf([[1, hashOf([[2, 3]])]])]]);
+  const illegalSymbols = () => hashOf([[[], 3]]);
+  const nestedIllegalSymbols = () => hashOf([[[], hashOf([[[], 3]])]]);
   it("indifferent reading — string and symbol keys are interchangeable", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: true, c: false });
     expect(h.get("a")).toBe(1);
@@ -317,60 +358,73 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("to options for hash with indifferent access", () => {
-    expect(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions()).toBeInstanceOf(Hash);
-    expect(plainly(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions())).toEqual({
-      ":a": 1,
-      ":b": 2,
-    });
-    expect(plainly(new HashWithIndifferentAccess({ ":a": 1, b: 2 }).toOptions())).toEqual({
-      ":a": 1,
-      ":b": 2,
-    });
+    expect(wia(symbols()).toOptions()).toBeInstanceOf(Hash);
+    expect(plainly(wia(symbols()).toOptions())).toEqual(symbols());
+    expect(plainly(wia(strings()).toOptions())).toEqual(symbols());
+    expect(plainly(wia(mixed()).toOptions())).toEqual(symbols());
   });
 
   it("deep symbolize keys for hash with indifferent access", () => {
-    const nestedSymbols = { ":a": { ":b": { ":c": 3 } } };
-    expect(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys()).toBeInstanceOf(Hash);
-    expect(plainly(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys())).toEqual(
-      nestedSymbols,
+    expect(wia(nestedSymbols()).deepSymbolizeKeys()).toBeInstanceOf(Hash);
+    expect(plainly(wia(nestedSymbols()).deepSymbolizeKeys())).toEqual(nestedSymbols());
+    expect(plainly(wia(nestedStrings()).deepSymbolizeKeys())).toEqual(nestedSymbols());
+    expect(plainly(wia(nestedMixed()).deepSymbolizeKeys())).toEqual(nestedSymbols());
+  });
+
+  it("symbolize keys bang for hash with indifferent access", async () => {
+    const symbolizeKeysBang = (h: unknown) =>
+      (h as { symbolizeKeysBang(): unknown }).symbolizeKeysBang();
+    await assertRaises([globalThis.TypeError], {}, () => symbolizeKeysBang(wia(symbols()).dup()));
+    await assertRaises([globalThis.TypeError], {}, () => symbolizeKeysBang(wia(strings()).dup()));
+    await assertRaises([globalThis.TypeError], {}, () => symbolizeKeysBang(wia(mixed()).dup()));
+  });
+
+  it("deep symbolize keys bang for hash with indifferent access", async () => {
+    const deepSymbolizeKeysBang = (h: unknown) =>
+      (h as { deepSymbolizeKeysBang(): unknown }).deepSymbolizeKeysBang();
+    await assertRaises([globalThis.TypeError], {}, () =>
+      deepSymbolizeKeysBang(deepDup(wia(nestedSymbols()))),
     );
-    expect(
-      plainly(new HashWithIndifferentAccess({ a: { b: { c: 3 } } }).deepSymbolizeKeys()),
-    ).toEqual(nestedSymbols);
+    await assertRaises([globalThis.TypeError], {}, () =>
+      deepSymbolizeKeysBang(deepDup(wia(nestedStrings()))),
+    );
+    await assertRaises([globalThis.TypeError], {}, () =>
+      deepSymbolizeKeysBang(deepDup(wia(nestedMixed()))),
+    );
   });
 
-  it("symbolize keys bang for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const symbolized = h.symbolizeKeys();
-    expect(symbolized.get(":a")).toBe(1);
+  it("symbolize keys preserves keys that cant be symbolized for hash with indifferent access", async () => {
+    expect(wia(illegalSymbols()).symbolizeKeys()).toEqual(illegalSymbols());
+    await assertRaises([globalThis.TypeError], {}, () =>
+      ((h: unknown) => (h as { symbolizeKeysBang(): unknown }).symbolizeKeysBang())(
+        wia(illegalSymbols()).dup(),
+      ),
+    );
   });
 
-  it("deep symbolize keys bang for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const symbolized = h.symbolizeKeys();
-    expect([...symbolized.keys()]).toContain(":a");
+  it("deep symbolize keys preserves keys that cant be symbolized for hash with indifferent access", async () => {
+    expect(wia(nestedIllegalSymbols()).deepSymbolizeKeys()).toEqual(nestedIllegalSymbols());
+    await assertRaises([globalThis.TypeError], {}, () =>
+      ((h: unknown) => (h as { deepSymbolizeKeysBang(): unknown }).deepSymbolizeKeysBang())(
+        deepDup(wia(nestedIllegalSymbols())),
+      ),
+    );
   });
 
-  it("symbolize keys preserves keys that cant be symbolized for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ "123": "val" });
-    const symbolized = h.symbolizeKeys();
-    expect(symbolized.get(":123")).toBe("val");
-  });
-
-  it("deep symbolize keys preserves keys that cant be symbolized for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ "123": "val" });
-    expect(h.get("123")).toBe("val");
-  });
-
-  it("symbolize keys preserves integer keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ "1": "one" });
-    expect(h.get("1")).toBe("one");
+  it("symbolize keys preserves integer keys for hash with indifferent access", async () => {
+    expect(wia(integers()).symbolizeKeys()).toEqual(integers());
+    await assertRaises([globalThis.TypeError], {}, () =>
+      ((h: unknown) => (h as { symbolizeKeysBang(): unknown }).symbolizeKeysBang())(
+        wia(integers()).dup(),
+      ),
+    );
   });
 
   it("stringify keys stringifies integer keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ "1": "one" });
-    const stringified = h.stringifyKeys();
-    expect(stringified.get("1")).toBe("one");
+    expect(plainly(wia(integers()).stringifyKeys())).toEqual({ "0": 1, "1": 2 });
+    expect(plainly(wia({ ":ints": integers() }).deepStringifyKeys())).toEqual({
+      ints: { "0": 1, "1": 2 },
+    });
   });
 
   it("stringify keys stringifies non string keys for hash with indifferent access", () => {
@@ -379,48 +433,117 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(stringified.get("a")).toBe(1);
   });
 
-  it("deep symbolize keys preserves integer keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ "1": "one" });
-    expect(h.get("1")).toBe("one");
+  it("deep symbolize keys preserves integer keys for hash with indifferent access", async () => {
+    expect(wia(nestedIntegers()).deepSymbolizeKeys()).toEqual(nestedIntegers());
+    await assertRaises([globalThis.TypeError], {}, () =>
+      ((h: unknown) => (h as { deepSymbolizeKeysBang(): unknown }).deepSymbolizeKeysBang())(
+        deepDup(wia(nestedIntegers())),
+      ),
+    );
   });
 
   it("stringify keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const stringified = h.stringifyKeys();
-    expect(stringified).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(stringified.get("a")).toBe(1);
+    expect(wia(symbols()).stringifyKeys()).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(plainly(wia(symbols()).stringifyKeys())).toEqual(strings());
+    expect(plainly(wia(strings()).stringifyKeys())).toEqual(strings());
+    expect(plainly(wia(mixed()).stringifyKeys())).toEqual(strings());
   });
 
   it("deep stringify keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const stringified = h.stringifyKeys();
-    expect(stringified.get("a")).toBe(1);
+    expect(wia(nestedSymbols()).deepStringifyKeys()).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(plainly(wia(nestedSymbols()).deepStringifyKeys())).toEqual(nestedStrings());
+    expect(plainly(wia(nestedStrings()).deepStringifyKeys())).toEqual(nestedStrings());
+    expect(plainly(wia(nestedMixed()).deepStringifyKeys())).toEqual(nestedStrings());
   });
 
   it("stringify keys bang for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const stringified = h.stringifyKeys();
-    expect(stringified.get("a")).toBe(1);
+    expect(wia(symbols()).dup().stringifyKeysBang()).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(plainly(wia(symbols()).dup().stringifyKeysBang())).toEqual(strings());
+    expect(plainly(wia(strings()).dup().stringifyKeysBang())).toEqual(strings());
+    expect(plainly(wia(mixed()).dup().stringifyKeysBang())).toEqual(strings());
   });
 
   it("deep stringify keys bang for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = Object.fromEntries(h.toHash());
-    expect(Object.keys(plain).every((k) => typeof k === "string")).toBe(true);
+    expect(wia(nestedSymbols()).dup().deepStringifyKeysBang()).toBeInstanceOf(
+      HashWithIndifferentAccess,
+    );
+    expect(plainly(deepDup(wia(nestedSymbols())).deepStringifyKeysBang())).toEqual(nestedStrings());
+    expect(plainly(deepDup(wia(nestedStrings())).deepStringifyKeysBang())).toEqual(nestedStrings());
+    expect(plainly(deepDup(wia(nestedMixed())).deepStringifyKeysBang())).toEqual(nestedStrings());
   });
 
   it("nested under indifferent access", () => {
-    const inner = new HashWithIndifferentAccess({ x: 42 });
-    const outer = new HashWithIndifferentAccess<unknown>({ inner });
-    const retrieved = outer.get("inner") as HashWithIndifferentAccess<number>;
-    expect(retrieved.get("x")).toBe(42);
+    let foo = wia({
+      foo: (() => {
+        const h = new SubclassingHash();
+        h.set("bar", "baz");
+        return h;
+      })(),
+    });
+    expect(foo.get("foo")).toBeInstanceOf(HashWithIndifferentAccess);
+
+    foo = wia({
+      foo: (() => {
+        const h = new NonIndifferentHash();
+        h.set("bar", "baz");
+        return h;
+      })(),
+    });
+    expect(foo.get("foo")).toBeInstanceOf(NonIndifferentHash);
+
+    foo = wia({
+      foo: (() => {
+        const h = new IndifferentHash();
+        h.set("bar", "baz");
+        return h;
+      })(),
+    });
+    expect(foo.get("foo")).toBeInstanceOf(IndifferentHash);
   });
 
   it("indifferent assorted", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: "hello", c: true });
-    expect(h.get("a")).toBe(1);
-    expect(h.get("b")).toBe("hello");
-    expect(h.get("c")).toBe(true);
+    const indifferentStrings = wia(strings());
+    const indifferentSymbols = wia(symbols());
+    const indifferentMixed = wia(mixed());
+
+    expect(
+      (indifferentStrings as unknown as { convertKey(k: string): string }).convertKey(":a"),
+    ).toEqual("a");
+
+    expect(indifferentStrings.fetch("a")).toEqual(1);
+    expect(indifferentStrings.fetch(symbolToS(":a"))).toEqual(1);
+    expect(indifferentStrings.fetch(":a")).toEqual(1);
+
+    const hashes = {
+      ":@strings": indifferentStrings,
+      ":@symbols": indifferentSymbols,
+      ":@mixed": indifferentMixed,
+    };
+    const methodMap: Record<string, [string, unknown]> = {
+      "[]": ["get", 1],
+      fetch: ["fetch", 1],
+      valuesAt: ["valuesAt", [1]],
+      hasKey: ["hasKey", true],
+      include: ["include", true],
+      key: ["key", true],
+      member: ["member", true],
+    };
+
+    for (const [name, hash] of Object.entries(hashes)) {
+      for (const [meth, [method, expected]] of Object.entries(methodMap).sort()) {
+        const send = (key: string) =>
+          (hash as unknown as Record<string, (k: string) => unknown>)[method](key);
+        expect(send("a"), `Calling ${name}.${meth} 'a'`).toEqual(expected);
+        expect(send(":a"), `Calling ${name}.${meth} :a`).toEqual(expected);
+      }
+    }
+
+    expect(indifferentStrings.valuesAt("a", "b")).toEqual([1, 2]);
+    expect(indifferentStrings.valuesAt(":a", ":b")).toEqual([1, 2]);
+    expect(indifferentSymbols.valuesAt("a", "b")).toEqual([1, 2]);
+    expect(indifferentSymbols.valuesAt(":a", ":b")).toEqual([1, 2]);
+    expect(indifferentMixed.valuesAt("a", "b")).toEqual([1, 2]);
+    expect(indifferentMixed.valuesAt(":a", ":b")).toEqual([1, 2]);
   });
 
   it("indifferent fetch values", () => {
@@ -434,84 +557,155 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent reading", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: true, c: false });
-    expect(h.get("a")).toBe(1);
-    expect(h.get("b")).toBe(true);
-    expect(h.get("c")).toBe(false);
-    expect(h.get("d")).toBeUndefined();
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set("a", 1);
+    hash.set("b", true);
+    hash.set("c", false);
+    hash.set("d", null);
+
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get(":b")).toEqual(true);
+    expect(hash.get(":c")).toEqual(false);
+    expect(hash.get(":d")).toBeNull();
+    expect(hash.get(":e")).toBeUndefined();
   });
 
   it("indifferent reading with nonnil default", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    expect(h.get("a")).toBe(1);
-    expect(h.get("missing")).toBeUndefined();
+    const hash = new HashWithIndifferentAccess<unknown>(1);
+    hash.set("a", 1);
+    hash.set("b", true);
+    hash.set("c", false);
+    hash.set("d", null);
+
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get(":b")).toEqual(true);
+    expect(hash.get(":c")).toEqual(false);
+    expect(hash.get(":d")).toBeNull();
+    expect(hash.get(":e")).toEqual(1);
   });
 
   it("indifferent writing", () => {
-    const h = new HashWithIndifferentAccess<number>();
-    h.set("a", 1);
-    h.set("b", 2);
-    expect(h.get("a")).toBe(1);
-    expect(h.get("b")).toBe(2);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set(":a", 1);
+    hash.set("b", 2);
+    hash.set(3 as unknown as string, 3);
+
+    expect(hash.get("a")).toEqual(1);
+    expect(hash.get("b")).toEqual(2);
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get(":b")).toEqual(2);
+    expect(hash.get(3 as unknown as string)).toEqual(3);
   });
 
   it("indifferent update", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: "old" });
-    const returned = h.update({ a: 1, b: 2 });
-    expect(h.get("a")).toBe(1);
-    expect(h.get("b")).toBe(2);
-    expect(returned).toBe(h);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set(":a", "a");
+    hash.set("b", "b");
+
+    const updatedWithStrings = hash.update(strings());
+    const updatedWithSymbols = hash.update(symbols());
+    const updatedWithMixed = hash.update(mixed());
+
+    expect(updatedWithStrings.get(":a")).toEqual(1);
+    expect(updatedWithStrings.get("a")).toEqual(1);
+    expect(updatedWithStrings.get("b")).toEqual(2);
+
+    expect(updatedWithSymbols.get(":a")).toEqual(1);
+    expect(updatedWithSymbols.get("b")).toEqual(2);
+    expect(updatedWithSymbols.get(":b")).toEqual(2);
+
+    expect(updatedWithMixed.get(":a")).toEqual(1);
+    expect(updatedWithMixed.get("b")).toEqual(2);
+
+    expect(
+      [updatedWithStrings, updatedWithSymbols, updatedWithMixed].every((h) => h.size === 2),
+    ).toBeTruthy();
   });
 
   it("update with to hash conversion", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ x: 1 });
-    h.update({ y: 2 });
-    expect(h.get("x")).toBe(1);
-    expect(h.get("y")).toBe(2);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.update(new HashByConversion({ ":a": 1 }) as never);
+    expect(hash.get("a")).toEqual(1);
   });
 
   it("indifferent merging", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: "failure", b: "failure" });
-    const merged = h.merge({ a: 1, b: 2 });
-    expect(merged).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe(2);
-    expect(h.get("a")).toBe("failure");
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set(":a", "failure");
+    hash.set("b", "failure");
+
+    const other = { a: 1, ":b": 2 };
+
+    const merged = hash.merge(other);
+
+    expect(merged.constructor).toEqual(HashWithIndifferentAccess);
+    expect(merged.get(":a")).toEqual(1);
+    expect(merged.get("b")).toEqual(2);
+
+    hash.update(other);
+
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get("b")).toEqual(2);
   });
 
   it("merging with multiple arguments", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    const merged = h.merge(new HashWithIndifferentAccess({ b: 2 }));
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe(2);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    const merged = hash.merge({ a: 1 }, { b: 2 });
+
+    expect(merged.get("a")).toEqual(1);
+    expect(merged.get("b")).toEqual(2);
   });
 
   it("merge with to hash conversion", () => {
-    const h1 = new HashWithIndifferentAccess({ a: 1 });
-    const h2 = new HashWithIndifferentAccess({ b: 2 });
-    const merged = h1.merge(h2);
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe(2);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    const merged = hash.merge(new HashByConversion({ ":a": 1 }) as never);
+    expect(merged.get("a")).toEqual(1);
   });
 
   it("indifferent replace", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 42 });
-    h.replace({ b: 12 });
-    expect(h.hasKey("a")).toBe(false);
-    expect(h.get("b")).toBe(12);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set(":a", 42);
+
+    const replaced = hash.replace({ ":b": 12 });
+
+    expect(hash.key("b")).toBeTruthy();
+    expect(hash.key(":a")).toBeFalsy();
+    expect(hash.get(":b")).toEqual(12);
+    expect(replaced).toBe(hash);
   });
 
   it("replace with to hash conversion", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    h.replace({ b: 2 });
-    expect(h.hasKey("a")).toBe(false);
-    expect(h.get("b")).toBe(2);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.set(":a", 42);
+
+    const replaced = hash.replace(new HashByConversion({ ":b": 12 }) as never);
+
+    expect(hash.key("b")).toBeTruthy();
+    expect(hash.key(":a")).toBeFalsy();
+    expect(hash.get(":b")).toEqual(12);
+    expect(replaced).toBe(hash);
   });
 
   it("indifferent merging with block", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    const merged = h.merge({ a: 2 });
-    expect(merged.get("a")).toBe(2);
+    const hash = new HashWithIndifferentAccess<number>();
+    hash.set(":a", 1);
+    hash.set("b", 3);
+
+    const other = { a: 4, ":b": 2, c: 10 };
+
+    let merged = hash.merge(other, (_key, old, n) => (old > n ? old : n));
+
+    expect(merged.constructor).toEqual(HashWithIndifferentAccess);
+    expect(merged.get(":a")).toEqual(4);
+    expect(merged.get("b")).toEqual(3);
+    expect(merged.get(":c")).toEqual(10);
+
+    const otherIndifferent = new HashWithIndifferentAccess<number>({ a: 9, ":b": 2 });
+
+    merged = hash.merge(otherIndifferent, (_key, old, n) => old + n);
+
+    expect(merged.constructor).toEqual(HashWithIndifferentAccess);
+    expect(merged.get(":a")).toEqual(10);
+    expect(merged.get(":b")).toEqual(5);
   });
 
   it("indifferent reverse merging", () => {
@@ -559,16 +753,17 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent select returns a hash when unchanged", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const selected = h.select(() => true);
-    expect(selected).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(selected.size).toBe(h.size);
+    const hash = new HashWithIndifferentAccess(strings()).select(() => true);
+
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
   it("indifferent select bang", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    h.select((_k, v) => v === 1);
-    expect(h.size).toBe(2);
+    const indifferentStrings = new HashWithIndifferentAccess(strings());
+    indifferentStrings.selectBang((_k, v) => v === 1);
+
+    expect(plainly(indifferentStrings)).toEqual({ a: 1 });
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
   it("indifferent reject", () => {
@@ -585,35 +780,115 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent reject bang", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    h.reject((_k, v) => v === 1);
-    expect(h.size).toBe(2);
+    const indifferentStrings = new HashWithIndifferentAccess(strings());
+    indifferentStrings.rejectBang((_k, v) => v !== 1);
+
+    expect(plainly(indifferentStrings)).toEqual({ a: 1 });
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  it("indifferent transform keys", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const transformed = h.transformKeys((k) => k.repeat(2));
-    expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(Object.fromEntries(transformed.toHash())).toEqual({ aa: 1, bb: 2 });
+  it("indifferent transform keys", async () => {
+    let hash = new HashWithIndifferentAccess(strings()).transformKeys((k) => k.repeat(2));
+
+    expect(plainly(hash)).toEqual({ aa: 1, bb: 2 });
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(strings()).transformKeys((k) => `:${k}`);
+
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get("a")).toEqual(1);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(strings()).transformKeys({ a: "x", y: "z" });
+
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("x")).toEqual(1);
+    expect(hash.get("b")).toEqual(2);
+    expect(hash.get("y")).toBeUndefined();
+    expect(hash.get("z")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["x", "b"]);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(strings()).transformKeys({ a: "A", q: "Q" }, (k) =>
+      k.repeat(3),
+    );
+
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("A")).toEqual(1);
+    expect(hash.get("bbb")).toEqual(2);
+    expect(hash.get("q")).toBeUndefined();
+    expect(hash.get("Q")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["A", "bbb"]);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    await assertRaises([TypeError], {}, () => hash.transformKeys(null));
   });
 
   it("indifferent deep transform keys", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const transformed = h.transformKeys((k) => k.toUpperCase());
-    expect(transformed.get("A")).toBe(1);
+    let hash = new HashWithIndifferentAccess(nestedStrings()).deepTransformKeys((k) => k.repeat(2));
+
+    expect(plainly(hash)).toEqual({ aa: { bb: { cc: 3 } } });
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(nestedStrings()).deepTransformKeys((k) => `:${k}`);
+
+    expect(hash.dig(":a", ":b", ":c")).toEqual(3);
+    expect(hash.dig("a", "b", "c")).toEqual(3);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  it("indifferent transform keys bang", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const transformed = h.transformKeys((k) => k.toUpperCase());
-    expect(h.hasKey("a")).toBe(true);
-    expect(transformed.hasKey("A")).toBe(true);
+  it("indifferent transform keys bang", async () => {
+    let indifferentStrings = new HashWithIndifferentAccess(strings());
+    indifferentStrings.transformKeysBang((k) => k.repeat(2));
+
+    expect(plainly(indifferentStrings)).toEqual({ aa: 1, bb: 2 });
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
+
+    indifferentStrings = new HashWithIndifferentAccess(strings());
+    indifferentStrings.transformKeysBang((k) => `:${k}`);
+
+    expect(indifferentStrings.get(":a")).toEqual(1);
+    expect(indifferentStrings.get("a")).toEqual(1);
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
+
+    let hash = new HashWithIndifferentAccess(strings());
+    hash.transformKeysBang({ a: "x", y: "z" });
+
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("x")).toEqual(1);
+    expect(hash.get("b")).toEqual(2);
+    expect(hash.get("y")).toBeUndefined();
+    expect(hash.get("z")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["x", "b"]);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(strings());
+    hash.transformKeysBang({ a: "A", q: "Q" }, (k) => k.repeat(3));
+
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("A")).toEqual(1);
+    expect(hash.get("bbb")).toEqual(2);
+    expect(hash.get("q")).toBeUndefined();
+    expect(hash.get("Q")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["A", "bbb"]);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    await assertRaises([TypeError], {}, () => hash.transformKeys(null));
   });
 
   it("indifferent deep transform keys bang", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const transformed = h.transformKeys((k) => `${k}!`);
-    expect(transformed.get("a!")).toBe(1);
+    let hash = new HashWithIndifferentAccess(nestedStrings());
+    hash.deepTransformKeysBang((k) => k.repeat(2));
+
+    expect(plainly(hash)).toEqual({ aa: { bb: { cc: 3 } } });
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    hash = new HashWithIndifferentAccess(nestedStrings());
+    hash.deepTransformKeysBang((k) => `:${k}`);
+
+    expect(hash.dig(":a", ":b", ":c")).toEqual(3);
+    expect(hash.dig("a", "b", "c")).toEqual(3);
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
   it("indifferent transform values", () => {
@@ -624,34 +899,57 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent transform values bang", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const transformed = h.transformValues((v) => (v as number) + 10);
-    expect(h.get("a")).toBe(1);
-    expect(transformed.get("a")).toBe(11);
+    const indifferentStrings = new HashWithIndifferentAccess<number>(strings());
+    indifferentStrings.transformValuesBang((v) => v * 2);
+
+    expect(plainly(indifferentStrings)).toEqual({ a: 2, b: 4 });
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
   it("indifferent assoc", () => {
-    const indifferentStrings = new HashWithIndifferentAccess({ a: 1, b: 2 });
+    const indifferentStrings = new HashWithIndifferentAccess(strings());
     const [key, value] = indifferentStrings.assoc(":a")!;
 
-    expect(key).toBe("a");
-    expect(value).toBe(1);
-    expect(indifferentStrings.assoc(":z")).toBeUndefined();
+    expect(key).toEqual("a");
+    expect(value).toEqual(1);
   });
 
   it("indifferent compact", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: null, c: undefined, d: 2 });
-    const compacted = h.compact();
-    expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, d: 2 });
-    expect(h.hasKey("b")).toBe(true);
+    const hashContainNilValue = { ...strings(), z: null };
+    const hash = new HashWithIndifferentAccess<unknown>(hashContainNilValue);
+    let compactedHash = hash.compact();
+
+    expect(plainly(compactedHash)).toEqual(strings());
+    expect(plainly(hash)).toEqual(hashContainNilValue);
+    expect(compactedHash).toBeInstanceOf(HashWithIndifferentAccess);
+
+    const emptyHash = new HashWithIndifferentAccess<unknown>();
+    compactedHash = emptyHash.compact();
+
+    expect(compactedHash).toEqual(emptyHash);
+
+    const nonEmptyHash = new HashWithIndifferentAccess<unknown>({ ":foo": ":bar" });
+    compactedHash = nonEmptyHash.compact();
+
+    expect(compactedHash).toEqual(nonEmptyHash);
   });
 
   it("indifferent to hash", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: 2 });
-    const plain = Object.fromEntries(h.toHash());
-    expect(plain).toEqual({ a: 1, b: 2 });
-    expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
+    expect(plainly(wia(mixed()).toHash())).toEqual(strings());
+
+    const mixedWithDefault = hashOf(Object.entries(mixed()));
+    mixedWithDefault.setDefault("1234");
+    const roundtrip = wia(mixedWithDefault).toHash();
+    expect(plainly(roundtrip)).toEqual(strings());
+    expect(roundtrip.default()).toEqual("1234");
+
+    const newToHash = wia(nestedMixed()).toHash();
+    expect(newToHash.constructor === HashWithIndifferentAccess).toBeFalsy();
+    expect((newToHash.get("a") as object).constructor === HashWithIndifferentAccess).toBeFalsy();
+    expect(
+      ((newToHash.get("a") as Hash<string, unknown>).get("b") as object).constructor ===
+        HashWithIndifferentAccess,
+    ).toBeFalsy();
   });
 
   it("with indifferent access has no side effects on existing hash", () => {
@@ -662,10 +960,20 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent hash with array of hashes", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ items: [{ a: 1 }, { b: 2 }] });
-    const items = h.get("items") as Array<Record<string, unknown>>;
-    expect(Array.isArray(items)).toBe(true);
-    expect((items[0] as unknown as HashWithIndifferentAccess<unknown>).get("a")).toBe(1);
+    let hash: Hash<string, unknown> = wia({ urls: { url: [{ address: "1" }, { address: "2" }] } });
+    expect(
+      ((hash.get(":urls") as Hash<string, unknown>).get(":url") as Hash<string, unknown>[])[0].get(
+        ":address",
+      ),
+    ).toEqual("1");
+
+    hash = (hash as HashWithIndifferentAccess<unknown>).toHash();
+    expect(hash.constructor === HashWithIndifferentAccess).toBeFalsy();
+    expect((hash.get("urls") as object).constructor === HashWithIndifferentAccess).toBeFalsy();
+    expect(
+      ((hash.get("urls") as Hash<string, unknown>).get("url") as object[])[0].constructor ===
+        HashWithIndifferentAccess,
+    ).toBeFalsy();
   });
 
   it("should preserve array subclass when value is array", () => {
@@ -681,15 +989,25 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("stringify and symbolize keys on indifferent preserves hash", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const stringified = h.stringifyKeys();
-    expect(stringified.get("a")).toBe(1);
+    let h: Hash<string, unknown> = new HashWithIndifferentAccess<unknown>();
+    h.set(":first", 1);
+    h = (h as HashWithIndifferentAccess<unknown>).stringifyKeys();
+    expect(h.get("first")).toEqual(1);
+    h = new HashWithIndifferentAccess<unknown>();
+    h.set("first", 1);
+    h = (h as HashWithIndifferentAccess<unknown>).symbolizeKeys();
+    expect(h.get(":first")).toEqual(1);
   });
 
   it("deep stringify and deep symbolize keys on indifferent preserves hash", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const symbolized = h.symbolizeKeys();
-    expect(plainly(symbolized)).toEqual({ ":a": 1 });
+    let h: Hash<string, unknown> = new HashWithIndifferentAccess<unknown>();
+    h.set(":first", 1);
+    h = (h as HashWithIndifferentAccess<unknown>).deepStringifyKeys();
+    expect(h.get("first")).toEqual(1);
+    h = new HashWithIndifferentAccess<unknown>();
+    h.set("first", 1);
+    h = (h as HashWithIndifferentAccess<unknown>).deepSymbolizeKeys();
+    expect(h.get(":first")).toEqual(1);
   });
 
   it("to options on indifferent preserves hash", () => {
@@ -698,23 +1016,42 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("to options on indifferent preserves works as hash with dup", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const dup = h.withIndifferentAccess();
-    expect(dup.get("a")).toBe(1);
-    expect(dup).not.toBe(h);
+    const h = new HashWithIndifferentAccess<unknown>({ ":a": { ":b": "b" } });
+    const dup = h.dup();
+
+    (dup.get(":a") as HashWithIndifferentAccess<unknown>).set(":c", "c");
+    expect((h.get(":a") as HashWithIndifferentAccess<unknown>).get(":c")).toEqual("c");
   });
 
   it("indifferent sub hashes", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ user: { id: 5 } });
-    expect(h.get("user")).toBeDefined();
+    let h = wia({ user: { id: 5 } });
+    for (const user of ["user", ":user"]) {
+      for (const id of [":id", "id"]) {
+        expect(
+          (h.get(user) as HashWithIndifferentAccess<unknown>).get(id),
+          `h[${user}][${id}] should be 5`,
+        ).toEqual(5);
+      }
+    }
+
+    h = wia({ ":user": { ":id": 5 } });
+    for (const user of ["user", ":user"]) {
+      for (const id of [":id", "id"]) {
+        expect(
+          (h.get(user) as HashWithIndifferentAccess<unknown>).get(id),
+          `h[${user}][${id}] should be 5`,
+        ).toEqual(5);
+      }
+    }
   });
 
   it("indifferent duplication", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const dup = h.withIndifferentAccess();
-    expect(dup).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(dup).not.toBe(h);
-    expect(dup.get("a")).toBe(1);
+    let h = new HashWithIndifferentAccess<unknown>();
+    h.setDefault("1234");
+    expect(h.dup().default()).toEqual(h.default());
+
+    h = new IndifferentHash();
+    expect(h.dup().constructor).toEqual(h.constructor);
   });
 
   it("argless default with existing nil key", () => {
@@ -743,23 +1080,35 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("assorted keys not stringified", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const keys = [...h.keys()];
-    expect(keys.every((k) => typeof k === "string")).toBe(true);
+    const original = hashOf([
+      [{}, 2],
+      [1, 2],
+      [[], true],
+    ]);
+    const indiff = wia(original);
+    expect(
+      [...indiff.keys()].some((k) => typeof k === "string"),
+      "A key was converted to a string!",
+    ).toBeFalsy();
   });
 
   it("deep merge on indifferent access", () => {
-    const h1 = new HashWithIndifferentAccess<unknown>({
-      a: "a",
-      b: "b",
-      c: { c1: "c1", c2: "c2" },
+    const hash1 = new HashWithIndifferentAccess<unknown>({
+      ":a": "a",
+      ":b": "b",
+      ":c": { ":c1": "c1", ":c2": "c2", ":c3": { ":d1": "d1" } },
     });
-    const h2 = new HashWithIndifferentAccess<unknown>({ a: 1, c: { c1: 2 } });
-    const merged = h1.deepMerge(h2);
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe("b");
-    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c1")).toBe(2);
-    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
+    const hash2 = new HashWithIndifferentAccess<unknown>({
+      ":a": 1,
+      ":c": { ":c1": 2, ":c3": { ":d2": "d2" } },
+    });
+    const hash3 = { ":a": 1, ":c": { ":c1": 2, ":c3": { ":d2": "d2" } } };
+    const expected = { a: 1, b: "b", c: { c1: 2, c2: "c2", c3: { d1: "d1", d2: "d2" } } };
+    expect(plainly(hash1.deepMerge(hash2))).toEqual(expected);
+    expect(plainly(hash1.deepMerge(hash3))).toEqual(expected);
+
+    hash1.deepMergeBang(hash2);
+    expect(plainly(hash1)).toEqual(expected);
   });
 
   it("store on indifferent access", () => {
@@ -769,8 +1118,12 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("constructor on indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("a")).toBe(1);
+    const hash = HashWithIndifferentAccess.get(":foo", 1);
+    expect(hash.get(":foo")).toEqual(1);
+    expect(hash.get("foo")).toEqual(1);
+    hash.set(":foo", 3);
+    expect(hash.get(":foo")).toEqual(3);
+    expect(hash.get("foo")).toEqual(3);
   });
 
   it("indifferent slice", () => {
@@ -784,13 +1137,6 @@ describe("HashWithIndifferentAccessTest", () => {
       expect(original.slice(...keys).toHash()).toEqual(expected.toHash());
       expect(original.toHash()).not.toEqual(expected.toHash());
     }
-  });
-
-  it("indifferent slice inplace", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
-    const sliced = h.slice("a");
-    expect(h.size).toBe(3);
-    expect(sliced.size).toBe(1);
   });
 
   it("indifferent slice access with symbols", () => {
@@ -807,21 +1153,37 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent without", () => {
-    const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
-    const result = original.without("a", "b");
-    expect(result).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
+    const original = wia({ ":a": "x", ":b": "y", ":c": 10 });
+    const expected = wia({ ":c": 10 });
+
+    for (const keys of [
+      ["a", "b"],
+      [":a", ":b"],
+    ]) {
+      expect(original.without(...keys), inspect(keys)).toEqual(expected);
+      expect(original).not.toEqual(expected);
+    }
   });
 
   it("indifferent extract", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
-    const result = h.except("b", "c");
-    expect(Object.fromEntries(result.toHash())).toEqual({ a: 1 });
+    const original = wia({ ":a": 1, b: 2, ":c": 3, d: 4 });
+    const expected = wia({ ":a": 1, ":b": 2 });
+    const remaining = wia({ ":c": 3, ":d": 4 });
+
+    for (const keys of [
+      ["a", "b"],
+      [":a", ":b"],
+    ]) {
+      const copy = original.dup();
+      expect(copy.extractBang(...keys)).toEqual(expected);
+      expect(copy).toEqual(remaining);
+    }
   });
 
   it("new with to hash conversion", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("a")).toBe(1);
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion({ ":a": 1 }) as never);
+    expect(hash.key("a")).toBeTruthy();
+    expect(hash.get(":a")).toEqual(1);
   });
 
   it("dup with default proc", () => {
@@ -853,20 +1215,26 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("new with to hash conversion copies default", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("a")).toBe(1);
+    const normalHash = new Hash<unknown, unknown>(3);
+    normalHash.set(":a", 1);
+
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash) as never);
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get(":b")).toEqual(3);
   });
 
   it("new with to hash conversion copies default proc", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const normalHash = new Hash<unknown, unknown>(() => 1 + 2);
+    normalHash.set(":a", 1);
+
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash) as never);
+    expect(hash.get(":a")).toEqual(1);
+    expect(hash.get(":b")).toEqual(3);
   });
 
   it("inheriting from top level hash with indifferent access preserves ancestors chain", () => {
-    class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
-    const h = new MyHWIA({ a: 1 });
-    expect(h).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(h.get("a")).toBe(1);
+    const klass = class extends HashWithIndifferentAccess {};
+    expect(Object.getPrototypeOf(klass)).toEqual(HashWithIndifferentAccess);
   });
 
   it("inheriting from hash with indifferent access properly dumps ivars", () => {
@@ -876,28 +1244,28 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("should use default proc for unknown key", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("unknown")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(() => 1 + 2);
+    expect(hashWia.get(":new_key")).toEqual(3);
   });
 
   it("should return nil if no key is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(() => 1 + 2);
+    expect(hashWia.default()).toBeUndefined();
   });
 
   it("should use default value for unknown key", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(3);
+    expect(hashWia.get(":new_key")).toEqual(3);
   });
 
   it("should use default value if no key is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(3);
+    expect(hashWia.default()).toEqual(3);
   });
 
   it("should nil if no default value is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>();
+    expect(hashWia.default()).toBeUndefined();
   });
 
   it("should return dup for with indifferent access", () => {
@@ -915,29 +1283,51 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("should copy the default value when converting to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    h.setDefault("1234");
-    const roundtrip = h.toHash();
-    expect(Object.fromEntries(roundtrip)).toEqual({ a: 1 });
-    expect(roundtrip.default()).toBe("1234");
+    const hash = new Hash<string, unknown>(3);
+    const hashWia = wia(hash);
+    expect(hashWia.default()).toEqual(3);
   });
 
   it("should copy the default proc when converting to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    h.setDefaultProc((_hash, key) => `${key}!`);
-    const roundtrip = h.toHash();
-    expect(roundtrip.get("a")).toBe(1);
-    expect(roundtrip.get("b")).toBe("b!");
+    const hash = new Hash<string, unknown>(() => 2 + 1);
+    expect(hash.get(":foo")).toEqual(3);
+
+    const hashWia = wia(hash);
+    expect(hashWia.get(":foo")).toEqual(3);
+    expect(hashWia.get(":bar")).toEqual(3);
   });
 
   it("should copy the default when converting non hash to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("a")).toBe(1);
+    const nonHash = new (class {
+      toHash() {
+        const h = new Hash<string, unknown>();
+        h.set(":foo", ":bar");
+        h.setDefault(":baz");
+        return h;
+      }
+    })();
+
+    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash as never);
+    expect(hashWia.get(":foo")).toEqual(":bar");
+    expect(hashWia.get(":missing")).toEqual(":baz");
   });
 
   it("should copy the default proc when converting non hash to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const nonHash = new (class {
+      toHash() {
+        const h = new Hash<string, unknown>();
+        h.set(":foo", ":bar");
+        h.setDefaultProc((hash, key) => {
+          hash.set(key, ":baz");
+          return ":baz";
+        });
+        return h;
+      }
+    })();
+
+    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash as never);
+    expect(hashWia.get(":foo")).toEqual(":bar");
+    expect(hashWia.get(":missing")).toEqual(":baz");
   });
 
   it("indifferent to proc", () => {
@@ -980,16 +1370,15 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent slice inplace", () => {
-    const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
-    const expected = new HashWithIndifferentAccess({ c: 10 });
+    const original = wia({ ":a": "x", ":b": "y", ":c": 10 });
+    const expected = wia({ ":c": 10 });
 
     for (const keys of [
       ["a", "b"],
       [":a", ":b"],
     ]) {
-      const copy = new HashWithIndifferentAccess(original);
-      expect(copy.sliceBang(...keys).toHash()).toEqual(expected.toHash());
-      expect(Object.fromEntries(copy.toHash())).toEqual({ a: "x", b: "y" });
+      const copy = original.dup();
+      expect(copy.sliceBang(...keys)).toEqual(expected);
     }
   });
 

@@ -1,16 +1,20 @@
 /**
  * ActiveSupport::Duration — mirrors the Rails API as closely as possible.
  *
- * @boundary-file: `since`/`ago`/`from_now`/`until`/`after`/`before` accept
- *   `Date | Temporal.Instant` (`Date` for ergonomic interop) but return
- *   `Temporal.Instant`. The default reference is `Temporal.Now.instant()`.
+ * @boundary-file: `since`/`ago`/`from_now`/`until`/`after`/`before` also accept
+ *   `Date | Temporal.Instant` (`Date` for ergonomic interop) and return
+ *   `Temporal.Instant` for them. The default reference is `Time.current`.
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { cmp, equals as cmpEquals, rbEqual, rbObjClass, rubyClass } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
-import { advance as timeAdvance, since as timeSince } from "./core-ext/time/calculations.js";
+import {
+  advance as timeAdvance,
+  current as timeCurrent,
+  since as timeSince,
+} from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
@@ -290,42 +294,47 @@ export class Duration {
 
   since(time: RubyTime): RubyTime;
   since(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  since(time?: Date | Temporal.Instant): Temporal.Instant;
+  since(time: Date | Temporal.Instant): Temporal.Instant;
+  since(time?: TimeWithZone): TimeWithZone | RubyTime;
   since(time?: DurationReceiver): DurationResult;
-  since(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  since(time: DurationReceiver = timeCurrent()): DurationResult {
     return this.sum(1, time);
   }
 
   ago(time: RubyTime): RubyTime;
   ago(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  ago(time?: Date | Temporal.Instant): Temporal.Instant;
+  ago(time: Date | Temporal.Instant): Temporal.Instant;
+  ago(time?: TimeWithZone): TimeWithZone | RubyTime;
   ago(time?: DurationReceiver): DurationResult;
-  ago(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  ago(time: DurationReceiver = timeCurrent()): DurationResult {
     return this.sum(-1, time);
   }
 
-  fromNow(): Temporal.Instant {
+  fromNow(): TimeWithZone | RubyTime {
     return this.since();
   }
 
   until(time: RubyTime): RubyTime;
   until(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  until(time?: Date | Temporal.Instant): Temporal.Instant;
-  until(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  until(time: Date | Temporal.Instant): Temporal.Instant;
+  until(time?: TimeWithZone): TimeWithZone | RubyTime;
+  until(time: DurationReceiver = timeCurrent()): DurationResult {
     return this.ago(time);
   }
 
   after(time: RubyTime): RubyTime;
   after(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  after(time?: Date | Temporal.Instant): Temporal.Instant;
-  after(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  after(time: Date | Temporal.Instant): Temporal.Instant;
+  after(time?: TimeWithZone): TimeWithZone | RubyTime;
+  after(time: DurationReceiver = timeCurrent()): DurationResult {
     return this.since(time);
   }
 
   before(time: RubyTime): RubyTime;
   before(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  before(time?: Date | Temporal.Instant): Temporal.Instant;
-  before(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  before(time: Date | Temporal.Instant): Temporal.Instant;
+  before(time?: TimeWithZone): TimeWithZone | RubyTime;
+  before(time: DurationReceiver = timeCurrent()): DurationResult {
     return this.ago(time);
   }
 
@@ -388,13 +397,14 @@ export class Duration {
     return this.transformValues((number) => number);
   }
 
-  private sum(sign: 1 | -1, time: DurationReceiver = Temporal.Now.instant()): DurationResult {
+  private sum(sign: 1 | -1, time: DurationReceiver = timeCurrent()): DurationResult {
     if (
       !(
         time instanceof Date ||
         time instanceof Temporal.Instant ||
         time instanceof Temporal.PlainDate ||
-        time instanceof RubyTime
+        time instanceof RubyTime ||
+        (time != null && time.actsLikeTime?.() === true)
       )
     ) {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
@@ -403,10 +413,12 @@ export class Duration {
     if (isEmpty(this._partKeys)) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
       if (time instanceof RubyTime) return timeSince.call(time, sign * this.inSeconds());
+      if (!(time instanceof Date || time instanceof Temporal.Instant))
+        return time.since(sign * this.inSeconds());
       return applyDurationPreservingNs(time, this.parts, sign);
     }
 
-    if (time instanceof Temporal.PlainDate || time instanceof RubyTime)
+    if (!(time instanceof Date || time instanceof Temporal.Instant))
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
     return applyDurationPreservingNs(time, this.parts, sign);
   }
@@ -502,7 +514,7 @@ export function years(n: number): Duration {
   return Duration.years(n);
 }
 
-type DurationReceiver = Date | Temporal.Instant | Temporal.PlainDate | RubyTime;
+type DurationReceiver = Date | Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
 type DurationResult = Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
 
 function toDateInput(date: Date | Temporal.Instant): Date {
@@ -512,7 +524,7 @@ function toDateInput(date: Date | Temporal.Instant): Date {
 }
 
 function applyDurationToDate(
-  date: Temporal.PlainDate | RubyTime,
+  date: Temporal.PlainDate | TimeWithZone | RubyTime,
   parts: DurationParts,
   partKeys: readonly (keyof DurationParts)[],
   sign: 1 | -1,
