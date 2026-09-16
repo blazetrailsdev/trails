@@ -1132,8 +1132,9 @@ internal-field number lands on every framework read, not only user code.
   construction.
 
 **The Migration half.** Rails' `Migration#method_missing`
-(`activerecord/lib/active_record/migration.rb:1044-1059`) forwards every DSL
-statement (`create_table`, `add_column`, …) to the connection. trails has no
+(`activerecord/lib/active_record/migration.rb:1044-1059`) wraps every DSL
+statement (`create_table`, `add_column`, …) in `say_with_time` and sends it to
+`execution_strategy`. trails has no
 such dispatch, so `migration.ts` declares typed forwarders, each a
 `this.methodMissing(name, ...args)` call (`createTable` at `:352` onward). They
 **stay**. A Proxy would not buy back extra surface either: typing the proxied
