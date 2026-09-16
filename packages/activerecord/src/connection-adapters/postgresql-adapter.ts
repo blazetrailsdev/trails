@@ -653,7 +653,7 @@ export class PostgreSQLAdapter
     });
   }
 
-  /** @missingRailsCall verify! — CONVERGEABLE typecaster-connection-drops-datasource-gate-and-with-connection */
+  /** @missingRailsCall verify! — PERMANENT */
   override lookupCastTypeFromColumn(column: CastableColumn): ValueType {
     if (this._typeMap == null) {
       throw new ConnectionNotEstablished(
