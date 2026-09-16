@@ -121,6 +121,16 @@ describe("ColumnDeduplicationTrails", () => {
     expect(plain.deduplicate()).not.toBe(serial.deduplicate());
   });
 
+  it("folds the PostgreSQL type metadata oid and fmod into the key", () => {
+    const opts = { sqlType: "integer", type: "integer" };
+    const plain = new PgTypeMetadata(opts);
+    const withOid = new PgTypeMetadata(opts, { oid: 23 });
+    const withFmod = new PgTypeMetadata(opts, { fmod: 4 });
+    expect(plain.hash()).not.toBe(withOid.hash());
+    expect(plain.hash()).not.toBe(withFmod.hash());
+    expect(plain.deduplicate()).not.toBe(withOid.deduplicate());
+  });
+
   it("interns the sqlTypeMetadata onto the shared canonical instance", () => {
     const canonical = meta({ sqlType: "bigint" }).deduplicate();
     const own = meta({ sqlType: "bigint" });

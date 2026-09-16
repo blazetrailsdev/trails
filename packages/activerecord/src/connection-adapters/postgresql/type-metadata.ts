@@ -1,3 +1,4 @@
+import { rbHash } from "@blazetrails/ruby-compat";
 import {
   SqlTypeMetadata,
   registerTypeMetadataClass,
@@ -35,6 +36,10 @@ export class TypeMetadata extends SqlTypeMetadata {
       this.oid === other.oid &&
       this.fmod === other.fmod
     );
+  }
+
+  override hash(): number {
+    return rbHash(TypeMetadata) ^ rbHash(super.hash()) ^ rbHash(this.oid) ^ rbHash(this.fmod);
   }
 
   /** @noRailsEquivalent PERMANENT */
