@@ -1,5 +1,6 @@
 import { Temporal, Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import * as date from "../date/calculations.js";
+import * as dateTime from "../date-time/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
@@ -9,7 +10,9 @@ import * as DateAndTimeCalculations from "./calculations.js";
 
 export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
 
-export type Comparable = DateOrTime | TimeWithZone | Temporal.Instant;
+export type Comparable = DateOrTime | DateTime | TimeWithZone | Temporal.Instant;
+
+type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
 
 export type DateOrInstant = Temporal.PlainDate | RubyDate | Temporal.Instant;
 
@@ -33,6 +36,8 @@ function advance(
   if (dateOrTime instanceof RubyTime) {
     return (dateOrTime as unknown as { advance(options: unknown): DateOrInstant }).advance(options);
   }
+  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
+    return dateTime.advance(dateOrTime, options) as never;
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
@@ -40,9 +45,15 @@ function advance(
     : date.advance(dateOrTime, options);
 }
 
-function toDate(dateOrTime: DateOrTime | RubyTime): Temporal.PlainDate {
+function toDate(dateOrTime: DateOrTime | DateTime | RubyTime): Temporal.PlainDate {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return time.toDate(dateOrTime);
+  if (
+    dateOrTime instanceof Temporal.PlainDateTime ||
+    dateOrTime instanceof Temporal.ZonedDateTime
+  ) {
+    return dateOrTime.toPlainDate();
+  }
   return dateOrTime instanceof RubyDate || dateOrTime instanceof RubyTime
     ? dateOrTime.toDate()
     : dateOrTime;
@@ -55,7 +66,13 @@ function wday(dateOrTime: DateOrTime | Temporal.Instant | RubyTime): number {
   return dateOrTime instanceof RubyDate ? dateOrTime.wday : dateOrTime.dayOfWeek % 7;
 }
 
-function classCurrent(dateOrTime: DateOrTime): Temporal.PlainDate | TimeWithZone | Date {
+function classCurrent(dateOrTime: DateOrTime | DateTime): Comparable {
+  if (
+    dateOrTime instanceof Temporal.PlainDateTime ||
+    dateOrTime instanceof Temporal.ZonedDateTime
+  ) {
+    return dateTime.current();
+  }
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? time.current() : date.current();
 }
@@ -69,11 +86,14 @@ function toInstant(dateOrTime: Comparable): Temporal.Instant {
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
+  if (dateOrTime instanceof Temporal.PlainDateTime)
+    return dateOrTime.toZonedDateTime("UTC").toInstant();
+  if (dateOrTime instanceof Temporal.ZonedDateTime) return dateOrTime.toInstant();
   return toDate(dateOrTime).toZonedDateTime("UTC").toInstant();
 }
 
 function change(
-  dateOrTime: DateOrTime | Temporal.Instant,
+  dateOrTime: DateOrTime | DateTime | Temporal.Instant,
   options: {
     year?: number;
     month?: number;
@@ -84,6 +104,8 @@ function change(
     nsec?: number;
   },
 ): DateOrInstant {
+  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
+    return dateTime.change(dateOrTime, options) as never;
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
@@ -99,20 +121,20 @@ function receiver(dateOrTime: DateOrTime | Temporal.Instant | RubyTime): DateOrT
     : dateOrTime;
 }
 
-function year(dateOrTime: DateOrTime | Temporal.Instant): number {
-  dateOrTime = receiver(dateOrTime);
+function year(dateOrTime: DateOrTime | DateTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime as DateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getFullYear() : Number(dateOrTime.year);
 }
 
-function month(dateOrTime: DateOrTime | Temporal.Instant): number {
-  dateOrTime = receiver(dateOrTime);
+function month(dateOrTime: DateOrTime | DateTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime as DateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getMonth() + 1 : dateOrTime.month;
 }
 
-function day(dateOrTime: DateOrTime | Temporal.Instant): number {
-  dateOrTime = receiver(dateOrTime);
+function day(dateOrTime: DateOrTime | DateTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime as DateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getDate() : dateOrTime.day;
 }
@@ -173,27 +195,27 @@ export function tomorrow(dateOrTime: DateOrTime | RubyTime): DateOrInstant | Rub
   return advance(dateOrTime, { days: 1 });
 }
 
-export function isToday(dateOrTime: DateOrTime | RubyTime): boolean {
+export function isToday(dateOrTime: DateOrTime | DateTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(date.current());
 }
 
-export function isTomorrow(dateOrTime: DateOrTime | RubyTime): boolean {
+export function isTomorrow(dateOrTime: DateOrTime | DateTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(tomorrow(date.current()));
 }
 
 export const isNextDay = isTomorrow;
 
-export function isYesterday(dateOrTime: DateOrTime | RubyTime): boolean {
+export function isYesterday(dateOrTime: DateOrTime | DateTime | RubyTime): boolean {
   return toDate(dateOrTime).equals(yesterday(date.current()));
 }
 
 export const isPrevDay = isYesterday;
 
-export function isPast(dateOrTime: DateOrTime): boolean {
+export function isPast(dateOrTime: DateOrTime | DateTime): boolean {
   return compare(dateOrTime, classCurrent(dateOrTime)) < 0;
 }
 
-export function isFuture(dateOrTime: DateOrTime): boolean {
+export function isFuture(dateOrTime: DateOrTime | DateTime): boolean {
   return compare(dateOrTime, classCurrent(dateOrTime)) > 0;
 }
 
@@ -368,7 +390,8 @@ export function nextWeekday(dateOrTime: DateOrTime): DateOrInstant {
 
 export function nextQuarter(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function nextQuarter(dateOrTime: Date): Temporal.Instant;
-export function nextQuarter(dateOrTime: DateOrTime): DateOrInstant {
+export function nextQuarter(dateOrTime: DateTime): DateTime;
+export function nextQuarter(dateOrTime: DateOrTime | DateTime): DateOrInstant | DateTime {
   return monthsSince(dateOrTime as Date, 3);
 }
 
@@ -383,14 +406,19 @@ export function prevWeek(
   options?: { sameTime?: boolean },
 ): Temporal.Instant;
 export function prevWeek(
-  dateOrTime: DateOrTime,
+  dateOrTime: DateTime,
+  startDay?: string,
+  options?: { sameTime?: boolean },
+): DateTime;
+export function prevWeek(
+  dateOrTime: DateOrTime | DateTime,
   startDay: string = date.beginningOfWeek(),
   { sameTime = false }: { sameTime?: boolean } = {},
-): DateOrInstant {
+): DateOrInstant | DateTime {
   const result = firstHour(
     daysSince(beginningOfWeek(weeksAgo(dateOrTime as Date, 1)), daysSpan(startDay)),
   );
-  return sameTime ? copyTimeTo(dateOrTime, result) : result;
+  return sameTime ? copyTimeTo(dateOrTime as DateOrTime, result) : result;
 }
 
 export const lastWeek = prevWeek;
@@ -415,7 +443,8 @@ export function lastMonth(dateOrTime: DateOrTime): DateOrInstant {
 
 export function prevQuarter(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function prevQuarter(dateOrTime: Date): Temporal.Instant;
-export function prevQuarter(dateOrTime: DateOrTime): DateOrInstant {
+export function prevQuarter(dateOrTime: DateTime): DateTime;
+export function prevQuarter(dateOrTime: DateOrTime | DateTime): DateOrInstant | DateTime {
   return monthsAgo(dateOrTime as Date, 3);
 }
 
@@ -448,6 +477,8 @@ export function beginningOfWeek(
   startDay: string = date.beginningOfWeek(),
 ): DateOrInstant {
   const result = daysAgo(dateOrTime as Date, daysToWeekStart(dateOrTime, startDay));
+  if (result instanceof Temporal.PlainDateTime || result instanceof Temporal.ZonedDateTime)
+    return dateTime.beginningOfDay(result) as never;
   return Object.actsLike(dateOrTime, "time") ? time.midnight(receiver(result) as Date) : result;
 }
 
@@ -479,8 +510,11 @@ export function sunday(dateOrTime: DateOrTime): DateOrInstant {
 
 export function endOfMonth(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function endOfMonth(dateOrTime: Date): Temporal.Instant;
+export function endOfMonth(dateOrTime: DateTime): DateTime;
 export function endOfMonth(dateOrTime: DateOrInstant): DateOrInstant;
-export function endOfMonth(dateOrTime: DateOrTime | Temporal.Instant): DateOrInstant {
+export function endOfMonth(
+  dateOrTime: DateOrTime | DateTime | Temporal.Instant,
+): DateOrInstant | DateTime {
   const lastDay = time.daysInMonth(month(dateOrTime), year(dateOrTime));
   return lastHour(daysSince(dateOrTime as Date, lastDay - day(dateOrTime)));
 }
@@ -553,6 +587,8 @@ export function prevOccurring(
 
 /** @internal */
 function firstHour(dateOrTime: DateOrInstant): DateOrInstant {
+  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
+    return dateTime.beginningOfDay(dateOrTime) as never;
   return Object.actsLike(dateOrTime, "time")
     ? time.beginningOfDay(receiver(dateOrTime) as Date)
     : dateOrTime;
@@ -560,6 +596,8 @@ function firstHour(dateOrTime: DateOrInstant): DateOrInstant {
 
 /** @internal */
 function lastHour(dateOrTime: DateOrInstant): DateOrInstant {
+  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
+    return dateTime.endOfDay(dateOrTime) as never;
   return Object.actsLike(dateOrTime, "time")
     ? time.endOfDay(receiver(dateOrTime) as Date)
     : dateOrTime;
