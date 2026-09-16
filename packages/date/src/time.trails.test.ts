@@ -669,3 +669,14 @@ describe("Time", () => {
     });
   });
 });
+
+describe("Time class constructors allocate the receiver", () => {
+  class TimeSubclass extends Time {}
+
+  it("now and at build the subclass (time.c time_s_now / time_s_at)", () => {
+    expect(TimeSubclass.now().constructor).toBe(TimeSubclass);
+    expect(TimeSubclass.at(0).constructor).toBe(TimeSubclass);
+    expect(TimeSubclass.at(Time.now()).constructor).toBe(TimeSubclass);
+    expect(Time.at(0).constructor).toBe(Time);
+  });
+});

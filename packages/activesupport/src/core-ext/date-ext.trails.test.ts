@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import * as DateExt from "./date/calculations.js";
 import { setZone } from "../time-zone-config.js";
 import { Duration } from "../duration.js";
@@ -52,15 +52,9 @@ describe("date calculations coercion arms", () => {
   });
 
   it("plus_with_duration widens for a zero sub-day part and not for a zero day part", () => {
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(
-      TimeWithZone,
-    );
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.minutes(0))).toBeInstanceOf(
-      TimeWithZone,
-    );
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.hours(0))).toBeInstanceOf(
-      TimeWithZone,
-    );
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(RubyTime);
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.minutes(0))).toBeInstanceOf(RubyTime);
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.hours(0))).toBeInstanceOf(RubyTime);
     expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(0))).toEqual(pd(2017, 1, 1));
     expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.months(0))).toEqual(pd(2017, 1, 1));
   });
