@@ -3,6 +3,8 @@ import { OrderedHash } from "./ordered-hash.js";
 import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { extractOptionsBang } from "./hash-utils.js";
 
+const Enumerator = (globalThis as unknown as { Iterator: abstract new () => unknown }).Iterator;
+
 describe("OrderedHashTest", () => {
   let keys: string[];
   let values: string[];
@@ -92,7 +94,7 @@ describe("OrderedHashTest", () => {
     orderedHash.forEach((_, k) => eachKeys.push(k));
     expect(eachKeys).toEqual(keys);
     expect([...orderedHash.keys()]).toEqual(eachKeys);
-    expect(orderedHash.keys()).toBeInstanceOf(Iterator);
+    expect(orderedHash.keys()).toBeInstanceOf(Enumerator);
   });
 
   it("each value", () => {
@@ -100,7 +102,7 @@ describe("OrderedHashTest", () => {
     orderedHash.forEach((v) => eachValues.push(v));
     expect(eachValues).toEqual(values);
     expect([...orderedHash.values()]).toEqual(eachValues);
-    expect(orderedHash.values()).toBeInstanceOf(Iterator);
+    expect(orderedHash.values()).toBeInstanceOf(Enumerator);
   });
 
   it("each", () => {
@@ -108,7 +110,7 @@ describe("OrderedHashTest", () => {
     for (const [, value] of orderedHash) eachValues.push(value);
     expect(eachValues).toEqual(values);
     expect([...orderedHash.values()]).toEqual(eachValues);
-    expect(orderedHash[Symbol.iterator]()).toBeInstanceOf(Iterator);
+    expect(orderedHash[Symbol.iterator]()).toBeInstanceOf(Enumerator);
   });
 
   it("each with index", () => {
@@ -124,7 +126,7 @@ describe("OrderedHashTest", () => {
     }
     expect(pairValues).toEqual(values);
     expect(pairKeys).toEqual(keys);
-    expect(orderedHash.entries()).toBeInstanceOf(Iterator);
+    expect(orderedHash.entries()).toBeInstanceOf(Enumerator);
   });
 
   it("find all", () => {
