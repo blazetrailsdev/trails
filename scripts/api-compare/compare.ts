@@ -3319,7 +3319,6 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
-    // The `@missingRailsName` receipts (RFC 0153), keyed identically.
     const tsMissingNameTagsByFileName = new Map<
       string,
       Map<string, Map<string, Map<string, string>>>
@@ -4294,7 +4293,6 @@ export function main() {
           tsClass,
         );
         const nameTagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
-        // A compared pair with name tags marks them seen, so an unmatched one reads stale.
         if (nameTags) nameTagsUsed.set(nameTagKey, nameTagsUsed.get(nameTagKey) ?? new Set());
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
