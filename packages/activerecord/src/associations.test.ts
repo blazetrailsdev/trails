@@ -1063,7 +1063,7 @@ describe("PreloaderTest", () => {
 
     await assertNoQueries(false, async () => {
       assertSame(bob, await bobPost.author);
-      expect(mary.id).toEqual((await maryPost.author).id);
+      expect(mary.equals(await maryPost.author)).toBe(true);
     });
   });
 
@@ -1082,7 +1082,7 @@ describe("PreloaderTest", () => {
 
     await assertNoQueries(false, async () => {
       assertSame(bob, await bobPost.author);
-      expect(mary.id).toEqual((await maryPost.author).id);
+      expect(mary.equals(await maryPost.author)).toBe(true);
     });
   });
 
@@ -1121,7 +1121,7 @@ describe("PreloaderTest", () => {
 
     await assertNoQueries(false, async () => {
       assertSame(maryCategory, await mary.essayCategory);
-      expect(daveCategory.id).toEqual((await dave.essayCategory).id);
+      expect(daveCategory.equals(await dave.essayCategory)).toBe(true);
     });
   });
 
@@ -1192,7 +1192,7 @@ describe("PreloaderTest", () => {
 
     await assertNoQueries(false, async () => {
       assertPredicate(post.association("author"), (a: any) => a.isLoaded());
-      expect(david.id).toEqual((await post.author).id);
+      expect(david.equals(await post.author)).toBe(true);
     });
   });
 
@@ -1248,7 +1248,7 @@ describe("PreloaderTest", () => {
     await new Preloader({ records: comments, associations: "blogPost" }).call();
 
     assertPredicate(comment.association("blogPost"), (a: any) => a.isLoaded());
-    expect(shardedBlogPosts("great_post_blog_one").id).toEqual((await comment.blogPost).id);
+    expect(shardedBlogPosts("great_post_blog_one").equals(await comment.blogPost)).toBe(true);
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
@@ -1311,7 +1311,7 @@ describe("PreloaderTest", () => {
   it("preloads belongs to a composite primary key model through id attribute", async () => {
     const orderAgreement = cpkOrderAgreements("order_agreement_three") as any;
     const order = cpkOrders("cpk_groceries_order_2");
-    expect(order.id).toEqual((await orderAgreement.order).id);
+    expect(order.equals(await orderAgreement.order)).toBe(true);
 
     let loadedOrderAgreement: any = null;
     const sql = await captureSql(async () => {
@@ -1327,7 +1327,7 @@ describe("PreloaderTest", () => {
     const expectation = new RegExp(`SELECT.*WHERE.* ${orderId} = (\\?|(\\d+)|\\$\\d)$`);
 
     expect(preloadSql).toMatch(expectation);
-    expect(order.id).toEqual((await loadedOrderAgreement.order).id);
+    expect(order.equals(await loadedOrderAgreement.order)).toBe(true);
   });
 
   it("preload keeps built has many records no ops", async () => {
@@ -1931,7 +1931,7 @@ describe("AssociationsTest", () => {
     const comment = shardedComments("great_comment_blog_post_one") as any;
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
-    expect(blogPost.id).toEqual((await comment.blogPost).id);
+    expect(blogPost.equals(await comment.blogPost)).toBe(true);
   });
 
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
@@ -2062,7 +2062,7 @@ describe("AssociationsTest", () => {
     let comment: any = shardedComments("great_comment_blog_post_one");
     const comments = await ShardedComment.where({ id: comment.id }).preload("blogPostById");
     comment = comments[0];
-    expect((await comment.blogPostById).id).toEqual((await comment.blogPost).id);
+    expect((await comment.blogPostById).equals(await comment.blogPost)).toBe(true);
   });
 
   it("append composite foreign key has many association with autosave", async () => {
@@ -2184,7 +2184,7 @@ describe("AssociationsTest", () => {
     await comment.save();
 
     assertPredicate(blogPost, (p: any) => p.isPersisted());
-    expect(blogPost.id).toEqual((await comment.blogPost).id);
+    expect(blogPost.equals(await comment.blogPost)).toBe(true);
     expect(comment.blog_id).toEqual(blogPost.blog_id);
     expect(anotherBlog.id).toEqual(comment.blog_id);
     expect(comment.blog_post_id).toEqual(blogPost.id);
@@ -2202,7 +2202,7 @@ describe("AssociationsTest", () => {
     await comment.save();
 
     assertPredicate(blogPost, (p: Base) => p.isPersisted());
-    expect(blogPost.id).toEqual((await comment.blogPostById).id);
+    expect(blogPost.equals(await comment.blogPostById)).toBe(true);
   });
 
   it("polymorphic belongs to uses parent query constraints", async () => {
@@ -2235,7 +2235,7 @@ describe("AssociationsTest", () => {
     await review.reload();
 
     const sql = await captureSql(async () => {
-      expect(car.id).toEqual((await review.car).id);
+      expect(car.equals(await review.car)).toBe(true);
     });
 
     expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.make"))} =`));
