@@ -22,6 +22,48 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["two expects"]).toBe(2);
   });
 
+  it("counts a helper declared inside the test body once, not per call site", () => {
+    const src = `
+      it("inline lambda", () => {
+        const assertions = (firm) => {
+          expect(firm.name).toEqual("a");
+          expect(firm.id).toEqual(1);
+        };
+        assertions(first);
+        assertions(second);
+      });
+    `;
+    expect(tsAssertionCounts(src)["inline lambda"]).toBe(2);
+  });
+
+  it("does not count an inline helper named assert* as an assertion itself", () => {
+    const src = `
+      it("inline assert local", () => {
+        const assertBoth = () => {
+          expect(a).toEqual(1);
+        };
+        assertBoth();
+        assertBoth();
+      });
+    `;
+    expect(tsAssertionCounts(src)["inline assert local"]).toBe(1);
+  });
+
+  it("still expands a helper declared outside the test body per call site", () => {
+    const src = `
+      describe("s", () => {
+        const shared = () => {
+          expect(a).toEqual(1);
+        };
+        it("outer helper", () => {
+          shared();
+          shared();
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["outer helper"]).toBe(2);
+  });
+
   it("does not dedup repeated assertion kinds (raw count)", () => {
     const src = `
       it("three equals", () => {
@@ -395,6 +437,19 @@ describe("TS extractor assertion-value collection", () => {
       });
     `;
     expect(tsAssertionValues(src)["delegates"]).toEqual(["n:1", "n:2"]);
+  });
+
+  it("collects an inline helper's kinds once, not per call site", () => {
+    const src = `
+      it("inline kinds", () => {
+        const assertions = () => {
+          expect(a).toEqual(1);
+        };
+        assertions();
+        assertions();
+      });
+    `;
+    expect(tsAssertionKinds(src)["inline kinds"]).toEqual(["toEqual"]);
   });
 
   it("emits null value for a non-value-bearing helper callee kind", () => {
