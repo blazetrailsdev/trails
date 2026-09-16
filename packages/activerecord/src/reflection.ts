@@ -69,7 +69,7 @@ export interface ConcreteReflection {
   readonly className: string;
   readonly klass: typeof Base;
   readonly type?: string;
-  foreignKey?(inferFromInverseOf?: boolean): string | string[];
+  foreignKey?(kwargs?: { inferFromInverseOf?: boolean }): string | string[];
   readonly scope?: ((...args: any[]) => any) | null;
   joinPrimaryKey?(klass?: typeof Base): string | string[];
   readonly joinForeignKey?: string | string[];
@@ -634,7 +634,9 @@ export class AssociationReflection extends MacroReflection {
     throw new Error("Subclass must implement macro");
   }
 
-  foreignKey(inferFromInverseOf = true): string | string[] {
+  foreignKey({ inferFromInverseOf = true }: { inferFromInverseOf?: boolean } = {}):
+    | string
+    | string[] {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 
     if (this.options.foreignKey) {
@@ -662,7 +664,7 @@ export class AssociationReflection extends MacroReflection {
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
     if (this.options.inverseOf && inferFromInverseOf) {
       const inv = this.inverseOf();
-      if (inv) return String(inv.foreignKey(false));
+      if (inv) return String(inv.foreignKey({ inferFromInverseOf: false }));
     }
     const baseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
     return `${underscore(demodulize(baseName))}_id`;
@@ -1266,11 +1268,8 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.pluralName;
   }
 
-  foreignKey(inferFromInverseOf = true): string | string[] {
-    return (
-      this.sourceReflection?.foreignKey(inferFromInverseOf) ??
-      this.delegateReflection.foreignKey(inferFromInverseOf)
-    );
+  foreignKey(kwargs?: { inferFromInverseOf?: boolean }): string | string[] {
+    return this.sourceReflection?.foreignKey(kwargs) ?? this.delegateReflection.foreignKey(kwargs);
   }
 
   get foreignType(): string | null {

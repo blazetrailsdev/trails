@@ -187,14 +187,14 @@ describe("defineFixtures", () => {
         macro: "hasMany",
         options: { through: "categorizations" },
         isThroughReflection: () => true,
-        foreignKey: "post_id",
+        foreignKey: () => "post_id",
         klass: {
           tableName: "posts",
           primaryKey: "id",
           typeForAttribute: () => ({ type: () => "integer" }),
         },
         throughReflection: {
-          foreignKey: "author_id",
+          foreignKey: () => "author_id",
           klass: Categorization,
           tableName: "categorizations",
         },
