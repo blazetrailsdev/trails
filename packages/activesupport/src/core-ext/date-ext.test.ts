@@ -414,9 +414,9 @@ describe("DateExtCalculationsTest", () => {
       expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00-05:?00$/);
       expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00-04:?00$/);
       if (toTime(pd(1880, 6, 28)) instanceof RubyDateTime) {
-        // eslint-disable-next-line vitest/no-conditional-expect -- date_ext_test.rb:323 platform guard
+        // eslint-disable-next-line vitest/no-conditional-expect
         expect(dateXmlschema(pd(1880, 2, 28))).toMatch(/^1880-02-28T00:00:00-05:?00$/);
-        // eslint-disable-next-line vitest/no-conditional-expect -- date_ext_test.rb:323 platform guard
+        // eslint-disable-next-line vitest/no-conditional-expect
         expect(dateXmlschema(pd(1880, 6, 28))).toMatch(/^1880-06-28T00:00:00-05:?00$/);
       }
     });
