@@ -410,8 +410,8 @@ write.
    argument list in the key, and each gate reads only its own kind. It gates
    `shape` rows — count, order, literal values, kwarg keys. `naming` rows (a
    `ref:` identifier spelled differently) are never baselined: in a package
-   listed in `NAMING_ENROLLED_PACKAGES` (`lint-call-args.ts`, only-grow, RFC 0153) every one is renamed to the Rails identifier or, when `classifyRow`
-   files it permanent, receipted with
+   listed in `NAMING_ENROLLED_PACKAGES` (`lint-call-args.ts`, only-grow, RFC 0153) every differing identifier is renamed to the Rails one or, when
+   `classifyPair` files that pair permanent, receipted with
    `@missingRailsName <ruby_identifier> — PERMANENT|CONVERGEABLE <story-id>` on
    the enclosing declaration. A receipt on a convergeable pair, or one matching
    no row, reds the same gate. Elsewhere they are report-only via
