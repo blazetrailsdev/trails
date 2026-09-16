@@ -1,17 +1,14 @@
-import { ref } from "../../fixtures.js";
-
 export const faceFixtureData = {
   trusting: {
     description: "trusting",
-    human_id: ref("humans", "gordon"),
+    human: "gordon",
   },
   weather_beaten: {
     description: "weather beaten",
-    human_id: ref("humans", "steve"),
+    human: "steve",
   },
   confused: {
     description: "confused",
-    polymorphic_human_id: ref("humans", "gordon"),
-    polymorphic_human_type: "Human",
+    polymorphicHuman: "gordon (Human)",
   },
 };

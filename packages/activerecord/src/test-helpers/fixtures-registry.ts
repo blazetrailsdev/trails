@@ -50,7 +50,11 @@ export const fixtureRegistry = {
     data: FixtureData.adminRandomlyNamedB0FixtureData,
   },
   "admin/users": {
-    model: () => import("./models/admin/user.js").then((m) => m.AdminUser),
+    model: () =>
+      import("./models/admin/user.js").then(
+        async (m) =>
+          [m.AdminUser, (await import("./models/admin/account.js")).AdminAccount] as const,
+      ),
     data: FixtureData.adminUsersFixtureData,
   },
   accounts: {
@@ -158,7 +162,10 @@ export const fixtureRegistry = {
     data: FixtureData.contentPositionFixtureData,
   },
   courses: {
-    model: () => import("./models/course.js").then((m) => m.Course),
+    model: () =>
+      import("./models/course.js").then(
+        async (m) => [m.Course, (await import("./models/college.js")).College] as const,
+      ),
     data: FixtureData.courseFixtureData,
   },
   cpkAuthors: {
@@ -166,7 +173,7 @@ export const fixtureRegistry = {
     data: FixtureData.cpkAuthorFixtureData,
   },
   cpkBooks: {
-    model: () => import("./models/cpk.js").then((m) => m.CpkBook),
+    model: () => import("./models/cpk.js").then((m) => [m.CpkBook, m.CpkAuthor] as const),
     data: FixtureData.cpkBookFixtureData,
   },
   cpkOrderAgreements: {
@@ -198,7 +205,10 @@ export const fixtureRegistry = {
     data: FixtureData.dashboardFixtureData,
   },
   deadParrots: {
-    model: () => import("./models/parrot.js").then((m) => m.DeadParrot),
+    model: () =>
+      import("./models/parrot.js").then(
+        async (m) => [m.DeadParrot, (await import("./models/pirate.js")).Pirate] as const,
+      ),
     data: FixtureData.deadParrotFixtureData,
   },
   developers: {
@@ -227,7 +237,10 @@ export const fixtureRegistry = {
     data: FixtureData.dogFixtureData,
   },
   doubloons: {
-    model: () => import("./models/doubloon.js").then((m) => m.Doubloon),
+    model: () =>
+      import("./models/doubloon.js").then(
+        async (m) => [m.Doubloon, (await import("./models/pirate.js")).Pirate] as const,
+      ),
     data: FixtureData.doubloonFixtureData,
   },
   drinkDesigners: {
@@ -257,7 +270,10 @@ export const fixtureRegistry = {
     data: FixtureData.essayFixtureData,
   },
   faces: {
-    model: () => import("./models/face.js").then((m) => m.Face),
+    model: () =>
+      import("./models/face.js").then(
+        async (m) => [m.Face, (await import("./models/human.js")).Human] as const,
+      ),
     data: FixtureData.faceFixtureData,
   },
   fkTestHasPk: {
@@ -281,7 +297,15 @@ export const fixtureRegistry = {
     data: FixtureData.humanFixtureData,
   },
   interests: {
-    model: () => import("./models/interest.js").then((m) => m.Interest),
+    model: () =>
+      import("./models/interest.js").then(
+        async (m) =>
+          [
+            m.Interest,
+            (await import("./models/zine.js")).Zine,
+            (await import("./models/human.js")).Human,
+          ] as const,
+      ),
     data: FixtureData.interestFixtureData,
   },
   items: {
@@ -309,7 +333,11 @@ export const fixtureRegistry = {
     data: FixtureData.mateyFixtureData,
   },
   memberDetails: {
-    model: () => import("./models/member-detail.js").then((m) => m.MemberDetail),
+    model: () =>
+      import("./models/member-detail.js").then(
+        async (m) =>
+          [m.MemberDetail, (await import("./models/organization.js")).Organization] as const,
+      ),
     data: FixtureData.memberDetailFixtureData,
   },
   memberTypes: {
@@ -321,7 +349,10 @@ export const fixtureRegistry = {
     data: FixtureData.memberFixtureData,
   },
   memberships: {
-    model: () => import("./models/membership.js").then((m) => m.Membership),
+    model: () =>
+      import("./models/membership.js").then(
+        async (m) => [m.Membership, (await import("./models/club.js")).Club] as const,
+      ),
     data: FixtureData.membershipFixtureData,
   },
   minimalistics: {
@@ -379,8 +410,15 @@ export const fixtureRegistry = {
         typeof import("./models/parrot.js").Parrot,
         typeof import("./models/parrot.js").LiveParrot,
         typeof import("./models/parrot.js").DeadParrot,
+        typeof import("./models/pirate.js").Pirate,
       ]
-    > => import("./models/parrot.js").then((m) => [m.Parrot, m.LiveParrot, m.DeadParrot]),
+    > =>
+      import("./models/parrot.js").then(async (m) => [
+        m.Parrot,
+        m.LiveParrot,
+        m.DeadParrot,
+        (await import("./models/pirate.js")).Pirate,
+      ]),
     data: FixtureData.parrotFixtureData,
   },
   parrotsPirates: {
@@ -404,11 +442,17 @@ export const fixtureRegistry = {
     data: FixtureData.petFixtureData,
   },
   pirates: {
-    model: () => import("./models/pirate.js").then((m) => m.Pirate),
+    model: () =>
+      import("./models/pirate.js").then(
+        async (m) => [m.Pirate, (await import("./models/parrot.js")).Parrot] as const,
+      ),
     data: FixtureData.pirateFixtureData,
   },
   otherComments: {
-    model: () => import("./models/comment.js").then((m) => m.Comment),
+    model: () =>
+      import("./models/comment.js").then(
+        async (m) => [m.Comment, (await import("./models/post.js")).Post] as const,
+      ),
     data: FixtureData.otherCommentFixtureData,
   },
   otherPosts: {
@@ -464,7 +508,10 @@ export const fixtureRegistry = {
     data: FixtureData.shardedTagFixtureData,
   },
   ships: {
-    model: () => import("./models/ship.js").then((m) => m.Ship),
+    model: () =>
+      import("./models/ship.js").then(
+        async (m) => [m.Ship, (await import("./models/pirate.js")).Pirate] as const,
+      ),
     data: FixtureData.shipFixtureData,
   },
   speedometers: {
@@ -472,7 +519,10 @@ export const fixtureRegistry = {
     data: FixtureData.speedometerFixtureData,
   },
   sponsors: {
-    model: () => import("./models/sponsor.js").then((m) => m.Sponsor),
+    model: () =>
+      import("./models/sponsor.js").then(
+        async (m) => [m.Sponsor, (await import("./models/club.js")).Club] as const,
+      ),
     data: FixtureData.sponsorFixtureData,
   },
   strictZines: {

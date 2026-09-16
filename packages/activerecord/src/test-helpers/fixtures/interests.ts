@@ -1,39 +1,36 @@
-import { ref } from "../../fixtures.js";
-
 export const interestFixtureData = {
   trainspotting: {
     topic: "Trainspotting",
-    zine_id: ref("zines", "staying_in"),
-    human_id: ref("humans", "gordon"),
+    zine: "staying_in",
+    human: "gordon",
   },
   birdwatching: {
     topic: "Birdwatching",
-    zine_id: ref("zines", "staying_in"),
-    human_id: ref("humans", "gordon"),
+    zine: "staying_in",
+    human: "gordon",
   },
   stamp_collecting: {
     topic: "Stamp Collecting",
-    zine_id: ref("zines", "staying_in"),
-    human_id: ref("humans", "gordon"),
+    zine: "staying_in",
+    human: "gordon",
   },
   hunting: {
     topic: "Hunting",
-    zine_id: ref("zines", "going_out"),
-    human_id: ref("humans", "steve"),
+    zine: "going_out",
+    human: "steve",
   },
   woodsmanship: {
     topic: "Woodsmanship",
-    zine_id: ref("zines", "going_out"),
-    human_id: ref("humans", "steve"),
+    zine: "going_out",
+    human: "steve",
   },
   survival: {
     topic: "Survival",
-    zine_id: ref("zines", "going_out"),
-    human_id: ref("humans", "steve"),
+    zine: "going_out",
+    human: "steve",
   },
   llama_wrangling: {
     topic: "Llama Wrangling",
-    polymorphic_human_id: ref("humans", "gordon"),
-    polymorphic_human_type: "Human",
+    polymorphicHuman: "gordon (Human)",
   },
 };

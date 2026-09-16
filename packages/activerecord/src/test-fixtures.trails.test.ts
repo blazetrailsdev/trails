@@ -34,6 +34,19 @@ describe("TestFixtures::ClassMethods", () => {
     });
   });
 
+  it("fixtures :all globs every .yml under the fixture paths", () => {
+    klass.fixturePaths = [new URL("./fixture-set/test-data", import.meta.url).pathname];
+    klass.fixtures(":all");
+    expect(klass.fixtureTableNames).toEqual([
+      "accounts",
+      "developers",
+      "naked/yml/accounts",
+      "naked/yml/companies",
+      "other_posts",
+      "parrots",
+    ]);
+  });
+
   it("fixtures unions and sorts table names and sets up accessors", () => {
     klass.fixtures("topics", ["accounts", ["admin/users"]]);
     klass.fixtures("topics");

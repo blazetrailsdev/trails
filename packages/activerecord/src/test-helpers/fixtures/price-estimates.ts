@@ -1,20 +1,15 @@
-import { ref } from "../../fixtures.js";
-
 export const priceEstimateFixtureData = {
   sapphire_1: {
     price: 10,
-    estimate_of_id: ref("treasures", "sapphire"),
-    estimate_of_type: "Treasure",
+    estimateOf: "sapphire (Treasure)",
   },
   sapphire_2: {
     price: 20,
-    estimate_of_id: ref("treasures", "sapphire"),
-    estimate_of_type: "Treasure",
+    estimateOf: "sapphire (Treasure)",
   },
   diamond: {
     price: 30,
-    estimate_of_id: ref("treasures", "diamond"),
-    estimate_of_type: "Treasure",
+    estimateOf: "diamond (Treasure)",
   },
   honda: {
     price: 40,

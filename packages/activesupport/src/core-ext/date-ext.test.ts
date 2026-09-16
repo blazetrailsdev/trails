@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Date as RubyDate, DateTime as RubyDateTime, Temporal } from "@blazetrails/date";
 import {
   endOfMonth,
@@ -14,7 +14,6 @@ import {
   beginningOfQuarter,
   change,
   toDate,
-  isToday,
 } from "../time-ext.js";
 import {
   inspect as dateInspect,
@@ -445,7 +444,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("current returns date today when zone not set", () => {
-    expect(isToday(new Date())).toBe(true);
+    withEnvTz("US/Central", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(1999, 11, 31, 23));
+      try {
+        expect(DateExt.current().toString()).toEqual(RubyDate.today().toString());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it("current returns time zone today when zone is set", () => {

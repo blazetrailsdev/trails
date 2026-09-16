@@ -1,44 +1,44 @@
-import { ref } from "../../fixtures.js";
+import { FixtureSet } from "../../fixtures.js";
 
 export const parrotsTreasuresFixtureData = {
   george_diamond: {
-    parrot_id: ref("parrots", "george"),
-    treasure_id: ref("treasures", "diamond"),
+    parrot_id: FixtureSet.identify("george"),
+    treasure_id: FixtureSet.identify("diamond"),
   },
   george_sapphire: {
-    parrot_id: ref("parrots", "george"),
-    treasure_id: ref("treasures", "sapphire"),
+    parrot_id: FixtureSet.identify("george"),
+    treasure_id: FixtureSet.identify("sapphire"),
   },
   louis_diamond: {
-    parrot_id: ref("parrots", "louis"),
-    treasure_id: ref("treasures", "diamond"),
+    parrot_id: FixtureSet.identify("louis"),
+    treasure_id: FixtureSet.identify("diamond"),
   },
   louis_sapphire: {
-    parrot_id: ref("parrots", "louis"),
-    treasure_id: ref("treasures", "sapphire"),
+    parrot_id: FixtureSet.identify("louis"),
+    treasure_id: FixtureSet.identify("sapphire"),
   },
   polly_sapphire: {
     parrot_id: 4,
-    treasure_id: ref("treasures", "sapphire"),
+    treasure_id: FixtureSet.identify("sapphire"),
   },
   polly_ruby: {
     parrot_id: 4,
-    treasure_id: ref("treasures", "ruby"),
+    treasure_id: FixtureSet.identify("ruby"),
   },
   defaults_sapphire: {
-    parrot_id: ref("parrots", "DEFAULTS"),
-    treasure_id: ref("treasures", "sapphire"),
+    parrot_id: FixtureSet.identify("DEFAULTS"),
+    treasure_id: FixtureSet.identify("sapphire"),
   },
   defaults_ruby: {
-    parrot_id: ref("parrots", "DEFAULTS"),
-    treasure_id: ref("treasures", "ruby"),
+    parrot_id: FixtureSet.identify("DEFAULTS"),
+    treasure_id: FixtureSet.identify("ruby"),
   },
   davey_sapphire: {
-    parrot_id: ref("parrots", "davey"),
-    treasure_id: ref("treasures", "sapphire"),
+    parrot_id: FixtureSet.identify("davey"),
+    treasure_id: FixtureSet.identify("sapphire"),
   },
   davey_ruby: {
-    parrot_id: ref("parrots", "davey"),
-    treasure_id: ref("treasures", "ruby"),
+    parrot_id: FixtureSet.identify("davey"),
+    treasure_id: FixtureSet.identify("ruby"),
   },
 };

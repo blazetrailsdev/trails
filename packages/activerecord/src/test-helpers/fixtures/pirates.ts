@@ -1,16 +1,14 @@
 import { Temporal } from "@blazetrails/date";
-import { ref } from "../../fixtures.js";
-
 const twoWeeksAgo = Temporal.Instant.fromEpochMilliseconds(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
 export const pirateFixtureData = {
   blackbeard: {
     catchphrase: "Yar.",
-    parrot_id: ref("parrots", "george"),
+    parrot: "george",
   },
   redbeard: {
     catchphrase: "Avast!",
-    parrot_id: ref("parrots", "louis"),
+    parrot: "louis",
     created_on: twoWeeksAgo,
     updated_on: twoWeeksAgo,
   },
