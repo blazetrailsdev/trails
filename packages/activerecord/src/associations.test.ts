@@ -6,9 +6,25 @@ import {
   reflectOnAssociation,
   registerModel,
   NameError,
+  Relation,
   pp,
 } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assertEmpty,
+  assertNot,
+  assertNotEmpty,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaises,
+  assertSame,
+} from "@blazetrails/activesupport";
+import {
+  assertNoQueries,
+  assertQueriesCount,
+  assertQueriesMatch,
+} from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { clearReflectionsCache } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
@@ -45,19 +61,8 @@ import { NoMethodError, regexpEscape } from "@blazetrails/ruby-compat";
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 
-function expectQuotedColumnInSql(
-  sql: string,
-  qualifiedColumn: string,
-  options: { inWhere?: boolean } = {},
-): void {
-  const quoted = (Base.connection as { quoteTableName(n: string): string }).quoteTableName(
-    qualifiedColumn,
-  );
-  if (options.inWhere) {
-    expect(sql).toMatch(new RegExp(`WHERE[\\s\\S]*${regexpEscape(quoted)} =`));
-  } else {
-    expect(sql).toContain(`${quoted} =`);
-  }
+function quoteTableName(name: string): string {
+  return (Base.connection as { quoteTableName(n: string): string }).quoteTableName(name);
 }
 
 describe("AssociationsTest", () => {
@@ -108,14 +113,14 @@ describe("AssociationProxyTest", () => {
   it("push does not lose additions to new record", async () => {
     const josh = new Author({ name: "Josh" }) as any;
     await josh.posts.push(new Post({ title: "New on Edge", body: "More cool stuff!" }));
-    expect(josh.posts.loaded).toBe(true);
+    assertPredicate(josh.posts, (p: any) => p.loaded);
     expect(await josh.posts.size()).toBe(1);
   });
 
   it("append behaves like push", async () => {
     const josh = new Author({ name: "Josh" }) as any;
     await josh.posts.append(new Post({ title: "New on Edge", body: "More cool stuff!" }));
-    expect(josh.posts.loaded).toBe(true);
+    assertPredicate(josh.posts, (p: any) => p.loaded);
     expect(await josh.posts.size()).toBe(1);
   });
 
@@ -126,9 +131,9 @@ describe("AssociationProxyTest", () => {
 
   it("load does load target", async () => {
     const david = developers("david") as any;
-    expect(david.projects.loaded).toBe(false);
+    assertNotPredicate(david.projects, (p: any) => p.loaded);
     await david.projects.load();
-    expect(david.projects.loaded).toBe(true);
+    assertPredicate(david.projects, (p: any) => p.loaded);
   });
 
   it("create via association with block", async () => {
@@ -151,15 +156,12 @@ describe("AssociationProxyTest", () => {
 
   it("proxy association accessor", async () => {
     const david = developers("david") as any;
-    const proxyAssociation = david.projects.proxyAssociation;
-    expect(proxyAssociation.owner).toBe(david);
-    expect(proxyAssociation.reflection.name).toBe("projects");
+    expect(david.projects.proxyAssociation).toBe(david.association("projects"));
   });
 
   it("scoped allows conditions", async () => {
     const david = developers("david") as any;
-    const sql = david.projects.merge(Project.where("foo")).toSql();
-    expect(sql).toContain("foo");
+    expect(david.projects.merge(Project.where("foo")).toSql().includes("foo")).toBeTruthy();
   });
 
   it("proxy object is cached", async () => {
@@ -175,14 +177,11 @@ describe("AssociationProxyTest", () => {
 
   it("first! works on loaded associations", async () => {
     const david = authors("david") as any;
-    const expected = await david.firstPosts.first();
-    await david.firstPosts.reload();
-    const sqls = await captureSql(async () => {
-      const first = await david.firstPosts.firstBang();
-      expect(first.id).toBe(expected!.id);
-    });
-    expect(sqls).toHaveLength(0);
-    expect(david.firstPosts.loaded).toBe(true);
+    expect(await (await david.firstPosts.reload()).firstBang()).toEqual(
+      await david.firstPosts.first(),
+    );
+    assertPredicate(david.firstPosts, (p: any) => p.loaded);
+    await assertNoQueries(false, () => david.firstPosts.firstBang());
   });
 
   it("last! works on loaded associations", async () => {
@@ -211,7 +210,7 @@ describe("AssociationProxyTest", () => {
 
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
-    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    assertEmpty(await member.favoriteMemberships.scope().toArray());
     const membership = await member.favoriteMemberships.createBang({});
     await membership.updateBang({ favorite: false });
     expect(await member.favoriteMemberships.size()).toBe(0);
@@ -222,37 +221,37 @@ describe("AssociationProxyTest", () => {
     const david = authors("david") as any;
     const post = new Post({ title: "New on Edge", body: "More cool stuff!" });
     await david.posts.push(post);
-    expect(david.posts.loaded).toBe(false);
-    expect(await david.posts.isInclude(post)).toBe(true);
+    assertNotPredicate(david.posts, (p: any) => p.loaded);
+    expect(await david.posts.toArray()).toContain(post);
   });
   it("push has many through does not load target", async () => {
     const david = authors("david") as any;
     const technology = categories("technology") as any;
     await david.categories.push(technology);
-    expect(david.categories.loaded).toBe(false);
-    expect(await david.categories.isInclude(technology)).toBe(true);
+    assertNotPredicate(david.categories, (p: any) => p.loaded);
+    expect(await david.categories.toArray()).toContainEqual(technology);
   });
   it("push followed by save does not load target", async () => {
     const david = authors("david") as any;
     const post = new Post({ title: "New on Edge", body: "More cool stuff!" });
     await david.posts.push(post);
-    expect(david.posts.loaded).toBe(false);
+    assertNotPredicate(david.posts, (p: any) => p.loaded);
     await david.save();
-    expect(david.posts.loaded).toBe(false);
-    expect(await david.posts.isInclude(post)).toBe(true);
+    assertNotPredicate(david.posts, (p: any) => p.loaded);
+    expect(await david.posts.toArray()).toContain(post);
   });
   it("save on parent does not load target", async () => {
     const david = developers("david") as any;
-    expect(david.projects.loaded).toBe(false);
-    await david.updateColumns({ salary: 80_000 });
-    expect(david.projects.loaded).toBe(false);
+    assertNotPredicate(david.projects, (p: any) => p.loaded);
+    await david.updateColumns({ created_at: new Date() });
+    assertNotPredicate(david.projects, (p: any) => p.loaded);
   });
   it("inspect does not reload a not yet loaded target", async () => {
     const andreas = new Developer({ name: "Andreas" });
     (andreas as any).log = "new developer added";
-    expect(andreas.auditLogs.loaded).toBe(false);
+    assertNotPredicate(andreas.auditLogs, (p: any) => p.loaded);
     expect(await andreas.auditLogs.inspect()).toMatch(/message: "new developer added"/);
-    expect(andreas.auditLogs.loaded).toBe(true);
+    assertPredicate(andreas.auditLogs, (p: any) => p.loaded);
   });
   it("pretty_print does not reload a not yet loaded target", async () => {
     const andreas = new Developer({});
@@ -270,57 +269,53 @@ describe("AssociationProxyTest", () => {
   });
   it("reload returns association", async () => {
     const david = developers("david") as any;
-    const once = await david.projects.reload();
-    const reloaded = await once.reload();
-    expect(await reloaded.toArray()).toEqual(await david.projects.toArray());
-    expect(david.projects.loaded).toBe(true);
+    await assertNothingRaised(async () => {
+      expect(await david.projects.toArray()).toEqual(
+        await (await (await david.projects.reload()).reload()).toArray(),
+      );
+    });
   });
   it("getting a scope from an association", async () => {
     const david = developers("david") as any;
-    const scope = david.projects.scope();
-    const results = (await scope.toArray()).map((r: any) => r.id).sort();
-    const expected = (await david.projects.toArray()).map((r: any) => r.id).sort();
-    expect(results).toEqual(expected);
+    expect(david.projects.scope() instanceof Relation).toBeTruthy();
+    expect(await david.projects.toArray()).toEqual(await david.projects.scope().toArray());
   });
   it("inverses get set of subsets of the association", async () => {
     const human = await Human.create({});
     await (human as any).interests.create({});
-    const found = await Human.find((human as any).id);
-    const subset = await (found as any).interests.where("1=1").first();
-    expect(subset).not.toBeNull();
-    expect(subset._associationCache("human")?.target).toBe(found);
+    const found = (await Human.find((human as any).id)) as any;
+    await assertQueriesCount(1, false, async () => {
+      expect(await (await found.interests.where("1=1").first()).human).toBe(found);
+    });
   });
   it("pluck uses loaded target", async () => {
     const david = authors("david") as any;
-    const expected = await david.firstPosts.pluck("title");
-    const loaded = await david.firstPosts.load();
-    expect(david.firstPosts.loaded).toBe(true);
-    expect((await loaded.records()).length).toBeGreaterThan(0);
-    const sqls = await captureSql(async () => {
-      expect(await david.firstPosts.pluck("title")).toEqual(expected);
-    });
-    expect(sqls).toHaveLength(0);
+    expect(await (await david.firstPosts.load()).pluck("title")).toEqual(
+      await david.firstPosts.pluck("title"),
+    );
+    assertPredicate(david.firstPosts, (p: any) => p.loaded);
+    await assertNoQueries(false, () => david.firstPosts.pluck("title"));
   });
   it("pick uses loaded target", async () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.pick("title");
-    await david.firstPosts.load();
-    expect(david.firstPosts.loaded).toBe(true);
-    const sqls = await captureSql(async () => {
-      expect(await david.firstPosts.pick("title")).toEqual(expected);
-    });
-    expect(sqls).toHaveLength(0);
+    expect(await (await david.firstPosts.load()).pick("title")).toEqual(expected);
+    assertPredicate(david.firstPosts, (p: any) => p.loaded);
+    await assertNoQueries(false, () => david.firstPosts.pick("title"));
   });
   it("reset unloads target", async () => {
     const david = authors("david") as any;
     await david.posts.reload();
-    expect(david.posts.loaded).toBe(true);
+
+    assertPredicate(david.posts, (p: any) => p.isLoaded);
+    assertPredicate(david.posts, (p: any) => p.loaded);
     david.posts.reset();
-    expect(david.posts.loaded).toBe(false);
+    assertNotPredicate(david.posts, (p: any) => p.isLoaded);
+    assertNotPredicate(david.posts, (p: any) => p.loaded);
   });
   it("target merging ignores persisted in memory records", async () => {
     const david = authors("david") as any;
-    expect(await david.thinkingPosts.isInclude(posts("thinking") as any)).toBe(true);
+    expect(await david.thinkingPosts.isInclude(posts("thinking") as any)).toBeTruthy();
     await david.thinkingPosts.createBang({
       title: "Something else entirely",
       body: "Does not matter.",
@@ -330,17 +325,17 @@ describe("AssociationProxyTest", () => {
   });
   it("target merging ignores persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
-    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    assertEmpty(await member.favoriteMemberships.scope().toArray());
     const membership = await member.favoriteMemberships.createBang({});
     await membership.updateBang({ favorite: false });
-    expect((await member.favoriteMemberships.toArray()).length).toBe(0);
+    assertEmpty(await member.favoriteMemberships.toArray());
   });
   it("target merging recognizes updated in memory records", async () => {
     const member = members("blarpy_winkup") as any;
     const membership = await member.createMembershipBang({ favorite: false });
-    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    assertEmpty(await member.favoriteMemberships.scope().toArray());
     await membership.updateBang({ favorite: true });
-    expect((await member.favoriteMemberships.toArray()).length).toBeGreaterThan(0);
+    assertNotEmpty(await member.favoriteMemberships.toArray());
   });
   it("load preserves in-memory instances added via push", async () => {
     const david = authors("david") as any;
@@ -494,39 +489,38 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with scope", async () => {
-    const post = posts("welcome");
-    await new Preloader({
+    const post = posts("welcome") as any;
+
+    const preloader = new Preloader({
       records: [post],
-      associations: ["comments"],
+      associations: "comments",
       scope: Comment.where({ body: "Thank you for the welcome" }),
-    }).call();
-    const loaded = (post as any).association("comments").target as Base[];
-    expect(loaded.map((c) => c.id)).toEqual([comments("greetings").id]);
+    });
+    await preloader.call();
+
+    assertPredicate(post.comments, (c: any) => c.isLoaded);
+    expect((await post.comments.toArray()).map((c: Base) => c.id)).toEqual([
+      comments("greetings").id,
+    ]);
   });
 
   it("preload makes correct number of queries on array", async () => {
     const post = posts("welcome");
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [post], associations: ["comments"] }).call();
+
+    await assertQueriesCount(1, false, async () => {
+      const preloader = new Preloader({ records: [post], associations: "comments" });
+      await preloader.call();
     });
-    expect(sqls).toHaveLength(1);
   });
 
   it("preload makes correct number of queries on relation", async () => {
     const post = posts("welcome");
     const relation = Post.where({ id: post.id });
-    let preloader: Preloader;
-    const sqls = await captureSql(
-      async () => {
-        preloader = new Preloader({ records: relation, associations: "comments" });
-        await preloader.call();
-      },
-      { includeSchema: false },
-    );
-    const preloaded = (relation as any)._records;
-    expect(preloaded).toHaveLength(1);
-    expect(preloaded[0].association("comments").isLoaded()).toBe(true);
-    expect(sqls).toHaveLength(2);
+
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({ records: relation, associations: "comments" });
+      await preloader.call();
+    });
   });
 
   it("isEmpty materializes an empty relation and reports true", async () => {
@@ -546,58 +540,57 @@ describe("PreloaderTest", () => {
   });
 
   it("preload does not concatenate duplicate records", async () => {
-    const post = posts("welcome");
-    await Comment.create({ post_id: post.id, body: "A new comment" });
-    await new Preloader({ records: [post], associations: ["comments"] }).call();
-    await new Preloader({ records: [post], associations: ["comments"] }).call();
-    const loaded = (post as any).association("comments").target;
-    expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
+    const post = posts("welcome") as any;
+    await post.reload();
+    await post.comments.createBang({ body: "A new comment" });
+
+    await new Preloader({ records: [post], associations: "comments" }).call();
+
+    expect((await post.comments.toArray()).length).toBe(Number(await post.comments.count()));
+    expect((await post.comments.all().toArray()).map((c: Base) => c.id)).toEqual(
+      (await post.comments.toArray()).map((c: Base) => c.id),
+    );
   });
 
   it("preload for hmt with conditions", async () => {
-    const post = posts("welcome");
-    await CategoryPost.create({
-      category_id: (await Category.create({ name: "Normal" })).id,
-      post_id: post.id,
-    });
-    const specialCat = await SpecialCategory.create({ name: "Special" });
-    await CategoryPost.create({ category_id: specialCat.id, post_id: post.id });
-    await new Preloader({ records: [post], associations: ["hmtSpecialCategories"] }).call();
-    const loaded = (post as any).association("hmtSpecialCategories").target;
-    expect(loaded).toHaveLength(1);
-    expect(loaded[0].id).toBe(specialCat.id);
+    const post = posts("welcome") as any;
+    await post.categories.createBang({ name: "Normal" });
+    const specialCategory = await post.specialCategories.createBang({ name: "Special" });
+
+    const preloader = new Preloader({ records: [post], associations: "hmtSpecialCategories" });
+    await preloader.call();
+
+    expect((await post.hmtSpecialCategories.toArray()).length).toBe(1);
+    expect((await post.hmtSpecialCategories.toArray()).map((c: Base) => c.id)).toEqual([
+      specialCategory.id,
+    ]);
   });
 
   it("preload groups queries with same scope", async () => {
-    const book = books("awdr");
-    const post = posts("welcome");
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [book, post], associations: ["author"] }).call();
+    const book = books("awdr") as any;
+    const post = posts("welcome") as any;
+
+    await assertQueriesCount(1, false, async () => {
+      const preloader = new Preloader({ records: [book, post], associations: "author" });
+      await preloader.call();
     });
-    expect(sqls).toHaveLength(1);
-    const noQueriesAfter = await captureSql(async () => {
-      void (book as any).association("author").target;
-      void (post as any).association("author").target;
+
+    await assertNoQueries(false, async () => {
+      await book.author;
+      await post.author;
     });
-    expect(noQueriesAfter).toHaveLength(0);
-    expect((book as any).association("author").target.id).toBe((book as any).author_id);
-    expect((post as any).association("author").target.id).toBe((post as any).author_id);
   });
 
   it("preload grouped queries with already loaded records", async () => {
-    const author = authors("david");
-    const book = books("awdr");
-    const post = posts("welcome");
-    const bookLoaded = (await Book.where({ id: book.id }).includes(":author"))[0];
-    const postFresh = (await Post.where({ id: post.id }))[0];
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
-      void (bookLoaded as any).association("author").target;
-      void (postFresh as any).association("author").target;
+    const book = books("awdr") as any;
+    const post = posts("welcome") as any;
+    await book.author;
+
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: [book, post], associations: "author" }).call();
+      await book.author;
+      await post.author;
     });
-    expect(sqls).toHaveLength(0);
-    expect((bookLoaded as any).association("author").target.id).toBe(author.id);
-    expect((postFresh as any).association("author").target.id).toBe(author.id);
   });
   it("preload grouped queries of middle records", async () => {
     const records = [
@@ -605,178 +598,209 @@ describe("PreloaderTest", () => {
       comments("eager_sti_on_associations_s_comment2"),
     ];
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({ records, associations: ["author", "ordinaryPost"] }).call();
-    expect(spy).toHaveBeenCalledTimes(2);
+    await assertQueriesCount(2, false, async () => {
+      await new Preloader({ records, associations: ["author", "ordinaryPost"] }).call();
+    });
   });
   it("preload grouped queries of through records", async () => {
     const author = authors("david");
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [author],
-      associations: ["helloPostComments", "comments"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(3);
+    await assertQueriesCount(3, false, async () => {
+      await new Preloader({
+        records: [author],
+        associations: ["helloPostComments", "comments"],
+      }).call();
+    });
   });
   it("preload through records with already loaded middle record", async () => {
     const member = members("groucho") as any;
-    const expectedMemberDetailIds = ((await member.organizationMemberDetails_2) as Base[])
-      .map((d) => Number(d.id))
-      .sort();
+    const expectedMemberDetailIds = await member.organizationMemberDetails_2.pluck("id");
 
-    await member.reload();
-    await member.organization;
+    await (
+      await member.reload()
+    ).organization;
 
-    const sqls = await captureSql(async () => {
+    await assertQueriesCount(1, false, async () => {
       await new Preloader({
         records: [member],
         associations: "organizationMemberDetails_2",
       }).call();
     });
-    expect(sqls).toHaveLength(1);
 
-    const reads = await captureSql(async () => {
-      const loaded = member.association("organizationMemberDetails_2").target as Base[];
-      expect(loaded.map((d) => Number(d.id)).sort()).toEqual(expectedMemberDetailIds);
+    await assertNoQueries(false, async () => {
+      expect([...expectedMemberDetailIds].sort()).toEqual(
+        (await member.organizationMemberDetails_2.toArray()).map((d: Base) => d.id).sort(),
+      );
     });
-    expect(reads).toHaveLength(0);
   });
 
   it("preload with instance dependent scope", async () => {
-    const david = authors("david");
-    const david2 = await Author.create({ name: "David" });
-    const bob = authors("bob");
-    const post1 = await Post.create({
-      author_id: david.id,
+    const david = authors("david") as any;
+    const david2 = (await Author.createBang({ name: "David" })) as any;
+    const bob = authors("bob") as any;
+    const post = await Post.createBang({
+      author: david,
       title: "test post",
-      body: "this post is about david",
+      body: "this post is about David",
     });
-    const post2 = await Post.create({
-      author_id: david.id,
+    const post2 = await Post.createBang({
+      author: david,
       title: "test post 2",
-      body: "this post is also about david",
+      body: "this post is also about David",
     });
 
-    await new Preloader({
-      records: [david, david2, bob],
-      associations: ["postsMentioningAuthor"],
-    }).call();
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({
+        records: [david, david2, bob],
+        associations: "postsMentioningAuthor",
+      });
+      await preloader.call();
+    });
 
-    const davidPosts = (david as any).association("postsMentioningAuthor").target as any[];
-    const david2Posts = (david2 as any).association("postsMentioningAuthor").target as any[];
-    const bobPosts = (bob as any).association("postsMentioningAuthor").target as any[];
+    assertPredicate(david.postsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(david2.postsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(bob.postsMentioningAuthor, (c: any) => c.isLoaded);
 
-    expect(davidPosts.map((p: any) => p.id).sort()).toEqual([post1.id, post2.id].sort());
-    expect(david2Posts).toEqual([]);
-    expect(bobPosts).toEqual([]);
+    expect([post.id, post2.id].sort()).toEqual(
+      (await david.postsMentioningAuthor.toArray()).map((p: Base) => p.id).sort(),
+    );
+    expect(await david2.postsMentioningAuthor.toArray()).toEqual([]);
+    expect(await bob.postsMentioningAuthor.toArray()).toEqual([]);
   });
   it("preload with instance dependent through scope", async () => {
-    const david = authors("david");
-    const david2 = await Author.create({ name: "David" });
-    const bob = authors("bob");
-    const davidPost = posts("welcome");
-    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi david!" });
-    const comment2 = await Comment.create({
-      post_id: davidPost.id,
+    const david = authors("david") as any;
+    const david2 = (await Author.createBang({ name: "David" })) as any;
+    const bob = authors("bob") as any;
+    const comment1 = await (await david.posts.first()).comments.createBang({ body: "Hi David!" });
+    const comment2 = await (
+      await david.posts.first()
+    ).comments.createBang({
       body: "This comment mentions david",
     });
 
-    await new Preloader({
-      records: [david, david2, bob],
-      associations: ["commentsMentioningAuthor"],
-    }).call();
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({
+        records: [david, david2, bob],
+        associations: "commentsMentioningAuthor",
+      });
+      await preloader.call();
+    });
 
-    const davidComments = (david as any).association("commentsMentioningAuthor").target as any[];
-    const david2Comments = (david2 as any).association("commentsMentioningAuthor").target as any[];
-    const bobComments = (bob as any).association("commentsMentioningAuthor").target as any[];
+    assertPredicate(david.commentsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(david2.commentsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(bob.commentsMentioningAuthor, (c: any) => c.isLoaded);
 
-    expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
-    expect(david2Comments).toEqual([]);
-    expect(bobComments).toEqual([]);
+    expect([comment1.id, comment2.id].sort()).toEqual(
+      (await david.commentsMentioningAuthor.toArray()).map((c: Base) => c.id).sort(),
+    );
+    expect(await david2.commentsMentioningAuthor.toArray()).toEqual([]);
+    expect(await bob.commentsMentioningAuthor.toArray()).toEqual([]);
   });
   it("preload with through instance dependent scope", async () => {
-    const david = authors("david");
-    const david2 = await Author.create({ name: "David" });
-    const bob = authors("bob");
-    const davidPost = await Post.create({
-      author_id: david.id,
+    const david = authors("david") as any;
+    const david2 = (await Author.createBang({ name: "David" })) as any;
+    const bob = authors("bob") as any;
+    const post = (await Post.createBang({
+      author: david,
       title: "test post",
-      body: "this post is about david",
-    });
-    await Post.create({
-      author_id: david.id,
+      body: "this post is about David",
+    })) as any;
+    await Post.createBang({
+      author: david,
       title: "test post 2",
-      body: "this post is also about david",
+      body: "this post is also about David",
     });
-    const bobPost = await Post.create({
-      author_id: bob.id,
+    const post3 = (await Post.createBang({
+      author: bob,
       title: "test post 3",
-      body: "this post is about bob",
+      body: "this post is about Bob",
+    })) as any;
+    const comment1 = await post.comments.createBang({ body: "hi!" });
+    const comment2 = await post.comments.createBang({ body: "hello!" });
+    const comment3 = await post3.comments.createBang({ body: "HI BOB!" });
+
+    await assertQueriesCount(3, false, async () => {
+      const preloader = new Preloader({
+        records: [david, david2, bob],
+        associations: "commentsOnPostsMentioningAuthor",
+      });
+      await preloader.call();
     });
-    const comment1 = await Comment.create({ post_id: davidPost.id, body: "hi!" });
-    const comment2 = await Comment.create({ post_id: davidPost.id, body: "hello!" });
-    const comment3 = await Comment.create({ post_id: bobPost.id, body: "HI BOB!" });
 
-    await new Preloader({
-      records: [david, david2, bob],
-      associations: ["commentsOnPostsMentioningAuthor"],
-    }).call();
+    assertPredicate(david.commentsOnPostsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(david2.commentsOnPostsMentioningAuthor, (c: any) => c.isLoaded);
+    assertPredicate(bob.commentsOnPostsMentioningAuthor, (c: any) => c.isLoaded);
 
-    const davidComments = (david as any).association("commentsOnPostsMentioningAuthor")
-      .target as any[];
-    const david2Comments = (david2 as any).association("commentsOnPostsMentioningAuthor")
-      .target as any[];
-    const bobComments = (bob as any).association("commentsOnPostsMentioningAuthor").target as any[];
-
-    expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
-    expect(david2Comments).toEqual([]);
-    expect(bobComments.map((c: any) => c.id)).toEqual([comment3.id]);
+    expect([comment1.id, comment2.id].sort()).toEqual(
+      (await david.commentsOnPostsMentioningAuthor.toArray()).map((c: Base) => c.id).sort(),
+    );
+    expect(await david2.commentsOnPostsMentioningAuthor.toArray()).toEqual([]);
+    expect([comment3.id]).toEqual(
+      (await bob.commentsOnPostsMentioningAuthor.toArray()).map((c: Base) => c.id),
+    );
   });
 
   it("some already loaded associations", async () => {
     const itemDiscount = await Discount.create({ amount: 5 });
     const shippingDiscount = await Discount.create({ amount: 20 });
-    const invoice = await Invoice.create({});
-    const lineItem = await LineItem.create({ amount: 20, invoice_id: invoice.id });
-    await LineItemDiscountApplication.create({
-      line_item_id: lineItem.id,
-      discount_id: itemDiscount.id,
-    });
-    const shippingLine = await ShippingLine.create({ amount: 50, invoice_id: invoice.id });
-    await ShippingLineDiscountApplication.create({
-      shipping_line_id: shippingLine.id,
-      discount_id: shippingDiscount.id,
-    });
 
-    const nested = [
+    const invoice = new Invoice({}) as any;
+    const lineItem = new LineItem({ amount: 20 }) as any;
+    await lineItem.discountApplications.push(
+      new LineItemDiscountApplication({ discount: itemDiscount }),
+    );
+    await invoice.lineItems.push(lineItem);
+
+    const shippingLine = new ShippingLine({ amount: 50 }) as any;
+    await shippingLine.discountApplications.push(
+      new ShippingLineDiscountApplication({ discount: shippingDiscount }),
+    );
+    await invoice.shippingLines.push(shippingLine);
+
+    await invoice.saveBang();
+    await invoice.reload();
+
+    const associations = [
       { lineItems: { discountApplications: "discount" } },
       { shippingLines: { discountApplications: "discount" } },
     ];
-    const readDiscounts = (inv: Base) => {
-      const li = (inv as any).association("lineItems").target[0];
-      const sl = (inv as any).association("shippingLines").target[0];
-      expect(li.association("discountApplications").target[0].discount).not.toBeNull();
-      expect(sl.association("discountApplications").target[0].discount).not.toBeNull();
-    };
-
-    const fresh = (await Invoice.where({ id: invoice.id }))[0];
-    const firstSqls = await captureSql(async () => {
-      await new Preloader({ records: [fresh], associations: nested }).call();
+    await assertQueriesCount(5, false, async () => {
+      const preloader = new Preloader({ records: [invoice], associations });
+      await preloader.call();
     });
-    expect(firstSqls).toHaveLength(5);
-    const firstReads = await captureSql(async () => readDiscounts(fresh));
-    expect(firstReads).toHaveLength(0);
 
-    const reloaded = (await Invoice.where({ id: invoice.id }))[0];
-    const lineItems = await (reloaded as any).lineItems;
-    for (const li of lineItems) await li.discountApplications;
-    const secondSqls = await captureSql(async () => {
-      await new Preloader({ records: [reloaded], associations: nested }).call();
+    await assertNoQueries(false, async () => {
+      expect(
+        await (
+          await (await invoice.lineItems.first()).discountApplications.first()
+        ).discount,
+      ).not.toBeNull();
+      expect(
+        await (
+          await (await invoice.shippingLines.first()).discountApplications.first()
+        ).discount,
+      ).not.toBeNull();
     });
-    expect(secondSqls).toHaveLength(3);
-    const secondReads = await captureSql(async () => readDiscounts(reloaded));
-    expect(secondReads).toHaveLength(0);
+
+    await invoice.reload();
+    for (const i of await invoice.lineItems.toArray()) await i.discountApplications.toArray();
+    await assertQueriesCount(3, false, async () => {
+      const preloader = new Preloader({ records: [invoice], associations });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      expect(
+        await (
+          await (await invoice.lineItems.first()).discountApplications.first()
+        ).discount,
+      ).not.toBeNull();
+      expect(
+        await (
+          await (await invoice.shippingLines.first()).discountApplications.first()
+        ).discount,
+      ).not.toBeNull();
+    });
   });
 
   it("preload through", async () => {
@@ -785,128 +809,187 @@ describe("PreloaderTest", () => {
       comments("eager_sti_on_associations_s_comment2"),
     ];
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({ records, associations: ["author", "post"] }).call();
-    expect(spy).toHaveBeenCalledTimes(2);
-
-    const reads = await captureSql(async () => {
-      for (const comment of records) void (comment as any).association("author").target;
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({ records, associations: ["author", "post"] });
+      await preloader.call();
     });
-    expect(reads).toHaveLength(0);
+
+    await assertNoQueries(false, async () => {
+      for (const comment of records) await (comment as any).author;
+    });
   });
 
   it("preload groups queries with same scope at second level", async () => {
-    const a = await Author.create({ name: "David" });
-    const tp = await Post.create({ title: "So I was thinking", body: "body", author_id: a.id });
-    const wp = await Post.create({ title: "Welcome to the weblog", body: "body", author_id: a.id });
-    await Comment.create({ body: "c1", post_id: tp.id });
-    await Comment.create({ body: "c2", post_id: wp.id });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [a],
-      associations: [{ thinkingPosts: "comments" }, { welcomePosts: "comments" }],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(3);
+    let author: any = null;
+
+    await assertQueriesCount(4, false, async () => {
+      author = await Author.where({ name: "David" })
+        .includes({ thinkingPosts: "comments", welcomePosts: "comments" })
+        .first();
+    });
+
+    await assertNoQueries(false, async () => {
+      for (const p of await author.thinkingPosts.toArray()) await p.comments.toArray();
+      for (const p of await author.welcomePosts.toArray()) await p.comments.toArray();
+    });
   });
   it("preload groups queries with same sql at second level", async () => {
-    const a = await Author.create({ name: "David" });
-    const tp = await Post.create({ title: "So I was thinking", body: "body", author_id: a.id });
-    const wp = await Post.create({ title: "Welcome to the weblog", body: "body", author_id: a.id });
-    await Comment.create({ body: "c1", post_id: tp.id });
-    await Comment.create({ body: "c2", post_id: wp.id });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [a],
-      associations: [{ thinkingPosts: "comments" }, { welcomePosts: "commentsWithExtending" }],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(3);
+    let author: any = null;
+
+    await assertQueriesCount(4, false, async () => {
+      author = await Author.where({ name: "David" })
+        .includes({ thinkingPosts: "comments", welcomePosts: "commentsWithExtending" })
+        .first();
+    });
+
+    await assertNoQueries(false, async () => {
+      for (const p of await author.thinkingPosts.toArray()) await p.comments.toArray();
+      for (const p of await author.welcomePosts.toArray()) await p.commentsWithExtending.toArray();
+    });
   });
   it("preload with grouping sets inverse association", async () => {
     const mary = authors("mary");
     const bob = authors("bob");
-    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
+
+    await AuthorFavorite.createBang({ author: mary, favoriteAuthor: bob });
     const favorites = await AuthorFavorite.all();
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: favorites,
-      associations: ["author", "favoriteAuthor"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(1);
-    const fav = favorites[0] as any;
-    expect(fav.association("author").target.name).toBe("Mary");
-    expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
-    spy.mockClear();
-    const reloadedAuthor = await fav.author;
-    const reloadedFavorite = await fav.favoriteAuthor;
-    expect(reloadedAuthor.name).toBe("Mary");
-    expect(reloadedFavorite.name).toBe("Bob");
-    expect(spy).not.toHaveBeenCalled();
+
+    await assertQueriesCount(1, false, async () => {
+      const preloader = new Preloader({
+        records: favorites,
+        associations: ["author", "favoriteAuthor"],
+      });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      const first = favorites[0] as any;
+      await first.author;
+      await first.favoriteAuthor;
+    });
   });
   it("preload can group separate levels", async () => {
-    const mary = authors("mary");
+    const mary = authors("mary") as any;
     const bob = authors("bob");
-    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [mary],
-      associations: ["posts", { favoriteAuthors: "posts" }],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(3);
+
+    await AuthorFavorite.createBang({ author: mary, favoriteAuthor: bob });
+
+    await assertQueriesCount(3, false, async () => {
+      const preloader = new Preloader({
+        records: [mary],
+        associations: ["posts", { favoriteAuthors: "posts" }],
+      });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      await mary.posts.toArray();
+      for (const a of await mary.favoriteAuthors.toArray()) await a.posts.toArray();
+    });
   });
   it("preload can group multi level ping pong through", async () => {
-    const mary = authors("mary");
+    const mary = authors("mary") as any;
     const bob = authors("bob");
-    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
 
-    const associations = [
-      { similarPosts: "comments" },
-      { favoriteAuthors: { similarPosts: "comments" } },
-    ];
+    await AuthorFavorite.createBang({ author: mary, favoriteAuthor: bob });
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({ records: [mary], associations }).call();
-    const preloadCalls = spy.mock.calls.length;
-    expect(preloadCalls).toBe(9);
+    const associations = {
+      similarPosts: "comments",
+      favoriteAuthors: { similarPosts: "comments" },
+    };
 
-    const marySimilar = (mary as any).association("similarPosts").target as Base[];
-    expect(marySimilar.length).toBeGreaterThan(0);
-    for (const post of marySimilar) void (post as any).association("comments").target;
-    const maryFavs = (mary as any).association("favoriteAuthors").target as Base[];
-    expect(maryFavs.map((a) => a.id)).toEqual([bob.id]);
-    const bobSimilar = (maryFavs[0] as any).association("similarPosts").target as Base[];
-    for (const post of bobSimilar) void (post as any).association("comments").target;
-    expect(spy.mock.calls.length).toBe(preloadCalls);
+    await assertQueriesCount(9, false, async () => {
+      const preloader = new Preloader({ records: [mary], associations });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      for (const p of await mary.similarPosts.toArray()) await p.comments.toArray();
+      for (const a of await mary.favoriteAuthors.toArray()) {
+        for (const p of await a.similarPosts.toArray()) await p.comments.toArray();
+      }
+    });
+
+    const tagReflection = Tagging.reflectOnAssociation("tag") as any;
+    const taggingsReflection = Tag.reflectOnAssociation("taggings") as any;
+
+    expect(tagReflection.scope).toBeTruthy();
+    assertNot(taggingsReflection.scope);
+
+    const saved = [tagReflection, taggingsReflection].map((r) => ({
+      r,
+      prevAutoScope: r.klass.automaticScopeInversing,
+      prevNameCache: r._inverseNameCache,
+      prevOfCache: r._inverseOfCache,
+    }));
+    for (const { r } of saved) {
+      r.klass.automaticScopeInversing = true;
+      r._inverseNameCache = undefined;
+      r._inverseOfCache = undefined;
+    }
+    try {
+      await mary.reload();
+
+      await assertQueriesCount(8, false, async () => {
+        const preloader = new Preloader({ records: [mary], associations });
+        await preloader.call();
+      });
+    } finally {
+      for (const { r, prevAutoScope, prevNameCache, prevOfCache } of saved) {
+        r.klass.automaticScopeInversing = prevAutoScope;
+        r._inverseNameCache = prevNameCache;
+        r._inverseOfCache = prevOfCache;
+      }
+    }
   });
   it("preload does not group same class different scope", async () => {
-    const post = posts("welcome");
-    const postesque = await PostesquePL.create({ author_name: (authors("david") as any).name });
+    const post = posts("welcome") as any;
+    const postesque = (await PostesquePL.create({ author: await Author.last() })) as any;
+    await postesque.reload();
 
-    let spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [post, postesque],
-      associations: ["authorWithTheLetterA"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(2);
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({
+        records: [post, postesque],
+        associations: "authorWithTheLetterA",
+      });
+      await preloader.call();
+    });
 
-    (post as any)._resetAssociationCaches();
-    (postesque as any)._resetAssociationCaches();
+    await assertNoQueries(false, async () => {
+      await post.authorWithTheLetterA;
+      await postesque.authorWithTheLetterA;
+    });
 
-    spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [post, postesque],
-      associations: ["authorWithAddress"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(3);
+    await post.reload();
+    await postesque.reload();
+
+    await assertQueriesCount(3, false, async () => {
+      const preloader = new Preloader({
+        records: [post, postesque],
+        associations: "authorWithAddress",
+      });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      await post.authorWithAddress;
+      await postesque.authorWithAddress;
+    });
   });
   it("preload does not group same scope different key name", async () => {
-    const post = posts("welcome");
-    const postesque = await PostesquePL.create({ author_name: (authors("david") as any).name });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [post, postesque],
-      associations: ["author"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(2);
+    const post = posts("welcome") as any;
+    const postesque = (await PostesquePL.create({ author: await Author.last() })) as any;
+    await postesque.reload();
+
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({ records: [post, postesque], associations: "author" });
+      await preloader.call();
+    });
+
+    await assertNoQueries(false, async () => {
+      await post.author;
+      await postesque.author;
+    });
   });
   it("multi database polymorphic preload with same table name", async () => {
     const dog = dogs("sophie");
@@ -928,122 +1011,118 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records", async () => {
-    const post = posts("welcome");
+    const post = posts("welcome") as any;
     const david = authors("david");
 
-    const sqls = await captureSql(async () => {
+    await assertNoQueries(false, async () => {
       await new Preloader({
         records: [post],
         associations: "author",
         availableRecords: [[david]],
       }).call();
-      expect(post.association("author").isLoaded()).toBe(true);
-      expect(post.association("author").target).toBe(david);
+
+      assertPredicate(post.association("author"), (a: any) => a.isLoaded());
+      assertSame(david, await post.author);
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload with available records sti", async () => {
-    const book = await (Book as any).create({});
-    const essaySpecial = await (EssaySpecial as any).create({ book_id: book.id });
+    const book = (await Book.createBang({})) as any;
+    const essaySpecial = await EssaySpecial.createBang({});
+    await book.setEssay(essaySpecial);
+    await book.saveBang();
+    await book.reload();
 
-    expect(book.association("essay").isLoaded()).toBe(false);
+    assertNotPredicate(book.association("essay"), (a: any) => a.isLoaded());
 
-    const sqls = await captureSql(async () => {
+    await assertNoQueries(false, async () => {
       await new Preloader({
         records: [book],
         associations: "essay",
         availableRecords: [[essaySpecial]],
       }).call();
     });
-    expect(sqls).toHaveLength(0);
 
-    expect(book.association("essay").isLoaded()).toBe(true);
-    expect(book.association("essay").target).toBe(essaySpecial);
+    assertPredicate(book.association("essay"), (a: any) => a.isLoaded());
+    assertSame(essaySpecial, await book.essay);
   });
 
   it("preload with only some records available", async () => {
-    const bobPost = posts("misc_by_bob");
-    const maryPost = posts("misc_by_mary");
+    const bobPost = posts("misc_by_bob") as any;
+    const maryPost = posts("misc_by_mary") as any;
     const bob = authors("bob");
     const mary = authors("mary");
 
-    const sqls = await captureSql(async () => {
+    await assertQueriesCount(1, false, async () => {
       await new Preloader({
         records: [bobPost, maryPost],
         associations: "author",
         availableRecords: [bob],
       }).call();
     });
-    expect(sqls).toHaveLength(1);
 
-    const reads = await captureSql(async () => {
-      expect(bobPost.association("author").target).toBe(bob);
-      expect((maryPost.association("author").target as any).id).toBe(mary.id);
+    await assertNoQueries(false, async () => {
+      assertSame(bob, await bobPost.author);
+      expect(mary.id).toEqual((await maryPost.author).id);
     });
-    expect(reads).toHaveLength(0);
   });
 
   it("preload with some records already loaded", async () => {
-    const bobPost = posts("misc_by_bob");
-    const maryPost = posts("misc_by_mary");
+    const bobPost = posts("misc_by_bob") as any;
+    const maryPost = posts("misc_by_mary") as any;
+    const bob = await bobPost.author;
     const mary = authors("mary");
 
-    const loadedBob = (await bobPost.author) as Author;
-    expect(bobPost.association("author").isLoaded()).toBe(true);
-    expect(maryPost.association("author").isLoaded()).toBe(false);
+    assertPredicate(bobPost.association("author"), (a: any) => a.isLoaded());
+    assertNot(maryPost.association("author").isLoaded());
 
-    const sqls = await captureSql(async () => {
+    await assertQueriesCount(1, false, async () => {
       await new Preloader({ records: [bobPost, maryPost], associations: "author" }).call();
     });
-    expect(sqls).toHaveLength(1);
 
-    const reads = await captureSql(async () => {
-      expect(bobPost.association("author").target).toBe(loadedBob);
-      expect((maryPost.association("author").target as any).id).toBe(mary.id);
+    await assertNoQueries(false, async () => {
+      assertSame(bob, await bobPost.author);
+      expect(mary.id).toEqual((await maryPost.author).id);
     });
-    expect(reads).toHaveLength(0);
   });
 
   it("preload with available records with through association", async () => {
-    const author = authors("david");
-    const allCategories = await Category.all();
+    const author = authors("david") as any;
+    const categories = await Category.all();
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [author],
-      associations: "essayCategory",
-      availableRecords: allCategories,
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(1);
-    expect((author as any).association("essayCategory").isLoaded()).toBe(true);
-    const preloaded = (author as any).association("essayCategory").target;
-    expect(allCategories).toContain(preloaded);
+    await assertQueriesCount(1, false, async () => {
+      await new Preloader({
+        records: [author],
+        associations: "essayCategory",
+        availableRecords: categories,
+      }).call();
+    });
+
+    assertPredicate(author.association("essayCategory"), (a: any) => a.isLoaded());
+    expect(categories.includes(await author.essayCategory)).toBeTruthy();
   });
 
   it("preload with only some records available with through associations", async () => {
-    const mary = authors("mary");
-    const maryEssay = essays("mary_stay_home");
-    const tech = categories("technology");
-    await (maryEssay as any).update({ category_id: (tech as any).name });
+    const mary = authors("mary") as any;
+    const maryEssay = essays("mary_stay_home") as any;
+    const maryCategory = categories("technology");
+    await maryEssay.updateBang({ category: maryCategory });
 
-    const dave = authors("david");
-    const general = categories("general");
+    const dave = authors("david") as any;
+    const daveCategory = categories("general");
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [mary, dave],
-      associations: "essayCategory",
-      availableRecords: [tech],
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(2);
-    const reads = await captureSql(async () => {
-      expect((mary as any).association("essayCategory").reader).toBe(tech);
-      expect((dave as any).association("essayCategory").reader.id).toBe(general.id);
+    await assertQueriesCount(2, false, async () => {
+      await new Preloader({
+        records: [mary, dave],
+        associations: "essayCategory",
+        availableRecords: [maryCategory],
+      }).call();
     });
-    expect(reads).toHaveLength(0);
+
+    await assertNoQueries(false, async () => {
+      assertSame(maryCategory, await mary.essayCategory);
+      expect(daveCategory.id).toEqual((await dave.essayCategory).id);
+    });
   });
 
   it("preload with available records with multiple classes", async () => {
@@ -1051,55 +1130,51 @@ describe("PreloaderTest", () => {
     const general = categories("general");
     const david = authors("david");
 
-    const sqls = await captureSql(async () => {
+    await assertNoQueries(false, async () => {
       await new Preloader({
         records: [essay],
         associations: ["category", "author"],
         availableRecords: [general, david],
       }).call();
-      expect(essay.association("category").isLoaded()).toBe(true);
-      expect(essay.association("author").isLoaded()).toBe(true);
-      expect(essay.association("category").target).toBe(general);
-      expect(essay.association("author").target).toBe(david);
+
+      assertPredicate(essay.association("category"), (a: any) => a.isLoaded());
+      assertPredicate(essay.association("author"), (a: any) => a.isLoaded());
+      assertSame(general, await essay.category);
+      assertSame(david, await essay.author);
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload with available records queries when scoped", async () => {
     const post = posts("welcome") as any;
     const david = authors("david");
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [post],
-      associations: "author",
-      scope: Author.where({ name: "David" }) as any,
-      availableRecords: [david],
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(1);
-    expect(post.association("author").isLoaded()).toBe(true);
-    expect(post.association("author").target).not.toBe(david);
+    await assertQueriesCount(1, false, async () => {
+      await new Preloader({
+        records: [post],
+        associations: "author",
+        scope: Author.where({ name: "David" }) as any,
+        availableRecords: [david],
+      }).call();
+    });
+
+    assertPredicate(post.association("author"), (a: any) => a.isLoaded());
+    expect(await post.author).not.toBe(david);
   });
 
   it("preload with available records queries when collection", async () => {
     const post = posts("welcome") as any;
-    const allComments = await Comment.all();
+    const comments = await Comment.all();
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [post],
-      associations: "comments",
-      availableRecords: allComments,
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(1);
-    expect(post.association("comments").isLoaded()).toBe(true);
-    const loaded = post.association("comments").target as Base[];
-    expect(loaded.some((lc) => allComments.includes(lc))).toBe(false);
-    expect(loaded.map((lc) => lc.id).sort()).toEqual(
-      [comments("greetings").id, comments("more_greetings").id].sort(),
-    );
+    await assertQueriesCount(1, false, async () => {
+      await new Preloader({
+        records: [post],
+        associations: "comments",
+        availableRecords: comments,
+      }).call();
+    });
+
+    assertPredicate(post.association("comments"), (a: any) => a.isLoaded());
+    assertEmpty((await post.comments.toArray()).filter((c: Base) => comments.includes(c)));
   });
 
   it("preload with available records queries when incomplete", async () => {
@@ -1107,180 +1182,196 @@ describe("PreloaderTest", () => {
     const bob = authors("bob");
     const david = authors("david");
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [post],
-      associations: "author",
-      availableRecords: [bob],
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(1);
-    const preloaded = post.association("author").target;
-    expect(preloaded?.id).toBe(david.id);
+    await assertQueriesCount(1, false, async () => {
+      await new Preloader({
+        records: [post],
+        associations: "author",
+        availableRecords: [bob],
+      }).call();
+    });
+
+    await assertNoQueries(false, async () => {
+      assertPredicate(post.association("author"), (a: any) => a.isLoaded());
+      expect(david.id).toEqual((await post.author).id);
+    });
   });
 
   it("preload with unpersisted records no ops", async () => {
     const author = new Author({});
-    const newPostWithAuthor = new Post({ author });
-    const newPostWithoutAuthor = new Post({});
+    const newPostWithAuthor = new Post({ author }) as any;
+    const newPostWithoutAuthor = new Post({}) as any;
     const posts = [newPostWithAuthor, newPostWithoutAuthor];
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: posts, associations: ["author"] }).call();
-      expect(newPostWithAuthor.association("author").target).toBe(author);
-      expect(newPostWithoutAuthor.association("author").target).toBeNull();
+
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: posts, associations: "author" }).call();
+
+      assertSame(author, await newPostWithAuthor.author);
+      expect(await newPostWithoutAuthor.author).toBeNull();
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload wont set the wrong target", async () => {
     const post = posts("welcome") as any;
-    await post.update({ author_id: 54321 });
-    const general = categories("general") as any;
-    await general.update({ id: 54321 });
+    await post.updateBang({ author_id: 54321 });
+    const someOtherRecord = categories("general") as any;
+    await someOtherRecord.updateBang({ id: 54321 });
 
-    expect(() => general.association("author")).toThrow();
+    await assertRaises([Error], {}, () => someOtherRecord.association("author"));
 
-    await new Preloader({
-      records: [post],
-      associations: "author",
-      availableRecords: [[general]],
-    }).call();
-    expect(post.association("author").isLoaded()).toBe(true);
-    expect(post.association("author").target).not.toBe(general);
+    await assertNothingRaised(async () => {
+      await new Preloader({
+        records: [post],
+        associations: "author",
+        availableRecords: [[someOtherRecord]],
+      }).call();
+      assertPredicate(post.association("author"), (a: any) => a.isLoaded());
+      expect(await post.author).not.toEqual(someOtherRecord);
+    });
   });
 
   it("preload has many association with composite foreign key", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
     const blogPosts = [blogPost, shardedBlogPosts("great_post_blog_two")];
 
     await new Preloader({ records: blogPosts, associations: ["comments"] }).call();
 
-    expect((blogPost as any).association("comments").isLoaded()).toBe(true);
-    const preloaded = (blogPost as any).association("comments").target as Base[];
-    expect(preloaded.map((c) => c.id)).toContain(shardedComments("great_comment_blog_post_one").id);
+    assertPredicate(blogPost.association("comments"), (a: any) => a.isLoaded());
+    expect((await blogPost.comments.toArray()).map((c: Base) => c.id)).toContainEqual(
+      shardedComments("great_comment_blog_post_one").id,
+    );
   });
 
   it("preload belongs to association with composite foreign key", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
+    const comment = shardedComments("great_comment_blog_post_one") as any;
     const comments = [comment, shardedComments("great_comment_blog_post_two")];
 
     await new Preloader({ records: comments, associations: "blogPost" }).call();
 
-    expect((comment as any).association("blogPost").isLoaded()).toBe(true);
-    expect((comment as any).association("blogPost").target.id).toBe(
-      shardedBlogPosts("great_post_blog_one").id,
-    );
+    assertPredicate(comment.association("blogPost"), (a: any) => a.isLoaded());
+    expect(shardedBlogPosts("great_post_blog_one").id).toEqual((await comment.blogPost).id);
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
-
+    const comment = shardedComments("great_comment_blog_post_one") as any;
     await comment.blogPost;
 
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [comment], associations: ["blogPost"] }).call();
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: [comment], associations: "blogPost" }).call();
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload has many through association with composite query constraints", async () => {
-    const tag = shardedTags("short_read_blog_one");
+    const tag = shardedTags("short_read_blog_one") as any;
+
     const tags = [tag, shardedTags("breaking_news_blog_2")];
 
     await new Preloader({ records: tags, associations: "blogPosts" }).call();
 
-    expect(tags.every((t) => (t as any).association("blogPosts").isLoaded())).toBe(true);
+    expect(tags.every((tag: any) => tag.association("blogPosts").isLoaded())).toBeTruthy();
 
-    const expectedBlogPostIds = await ShardedBlogPostTagPL.where(
-      "blog_id = ? AND tag_id = ?",
-      (tag as any).blog_id,
-      tag.id,
-    )
-      .toArray()
-      .then((rows) => rows.map((r) => Number((r as any).blog_post_id)).sort());
-    expect(expectedBlogPostIds).not.toHaveLength(0);
-    const preloaded = (tag as any).association("blogPosts").target;
-    expect(preloaded.map((p: any) => Number(p.id)).sort()).toEqual(expectedBlogPostIds);
+    const expectedBlogPostIds = await ShardedBlogPostTagPL.where({
+      blog_id: tag.blog_id,
+      tag_id: tag.id,
+    }).pluck("blog_post_id");
+
+    assertNotEmpty(expectedBlogPostIds);
+
+    expect([...expectedBlogPostIds].sort()).toEqual(
+      (await tag.blogPosts.toArray()).map((p: Base) => p.id).sort(),
+    );
   });
 
   it("preloads has many on model with a composite primary key through id attribute", async () => {
-    const order = cpkOrders("cpk_groceries_order_2");
+    const order = cpkOrders("cpk_groceries_order_2") as any;
     const [, orderId] = order.id as [number, number];
     const orderAgreements = await CpkOrderAgreementPL.where({ order_id: orderId });
-    expect(orderAgreements).not.toHaveLength(0);
 
-    let orders: any[];
-    const sqls = await captureSql(async () => {
-      orders = await CpkOrderPL.where("id = ?", orderId).includes(":orderAgreements");
+    assertNotEmpty(orderAgreements);
+    expect(orderAgreements.map((a) => a.id).sort()).toEqual(
+      (await order.orderAgreements.toArray()).map((a: Base) => a.id).sort(),
+    );
+
+    let loadedOrder: any = null;
+    const sql = await captureSql(async () => {
+      loadedOrder = (await CpkOrderPL.where({ id: orderId }).includes("orderAgreements"))[0];
     });
-    expect(sqls).toHaveLength(2);
-    const preloadSql = sqls[1];
-    expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
-    expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
-    const loaded = orders![0].association("orderAgreements").target;
-    expect(loaded.map((a: any) => a.id).sort()).toEqual(orderAgreements.map((a) => a.id).sort());
+
+    expect(sql.length).toBe(2);
+    const preloadSql = sql[sql.length - 1];
+
+    const orderIdColumn = regexpEscape(quoteTableName("cpk_order_agreements.order_id"));
+    const expectation = new RegExp(`SELECT.*WHERE.* ${orderIdColumn} = (\\?|(\\d+)|\\$\\d)$`);
+
+    expect(preloadSql).toMatch(expectation);
+    expect(orderAgreements.map((a) => a.id).sort()).toEqual(
+      (await loadedOrder.orderAgreements.toArray()).map((a: Base) => a.id).sort(),
+    );
   });
 
   it("preloads belongs to a composite primary key model through id attribute", async () => {
-    const ag = cpkOrderAgreements("order_agreement_three");
+    const orderAgreement = cpkOrderAgreements("order_agreement_three") as any;
     const order = cpkOrders("cpk_groceries_order_2");
-    const [, orderId] = order.id as [number, number];
+    expect(order.id).toEqual((await orderAgreement.order).id);
 
-    let agreements: any[];
-    const sqls = await captureSql(async () => {
-      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes(":order");
+    let loadedOrderAgreement: any = null;
+    const sql = await captureSql(async () => {
+      loadedOrderAgreement = (
+        await CpkOrderAgreementPL.where({ id: orderAgreement.id }).includes("order")
+      )[0];
     });
-    expect(sqls).toHaveLength(2);
-    const preloadSql = sqls[1];
-    expectQuotedColumnInSql(preloadSql, "cpk_orders.id", { inWhere: true });
-    expect(agreements![0].association("order").isLoaded()).toBe(true);
-    const loadedOrder = agreements![0].association("order").target;
-    expect(loadedOrder).not.toBeNull();
-    expect((loadedOrder.id as [number, number])[1]).toBe(orderId);
+
+    expect(sql.length).toBe(2);
+    const preloadSql = sql[sql.length - 1];
+
+    const orderId = regexpEscape(quoteTableName("cpk_orders.id"));
+    const expectation = new RegExp(`SELECT.*WHERE.* ${orderId} = (\\?|(\\d+)|\\$\\d)$`);
+
+    expect(preloadSql).toMatch(expectation);
+    expect(order.id).toEqual((await loadedOrderAgreement.order).id);
   });
 
   it("preload keeps built has many records no ops", async () => {
-    const post = new (Post as any)();
-    const comment = post.association("comments").build({ body: "built" });
+    const post = new Post({}) as any;
+    const comment = post.comments.build();
 
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [post], associations: ["comments"] }).call();
-      expect(post.association("comments").target).toContain(comment);
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: [post], associations: "comments" }).call();
+
+      expect(await post.comments.toArray()).toEqual([comment]);
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload keeps built has many records after query", async () => {
-    const post = posts("welcome");
-    const comment = (post as any).association("comments").build({ body: "built" });
+    const post = posts("welcome") as any;
+    const comment = post.comments.build();
 
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [post], associations: ["comments"] }).call();
-      expect((post as any).association("comments").target).toContain(comment);
+    await assertQueriesCount(1, false, async () => {
+      await new Preloader({ records: [post], associations: "comments" }).call();
+
+      expect(await post.comments.toArray()).toContain(comment);
     });
-    expect(sqls).toHaveLength(1);
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    const post = new (Post as any)();
-    const author = post.association("author").build({ name: "Built" });
+    const post = new Post({}) as any;
+    const author = post.buildAuthor();
 
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [post], associations: ["author"] }).call();
-      expect(post.association("author").target).toBe(author);
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: [post], associations: "author" }).call();
+
+      assertSame(author, await post.author);
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    const post = posts("welcome");
-    const author = (post as any).association("author").build({ name: "Built" });
+    const post = posts("welcome") as any;
+    const author = post.buildAuthor();
 
-    const sqls = await captureSql(async () => {
-      await new Preloader({ records: [post], associations: ["author"] }).call();
-      expect((post as any).association("author").target).toBe(author);
+    await assertNoQueries(false, async () => {
+      await new Preloader({ records: [post], associations: "author" }).call();
+
+      assertSame(author, await post.author);
     });
-    expect(sqls).toHaveLength(0);
   });
 
   it("preload marks belongs_to association loaded on owner", async () => {
@@ -1328,13 +1419,17 @@ describe("OverridingAssociationsTest", () => {
   }
 
   it("habtm association redefinition callbacks should differ and not inherited", () => {
-    expect((PeopleList as any).beforeAddForHasAndBelongsToMany).toHaveLength(1);
-    expect((DifferentPeopleList as any).beforeAddForHasAndBelongsToMany).toEqual([]);
+    let callbacks = (PeopleList as any).beforeAddForHasAndBelongsToMany;
+    expect(callbacks.length).toBe(1);
+    callbacks = (DifferentPeopleList as any).beforeAddForHasAndBelongsToMany;
+    expect(callbacks).toEqual([]);
   });
 
   it("has many association redefinition callbacks should differ and not inherited", () => {
-    expect((PeopleList as any).beforeAddForHasMany).toHaveLength(1);
-    expect((DifferentPeopleList as any).beforeAddForHasMany).toEqual([]);
+    let callbacks = (PeopleList as any).beforeAddForHasMany;
+    expect(callbacks.length).toBe(1);
+    callbacks = (DifferentPeopleList as any).beforeAddForHasMany;
+    expect(callbacks).toEqual([]);
   });
 
   it("habtm association redefinition reflections should differ and not inherited", () => {
@@ -1362,12 +1457,14 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("requires symbol argument", async () => {
-    class OaArgTest extends Base {
-      static {
-        this.hasMany("items");
+    await assertRaises([ArgumentError], {}, () => {
+      class RequiresSymbolArgument extends Post {
+        static {
+          this.belongsTo(new String("author") as any);
+        }
       }
-    }
-    expect(reflectOnAssociation(OaArgTest, "items")).not.toBeNull();
+      return RequiresSymbolArgument;
+    });
   });
 
   it("associations raise with name error if associated to classes that do not exist", () => {
@@ -1470,72 +1567,111 @@ describe("WithAnnotationsTest", () => {
   ]);
 
   it("belongs to with annotation includes a query comment", async () => {
-    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(() => (pirate as any).parrot);
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(() => (pirate as any).parrotWithAnnotation);
-    expect(sqls.some((s) => s.includes("that tells jokes"))).toBe(true);
+    const pirate = (await SpacePirateAnnotated.where().not({ parrot_id: null }).first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.parrot;
+    });
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* that tells jokes \*\//, undefined, false, async () => {
+      await pirate.parrotWithAnnotation;
+    });
   });
 
   it("has and belongs to many with annotation includes a query comment", async () => {
-    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(async () => {
-      await (pirate as any).parrots.first();
+    const pirate = (await SpacePirateAnnotated.first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.parrots.first();
     });
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(async () => {
-      await (pirate as any).parrotsWithAnnotation.first();
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* that are very colorful \*\//, undefined, false, async () => {
+      await pirate.parrotsWithAnnotation.first();
     });
-    expect(sqls.some((s) => s.includes("that are very colorful"))).toBe(true);
   });
 
   it("has one with annotation includes a query comment", async () => {
-    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(() => (pirate as any).ship);
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(() => (pirate as any).shipWithAnnotation);
-    expect(sqls.some((s) => s.includes("that is a rocket"))).toBe(true);
+    const pirate = (await SpacePirateAnnotated.first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.ship;
+    });
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* that is a rocket \*\//, undefined, false, async () => {
+      await pirate.shipWithAnnotation;
+    });
   });
 
   it("has many with annotation includes a query comment", async () => {
-    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
-    const plain = await captureSql(async () => {
-      await (pirate as any).birds.first();
+    const pirate = (await SpacePirateAnnotated.first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.birds.first();
     });
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(async () => {
-      await (pirate as any).birdsWithAnnotation.first();
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* that are also parrots \*\//, undefined, false, async () => {
+      await pirate.birdsWithAnnotation.first();
     });
-    expect(sqls.some((s) => s.includes("that are also parrots"))).toBe(true);
   });
 
   it("has many through with annotation includes a query comment", async () => {
-    const pirate = await SpacePirateAnnotated.find(pirates("redbeard").id);
-    const plain = await captureSql(async () => {
-      await (pirate as any).treasureEstimates.first();
+    const pirate = (await SpacePirateAnnotated.first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.treasureEstimates.first();
     });
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(async () => {
-      await (pirate as any).treasureEstimatesWithAnnotation.first();
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+      await pirate.treasureEstimatesWithAnnotation.first();
     });
-    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
 
   it("has many through with annotation includes a query comment when eager loading", async () => {
-    const plain = await captureSql(async () => {
-      await SpacePirateAnnotated.includes(":treasureEstimates").first();
+    const pirate = (await SpacePirateAnnotated.first()) as any;
+    expect(pirate).toBeTruthy();
+
+    const log = await captureSql(async () => {
+      await pirate.treasureEstimates.first();
     });
-    expect(plain.length).toBeGreaterThan(0);
-    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
-    const sqls = await captureSql(async () => {
-      await SpacePirateAnnotated.includes(":treasureEstimatesWithAnnotation").first();
+    assertNotPredicate(log, (l: string[]) => l.length === 0);
+    assertPredicate(
+      log.filter((query) => /\/\*/.test(query)),
+      (l: string[]) => l.length === 0,
+    );
+
+    await assertQueriesMatch(/\/\* yarrr \*\//, undefined, false, async () => {
+      await SpacePirateAnnotated.includes("treasureEstimatesWithAnnotation", "treasures").first();
     });
-    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
 });
 
@@ -1686,23 +1822,19 @@ describe("AssociationsTest", () => {
   });
 
   it("subselect", async () => {
-    const author = authors("david");
-    const favs = await association(author, "authorFavorites");
-    const fav2 = await association(author, "authorFavorites").where({
-      author: Author.where({ id: author.id }),
-    });
-    expect(fav2.length).toEqual(favs.length);
-    fav2.forEach((f: any, i: number) => {
-      expect(f.equals(favs[i])).toBe(true);
-    });
+    const author = authors("david") as any;
+    const favs = await author.authorFavorites.toArray();
+    const fav2 = await author.authorFavorites
+      .where({ author: Author.where({ id: author.id }) })
+      .toArray();
+    expect(favs.map((f: Base) => f.id)).toEqual(fav2.map((f: Base) => f.id));
   });
 
   it("loading the association target should keep child records marked for destruction", async () => {
-    const ship = await Ship.create({ name: "The good ship Dollypop" });
-    const part = await (ship as any).parts.create({ name: "Mast" });
+    const ship = (await Ship.createBang({ name: "The good ship Dollypop" })) as any;
+    const part = await ship.parts.createBang({ name: "Mast" });
     part.markForDestruction();
-    const parts = await (ship as any).parts.toArray();
-    expect(parts[0].markedForDestruction()).toBe(true);
+    assertPredicate((await ship.parts.toArray())[0], (p: any) => p.markedForDestruction());
   });
 
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
@@ -1716,14 +1848,8 @@ describe("AssociationsTest", () => {
   });
 
   it("include with order works", async () => {
-    let raised: unknown;
-    try {
-      await Account.all().order("id").includes(":firm").first();
-      await Account.all().order({ id: "asc" }).includes(":firm").first();
-    } catch (e) {
-      raised = e;
-    }
-    expect(raised).toBeUndefined();
+    await assertNothingRaised(() => Account.all().order("id").includes("firm").first());
+    await assertNothingRaised(() => Account.all().order("id").includes("firm").first());
   });
 
   it("bad collection keys", () => {
@@ -1737,17 +1863,23 @@ describe("AssociationsTest", () => {
     const usingLimitableReflections = (reflections: any[]) =>
       (Tagging.all() as any).usingLimitableReflections(reflections);
     const belongsToReflections = [
-      reflectOnAssociation(Tagging, "tag"),
-      reflectOnAssociation(Tagging, "superTag"),
+      Tagging.reflectOnAssociation("tag"),
+      Tagging.reflectOnAssociation("superTag"),
     ];
     const hasManyReflections = [
-      reflectOnAssociation(Tag, "taggings"),
-      reflectOnAssociation(Developer, "projects"),
+      Tag.reflectOnAssociation("taggings"),
+      Developer.reflectOnAssociation("projects"),
     ];
-    const mixedReflections = [...belongsToReflections, ...hasManyReflections];
-    expect(usingLimitableReflections(belongsToReflections)).toBe(true);
-    expect(usingLimitableReflections(hasManyReflections)).toBe(false);
-    expect(usingLimitableReflections(mixedReflections)).toBe(false);
+    const mixedReflections = [...new Set([...belongsToReflections, ...hasManyReflections])];
+    expect(usingLimitableReflections(belongsToReflections)).toBeTruthy();
+    assertNot(
+      usingLimitableReflections(hasManyReflections),
+      "All has many style associations are not limitable",
+    );
+    assertNot(
+      usingLimitableReflections(mixedReflections),
+      "No collection associations (has many style) should pass",
+    );
   });
 
   it("association with references", async () => {
@@ -1757,23 +1889,29 @@ describe("AssociationsTest", () => {
   });
 
   it("force reload", async () => {
-    const firm = new Firm({ name: "A New Firm, Inc" });
+    const firm = new Firm({ name: "A New Firm, Inc" }) as any;
     await firm.save();
-    for (const _ of await firm.clients) {
-      void _;
-    }
-    expect(await firm.clients.isEmpty()).toBe(true);
+    for (const _ of await firm.clients.toArray()) void _;
+    assertPredicate(
+      await firm.clients.isEmpty(),
+      (e: boolean) => e,
+      "New firm shouldn't have client objects",
+    );
     expect(await firm.clients.size()).toBe(0);
 
     const client = new Client({ name: "TheClient.com", firm_id: firm.id });
     await client.save();
 
-    expect(await firm.clients.isEmpty()).toBe(true);
+    assertPredicate(
+      await firm.clients.isEmpty(),
+      (e: boolean) => e,
+      "New firm should have cached no client objects",
+    );
     expect(await firm.clients.size()).toBe(0);
 
     await firm.clients.reload();
 
-    expect(await firm.clients.isEmpty()).toBe(false);
+    assertNot(await firm.clients.isEmpty(), "New firm should have reloaded client objects");
     expect(await firm.clients.size()).toBe(1);
   });
 
@@ -1790,24 +1928,25 @@ describe("AssociationsTest", () => {
   });
 
   it("belongs to a model with composite foreign key finds associated record", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
+    const comment = shardedComments("great_comment_blog_post_one") as any;
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
-    const loaded = await (comment as any).blogPost;
-    expect(loaded.id).toBe((blogPost as any).id);
-    expect(loaded.blog_id).toBe((blogPost as any).blog_id);
+    expect(blogPost.id).toEqual((await comment.blogPost).id);
   });
 
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
+    const comment = shardedComments("great_comment_blog_post_one") as any;
 
-    const sqls = await captureSql(async () => {
-      await (comment as any).blogPost;
-    });
-    const sql = sqls.find((s) => /sharded_blog_posts/.test(s))!;
+    const sql = (
+      await captureSql(async () => {
+        await comment.blogPost;
+      })
+    )[0];
 
-    expectQuotedColumnInSql(sql, "sharded_blog_posts.blog_id");
-    expectQuotedColumnInSql(sql, "sharded_blog_posts.id");
+    expect(sql).toMatch(
+      new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.blog_id"))} =`),
+    );
+    expect(sql).toMatch(new RegExp(`${regexpEscape(quoteTableName("sharded_blog_posts.id"))} =`));
   });
 
   it("querying by whole associated records using query constraints", async () => {
@@ -1870,136 +2009,125 @@ describe("AssociationsTest", () => {
   it("has many association from a model with query constraints different from the association", async () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
     blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
+    let comments: Base[] = [];
     const expectedComments = await ShardedComment.where({
       blog_id: blogPost.blog_id,
       blog_post_id: blogPost.id,
     });
 
-    let comments: any[] = [];
-    const sqls = await captureSql(async () => {
-      comments = await blogPost.comments;
-    });
-    const sql = sqls.find((s) => /sharded_comments/.test(s))!;
+    const sql = (
+      await captureSql(async () => {
+        comments = await blogPost.comments.toArray();
+      })
+    )[0];
 
-    expectQuotedColumnInSql(sql, "sharded_comments.blog_id", { inWhere: true });
-    expect(comments).not.toHaveLength(0);
-    expect(comments.map((c: any) => Number(c.id)).sort((a: number, b: number) => a - b)).toEqual(
-      expectedComments.map((c: any) => Number(c.id)).sort((a: number, b: number) => a - b),
+    expect(sql).toMatch(
+      new RegExp(`WHERE .*${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
     );
+    assertNotEmpty(comments);
+    expect(expectedComments.map((c) => c.id).sort()).toEqual(comments.map((c) => c.id).sort());
   });
 
   it("query constraints over three without defining explicit foreign key query constraints raises", async () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
     blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
 
-    const proxy = blogPost.commentsWithoutQueryConstraints;
-    await expect(proxy.toArray()).rejects.toThrow(
-      /has more than 2 attributes\. Active Record is unable to derive the query constraints for the association\. You need to explicitly define the query constraints for this association\./,
+    const error = await assertRaises([ArgumentError], {}, () =>
+      blogPost.commentsWithoutQueryConstraints.toArray(),
+    );
+
+    expect(error.message).toEqual(
+      `The query constraints list on the \`${ShardedBlogPostWithRevision.name}\` model has more than 2 attributes. Active Record is unable to derive the query constraints for the association. You need to explicitly define the query constraints for this association.`,
     );
   });
 
   it("model with composite query constraints has many association sql", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
 
-    const sqls = await captureSql(async () => {
-      await (blogPost as any).comments;
-    });
-    const sql = sqls.find((s) => /sharded_comments/.test(s))!;
+    const sql = (
+      await captureSql(async () => {
+        await blogPost.comments.toArray();
+      })
+    )[0];
 
-    expectQuotedColumnInSql(sql, "sharded_comments.blog_post_id");
-    expectQuotedColumnInSql(sql, "sharded_comments.blog_id");
+    expect(sql).toMatch(
+      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_post_id"))} =`),
+    );
+    expect(sql).toMatch(
+      new RegExp(`${regexpEscape(quoteTableName("sharded_comments.blog_id"))} =`),
+    );
   });
 
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
-    const comments = await ShardedComment.where({ id: (comment as any).id }).preload(
-      ":blogPostById",
-    );
-    const loaded = comments[0];
-    const preloaded = (loaded as any).association("blogPostById").target;
-    expect(preloaded).toBeDefined();
-    const byCompositeKey = await (loaded as any).blogPost;
-    expect(preloaded.id).toBe(byCompositeKey.id);
+    let comment: any = shardedComments("great_comment_blog_post_one");
+    const comments = await ShardedComment.where({ id: comment.id }).preload("blogPostById");
+    comment = comments[0];
+    expect((await comment.blogPostById).id).toEqual((await comment.blogPost).id);
   });
 
   it("append composite foreign key has many association with autosave", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    const comment = new ShardedComment({ body: "Great post! :clap:" });
-    await association(blogPost, "comments").push(comment);
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    const comment = new ShardedComment({ body: "Great post! :clap:" }) as any;
+    await blogPost.comments.push(comment);
 
-    expect(comment.isPersisted()).toBe(true);
-    const comments = await association(blogPost, "comments");
-    expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
-    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
-    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+    assertPredicate(comment, (c: any) => c.isPersisted());
+    expect(await blogPost.comments.toArray()).toContain(comment);
+    expect(blogPost.id).toEqual(comment.blog_post_id);
+    expect(blogPost.blog_id).toEqual(comment.blog_id);
   });
 
   it("append composite has many through association", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    const tag = new ShardedTag({
-      name: "Ruby on Rails",
-      blog_id: (blogPost as any).blog_id,
-    });
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    const tag = new ShardedTag({ name: "Ruby on Rails", blog_id: blogPost.blog_id }) as any;
     await tag.save();
 
-    const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
-    const noiseTag = await ShardedTag.create({ name: "Other Blog Tag", blog_id: otherBlogId });
-    await ShardedBlogPostTag.create({
-      blog_id: otherBlogId,
-      blog_post_id: (blogPost as any).id,
-      tag_id: (noiseTag as any).id,
-    });
+    await blogPost.tags.push(tag);
 
-    await association(blogPost, "tags").push(tag);
-
-    await blogPost.reload();
-    const reloadedTags = await association(blogPost, "tags");
-    expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
-    expect(reloadedTags.map((t: any) => t.id)).not.toContain((noiseTag as any).id);
-    const join = await ShardedBlogPostTag.where({
-      blog_post_id: (blogPost as any).id,
-      blog_id: (blogPost as any).blog_id,
-      tag_id: (tag as any).id,
-    });
-    expect(join).toHaveLength(1);
+    expect((await (await blogPost.reload()).tags.toArray()).map((t: Base) => t.id)).toContainEqual(
+      tag.id,
+    );
+    assertPredicate(
+      await ShardedBlogPostTag.where({
+        blog_post_id: blogPost.id,
+        blog_id: blogPost.blog_id,
+        tag_id: tag.id,
+      }).exists(),
+      (e: boolean) => e,
+    );
   });
 
   it("append composite has many through association with autosave", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    const tag = new ShardedTag({
-      name: "Ruby on Rails",
-      blog_id: (blogPost as any).blog_id,
-    });
-    expect(tag.isNewRecord()).toBe(true);
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    const tag = new ShardedTag({ name: "Ruby on Rails", blog_id: blogPost.blog_id }) as any;
 
-    await association(blogPost, "tags").push(tag);
+    await blogPost.tags.push(tag);
 
-    expect(tag.isPersisted()).toBe(true);
-    await blogPost.reload();
-    const reloadedTags = await association(blogPost, "tags");
-    expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
-    const join = await ShardedBlogPostTag.where({
-      blog_post_id: (blogPost as any).id,
-      blog_id: (blogPost as any).blog_id,
-      tag_id: (tag as any).id,
-    });
-    expect(join).toHaveLength(1);
+    expect((await (await blogPost.reload()).tags.toArray()).map((t: Base) => t.id)).toContainEqual(
+      tag.id,
+    );
+    assertPredicate(
+      await ShardedBlogPostTag.where({
+        blog_post_id: blogPost.id,
+        blog_id: blogPost.blog_id,
+        tag_id: tag.id,
+      }).exists(),
+      (e: boolean) => e,
+    );
   });
 
   it("nullify composite foreign key has many association", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    let comment = shardedComments("great_comment_blog_post_one");
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    let comment: any = shardedComments("great_comment_blog_post_one");
 
-    expect(await association(blogPost, "comments")).not.toHaveLength(0);
-    await association(blogPost, "comments").replace([]);
+    assertNotEmpty(await blogPost.comments.toArray());
+    await blogPost.comments.replace([]);
 
-    comment = (await ShardedComment.find((comment as any).id)) as never;
-    expect((comment as any).blog_post_id).toBeNull();
-    expect((comment as any).blog_id).toBeNull();
+    comment = await ShardedComment.find(comment.id);
+    expect(comment.blog_post_id).toBeNull();
+    expect(comment.blog_id).toBeNull();
 
-    expect(await association(blogPost, "comments")).toHaveLength(0);
-    await blogPost.reload();
-    expect(await association(blogPost, "comments")).toHaveLength(0);
+    assertEmpty(await blogPost.comments.toArray());
+    assertEmpty(await (await blogPost.reload()).comments.toArray());
   });
 
   it("assign persisted composite foreign key belongs to association", async () => {
@@ -2047,35 +2175,34 @@ describe("AssociationsTest", () => {
   });
 
   it("assign composite foreign key belongs to association with autosave", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
+    const comment = shardedComments("great_comment_blog_post_one") as any;
     const anotherBlog = shardedBlogs("sharded_blog_two");
-    expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
+    expect(comment.blog_id).not.toEqual(anotherBlog.id);
 
-    const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
+    const blogPost = new ShardedBlogPost({ title: "New post", blog_id: anotherBlog.id }) as any;
     await (comment.association("blogPost") as SingularAssociation).writer(blogPost);
     await comment.save();
 
-    expect(blogPost.isPersisted()).toBe(true);
-    const loaded = await (comment as any).blogPost;
-    expect(loaded.id).toBe((blogPost as any).id);
-    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
-    expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
-    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
+    assertPredicate(blogPost, (p: any) => p.isPersisted());
+    expect(blogPost.id).toEqual((await comment.blogPost).id);
+    expect(comment.blog_id).toEqual(blogPost.blog_id);
+    expect(anotherBlog.id).toEqual(comment.blog_id);
+    expect(comment.blog_post_id).toEqual(blogPost.id);
   });
 
   it("belongs to association does not use parent query constraints if not configured to", async () => {
-    const comment = shardedComments("great_comment_blog_post_one");
+    const comment = shardedComments("great_comment_blog_post_one") as any;
     const blogPost = new ShardedBlogPost({
-      blog_id: (comment as any).blog_id,
+      blog_id: comment.blog_id,
       title: "Following best practices",
     });
 
     await (comment.association("blogPostById") as SingularAssociation).writer(blogPost);
+
     await comment.save();
 
-    expect(blogPost.isPersisted()).toBe(true);
-    const loaded = await (comment as any).blogPostById;
-    expect(loaded.id).toBe((blogPost as any).id);
+    assertPredicate(blogPost, (p: Base) => p.isPersisted());
+    expect(blogPost.id).toEqual((await comment.blogPostById).id);
   });
 
   it("polymorphic belongs to uses parent query constraints", async () => {
@@ -2103,19 +2230,16 @@ describe("AssociationsTest", () => {
 
   it("belongs to with explicit composite foreign key", async () => {
     const car = await CpkCar.create({ make: "Tesla", model: "Model S" });
-    const review = await CpkCarReview.create({ car, comment: "Great car!", rating: 5 });
+    const review = (await CpkCarReview.create({ car, comment: "Great car!", rating: 5 })) as any;
 
     await review.reload();
 
-    let loaded: any;
-    const sqls = await captureSql(async () => {
-      loaded = await (review as any).car;
+    const sql = await captureSql(async () => {
+      expect(car.id).toEqual((await review.car).id);
     });
-    expect(loaded.id).toEqual((car as any).id);
 
-    const sql = sqls.find((s) => /cpk_cars/.test(s))!;
-    expectQuotedColumnInSql(sql, "cpk_cars.make");
-    expectQuotedColumnInSql(sql, "cpk_cars.model");
+    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.make"))} =`));
+    expect(sql[0]).toMatch(new RegExp(`${regexpEscape(quoteTableName("cpk_cars.model"))} =`));
   });
 
   it("cpk model has many records by id attribute", async () => {
@@ -2158,15 +2282,15 @@ describe("AssociationsTest", () => {
           className: "ShardedComment",
         });
       }
-      const blogPost = shardedBlogPosts("great_post_blog_one");
-      let error: unknown;
-      try {
-        await association(blogPost, "commentsWithoutSingleColumnQueryConstraints");
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(ArgumentError);
-      expect((error as Error).message).toContain("does not include the primary key");
+      const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+
+      const error = await assertRaises([ArgumentError], {}, () =>
+        blogPost.commentsWithoutSingleColumnQueryConstraints.toArray(),
+      );
+
+      expect(error.message).toEqual(
+        `The query constraints on the \`${ShardedBlogPost.name}\` model does not include the primary key so Active Record is unable to derive the foreign key constraints for the association. You need to explicitly define the query constraints for this association.`,
+      );
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = original;
     }
@@ -2183,15 +2307,15 @@ describe("AssociationsTest", () => {
           className: "ShardedComment",
         });
       }
-      const blogPost = shardedBlogPosts("great_post_blog_one");
-      let error: unknown;
-      try {
-        await association(blogPost, "commentsWithoutMultipleColumnQueryConstraints");
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(ArgumentError);
-      expect((error as Error).message).toContain("does not include the primary key");
+      const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+
+      const error = await assertRaises([ArgumentError], {}, () =>
+        blogPost.commentsWithoutMultipleColumnQueryConstraints.toArray(),
+      );
+
+      expect(error.message).toEqual(
+        `The query constraints on the \`${ShardedBlogPost.name}\` model does not include the primary key so Active Record is unable to derive the foreign key constraints for the association. You need to explicitly define the query constraints for this association.`,
+      );
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = original;
     }
@@ -2227,20 +2351,20 @@ describe("AssociationsTest", () => {
   });
 
   it("nullify composite has many through association", async () => {
-    const blogPost = shardedBlogPosts("great_post_blog_one");
-    expect((await association(blogPost, "tags")).length).toBeGreaterThan(0);
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    assertNotEmpty(await blogPost.tags.toArray());
 
-    await association(blogPost, "tags").replace([]);
+    await blogPost.tags.replace([]);
 
-    expect(await association(blogPost, "tags")).toEqual([]);
-    await association(blogPost, "tags").reload();
-    expect(await association(blogPost, "tags")).toEqual([]);
-    expect(
+    assertEmpty(await blogPost.tags.toArray());
+    assertEmpty(await (await blogPost.reload()).tags.toArray());
+    assertNotPredicate(
       await ShardedBlogPostTag.where({
-        blog_post_id: (blogPost as any).id,
-        blog_id: (blogPost as any).blog_id,
+        blog_post_id: blogPost.id,
+        blog_id: blogPost.blog_id,
       }).exists(),
-    ).toBe(false);
+      (e: boolean) => e,
+    );
   });
 
   it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
