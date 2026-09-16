@@ -9,7 +9,8 @@
  * argument lists at one call would collapse into a single row. See
  * call-mismatch-baseline.ts#RowKind.
  *
- * Only `shape` rows are gated (RFC 0095 §4); `naming` rows stay report-only.
+ * Only `shape` rows are baselined (RFC 0095 §4); `naming` rows are gated by
+ * enrollment and receipt instead (RFC 0153, lint-call-args.ts).
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
@@ -46,6 +47,8 @@ export interface CallArgArtifact {
     tsName: string;
     class: string;
     tsArgs: string[];
+    /** A `naming` row's `@missingRailsName` receipts (RFC 0153). */
+    receipts?: string[];
   })[];
   /** `@missingRailsArgs` tags (RFC 0099) on a COMPARED pair that suppressed no
    *  mismatch. Absent on an artifact predating the field. */
@@ -54,6 +57,9 @@ export interface CallArgArtifact {
    *  (RFC 0099) — grouped by permanence claim in the report. Absent on an
    *  artifact predating the field. */
   suppressed?: TagReceipt[];
+  /** `@missingRailsName` tags (RFC 0153) on a COMPARED pair that matched no
+   *  naming row. Absent on an artifact predating the field. */
+  staleNameTags?: { package: string; tsFile: string; tsName: string; call: string }[];
 }
 
 /** The rows the gate ratchets: `shape` only. */

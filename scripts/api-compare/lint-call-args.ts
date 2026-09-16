@@ -20,8 +20,11 @@
  * Per RFC 0095 §4 the gate ratchets `shape` rows only — argument count, order,
  * literal values, kwarg keys. `naming` rows (differing only in how a `ref:`
  * identifier is spelled) are the local/parameter-identifier dimension surfacing
- * through the argument comparison rather than an argument defect; they stay
- * report-only, reachable through `--report`, until RFC 0096 drains them.
+ * through the argument comparison rather than an argument defect, and are never
+ * baselined. They are gated per package instead (RFC 0153): in a package listed
+ * in {@link NAMING_ENROLLED_PACKAGES}, every differing identifier is renamed
+ * away or carries an `@missingRailsName` receipt, and a receipt is legal only
+ * on a pair `classifyPair` files as permanent. Elsewhere they are report-only.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
@@ -44,6 +47,8 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
+import { TAG as NAME_TAG } from "./missing-rails-name-tags.js";
+import { NAMING_CLASSES, classifyPair, refName } from "./naming-taxonomy.js";
 import {
   type CallArgArtifact,
   type CallArgExcludeEntry,
@@ -77,9 +82,94 @@ import {
   relPathFor,
   writeSplitBaseline,
 } from "./lint-call-mismatches.js";
-import { parseTop, renderReport } from "./report-call-args.js";
+import {
+  type TsApi,
+  parseTop,
+  renderReport,
+  thisTypedFunctionsByPackage,
+} from "./report-call-args.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
+const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
+
+/**
+ * The packages whose `naming` rows are gated (RFC 0153 §2). Only-grow, like
+ * `GATED_PACKAGES` in extra-surface-mark.ts: a package joins in the PR that
+ * renamed its convergeable rows away and receipted its permanent ones, and is
+ * never removed to turn a red run green.
+ */
+export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
+  "activerecord-test-support",
+  "globalid",
+  "i18n",
+];
+
+export interface NamingFinding {
+  package: string;
+  tsFile: string;
+  tsName: string;
+  call: string;
+  /** The Ruby identifier at issue; absent for a row with no differing `ref:` pair. */
+  identifier?: string;
+  problem: "unreceipted" | "receipt-on-convergeable" | "stale-receipt";
+}
+
+/**
+ * Every naming-gate failure in the enrolled packages. The receipt check
+ * classifies with the package's `thisTypedFunctions` — the mixin-aware arm — so
+ * a `module-mixin-call` receipt is never rejected as `burndown`.
+ */
+export function namingFindings(
+  artifact: CallArgArtifact,
+  thisTyped: ReadonlyMap<string, ReadonlySet<string>>,
+  enrolled: readonly string[] = NAMING_ENROLLED_PACKAGES,
+): NamingFinding[] {
+  const permanent = new Set(NAMING_CLASSES.filter((c) => c.permanent).map((c) => c.name));
+  const out: NamingFinding[] = [];
+  for (const m of artifact.mismatches) {
+    if (m.class !== "naming" || !enrolled.includes(m.package)) continue;
+    const at = { package: m.package, tsFile: m.tsFile, tsName: m.tsName, call: m.call };
+    let pairs = 0;
+    for (let i = 0; i < Math.max(m.rubyArgs.length, m.tsArgs.length); i++) {
+      const r = refName(m.rubyArgs[i] ?? "");
+      const t = refName(m.tsArgs[i] ?? "");
+      if (r === undefined || t === undefined || r === t) continue;
+      pairs++;
+      if (!m.receipts?.includes(r)) {
+        out.push({ ...at, identifier: r, problem: "unreceipted" });
+      } else if (!permanent.has(classifyPair(r, t, thisTyped.get(m.package)))) {
+        out.push({ ...at, identifier: r, problem: "receipt-on-convergeable" });
+      }
+    }
+    if (pairs === 0) out.push({ ...at, problem: "unreceipted" });
+  }
+  for (const t of artifact.staleNameTags ?? []) {
+    if (!enrolled.includes(t.package)) continue;
+    out.push({
+      package: t.package,
+      tsFile: t.tsFile,
+      tsName: t.tsName,
+      call: t.call,
+      identifier: t.call,
+      problem: "stale-receipt",
+    });
+  }
+  return out;
+}
+
+export function renderNamingFindings(findings: NamingFinding[]): string {
+  return [
+    `\ncall-args naming gate: ${findings.length} failure(s) in NAMING_ENROLLED_PACKAGES.`,
+    "Rename the TS identifier to the Rails one (camelCased). A pair no rename can close takes " +
+      `\`${NAME_TAG} <ruby_identifier> — PERMANENT\` on the enclosing declaration; a receipt on ` +
+      "a convergeable pair is rejected, and a receipt matching no row must be deleted.\n",
+    ...findings.map(
+      (f) =>
+        `  ${f.problem}  ${f.package}  ${f.tsFile}  ${f.tsName}  ${f.call}` +
+        (f.identifier !== undefined ? `  (${f.identifier})` : ""),
+    ),
+  ].join("\n");
+}
 
 export const DEFAULT_REASON = "TODO: unreviewed — replace with a one-line justification";
 
@@ -117,7 +207,7 @@ export function renderKey(k: CallArgKey): string {
 export async function main(write: boolean): Promise<number> {
   const artifact = await loadArtifact();
   const current: CallArgKey[] = gatedRows(artifact);
-  const naming = artifact.mismatches.length - current.length;
+  const namingRows = artifact.mismatches.length - current.length;
 
   // Determinism guard (RFC 0044): an artifact covering fewer packages than CI
   // must neither seed nor pass a gate. Shared with the call-set ratchet.
@@ -140,7 +230,7 @@ export async function main(write: boolean): Promise<number> {
     await writeSplitBaseline([...next, ...(await loadCallSetRows())], BASELINE_DIR);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call-argument ` +
-        `mismatch(es) (shape only; ${naming} naming row(s) are report-only)`,
+        `mismatch(es) (shape only; ${namingRows} naming row(s) are never baselined)`,
     );
     return 0;
   }
@@ -163,8 +253,14 @@ export async function main(write: boolean): Promise<number> {
   const { added, stale } = diffAgainstBaseline(current, baseline);
   const staleTags = artifact.staleTags ?? [];
   if (staleTags.length > 0) console.error(renderStaleTags(staleTags));
-  if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
-    console.log(`call-args ratchet: OK (${baseline.length} baselined shape row(s))`);
+  const api = await readJson<TsApi>(TS_API_PATH);
+  const naming = namingFindings(artifact, thisTypedFunctionsByPackage(api));
+  if (naming.length > 0) console.error(renderNamingFindings(naming));
+  if (added.length === 0 && stale.length === 0 && staleTags.length === 0 && naming.length === 0) {
+    console.log(
+      `call-args ratchet: OK (${baseline.length} baselined shape row(s); naming gated in ` +
+        `${NAMING_ENROLLED_PACKAGES.join(", ")})`,
+    );
     return 0;
   }
 

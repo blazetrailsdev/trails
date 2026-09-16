@@ -218,8 +218,13 @@ Two things are specific to it:
 - **It gates `shape` rows only** — argument count, order, literal values, kwarg
   keys. `naming` rows, where the two lists differ only in how a `ref:`
   identifier is spelled, are the local/parameter-identifier dimension surfacing
-  through the argument comparison; they are report-only, and
-  `pnpm parity:api:calls:args:report` is the only place they are visible.
+  through the argument comparison. They are never baselined. In a package
+  listed in `NAMING_ENROLLED_PACKAGES` (only-grow, RFC 0153) the same gate
+  requires each one to be renamed away or, when the naming taxonomy files it
+  permanent, receipted with
+  `@missingRailsName <ruby_identifier> — PERMANENT|CONVERGEABLE <story-id>` on
+  the enclosing declaration; a receipt on a convergeable pair, or one matching
+  no row, is red. Elsewhere `pnpm parity:api:calls:args:report` reports them.
 - **A reordering is `shape`, not `naming`.** The same identifiers in a different
   order is an argument-ORDER defect (`inject_join(list, collector, join_str)`
   ported as `injectJoin(nodes, connector, collector)`), and it is gated.

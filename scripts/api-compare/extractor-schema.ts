@@ -85,6 +85,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "noRailsEquivalentInherited",
   "missingRailsCalls",
   "missingRailsArgs",
+  "missingRailsNames",
   "missingRailsCallReasons",
   "missingRailsArgsReasons",
   "recv",

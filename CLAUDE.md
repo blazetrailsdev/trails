@@ -408,9 +408,14 @@ write.
    Same only-shrink contract, same no-reseed rule, over the SAME
    `call-mismatches-exclude/` shards — its rows carry `kind: "args"` and the
    argument list in the key, and each gate reads only its own kind. It gates
-   `shape` rows — count, order, literal values, kwarg keys; `naming` rows (a
-   `ref:` identifier spelled differently) are report-only via
-   `pnpm parity:api:calls:args:report`. New row? Pass what Rails passes;
+   `shape` rows — count, order, literal values, kwarg keys. `naming` rows (a
+   `ref:` identifier spelled differently) are never baselined: in a package
+   listed in `NAMING_ENROLLED_PACKAGES` (`lint-call-args.ts`, only-grow, RFC 0153) every one is renamed to the Rails identifier or, when `classifyRow`
+   files it permanent, receipted with
+   `@missingRailsName <ruby_identifier> — PERMANENT|CONVERGEABLE <story-id>` on
+   the enclosing declaration. A receipt on a convergeable pair, or one matching
+   no row, reds the same gate. Elsewhere they are report-only via
+   `pnpm parity:api:calls:args:report`. New `shape` row? Pass what Rails passes;
    baselining is the fallback and costs a one-line `reason` on the baseline row.
    A single argument-shape deviation can instead carry a
    `@missingRailsArgs <ruby_call> — PERMANENT|CONVERGEABLE <story-id>` JSDoc tag

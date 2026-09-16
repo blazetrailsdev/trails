@@ -123,7 +123,10 @@ export class UnscopedLocator extends BaseLocator {
     return this.unscoped(modelClass, () => super.findRecords(modelClass, ids, options));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName modelClass — PERMANENT
+   */
   protected unscoped<R>(
     modelClass: LocatorModel | undefined,
     block: () => R | Promise<R>,
@@ -206,6 +209,7 @@ export class Locator {
     return Locator.locate(parsed.uri.toString(), options);
   }
 
+  /** @missingRailsName compact — PERMANENT */
   static async locateManySigned(
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,

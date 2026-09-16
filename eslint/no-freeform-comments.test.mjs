@@ -28,6 +28,7 @@ tester.run("no-freeform-comments", rule, {
     },
     { code: `/** @missingRailsCall PERMANENT */\nconst x = 1;\n` },
     { code: `/** @missingRailsArgs CONVERGEABLE */\nconst x = 1;\n` },
+    { code: `/** @missingRailsName throw — PERMANENT */\nconst x = 1;\n` },
     { code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n` },
     // Tool directives change behaviour when deleted.
     { code: `// eslint-disable-next-line no-unused-vars\nconst x = 1;\n` },
