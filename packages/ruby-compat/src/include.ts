@@ -106,7 +106,7 @@ export class Module {
   aliasMethod(newName: string, oldName: string): string {
     const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
     if (!descriptor) {
-      throw new NameError(`undefined method '${oldName}' for module '${String(this)}'`);
+      throw new NameError(`undefined method '${oldName}' for module '${String(this)}'`, oldName);
     }
     Object.defineProperty(carrierOf(this), newName, descriptor);
     relinkIncluders(this);
@@ -123,7 +123,7 @@ export class Module {
     const carrier = carrierOf(this);
     for (const name of names) {
       if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
-        throw new NameError(`method '${name}' not defined in ${String(this)}`);
+        throw new NameError(`method '${name}' not defined in ${String(this)}`, name);
       }
       delete carrier[name];
     }
