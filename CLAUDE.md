@@ -990,58 +990,228 @@ repo-wide here. `basicObjRespondTo` (`packages/ruby-compat/src/object.ts`) cites
 **this section**; a call site that passes `pub` is not re-deriving the decision,
 and there is no story to make `in` visibility-aware.
 
-## Records are not Proxies (instance `method_missing`)
+## Schema reflection peeks at a warm cache (`load_schema!`'s `schema_cache.columns_hash`)
+
+Rails' `ModelSchema#load_schema!`
+(`activerecord/lib/active_record/model_schema.rb:587-597`) reads
+`schema_cache.columns_hash(table_name)` at `:592` synchronously, and a cold
+cache is no special case: the schema cache runs the reflection query in line,
+because in Ruby every query is synchronous. So every caller that needs
+`columns_hash`, `primary_key` or `table_exists?` can reach the database from a
+plain method body.
+
+In trails a cold cache needs a query, and a query is `await`ed. A warm cache
+needs nothing. So the divergence is confined to the cold path, and the settled
+shape splits it the same way:
+
+- **Warming is an explicit async step.** `SchemaCache#columnsHash`,
+  `#primaryKeys` and `#dataSourceExists` are the async ports, and
+  `loadSchemaFromAdapter` (`model-schema.ts`) warms all three inside a
+  `withConnection` scope and then enters the single `loadSchemaBang` body.
+  `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` and
+  `SchemaReflection.eagerLoadSchemaCache` warm a whole pool up front.
+- **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
+  `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
+  `SchemaReflection#loadedCache` read or seed the memo maps and never query.
+  The warm precondition is that one of the async steps above has already run
+  for that table on that pool.
+- **A cold peek answers `undefined`, never a query.** Each sync reader treats
+  it as "not reflected yet": `loadSchemaFromCacheSync` (`model-schema.ts`)
+  returns `false` and leaves the model unloaded, `cachedTableExists` returns
+  `undefined` (unknown), and `getPrimaryKey`
+  (`attribute-methods/primary-key.ts`) falls through to the `"id"` convention —
+  the same answer its `table_exists?` arm gives an absent table. The one exception is `warmColumnsHashSync`, which
+  seeds the cache when the adapter's `columns` itself answers synchronously (a
+  fake test adapter); a real adapter's promise is dropped with its rejection
+  handled, and the cold answer stands.
+
+The alternatives each lose more than they buy:
+
+- **Making every reader async** propagates through `columns_hash`,
+  `attribute_types`, `type_for_attribute`, Arel type-casting and
+  `Relation#to_sql`, which are synchronous Rails-facing API — the same cascade
+  § "Serialization's dual sync/async hash" rejects for `as_json`.
+- **Blocking on the query** is not available: JS has no synchronous await.
+- **Answering a cold column read with an empty column set** makes a cold model
+  silently attribute-less where Rails would have reflected it; `undefined`
+  keeps it unloaded so the async warm can still load it.
+
+**Scope boundary.** This ratifies the schema-cache PEEK only. It does **not**
+bless the synchronous _lease_ a peek may sit behind — `leaseConnectionSync`
+(`reflectionAdapter`, `model-schema.ts:27-30`), `acquireConnectionSync`
+(`abstract/connection-pool.ts`), or the promise arm in
+`abstract/connection-pool/queue.ts`'s internal poll. Those stay CONVERGEABLE and are owned by their own RFC: a
+synchronous lease is permanent, and it trips the
+`permanent_connection_checkout = :disallowed` flag #7781 armed, which is exactly
+why `loadSchemaFromAdapter` wraps its warm in `withConnection` (see its JSDoc).
+Nothing here is a receipt for a new sync lease.
+
+This is a genuine language shortcoming, ratified repo-wide here. The sync
+schema-cache readers carry `@noRailsEquivalent PERMANENT` receipts against this
+section, and a cold-cache `undefined` at a sync reader is the designed answer,
+not a bug to re-derive per call site.
+
+## The adapter lock defaults to a monitor, not `NullLock`
+
+Rails' `AbstractAdapter#initialize` ends with `self.lock_thread = nil`
+(`activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:157`),
+and `lock_thread=` (`:181-191`) maps `nil` to
+`ActiveSupport::Concurrency::NullLock`. Only a pinned connection gets a real
+monitor (`connection_pool.rb:335`). That is safe in Ruby because the pool leases
+a connection per execution context
+(`@leases[ActiveSupport::IsolatedExecutionState.context]`,
+`connection_pool.rb:710-712`), and a thread runs one statement at a time: the
+concurrency unit and the serialization unit are the same object.
+
+In JS they are not. trails' lease registry is keyed the same way
+(`connectionLease`, `abstract/connection-pool.ts`, over `IsolatedExecutionState.context()`),
+faithfully — but one async context can hold many in-flight promises, so
+`Promise.all([Post.count(), Post.first()])` hands one adapter to two concurrent
+statements. Nothing in the lease model serializes them.
+
+The alternatives were tried:
+
+- **Porting `self.lock_thread = nil` verbatim** reds all three tests named in
+  `abstract-adapter-null-lock-breaks-concurrent-async-statements`.
+- **Leaning on SQLite's `_statementLock`** (`acquireStatementLock`,
+  `sqlite3/database-statements.ts`) does not cover it: that lock wraps only
+  `performQuery`, not `withRawConnection`'s `connectBang` (three concurrent
+  opens) nor `executeMutation`'s post-`rawExecute` `_lastInsertRowid` read, and
+  it exists on one adapter only.
+- **Leasing per promise** has no Ruby counterpart and no JS hook to key on.
+
+So trails' `lock` field initializer is `new LoadInterlockAwareMonitor()`
+(`abstract-adapter.ts`), where Rails' constructor leaves `NullLock`, and
+`setLockThread` itself stays a faithful port of `lock_thread=` — a caller that
+passes `null` still gets `NullLock`. The constructor simply does not make that
+call.
+
+This is a genuine language shortcoming, ratified repo-wide here. Stories that
+serialize adapter access (retiring SQLite's statement lock onto
+`withRawConnection`, the server-version barrier, `FutureResult`'s mutex) build
+on the monitor default; none of them is a story to restore `NullLock`.
+
+## Records are not Proxies (`method_missing`)
 
 Ruby reaches `NoMethodError` for an undefined name through
 `BasicObject#method_missing`, and ActiveRecord regenerates undefined attribute
-methods from the same hook. So `topic.mumbo` raises
-(`activerecord/test/cases/attribute_methods_test.rb:641-645`), and a read off an
-existing record after `undefine_attribute_methods` redefines the reader
+methods from the same hook. So `topic.mumbo` and `topic.mumbo = 5` raise at run
+time (`activerecord/test/cases/attribute_methods_test.rb:641-645`), and a read
+off an existing record after `undefine_attribute_methods` redefines the reader
 (`attribute_methods_test.rb:1098`).
 
-The only JS read/write hook on an arbitrary name is a `Proxy` trap, so matching
-that would mean constructing every record as a `Proxy`. **Records are not
-Proxies.** A proxied record is not the object the class constructor built, so
-every identity-keyed seat (`errors.base`, `association.owner`, WeakMap-keyed
-state) would need to point at the proxy instead. It also defeats property-read
-inlining on every attribute access: #7208 measured a get trap at 3.7× on an
-attribute read and 64× on an internal field read, and a set trap at 1.5× on a
-write.
+trails enforces both halves at **compile** time instead: #7222 removed
+`[key: string]: unknown` from `ActiveModel::Model`, so `topic.mumbo` does not
+type-check. An `as any` cast or a plain-JS caller still evades it, and there it
+reads `undefined` / creates an own property.
 
-As a consequence:
+The only JS read/write hook on an arbitrary name is a `Proxy` trap, and the
+converged shape would be a Proxy returned from the constructor standing in for
+`self`. Identity must be the object callers hold, or `errors.base`,
+`association.owner`, WeakMap-keyed state and `has_secure_password`'s ivars land
+on a second object. **The blocker is cost**, measured best-of-5 over 200k
+iterations on #7208, on every ActiveModel instance:
 
-- An undefined name on a record reads `undefined` and a write silently creates an
-  own property. `NoMethodError` for those is not ported.
+| trap | operation              | slowdown |
+| ---- | ---------------------- | -------- |
+| get  | attribute read         | 3.7×     |
+| get  | internal `_field` read | 64×      |
+| set  | attribute write        | 1.5×     |
+| set  | construction           | 1.7×     |
+
+A proxied object defeats the property-read inlining those reads get, and the
+internal-field number lands on every framework read, not only user code.
+**Records are not Proxies.** As a consequence:
+
+- An undefined name on a record is a type error, not a `NoMethodError`, and
+  untyped access reads `undefined` or silently creates an own property.
 - A generated reader removed by `undefineAttributeMethods` is not regenerated by
-  reading it off an existing record. It comes back through `defineAttributeMethods`
+  reading it off an existing record. It comes back through
+  `defineAttributeMethods`
   (`activerecord/lib/active_record/attribute_methods.rb:104`), or through
   construction.
 
+**The Migration half.** Rails' `Migration#method_missing`
+(`activerecord/lib/active_record/migration.rb:1044-1059`) forwards every DSL
+statement (`create_table`, `add_column`, …) to the connection. trails has no
+such dispatch, so `migration.ts` declares typed forwarders, each a
+`this.methodMissing(name, ...args)` call (`createTable` at `:352` onward). They
+**stay**. A Proxy would not buy back extra surface either: typing the proxied
+statements needs a declaration-merged `interface Migration` in the same file,
+whose members `parity:api:extra` counts exactly as it counts the class members,
+so `moved` / `total` do not drop. The criterion is unreachable in TS either way.
+
 This is a genuine language shortcoming, ratified repo-wide here. Tests mirroring
-those Rails arms port the assertions that do not depend on the hook (e.g. the
-first four of `#undefine_attribute_methods undefines alias attribute methods`),
-and there is no story to proxy records. It does not rule out a `Proxy` on a non-record object
-whose Rails counterpart dispatches through `method_missing` (e.g. `Migration`);
-that is decided per class.
+the Rails `NoMethodError` arms port the assertions that do not depend on the
+hook (e.g. the first four of
+`#undefine_attribute_methods undefines alias attribute methods`), and there is
+no story to proxy records or to replace the Migration forwarders. It does not
+rule out a `Proxy` on some other non-record object whose Rails counterpart
+dispatches through `method_missing`; that is decided per class.
+
+## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
+
+§ "Module mixins" says only `inherited` has no JS equivalent and its semantics
+"have to be deferred some other way". For `ModelSchema` this is that way.
+Rails' `ModelSchema.inherited`
+(`activerecord/lib/active_record/model_schema.rb:574-580`) runs at
+class-definition time and gives the child a fresh load-schema monitor, calls
+`reload_schema_from_cache(false)` — a non-recursive reset of the child's
+schema memos — and clears `@ignored_columns`. So a subclass never observes its
+parent's `@columns_hash`, `@schema_loaded` or attribute builder.
+
+JS has no hook that fires when `class Child extends Parent` is evaluated, and a
+static field read on the child walks the prototype chain to the parent's memo.
+**The settled deferral is the own-property guard**: `ownSchemaMemo`
+(`model-schema.ts`) answers a memo only when it is an own property of the class
+being asked (`Object.prototype.hasOwnProperty.call(host, key)`), so an inherited
+memo reads as unset — the observable state `inherited`'s reset leaves behind —
+without anything running at definition time. `_schemaLoaded`, `_columnsHash`,
+`_columns`, `_attributesBuilder` and `_yamlEncoder` are all read through it.
+
+The alternatives lose:
+
+- **A lazy reset at the child's first schema read** would clobber memos written
+  to the child _before_ that read — `applyColumnsHash`, attribute declarations —
+  which Rails' definition-time reset runs ahead of by construction.
+- **A decorator or explicit registration step** on every model (`@model class
+Post`, `Post.register()`) would fire at the right moment, but it is invented
+  surface imposed at a Rails-facing API on every trails user.
+
+This is a genuine language shortcoming, ratified repo-wide here. An own-property
+memo guard in `model-schema.ts` is the port of `inherited`, not a deviation to
+retire, and there is no story to port `inherited` as a hook.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
-Rails loads application code through Zeitwerk (`railties/lib/rails/autoloaders.rb`):
-a pair of loaders that map file paths to constant names and resolve a constant
-through `Module#autoload` when it is first referenced. `Rails.autoloaders.main.ignore`,
+`Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of
+`Zeitwerk::Loader` instances, `main` and `once`. Zeitwerk's entire mechanism is
+Ruby constant resolution at reference time: it maps file paths to constant names
+and registers `Module#autoload` so the file loads when the constant is first
+named. `Rails.autoloaders.main.ignore` (`application/configuration.rb:479-480`),
 `Zeitwerk::Loader.eager_load_all`, `Rails.eager_load!`, and
 `reloader.after_class_unload { … eager_load }` all hang off that graph
 (`application/configuration.rb:471-493`, `application/finisher.rb:76-87`).
 
-ESM resolves nothing from a constant name and has no hook for an unresolved
-identifier, and zeitwerk is not vendored. **Trails has no autoloader.** Application
-constants come from explicit imports and trails' eager directory scans
-(`loadControllers` in `trailties/src/application/finisher.ts`). As a consequence:
+ESM resolves nothing from a constant name and offers no hook for an unresolved
+identifier, so there is no loader graph for a `Trails.autoloaders` to hold. And
+**Zeitwerk is not vendored under `vendor/`**, so a port would be invented surface
+with no Ruby source to mirror — there is nothing to be faithful to.
+
+**Trails has no autoloader.** Application constants come from explicit imports
+and trails' eager directory scan: `loadControllers` in
+`trailties/src/application/finisher.ts`, which walks every existent
+`app/controllers` directory, dynamically `import()`s each `*_controller` /
+`*-controller` `.ts`/`.js` file, and registers each exported `…Controller`
+function under its underscored, namespace-prefixed name. That scan is the port.
+As a consequence:
 
 - The finisher's `eager_load!` initializer runs only its portable arms. The three
   Zeitwerk calls carry `@missingRailsCall … — PERMANENT`.
-- `Configuration#autoloadLib` pushes its paths and has no `ignore` receiver.
-- There is no `Trails.autoloaders`, `autoloadLibOnce`, or class-unload re-eager-load.
+- `Configuration#autoloadLib` pushes its paths and has no loader to hand
+  `ignore` to.
+- There is no `Trails.autoloaders`, `autoloadLibOnce`, class-unload
+  re-eager-load, or `autoload_lib` line emitted by `trails new`.
 
 This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
 about the application loader only: framework-internal call-time constant
