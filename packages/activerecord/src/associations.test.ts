@@ -229,7 +229,8 @@ describe("AssociationProxyTest", () => {
     const technology = categories("technology") as any;
     await david.categories.push(technology);
     assertNotPredicate(david.categories, (p: any) => p.loaded);
-    expect(await david.categories.toArray()).toContainEqual(technology);
+    const davidCategories = await david.categories.toArray();
+    expect(davidCategories).toContain(davidCategories.find((c: Base) => c.equals(technology)));
   });
   it("push followed by save does not load target", async () => {
     const david = authors("david") as any;
@@ -1236,8 +1237,9 @@ describe("PreloaderTest", () => {
     await new Preloader({ records: blogPosts, associations: ["comments"] }).call();
 
     assertPredicate(blogPost.association("comments"), (a: any) => a.isLoaded());
-    expect((await blogPost.comments.toArray()).map((c: Base) => c.id)).toContainEqual(
-      shardedComments("great_comment_blog_post_one").id,
+    const blogPostComments = await blogPost.comments.toArray();
+    expect(blogPostComments).toContain(
+      blogPostComments.find((c: Base) => c.equals(shardedComments("great_comment_blog_post_one"))),
     );
   });
 
@@ -2083,9 +2085,8 @@ describe("AssociationsTest", () => {
 
     await blogPost.tags.push(tag);
 
-    expect((await (await blogPost.reload()).tags.toArray()).map((t: Base) => t.id)).toContainEqual(
-      tag.id,
-    );
+    const tags = await (await blogPost.reload()).tags.toArray();
+    expect(tags).toContain(tags.find((t: Base) => t.equals(tag)));
     assertPredicate(
       await ShardedBlogPostTag.where({
         blog_post_id: blogPost.id,
@@ -2102,9 +2103,8 @@ describe("AssociationsTest", () => {
 
     await blogPost.tags.push(tag);
 
-    expect((await (await blogPost.reload()).tags.toArray()).map((t: Base) => t.id)).toContainEqual(
-      tag.id,
-    );
+    const tags = await (await blogPost.reload()).tags.toArray();
+    expect(tags).toContain(tags.find((t: Base) => t.equals(tag)));
     assertPredicate(
       await ShardedBlogPostTag.where({
         blog_post_id: blogPost.id,
