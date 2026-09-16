@@ -29,7 +29,7 @@ function advance(
   dateOrTime: DateOrTime | Temporal.Instant | RubyTime,
   options: { years?: number; months?: number; weeks?: number; days?: number },
 ): DateOrInstant {
-  // boundary: `Time#advance` is this module's receiver-side dispatch once Time includes it
+  // boundary: once Time includes this module (time/calculations.rb:12) `advance` is Time's own (core_ext/time/calculations.rb:194), so a RubyTime receiver answers it itself and returns a RubyTime, the way Ruby's method resolution does.
   if (dateOrTime instanceof RubyTime) {
     return (dateOrTime as unknown as { advance(options: unknown): DateOrInstant }).advance(options);
   }
@@ -48,7 +48,7 @@ function toDate(dateOrTime: DateOrTime | RubyTime): Temporal.PlainDate {
     : dateOrTime;
 }
 
-function wday(dateOrTime: DateOrTime | Temporal.Instant): number {
+function wday(dateOrTime: DateOrTime | Temporal.Instant | RubyTime): number {
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return dateOrTime.getDay();
@@ -91,7 +91,8 @@ function change(
     : date.change(dateOrTime, options);
 }
 
-function receiver(dateOrTime: DateOrTime | Temporal.Instant): DateOrTime {
+function receiver(dateOrTime: DateOrTime | Temporal.Instant | RubyTime): DateOrTime {
+  if (dateOrTime instanceof RubyTime) return receiver(dateOrTime.toTime().toInstant());
   // boundary: the `Time` arm's receiver is a JS `Date`, which is what this rebuilds.
   return dateOrTime instanceof Temporal.Instant
     ? new Date(dateOrTime.epochMilliseconds)
@@ -159,14 +160,16 @@ function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
 export function yesterday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function yesterday(dateOrTime: Date): Temporal.Instant;
 export function yesterday(dateOrTime: RubyDate): RubyDate;
-export function yesterday(dateOrTime: DateOrTime): DateOrInstant {
+export function yesterday(dateOrTime: RubyTime): RubyTime;
+export function yesterday(dateOrTime: DateOrTime | RubyTime): DateOrInstant | RubyTime {
   return advance(dateOrTime, { days: -1 });
 }
 
 export function tomorrow(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function tomorrow(dateOrTime: Date): Temporal.Instant;
 export function tomorrow(dateOrTime: RubyDate): RubyDate;
-export function tomorrow(dateOrTime: DateOrTime): DateOrInstant {
+export function tomorrow(dateOrTime: RubyTime): RubyTime;
+export function tomorrow(dateOrTime: DateOrTime | RubyTime): DateOrInstant | RubyTime {
   return advance(dateOrTime, { days: 1 });
 }
 
@@ -212,50 +215,79 @@ export function isAfter(self: DateOrTime, dateOrTime: Comparable): boolean {
 
 export function daysAgo(dateOrTime: Temporal.PlainDate, days: number): Temporal.PlainDate;
 export function daysAgo(dateOrTime: Date, days: number): Temporal.Instant;
-export function daysAgo(dateOrTime: DateOrTime, days: number): DateOrInstant {
+export function daysAgo(dateOrTime: RubyTime, days: number): RubyTime;
+export function daysAgo(dateOrTime: DateOrTime | RubyTime, days: number): DateOrInstant | RubyTime {
   return advance(dateOrTime, { days: -days });
 }
 
 export function daysSince(dateOrTime: Temporal.PlainDate, days: number): Temporal.PlainDate;
 export function daysSince(dateOrTime: Date, days: number): Temporal.Instant;
 export function daysSince(dateOrTime: DateOrInstant, days: number): DateOrInstant;
-export function daysSince(dateOrTime: DateOrTime | Temporal.Instant, days: number): DateOrInstant {
+export function daysSince(dateOrTime: RubyTime, days: number): RubyTime;
+export function daysSince(
+  dateOrTime: DateOrTime | Temporal.Instant | RubyTime,
+  days: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { days: days });
 }
 
 export function weeksAgo(dateOrTime: Temporal.PlainDate, weeks: number): Temporal.PlainDate;
 export function weeksAgo(dateOrTime: Date, weeks: number): Temporal.Instant;
-export function weeksAgo(dateOrTime: DateOrTime, weeks: number): DateOrInstant {
+export function weeksAgo(dateOrTime: RubyTime, weeks: number): RubyTime;
+export function weeksAgo(
+  dateOrTime: DateOrTime | RubyTime,
+  weeks: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { weeks: -weeks });
 }
 
 export function weeksSince(dateOrTime: Temporal.PlainDate, weeks: number): Temporal.PlainDate;
 export function weeksSince(dateOrTime: Date, weeks: number): Temporal.Instant;
-export function weeksSince(dateOrTime: DateOrTime, weeks: number): DateOrInstant {
+export function weeksSince(dateOrTime: RubyTime, weeks: number): RubyTime;
+export function weeksSince(
+  dateOrTime: DateOrTime | RubyTime,
+  weeks: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { weeks: weeks });
 }
 
 export function monthsAgo(dateOrTime: Temporal.PlainDate, months: number): Temporal.PlainDate;
 export function monthsAgo(dateOrTime: Date, months: number): Temporal.Instant;
-export function monthsAgo(dateOrTime: DateOrTime, months: number): DateOrInstant {
+export function monthsAgo(dateOrTime: RubyTime, months: number): RubyTime;
+export function monthsAgo(
+  dateOrTime: DateOrTime | RubyTime,
+  months: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { months: -months });
 }
 
 export function monthsSince(dateOrTime: Temporal.PlainDate, months: number): Temporal.PlainDate;
 export function monthsSince(dateOrTime: Date, months: number): Temporal.Instant;
-export function monthsSince(dateOrTime: DateOrTime, months: number): DateOrInstant {
+export function monthsSince(dateOrTime: RubyTime, months: number): RubyTime;
+export function monthsSince(
+  dateOrTime: DateOrTime | RubyTime,
+  months: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { months: months });
 }
 
 export function yearsAgo(dateOrTime: Temporal.PlainDate, years: number): Temporal.PlainDate;
 export function yearsAgo(dateOrTime: Date, years: number): Temporal.Instant;
-export function yearsAgo(dateOrTime: DateOrTime, years: number): DateOrInstant {
+export function yearsAgo(dateOrTime: RubyTime, years: number): RubyTime;
+export function yearsAgo(
+  dateOrTime: DateOrTime | RubyTime,
+  years: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { years: -years });
 }
 
 export function yearsSince(dateOrTime: Temporal.PlainDate, years: number): Temporal.PlainDate;
 export function yearsSince(dateOrTime: Date, years: number): Temporal.Instant;
-export function yearsSince(dateOrTime: DateOrTime, years: number): DateOrInstant {
+export function yearsSince(dateOrTime: RubyTime, years: number): RubyTime;
+export function yearsSince(
+  dateOrTime: DateOrTime | RubyTime,
+  years: number,
+): DateOrInstant | RubyTime {
   return advance(dateOrTime, { years: years });
 }
 
@@ -494,7 +526,11 @@ export function nextOccurring(
   dayOfWeek: string,
 ): Temporal.PlainDate;
 export function nextOccurring(dateOrTime: Date, dayOfWeek: string): Temporal.Instant;
-export function nextOccurring(dateOrTime: DateOrTime, dayOfWeek: string): DateOrInstant {
+export function nextOccurring(dateOrTime: RubyTime, dayOfWeek: string): RubyTime;
+export function nextOccurring(
+  dateOrTime: DateOrTime | RubyTime,
+  dayOfWeek: string,
+): DateOrInstant | RubyTime {
   let fromNow = fetch<number>(DAYS_INTO_WEEK, dayOfWeek) - wday(dateOrTime);
   if (!(fromNow > 0)) fromNow += 7;
   return advance(dateOrTime, { days: fromNow });
@@ -505,7 +541,11 @@ export function prevOccurring(
   dayOfWeek: string,
 ): Temporal.PlainDate;
 export function prevOccurring(dateOrTime: Date, dayOfWeek: string): Temporal.Instant;
-export function prevOccurring(dateOrTime: DateOrTime, dayOfWeek: string): DateOrInstant {
+export function prevOccurring(dateOrTime: RubyTime, dayOfWeek: string): RubyTime;
+export function prevOccurring(
+  dateOrTime: DateOrTime | RubyTime,
+  dayOfWeek: string,
+): DateOrInstant | RubyTime {
   let ago = wday(dateOrTime) - fetch<number>(DAYS_INTO_WEEK, dayOfWeek);
   if (!(ago > 0)) ago += 7;
   return advance(dateOrTime, { days: -ago });
