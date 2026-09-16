@@ -1,4 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
+import { NameError } from "./name-error.js";
 import {
   include,
   prepend,
@@ -277,6 +278,29 @@ describe("include", () => {
     expect((new User() as unknown as { greet(): string }).greet()).toBe("hello");
     mod.undefMethod(...mod.instanceMethods());
     expect((new User() as unknown as { greet?: unknown }).greet).toBeUndefined();
+  });
+
+  it("propagates post-include method-table changes to every includer", () => {
+    class A {}
+    class B {}
+    const mod = new Module();
+    mod.defineMethod("original", () => "dump");
+    include(A, mod);
+    include(B, mod);
+    type Dyn = { original?(): string; aliased?(): string };
+    mod.aliasMethod("aliased", "original");
+    expect((new A() as Dyn).aliased!()).toBe("dump");
+    expect((new B() as Dyn).aliased!()).toBe("dump");
+    mod.removeMethod("aliased");
+    expect((new A() as Dyn).aliased).toBeUndefined();
+    expect((new B() as Dyn).aliased).toBeUndefined();
+    expect((new B() as Dyn).original!()).toBe("dump");
+  });
+
+  it("raises NameError removing or aliasing an undefined method", () => {
+    const mod = new Module();
+    expect(() => mod.removeMethod("missing")).toThrow(NameError);
+    expect(() => mod.aliasMethod("x", "missing")).toThrow(NameError);
   });
 
   it("keeps a class-body method ahead of an included Module", () => {
