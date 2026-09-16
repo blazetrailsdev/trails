@@ -848,28 +848,6 @@ export class PostgreSQLAdapter
     return pgAffectedRows(result);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-execute-mutation-onto-exec-statements */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = [],
-    name: string | null = "SQL",
-  ): Promise<number> {
-    sql = this.preprocessQuery(sql);
-    const upper = sql.trimStart().toUpperCase();
-    const isInsert = upper.startsWith("INSERT");
-    if (isInsert && this.isUseInsertReturning() && !upper.includes("RETURNING")) {
-      [sql, binds] = await this.sqlForInsert(sql, null, binds, null);
-    }
-    const result = (await this.rawExecute(this.rewriteBinds(sql, binds), name, binds)) as PGResult;
-    const ntuples = result.ntuples();
-    const value = result.getvalue(0, 0);
-    const affected = this.affectedRows(result);
-    if (isInsert && ntuples === 1) {
-      return value as number;
-    }
-    return affected;
-  }
-
   private static _isConnectionError(err: unknown): boolean {
     const e = err as { code?: string; message?: string } | null | undefined;
     if (!e) return false;

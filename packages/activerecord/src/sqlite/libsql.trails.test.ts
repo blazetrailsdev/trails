@@ -170,20 +170,20 @@ describe("LibSQLAdapter — local-file smoke", () => {
   beforeAll(async () => {
     removeFiles();
     adapter = new LibSQLAdapter({ database: dbPath });
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
   });
 
   afterAll(async () => {
-    await adapter.executeMutation("DROP TABLE IF EXISTS items");
+    await adapter.execute("DROP TABLE IF EXISTS items");
     await adapter.disconnectBang();
     removeFiles();
   });
 
   it("inserts and selects rows through the adapter", async () => {
-    await adapter.executeMutation("INSERT INTO items (name) VALUES ('apple')");
-    await adapter.executeMutation("INSERT INTO items (name) VALUES ('banana')");
+    await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
+    await adapter.execute("INSERT INTO items (name) VALUES ('banana')");
     const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
     expect(rows.map((r) => (r as { name: string }).name)).toEqual(["apple", "banana"]);
   });
@@ -482,9 +482,9 @@ describe.skipIf(!hasCredentials)(
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       });
-      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
-      await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
-      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
+      await primary.execute(`DROP TABLE IF EXISTS ${table}`);
+      await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
+      await primary.execute(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
 
       replica = (await LibSQLReplicaAdapter.openAsync({
         database: replicaPath,
@@ -494,7 +494,7 @@ describe.skipIf(!hasCredentials)(
 
     afterAll(async () => {
       await replica.disconnectBang();
-      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.execute(`DROP TABLE IF EXISTS ${table}`);
       await primary.disconnectBang();
       removeFiles();
     });
@@ -504,7 +504,7 @@ describe.skipIf(!hasCredentials)(
       const rows = (await replica.execute(`SELECT label FROM ${table} WHERE id = 1`))!;
       expect((rows[0] as { label: string }).label).toBe("remote");
 
-      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
+      await primary.execute(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
       await replica.syncReplica();
       const after = (await replica.execute(`SELECT count(*) AS c FROM ${table}`))!;
       expect(Number((after[0] as { c: number }).c)).toBe(2);
@@ -541,8 +541,8 @@ describe.skipIf(!hasCredentials)(
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       });
-      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
-      await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
+      await primary.execute(`DROP TABLE IF EXISTS ${table}`);
+      await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
 
       replica = (await LibSQLReplicaAdapter.openAsync({
         database: replicaPath,
@@ -552,13 +552,13 @@ describe.skipIf(!hasCredentials)(
 
     afterAll(async () => {
       await replica.disconnectBang();
-      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.execute(`DROP TABLE IF EXISTS ${table}`);
       await primary.disconnectBang();
       removeFiles();
     });
 
     it("reflects a remote write without an explicit syncReplica()", async () => {
-      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'auto')`);
+      await primary.execute(`INSERT INTO ${table} (id, label) VALUES (1, 'auto')`);
 
       let label: string | undefined;
       for (let attempt = 0; attempt < 15 && label === undefined; attempt++) {

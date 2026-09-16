@@ -19,7 +19,6 @@ const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
 function makeAdapter(): DatabaseAdapter {
   return {
     execute: vi.fn(async () => []),
-    executeMutation: vi.fn(async () => 0),
     beginTransaction: vi.fn(async () => {}),
     commit: vi.fn(async () => {}),
     rollback: vi.fn(async () => {}),

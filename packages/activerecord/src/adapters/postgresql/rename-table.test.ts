@@ -38,14 +38,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
       await adapter.renameTable("before_rename", "after_rename");
       expect(await adapter.primaryKey("after_rename")).toBe("id");
-      const id = await adapter.executeMutation(`INSERT INTO after_rename (name) VALUES ('test')`);
+      const id = await adapter.insert(`INSERT INTO after_rename (name) VALUES ('test')`);
       expect(id).toBeGreaterThan(0);
     });
 
     it("rename table preserves data", async () => {
       await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
-      await adapter.executeMutation(`INSERT INTO before_rename (name) VALUES ('alice')`);
-      await adapter.executeMutation(`INSERT INTO before_rename (name) VALUES ('bob')`);
+      await adapter.execute(`INSERT INTO before_rename (name) VALUES ('alice')`);
+      await adapter.execute(`INSERT INTO before_rename (name) VALUES ('bob')`);
       await adapter.renameTable("before_rename", "after_rename");
       const rows = await adapter.execute("SELECT name FROM after_rename ORDER BY name");
       expect(rows.map((r) => r.name)).toEqual(["alice", "bob"]);

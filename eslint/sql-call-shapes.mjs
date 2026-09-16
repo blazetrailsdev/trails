@@ -42,11 +42,4 @@ export function staticString(node) {
  * `expect(...).toContain` does not. Receiver-agnostic, like every other name
  * the rule matches. Extend this set if a new execution sink appears.
  */
-export const SQL_SINKS = new Set([
-  "exec",
-  "execute",
-  "executeMutation",
-  "internalExecute",
-  "execQuery",
-  "query",
-]);
+export const SQL_SINKS = new Set(["exec", "execute", "internalExecute", "execQuery", "query"]);

@@ -23,7 +23,7 @@ describe("boot-laid table snapshot", () => {
 
   it("excludes a table left in the database before the schema load", async () => {
     const adapter = Base.connection;
-    await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
+    await adapter.execute(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
 
     await resetTestTables(adapter);
     await loadAdapterSpecificSchema(adapter);
@@ -31,7 +31,7 @@ describe("boot-laid table snapshot", () => {
 
     expect(await adapter.tables()).not.toContain("leftover_boot_t");
 
-    await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
+    await adapter.execute(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
     await resetTestTables(adapter);
 
     const after = await adapter.tables();

@@ -157,13 +157,13 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec insert", async () => {
-    const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('test')`);
+    const id = await adapter.insert(`INSERT INTO "items" ("name") VALUES ('test')`);
     expect(id).toBe(1);
   });
 
   it("exec insert with quote", async () => {
     await createExampleTable();
-    await adapter.executeMutation(`insert into "ex" (number) VALUES (?)`, [10]);
+    await adapter.execInsert(`insert into "ex" (number) VALUES (?)`, null, [10]);
     const rows = (
       await adapter.execQuery(`select number from "ex" where number = ?`, "SQL", [10])
     ).toArray();
@@ -274,14 +274,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec query with binds", async () => {
-    await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('widget', 10)`);
+    await adapter.execute(`INSERT INTO "items" ("name", "price") VALUES ('widget', 10)`);
     const rows = (await adapter.execute(`SELECT * FROM "items" WHERE "name" = 'widget'`))!;
     expect(rows).toHaveLength(1);
     expect(rows[0].price).toBe(10);
   });
 
   it("exec query typecasts bind vals", async () => {
-    await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "items" ("name", "price") VALUES (?, ?)`, null, [
       "widget",
       10,
     ]);
@@ -295,7 +295,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("quote binary column escapes it", async () => {
     await adapter.execute(`CREATE TABLE "bin_esc" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
     const buf = Buffer.from([0x00, 0x01, 0x02, 0xff]);
-    await adapter.executeMutation(`INSERT INTO "bin_esc" ("data") VALUES (?)`, [
+    await adapter.execInsert(`INSERT INTO "bin_esc" ("data") VALUES (?)`, null, [
       new BinaryData(buf),
     ]);
     const rows = (await adapter.execute(`SELECT "data" FROM "bin_esc"`))!;
@@ -306,14 +306,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(`CREATE TABLE "enc_test" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
     const original = Buffer.from("hello world");
     const copy = Buffer.from(original);
-    await adapter.executeMutation(`INSERT INTO "enc_test" ("data") VALUES (?)`, [
+    await adapter.execInsert(`INSERT INTO "enc_test" ("data") VALUES (?)`, null, [
       new BinaryData(copy),
     ]);
     expect(original).toEqual(Buffer.from("hello world"));
   });
 
   it("execute", async () => {
-    await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "items" ("name") VALUES ('a')`);
     const rows = (await adapter.execute(`SELECT * FROM "items"`))!;
     expect(rows).toHaveLength(1);
   });
@@ -325,7 +325,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       if (event.payload?.sql?.includes("INSERT")) logged.push(event.payload.sql);
     });
     try {
-      await adapter.executeMutation(sql);
+      await adapter.execute(sql);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -333,8 +333,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("insert id value returned", async () => {
-    const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('a')`);
-    const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('b')`);
+    const id1 = await adapter.insert(`INSERT INTO "items" ("name") VALUES ('a')`);
+    const id2 = await adapter.insert(`INSERT INTO "items" ("name") VALUES ('b')`);
     expect(id1).toBe(1);
     expect(id2).toBe(2);
   });
@@ -343,15 +343,15 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "def_vals" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'default')`,
     );
-    const id = await adapter.executeMutation(`INSERT INTO "def_vals" DEFAULT VALUES`);
+    const id = await adapter.insert(`INSERT INTO "def_vals" DEFAULT VALUES`);
     expect(id).toBe(1);
     const rows = (await adapter.execute(`SELECT * FROM "def_vals"`))!;
     expect(rows[0].name).toBe("default");
   });
 
   it("select rows", async () => {
-    await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('a', 1)`);
-    await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('b', 2)`);
+    await adapter.execute(`INSERT INTO "items" ("name", "price") VALUES ('a', 1)`);
+    await adapter.execute(`INSERT INTO "items" ("name", "price") VALUES ('b', 2)`);
     const rows = (await adapter.execute(`SELECT "name", "price" FROM "items" ORDER BY "name"`))!;
     expect(rows).toHaveLength(2);
     expect(rows[0].name).toBe("a");
@@ -374,7 +374,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("transaction", async () => {
     await adapter.beginTransaction({ _lazy: false });
-    await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('x')`);
+    await adapter.execute(`INSERT INTO "items" ("name") VALUES ('x')`);
     await adapter.commitTransaction();
     const rows = (await adapter.execute(`SELECT * FROM "items"`))!;
     expect(rows).toHaveLength(1);
@@ -542,7 +542,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "custom_pk_src" ("custom_id" INTEGER PRIMARY KEY, "name" TEXT)`,
     );
-    await adapter.executeMutation(`INSERT INTO "custom_pk_src" ("name") VALUES ('Alice')`);
+    await adapter.execute(`INSERT INTO "custom_pk_src" ("name") VALUES ('Alice')`);
     await adapter.execute(`CREATE TABLE "custom_pk_dest" AS SELECT * FROM "custom_pk_src"`);
     const rows = (await adapter.execute(`SELECT * FROM "custom_pk_dest"`))!;
     expect(rows).toHaveLength(1);
@@ -553,7 +553,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "cpk_src" ("a" INTEGER, "b" INTEGER, "val" TEXT, PRIMARY KEY ("a", "b"))`,
     );
-    await adapter.executeMutation(`INSERT INTO "cpk_src" ("a", "b", "val") VALUES (1, 2, 'x')`);
+    await adapter.execute(`INSERT INTO "cpk_src" ("a", "b", "val") VALUES (1, 2, 'x')`);
     await adapter.execute(`CREATE TABLE "cpk_dest" AS SELECT * FROM "cpk_src"`);
     const rows = (await adapter.execute(`SELECT * FROM "cpk_dest"`))!;
     expect(rows).toHaveLength(1);
@@ -616,10 +616,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("auto increment preserved on table changes", async () => {
-    await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('b')`);
-    await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'b'`);
-    const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('c')`);
+    await adapter.execute(`INSERT INTO "items" ("name") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "items" ("name") VALUES ('b')`);
+    await adapter.execute(`DELETE FROM "items" WHERE "name" = 'b'`);
+    const id = await adapter.insert(`INSERT INTO "items" ("name") VALUES ('c')`);
     expect(id).toBe(3);
   });
 
@@ -669,9 +669,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await writer.execute(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await writer.disconnectBang();
     const reader = new BetterSQLite3Adapter({ database: tmpFile, readonly: true });
-    await expect(
-      reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
-    ).rejects.toThrow();
+    await expect(reader.insert(`INSERT INTO "test" ("name") VALUES ('fail')`)).rejects.toThrow();
     await reader.disconnectBang();
     fs.unlinkSync(tmpFile);
   });

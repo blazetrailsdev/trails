@@ -36,38 +36,32 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute still returns rows for a row-returning statement", async () => {
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
     expect(((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2RawResult).rows).toEqual([
       ["a"],
     ]);
   });
 
-  it("executeMutation sources affected rows through the affectedRows port", async () => {
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('c')`);
+  it("update and delete source affected rows through the affectedRows port", async () => {
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('b')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('c')`);
 
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
-    expect(await adapter.executeMutation(`DELETE FROM pq`)).toBe(3);
+    expect(await adapter.update(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
+    expect(await adapter.update(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
+    expect(await adapter.delete(`DELETE FROM pq`)).toBe(3);
   });
 
-  it("executeMutation returns the driver insert id for a bare INSERT", async () => {
-    const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+  it("insert returns the driver insert id for a bare INSERT", async () => {
+    const id = await adapter.insert(`INSERT INTO pq (nick) VALUES ('a')`);
     expect(id).toBe(1);
-    const second = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
+    const second = await adapter.insert(`INSERT INTO pq (nick) VALUES ('b')`);
     expect(second).toBe(2);
   });
 
-  it("executeMutation returns affected rows for a multi-row INSERT", async () => {
-    expect(await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a'), ('b'), ('c')`)).toBe(
-      3,
-    );
-  });
-
-  it("errors when a write is routed through executeMutation while preventing writes", async () => {
+  it("errors when a write is routed through insert while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
+      await expect(adapter.insert(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
         ReadOnlyError,
       );
     });

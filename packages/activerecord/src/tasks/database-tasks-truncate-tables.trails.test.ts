@@ -32,10 +32,10 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbPath });
-    await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
-    await seed.executeMutation("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
-    await seed.executeMutation("INSERT INTO widgets (name) VALUES ('gizmo')");
-    await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+    await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+    await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
+    await seed.execute("INSERT INTO widgets (name) VALUES ('gizmo')");
+    await seed.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
     await seed.disconnectBang();
 
     DatabaseTasks.clearRegisteredTasks();
@@ -47,8 +47,8 @@ describe("DatabaseTasksTruncateTablesTest", () => {
       expect(await reader.execute("SELECT * FROM widgets")).toEqual([]);
       expect(await reader.execute("SELECT * FROM schema_migrations")).toHaveLength(1);
     } finally {
-      await reader.executeMutation("DROP TABLE IF EXISTS widgets");
-      await reader.executeMutation("DROP TABLE IF EXISTS schema_migrations");
+      await reader.execute("DROP TABLE IF EXISTS widgets");
+      await reader.execute("DROP TABLE IF EXISTS schema_migrations");
       await reader.disconnectBang();
     }
   });

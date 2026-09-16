@@ -23,9 +23,6 @@ class StubAdapter extends AbstractAdapter {
   execute(_sql: string) {
     return Promise.resolve([] as Record<string, unknown>[]);
   }
-  executeMutation(_sql: string) {
-    return Promise.resolve(0);
-  }
 }
 
 class SqliteCapturingAdapter extends AbstractAdapter {
@@ -47,9 +44,6 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return Promise.resolve(
       this.allSql.length === 1 ? this.firstRows : ([] as Record<string, unknown>[]),
     );
-  }
-  executeMutation(_sql: string) {
-    return Promise.resolve(0);
   }
   override async internalExecQuery(sql: string) {
     const rows = await this.execute(sql);
@@ -260,9 +254,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("addForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
     let executed = false;
     class NoFkAdapter extends StubAdapter {
-      executeMutation(_sql: string) {
+      execute(_sql: string) {
         executed = true;
-        return Promise.resolve(0);
+        return Promise.resolve([] as Record<string, unknown>[]);
       }
     }
     const stub = new NoFkAdapter({});
@@ -274,9 +268,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("removeForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
     let executed = false;
     class NoFkAdapter extends StubAdapter {
-      executeMutation(_sql: string) {
+      execute(_sql: string) {
         executed = true;
-        return Promise.resolve(0);
+        return Promise.resolve([] as Record<string, unknown>[]);
       }
     }
     const stub = new NoFkAdapter({});
@@ -297,9 +291,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       supportsForeignKeys() {
         return true;
       }
-      executeMutation(_sql: string) {
+      execute(_sql: string) {
         executed = true;
-        return Promise.resolve(0);
+        return Promise.resolve([] as Record<string, unknown>[]);
       }
     }
     const stub = new DisabledFkAdapter();

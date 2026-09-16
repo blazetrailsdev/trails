@@ -14,8 +14,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
-    await adapter.executeMutation(`DROP TABLE IF EXISTS \`bigint_rt\``);
-    await adapter.executeMutation(`
+    await adapter.execute(`DROP TABLE IF EXISTS \`bigint_rt\``);
+    await adapter.execute(`
       CREATE TABLE \`bigint_rt\` (
         \`id\`    BIGINT AUTO_INCREMENT PRIMARY KEY,
         \`score\` BIGINT NOT NULL,
@@ -25,13 +25,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   afterEach(async () => {
-    await adapter.executeMutation(`DROP TABLE IF EXISTS \`bigint_rt\``);
+    await adapter.execute(`DROP TABLE IF EXISTS \`bigint_rt\``);
   });
 
   describe("MySQL bigint round-trip", () => {
     it("preserves exact value above Number.MAX_SAFE_INTEGER via BigIntegerType", async () => {
       const unsafe = 9007199254740993n;
-      await adapter.executeMutation(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, [unsafe]);
+      await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [unsafe]);
       const result = (await adapter.execute(
         `SELECT \`score\` FROM \`bigint_rt\``,
       )) as Mysql2RawResult;
@@ -39,8 +39,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("update round-trip preserves value", async () => {
-      await adapter.executeMutation(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, [BIG]);
-      await adapter.executeMutation(`UPDATE \`bigint_rt\` SET \`score\` = ?`, [BIG + 1n]);
+      await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [BIG]);
+      await adapter.execUpdate(`UPDATE \`bigint_rt\` SET \`score\` = ?`, null, [BIG + 1n]);
       const result = (await adapter.execute(
         `SELECT \`score\` FROM \`bigint_rt\``,
       )) as Mysql2RawResult;
@@ -48,7 +48,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("safe-range BIGINT returns as number (auto-increment IDs unaffected)", async () => {
-      await adapter.executeMutation(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, [42]);
+      await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [42]);
       const result = (await adapter.execute(
         `SELECT \`id\`, \`score\` FROM \`bigint_rt\``,
       )) as Mysql2RawResult;
@@ -57,8 +57,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("INT column is unaffected by supportBigNumbers", async () => {
-      await adapter.executeMutation(
+      await adapter.execInsert(
         `INSERT INTO \`bigint_rt\` (\`score\`, \`count\`) VALUES (?, ?)`,
+        null,
         [BIG, 42],
       );
       const result = (await adapter.execute(

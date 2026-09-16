@@ -26,8 +26,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE TABLE utils_reset_pk_custom (custom_id serial primary key, name text)`,
       );
-      await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('a')`);
-      await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('b')`);
+      await adapter.execute(`INSERT INTO utils_reset_pk_custom (name) VALUES ('a')`);
+      await adapter.execute(`INSERT INTO utils_reset_pk_custom (name) VALUES ('b')`);
       await adapter.execute(`SELECT setval('utils_reset_pk_custom_custom_id_seq', 100)`);
       await adapter.resetPkSequenceBang("utils_reset_pk_custom");
       const rows = await adapter.execute(

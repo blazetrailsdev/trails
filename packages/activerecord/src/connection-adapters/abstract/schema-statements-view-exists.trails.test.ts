@@ -16,13 +16,11 @@ describe("SchemaStatements#viewExists", () => {
   beforeAll(async () => {
     await (
       await conn()
-    ).executeMutation(
-      `CREATE VIEW ${(await conn()).quoteTableName(viewName)} AS SELECT * FROM books`,
-    );
+    ).execute(`CREATE VIEW ${(await conn()).quoteTableName(viewName)} AS SELECT * FROM books`);
   });
 
   afterAll(async () => {
-    await (await conn()).executeMutation(`DROP VIEW ${(await conn()).quoteTableName(viewName)}`);
+    await (await conn()).execute(`DROP VIEW ${(await conn()).quoteTableName(viewName)}`);
   });
 
   it("issues its probe as a SCHEMA query", async () => {

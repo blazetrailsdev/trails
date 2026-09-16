@@ -76,7 +76,6 @@ describe("PrimaryKeyErrorTest", () => {
   it("generates the correct value", async () => {
     const adapter = {
       execute: vi.fn(async () => []),
-      executeMutation: vi.fn(async () => 0),
       beginTransaction: vi.fn(async () => {}),
       commit: vi.fn(async () => {}),
       rollback: vi.fn(async () => {}),

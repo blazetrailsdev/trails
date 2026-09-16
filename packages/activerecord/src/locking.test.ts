@@ -304,9 +304,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     await t1.touch();
@@ -327,9 +325,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default should work with null in the database", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     const t2 = await LockWithoutDefault.find(t1.id);
     expect(t1.lock_version).toBe(0);
@@ -347,9 +343,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -363,9 +357,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -410,9 +402,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults_cust(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults_cust(title) VALUES('title1')");
     const t1 = (await LockWithCustomColumnWithoutDefault.last())!;
     const t2 = await LockWithCustomColumnWithoutDefault.find(t1.id);
     expect(t1.custom_lock_version).toBe(0);
@@ -689,9 +679,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
-    await Base.connection.executeMutation(
-      "INSERT INTO lock_without_defaults(title) VALUES('title1')",
-    );
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();

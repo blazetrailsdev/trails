@@ -573,7 +573,6 @@ describe("SchemaReflectionTest", () => {
 class MockAdapter {
   quoteColumnName = (n: string) => `"${n}"`;
   quoteTableName = (n: string) => `"${n}"`;
-  executeMutation = vi.fn().mockResolvedValue(0);
   execute = vi.fn().mockResolvedValue([]);
   schemaCache: BoundSchemaReflection;
   pool = {};

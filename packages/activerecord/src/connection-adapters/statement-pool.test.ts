@@ -131,12 +131,10 @@ describe("SQLite3 StatementPool integration", () => {
     const prepareSpy = vi.spyOn((adapter as any)._rawConnection, "prepare");
 
     try {
-      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
-      await adapter.executeMutation(
-        'CREATE TABLE "test_pool" ("id" INTEGER PRIMARY KEY, "name" TEXT)',
-      );
-      await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["a"]);
-      await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["b"]);
+      await adapter.execute('DROP TABLE IF EXISTS "test_pool"');
+      await adapter.execute('CREATE TABLE "test_pool" ("id" INTEGER PRIMARY KEY, "name" TEXT)');
+      await adapter.execInsert('INSERT INTO "test_pool" ("name") VALUES (?)', null, ["a"]);
+      await adapter.execInsert('INSERT INTO "test_pool" ("name") VALUES (?)', null, ["b"]);
 
       const selectSql = 'SELECT * FROM "test_pool" WHERE "name" = ?';
       const rows1 = (
@@ -154,7 +152,7 @@ describe("SQLite3 StatementPool integration", () => {
       expect(selectCalls).toHaveLength(1);
     } finally {
       prepareSpy.mockRestore();
-      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
+      await adapter.execute('DROP TABLE IF EXISTS "test_pool"');
       adapterPool.releaseConnection();
       await adapterPool.disconnectBang();
     }

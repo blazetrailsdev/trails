@@ -736,7 +736,6 @@ interface DatabaseStatementsDefaultsHost {
     name?: string | null,
     kwargs?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
-  executeMutation(sql: string, binds?: unknown[], name?: string | null): Promise<number>;
   selectAll(
     arel: unknown,
     name?: string | null,

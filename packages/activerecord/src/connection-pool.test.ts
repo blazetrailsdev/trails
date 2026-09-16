@@ -62,9 +62,6 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async execute(_sql: string, _name?: string | null): Promise<Record<string, unknown>[]> {
     return [];
   }
-  async executeMutation(_sql: string, _binds?: unknown[], _name?: string): Promise<number> {
-    return 0;
-  }
   async commit(): Promise<void> {}
   async rollback(): Promise<void> {}
   async createSavepoint(_name: string): Promise<void> {}
@@ -91,11 +88,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async execInsert(sql: string, _n?: string | null, _b?: unknown[]) {
     return Result.fromRowHashes(await this.execute(sql));
   }
-  async execDelete(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
+  async execDelete(_sql: string, _n?: string | null, _b?: unknown[]) {
+    return 0;
   }
-  async execUpdate(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
+  async execUpdate(_sql: string, _n?: string | null, _b?: unknown[]) {
+    return 0;
   }
   isWriteQuery(_sql: string) {
     return false;

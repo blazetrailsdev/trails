@@ -61,7 +61,7 @@ Every read and every write is a `Promise`. Concretely:
 - **Associations**: `user.posts`, `post.author` return relations/
   promises — accessing them is async because loading them is.
 - **Schema / connection calls**: every adapter method (`executeQuery`,
-  `selectAll`, `insert`, `executeMutation`, `beginTransaction`,
+  `selectAll`, `insert`, `execUpdate`, `beginTransaction`,
   `commit`, `rollback`) returns `Promise`.
 
 There is no synchronous escape hatch. Browser and Node both expose DB

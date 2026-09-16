@@ -62,11 +62,11 @@ async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<voi
   const originalCharset = row[0] as string;
   const originalCollation = row[1] as string;
 
-  await adapter.executeMutation("ALTER DATABASE DEFAULT CHARACTER SET utf8mb4");
+  await adapter.execute("ALTER DATABASE DEFAULT CHARACTER SET utf8mb4");
   try {
     await fn();
   } finally {
-    await adapter.executeMutation(
+    await adapter.execute(
       `ALTER DATABASE DEFAULT CHARACTER SET ${originalCharset} COLLATE ${originalCollation}`,
     );
   }

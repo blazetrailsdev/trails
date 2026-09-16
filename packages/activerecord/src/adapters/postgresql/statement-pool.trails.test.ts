@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("executeMutation caches the plan for INSERT (reuses on repeat)", async () => {
+    it("internalExecQuery caches the plan for INSERT (reuses on repeat)", async () => {
       await adapter.execute(
         `CREATE TABLE IF NOT EXISTS "sp_exec_mut" ("id" SERIAL PRIMARY KEY, "name" TEXT)`,
       );

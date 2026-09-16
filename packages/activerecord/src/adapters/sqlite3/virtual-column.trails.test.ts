@@ -17,9 +17,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
     await adapter.execute(
       `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "column1" integer)`,
     );
-    await adapter.executeMutation(
-      `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
-    );
+    await adapter.execute(`INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`);
   });
 
   afterEach(async () => {

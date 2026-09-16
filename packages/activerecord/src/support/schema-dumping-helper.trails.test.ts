@@ -18,13 +18,13 @@ beforeAll(() => {
 const createdTables = new Set<string>();
 async function createSdhTable(name: string, columns = "id INTEGER PRIMARY KEY"): Promise<void> {
   createdTables.add(name);
-  await adapter.executeMutation(`CREATE TABLE ${name} (${columns})`);
+  await adapter.execute(`CREATE TABLE ${name} (${columns})`);
 }
 
 describe("SchemaDumpingHelper", () => {
   afterEach(async () => {
     for (const t of createdTables) {
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ${adapter.quoteTableName(t)}`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${adapter.quoteTableName(t)}`);
     }
     createdTables.clear();
   });

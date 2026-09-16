@@ -751,12 +751,7 @@ function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
   if (v === null || typeof v !== "object") return false;
   const obj = v as {
     execute?: unknown;
-    executeMutation?: unknown;
     adapterName?: unknown;
   };
-  return (
-    typeof obj.execute === "function" &&
-    typeof obj.executeMutation === "function" &&
-    typeof obj.adapterName === "string"
-  );
+  return typeof obj.execute === "function" && typeof obj.adapterName === "string";
 }

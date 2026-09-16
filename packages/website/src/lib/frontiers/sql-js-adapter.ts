@@ -33,15 +33,6 @@ export class SqlJsAdapter {
     }
   }
 
-  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
-    this.db.run(sql, binds as any[]);
-    if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-      const result = this.db.exec("SELECT last_insert_rowid()");
-      return (result[0]?.values[0]?.[0] as number) ?? 0;
-    }
-    return this.db.getRowsModified();
-  }
-
   async beginTransaction() {
     this.db.run("BEGIN");
   }

@@ -38,7 +38,6 @@ const DOUBLE_ONLY_COLUMNS: Record<string, string[]> = {
 function makeAdapter(): DatabaseAdapter {
   return {
     execute: vi.fn(async () => []),
-    executeMutation: vi.fn(async () => 0),
     beginTransaction: vi.fn(async () => {}),
     commit: vi.fn(async () => {}),
     rollback: vi.fn(async () => {}),
@@ -273,7 +272,7 @@ describe("useFixtures by registry name", () => {
 
   it("isolation part 1 — a delete lands within the test", async () => {
     expect(await Author.count()).toBe(3);
-    await Base.connection.executeMutation(
+    await Base.connection.execute(
       `DELETE FROM ${Base.connection.quoteTableName(Author.tableName)}`,
     );
     expect(await Author.count()).toBe(0);

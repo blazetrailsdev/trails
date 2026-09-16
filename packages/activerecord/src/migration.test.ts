@@ -166,7 +166,7 @@ describe("MigrationTest", () => {
       await migration.createTable("old", {}, (t) => {
         t.string("content");
       });
-      await adapter.executeMutation(
+      await adapter.execute(
         `INSERT INTO ${adapter.quoteTableName("pre_old_suf")} (${adapter.quoteColumnName("content")}) VALUES ('hello world')`,
       );
       const before = (
@@ -1163,7 +1163,7 @@ describe("MigrationTest", () => {
       await runMigration(m, "up");
       const qt = adapter.quoteTableName("prefix_reminders_suffix");
       const qc = adapter.quoteColumnName("content");
-      await adapter.executeMutation(`INSERT INTO ${qt} (${qc}) VALUES ('hello')`);
+      await adapter.execute(`INSERT INTO ${qt} (${qc}) VALUES ('hello')`);
       const rows = (await adapter.selectAll(`SELECT * FROM ${qt}`)).toArray();
       expect(rows).toHaveLength(1);
 
@@ -1189,7 +1189,7 @@ describe("MigrationTest", () => {
     await adapter.createTable("people_src", {}, (t) => {
       t.integer("person_id");
     });
-    await adapter.executeMutation(`INSERT INTO people_src (person_id) VALUES (1)`);
+    await adapter.execute(`INSERT INTO people_src (person_id) VALUES (1)`);
 
     await adapter.createTable("table_from_query_testings", {
       as: `SELECT person_id FROM people_src WHERE person_id = 1`,
@@ -1210,7 +1210,7 @@ describe("MigrationTest", () => {
     await adapter.createTable("people_src2", {}, (t) => {
       t.integer("person_id");
     });
-    await adapter.executeMutation(`INSERT INTO people_src2 (person_id) VALUES (1)`);
+    await adapter.execute(`INSERT INTO people_src2 (person_id) VALUES (1)`);
 
     const t = adapter.quoteTableName("people_src2");
     const c = `${t}.${adapter.quoteColumnName("person_id")}`;
@@ -1595,9 +1595,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(
-        `INSERT INTO bk1 (name, age, email) VALUES ('test', 25, 'a@b.c')`,
-      );
+      await bulkAdapter.execute(`INSERT INTO bk1 (name, age, email) VALUES ('test', 25, 'a@b.c')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk1`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].age).toBe(25);
@@ -1623,7 +1621,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk2 (new_c) VALUES ('test')`);
+      await bulkAdapter.execute(`INSERT INTO bk2 (new_c) VALUES ('test')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk2`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].new_c).toBe("test");
@@ -1649,7 +1647,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk3 (a) VALUES ('test')`);
+      await bulkAdapter.execute(`INSERT INTO bk3 (a) VALUES ('test')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk3`)).toArray();
       expect(rows.length).toBe(1);
     });
@@ -1673,7 +1671,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(
+      await bulkAdapter.execute(
         `INSERT INTO bk4 (x, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
       );
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk4`)).toArray();
@@ -1707,7 +1705,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk5 (x) VALUES ('test')`);
+      await bulkAdapter.execute(`INSERT INTO bk5 (x) VALUES ('test')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk5`)).toArray();
       expect(rows.length).toBe(1);
     });
@@ -1731,7 +1729,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk6 (email) VALUES ('test@test.com')`);
+      await bulkAdapter.execute(`INSERT INTO bk6 (email) VALUES ('test@test.com')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk6`)).toArray();
       expect(rows.length).toBe(1);
     });
@@ -1756,7 +1754,7 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk7 (email) VALUES ('test@test.com')`);
+      await bulkAdapter.execute(`INSERT INTO bk7 (email) VALUES ('test@test.com')`);
       const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk7`)).toArray();
       expect(rows.length).toBe(1);
     });
@@ -1782,9 +1780,9 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      await bulkAdapter.executeMutation(`INSERT INTO bk_idx (username) VALUES ('alice')`);
+      await bulkAdapter.execute(`INSERT INTO bk_idx (username) VALUES ('alice')`);
       await expect(
-        bulkAdapter.executeMutation(`INSERT INTO bk_idx (username) VALUES ('alice')`),
+        bulkAdapter.insert(`INSERT INTO bk_idx (username) VALUES ('alice')`),
       ).rejects.toThrow();
     });
   });
@@ -1806,7 +1804,7 @@ describe("MigrationTest", () => {
       }
       const m = makeRvMig(new BulkMig());
       await m.execMigration(rvAdapter, "up");
-      await rvAdapter.executeMutation(`INSERT INTO rv_bulk (name, extra) VALUES ('test', 'val')`);
+      await rvAdapter.execute(`INSERT INTO rv_bulk (name, extra) VALUES ('test', 'val')`);
       const rows = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
       expect(rows.length).toBe(1);
       expect(rows[0].extra).toBe("val");
@@ -2158,7 +2156,7 @@ describe("BulkAlterTableMigrationsTest", () => {
       expect(name.default).toBeNull();
       expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
 
-      await adapter.executeMutation(
+      await adapter.execute(
         isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
       );
       const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
@@ -2208,10 +2206,9 @@ function mockMigration(): { migration: Migration; sql: string[] } {
     async change() {}
   })(undefined, 20240101000000);
   (migration as any).adapter = adapterDouble({
-    execute: async () => [],
-    executeMutation: async (s: string) => {
+    execute: async (s: string) => {
       sql.push(s);
-      return 0;
+      return [];
     },
     beginTransaction: async () => {},
     commit: async () => {},

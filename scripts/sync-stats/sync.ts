@@ -518,7 +518,7 @@ async function migrateDb(adapter: SQLite3Adapter) {
         !(await columnExists(adapter, "raw_job_logs", "run_id")) ||
         !(await columnExists(adapter, "raw_job_logs", "job_name"))
       ) {
-        await adapter.executeMutation(
+        await adapter.execute(
           `CREATE TABLE raw_job_logs_new (
             job_id INTEGER PRIMARY KEY,
             run_id INTEGER,
@@ -528,21 +528,19 @@ async function migrateDb(adapter: SQLite3Adapter) {
             log_output TEXT
           )`,
         );
-        await adapter.executeMutation(
+        await adapter.execute(
           `INSERT OR IGNORE INTO raw_job_logs_new (job_id, merge_commit_sha, pr_number, log_output)
            SELECT job_id, merge_commit_sha, pr_number, log_output FROM raw_job_logs`,
         );
-        await adapter.executeMutation(`DROP TABLE raw_job_logs`);
-        await adapter.executeMutation(`ALTER TABLE raw_job_logs_new RENAME TO raw_job_logs`);
-        await adapter.executeMutation(
+        await adapter.execute(`DROP TABLE raw_job_logs`);
+        await adapter.execute(`ALTER TABLE raw_job_logs_new RENAME TO raw_job_logs`);
+        await adapter.execute(
           `CREATE INDEX index_raw_job_logs_on_merge_commit_sha ON raw_job_logs (merge_commit_sha)`,
         );
-        await adapter.executeMutation(
-          `CREATE INDEX index_raw_job_logs_on_run_id ON raw_job_logs (run_id)`,
-        );
+        await adapter.execute(`CREATE INDEX index_raw_job_logs_on_run_id ON raw_job_logs (run_id)`);
       }
       if (await tableExists(adapter, "workflow_jobs")) {
-        await adapter.executeMutation(
+        await adapter.execute(
           `UPDATE raw_job_logs SET
             run_id = (SELECT wj.run_id FROM workflow_jobs wj WHERE wj.id = raw_job_logs.job_id),
             job_name = (SELECT wj.name FROM workflow_jobs wj WHERE wj.id = raw_job_logs.job_id)
@@ -564,14 +562,10 @@ async function migrateDb(adapter: SQLite3Adapter) {
 
     if (await tableExists(adapter, "pull_requests")) {
       if (!(await columnExists(adapter, "pull_requests", "state"))) {
-        await adapter.executeMutation(
-          `ALTER TABLE pull_requests ADD COLUMN state TEXT DEFAULT 'merged'`,
-        );
+        await adapter.execute(`ALTER TABLE pull_requests ADD COLUMN state TEXT DEFAULT 'merged'`);
       }
       if (!(await columnExists(adapter, "pull_requests", "is_draft"))) {
-        await adapter.executeMutation(
-          `ALTER TABLE pull_requests ADD COLUMN is_draft INTEGER DEFAULT 0`,
-        );
+        await adapter.execute(`ALTER TABLE pull_requests ADD COLUMN is_draft INTEGER DEFAULT 0`);
       }
       for (const col of [
         "reviewers_synced",
@@ -580,38 +574,30 @@ async function migrateDb(adapter: SQLite3Adapter) {
         "reactions_synced",
       ]) {
         if (!(await columnExists(adapter, "pull_requests", col))) {
-          await adapter.executeMutation(
-            `ALTER TABLE pull_requests ADD COLUMN ${col} INTEGER DEFAULT 0`,
-          );
+          await adapter.execute(`ALTER TABLE pull_requests ADD COLUMN ${col} INTEGER DEFAULT 0`);
         }
       }
     }
 
     if (await tableExists(adapter, "pr_reviews")) {
       if (!(await columnExists(adapter, "pr_reviews", "source"))) {
-        await adapter.executeMutation(
-          `ALTER TABLE pr_reviews ADD COLUMN source TEXT DEFAULT 'github'`,
-        );
+        await adapter.execute(`ALTER TABLE pr_reviews ADD COLUMN source TEXT DEFAULT 'github'`);
       }
       if (!(await columnExists(adapter, "pr_reviews", "source_path"))) {
-        await adapter.executeMutation(`ALTER TABLE pr_reviews ADD COLUMN source_path TEXT`);
+        await adapter.execute(`ALTER TABLE pr_reviews ADD COLUMN source_path TEXT`);
       }
       // Match the fresh-DB schema below. NULLs (every github-sourced row) are
       // distinct under a SQLite unique index, so this only constrains the
       // source_path of local reviews.
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE UNIQUE INDEX IF NOT EXISTS index_pr_reviews_on_source_path ON pr_reviews (source_path)`,
       );
     }
 
     if (await tableExists(adapter, "workflow_runs")) {
       if (!(await columnExists(adapter, "workflow_runs", "run_attempt"))) {
-        await adapter.executeMutation(
-          `ALTER TABLE workflow_runs ADD COLUMN run_attempt INTEGER DEFAULT 1`,
-        );
-        await adapter.executeMutation(
-          `UPDATE workflow_runs SET run_attempt = 1 WHERE run_attempt IS NULL`,
-        );
+        await adapter.execute(`ALTER TABLE workflow_runs ADD COLUMN run_attempt INTEGER DEFAULT 1`);
+        await adapter.execute(`UPDATE workflow_runs SET run_attempt = 1 WHERE run_attempt IS NULL`);
       }
     }
 
@@ -689,9 +675,7 @@ async function migrateDb(adapter: SQLite3Adapter) {
 
     for (const col of ["assertion_count_mismatch", "assertion_kind_mismatch"]) {
       if (await columnExists(adapter, "test_compare_stats", col)) continue;
-      await adapter.executeMutation(
-        `ALTER TABLE test_compare_stats ADD COLUMN ${col} INTEGER DEFAULT 0`,
-      );
+      await adapter.execute(`ALTER TABLE test_compare_stats ADD COLUMN ${col} INTEGER DEFAULT 0`);
     }
 
     for (const table of ["api_calls_stats", "api_call_args_stats"]) {
@@ -1263,16 +1247,14 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
     const cnt = (staleCount[0] as { cnt: number }).cnt;
     if (cnt > 0) {
       console.log(`Backfilling state for ${cnt} existing PRs from merged_at/closed_at...`);
-      await Base.connection.executeMutation(
+      await Base.connection.execute(
         `UPDATE pull_requests SET state = CASE
           WHEN merged_at IS NOT NULL THEN 'merged'
           WHEN closed_at IS NOT NULL THEN 'closed'
           ELSE 'open'
         END WHERE state IS NULL`,
       );
-      await Base.connection.executeMutation(
-        `UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`,
-      );
+      await Base.connection.execute(`UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`);
     }
   }
 
@@ -1312,7 +1294,9 @@ async function syncPrFiles() {
     const number = pr.readAttribute("number") as number;
     try {
       const files = ghJson<GhPrFile[]>(`api repos/${REPO}/pulls/${number}/files --paginate`);
-      await PrFile.connection.executeMutation(`DELETE FROM pr_files WHERE pr_number = ?`, [number]);
+      await PrFile.connection.execDelete(`DELETE FROM pr_files WHERE pr_number = ?`, null, [
+        number,
+      ]);
       if (files.length > 0) {
         await PrFile.insertAll(
           files.map((f) => ({
@@ -1347,7 +1331,7 @@ async function syncPrCommits() {
     const number = pr.readAttribute("number") as number;
     try {
       const commits = ghJson<GhPrCommit[]>(`api repos/${REPO}/pulls/${number}/commits --paginate`);
-      await PrCommit.connection.executeMutation(`DELETE FROM pr_commits WHERE pr_number = ?`, [
+      await PrCommit.connection.execDelete(`DELETE FROM pr_commits WHERE pr_number = ?`, null, [
         number,
       ]);
       if (commits.length > 0) {
@@ -1658,8 +1642,9 @@ async function syncPrTimelineEvents() {
       const events = ghJson<GhTimelineEvent[]>(
         `api repos/${REPO}/issues/${number}/timeline --paginate`,
       );
-      await PrTimelineEvent.connection.executeMutation(
+      await PrTimelineEvent.connection.execDelete(
         `DELETE FROM pr_timeline_events WHERE pr_number = ?`,
+        null,
         [number],
       );
       if (events.length > 0) {
@@ -1959,8 +1944,9 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
       const annotations = ghJson<GhCheckAnnotation[]>(
         `api repos/${REPO}/check-runs/${jobId}/annotations --paginate`,
       );
-      await CheckAnnotation.connection.executeMutation(
+      await CheckAnnotation.connection.execDelete(
         `DELETE FROM check_annotations WHERE job_id = ?`,
+        null,
         [jobId],
       );
       if (annotations.length > 0) {

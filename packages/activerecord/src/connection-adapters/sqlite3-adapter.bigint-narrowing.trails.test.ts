@@ -12,10 +12,10 @@ describe("SQLite3Adapter bigint narrowing", () => {
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-sqlite-bignarrow-"));
     adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, wide BIGINT, narrow INTEGER)",
     );
-    await adapter.executeMutation("INSERT INTO widgets (id, wide, narrow) VALUES (1, 7, 2)");
+    await adapter.execute("INSERT INTO widgets (id, wide, narrow) VALUES (1, 7, 2)");
   });
 
   afterEach(async () => {

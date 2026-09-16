@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("quote column name", async () => {
       await adapter.execute(`DROP TABLE IF EXISTS "quoting_test"`);
       await adapter.execute(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
-      await adapter.executeMutation(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
+      await adapter.execute(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
       const rows = await adapter.execute(`SELECT "select" FROM "quoting_test"`);
       expect(rows[0].select).toBe("works");
     });
@@ -116,7 +116,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote table name with spaces", async () => {
       await adapter.execute(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
-      await adapter.executeMutation(`INSERT INTO "table with spaces" DEFAULT VALUES`);
+      await adapter.execute(`INSERT INTO "table with spaces" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
       expect(rows).toHaveLength(1);
     });

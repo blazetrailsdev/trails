@@ -87,7 +87,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   it("moveTable copies data to destination and drops source", async () => {
     await internals().copyTable("customers", "customers2");
-    await db.executeMutation("INSERT INTO customers2 (name) VALUES ('Alice')");
+    await db.execute("INSERT INTO customers2 (name) VALUES ('Alice')");
     const sourceRows = (await db.execute("SELECT * FROM customers2"))!;
     await internals().moveTable("customers2", "customers3");
     const rows = (await db.execute("SELECT * FROM customers3")) as Row[];

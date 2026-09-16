@@ -368,9 +368,7 @@ describe("SQLite3::Quoting", () => {
 
     it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {
       const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
-      await adapter.executeMutation(
-        `INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`,
-      );
+      await adapter.execute(`INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`);
       const rows = (await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`))!;
       const raw = rows[0].ts as string;
       const cast = new ARDateTimeType().cast(raw);
@@ -382,7 +380,7 @@ describe("SQLite3::Quoting", () => {
 
     it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
       const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
-      await adapter.executeMutation(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
+      await adapter.execute(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
       const rows = (await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`))!;
       const raw = rows[0].dt as string;
       const cast = new ARDateTimeType().cast(raw) as RubyTime;
@@ -392,7 +390,7 @@ describe("SQLite3::Quoting", () => {
 
     it("Temporal.PlainDate survives INSERT → SELECT", async () => {
       const date = Temporal.PlainDate.from("2026-04-18");
-      await adapter.executeMutation(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
+      await adapter.execute(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
       const rows = (await adapter.execute(`SELECT "d" FROM "quoting_events" LIMIT 1`))!;
       const raw = rows[0].d as string;
       const cast = new DateType().cast(raw);
@@ -405,7 +403,7 @@ describe("SQLite3::Quoting", () => {
 
     it("Time::Value with microseconds survives INSERT → SELECT", async () => {
       const time = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
-      await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
+      await adapter.execute(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
       const rows = (await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`))!;
       const raw = rows[0].t as string;
       const cast = new TimeType().cast(raw) as RubyTime;
