@@ -161,15 +161,14 @@ function countAssertions(
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
       const name = n.expression.text;
       const def = resolveHelper(helpers, name, n.pos);
-      const inline = def !== null && isInlineDef(def, rootStart, rootEnd);
-      if (inline) {
-        /* counted lexically at its declaration — see isInlineDef */
-      } else if (isAssertionCallee(name)) {
-        count++;
-      } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
-        visiting.add(name);
-        count += countAssertions(def.body, helpers, depth + 1, visiting, rootStart, rootEnd);
-        visiting.delete(name);
+      if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
+        if (isAssertionCallee(name)) {
+          count++;
+        } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
+          visiting.add(name);
+          count += countAssertions(def.body, helpers, depth + 1, visiting, rootStart, rootEnd);
+          visiting.delete(name);
+        }
       }
     }
     ts.forEachChild(n, walk);
@@ -308,30 +307,29 @@ function collectAssertionKinds(
       } else if (ts.isIdentifier(n.expression)) {
         const name = n.expression.text;
         const def = resolveHelper(helpers, name, n.pos);
-        const inline = def !== null && isInlineDef(def, rootStart, rootEnd);
-        if (inline) {
-          /* counted lexically at its declaration — see isInlineDef */
-        } else if (isAssertionCallee(name)) {
-          // Bare `expect(...)` is recorded via its matcher chain above; a helper
-          // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
-          if (name !== "expect") {
-            kinds.push(name);
-            values.push(helperCalleeValue(name, n.arguments, sourceFile));
+        if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
+          if (isAssertionCallee(name)) {
+            // Bare `expect(...)` is recorded via its matcher chain above; a helper
+            // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
+            if (name !== "expect") {
+              kinds.push(name);
+              values.push(helperCalleeValue(name, n.arguments, sourceFile));
+            }
+          } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
+            visiting.add(name);
+            const sub = collectAssertionKinds(
+              def.body,
+              helpers,
+              sourceFile,
+              depth + 1,
+              visiting,
+              rootStart,
+              rootEnd,
+            );
+            kinds.push(...sub.kinds);
+            values.push(...sub.values);
+            visiting.delete(name);
           }
-        } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
-          visiting.add(name);
-          const sub = collectAssertionKinds(
-            def.body,
-            helpers,
-            sourceFile,
-            depth + 1,
-            visiting,
-            rootStart,
-            rootEnd,
-          );
-          kinds.push(...sub.kinds);
-          values.push(...sub.values);
-          visiting.delete(name);
         }
       }
     }
