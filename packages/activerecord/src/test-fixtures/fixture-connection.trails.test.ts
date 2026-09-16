@@ -8,14 +8,14 @@ describe("fixture connection source", () => {
     setPermanentConnectionCheckout(true);
   });
 
-  it("leases without tripping permanentConnectionCheckout = disallowed", () => {
+  it("leases without tripping permanentConnectionCheckout = disallowed", async () => {
     setPermanentConnectionCheckout("disallowed");
 
-    expect(() => leaseFixtureConnection()).not.toThrow();
+    await expect(leaseFixtureConnection()).resolves.toBeDefined();
   });
 
-  it("resolves the same connection the pool holds", () => {
-    const leased = leaseFixtureConnection();
+  it("resolves the same connection the pool holds", async () => {
+    const leased = await leaseFixtureConnection();
 
     expect(leased).toBe(Base.connectionPool().activeConnection);
   });

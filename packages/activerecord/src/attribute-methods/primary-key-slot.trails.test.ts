@@ -38,6 +38,7 @@ describe("per-instance @primary_key slot", () => {
         internalSchemaCache: { getCachedPrimaryKeys: () => "toy_id" },
       }) as never,
     );
+    await ColdToy.leaseConnection();
     const spy = vi.spyOn(
       record as unknown as { _readAttribute(n: string): unknown },
       "_readAttribute",

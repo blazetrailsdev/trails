@@ -36,10 +36,10 @@ describe("Arel toSql through Table.engine", () => {
     expect(pool.isPermanentLease()).toBe(true);
   });
 
-  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", async () => {
+  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", () => {
     Base.releaseConnection();
     const pool = Base.connectionPool();
-    const leased = await pool.withConnectionSync(() => pool.leaseConnection());
+    const leased = pool.withConnectionSync(() => pool.leaseConnectionSync());
     try {
       expect(pool.activeConnection).toBe(leased);
     } finally {
