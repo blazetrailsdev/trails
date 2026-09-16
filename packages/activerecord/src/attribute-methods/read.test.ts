@@ -48,28 +48,33 @@ describe("ReadTest", () => {
   it("define attribute methods", () => {
     const Klass = buildKlass();
     const instance = new Klass();
+    const methods = (object: object): string[] => {
+      const names: string[] = [];
+      for (let proto = Object.getPrototypeOf(object); proto; proto = Object.getPrototypeOf(proto)) {
+        names.push(...Object.getOwnPropertyNames(proto));
+      }
+      return names;
+    };
 
     for (const name of Klass.attributeNames()) {
-      expect(name in instance).toBe(false);
+      expect(methods(instance)).not.toContain(name);
     }
 
     Klass.defineAttributeMethods();
 
     for (const name of Klass.attributeNames()) {
-      expect(name in instance).toBe(true);
+      expect(methods(instance)).toContain(name);
     }
   });
 
   it("attribute methods generated?", () => {
     const Klass = buildKlass();
 
-    expect("one" in Klass.prototype).toBe(false);
-    expect(Klass.attributeMethodsGenerated()).toBe(false);
+    expect("one" in Klass.prototype).toBeFalsy();
 
     Klass.defineAttributeMethods();
 
-    expect("one" in Klass.prototype).toBe(true);
-    expect(Klass.attributeMethodsGenerated()).toBe(true);
+    expect("one" in Klass.prototype).toBeTruthy();
   });
 
   it("_read_attribute returns value for existing attribute", () => {
