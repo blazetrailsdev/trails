@@ -3,7 +3,7 @@ import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
-import { makeCachedSelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
+import { selectAll as querySelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
@@ -350,11 +350,18 @@ describe("QueryCache#select_all", () => {
       null,
       [],
     ]);
-    const selectAll = makeCachedSelectAll(() => pending);
+    const superSelectAll = () => pending;
 
-    const returned = selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], {
-      async: true,
-    });
+    const returned = querySelectAll.call(
+      cacheHost(store) as never,
+      superSelectAll as never,
+      "SELECT 1",
+      null,
+      [],
+      {
+        async: true,
+      },
+    );
 
     expect(returned).toBe(pending);
     expect((returned as FutureResult).pending()).toBe(true);
@@ -364,13 +371,20 @@ describe("QueryCache#select_all", () => {
     const store = new Store();
     store.enabled = true;
     await store.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
-    const selectAll = makeCachedSelectAll(() => {
+    const superSelectAll = () => {
       throw new Error("must not reach super on a cache hit");
-    });
+    };
 
-    const returned = selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], {
-      async: true,
-    });
+    const returned = querySelectAll.call(
+      cacheHost(store) as never,
+      superSelectAll as never,
+      "SELECT 1",
+      null,
+      [],
+      {
+        async: true,
+      },
+    );
 
     expect(returned).toBeInstanceOf(Complete);
     expect((returned as Complete).pending()).toBe(false);
@@ -381,10 +395,17 @@ describe("QueryCache#select_all", () => {
     const result = new Result(["id"], [[1]]);
     const store = new Store();
     store.enabled = true;
-    const selectAll = makeCachedSelectAll(async () => result);
+    const superSelectAll = async () => result;
 
     expect(
-      await selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], { async: false }),
+      await querySelectAll.call(
+        cacheHost(store) as never,
+        superSelectAll as never,
+        "SELECT 1",
+        null,
+        [],
+        { async: false },
+      ),
     ).toEqual(result);
   });
 });

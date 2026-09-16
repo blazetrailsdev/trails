@@ -1,6 +1,12 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
-import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/activesupport";
+import {
+  assertValidKeys,
+  camelize,
+  constantize,
+  prepend,
+  type PrependModule,
+} from "@blazetrails/activesupport";
 
 /** @internal */
 export function clearAggregationCache(record: Base): void {
@@ -32,7 +38,11 @@ export function composedOf(
     "converter",
   ]);
 
-  includeAggregations(modelClass);
+  const proto = modelClass.prototype as Record<string | symbol, any>;
+  if (!proto[aggregationsIncluded]) {
+    Object.defineProperty(proto, aggregationsIncluded, { value: true, configurable: true });
+    prepend(proto, { initializeDup, reload, initInternals } as PrependModule);
+  }
 
   const name = partId;
   const className = options.className ?? camelize(name);
@@ -178,43 +188,22 @@ function writerMethod(
 }
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
-type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
 
-export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
-  return function (this: T, options?: ReloadOptions): Promise<T> {
-    clearAggregationCache(this);
-    return inheritedReload.call(this, options);
-  };
+export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+  (this as any)._aggregationCache = new Map((this as any)._aggregationCache);
+  super_(other);
+}
+
+export function reload(
+  this: Base,
+  super_: (options?: ReloadOptions) => Promise<Base>,
+  options?: ReloadOptions,
+): Promise<Base> {
+  clearAggregationCache(this);
+  return super_(options);
 }
 
 const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsIncluded");
-
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
-export function includeAggregations(modelClass: typeof Base): void {
-  const proto = modelClass.prototype as Record<string | symbol, any>;
-  if (proto[aggregationsIncluded]) return;
-  Object.defineProperty(proto, aggregationsIncluded, {
-    value: true,
-    configurable: true,
-    enumerable: false,
-  });
-
-  const inheritedReload = proto.reload as ReloadFn<Base>;
-  Object.defineProperty(proto, "reload", {
-    value: reload(inheritedReload),
-    writable: true,
-    configurable: true,
-    enumerable: false,
-  });
-
-  prepend(proto, {
-    initInternals,
-    initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-      (this as any)._aggregationCache = new Map((this as any)._aggregationCache);
-      super_(other);
-    },
-  });
-}
 
 /** @internal */
 function initInternals(this: Base, super_: () => void): void {

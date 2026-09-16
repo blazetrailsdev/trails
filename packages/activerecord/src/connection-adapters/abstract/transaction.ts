@@ -228,8 +228,7 @@ export class NullTransaction {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-export class TransactionCallback {
+export class Callback {
   private _event: "before_commit" | "after_commit" | "after_rollback";
   private _callback: () => void | Promise<void>;
 
@@ -274,7 +273,7 @@ export type TransactionConnection = DatabaseAdapter & {
 export class Transaction {
   readonly state = new TransactionState();
   readonly savepointName: string | null = null;
-  private _callbacks: TransactionCallback[] | null = null;
+  private _callbacks: Callback[] | null = null;
   private _records: unknown[] | null = null;
   private _lazyEnrollmentRecords: Map<unknown, unknown> | null = null;
   private _connection: TransactionConnection;
@@ -287,7 +286,7 @@ export class Transaction {
   readonly userTransaction: UserTransaction;
   protected _instrumenter: TransactionInstrumenter;
 
-  static readonly Callback = TransactionCallback;
+  static readonly Callback = Callback;
 
   constructor(
     connection: TransactionConnection,
@@ -394,7 +393,7 @@ export class Transaction {
       throw new Error("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
-    this._callbacks.push(new TransactionCallback("before_commit", fn));
+    this._callbacks.push(new Callback("before_commit", fn));
   }
 
   afterCommit(fn: () => void | Promise<void>): void {
@@ -402,7 +401,7 @@ export class Transaction {
       throw new Error("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
-    this._callbacks.push(new TransactionCallback("after_commit", fn));
+    this._callbacks.push(new Callback("after_commit", fn));
   }
 
   afterRollback(fn: () => void | Promise<void>): void {
@@ -410,7 +409,7 @@ export class Transaction {
       throw new Error("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
-    this._callbacks.push(new TransactionCallback("after_rollback", fn));
+    this._callbacks.push(new Callback("after_rollback", fn));
   }
 
   async rollbackRecords(): Promise<void> {
@@ -546,7 +545,7 @@ export class Transaction {
   }
 
   /** @internal */
-  appendCallbacks(callbacks: TransactionCallback[]): void {
+  appendCallbacks(callbacks: Callback[]): void {
     if (!this._callbacks) this._callbacks = [];
     this._callbacks.push(...callbacks);
   }

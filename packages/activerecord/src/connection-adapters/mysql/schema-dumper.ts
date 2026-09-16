@@ -11,8 +11,9 @@ interface MysqlAdapterLike {
 
 export class SchemaDumper extends AbstractSchemaDumper {
   declare protected connection?: MysqlAdapterLike;
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-  tableCollationCache: Record<string, string | undefined> = Object.create(null);
+
+  protected _tableCollationCache: Record<string, string | undefined> = Object.create(null);
+
   /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
@@ -24,7 +25,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected async populateTableCollationFromStatus(tableName: string): Promise<void> {
-    if (Object.hasOwn(this.tableCollationCache, tableName)) return;
+    if (Object.hasOwn(this._tableCollationCache, tableName)) return;
     const conn = this.connection;
     if (!conn?.internalExecQuery || !conn.quote) return;
     const rows = (
@@ -32,7 +33,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     ).toArray();
     const collation = rows[0]?.["Collation"] as string | null | undefined;
     if (typeof collation === "string" && collation.length > 0) {
-      this.tableCollationCache[tableName] = collation;
+      this._tableCollationCache[tableName] = collation;
     }
   }
 
@@ -171,9 +172,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (!column.collation) return undefined;
     const tableName = this.tableName;
     if (!tableName) return JSON.stringify(column.collation);
-    if (!Object.hasOwn(this.tableCollationCache, tableName))
+    if (!Object.hasOwn(this._tableCollationCache, tableName))
       return JSON.stringify(column.collation);
-    const cached = this.tableCollationCache[tableName];
+    const cached = this._tableCollationCache[tableName];
     return column.collation !== cached ? JSON.stringify(column.collation) : undefined;
   }
 

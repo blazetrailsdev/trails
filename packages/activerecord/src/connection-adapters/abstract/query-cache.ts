@@ -307,45 +307,43 @@ type BaseSelectAll = (
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Result | Promise<Result> | FutureResult | FutureResultComplete;
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
-  return function cachedSelectAll(
-    this: QueryCacheHost,
-    arel: string | unknown,
-    name: string | null = null,
-    binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Result | Promise<Result> | FutureResult | FutureResultComplete {
-    arel = arelFromRelation(arel);
-    const [sql, resolvedBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
-      this as DatabaseStatementsHost,
-      arel,
-      binds ?? [],
-      opts?.preparable ?? null,
-      opts?.allowRetry ?? false,
-    );
-    binds = resolvedBinds;
-    const resolvedPreparable = compiledPreparable ?? opts?.preparable;
-    const forwardOpts = { ...opts, preparable: resolvedPreparable, allowRetry: compiledAllowRetry };
-    const qc = this._queryCache;
-    if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
-      if (opts?.async) {
-        const cached = this.lookupSqlCache(sql, name, binds ?? []);
-        const result =
-          cached !== undefined
-            ? Result.fromRowHashes(cached)
-            : original.call(this, sql, name, binds, forwardOpts);
-        return result instanceof Promise
-          ? result.then((r) => FutureResult.wrap(r))
-          : FutureResult.wrap(result);
-      }
-      return this.cacheSql(sql, name, binds ?? [], async () => {
-        const result = await original.call(this, sql, name, binds, forwardOpts);
-        return result.toArray();
-      }).then((rows) => Result.fromRowHashes(rows));
+export function selectAll(
+  this: QueryCacheHost,
+  super_: BaseSelectAll,
+  arel: string | unknown,
+  name: string | null = null,
+  binds?: unknown[],
+  opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
+): Result | Promise<Result> | FutureResult | FutureResultComplete {
+  arel = arelFromRelation(arel);
+  const [sql, resolvedBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
+    this as DatabaseStatementsHost,
+    arel,
+    binds ?? [],
+    opts?.preparable ?? null,
+    opts?.allowRetry ?? false,
+  );
+  binds = resolvedBinds;
+  const resolvedPreparable = compiledPreparable ?? opts?.preparable;
+  const forwardOpts = { ...opts, preparable: resolvedPreparable, allowRetry: compiledAllowRetry };
+  const qc = this._queryCache;
+  if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
+    if (opts?.async) {
+      const cached = this.lookupSqlCache(sql, name, binds ?? []);
+      const result =
+        cached !== undefined
+          ? Result.fromRowHashes(cached)
+          : super_.call(this, sql, name, binds, forwardOpts);
+      return result instanceof Promise
+        ? result.then((r) => FutureResult.wrap(r))
+        : FutureResult.wrap(result);
     }
-    return original.call(this, sql, name, binds, forwardOpts);
-  };
+    return this.cacheSql(sql, name, binds ?? [], async () => {
+      const result = await super_.call(this, sql, name, binds, forwardOpts);
+      return result.toArray();
+    }).then((rows) => Result.fromRowHashes(rows));
+  }
+  return super_.call(this, sql, name, binds, forwardOpts);
 }
 
 /** @internal */

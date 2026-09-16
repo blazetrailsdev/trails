@@ -115,13 +115,13 @@ describe("MySQL::SchemaDumper", () => {
       ));
     it("omits when matching table default", () => {
       const d = make();
-      d.tableCollationCache["users"] = "utf8mb4_unicode_ci";
+      (d as any)._tableCollationCache["users"] = "utf8mb4_unicode_ci";
       d.tableName = "users";
       expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBeUndefined();
     });
     it("emits when differing from table default", () => {
       const d = make();
-      d.tableCollationCache["users"] = "utf8mb4_general_ci";
+      (d as any)._tableCollationCache["users"] = "utf8mb4_general_ci";
       d.tableName = "users";
       expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
         '"utf8mb4_unicode_ci"',
@@ -221,7 +221,7 @@ describe("MySQL::SchemaDumper", () => {
         charset: "utf8mb4",
         collation: "utf8mb4_bin",
       });
-      expect(Object.hasOwn(d.tableCollationCache, "users")).toBe(false);
+      expect(Object.hasOwn((d as any)._tableCollationCache, "users")).toBe(false);
     });
 
     it("returns empty object when connection is absent", async () => {
@@ -240,7 +240,7 @@ describe("MySQL::SchemaDumper", () => {
         quote: (v: unknown) => `'${String(v)}'`,
       });
       await (d as any).populateTableCollationFromStatus("users");
-      expect(d.tableCollationCache["users"]).toBe("utf8mb4_general_ci");
+      expect((d as any)._tableCollationCache["users"]).toBe("utf8mb4_general_ci");
     });
   });
 
