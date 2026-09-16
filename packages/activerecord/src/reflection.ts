@@ -640,8 +640,11 @@ export class AssociationReflection extends MacroReflection {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 
     if (this.options.foreignKey) {
-      const fk = this.options.foreignKey;
-      this._foreignKeyCache = Array.isArray(fk) ? fk.map((fk) => String(fk)) : String(fk);
+      if (Array.isArray(this.options.foreignKey)) {
+        this._foreignKeyCache = this.options.foreignKey.map((fk) => String(fk));
+      } else {
+        this._foreignKeyCache = String(this.options.foreignKey);
+      }
     } else if (this.options.queryConstraints) {
       this._foreignKeyCache = (this.options.queryConstraints as string[]).map((fk) => String(fk));
     } else {
