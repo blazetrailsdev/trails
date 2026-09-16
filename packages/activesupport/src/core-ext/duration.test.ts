@@ -341,8 +341,20 @@ describe("DurationTest", () => {
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
-    const result = Duration.seconds(5).since();
-    expect(result).toBeInstanceOf(Temporal.Instant);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2000, 0, 1));
+      expect(Duration.seconds(5).since()).not.toBeInstanceOf(TimeWithZone);
+      expect(Duration.seconds(5).since().epochMilliseconds).toEqual(
+        new Date(2000, 0, 1, 0, 0, 5).getTime(),
+      );
+      expect(Duration.seconds(5).ago()).not.toBeInstanceOf(TimeWithZone);
+      expect(Duration.seconds(5).ago().epochMilliseconds).toEqual(
+        new Date(1999, 11, 31, 23, 59, 55).getTime(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("since and ago anchored to time zone now when time zone is set", () => {

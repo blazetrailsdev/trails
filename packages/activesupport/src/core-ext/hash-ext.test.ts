@@ -17,6 +17,7 @@ import {
   exceptBang,
   deepTransformKeys,
   deepTransformValues,
+  deepDup,
   symbolizeKeys,
   stringifyKeys,
   deepSymbolizeKeys,
@@ -32,6 +33,15 @@ import {
 import { Hash, except } from "@blazetrails/ruby-compat";
 
 describe("HashExtTest", () => {
+  const strings = () => ({ a: 1, b: 2 });
+  const nestedStrings = () => ({ a: { b: { c: 3 } } });
+  const symbols = () => ({ ":a": 1, ":b": 2 });
+  const nestedSymbols = () => ({ ":a": { ":b": { ":c": 3 } } });
+  const mixed = () => ({ ":a": 1, b: 2 });
+  const nestedMixed = () => ({ a: { ":b": { c: 3 } } });
+  const stringArrayOfHashes = () => ({ a: [{ b: 2 }, { c: 3 }, 4] });
+  const symbolArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { ":c": 3 }, 4] });
+  const mixedArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { c: 3 }, 4] });
   it("methods", () => {
     const h = { a: 1, b: 2 };
     expect(Object.keys(h)).toContain("a");
@@ -63,8 +73,13 @@ describe("HashExtTest", () => {
   });
 
   it("deep transform values", () => {
-    const obj = { a: 1, b: 2 };
-    expect(deepTransformValues(obj, (v) => (v as number) * 2)).toEqual({ a: 2, b: 4 });
+    expect(deepTransformValues(strings(), (value) => String(value))).toEqual({ a: "1", b: "2" });
+    expect(deepTransformValues(nestedStrings(), (value) => String(value))).toEqual({
+      a: { b: { c: "3" } },
+    });
+    expect(deepTransformValues(stringArrayOfHashes(), (value) => String(value))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
   });
 
   it("deep transform values not mutates", () => {
@@ -86,9 +101,9 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys", () => {
-    expect(symbolizeKeys({ ":a": 1, ":b": 2 })).toEqual({ ":a": 1, ":b": 2 });
-    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
-    expect(symbolizeKeys({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeys(symbols())).toEqual(symbols());
+    expect(symbolizeKeys(strings())).toEqual(symbols());
+    expect(symbolizeKeys(mixed())).toEqual(symbols());
   });
 
   it("symbolize keys not mutates", () => {
@@ -98,13 +113,12 @@ describe("HashExtTest", () => {
   });
 
   it("deep symbolize keys", () => {
-    expect(deepSymbolizeKeys({ ":a": { ":b": { ":c": 3 } } })).toEqual({
-      ":a": { ":b": { ":c": 3 } },
-    });
-    expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({ ":a": { ":b": { ":c": 3 } } });
-    expect(deepSymbolizeKeys({ a: [{ b: 2 }, { c: 3 }, 4] })).toEqual({
-      ":a": [{ ":b": 2 }, { ":c": 3 }, 4],
-    });
+    expect(deepSymbolizeKeys(nestedSymbols())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(nestedStrings())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(nestedMixed())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(stringArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeys(symbolArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeys(mixedArrayOfHashes())).toEqual(symbolArrayOfHashes());
   });
 
   it("deep symbolize keys not mutates", () => {
@@ -114,26 +128,34 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys!", () => {
-    expect(symbolizeKeysBang({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
-    expect(symbolizeKeysBang({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeysBang(symbols())).toEqual(symbols());
+    expect(symbolizeKeysBang(strings())).toEqual(symbols());
+    expect(symbolizeKeysBang(mixed())).toEqual(symbols());
   });
 
   it("symbolize keys with bang mutates", () => {
-    const h = { ":a": 1, b: 2 };
-    symbolizeKeysBang(h);
-    expect(h).toEqual({ ":a": 1, ":b": 2 });
+    const original = mixed();
+    const transformedHash = { ...original };
+    deepSymbolizeKeysBang(transformedHash);
+    expect(transformedHash).toEqual(symbols());
+    expect(original).toEqual({ ":a": 1, b: 2 });
   });
 
   it("deep symbolize keys!", () => {
-    expect(deepSymbolizeKeysBang({ a: { ":b": { c: 3 } } })).toEqual({
-      ":a": { ":b": { ":c": 3 } },
-    });
+    expect(deepSymbolizeKeysBang(nestedSymbols())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(nestedStrings())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(nestedMixed())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(stringArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeysBang(symbolArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeysBang(mixedArrayOfHashes())).toEqual(symbolArrayOfHashes());
   });
 
   it("deep symbolize keys with bang mutates", () => {
-    const h = { a: { ":b": { c: 3 } } };
-    deepSymbolizeKeysBang(h);
-    expect(h).toEqual({ ":a": { ":b": { ":c": 3 } } });
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepSymbolizeKeysBang(transformedHash);
+    expect(transformedHash).toEqual(nestedSymbols());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
   });
 
   it("symbolize keys preserves keys that cant be symbolized", () => {
