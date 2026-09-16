@@ -19,6 +19,12 @@ describe("DecimalTypeTrails", () => {
     expect(noPrec.cast(1.2346)).toEqual(bd("1.2346"));
   });
 
+  it("cast_value falls through to cast_value(value.to_s) for a value with no to_d", () => {
+    const type = new Types.DecimalType();
+    expect(type.cast({})).toEqual(bd("0"));
+    expect(type.cast(":sym")).toEqual(bd("0"));
+  });
+
   it("apply_scale handles leading-dot and trailing-dot numeric forms", () => {
     const type = new Types.DecimalType({ scale: 2 });
     expect(type.cast(".5")).toEqual(bd("0.50"));
