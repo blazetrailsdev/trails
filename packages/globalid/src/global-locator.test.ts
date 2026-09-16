@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
+import { assertDeprecated, registerConstant, _resetConstants } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
@@ -513,12 +513,18 @@ describe("GlobalLocatorTest", () => {
 
   it("use locator with class and single argument", async () => {
     const deprecated = {
-      locate: async () => "deprecated",
-      locateMany: async (gids: GlobalID[]) => gids.map((g) => g.modelId),
+      async locate(_gid: GlobalID) {
+        return "deprecated";
+      },
+      async locateMany(gids: GlobalID[], _options = {}) {
+        return gids.map((g) => g.modelId);
+      },
     };
     Locator.use("deprecated", deprecated);
     try {
-      expect(await Locator.locate("gid://deprecated/Person/1")).toBe("deprecated");
+      await assertDeprecated(null, GlobalID.deprecator(), async () => {
+        expect(await Locator.locate("gid://deprecated/Person/1")).toBe("deprecated");
+      });
       expect(
         await Locator.locateMany(["gid://deprecated/Person/1", "gid://deprecated/Person/2"]),
       ).toEqual(["1", "2"]);
