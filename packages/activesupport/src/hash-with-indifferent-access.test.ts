@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { Hash, KeyError, TypeError, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  KeyError,
+  TypeError,
+  rbInspect as inspect,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { assertRaises } from "./testing/assertions.js";
 import { deepDup } from "./hash-utils.js";
 
@@ -1074,9 +1080,16 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("assorted keys not stringified", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const keys = [...h.keys()];
-    expect(keys.every((k) => typeof k === "string")).toBe(true);
+    const original = hashOf([
+      [{}, 2],
+      [1, 2],
+      [[], true],
+    ]);
+    const indiff = wia(original);
+    expect(
+      [...indiff.keys()].some((k) => typeof k === "string"),
+      "A key was converted to a string!",
+    ).toBeFalsy();
   });
 
   it("deep merge on indifferent access", () => {
@@ -1140,10 +1153,16 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent without", () => {
-    const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
-    const result = original.without("a", "b");
-    expect(result).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
+    const original = wia({ ":a": "x", ":b": "y", ":c": 10 });
+    const expected = wia({ ":c": 10 });
+
+    for (const keys of [
+      ["a", "b"],
+      [":a", ":b"],
+    ]) {
+      expect(original.without(...keys), inspect(keys)).toEqual(expected);
+      expect(original).not.toEqual(expected);
+    }
   });
 
   it("indifferent extract", () => {
@@ -1214,10 +1233,8 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("inheriting from top level hash with indifferent access preserves ancestors chain", () => {
-    class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
-    const h = new MyHWIA({ a: 1 });
-    expect(h).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(h.get("a")).toBe(1);
+    const klass = class extends HashWithIndifferentAccess {};
+    expect(Object.getPrototypeOf(klass)).toEqual(HashWithIndifferentAccess);
   });
 
   it("inheriting from hash with indifferent access properly dumps ivars", () => {
@@ -1227,28 +1244,28 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("should use default proc for unknown key", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("unknown")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(() => 1 + 2);
+    expect(hashWia.get(":new_key")).toEqual(3);
   });
 
   it("should return nil if no key is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(() => 1 + 2);
+    expect(hashWia.default()).toBeUndefined();
   });
 
   it("should use default value for unknown key", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(3);
+    expect(hashWia.get(":new_key")).toEqual(3);
   });
 
   it("should use default value if no key is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>(3);
+    expect(hashWia.default()).toEqual(3);
   });
 
   it("should nil if no default value is supplied", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const hashWia = new HashWithIndifferentAccess<unknown>();
+    expect(hashWia.default()).toBeUndefined();
   });
 
   it("should return dup for with indifferent access", () => {
