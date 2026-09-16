@@ -31,8 +31,8 @@
       "value": 28
     },
     "activesupport": {
-      "assertionCount": 722,
-      "kind": 1009,
+      "assertionCount": 720,
+      "kind": 1006,
       "value": 84
     },
     "arel": {

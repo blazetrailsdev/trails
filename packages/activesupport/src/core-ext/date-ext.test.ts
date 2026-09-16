@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Date as RubyDate, Temporal } from "@blazetrails/date";
+import { Date as RubyDate, DateTime as RubyDateTime, Temporal } from "@blazetrails/date";
 import {
   endOfMonth,
   endOfYear,
@@ -17,7 +17,7 @@ import {
   isToday,
 } from "../time-ext.js";
 import {
-  defaultInspect,
+  inspect as dateInspect,
   readableInspect,
   toFormattedS as dateToFormattedS,
   toFs as dateToFs,
@@ -36,9 +36,14 @@ import {
   yesterday,
 } from "./date-and-time/calculations.js";
 import { isBlank } from "./object/blank.js";
-import { assertNothingRaised, assertNotPredicate, assertPredicate } from "../testing/assertions.js";
+import {
+  assertNothingRaised,
+  assertRaises,
+  assertNotPredicate,
+  assertPredicate,
+} from "../testing/assertions.js";
 import { Object as ObjectExt } from "./object/acts-like.js";
-import { setZone, zone } from "../time-zone-config.js";
+import { ArgumentError, setZone, zone } from "../time-zone-config.js";
 import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { travelTo } from "../testing/time-helpers.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -158,13 +163,25 @@ describe("DateExtCalculationsTest", () => {
 
   it("readable inspect", () => {
     expect(readableInspect(pd(2005, 2, 21))).toBe("Mon, 21 Feb 2005");
-    expect(defaultInspect(pd(2005, 2, 21))).not.toBe(readableInspect(pd(2005, 2, 21)));
+    expect(dateInspect(pd(2005, 2, 21))).toBe(readableInspect(pd(2005, 2, 21)));
   });
 
-  it("to time", () => {
-    const date = Temporal.PlainDate.from("2005-02-21");
-    const result = toTime(date);
-    expect(result.year).toBe(2005);
+  it("to time", async () => {
+    withEnvTz("US/Eastern", () => {
+      expect(toTime(pd(2005, 2, 21)).constructor).toBe(RubyTime);
+      expect(toTime(pd(2005, 2, 21)).eql(RubyTime.local(2005, 2, 21))).toBe(true);
+      expect(toTime(pd(2005, 2, 21)).utcOffset).toBe(RubyTime.local(2005, 2, 21).utcOffset);
+    });
+
+    for (let year = 0; year <= 138; year++) {
+      for (const format of ["utc", "local"]) {
+        expect(toTime(pd(year, 1, 1), format).year).toBe(year);
+      }
+    }
+
+    await assertRaises([ArgumentError], {}, () => {
+      toTime(pd(2005, 2, 21), "tokyo");
+    });
   });
 
   it("compare to time", () => {
@@ -393,8 +410,16 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("xmlschema", () => {
-    expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
-    expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
+    withEnvTz("US/Eastern", () => {
+      expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00-05:?00$/);
+      expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00-04:?00$/);
+      if (toTime(pd(1880, 6, 28)) instanceof RubyDateTime) {
+        // eslint-disable-next-line vitest/no-conditional-expect
+        expect(dateXmlschema(pd(1880, 2, 28))).toMatch(/^1880-02-28T00:00:00-05:?00$/);
+        // eslint-disable-next-line vitest/no-conditional-expect
+        expect(dateXmlschema(pd(1880, 6, 28))).toMatch(/^1880-06-28T00:00:00-05:?00$/);
+      }
+    });
   });
 
   it("xmlschema when zone is set", () => {

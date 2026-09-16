@@ -1,7 +1,5 @@
-import { Date as RubyDate, Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ordinalize } from "../../inflector.js";
-import { TimeWithZone } from "../../time-with-zone.js";
-import { TimeZone } from "../../values/time-zone.js";
 import { ArgumentError } from "../../time-zone-config.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
@@ -38,16 +36,17 @@ export function readableInspect(date: Temporal.PlainDate): string {
   return new RubyDate(date).strftime("%a, %d %b %Y");
 }
 
+export { readableInspect as inspect };
+
 export function defaultInspect(date: Temporal.PlainDate): string {
   return new RubyDate(date).inspect();
 }
 
-export function toTime(date: Temporal.PlainDate, form: string = "local"): TimeWithZone {
+export function toTime(date: Temporal.PlainDate, form: string = "local"): RubyTime {
   if (!["local", "utc"].includes(form)) {
     throw new ArgumentError(`Expected :local or :utc, got :${form}.`);
   }
-  const zone = TimeZone.find(form === "utc" ? "UTC" : Temporal.Now.timeZoneId())!;
-  return zone.local(date.year, date.month, date.day);
+  return RubyTime[form as "local" | "utc"](date.year, date.month, date.day);
 }
 
 export function xmlschema(date: Temporal.PlainDate): string {
