@@ -91,7 +91,10 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#join` (`vendor/ruby/thread.c:1179`),
    * which waits for the thread to finish, re-raises the exception it died of, and
-   * returns the thread itself.
+   * returns the thread itself. Ruby blocks the calling thread to wait; JS has no
+   * synchronous await, so a thread whose block is async answers a `Promise` of
+   * itself and the caller awaits it — the same language shortcoming the repo
+   * guide ratifies for `serializable_hash` and `Relation`.
    */
   join(): this | Promise<this> {
     if (this.#error) throw this.#error.raised;
