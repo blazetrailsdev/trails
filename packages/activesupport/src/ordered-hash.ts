@@ -48,6 +48,10 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this.select((k, v) => !block(k, v));
   }
 
+  nestedUnderIndifferentAccess(): this {
+    return this;
+  }
+
   rejectBang(...args: [(key: K, value: V) => boolean]): this | null {
     const block = args[args.length - 1];
     const n = this.size;
