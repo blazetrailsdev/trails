@@ -150,17 +150,31 @@ function cachedSchemaCacheFor(
  * `primary_key` are not forced to null-guard. That narrowing is the accepted
  * deviation; this function is where the truth lives.
  * Rails' `primary_key` runs `reset_primary_key` on first read
- * (primary_key.rb:78-81) and latches the answer into `@primary_key`. trails
- * resolves through `get_primary_key` on EVERY read instead, because
- * `table_exists?` is async here: a read taken before the schema cache is warm
- * would otherwise cache the "id" convention forever.
+ * (primary_key.rb:80-81) and latches the answer into `@primary_key`. trails
+ * latches too, but only once the answer is reflected: `table_exists?` is async
+ * here, so a read taken before the schema cache is warm answers the "id"
+ * convention without latching it.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; Ruby's memoizes, ours re-resolves because table_exists? is async.
+ * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
   if (configured !== undefined) return configured;
-  return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
+  const base = baseClass.call(this as unknown as typeof Base) as unknown as PrimaryKeyHost & {
+    primaryKeyPrefixType?: string | null;
+  };
+  let reflected = base.primaryKeyPrefixType != null;
+  try {
+    const tableName = base.tableName;
+    reflected ||=
+      tableName != null &&
+      cachedSchemaCacheFor(base)?.getCachedPrimaryKeys?.(tableName) !== undefined;
+  } catch {}
+  if (reflected) {
+    resetPrimaryKey.call(this);
+    return this._primaryKey as string | string[] | null;
+  }
+  return getPrimaryKey.call(this, (base as unknown as typeof Base).name);
 }
 
 /**

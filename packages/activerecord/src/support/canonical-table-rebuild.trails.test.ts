@@ -28,7 +28,7 @@ describe("ensureCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
-      await adapter.executeMutation("DROP TABLE topics");
+      await adapter.execute("DROP TABLE topics");
       expect(await tableNames(adapter)).not.toContain("topics");
 
       await ensureCanonicalTables(adapter, ["topics", "authors"]);
@@ -44,8 +44,8 @@ describe("ensureCanonicalTables", () => {
     const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
-      await adapter.executeMutation("DROP TABLE topics");
-      await adapter.executeMutation("CREATE TABLE topics (id integer PRIMARY KEY, title varchar)");
+      await adapter.execute("DROP TABLE topics");
+      await adapter.execute("CREATE TABLE topics (id integer PRIMARY KEY, title varchar)");
       const drifted = await dumpSchema(adapter);
 
       await ensureCanonicalTables(adapter, ["topics", "authors"]);

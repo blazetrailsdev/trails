@@ -360,9 +360,9 @@ describe("AdapterTest", () => {
 
   it("uniqueness violations are translated to specific exception", async () => {
     const conn = Base.connection;
-    await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')");
-    const error = await conn
-      .executeMutation("INSERT INTO subscribers(nick) VALUES('me')")
+    await conn.execute("INSERT INTO subscribers(nick) VALUES('me')");
+    const error: any = await conn
+      .execute("INSERT INTO subscribers(nick) VALUES('me')")
       .catch((e) => e);
     expect(error).toBeInstanceOf(RecordNotUnique);
     expect(error.cause).toBeTruthy();
@@ -468,8 +468,8 @@ describe("AdapterForeignKeyTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   const cleanup = async (): Promise<void> => {
-    await Base.connection.executeMutation("DELETE FROM fk_test_has_fk");
-    await Base.connection.executeMutation("DELETE FROM fk_test_has_pk");
+    await Base.connection.execute("DELETE FROM fk_test_has_fk");
+    await Base.connection.execute("DELETE FROM fk_test_has_pk");
   };
 
   beforeEach(cleanup);
@@ -477,7 +477,7 @@ describe("AdapterForeignKeyTest", () => {
 
   beforeEach(async () => {
     if (adapterType === "sqlite") {
-      await Base.connection.executeMutation("PRAGMA foreign_keys = ON");
+      await Base.connection.execute("PRAGMA foreign_keys = ON");
     }
   });
 
@@ -504,10 +504,10 @@ describe("AdapterForeignKeyTest", () => {
   });
 
   it("foreign key violations on delete are translated to specific exception", async () => {
-    await Base.connection.executeMutation("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
+    await Base.connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
     await insertIntoFkTestHasFk(1);
     const error = await Base.connection
-      .executeMutation("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
+      .delete("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
       .catch((e) => e);
     expect(error).toBeInstanceOf(InvalidForeignKey);
     expect(error.cause).toBeTruthy();
@@ -517,7 +517,7 @@ describe("AdapterForeignKeyTest", () => {
     const conn = Base.connection;
     await conn.disableReferentialIntegrity(async () => {
       await insertIntoFkTestHasFk();
-      await conn.executeMutation("DELETE FROM fk_test_has_fk");
+      await conn.execute("DELETE FROM fk_test_has_fk");
     });
   });
 });

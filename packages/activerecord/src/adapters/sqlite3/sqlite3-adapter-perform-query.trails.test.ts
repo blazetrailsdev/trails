@@ -27,7 +27,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute still returns rows for a row-returning statement", async () => {
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
     await expect(adapter.execute(`SELECT "nick" FROM "pq"`)).resolves.toEqual([{ nick: "a" }]);
   });
 
@@ -49,10 +49,10 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("affectedRows reports the rows changed by the last write", async () => {
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('b')`);
 
-    expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
+    expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
     expect(adapter.affectedRows()).toBe(2);
 
     await adapter.execute(`SELECT * FROM "pq"`);
@@ -60,9 +60,9 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("affectedRows is preserved across DDL", async () => {
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
-    expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('b')`);
+    expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
 
     await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
     expect(adapter.affectedRows()).toBe(2);
@@ -76,23 +76,19 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("affectedRows is not reset by transaction control in the run branch", async () => {
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
-    await adapter.executeMutation(`BEGIN`);
-    expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
-    await adapter.executeMutation(`COMMIT`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('b')`);
+    await adapter.execute(`BEGIN`);
+    expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
+    await adapter.execute(`COMMIT`);
     expect(adapter.affectedRows()).toBe(2);
   });
 
-  it("executeMutation returns the inserted id for INSERT ... RETURNING", async () => {
-    const id = await adapter.executeMutation(
-      `INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`,
-    );
+  it("insert returns the inserted id for INSERT ... RETURNING", async () => {
+    const id = await adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('a')`);
     expect(id).toBe(1);
 
-    const second = await adapter.executeMutation(
-      `INSERT INTO "pq" ("nick") VALUES ('b') RETURNING "id"`,
-    );
+    const second = await adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     expect(second).toBe(2);
     expect(adapter.affectedRows()).toBe(1);
   });
@@ -101,11 +97,13 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const n = 25;
     const ids = await Promise.all(
       Array.from({ length: n }, (_, i) =>
-        adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('n${i}')`),
+        adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('n${i}')`),
       ),
     );
     expect(new Set(ids).size).toBe(n);
-    expect([...ids].sort((a, b) => a - b)).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+    expect([...ids].sort((a, b) => Number(a) - Number(b))).toEqual(
+      Array.from({ length: n }, (_, i) => i + 1),
+    );
   });
 
   it("serializes statements queued on one connection", async () => {
@@ -161,7 +159,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const release = await acquireStatementLock(closing);
     const held = closing._statementLock;
 
-    const queued = closing.executeMutation(`INSERT INTO "dc" DEFAULT VALUES`);
+    const queued = closing.insert(`INSERT INTO "dc" DEFAULT VALUES`, null, "id");
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
     expect(closing._statementLock).not.toBe(held);
 
@@ -183,7 +181,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const release = await acquireStatementLock(closing);
     const held = closing._statementLock;
 
-    const queued = closing.executeMutation(`INSERT INTO "dc2" DEFAULT VALUES`);
+    const queued = closing.insert(`INSERT INTO "dc2" DEFAULT VALUES`, null, "id");
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
 
     const disconnecting = closing.disconnectBang();
@@ -199,10 +197,10 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("returns the rowid of each of two RETURNING inserts issued together", async () => {
     const ids = await Promise.all([
-      adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`),
-      adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b') RETURNING "id"`),
+      adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('a')`),
+      adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('b')`),
     ]);
-    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
+    expect([...ids].sort((a, b) => Number(a) - Number(b))).toEqual([1, 2]);
   });
 
   it("errors when a write is routed through execute while preventing writes", async () => {

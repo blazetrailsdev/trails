@@ -157,7 +157,7 @@ async function _resetPgTablesOnce(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
     try {
-      await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
+      await adapter.execute(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -166,7 +166,7 @@ async function _resetPgTablesOnce(
     `SELECT schemaname, viewname AS name FROM pg_views WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
     try {
-      await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
+      await adapter.execute(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -182,7 +182,7 @@ async function _resetPgTablesOnce(
       continue;
     }
     try {
-      await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
+      await adapter.execute(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -213,7 +213,7 @@ async function resetMysqlTables(
       const name = r.table_name ?? r.TABLE_NAME;
       if (name)
         try {
-          await adapter.executeMutation(`DROP VIEW IF EXISTS \`${name}\``);
+          await adapter.execute(`DROP VIEW IF EXISTS \`${name}\``);
         } catch {}
     }
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
@@ -224,7 +224,7 @@ async function resetMysqlTables(
         continue;
       }
       try {
-        await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
+        await adapter.execute(`DROP TABLE IF EXISTS \`${name}\``);
       } catch {}
     }
   });
@@ -242,7 +242,7 @@ async function resetSqliteTables(
       `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
     )) as { name: string }[]) {
       try {
-        await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
+        await adapter.execute(`DROP VIEW IF EXISTS "${name}"`);
       } catch {}
     }
     for (const { name } of (await adapter.execute(
@@ -253,7 +253,7 @@ async function resetSqliteTables(
         continue;
       }
       try {
-        await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+        await adapter.execute(`DROP TABLE IF EXISTS "${name}"`);
       } catch {}
     }
   });

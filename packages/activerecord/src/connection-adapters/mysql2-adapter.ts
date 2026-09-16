@@ -364,26 +364,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return mysql2AffectedRows.call(this as any, rawResult);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-execute-mutation-onto-exec-statements */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = [],
-    name: string | null = "SQL",
-  ): Promise<number> {
-    sql = this.preprocessQuery(sql);
-    const raw = (await this.rawExecute(sql, name, binds)) as Mysql2RawResult;
-    const affected = this.affectedRows(raw);
-
-    if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-      if (affected > 1) {
-        return affected;
-      }
-      return raw.insertId ?? 0;
-    }
-
-    return affected;
-  }
-
   override isSavepointErrorsInvalidateTransactions(): boolean {
     return true;
   }

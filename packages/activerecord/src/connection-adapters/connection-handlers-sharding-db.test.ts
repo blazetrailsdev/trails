@@ -79,12 +79,12 @@ describe("ConnectionHandlersShardingDbTest", () => {
         await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
           await Base.establishConnection({ adapter: "sqlite3", database: primary });
           const conn = await Base.leaseConnection();
-          await conn.executeMutation(
+          await conn.execute(
             `CREATE TABLE IF NOT EXISTS "people" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)`,
           );
           const rows = await conn.execute(`SELECT * FROM "people" LIMIT 1`);
           expect(Array.isArray(rows)).toBe(true);
-          await conn.executeMutation(`DROP TABLE IF EXISTS "people"`);
+          await conn.execute(`DROP TABLE IF EXISTS "people"`);
 
           const pm = (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base");
           expect([...pm.shardNames].sort()).toEqual(["default", "shard_one"]);

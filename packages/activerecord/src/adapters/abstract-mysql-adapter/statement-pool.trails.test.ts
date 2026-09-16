@@ -65,7 +65,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
 
-    it("executeMutation caches the plan for INSERT (reuses on repeat)", async () => {
+    it("internalExecQuery caches the plan for INSERT (reuses on repeat)", async () => {
       await adapter.execute(`DROP TABLE IF EXISTS \`sp_mut\``);
       await adapter.execute(
         `CREATE TABLE \`sp_mut\` (\`id\` INT AUTO_INCREMENT PRIMARY KEY, \`name\` VARCHAR(32))`,

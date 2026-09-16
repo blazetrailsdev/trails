@@ -44,7 +44,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   it("applies the comment on write queries too", async () => {
     queryTransformers().push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
-      adapter.executeMutation("INSERT INTO customers (name) VALUES ('x')"),
+      adapter.execute("INSERT INTO customers (name) VALUES ('x')"),
     );
     expect(sqls.some((s) => s === "INSERT INTO customers (name) VALUES ('x') /*app:test*/")).toBe(
       true,

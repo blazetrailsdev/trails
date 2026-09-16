@@ -27,8 +27,8 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("shares one frozen Column instance between structurally identical columns", async () => {
-    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, label TEXT)");
-    await adapter.executeMutation("CREATE TABLE memberships (id INTEGER PRIMARY KEY, label TEXT)");
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, label TEXT)");
+    await adapter.execute("CREATE TABLE memberships (id INTEGER PRIMARY KEY, label TEXT)");
 
     const widgetLabel = (await adapter.columns("widgets")).find((c) => c.name === "label");
     const membershipLabel = (await adapter.columns("memberships")).find((c) => c.name === "label");
@@ -39,24 +39,24 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("tables returns user-created tables, hiding sqlite_* internals", async () => {
-    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
     expect(await adapter.tables()).toEqual(["widgets"]);
   });
 
   it("primaryKey returns the single-column pk name", async () => {
-    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     expect(await adapter.primaryKey("widgets")).toBe("id");
   });
 
   it("primaryKey returns null for composite primary keys", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE memberships (user_id INTEGER, group_id INTEGER, PRIMARY KEY (user_id, group_id))",
     );
     expect(await adapter.primaryKey("memberships")).toEqual(["user_id", "group_id"]);
   });
 
   it("columns returns Column metadata keyed by name", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, weight REAL)",
     );
     const cols = await adapter.columns("widgets");
@@ -68,7 +68,7 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("columns reflects a STORED generated column's expression as default_function", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       `CREATE TABLE "widgets" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,
     );
     const cols = await adapter.columns("widgets");
@@ -78,10 +78,10 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("indexes returns user-created indexes and skips auto-indexes", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, email TEXT UNIQUE, owner TEXT)",
     );
-    await adapter.executeMutation("CREATE INDEX widgets_on_owner ON widgets (owner)");
+    await adapter.execute("CREATE INDEX widgets_on_owner ON widgets (owner)");
     const indexes = (await adapter.indexes("widgets")) as Array<{
       table: string;
       name: string;
@@ -101,10 +101,8 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("indexes captures DESC column ordering", async () => {
-    await adapter.executeMutation(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, weight REAL)",
-    );
-    await adapter.executeMutation(
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, weight REAL)");
+    await adapter.execute(
       `CREATE INDEX widgets_on_name_weight ON widgets ("name" ASC, "weight" DESC)`,
     );
     const indexes = (await adapter.indexes("widgets")) as Array<{
@@ -124,8 +122,8 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("indexes surfaces expression-index columns from the index SQL", async () => {
-    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
-    await adapter.executeMutation("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.execute("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
     const indexes = (await adapter.indexes("widgets")) as Array<{
       name: string;
       columns: string[] | string;
@@ -135,10 +133,8 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("indexes keeps the WHERE clause of temp-table indexes", async () => {
-    await adapter.executeMutation(
-      "CREATE TEMP TABLE temp_widgets (id INTEGER PRIMARY KEY, name TEXT)",
-    );
-    await adapter.executeMutation(
+    await adapter.execute("CREATE TEMP TABLE temp_widgets (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.execute(
       "CREATE INDEX temp_widgets_on_name ON temp_widgets (name) WHERE name IS NOT NULL",
     );
     const indexes = (await adapter.indexes("temp_widgets")) as Array<{
@@ -150,14 +146,14 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("alterTable preserves expression, partial and unique indexes across the rebuild", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, code TEXT, doomed TEXT)",
     );
-    await adapter.executeMutation("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
-    await adapter.executeMutation(
+    await adapter.execute("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
+    await adapter.execute(
       "CREATE UNIQUE INDEX widgets_on_code ON widgets (code) WHERE code IS NOT NULL",
     );
-    await adapter.executeMutation(`CREATE INDEX widgets_on_name_desc ON widgets ("name" DESC)`);
+    await adapter.execute(`CREATE INDEX widgets_on_name_desc ON widgets ("name" DESC)`);
 
     const byNameSorted = (list: readonly unknown[]): Array<{ name: string }> =>
       [...(list as Array<{ name: string }>)].sort((a, b) => a.name.localeCompare(b.name));
@@ -180,10 +176,8 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
-    await adapter.executeMutation(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",
-    );
-    await adapter.executeMutation("CREATE VIEW widget_names AS SELECT name FROM widgets");
+    await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+    await adapter.execute("CREATE VIEW widget_names AS SELECT name FROM widgets");
     expect(await adapter.dataSourceExists("widgets")).toBe(true);
     expect(await adapter.dataSourceExists("widget_names")).toBe(true);
     expect(await adapter.dataSourceExists("missing")).toBe(false);

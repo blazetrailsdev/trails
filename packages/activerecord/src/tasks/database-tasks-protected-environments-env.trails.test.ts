@@ -42,16 +42,16 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         // eslint-disable-next-line blazetrails/require-table-teardown
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
-      await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
-      await adapter.executeMutation(
+      await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+      await adapter.execute(
         // eslint-disable-next-line blazetrails/require-table-teardown
         "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
       );
-      await adapter.executeMutation(
+      await adapter.execute(
         `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${storedEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       );
     } finally {
@@ -134,21 +134,19 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
       for (const version of versions) {
-        await adapter.executeMutation(
-          `INSERT INTO schema_migrations (version) VALUES ('${version}')`,
-        );
+        await adapter.execute(`INSERT INTO schema_migrations (version) VALUES ('${version}')`);
       }
       if (storedEnv !== undefined) {
-        await adapter.executeMutation(
+        await adapter.execute(
           // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach
           "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
         );
-        await adapter.executeMutation(
+        await adapter.execute(
           `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${storedEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         );
       }

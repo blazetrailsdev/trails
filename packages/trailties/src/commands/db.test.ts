@@ -1370,12 +1370,12 @@ export class CreatePosts extends Migration {
       createWidgets.migration = async () =>
         new (class extends Migration {
           override async up(): Promise<void> {
-            await this.connection.executeMutation(
+            await this.connection.execute(
               `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
             );
           }
           override async down(): Promise<void> {
-            await this.connection.executeMutation(`DROP TABLE widgets`);
+            await this.connection.execute(`DROP TABLE widgets`);
           }
         })("CreateWidgets", 20260101000000);
       const migrations = [createWidgets];
@@ -1446,13 +1446,13 @@ export class CreatePosts extends Migration {
     const seedAdapter = new BetterSQLite3Adapter({ database: dbFile });
     await establishMigrationConnection(seedAdapter, dbFile);
     try {
-      await seedAdapter.executeMutation("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
-      await seedAdapter.executeMutation("INSERT INTO posts (title) VALUES ('a'), ('b')");
+      await seedAdapter.execute("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
+      await seedAdapter.execute("INSERT INTO posts (title) VALUES ('a'), ('b')");
       await new InternalMetadata(seedAdapter.pool).createTableAndSetFlags("development");
-      await seedAdapter.executeMutation(
+      await seedAdapter.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR NOT NULL PRIMARY KEY)",
       );
-      await seedAdapter.executeMutation(
+      await seedAdapter.execute(
         "INSERT INTO schema_migrations (version) VALUES ('20260101000000')",
       );
     } finally {
@@ -1506,8 +1506,8 @@ export class CreatePosts extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
-      await seed.executeMutation("INSERT INTO widgets (name) VALUES ('x'), ('y')");
+      await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+      await seed.execute("INSERT INTO widgets (name) VALUES ('x'), ('y')");
     } finally {
       await seed.disconnectBang();
     }
@@ -1792,8 +1792,8 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
-      await seed.executeMutation("INSERT INTO widgets (name) VALUES ('keep-me')");
+      await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+      await seed.execute("INSERT INTO widgets (name) VALUES ('keep-me')");
     } finally {
       await seed.disconnectBang();
     }
@@ -1825,9 +1825,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation(
-        "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
-      );
+      await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
     } finally {
       await seed.disconnectBang();
     }
@@ -1875,10 +1873,8 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation(
-        "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
-      );
-      await seed.executeMutation("CREATE UNIQUE INDEX users_on_email ON users (email)");
+      await seed.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)");
+      await seed.execute("CREATE UNIQUE INDEX users_on_email ON users (email)");
     } finally {
       await seed.disconnectBang();
     }
@@ -2287,13 +2283,13 @@ export class CreateCats extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seedPrimary = new BetterSQLite3Adapter({ database: primaryDb });
     try {
-      await seedPrimary.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
+      await seedPrimary.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
     } finally {
       await seedPrimary.disconnectBang();
     }
     const seedAnimals = new BetterSQLite3Adapter({ database: animalsDb });
     try {
-      await seedAnimals.executeMutation("CREATE TABLE dogs (id INTEGER PRIMARY KEY)");
+      await seedAnimals.execute("CREATE TABLE dogs (id INTEGER PRIMARY KEY)");
     } finally {
       await seedAnimals.disconnectBang();
     }
@@ -2323,7 +2319,7 @@ export class CreateCats extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+      await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     } finally {
       await seed.disconnectBang();
     }
@@ -2350,7 +2346,7 @@ export class CreateCats extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation("CREATE TABLE items (id INTEGER PRIMARY KEY)");
+      await seed.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)");
     } finally {
       await seed.disconnectBang();
     }
@@ -2373,10 +2369,8 @@ export class CreateCats extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await seed.executeMutation(
-        "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
-      );
-      await seed.executeMutation("CREATE INDEX gadgets_on_label ON gadgets (label)");
+      await seed.execute("CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)");
+      await seed.execute("CREATE INDEX gadgets_on_label ON gadgets (label)");
     } finally {
       await seed.disconnectBang();
     }
@@ -2386,7 +2380,7 @@ export class CreateCats extends Migration {
 
     const dropper = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await dropper.executeMutation("DROP TABLE gadgets");
+      await dropper.execute("DROP TABLE gadgets");
     } finally {
       await dropper.disconnectBang();
     }
@@ -2464,9 +2458,9 @@ export class CreatePosts extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const dropper = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await dropper.executeMutation("DROP TABLE schema_migrations");
-      await dropper.executeMutation("DROP TABLE ar_internal_metadata");
-      await dropper.executeMutation("DROP TABLE posts");
+      await dropper.execute("DROP TABLE schema_migrations");
+      await dropper.execute("DROP TABLE ar_internal_metadata");
+      await dropper.execute("DROP TABLE posts");
     } finally {
       await dropper.disconnectBang();
     }

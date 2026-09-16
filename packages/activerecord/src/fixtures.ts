@@ -119,8 +119,9 @@ async function resetPkSequence(
   if (!sequence) return;
   const qt = adapter.quoteTableName(tableName);
   const qc = adapter.quoteColumnName(serialResetCol);
-  await adapter.executeMutation(
+  await adapter.execQuery(
     `SELECT setval($1, GREATEST(COALESCE(MAX(${qc}), 0), 1), COALESCE(MAX(${qc}), 0) <> 0) FROM ${qt}`,
+    "SQL",
     [sequence],
   );
 }

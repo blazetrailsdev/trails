@@ -82,11 +82,11 @@ describe("SQLiteDatabaseTasks", () => {
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const seedAdapter = new BetterSQLite3Adapter({ database: dbPath });
     try {
-      await seedAdapter.executeMutation(
+      await seedAdapter.execute(
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
       );
-      await seedAdapter.executeMutation("CREATE INDEX index_widgets_on_name ON widgets(name)");
-      await seedAdapter.executeMutation(
+      await seedAdapter.execute("CREATE INDEX index_widgets_on_name ON widgets(name)");
+      await seedAdapter.execute(
         "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
           "BEGIN " +
           "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
@@ -131,7 +131,7 @@ describe("SQLiteDatabaseTasks", () => {
       }
     } finally {
       const cleanupAdapter = new BetterSQLite3Adapter({ database: dbPath });
-      await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
+      await cleanupAdapter.execute("DROP TABLE IF EXISTS widgets");
       await (cleanupAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
     }
   });
@@ -193,7 +193,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
 
   async function lay(...statements: string[]): Promise<void> {
     await pool().withConnection(async (conn) => {
-      for (const statement of statements) await conn.executeMutation(statement);
+      for (const statement of statements) await conn.execute(statement);
     });
   }
 

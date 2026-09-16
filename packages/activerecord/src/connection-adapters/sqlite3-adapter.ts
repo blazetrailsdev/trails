@@ -340,24 +340,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-execute-mutation-onto-exec-statements */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = [],
-    name: string | null = "SQL",
-  ): Promise<number> {
-    sql = this.preprocessQuery(sql);
-    try {
-      await this.rawExecute(sql, name, binds);
-      if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-        return Number(this._lastInsertRowid);
-      }
-      return this._lastAffectedRows;
-    } finally {
-      this.dirtyCurrentTransaction();
-    }
-  }
-
   /** @internal */
   _previousReadUncommitted: unknown = null;
 

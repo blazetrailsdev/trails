@@ -239,7 +239,7 @@ class UpOnlyMigration extends SilentMigration {
   async change(): Promise<void> {
     await this.addColumn("horses", "oldie", "integer", { default: 0 });
     await this.upOnly(async () => {
-      await this.connection.executeMutation("update horses set oldie = 1");
+      await this.connection.execute("update horses set oldie = 1");
     });
   }
 }

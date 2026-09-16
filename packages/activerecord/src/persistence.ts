@@ -171,10 +171,8 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
 export async function _insertRecord(
   this: PersistenceHost,
   connection: {
-    insert?(arel: unknown, ...args: unknown[]): Promise<unknown>;
-    executeMutation?(sql: string, binds?: unknown[]): Promise<number>;
-    toSql(arel: unknown): string;
-    emptyInsertStatementValue?(pk?: string | null): string;
+    insert(arel: unknown, ...args: unknown[]): Promise<unknown>;
+    emptyInsertStatementValue(pk?: string | null): string;
   },
   values: Record<string, unknown>,
   returning?: string[] | null,
@@ -182,9 +180,9 @@ export async function _insertRecord(
   const ctor = this as any;
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
-  if (ctor.isPrefetchPrimaryKey?.() && primaryKey && !Array.isArray(primaryKey)) {
-    if (values[primaryKey] == null) {
-      primaryKeyValue = ctor.nextSequenceValue?.();
+  if (ctor.isPrefetchPrimaryKey() && primaryKey) {
+    if (values[primaryKey] == null || values[primaryKey] === false) {
+      primaryKeyValue = ctor.nextSequenceValue();
       values[primaryKey] = ctor
         ._defaultAttributes()
         .getAttribute(primaryKey)
@@ -196,31 +194,23 @@ export async function _insertRecord(
   const im = new InsertManager(arelTable);
 
   const entries = Object.entries(values);
-  if (entries.length > 0) {
+  if (entries.length === 0) {
+    im.insert(connection.emptyInsertStatementValue(primaryKey));
+  } else {
     im.insert(entries.map(([col, val]) => [arelTable.get(col), val]));
   }
 
-  if (typeof connection.insert === "function") {
-    const cols = typeof ctor.columns === "function" ? (ctor.columns() as { name: string }[]) : [];
-    const pkExists = cols.length === 0 || cols.some((c) => c.name === primaryKey);
-    const pkArg: string | false =
-      !Array.isArray(primaryKey) && primaryKey && pkExists ? primaryKey : false;
-    if (entries.length === 0) {
-      im.insert(
-        connection.emptyInsertStatementValue!(!Array.isArray(primaryKey) ? primaryKey : null),
-      );
-    }
-    return connection.insert(im, `${ctor.name} Create`, pkArg, primaryKeyValue, undefined, [], {
+  return connection.insert(
+    im,
+    `${ctor.name} Create`,
+    primaryKey || false,
+    primaryKeyValue,
+    undefined,
+    [],
+    {
       returning: returning ?? null,
-    });
-  }
-
-  const sql = connection.toSql(im);
-  const finalSql =
-    entries.length > 0
-      ? sql
-      : `${sql} ${connection.emptyInsertStatementValue?.() ?? "DEFAULT VALUES"}`;
-  return connection.executeMutation!(finalSql);
+    },
+  );
 }
 
 export async function _updateRecord(

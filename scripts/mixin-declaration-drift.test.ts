@@ -20,7 +20,7 @@ const ADAPTERS = "packages/activerecord/src/connection-adapters/";
  *
  * `witness` is the concrete class the declared surface is checked against.
  * `AbstractAdapter` cannot vouch for itself: a handful of its declared methods
- * (`beginTransaction`, `commit`, `rollback`, `executeMutation`,
+ * (`beginTransaction`, `commit`, `rollback`,
  * `currentDatabase`) are the base's abstract contract, implemented only by
  * concrete adapters — SQLite stands in for them, as it does in
  * `quoting-contract.test.ts`.

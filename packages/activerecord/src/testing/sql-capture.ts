@@ -3,23 +3,17 @@ import { Notifications } from "@blazetrails/activesupport";
 /** @internal */
 export interface StubbableAdapter {
   execute: (sql: string, name?: string | null) => Promise<unknown>;
-  executeMutation: (sql: string, binds?: unknown[], name?: string) => Promise<number>;
   exec?: (sql: string) => Promise<void>;
 }
 
 function installExecuteStub(adapter: StubbableAdapter): () => void {
   const original = {
     execute: adapter.execute,
-    executeMutation: adapter.executeMutation,
     exec: adapter.exec,
   };
   adapter.execute = (sql: string, name: string | null = "SQL") => {
     Notifications.instrument("sql.active_record", { sql, name });
     return Promise.resolve([]);
-  };
-  adapter.executeMutation = (sql: string, _binds?: unknown[], name: string = "SQL") => {
-    Notifications.instrument("sql.active_record", { sql, name });
-    return Promise.resolve(0);
   };
   if (original.exec) {
     adapter.exec = (sql: string) => {
@@ -29,7 +23,6 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
   }
   return () => {
     adapter.execute = original.execute;
-    adapter.executeMutation = original.executeMutation;
     adapter.exec = original.exec;
   };
 }
@@ -44,8 +37,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * `counter.log` unless the caller opts in. Pass `{ includeSchema: true }` for
  * Rails' `log_all` behaviour.
  *
- * Pass `{ stub: adapter }` to intercept the adapter's `execute`/
- * `executeMutation` so DDL is instrumented-and-returned without hitting the
+ * Pass `{ stub: adapter }` to intercept the adapter's `execute` so DDL is instrumented-and-returned without hitting the
  * DB — mirroring Rails' ActiveSchemaTest `setup` stub. This avoids issuing
  * real `CREATE TABLE` / `CREATE INDEX` round-trips for pure SQL-assertion
  * tests (and the mysql:8 DDL cost they carry).

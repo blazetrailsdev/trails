@@ -146,41 +146,41 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   describe("translate_exception", () => {
     beforeEach(async () => {
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ex_child`);
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ex_parent`);
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ex_uniq`);
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ex_notnull`);
-      await adapter.executeMutation(`DROP TABLE IF EXISTS ex_long`);
+      await adapter.execute(`DROP TABLE IF EXISTS ex_child`);
+      await adapter.execute(`DROP TABLE IF EXISTS ex_parent`);
+      await adapter.execute(`DROP TABLE IF EXISTS ex_uniq`);
+      await adapter.execute(`DROP TABLE IF EXISTS ex_notnull`);
+      await adapter.execute(`DROP TABLE IF EXISTS ex_long`);
     });
 
     it("translates ER_DUP_ENTRY to RecordNotUnique", async () => {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE ex_uniq (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20) UNIQUE)`,
       );
-      await adapter.executeMutation(`INSERT INTO ex_uniq (name) VALUES ('Alice')`);
+      await adapter.execute(`INSERT INTO ex_uniq (name) VALUES ('Alice')`);
       await expect(
-        adapter.executeMutation(`INSERT INTO ex_uniq (name) VALUES ('Alice')`),
+        adapter.insert(`INSERT INTO ex_uniq (name) VALUES ('Alice')`),
       ).rejects.toBeInstanceOf(RecordNotUnique);
     });
 
     it("translates ER_NO_REFERENCED_ROW_2 to InvalidForeignKey", async () => {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE ex_parent (id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB`,
       );
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE ex_child (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT, FOREIGN KEY (parent_id) REFERENCES ex_parent(id)) ENGINE=InnoDB`,
       );
       await expect(
-        adapter.executeMutation(`INSERT INTO ex_child (parent_id) VALUES (999)`),
+        adapter.insert(`INSERT INTO ex_child (parent_id) VALUES (999)`),
       ).rejects.toBeInstanceOf(InvalidForeignKey);
     });
 
     it("translates ER_NOT_NULL_VIOLATION to NotNullViolation", async () => {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE ex_notnull (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20) NOT NULL)`,
       );
       await expect(
-        adapter.executeMutation(`INSERT INTO ex_notnull (name) VALUES (NULL)`),
+        adapter.insert(`INSERT INTO ex_notnull (name) VALUES (NULL)`),
       ).rejects.toBeInstanceOf(NotNullViolation);
     });
 
@@ -188,17 +188,17 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
       await adapter.beginTransaction({ _lazy: false });
       try {
-        await adapter.executeMutation(
+        await adapter.execute(
           `SET SESSION sql_mode = CONCAT_WS(',', @@SESSION.sql_mode, 'STRICT_TRANS_TABLES')`,
         );
-        await adapter.executeMutation(
+        await adapter.execute(
           `CREATE TABLE ex_long (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(5))`,
         );
         await expect(
-          adapter.executeMutation(`INSERT INTO ex_long (name) VALUES ('toolongvalue')`),
+          adapter.insert(`INSERT INTO ex_long (name) VALUES ('toolongvalue')`),
         ).rejects.toBeInstanceOf(ValueTooLong);
       } finally {
-        await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
+        await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
         await adapter.rollbackTransaction().catch(() => {});
       }
     });
@@ -219,7 +219,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       await adapter.execQuery("SELECT 1");
       expect(adapter._databaseTimezone).toBe("local");
       adapter._databaseTimezone = "utc";
-      await adapter.executeMutation("DO 1");
+      await adapter.execute("DO 1");
       expect(adapter._databaseTimezone).toBe("local");
       adapter._databaseTimezone = "utc";
       await adapter.execute("DO 1");
@@ -247,26 +247,26 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   it("warnings handler actually fires on exec update", async () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-    await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
+    await adapter.execute(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction({ _lazy: false });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      await adapter.executeMutation(`SET SESSION sql_mode=''`);
-      await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
+      await adapter.execute(`SET SESSION sql_mode=''`);
+      await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
       const logger = { warn: vi.fn() };
       Base.logger = logger as never;
       await withDbWarningsAction("log", async () => {
-        await adapter.executeMutation(
+        await adapter.execute(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );
       });
       expect(logger.warn).toHaveBeenCalled();
     } finally {
-      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
+      await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollbackTransaction().catch(() => {});
-      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      await adapter.execute(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
       Base.logger = previousLogger;
     }
   });

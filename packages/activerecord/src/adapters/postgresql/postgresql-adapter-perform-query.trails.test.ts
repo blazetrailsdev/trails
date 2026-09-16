@@ -31,53 +31,48 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute still returns rows for a row-returning statement", async () => {
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
     await expect(adapter.execute(`SELECT nick FROM pq`)).resolves.toEqual([{ nick: "a" }]);
   });
 
-  it("executeMutation sources affected rows through the affectedRows port", async () => {
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('c')`);
+  it("update and delete source affected rows through the affectedRows port", async () => {
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('b')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('c')`);
 
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
-    expect(await adapter.executeMutation(`DELETE FROM pq`)).toBe(3);
+    expect(await adapter.update(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
+    expect(await adapter.update(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
+    expect(await adapter.delete(`DELETE FROM pq`)).toBe(3);
   });
 
-  it("executeMutation appends RETURNING id and returns the inserted id for a bare INSERT", async () => {
-    const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+  it("insert appends RETURNING id and returns the inserted id for a bare INSERT", async () => {
+    const id = await adapter.insert(`INSERT INTO pq (nick) VALUES ('a')`);
     expect(id).toBe(1);
-    const second = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
+    const second = await adapter.insert(`INSERT INTO pq (nick) VALUES ('b')`);
     expect(second).toBe(2);
   });
 
-  it("executeMutation emits one sql.active_record for an INSERT into a table without a primary key", async () => {
+  it("insert emits one sql.active_record for an INSERT into a table without a primary key", async () => {
     await adapter.execute(`CREATE TABLE pq_ddl (nick character varying(255))`);
     const subscriber = new SQLSubscriber();
     subscriber.start();
     try {
       await adapter.transaction(async () => {
-        expect(await adapter.executeMutation(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBe(1);
+        expect(await adapter.insert(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBeUndefined();
       });
       const inserts = subscriber.logged.filter(([sql]) => sql.startsWith("INSERT"));
-      expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "SQL", []]]);
+      expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "", []]]);
     } finally {
       subscriber.stop();
       await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);
     }
   });
 
-  it("executeMutation returns the inserted id for an explicit INSERT ... RETURNING", async () => {
-    const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a') RETURNING id`);
-    expect(id).toBe(1);
-  });
-
-  it("errors when a write is routed through executeMutation while preventing writes", async () => {
+  it("errors when a write is routed through insert while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(
-        connection.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`),
-      ).rejects.toThrow(ReadOnlyError);
+      await expect(connection.insert(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
+        ReadOnlyError,
+      );
     });
   });
 
@@ -186,7 +181,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
 
   it("prepareStatement parses once so the named query reuses the statement", async () => {
     const sql = "select nick from pq where id = $1";
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
     const rows = await adapter.execQuery(sql, "SQL", [1], { prepare: true });
     expect(rows.toArray()).toEqual([{ nick: "a" }]);
     expect(adapter._statements.isKey(adapter.sqlKey(sql))).toBe(true);

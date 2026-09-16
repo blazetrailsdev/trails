@@ -21,9 +21,7 @@ describe("useTransactionalTests — DML isolation", () => {
   });
 
   it("inserts a row that is visible within the same test", async () => {
-    await (
-      await conn()
-    ).executeMutation(`INSERT INTO txn_smoke_users (id, name) VALUES (1, 'alice')`);
+    await (await conn()).execute(`INSERT INTO txn_smoke_users (id, name) VALUES (1, 'alice')`);
     const rows = (await (await conn()).selectAll(`SELECT * FROM txn_smoke_users`)).toArray();
     expect(rows).toHaveLength(1);
   });
@@ -42,7 +40,7 @@ describe.skipIf(adapterType === "mysql")(
     it("creates a DDL table that is visible within the same test", async () => {
       await (
         await conn()
-      ).executeMutation(`CREATE TABLE txn_smoke_ddl (id INTEGER PRIMARY KEY, label TEXT)`);
+      ).execute(`CREATE TABLE txn_smoke_ddl (id INTEGER PRIMARY KEY, label TEXT)`);
       const rows = (await (await conn()).selectAll(`SELECT 1 AS ok FROM txn_smoke_ddl`)).toArray();
       expect(rows).toHaveLength(0);
     });

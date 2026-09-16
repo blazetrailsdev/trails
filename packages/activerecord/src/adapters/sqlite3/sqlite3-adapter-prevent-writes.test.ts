@@ -22,27 +22,25 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   it("errors when an insert query is called while preventing writes", async () => {
     await adapter.execute(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await Base.whilePreventingWrites(async () => {
-      await expect(
-        adapter.executeMutation(`INSERT INTO "pw" ("name") VALUES ('x')`),
-      ).rejects.toThrow(ReadOnlyError);
-    });
-  });
-
-  it("errors when an update query is called while preventing writes", async () => {
-    await adapter.execute(`CREATE TABLE "pw2" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await adapter.executeMutation(`INSERT INTO "pw2" ("name") VALUES ('x')`);
-    await Base.whilePreventingWrites(async () => {
-      await expect(adapter.executeMutation(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(
+      await expect(adapter.insert(`INSERT INTO "pw" ("name") VALUES ('x')`)).rejects.toThrow(
         ReadOnlyError,
       );
     });
   });
 
+  it("errors when an update query is called while preventing writes", async () => {
+    await adapter.execute(`CREATE TABLE "pw2" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.execute(`INSERT INTO "pw2" ("name") VALUES ('x')`);
+    await Base.whilePreventingWrites(async () => {
+      await expect(adapter.update(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(ReadOnlyError);
+    });
+  });
+
   it("errors when a delete query is called while preventing writes", async () => {
     await adapter.execute(`CREATE TABLE "pw3" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await adapter.executeMutation(`INSERT INTO "pw3" ("name") VALUES ('x')`);
+    await adapter.execute(`INSERT INTO "pw3" ("name") VALUES ('x')`);
     await Base.whilePreventingWrites(async () => {
-      await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(ReadOnlyError);
+      await expect(adapter.delete(`DELETE FROM "pw3"`)).rejects.toThrow(ReadOnlyError);
     });
   });
 
@@ -50,7 +48,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     await adapter.execute(`CREATE TABLE "pw4" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await Base.whilePreventingWrites(async () => {
       await expect(
-        adapter.executeMutation(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`),
+        adapter.execute(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`),
       ).rejects.toThrow(ReadOnlyError);
     });
   });

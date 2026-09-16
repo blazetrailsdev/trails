@@ -33,7 +33,7 @@ describe("SqliteAdapter", () => {
       await adapter.execute(
         `CREATE TABLE "affinities" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "untyped", "doomed" varchar)`,
       );
-      await adapter.executeMutation(`INSERT INTO "affinities" ("untyped") VALUES (42)`);
+      await adapter.execute(`INSERT INTO "affinities" ("untyped") VALUES (42)`);
 
       await adapter.removeColumn("affinities", "doomed");
 

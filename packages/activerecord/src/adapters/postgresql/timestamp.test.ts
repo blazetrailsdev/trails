@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp with time zone", async () => {
-      const id = await adapter.executeMutation(
+      const id = await adapter.insert(
         `INSERT INTO "postgresql_timestamps" ("occurred_at") VALUES ('2023-06-15 14:30:00+00')`,
       );
       const rows = (

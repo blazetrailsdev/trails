@@ -11,13 +11,11 @@ async function conn(): Promise<AbstractAdapter> {
 }
 
 async function createView(name: string, sql: string): Promise<void> {
-  await (
-    await conn()
-  ).executeMutation(`CREATE VIEW ${(await conn()).quoteTableName(name)} AS ${sql}`);
+  await (await conn()).execute(`CREATE VIEW ${(await conn()).quoteTableName(name)} AS ${sql}`);
 }
 async function dropView(name: string): Promise<void> {
   if (await (await conn()).viewExists(name)) {
-    await (await conn()).executeMutation(`DROP VIEW ${(await conn()).quoteTableName(name)}`);
+    await (await conn()).execute(`DROP VIEW ${(await conn()).quoteTableName(name)}`);
   }
 }
 

@@ -26,7 +26,6 @@ function makeStatements(
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => `${v}`,
     execute: vi.fn().mockResolvedValue([]),
-    executeMutation: vi.fn().mockResolvedValue(undefined),
     lookupCastType: (sqlType: string | null) => AbstractAdapter.TYPE_MAP.lookup(sqlType),
     config: {},
     schemaCache: { clearDataSourceCacheBang: vi.fn().mockResolvedValue(undefined) },
@@ -501,8 +500,8 @@ describe("SchemaStatements privates (PR 8)", () => {
       name: "fk_rails_composite",
     });
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
-    const executeMutation = (ss as any).executeMutation as ReturnType<typeof vi.fn>;
-    executeMutation.mockClear();
+    const execute = (ss as any).execute as ReturnType<typeof vi.fn>;
+    execute.mockClear();
 
     await ss.addForeignKey("astronauts", "rockets", {
       column: ["rocket_tenant_id", "rocket_id"],
@@ -510,7 +509,7 @@ describe("SchemaStatements privates (PR 8)", () => {
       ifNotExists: true,
     });
 
-    expect(executeMutation).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("foreignKeyForBang throws when not found", async () => {

@@ -2648,7 +2648,7 @@ describe("EagerLoadingTooManyIdsTest", () => {
   }, 180_000);
 
   afterAll(async () => {
-    await Base.connection.executeMutation("DELETE FROM citations");
+    await Base.connection.execute("DELETE FROM citations");
   }, 60_000);
 
   it("preloading too many ids", async () => {

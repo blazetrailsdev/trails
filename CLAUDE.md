@@ -1100,7 +1100,7 @@ The alternatives were tried:
 - **Leaning on SQLite's `_statementLock`** (`acquireStatementLock`,
   `sqlite3/database-statements.ts`) does not cover it: that lock wraps only
   `performQuery`, not `withRawConnection`'s `connectBang` (three concurrent
-  opens) nor `executeMutation`'s post-`rawExecute` `_lastInsertRowid` read, and
+  opens) nor the post-`rawExecute` `_lastInsertRowid` read, and
   it exists on one adapter only.
 - **Leasing per promise** has no Ruby counterpart and no JS hook to key on.
 

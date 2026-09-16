@@ -60,7 +60,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
         if (executeCallCount === 1) throw connErr;
         return [];
       }),
-      executeMutation: vi.fn(async () => {}),
       schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
@@ -75,7 +74,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
       execute: vi.fn(async () => {
         throw appErr;
       }),
-      executeMutation: vi.fn(async () => {}),
       schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
@@ -83,7 +81,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     expect(fakeAdapter.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("retries when executeMutation throws a connection error mid-loop", async () => {
+  it("retries when a DROP throws a connection error mid-loop", async () => {
     const connErr = Object.assign(new Error("invalid frontend message type 0"), {
       code: "08P01",
     });
@@ -92,27 +90,28 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     const fakeAdapter = {
       adapterName: "PostgreSQL",
       execute: vi.fn(async (sql: string) => {
+        if (sql.startsWith("DROP")) {
+          mutationCallCount++;
+          if (mutationCallCount === 1) throw connErr;
+          return [];
+        }
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
         }
         return [];
       }),
-      executeMutation: vi.fn(async () => {
-        mutationCallCount++;
-        if (mutationCallCount === 1) throw connErr;
-      }),
       schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
-    expect(fakeAdapter.execute).toHaveBeenCalledTimes(4);
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(5);
     expect(mutationCallCount).toBe(1);
   });
 });
 
 describe("resetTestTables", () => {
   it("truncates canonical tables (keeps shape) instead of dropping them", async () => {
-    await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4242)`);
+    await adapter.execute(`INSERT INTO articles (id) VALUES (4242)`);
     expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBeGreaterThan(
       0,
     );
@@ -124,7 +123,7 @@ describe("resetTestTables", () => {
   });
 
   it("drops bespoke (non-canonical) tables so their shape can't leak", async () => {
-    await adapter.executeMutation(`CREATE TABLE bespoke_reset_t (id INTEGER PRIMARY KEY)`);
+    await adapter.execute(`CREATE TABLE bespoke_reset_t (id INTEGER PRIMARY KEY)`);
     expect(await listTables(adapter)).toContain("bespoke_reset_t");
 
     await resetTestTables(adapter);
@@ -134,7 +133,7 @@ describe("resetTestTables", () => {
   });
 
   it("drops bookkeeping tables (schema_migrations / ar_internal_metadata) like the old drop-all", async () => {
-    await adapter.executeMutation(
+    await adapter.execute(
       `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
     );
 
@@ -167,16 +166,16 @@ describe("dropAllTables", () => {
 
   it("drops 3-table FK chain without error", async () => {
     const int = typeRegistryKeyFor(dropAdapter) === "mysql2" ? "INT" : "INTEGER";
-    await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
-    await dropAdapter.executeMutation(
+    await dropAdapter.execute(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
+    await dropAdapter.execute(
       `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,
     );
-    await dropAdapter.executeMutation(
+    await dropAdapter.execute(
       `CREATE TABLE fk_grandchild (id ${int} PRIMARY KEY, child_id ${int}, FOREIGN KEY (child_id) REFERENCES fk_child(id))`,
     );
-    await dropAdapter.executeMutation(`INSERT INTO fk_parent (id) VALUES (1)`);
-    await dropAdapter.executeMutation(`INSERT INTO fk_child (id, parent_id) VALUES (1, 1)`);
-    await dropAdapter.executeMutation(`INSERT INTO fk_grandchild (id, child_id) VALUES (1, 1)`);
+    await dropAdapter.execute(`INSERT INTO fk_parent (id) VALUES (1)`);
+    await dropAdapter.execute(`INSERT INTO fk_child (id, parent_id) VALUES (1, 1)`);
+    await dropAdapter.execute(`INSERT INTO fk_grandchild (id, child_id) VALUES (1, 1)`);
     await dropAllTables(dropAdapter);
     expect(await tableCount(dropAdapter)).toBe(0);
   });
@@ -259,7 +258,7 @@ describe("purge-only pre-snapshot path", () => {
 
   it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
     const { dropAllTablesModule } = await freshModules();
-    await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4243)`);
+    await adapter.execute(`INSERT INTO articles (id) VALUES (4243)`);
     expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(1);
 
     await dropAllTablesModule.purgeToCanonicalTables(adapter);

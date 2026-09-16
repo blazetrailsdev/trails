@@ -71,7 +71,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("exec query nothing raises with no result queries", async () => {
-    await adapter.executeMutation("CREATE TABLE IF NOT EXISTS `ex` (`number` INT) ENGINE=InnoDB");
+    await adapter.execute("CREATE TABLE IF NOT EXISTS `ex` (`number` INT) ENGINE=InnoDB");
     try {
       await expect(
         adapter.execQuery("INSERT INTO `ex` (number) VALUES (1)"),
@@ -80,7 +80,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         Result,
       );
     } finally {
-      await adapter.executeMutation("DROP TABLE IF EXISTS `ex`");
+      await adapter.execute("DROP TABLE IF EXISTS `ex`");
     }
   });
 
@@ -160,7 +160,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
     } finally {
-      await adapter.executeMutation("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
+      await adapter.execute("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
     }
   });
 
@@ -191,7 +191,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("errors for bigint fks on integer pk table in create table", async () => {
     try {
       const error = await adapter
-        .executeMutation(
+        .execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -222,7 +222,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("errors for integer fks on bigint pk table in create table", async () => {
     try {
       const error = await adapter
-        .executeMutation(
+        .execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -253,7 +253,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("errors for bigint fks on string pk table in create table", async () => {
     try {
       const error = await adapter
-        .executeMutation(
+        .execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -319,25 +319,25 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("warnings do not change returned value of exec update", async () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-    await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
+    await adapter.execute(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction({ _lazy: false });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      await adapter.executeMutation(`SET SESSION sql_mode=''`);
-      await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
+      await adapter.execute(`SET SESSION sql_mode=''`);
+      await adapter.execute(`INSERT INTO warn_posts (title) VALUES ('Title')`);
       await withDbWarningsAction("log", async () => {
         Base.logger = new Logger(null);
-        const affected = await adapter.executeMutation(
+        const affected = await adapter.update(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );
         expect(affected).toBe(1);
       });
     } finally {
-      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
+      await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollbackTransaction().catch(() => {});
-      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      await adapter.execute(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
       Base.logger = previousLogger;
     }
   });
@@ -345,25 +345,25 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("warnings do not change returned value of exec delete", async () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-    await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
+    await adapter.execute(`DROP TABLE IF EXISTS warn_posts_d`);
     await adapter.beginTransaction({ _lazy: false });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         `CREATE TABLE warn_posts_d (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      await adapter.executeMutation(`SET SESSION sql_mode=''`);
-      await adapter.executeMutation(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
+      await adapter.execute(`SET SESSION sql_mode=''`);
+      await adapter.execute(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
       await withDbWarningsAction("log", async () => {
         Base.logger = new Logger(null);
-        const affected = await adapter.executeMutation(
+        const affected = await adapter.delete(
           `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
         );
         expect(affected).toBe(1);
       });
     } finally {
-      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
+      await adapter.execute(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollbackTransaction().catch(() => {});
-      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
+      await adapter.execute(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
       Base.logger = previousLogger;
     }
   });

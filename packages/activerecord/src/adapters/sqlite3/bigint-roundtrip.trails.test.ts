@@ -33,7 +33,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   const BIG = 2n ** 62n;
 
   it("returns bigint for BIGINT column", async () => {
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, null, [
       BIG,
       1,
     ]);
@@ -44,7 +44,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
 
   it("preserves exact value above Number.MAX_SAFE_INTEGER", async () => {
     const unsafe = 9007199254740993n;
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, null, [
       unsafe,
       0,
     ]);
@@ -53,7 +53,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   });
 
   it("IntegerType.cast coerces safeIntegers bigint back to number for INTEGER columns", async () => {
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, null, [
       BIG,
       42,
     ]);
@@ -62,11 +62,11 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   });
 
   it("BooleanType.cast handles 0n/1n from safeIntegers mode correctly", async () => {
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, null, [
       BIG,
       0,
     ]);
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, null, [
       BIG,
       1,
     ]);
@@ -76,11 +76,11 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   });
 
   it("update round-trip preserves value", async () => {
-    await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, null, [
       BIG,
       0,
     ]);
-    await adapter.executeMutation(`UPDATE "big_items" SET "score" = ?`, [BIG + 1n]);
+    await adapter.execUpdate(`UPDATE "big_items" SET "score" = ?`, null, [BIG + 1n]);
     const rows = (await adapter.execute(`SELECT "score" FROM "big_items"`))!;
     expect(bigType.cast(rows[0].score)).toBe(BIG + 1n);
   });

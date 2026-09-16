@@ -120,14 +120,12 @@ describe("ConnectionHandlersMultiDbTest", () => {
     const relation = await Base.connectedTo({ role: "secondary" }, async () => {
       await (
         await MultiConnectionTestModel.leaseConnection()
-      ).executeMutation(
-        "CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))",
-      );
+      ).execute("CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))");
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
       const loaded = await MultiConnectionTestModel.where({ connection_role: "reading" }).load();
       await (
         await MultiConnectionTestModel.leaseConnection()
-      ).executeMutation("DROP TABLE IF EXISTS `multi_connection_test_models`");
+      ).execute("DROP TABLE IF EXISTS `multi_connection_test_models`");
       return loaded;
     });
 

@@ -53,14 +53,14 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         await import("../connection-adapters/better-sqlite3-adapter.js");
       const adapter = new BetterSQLite3Adapter({ database: dbFile });
       try {
-        await adapter.executeMutation(
+        await adapter.execute(
           "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
         );
-        await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
-        await adapter.executeMutation(
+        await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+        await adapter.execute(
           "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
         );
-        await adapter.executeMutation(
+        await adapter.execute(
           `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${currentEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         );
       } finally {
@@ -79,9 +79,9 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         Base.protectedEnvironments = protectedEnvironments;
         const cleanup = new BetterSQLite3Adapter({ database: dbFile });
 
-        await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
+        await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
 
-        await cleanup.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
+        await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
         await cleanup.disconnectBang();
         DatabaseTasks.databaseConfiguration = originalConfigurations;
         DatabaseTasks.clearRegisteredTasks();
@@ -110,12 +110,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const adapter = new BetterSQLite3Adapter({ database: dbFile });
     try {
-      await adapter.executeMutation(
+      await adapter.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
-      await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+      await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
 
-      await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
+      await adapter.execute("DROP TABLE IF EXISTS ar_internal_metadata");
     } finally {
       await adapter.disconnectBang();
     }
@@ -125,7 +125,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       );
     } finally {
       const cleanup = new BetterSQLite3Adapter({ database: dbFile });
-      await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
+      await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.disconnectBang();
       DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();
@@ -159,10 +159,10 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
     for (const dbFile of [primaryDb, secondaryDb]) {
       const adapter = new BetterSQLite3Adapter({ database: dbFile });
       try {
-        await adapter.executeMutation(
+        await adapter.execute(
           "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
         );
-        await adapter.executeMutation(
+        await adapter.execute(
           `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${env}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         );
       } finally {
@@ -176,10 +176,10 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 
       const secondary = new BetterSQLite3Adapter({ database: secondaryDb });
       try {
-        await secondary.executeMutation(
+        await secondary.execute(
           "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
         );
-        await secondary.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+        await secondary.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
       } finally {
         await secondary.disconnectBang();
       }
@@ -862,7 +862,7 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
       );
       const columnList = columns.map(([column]) => adapter.quoteColumnName(String(column)));
       if (columnList.length === 0) continue;
-      await adapter.executeMutation(
+      await adapter.execute(
         `INSERT INTO main.${table} (${columnList.join(", ")}) ` +
           `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
       );
@@ -871,8 +871,8 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
       "SELECT count(*) FROM backupSource.sqlite_master WHERE name = 'sqlite_sequence'",
     );
     if (Number(sequences) > 0) {
-      await adapter.executeMutation("DELETE FROM main.sqlite_sequence");
-      await adapter.executeMutation(
+      await adapter.execute("DELETE FROM main.sqlite_sequence");
+      await adapter.execute(
         "INSERT INTO main.sqlite_sequence (name, seq) SELECT name, seq FROM backupSource.sqlite_sequence",
       );
     }
@@ -1188,16 +1188,14 @@ describe("DatabaseTasksTruncateAllTest", () => {
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const seed = new BetterSQLite3Adapter({ database: dbPath });
-    await seed.executeMutation("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
-    await seed.executeMutation("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
-    await seed.executeMutation("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
-    await seed.executeMutation(
-      "CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)",
-    );
-    await seed.executeMutation("INSERT INTO courses (name) VALUES ('ruby')");
-    await seed.executeMutation("INSERT INTO colleges (name) VALUES ('trails')");
-    await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
-    await seed.executeMutation("INSERT INTO ar_internal_metadata (key, value) VALUES ('a', 'b')");
+    await seed.execute("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
+    await seed.execute("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
+    await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
+    await seed.execute("CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)");
+    await seed.execute("INSERT INTO courses (name) VALUES ('ruby')");
+    await seed.execute("INSERT INTO colleges (name) VALUES ('trails')");
+    await seed.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+    await seed.execute("INSERT INTO ar_internal_metadata (key, value) VALUES ('a', 'b')");
     await seed.disconnectBang();
 
     DatabaseTasks.clearRegisteredTasks();
@@ -1220,8 +1218,8 @@ describe("DatabaseTasksTruncateAllTest", () => {
       expect(await reader.execute("SELECT * FROM courses")).toEqual([]);
       expect(await reader.execute("SELECT * FROM colleges")).toEqual([]);
     } finally {
-      await reader.executeMutation("DROP TABLE IF EXISTS courses");
-      await reader.executeMutation("DROP TABLE IF EXISTS colleges");
+      await reader.execute("DROP TABLE IF EXISTS courses");
+      await reader.execute("DROP TABLE IF EXISTS colleges");
       await reader.disconnectBang();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
