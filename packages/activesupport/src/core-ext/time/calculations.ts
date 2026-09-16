@@ -41,26 +41,22 @@ export function current(): TimeWithZone | RubyTime {
     : RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
 }
 
-const atWithoutCoercion = RubyTime.at;
+const atWithoutCoercion = RubyTime.at.bind(RubyTime);
 
-export function atWithCoercion(
-  this: typeof RubyTime,
-  timeOrNumber: unknown,
-  ...args: unknown[]
-): RubyTime {
+export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): RubyTime {
   if (args.length === 0) {
     if (timeOrNumber instanceof TimeWithZone) {
-      return atWithoutCoercion.call(this, timeOrNumber.toR()).getlocal();
+      return atWithoutCoercion(timeOrNumber.toR()).getlocal();
     } else if (
       timeOrNumber instanceof Temporal.PlainDateTime ||
       timeOrNumber instanceof Temporal.ZonedDateTime
     ) {
-      return atWithoutCoercion.call(this, toF(timeOrNumber)).getlocal();
+      return atWithoutCoercion(toF(timeOrNumber)).getlocal();
     } else {
-      return atWithoutCoercion.call(this, timeOrNumber);
+      return atWithoutCoercion(timeOrNumber);
     }
   } else {
-    return atWithoutCoercion.call(this, timeOrNumber, ...args);
+    return atWithoutCoercion(timeOrNumber, ...args);
   }
 }
 
@@ -401,11 +397,7 @@ declare module "@blazetrails/date" {
     export function daysInMonth(month: number, year?: number): number;
     export function daysInYear(year?: number): number;
     export function rfc3339(str: string): Time;
-    export function atWithCoercion(
-      this: typeof Time,
-      timeOrNumber: unknown,
-      ...args: unknown[]
-    ): Time;
+    export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): Time;
   }
 }
 
@@ -459,4 +451,4 @@ Object.assign(RubyTime.prototype, {
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
-RubyTime.at = atWithCoercion as typeof RubyTime.at;
+RubyTime.at = atWithCoercion;

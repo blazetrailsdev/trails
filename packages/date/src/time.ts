@@ -368,16 +368,8 @@ export class Time {
     return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
   }
 
-  static now<T extends typeof Time>(
-    this: T,
-    { in: inZone = null }: { in?: string | number | null } = {},
-  ): InstanceType<T> {
-    return Time.#atInstant(
-      Temporal.Instant.fromEpochNanoseconds(systemEpochNs()),
-      inZone,
-      undefined,
-      this,
-    ) as InstanceType<T>;
+  static now({ in: inZone = null }: { in?: string | number | null } = {}): Time {
+    return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
   }
 
   static new(
@@ -431,7 +423,6 @@ export class Time {
     instant: Temporal.Instant,
     zone: string | number | null = null,
     tzmodeUtc?: boolean,
-    klass: typeof Time = Time,
   ): Time {
     const timeZoneId =
       zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
@@ -443,36 +434,22 @@ export class Time {
       tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
       localZone: zone == null,
     };
-    return new klass(0);
+    return new Time(0);
   }
 
-  static at<T extends typeof Time>(
-    this: T,
-    seconds: unknown,
-    microsecondsWithFrac?: unknown,
-  ): InstanceType<T> {
+  static at(seconds: unknown, microsecondsWithFrac?: unknown): Time {
     if (seconds instanceof Time) {
       if (microsecondsWithFrac !== undefined) {
         throw new TypeError("can't convert Time into an exact number");
       }
-      return Time.#atInstant(
-        seconds.#instant,
-        seconds.#zoneArgument(),
-        seconds.#tzmodeUtc,
-        this,
-      ) as InstanceType<T>;
+      return Time.#atInstant(seconds.#instant, seconds.#zoneArgument(), seconds.#tzmodeUtc);
     }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
       .add(numExact(microsecondsWithFrac ?? 0).mul(1_000));
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
-    return Time.#atInstant(
-      Temporal.Instant.fromEpochNanoseconds(nanoseconds),
-      null,
-      undefined,
-      this,
-    ) as InstanceType<T>;
+    return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(nanoseconds));
   }
 
   static utc(

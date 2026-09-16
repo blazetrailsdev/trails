@@ -166,7 +166,7 @@ describe("DateExtCalculationsTest", () => {
     expect(dateInspect(pd(2005, 2, 21))).toBe(readableInspect(pd(2005, 2, 21)));
   });
 
-  it("to time", () => {
+  it("to time", async () => {
     withEnvTz("US/Eastern", () => {
       expect(toTime(pd(2005, 2, 21)).constructor).toBe(RubyTime);
       expect(toTime(pd(2005, 2, 21)).eql(RubyTime.local(2005, 2, 21))).toBe(true);
@@ -179,7 +179,7 @@ describe("DateExtCalculationsTest", () => {
       }
     }
 
-    assertRaises([ArgumentError], {}, () => {
+    await assertRaises([ArgumentError], {}, () => {
       toTime(pd(2005, 2, 21), "tokyo");
     });
   });
