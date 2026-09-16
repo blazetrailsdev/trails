@@ -393,7 +393,7 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    expect(lastQuarter(DateTime.civil(2004, 5, 31) as never).toString()).toBe(
+    expect(lastQuarter(DateTime.civil(2004, 5, 31)).toString()).toBe(
       DateTime.civil(2004, 2, 29).toString(),
     );
   });

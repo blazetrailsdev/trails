@@ -390,7 +390,8 @@ export function nextWeekday(dateOrTime: DateOrTime): DateOrInstant {
 
 export function nextQuarter(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function nextQuarter(dateOrTime: Date): Temporal.Instant;
-export function nextQuarter(dateOrTime: DateOrTime): DateOrInstant {
+export function nextQuarter(dateOrTime: DateTime): DateTime;
+export function nextQuarter(dateOrTime: DateOrTime | DateTime): DateOrInstant | DateTime {
   return monthsSince(dateOrTime as Date, 3);
 }
 
@@ -442,7 +443,8 @@ export function lastMonth(dateOrTime: DateOrTime): DateOrInstant {
 
 export function prevQuarter(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function prevQuarter(dateOrTime: Date): Temporal.Instant;
-export function prevQuarter(dateOrTime: DateOrTime): DateOrInstant {
+export function prevQuarter(dateOrTime: DateTime): DateTime;
+export function prevQuarter(dateOrTime: DateOrTime | DateTime): DateOrInstant | DateTime {
   return monthsAgo(dateOrTime as Date, 3);
 }
 
