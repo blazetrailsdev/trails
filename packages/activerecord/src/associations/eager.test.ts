@@ -267,19 +267,23 @@ describe("EagerAssociationTest", () => {
   });
 
   it("loading associations dont leak instance state", async () => {
-    for (const firm of [
-      (await Firm.preload(":readonlyAccount", ":accounts").first()) as any,
-      (await Firm.eagerLoad(":readonlyAccount", ":accounts").first()) as any,
-    ]) {
+    const assertions = (firm: any) => {
       expect(firm.id).toBe(companies("first_firm").id);
+
       expect(firm.association("readonlyAccount").loaded).toBeTruthy();
       expect(firm.association("accounts").loaded).toBeTruthy();
+
       expect(firm.readonlyAccount.id).toBe(accounts("signals37").id);
-      const accts = firm.association("accounts").target;
-      expect(accts.map((a: any) => a.id)).toEqual([accounts("signals37").id]);
+      expect(firm.association("accounts").target.map((a: any) => a.id)).toEqual([
+        accounts("signals37").id,
+      ]);
+
       expect(firm.readonlyAccount.isReadonly()).toBeTruthy();
-      expect(accts.every((a: any) => !a.isReadonly())).toBeTruthy();
-    }
+      expect(firm.association("accounts").target.every((a: any) => !a.isReadonly())).toBeTruthy();
+    };
+
+    assertions(await Firm.preload(":readonlyAccount", ":accounts").first());
+    assertions(await Firm.eagerLoad(":readonlyAccount", ":accounts").first());
   });
 
   it("with ordering", async () => {

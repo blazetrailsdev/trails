@@ -33,11 +33,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason: "Method-table surgery to silence redefinition warnings; JS reassignment is silent.",
   },
   {
-    pattern: "starts_ends_with.rb",
-    package: "activesupport",
-    reason: "Aliases `start_with?`/`end_with?` for Symbol and String; both are native JS.",
-  },
-  {
     pattern: "core_ext/string/multibyte.rb",
     package: "activesupport",
     reason:

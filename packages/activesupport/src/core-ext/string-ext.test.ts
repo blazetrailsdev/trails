@@ -12,8 +12,9 @@ import {
   camelize as stringCamelize,
   pluralize as stringPluralize,
 } from "../core-ext/string/inflections.js";
-import { assertRaise } from "../testing/assertions.js";
+import { assert, assertNot, assertRaise } from "../testing/assertions.js";
 import { htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
+import { endsWith, startsWith } from "../core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
   pluralize,
@@ -684,8 +685,14 @@ describe("StringInflectionsTest", () => {
   });
 
   it("starts ends with alias", () => {
-    expect("hello".startsWith("hel")).toBe(true);
-    expect("hello".endsWith("llo")).toBe(true);
+    const s = "hello";
+    assert(startsWith(s, "h"));
+    assert(startsWith(s, "hel"));
+    assertNot(startsWith(s, "el"));
+
+    assert(endsWith(s, "o"));
+    assert(endsWith(s, "lo"));
+    assertNot(endsWith(s, "el"));
   });
 
   it("string squish", () => {

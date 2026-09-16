@@ -111,7 +111,7 @@ function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
  * genuinely colliding case — several same-named definitions — which is exactly
  * the wrong-body risk this resolution exists to remove.
  */
-function resolveHelper(helpers: HelperMap, name: string, pos: number): ts.Node | null {
+function resolveHelper(helpers: HelperMap, name: string, pos: number): HelperDef | null {
   const defs = helpers.get(name);
   if (!defs || defs.length === 0) return null;
   let best: HelperDef | null = null;
@@ -119,8 +119,25 @@ function resolveHelper(helpers: HelperMap, name: string, pos: number): ts.Node |
     if (pos < def.scopeStart || pos > def.scopeEnd) continue;
     if (!best || def.scopeStart > best.scopeStart) best = def;
   }
-  if (best) return best.body;
-  return defs.length === 1 ? defs[0].body : null;
+  if (best) return best;
+  return defs.length === 1 ? defs[0] : null;
+}
+
+/**
+ * Is this helper declared lexically INSIDE the test body being counted?
+ *
+ * The Ruby extractor counts a lambda assigned to a local and `.call`ed N times
+ * ONCE — the lambda body is part of the test's own source, and Ripper sees no
+ * `def` to expand. A faithful port of that shape (an arrow function assigned to
+ * a local, called N times) would otherwise score N+1 copies here: once
+ * lexically, because the declaration sits in the test subtree the walk already
+ * descends, and once more per call site. So an inline declaration is counted
+ * only where it is written, and its call sites contribute nothing — including
+ * when the local is itself named `assert*`, which `isAssertionCallee` would
+ * otherwise read as an assertion.
+ */
+function isInlineDef(def: HelperDef, rootStart: number, rootEnd: number): boolean {
+  return def.body.pos >= rootStart && def.body.end <= rootEnd;
 }
 
 /**
@@ -136,18 +153,20 @@ function countAssertions(
   helpers: HelperMap,
   depth = 0,
   visiting: Set<string> = new Set(),
+  rootStart: number = node.pos,
+  rootEnd: number = node.end,
 ): number {
   let count = 0;
   const walk = (n: ts.Node) => {
     if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
       const name = n.expression.text;
-      if (isAssertionCallee(name)) {
-        count++;
-      } else if (depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
-        const body = resolveHelper(helpers, name, n.pos);
-        if (body) {
+      const def = resolveHelper(helpers, name, n.pos);
+      if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
+        if (isAssertionCallee(name)) {
+          count++;
+        } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
           visiting.add(name);
-          count += countAssertions(body, helpers, depth + 1, visiting);
+          count += countAssertions(def.body, helpers, depth + 1, visiting, rootStart, rootEnd);
           visiting.delete(name);
         }
       }
@@ -272,6 +291,8 @@ function collectAssertionKinds(
   sourceFile: ts.SourceFile,
   depth = 0,
   visiting: Set<string> = new Set(),
+  rootStart: number = node.pos,
+  rootEnd: number = node.end,
 ): AssertionKinds {
   const kinds: string[] = [];
   const values: (string | null)[] = [];
@@ -285,18 +306,26 @@ function collectAssertionKinds(
         }
       } else if (ts.isIdentifier(n.expression)) {
         const name = n.expression.text;
-        if (isAssertionCallee(name)) {
-          // Bare `expect(...)` is recorded via its matcher chain above; a helper
-          // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
-          if (name !== "expect") {
-            kinds.push(name);
-            values.push(helperCalleeValue(name, n.arguments, sourceFile));
-          }
-        } else if (depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
-          const body = resolveHelper(helpers, name, n.pos);
-          if (body) {
+        const def = resolveHelper(helpers, name, n.pos);
+        if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
+          if (isAssertionCallee(name)) {
+            // Bare `expect(...)` is recorded via its matcher chain above; a helper
+            // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
+            if (name !== "expect") {
+              kinds.push(name);
+              values.push(helperCalleeValue(name, n.arguments, sourceFile));
+            }
+          } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
             visiting.add(name);
-            const sub = collectAssertionKinds(body, helpers, sourceFile, depth + 1, visiting);
+            const sub = collectAssertionKinds(
+              def.body,
+              helpers,
+              sourceFile,
+              depth + 1,
+              visiting,
+              rootStart,
+              rootEnd,
+            );
             kinds.push(...sub.kinds);
             values.push(...sub.values);
             visiting.delete(name);
@@ -473,7 +502,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     const atFileScope = currentAncestors.length === 0 && gateStack.length === 0;
     const declared = deferrableHelperName(node, atFileScope);
     if (declared !== null && registrars.has(declared)) {
-      deferredBodies.set(declared, resolveHelper(helpers, declared, node.pos)!);
+      deferredBodies.set(declared, resolveHelper(helpers, declared, node.pos)!.body);
       return;
     }
     if (ts.isCallExpression(node)) {
