@@ -693,7 +693,7 @@ synchronously too. Nothing in Rails' relation surface is a promise, so a
 `Relation` is both the query and its result, and a predicate that needs a
 second query to build itself can just run it in place.
 
-In trails the query is `await`ed, and that costs two shapes Rails has no
+In trails the query is `await`ed, and that costs three shapes Rails has no
 counterpart for:
 
 - **`applyThenable` / `stripThenable`** (`relation/thenable.ts`). `await rel`
@@ -716,11 +716,35 @@ counterpart for:
   carrying the thunks, and `Relation#_materializeDeferredDistinctPkPredicates`
   drains them on the way to SQL. The pair exists so `invert()` keeps working
   (`WhereClause#invert`) while the ids are still unresolved.
+- **The synchronous eager builders behind `toSql`** — `Relation#toSql`,
+  `_buildEagerOperandManager`, `_applyEagerJoinDependency`,
+  `_materializeDeferredDistinctPkPredicates` (all `relation.ts`), and the
+  `ConnectionPool#withConnectionSync` call `toSql` runs them through. Rails'
+  `Relation#to_sql` (`relation.rb:1210-1221`) returns a String: its
+  `eager_loading?` arm goes through `apply_join_dependency`, the other through
+  `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`.
+  Two independent constraints keep trails' `toSql(): string` synchronous. First,
+  `_buildEagerOperandManager` reads `this._model.primaryKey`, a synchronous
+  reader because a JS constructor cannot await — the reader § "Schema
+  reflection peeks at a warm cache" ratifies — so an async builder would force
+  that reader async and break `new Post()`. Second, an async builder turns a
+  prominent Rails String API into `Promise<string>`, and `toSql` is also read
+  from sync paths that have nothing to do with construction: the relation `==`
+  (`other.toSql() === this.toSql()`) and the query-cache key
+  (`computeCacheKey`). Nor is a synchronous `with_connection` seam expressible:
+  `ConnectionPool#withConnection` is `async`, so a sync seam can only serve an
+  already-leased connection — which is exactly the lease `withConnectionSync`
+  hands `toSql`. That is the settled shape, not a gap. This ratifies the sync
+  builders and `toSql`'s sync surface only; the synchronous _lease_ behind
+  `withConnectionSync` stays under § "Schema reflection peeks at a warm
+  cache"'s scope boundary.
 
 This is a genuine language shortcoming — JS has no synchronous await — and it is
 ratified repo-wide here. Those names carry `@noRailsEquivalent PERMANENT`
-receipts against this section; do not re-derive the decision per call site, and
-do not file a story to remove them.
+receipts against this section, and `toSql`'s omitted `apply_join_dependency` /
+`with_connection` calls carry `@missingRailsCall … — PERMANENT`; do not
+re-derive the decision per call site, and do not file a story to remove them or
+to make `toSql` async.
 
 ## Override arity (Ruby does not check it; TypeScript does)
 

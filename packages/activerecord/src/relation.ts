@@ -1103,8 +1103,8 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * @missingRailsCall apply_join_dependency — CONVERGEABLE converge-sync-eager-builders-async-to-sql
-   * @missingRailsCall with_connection — CONVERGEABLE converge-sync-eager-builders-async-to-sql
+   * @missingRailsCall apply_join_dependency — PERMANENT
+   * @missingRailsCall with_connection — PERMANENT
    */
   toSql(): string {
     return this._model.connectionPool().withConnectionSync(
