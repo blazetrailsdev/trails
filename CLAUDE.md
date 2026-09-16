@@ -975,15 +975,17 @@ That is the whole constraint, and it splits Rails' sections in two:
 
 - **Ported onto the monitor**: `checkout`'s pinned branch (`:550-567`), whose body
   awaits `verify!`. It nests inside the pinned connection's `lock` exactly as
-  Rails nests it, and keeps the `:553` re-check.
-- **Not wrapped**: `connections` (`:443`), `disconnect` (`:454`), `discard!`
-  (`:485`), `clear_reloadable_connections` (`:507`), and the queue's
-  `synchronize` (`connection_pool/queue.rb:80-81`, a bare `block()` in
-  `queue.ts`). Their trails bodies contain no `await`. `connections` is also a
-  synchronous reader in Rails, so it could not await the monitor even if it
-  needed to, and the other three run inside the synchronous
-  `with_exclusively_acquired_all_connections` block, where an async
-  `synchronize` cannot nest.
+  Rails nests it, and keeps the `:553` re-check. `disconnect` (`:454`),
+  `discard!` (`:485`) and `clear_reloadable_connections` (`:507`) are on it too:
+  their bodies await each connection's `disconnect!` / close, and
+  `with_exclusively_acquired_all_connections` is async, because
+  `checkout_for_exclusive_access` (`:802-820`) awaits `checkout` inside the
+  monitor exactly as Rails' `attempt_to_checkout_all_existing_connections`
+  (`:753-800`) calls it.
+- **Not wrapped**: `connections` (`:443`) and the queue's `synchronize`
+  (`connection_pool/queue.rb:80-81`, a bare `block()` in `queue.ts`). Their
+  trails bodies contain no `await`, and `connections` is a synchronous reader in
+  Rails, so it could not await the monitor even if it needed to.
 
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.
@@ -1067,7 +1069,7 @@ The alternatives each lose more than they buy:
   keeps it unloaded so the async warm can still load it.
 
 **Scope boundary.** This ratifies the schema-cache PEEK only. It does **not**
-bless the synchronous _lease_ a peek may sit behind — `leaseConnectionSync`
+bless the synchronous _lease_ a peek may sit behind — `withConnectionSync`
 (`reflectionAdapter`, `model-schema.ts:27-30`), `acquireConnectionSync`
 (`abstract/connection-pool.ts`), or the promise arm in
 `abstract/connection-pool/queue.ts`'s internal poll. Those stay CONVERGEABLE and are owned by their own RFC: a

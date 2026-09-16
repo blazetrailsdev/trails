@@ -5,8 +5,8 @@ import type { MergeColumnOptions } from "../../support/fake-adapter.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
-function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
-  const connection = klass.connectionPool().leaseConnectionSync();
+async function fakeConnection(klass: typeof Base): Promise<FakeActiveRecordAdapter> {
+  const connection = await klass.leaseConnection();
   if (!(connection instanceof FakeActiveRecordAdapter)) {
     throw new ConnectionNotEstablished(
       `${klass.name} expected the "fake" adapter, got ${connection.constructor.name}`,
@@ -15,30 +15,30 @@ function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
   return connection;
 }
 
-function column(
+async function column(
   this: typeof Base,
   name: string,
   sqlType: string | null = null,
   options: MergeColumnOptions = {},
-): void {
-  fakeConnection(this).mergeColumn(this.tableName, name, sqlType, options);
+): Promise<void> {
+  (await fakeConnection(this)).mergeColumn(this.tableName, name, sqlType, options);
 }
 
 async function extended(base: ContactFakeColumnsHost): Promise<void> {
   await base.establishConnection({ adapter: "fake" });
 
-  const connection = fakeConnection(base);
+  const connection = await fakeConnection(base);
   connection.dataSources = [base.tableName];
   connection.primaryKeys = { [base.tableName]: "id" };
 
-  base.column("id", "integer");
-  base.column("name", "string");
-  base.column("age", "integer");
-  base.column("avatar", "binary");
-  base.column("created_at", "datetime");
-  base.column("awesome", "boolean");
-  base.column("preferences", "string");
-  base.column("alternative_id", "integer");
+  await base.column("id", "integer");
+  await base.column("name", "string");
+  await base.column("age", "integer");
+  await base.column("avatar", "binary");
+  await base.column("created_at", "datetime");
+  await base.column("awesome", "boolean");
+  await base.column("preferences", "string");
+  await base.column("alternative_id", "integer");
 
   base.serialize("preferences");
 
@@ -77,4 +77,4 @@ export interface ContactSti {
 }
 
 await extended(ContactSti);
-ContactSti.column("type", "string");
+await ContactSti.column("type", "string");

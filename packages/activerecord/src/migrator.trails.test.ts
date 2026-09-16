@@ -29,8 +29,14 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 function withMigrationConnection(adapter: DatabaseAdapter): void {
-  const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockReturnValue(adapter);
-  onTestFinished(() => spy.mockRestore());
+  const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockResolvedValue(adapter);
+  const poolSpy = vi
+    .spyOn(DatabaseTasks, "migrationConnectionPool")
+    .mockReturnValue({ activeConnection: adapter } as never);
+  onTestFinished(() => {
+    spy.mockRestore();
+    poolSpy.mockRestore();
+  });
 }
 
 function envName(adapter: DatabaseAdapter): string {

@@ -10,8 +10,8 @@ describe("directly bound adapter", () => {
     const bound = adapterDouble();
     await establishConnectionTo(Boundish, bound);
 
-    const direct = connection.call(Boundish as unknown as typeof Base);
     const leased = await leaseConnection.call(Boundish as unknown as typeof Base);
+    const direct = connection.call(Boundish as unknown as typeof Base);
     const scoped = await withConnection.call(Boundish as unknown as typeof Base, (conn) => conn);
 
     expect(direct).toBe(bound);
@@ -36,10 +36,10 @@ describe("Arel toSql through Table.engine", () => {
     expect(pool.isPermanentLease()).toBe(true);
   });
 
-  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", () => {
+  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", async () => {
     Base.releaseConnection();
     const pool = Base.connectionPool();
-    const leased = pool.withConnectionSync(() => pool.leaseConnectionSync());
+    const leased = await pool.withConnectionSync(() => pool.leaseConnection());
     try {
       expect(pool.activeConnection).toBe(leased);
     } finally {

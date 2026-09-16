@@ -26,7 +26,7 @@ import { connectionPool, withConnection, connectedQ } from "./connection-handlin
 
 function reflectionAdapter(klass: any): any {
   const pool = connectionPool.call(klass);
-  return pool.activeConnection ?? pool.leaseConnectionSync();
+  return pool.withConnectionSync((connection: any) => connection);
 }
 
 /** @internal */
@@ -603,11 +603,9 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  *
  * Rails' `schema_cache` is a POOL read (`load_schema!`, model_schema.rb:591) and
  * never checks a connection out permanently, so the warm runs inside a
- * `with_connection` scope: `reflectionAdapter`'s last resort is
- * `leaseConnectionSync`, whose lease is permanent and trips
- * `permanent_connection_checkout = :deprecated | :disallowed` on every save. The
- * re-entry is the scope — inside it the connection is threaded, so the guard is
- * false and the body runs once. A model with a directly-assigned adapter has no
+ * `with_connection` scope, so the connection `reflectionAdapter` reads through
+ * `withConnectionSync` stays threaded for the whole warm and the guard is false
+ * on re-entry, so the body runs once. A model with a directly-assigned adapter has no
  * pool to scope against and skips it, as does a pool-less model, whose
  * `connection_pool` throws where Ruby's always answers.
  *

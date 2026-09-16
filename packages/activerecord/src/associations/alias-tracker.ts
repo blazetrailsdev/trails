@@ -64,32 +64,32 @@ export class AliasTracker {
     joins: any[],
     aliases?: AliasCounts,
   ): AliasTracker {
-    const connection =
-      typeof pool?.tableAliasLength === "function"
-        ? pool
-        : (pool?.activeConnection ?? pool?.leaseConnectionSync?.());
-
-    if (joins.length === 0) {
-      aliases ??= new AliasCounts(() => 0);
-    } else if (aliases) {
-      const defaultProc = aliases.defaultProc;
-      aliases.defaultProc = (h, k) => {
-        const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
-        h.set(k, count);
-        return count;
-      };
-    } else {
-      aliases = new AliasCounts((h, k) => {
-        const count = AliasTracker.initialCountFor(connection, k, joins);
-        h.set(k, count);
-        return count;
-      });
-    }
-    aliases.set(initialTable, 1);
-    return new AliasTracker(
-      connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH,
-      aliases,
-    );
+    const block = (connection: any): AliasTracker => {
+      if (joins.length === 0) {
+        aliases ??= new AliasCounts(() => 0);
+      } else if (aliases) {
+        const defaultProc = aliases.defaultProc;
+        aliases.defaultProc = (h, k) => {
+          const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
+          h.set(k, count);
+          return count;
+        };
+      } else {
+        aliases = new AliasCounts((h, k) => {
+          const count = AliasTracker.initialCountFor(connection, k, joins);
+          h.set(k, count);
+          return count;
+        });
+      }
+      aliases.set(initialTable, 1);
+      return new AliasTracker(
+        connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH,
+        aliases,
+      );
+    };
+    if (typeof pool?.tableAliasLength === "function") return block(pool);
+    if (pool?.withConnectionSync) return pool.withConnectionSync(block);
+    return block(undefined);
   }
 
   /** @missingRailsCall size — PERMANENT */

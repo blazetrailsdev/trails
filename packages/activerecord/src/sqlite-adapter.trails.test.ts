@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
@@ -491,8 +491,7 @@ describe("SQLite adapter driver binding", () => {
     await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
     expect(isClosed()).toBe(false);
     release();
-    await pool.drainPendingCloses();
-    expect(isClosed()).toBe(true);
+    await vi.waitFor(() => expect(isClosed()).toBe(true));
   });
 
   it("sync-driver teardown seams stay synchronous (whenClosed no-ops)", async () => {
@@ -512,7 +511,6 @@ describe("SQLite adapter driver binding", () => {
     await expect(pool.flushBang()).resolves.toBeUndefined();
     await expect(pool.clearReloadableConnections()).resolves.toBeUndefined();
     await expect(pool.discardBang()).resolves.toBeUndefined();
-    await expect(pool.drainPendingCloses()).resolves.toBeUndefined();
   });
 
   it("reconnects an async-only driver and reapplies pragmas", async () => {

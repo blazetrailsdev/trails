@@ -57,7 +57,7 @@ export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
-import { ActiveRecordError, NoDatabaseError } from "./errors.js";
+import { ActiveRecordError, ConnectionNotEstablished, NoDatabaseError } from "./errors.js";
 import type { Base } from "./base.js";
 import {
   maintainTestSchema,
@@ -865,7 +865,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (typeof this[direction] !== "function") return;
     this.announce(direction === "up" ? "migrating" : "reverting");
     let timeElapsed = 0;
-    const pool = migrationArConfig()!.databaseTasks().migrationConnection().pool as ConnectionPool;
+    const pool = (await migrationArConfig()!.databaseTasks().migrationConnection())
+      .pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
       const start = Date.now();
       await this.execMigration(conn, direction);
@@ -944,9 +945,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
+  /** @missingRailsCall migration_connection — CONVERGEABLE converge-sync-connection-readers-onto-awaited-lease-connection */
   get connection(): A {
-    return (this._connectionOverride ??
-      migrationArConfig()!.databaseTasks().migrationConnection()) as A;
+    return (this._connectionOverride ?? threadedMigrationConnection()) as A;
   }
 
   set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
@@ -1749,9 +1750,12 @@ export class Migrator {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall migration_connection — CONVERGEABLE converge-sync-connection-readers-onto-awaited-lease-connection
+   */
   private get connection(): DatabaseAdapter {
-    return migrationArConfig()!.databaseTasks().migrationConnection();
+    return threadedMigrationConnection();
   }
 
   /** @internal */
@@ -2071,3 +2075,19 @@ export class CheckPending {
 }
 
 Migration.delegate = new Migration();
+
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE converge-sync-connection-readers-onto-awaited-lease-connection
+ */
+function threadedMigrationConnection(): DatabaseAdapter {
+  const databaseTasks = migrationArConfig()!.databaseTasks();
+  const connection = databaseTasks.migrationConnectionPool().activeConnection;
+  if (!connection) {
+    throw new ConnectionNotEstablished(
+      "No connection is leased in this execution context; await `lease_connection` or use `with_connection`",
+    );
+  }
+  void databaseTasks.migrationConnection();
+  return connection;
+}

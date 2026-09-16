@@ -176,7 +176,7 @@ export class DatabaseTasks {
   }
 
   static async createAll(): Promise<void> {
-    const dbConfig = this.migrationConnection().pool.dbConfig as HashConfig;
+    const dbConfig = (await this.migrationConnection()).pool.dbConfig as HashConfig;
 
     for (const dbConfig of this.eachLocalConfiguration()) {
       await this.create(dbConfig);
@@ -627,7 +627,7 @@ export class DatabaseTasks {
       await this.structureDump(dbConfig, filename);
       if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
         await File.open(filename, "a", async (f) => {
-          f.puts(await this.migrationConnection().dumpSchemaInformation!());
+          f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
           f.print("\n");
         });
       }
@@ -880,8 +880,10 @@ export class DatabaseTasks {
     setModuleBase(base);
   }
 
-  static migrationConnection(): import("../connection-adapters/abstract-adapter.js").AbstractAdapter {
-    return this.migrationClass().connectionPool().leaseConnectionSync();
+  static migrationConnection(): Promise<
+    import("../connection-adapters/abstract-adapter.js").AbstractAdapter
+  > {
+    return this.migrationClass().leaseConnection();
   }
 
   static migrationConnectionPool(): ConnectionPool {

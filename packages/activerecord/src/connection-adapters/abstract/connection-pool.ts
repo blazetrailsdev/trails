@@ -393,27 +393,6 @@ export class ConnectionPool implements ReapablePool {
    * @internal
    * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
-  leaseConnectionSync(): DatabaseAdapter {
-    const lease = this.connectionLease();
-    lease.sticky = true;
-    if (!lease.connection) {
-      const pinned = this._pinnedConnection;
-      if (pinned) {
-        if (this._connections && !this._connections.includes(pinned)) {
-          this._connections.push(pinned);
-        }
-        lease.connection = pinned;
-      } else {
-        lease.connection = this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout));
-      }
-    }
-    return lease.connection;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
   withConnectionSync<T>(
     fn: (conn: DatabaseAdapter) => T,
     options: { preventPermanentCheckout?: boolean } = {},
@@ -633,30 +612,24 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
-  }
-
-  private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
-    const draining: Array<Promise<void>> = [];
-    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
-      for (const conn of this._connections ?? []) {
-        if (conn.inUse) {
-          conn.stealBang();
-          this.checkin(conn);
+    await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
+      synchronize.call(this, async () => {
+        for (const conn of this._connections ?? []) {
+          if (conn.inUse) {
+            conn.stealBang();
+            this.checkin(conn);
+          }
+          await (
+            conn as unknown as { disconnectBang?: () => void | Promise<void> }
+          ).disconnectBang?.();
+          await (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         }
-        const closed = (
-          conn as unknown as { disconnectBang?: () => void | Promise<void> }
-        ).disconnectBang?.();
-        if (closed) draining.push(closed);
-        const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-        if (drain) draining.push(drain);
-      }
-      if (this._connections) this._connections.length = 0;
-      this._available?.clear();
-      this._checkedOut.clear();
-      this._leases?.clear();
-    });
-    return draining;
+        if (this._connections) this._connections.length = 0;
+        this._leases?.clear();
+        this._available?.clear();
+        this._checkedOut.clear();
+      }),
+    );
   }
 
   async disconnectBang(): Promise<void> {
@@ -664,66 +637,50 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async discardBang(): Promise<void> {
-    await Promise.all(this._discardBang());
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  discardBangDraining(): Array<Promise<void>> {
-    return this._discardBang();
-  }
-
-  private _discardBang(): Array<Promise<void>> {
-    if (this.isDiscarded()) return [];
-    const draining: Array<Promise<void>> = [];
-    for (const conn of this._connections ?? []) {
-      (conn as unknown as { discardBang?: () => void }).discardBang?.();
-      const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-      if (drain) draining.push(drain);
-    }
-    this._connections = null;
-    this._available?.clear();
-    this._available = null;
-    this._leases = null;
-    this._checkedOut.clear();
-    return draining;
+    await synchronize.call(this, async () => {
+      if (this.isDiscarded()) return;
+      const draining: Array<Promise<void>> = [];
+      for (const conn of this._connections ?? []) {
+        (conn as unknown as { discardBang?: () => void }).discardBang?.();
+        const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+        if (drain) draining.push(drain);
+      }
+      this._connections = null;
+      this._available?.clear();
+      this._available = null;
+      this._leases = null;
+      this._checkedOut.clear();
+      await Promise.all(draining);
+    });
   }
 
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
-  }
-
-  private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
-    const draining: Array<Promise<void>> = [];
-    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
-      const reloadable = new Set<DatabaseAdapter>();
-      for (const conn of this._connections ?? []) {
-        if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
-          reloadable.add(conn);
+    await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
+      synchronize.call(this, async () => {
+        const reloadable = new Set<DatabaseAdapter>();
+        for (const conn of this._connections ?? []) {
+          if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
+            reloadable.add(conn);
+          }
         }
-      }
-      for (const conn of this._connections ?? []) {
-        if (conn.inUse) {
-          conn.stealBang();
-          this.checkin(conn);
+        for (const conn of this._connections ?? []) {
+          if (conn.inUse) {
+            conn.stealBang();
+            this.checkin(conn);
+          }
+          if (reloadable.has(conn)) {
+            await (
+              conn as unknown as { disconnectBang?: () => void | Promise<void> }
+            ).disconnectBang?.();
+            await (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+          }
         }
-        if (reloadable.has(conn)) {
-          const closed = (
-            conn as unknown as { disconnectBang?: () => void | Promise<void> }
-          ).disconnectBang?.();
-          if (closed) draining.push(closed);
-          const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-          if (drain) draining.push(drain);
+        if (this._connections) {
+          this._connections = this._connections.filter((c) => !reloadable.has(c));
         }
-      }
-      if (this._connections) {
-        this._connections = this._connections.filter((c) => !reloadable.has(c));
-      }
-      this._available?.clear();
-    });
-    return draining;
+        this._available?.clear();
+      }),
+    );
   }
 
   async clearReloadableConnectionsBang(): Promise<void> {
@@ -784,14 +741,6 @@ export class ConnectionPool implements ReapablePool {
       this._pendingCloseDrains.delete(drain);
     };
     drain.then(forget, forget);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  async drainPendingCloses(): Promise<void> {
-    await Promise.all(this._pendingCloseDrains);
   }
 
   newConnection(): DatabaseAdapter {
@@ -982,22 +931,22 @@ function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
 }
 
 /** @internal */
-function withExclusivelyAcquiredAllConnections<R>(
+async function withExclusivelyAcquiredAllConnections<R>(
   this: Pool,
   raiseOnAcquisitionTimeout: boolean,
-  block: () => R,
-): R {
-  return this.withNewConnectionsBlocked(() => {
-    this.attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout);
+  block: () => R | Promise<R>,
+): Promise<R> {
+  return this.withNewConnectionsBlocked(async () => {
+    await this.attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout);
     return block();
   });
 }
 
 /** @internal */
-function attemptToCheckoutAllExistingConnections(
+async function attemptToCheckoutAllExistingConnections(
   this: Pool,
   raiseOnAcquisitionTimeout: boolean,
-): void {
+): Promise<void> {
   this.reap();
   const conns = this._connections ? [...this._connections] : [];
   const newlyCheckedOut: DatabaseAdapter[] = [];
@@ -1007,7 +956,9 @@ function attemptToCheckoutAllExistingConnections(
       if (this._checkedOut.has(conn)) continue;
       try {
         if (this._available && this._available.delete(conn) === undefined) {
-          const acquired = checkoutForExclusiveAccess(this, this.checkoutTimeout);
+          const acquired = await (synchronize<DatabaseAdapter | null>).call(this, () =>
+            checkoutForExclusiveAccess(this, this.checkoutTimeout),
+          );
           if (acquired) newlyCheckedOut.push(acquired);
           continue;
         }
@@ -1042,9 +993,12 @@ function attemptToCheckoutAllExistingConnections(
 }
 
 /** @internal */
-function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
+async function checkoutForExclusiveAccess(
+  pool: Pool,
+  checkoutTimeout: number,
+): Promise<DatabaseAdapter | null> {
   try {
-    return pool.acquireConnectionSync(checkoutTimeout);
+    return await pool.checkout(checkoutTimeout);
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {
       throw new ExclusiveConnectionTimeoutError(
@@ -1057,10 +1011,10 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
 }
 
 /** @internal */
-function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
+async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>): Promise<R> {
   this._threadsBlockingNewConnections = (this._threadsBlockingNewConnections ?? 0) + 1;
   try {
-    return block();
+    return await block();
   } finally {
     this._threadsBlockingNewConnections! -= 1;
     if (this._threadsBlockingNewConnections === 0) {

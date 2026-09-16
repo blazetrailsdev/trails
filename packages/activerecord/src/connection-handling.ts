@@ -5,7 +5,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
-import { NotImplementedError, ActiveRecordError } from "./errors.js";
+import { NotImplementedError, ActiveRecordError, ConnectionNotEstablished } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -328,7 +328,10 @@ const CONNECTION_DEPRECATION_MSG =
   "Called deprecated `ActiveRecord::Base.connection` method. " +
   "Either use `with_connection` or `lease_connection`.";
 
-/** @deprecated */
+/**
+ * @deprecated
+ * @missingRailsCall lease_connection — CONVERGEABLE converge-sync-connection-readers-onto-awaited-lease-connection
+ */
 export function connection(this: typeof Base): DatabaseAdapter {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
@@ -338,7 +341,14 @@ export function connection(this: typeof Base): DatabaseAdapter {
     } else if (setting === "disallowed") {
       throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
     }
-    return pool.leaseConnectionSync();
+    const leased = pool.activeConnection;
+    if (!leased) {
+      throw new ConnectionNotEstablished(
+        "No connection is leased in this execution context; await `lease_connection` or use `with_connection`",
+      );
+    }
+    void pool.leaseConnection();
+    return leased;
   }
   return pool.activeConnection!;
 }
