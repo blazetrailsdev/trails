@@ -183,7 +183,7 @@ export class AssociationScope {
         activeRecord: ownerName,
         name,
         associationPrimaryKey: () => joinPks,
-        foreignKey: joinFks,
+        foreignKey: () => joinFks,
       });
     }
     const table = tableName ? this._arelTableFor(reflection, tableName) : null;
@@ -256,7 +256,7 @@ export class AssociationScope {
         activeRecord: ownerName,
         name,
         associationPrimaryKey: () => joinPks,
-        foreignKey: joinFks,
+        foreignKey: () => joinFks,
       });
     }
     const rAliased = (reflection as Partial<ReflectionProxy>).aliasedTable as

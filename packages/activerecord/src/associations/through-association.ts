@@ -85,7 +85,7 @@ export function constructJoinAttributes(
   ) {
     joinAttributes = { [sourceRefl.name]: records.length === 1 ? records[0] : records };
   } else {
-    const fk: string = sourceRefl.foreignKey ?? `${sourceRefl.name}_id`;
+    const fk: string = sourceRefl.foreignKey() ?? `${sourceRefl.name}_id`;
     const read = (r: any, k: string) => r._readAttribute?.(k) ?? r.readAttribute?.(k);
     const values = records.map((r: any) =>
       pkArr.length === 1 ? (read(r, pkArr[0]) ?? r.id) : pkArr.map((k: string) => read(r, k)),
@@ -163,7 +163,7 @@ export function throughBuildRecord(
 
     if (inverse && target && !Array.isArray(target)) {
       const primaryKeyValues: unknown[] = toArray(target.id);
-      const foreignKeyColumns: string[] = toArray(inverse.foreignKey) as string[];
+      const foreignKeyColumns: string[] = toArray(inverse.foreignKey()) as string[];
       primaryKeyValues.map((primaryKeyValue, i) => {
         const foreignKeyColumn = foreignKeyColumns[i];
         if (foreignKeyColumn != null) attributes[foreignKeyColumn] = primaryKeyValue;
@@ -213,7 +213,7 @@ export const ThroughAssociation = {
 
   staleState(this: ThroughAssociationHost): unknown {
     if (!(this.throughReflection() as any)?.isBelongsTo?.()) return null;
-    const state = toArray((this.throughReflection() as any).foreignKey)
+    const state = toArray((this.throughReflection() as any).foreignKey())
       .map((foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string))
       .filter((value) => value != null);
     if (state.length === 0) return null;
@@ -222,7 +222,7 @@ export const ThroughAssociation = {
 
   foreignKeyPresent(this: ThroughAssociationHost): boolean {
     if (!(this.throughReflection() as any)?.isBelongsTo?.()) return false;
-    return toArray((this.throughReflection() as any).foreignKey).every(
+    return toArray((this.throughReflection() as any).foreignKey()).every(
       (foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string) != null,
     );
   },

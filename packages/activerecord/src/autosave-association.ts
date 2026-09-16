@@ -195,9 +195,9 @@ export async function saveHasOneAssociation(
   const recordChanged = is_recordChanged(reflection, record, primaryKeyValue);
   if ((autosave && record.changedForAutosave()) || recordChanged) {
     if (!reflection?.throughReflection) {
-      const foreignKey: string[] = Array.isArray(reflection.foreignKey)
-        ? reflection.foreignKey
-        : [reflection.foreignKey];
+      const foreignKey: string[] = Array.isArray(reflection.foreignKey())
+        ? reflection.foreignKey()
+        : [reflection.foreignKey()];
       for (let i = 0; i < primaryKey.length; i++) {
         const fkCol = foreignKey[i];
         if (fkCol == null) continue;
@@ -243,9 +243,9 @@ export async function saveBelongsToAssociation(
   if (autosave === false) return true;
 
   if (autosave && record.markedForDestruction()) {
-    const foreignKey: string[] = Array.isArray(reflection.foreignKey)
-      ? reflection.foreignKey
-      : [reflection.foreignKey];
+    const foreignKey: string[] = Array.isArray(reflection.foreignKey())
+      ? reflection.foreignKey()
+      : [reflection.foreignKey()];
     for (const key of foreignKey) owner._writeAttribute(key, null);
     await record.destroy();
     return true;
@@ -271,9 +271,9 @@ export async function saveBelongsToAssociation(
   if (association.isUpdated()) {
     const pkSpec = computePrimaryKey(reflection, record);
     const primaryKey: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
-    const foreignKey: string[] = Array.isArray(reflection.foreignKey)
-      ? reflection.foreignKey
-      : [reflection.foreignKey];
+    const foreignKey: string[] = Array.isArray(reflection.foreignKey())
+      ? reflection.foreignKey()
+      : [reflection.foreignKey()];
     for (let i = 0; i < primaryKey.length; i++) {
       const fkCol = foreignKey[i];
       if (fkCol == null) continue;
@@ -473,9 +473,9 @@ export function aroundSaveCollectionAssociation(
 
 /** @internal */
 export function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
-  const fkCols: string[] = Array.isArray(reflection.foreignKey)
-    ? reflection.foreignKey
-    : [reflection.foreignKey];
+  const fkCols: string[] = Array.isArray(reflection.foreignKey())
+    ? reflection.foreignKey()
+    : [reflection.foreignKey()];
   return (
     (typeof record.isNewRecord === "function" ? record.isNewRecord() : false) ||
     isAssociationForeignKeyChanged(reflection, record, key) ||
@@ -489,9 +489,9 @@ export function is_recordChanged(reflection: any, record: any, key: any[]): bool
 /** @internal */
 export function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]): boolean {
   if (reflection.throughReflection) return false;
-  const fk: string[] = Array.isArray(reflection.foreignKey)
-    ? reflection.foreignKey
-    : [reflection.foreignKey];
+  const fk: string[] = Array.isArray(reflection.foreignKey())
+    ? reflection.foreignKey()
+    : [reflection.foreignKey()];
   if (!fk.every((k: string) => record.hasAttribute?.(k) !== false)) return false;
   const recordFk = fk.map((k: string) => String(record._readAttribute?.(k) ?? ""));
   const keyArr = (Array.isArray(key) ? key : [key]).map((v) => String(v ?? ""));

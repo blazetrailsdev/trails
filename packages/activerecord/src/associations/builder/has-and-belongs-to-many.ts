@@ -119,8 +119,8 @@ export class HasAndBelongsToMany {
     });
     joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
     joinModel.primaryKey = [
-      joinModel.leftReflection.foreignKey,
-      joinModel.rightReflection.foreignKey,
+      joinModel.leftReflection.foreignKey(),
+      joinModel.rightReflection.foreignKey(),
     ];
     return joinModel;
   }

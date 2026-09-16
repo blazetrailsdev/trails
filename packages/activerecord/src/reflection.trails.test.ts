@@ -152,7 +152,7 @@ describe("ReflectionTest", () => {
 
     const belongsTo = create("belongsTo", null, null, {}, NilDerivOwner);
     expect(belongsTo.className).toBe("");
-    expect(belongsTo.foreignKey).toBe("_id");
+    expect(belongsTo.foreignKey()).toBe("_id");
 
     const poly = create("belongsTo", null, null, { polymorphic: true }, NilDerivOwner);
     expect(poly.foreignType).toBe("_type");

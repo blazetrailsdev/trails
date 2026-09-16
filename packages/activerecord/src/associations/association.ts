@@ -322,7 +322,7 @@ export class Association {
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
-      this.reflection.foreignKey,
+      this.reflection.foreignKey(),
       this.reflection.type,
     ].filter((key) => key != null);
     let assignedKeys = record.changedAttributeNamesToSave;
@@ -463,18 +463,18 @@ export class Association {
     if (this.isForeignKeyFor(record)) {
       return (
         associationKeysEqual(
-          record.readAttribute(String(this.reflection.foreignKey)),
+          record.readAttribute(String(this.reflection.foreignKey())),
           this.owner.id,
         ) ||
         (this.isForeignKeyFor(this.owner) &&
           associationKeysEqual(
-            this.owner.readAttribute(String(this.reflection.foreignKey)),
+            this.owner.readAttribute(String(this.reflection.foreignKey())),
             record.id,
           ))
       );
     }
     return associationKeysEqual(
-      this.owner.readAttribute(String(this.reflection.foreignKey)),
+      this.owner.readAttribute(String(this.reflection.foreignKey())),
       record.id,
     );
   }
@@ -578,7 +578,7 @@ export class Association {
   }
 
   protected isForeignKeyFor(record: Base): boolean {
-    const fk = this.reflection.foreignKey ?? (this.reflection.options as any).foreignKey;
+    const fk = this.reflection.foreignKey() ?? (this.reflection.options as any).foreignKey();
     const fkArr = Array.isArray(fk) ? fk : [fk];
     const hasAttr = (record as any)._hasAttribute as ((k: string) => boolean) | undefined;
     return fkArr.every((key) => {

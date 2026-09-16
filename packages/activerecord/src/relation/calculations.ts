@@ -794,9 +794,9 @@ export async function executeGroupedCalculation(
     association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
     if (associated) {
-      groupFields = Array.isArray(association.foreignKey)
-        ? [...(association.foreignKey as string[])]
-        : [association.foreignKey as string];
+      groupFields = Array.isArray(association.foreignKey())
+        ? [...(association.foreignKey() as string[])]
+        : [association.foreignKey() as string];
     }
   }
   const relation = rel.except("group").distinctBang(false) as CalculationRelation;

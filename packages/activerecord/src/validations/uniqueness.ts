@@ -61,7 +61,7 @@ export class UniquenessValidator extends EachValidator {
   protected override readAttributeForValidation(record: any, attribute: string): unknown {
     const refl = record?.constructor?._reflectOnAssociation?.(attribute);
     if (refl) {
-      const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
+      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
       return record.readAttribute(fk);
     }
     return super.readAttributeForValidation(record, attribute);
@@ -160,7 +160,7 @@ export class UniquenessValidator extends EachValidator {
 
     const refl = klass._reflectOnAssociation?.(attribute);
     if (refl) {
-      const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
+      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
       if (
         value != null &&
         typeof value === "object" &&
@@ -232,7 +232,7 @@ export class UniquenessValidator extends EachValidator {
       if (refl) {
         const isPoly =
           typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
-        const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
+        const fks = Array.isArray(refl.foreignKey()) ? refl.foreignKey() : [refl.foreignKey()];
         for (const fk of fks) {
           r = r.where({ [fk]: record.readAttribute?.(fk) });
         }
@@ -322,7 +322,7 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
       out.push(String(attr));
       continue;
     }
-    const fk = refl.foreignKey;
+    const fk = refl.foreignKey();
     if (Array.isArray(fk)) out.push(...fk);
     else if (fk != null) out.push(fk);
     const isPoly =

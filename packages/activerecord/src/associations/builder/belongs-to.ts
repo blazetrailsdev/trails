@@ -186,7 +186,7 @@ export class BelongsTo extends SingularAssociation {
 
   static addTouchCallbacks(model: any, reflection: any): void {
     const foreignKey =
-      reflection.foreignKey ??
+      reflection.foreignKey() ??
       reflection.options?.foreignKey ??
       reflection.options?.queryConstraints;
     const name = reflection.name;
@@ -274,7 +274,7 @@ export class BelongsTo extends SingularAssociation {
       const name = reflection.name;
       const polymorphic = !!reflection.options?.polymorphic;
       const rawFk =
-        reflection.foreignKey ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
+        reflection.foreignKey() ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
       const foreignKeys = Array.isArray(rawFk) ? rawFk : [rawFk];
       const foreignTypes = polymorphic
         ? Array.isArray(reflection.foreignType)

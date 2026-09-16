@@ -1572,7 +1572,7 @@ export class Relation<T extends Base> {
   ): R {
     const reflection = this.model._reflectOnAssociation(name);
     if (reflection) {
-      name = reflection.foreignKey as string;
+      name = reflection.foreignKey() as string;
       if (value != null) {
         value = (value as { readAttribute(n: string): unknown }).readAttribute(
           reflection.associationPrimaryKey() as string,

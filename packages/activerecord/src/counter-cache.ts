@@ -84,10 +84,10 @@ export async function resetCounters(
       hasManyAssociation = hasManyAssociation.throughReflection;
     }
 
-    const foreignKey = String(hasManyAssociation.foreignKey);
+    const foreignKey = String(hasManyAssociation.foreignKey());
     const childClass = hasManyAssociation.klass;
     const reflection = reflectOnAllAssociations(childClass, "belongsTo").find(
-      (e: any) => String(e.foreignKey) === foreignKey && !!e.options?.counterCache,
+      (e: any) => String(e.foreignKey()) === foreignKey && !!e.options?.counterCache,
     ) as any;
     const counterName = reflection.counterCacheColumn();
 
@@ -188,11 +188,11 @@ export async function destroyRow(
     for (const associationName of this.constructor.counterCachedAssociationNames) {
       const association = this.association(associationName);
       const destroyedByAssociation = this.destroyedByAssociation as {
-        foreignKey: unknown;
+        foreignKey: () => unknown;
       } | null;
       if (
         !destroyedByAssociation ||
-        !_foreignKeysEqual(destroyedByAssociation.foreignKey, association.reflection.foreignKey)
+        !_foreignKeysEqual(destroyedByAssociation.foreignKey(), association.reflection.foreignKey())
       ) {
         await association.decrementCounters();
       }

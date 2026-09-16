@@ -9,10 +9,10 @@ describe("Association#matches_foreign_key? with a derived foreign key", () => {
   it("matches a persisted child through the derived foreign key", async () => {
     const post = (await Post.first())!;
     const association = post.association("comments") as unknown as {
-      reflection: { foreignKey?: string; options: { foreignKey?: string } };
+      reflection: { foreignKey(): string; options: { foreignKey?: string } };
       matchesForeignKey(record: Base): boolean;
     };
-    expect(association.reflection.foreignKey).toBe("post_id");
+    expect(association.reflection.foreignKey()).toBe("post_id");
     expect(association.reflection.options.foreignKey).toBeUndefined();
 
     const comment = (await post.comments)[0];
