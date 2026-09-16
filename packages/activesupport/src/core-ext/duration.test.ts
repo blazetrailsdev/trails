@@ -5,7 +5,7 @@ import { rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { assertNothingRaised, assertRaise, assertRaises } from "../testing/assertions.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-import { setZone } from "../time-zone-config.js";
+import { setZone, zone } from "../time-zone-config.js";
 import { plusWithDuration as timePlusWithDuration } from "./time/calculations.js";
 import { ArgumentError } from "../hash-utils.js";
 import { current, minusWithDuration, plusWithDuration } from "./date/calculations.js";
@@ -342,6 +342,7 @@ describe("DurationTest", () => {
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
+    const oldZone = zone();
     setZone(null);
     vi.useFakeTimers();
     try {
@@ -356,6 +357,7 @@ describe("DurationTest", () => {
       );
     } finally {
       vi.useRealTimers();
+      setZone(oldZone);
     }
   });
 
