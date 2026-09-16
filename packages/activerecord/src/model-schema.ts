@@ -443,16 +443,13 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
 }
 
 function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
-  let adapter: SchemaHost["connection"] | undefined;
+  let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
-    adapter = reflectionAdapter(host);
+    cache = connectionPool.call(host as unknown as typeof Base).schemaCache as typeof cache;
   } catch {
     return;
   }
   const table = (host as unknown as { tableName?: string }).tableName;
-  const cache = (
-    adapter as unknown as { schemaCache?: { columns?: (t: string) => Promise<unknown> } }
-  )?.schemaCache;
   if (!table || typeof cache?.columns !== "function") return;
   let started: Promise<void> | undefined;
   return {
@@ -791,7 +788,11 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
-  return (await reflectionAdapter(this).schemaCache.dataSourceExists(this.tableName)) ?? false;
+  return (
+    (await connectionPool
+      .call(this as unknown as typeof Base)
+      .schemaCache.dataSourceExists(this.tableName)) ?? false
+  );
 }
 
 export interface ModelSchema {

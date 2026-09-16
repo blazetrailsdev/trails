@@ -47,7 +47,7 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 }
 
 async function closePoolConnections(pool: ConnectionPool): Promise<void> {
-  await pool.disconnect();
+  await pool.disconnectBang();
 }
 
 function makePool(size: number = 5): ConnectionPool {
@@ -855,6 +855,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
           expect(pinnedCount()).toBe(1);
         }).value();
       } finally {
+        vi.restoreAllMocks();
         await closePoolConnections(pool);
       }
     });
