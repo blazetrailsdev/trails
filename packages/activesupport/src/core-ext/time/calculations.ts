@@ -454,6 +454,7 @@ Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoerc
 
 RubyTime.at = atWithCoercion;
 
+// boundary: `include DateAndTime::Calculations` (time/calculations.rb:13) — the module sits below Time in the ancestor chain, so a name Time defines itself wins, and each module function takes the receiver Ruby passes as self as its first argument.
 for (const [name, member] of Object.entries(DateAndTimeCalculations)) {
   if (typeof member !== "function") continue;
   if (name in RubyTime.prototype) continue;

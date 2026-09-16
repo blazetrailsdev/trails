@@ -1642,7 +1642,6 @@ export class Base extends Model {
   declare static updateAll: typeof Querying.updateAll;
   declare static deleteAll: typeof Querying.deleteAll;
   declare static destroy: typeof Querying.destroy;
-  declare static delete: typeof Querying.delete;
   declare static destroyAll: typeof Querying.destroyAll;
   declare static destroyBy: typeof Querying.destroyBy;
   declare static deleteBy: typeof Querying.deleteBy;

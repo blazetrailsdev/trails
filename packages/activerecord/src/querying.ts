@@ -430,11 +430,6 @@ export function destroy<T extends typeof Base>(
   return this.all().destroy(id);
 }
 
-function _delete<T extends typeof Base>(this: T, idOrArray: unknown): Promise<number> {
-  return this.all().delete(idOrArray);
-}
-export { _delete as delete };
-
 export function destroyAll<T extends typeof Base>(this: T): Promise<InstanceType<T>[]> {
   return this.all().destroyAll();
 }
