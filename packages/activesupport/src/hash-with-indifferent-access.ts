@@ -58,7 +58,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       hash = args[0] as AnyObject | Hash<unknown, unknown>;
     } else if (args.length === 1 && Array.isArray(args[0])) {
       hash = new Hash<unknown, unknown>();
-      for (const pair of args[0] as unknown[][]) {
+      for (const [i, pair] of (args[0] as unknown[][]).entries()) {
+        if (!Array.isArray(pair)) {
+          throw new ArgumentError(
+            `wrong element type ${rbObjClass(pair)} at ${i} (expected array)`,
+          );
+        }
         if (pair.length < 1 || pair.length > 2) {
           throw new ArgumentError(`invalid number of elements (${pair.length} for 1..2)`);
         }
