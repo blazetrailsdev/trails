@@ -28,7 +28,7 @@ import { Response } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { _RequestCtor } from "../http/request-slot.js";
 
-export type CookieExpires = Date | Temporal.Instant;
+export type CookieExpires = Date | Temporal.Instant | { toF(): number; httpdate(): string };
 
 type MetadataOptions = NonNullable<Parameters<MessageVerifier["generate"]>[1]>;
 
@@ -38,9 +38,9 @@ function isFromNow(expires: unknown): expires is { fromNow(): CookieExpires } {
 
 function toInstant(expires: CookieExpires | undefined): Temporal.Instant | null {
   if (expires == null) return null;
-  return expires instanceof Date
-    ? Temporal.Instant.fromEpochMilliseconds(expires.getTime())
-    : expires;
+  if (expires instanceof Date) return Temporal.Instant.fromEpochMilliseconds(expires.getTime());
+  if (expires instanceof Temporal.Instant) return expires;
+  return Temporal.Instant.fromEpochMilliseconds(Math.round(expires.toF() * 1000));
 }
 
 function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unknown>): boolean {

@@ -324,7 +324,8 @@ export function setCookieHeaderBang(headers: Record<string, any>, key: string, v
   }
 }
 
-function httpDate(date: Date | { epochMilliseconds: number }): string {
+function httpDate(date: Date | { epochMilliseconds: number } | { httpdate(): string }): string {
+  if ("httpdate" in date) return date.httpdate();
   // boundary: HTTP-date (RFC 7231 IMF-fixdate) is what `Date#toUTCString` produces.
   const time = "epochMilliseconds" in date ? new Date(date.epochMilliseconds) : date;
   return time.toUTCString().replace(/GMT$/, "GMT");

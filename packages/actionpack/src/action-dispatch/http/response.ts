@@ -665,7 +665,7 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
     domain: opts.domain,
     // boundary: `Rack::Utils.set_cookie_header` formats `expires` through
     expires:
-      opts.expires === undefined || opts.expires instanceof Date
+      opts.expires === undefined || !("epochMilliseconds" in opts.expires)
         ? opts.expires
         : new Date(opts.expires.epochMilliseconds),
     secure: opts.secure,

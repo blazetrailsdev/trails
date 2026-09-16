@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../duration.js";
-import { rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { cmp, rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { assertNothingRaised, assertRaise, assertRaises } from "../testing/assertions.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { setZone, zone } from "../time-zone-config.js";
-import { plusWithDuration as timePlusWithDuration } from "./time/calculations.js";
+import { clock } from "../time-travel.js";
+import {
+  minusWithDuration as minusWithTimeDuration,
+  plusWithDuration as timePlusWithDuration,
+} from "./time/calculations.js";
 import { ArgumentError } from "../hash-utils.js";
 import { current, minusWithDuration, plusWithDuration } from "./date/calculations.js";
 
@@ -295,14 +299,10 @@ describe("DurationTest", () => {
   });
 
   it("since and ago without argument", () => {
-    let now = Temporal.Now.instant();
-    expect(
-      Temporal.Instant.compare(Duration.second(1).since(), now.add({ seconds: 1 })) >= 0,
-    ).toBeTruthy();
-    now = Temporal.Now.instant();
-    expect(
-      Temporal.Instant.compare(Duration.second(1).ago(), now.subtract({ seconds: 1 })) >= 0,
-    ).toBeTruthy();
+    let now = RubyTime.now();
+    expect(cmp(Duration.second(1).since(), timePlusWithDuration.call(now, 1))! >= 0).toBeTruthy();
+    now = RubyTime.now();
+    expect(cmp(Duration.second(1).ago(), minusWithTimeDuration.call(now, 1))! >= 0).toBeTruthy();
   });
 
   it("since and ago with fractional days", () => {
@@ -344,25 +344,45 @@ describe("DurationTest", () => {
   it("since and ago anchored to time now when time zone is not set", () => {
     const oldZone = zone();
     setZone(null);
-    vi.useFakeTimers();
+    const now = vi
+      .spyOn(clock, "now")
+      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(new Date(2000, 0, 1).getTime()));
     try {
-      vi.setSystemTime(new Date(2000, 0, 1));
       expect(Duration.seconds(5).since()).not.toBeInstanceOf(TimeWithZone);
-      expect(Duration.seconds(5).since().epochMilliseconds).toEqual(
-        new Date(2000, 0, 1, 0, 0, 5).getTime(),
-      );
+      expect(Duration.seconds(5).since()).toEqual(RubyTime.local(2000, 1, 1, 0, 0, 5));
       expect(Duration.seconds(5).ago()).not.toBeInstanceOf(TimeWithZone);
-      expect(Duration.seconds(5).ago().epochMilliseconds).toEqual(
-        new Date(1999, 11, 31, 23, 59, 55).getTime(),
-      );
+      expect(Duration.seconds(5).ago()).toEqual(RubyTime.local(1999, 12, 31, 23, 59, 55));
     } finally {
-      vi.useRealTimers();
+      now.mockRestore();
       setZone(oldZone);
     }
   });
 
   it("since and ago anchored to time zone now when time zone is set", () => {
-    expect(true).toBe(true);
+    const oldZone = zone();
+    setZone(TimeZone.find("Eastern Time (US & Canada)"));
+    const now = vi
+      .spyOn(clock, "now")
+      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(Date.UTC(2000, 0, 1, 5)));
+    try {
+      expect(Duration.seconds(5).since()).toBeInstanceOf(TimeWithZone);
+      expect((Duration.seconds(5).since() as TimeWithZone).time).toEqual(
+        RubyTime.utc(2000, 1, 1, 0, 0, 5),
+      );
+      expect((Duration.seconds(5).since() as TimeWithZone).timeZone.name).toEqual(
+        "Eastern Time (US & Canada)",
+      );
+      expect(Duration.seconds(5).ago()).toBeInstanceOf(TimeWithZone);
+      expect((Duration.seconds(5).ago() as TimeWithZone).time).toEqual(
+        RubyTime.utc(1999, 12, 31, 23, 59, 55),
+      );
+      expect((Duration.seconds(5).ago() as TimeWithZone).timeZone.name).toEqual(
+        "Eastern Time (US & Canada)",
+      );
+    } finally {
+      now.mockRestore();
+      setZone(oldZone);
+    }
   });
 
   it("before and after", () => {
@@ -372,13 +392,21 @@ describe("DurationTest", () => {
   });
 
   it("before and after without argument", () => {
-    vi.useFakeTimers();
+    const oldZone = zone();
+    setZone(null);
+    const now = vi
+      .spyOn(clock, "now")
+      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(new Date(2000, 0, 1).getTime()));
     try {
-      vi.setSystemTime(new Date(2000, 0, 1));
-      expect(Duration.second(1).before().epochMilliseconds).toEqual(Date.now() - 1000);
-      expect(Duration.second(1).after().epochMilliseconds).toEqual(Date.now() + 1000);
+      expect(Duration.second(1).before()).toEqual(
+        minusWithTimeDuration.call(RubyTime.local(2000), Duration.second(1)),
+      );
+      expect(Duration.second(1).after()).toEqual(
+        timePlusWithDuration.call(RubyTime.local(2000), Duration.second(1)),
+      );
     } finally {
-      vi.useRealTimers();
+      now.mockRestore();
+      setZone(oldZone);
     }
   });
 
