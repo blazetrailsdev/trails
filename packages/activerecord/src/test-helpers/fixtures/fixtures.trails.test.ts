@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
-import { defineFixtures, FixtureSet, isFixtureRef } from "../../fixtures.js";
+import { FixtureSet, isFixtureRef } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
 import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";
@@ -47,6 +47,26 @@ function executedStatements(adapter: DatabaseAdapter): string[] {
     (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
       .calls as unknown[][]
   ).flatMap((c) => c[0] as string[]);
+}
+
+async function createFixtures(
+  adapter: DatabaseAdapter,
+  modelClass: any,
+  data: Record<string, Record<string, unknown>>,
+): Promise<Record<string, any>> {
+  const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
+  modelClass.connectionPool = () => pool;
+  FixtureSet.resetCache();
+  const [fixtureSet] = await FixtureSet.createFixtures(
+    { [modelClass.tableName]: data },
+    [modelClass.tableName],
+    { [modelClass.tableName]: modelClass },
+    modelClass,
+  );
+  const rows: Record<string, any> = {};
+  for (const [label, fixture] of Object.entries(fixtureSet.fixtures))
+    rows[label] = fixture.toHash();
+  return rows;
 }
 
 function makeModel(tableName: string, pk = "id") {
@@ -113,14 +133,14 @@ describe("topicFixtureData", () => {
     expect(topicFixtureData.second.parent_id).toBe(topicFixtureData.first.id);
   });
 
-  it("defineFixtures resolves cross-refs: second.parent_id equals first's declared id", async () => {
+  it("createFixtures resolves cross-refs: second.parent_id equals first's declared id", async () => {
     const adapter = makeAdapter();
     const Topic = makeModel("topics");
     for (const k of Object.keys(topicFixtureData) as Array<keyof typeof topicFixtureData>) {
       seedRows(Topic, k, topicFixtureData, { title: topicFixtureData[k].title });
     }
 
-    const topics = await defineFixtures(adapter, Topic, topicFixtureData);
+    const topics = await createFixtures(adapter, Topic, topicFixtureData);
     expect(topics.first).toBeTruthy();
     expect(topics.second).toBeTruthy();
 
@@ -155,14 +175,14 @@ describe("commentFixtureData", () => {
     expect(commentFixtureData.does_it_hurt.post_id).toBe(postFixtureData.thinking.id);
   });
 
-  it("defineFixtures resolves comment→post cross-ref correctly", async () => {
+  it("createFixtures resolves comment→post cross-ref correctly", async () => {
     const adapter = makeAdapter();
     const Comment = makeModel("comments");
     for (const k of Object.keys(commentFixtureData) as Array<keyof typeof commentFixtureData>) {
       seedRows(Comment, k, commentFixtureData);
     }
 
-    await defineFixtures(adapter, Comment, commentFixtureData);
+    await createFixtures(adapter, Comment, commentFixtureData);
 
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("comments"),
@@ -190,14 +210,14 @@ describe("authorFixtureData", () => {
     expect(authorFixtureData.mary.author_address_id).toBe(authorAddressFixtureData.mary_address.id);
   });
 
-  it("defineFixtures resolves author→address cross-ref", async () => {
+  it("createFixtures resolves author→address cross-ref", async () => {
     const adapter = makeAdapter();
     const Author = makeModel("authors");
     for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
       seedRows(Author, k, authorFixtureData, { name: authorFixtureData[k].name });
     }
 
-    await defineFixtures(adapter, Author, authorFixtureData);
+    await createFixtures(adapter, Author, authorFixtureData);
 
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("authors"),
@@ -223,14 +243,14 @@ describe("bookFixtureData", () => {
     expect(bookFixtureData.rfr.author_id).toBe(authorFixtureData.david.id);
   });
 
-  it("defineFixtures resolves book→author cross-ref", async () => {
+  it("createFixtures resolves book→author cross-ref", async () => {
     const adapter = makeAdapter();
     const Book = makeModel("books");
     for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
       seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
     }
 
-    await defineFixtures(adapter, Book, bookFixtureData);
+    await createFixtures(adapter, Book, bookFixtureData);
 
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("books"),
@@ -252,8 +272,8 @@ describe("bookFixtureData", () => {
       seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
     }
 
-    await defineFixtures(adapter, Author, authorFixtureData);
-    await defineFixtures(adapter, Book, bookFixtureData);
+    await createFixtures(adapter, Author, authorFixtureData);
+    await createFixtures(adapter, Book, bookFixtureData);
 
     const bookInserts = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("books"),
@@ -307,14 +327,14 @@ describe("companyFixtureData", () => {
     expect(companyFixtureData.odegy.type).toBe("ExclusivelyDependentFirm");
   });
 
-  it("defineFixtures resolves first_client.firm_id to first_firm id", async () => {
+  it("createFixtures resolves first_client.firm_id to first_firm id", async () => {
     const adapter = makeAdapter();
     const Company = makeModel("companies");
     for (const k of Object.keys(companyFixtureData) as Array<keyof typeof companyFixtureData>) {
       seedRows(Company, k, companyFixtureData, { name: (companyFixtureData[k] as any).name });
     }
 
-    await defineFixtures(adapter, Company, companyFixtureData);
+    await createFixtures(adapter, Company, companyFixtureData);
 
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("companies"),
@@ -351,7 +371,7 @@ describe("accountFixtureData", () => {
     expect(accountFixtureData.odegy_account.firm_id).toBe(companyFixtureData.odegy.id);
   });
 
-  it("defineFixtures: signals37.firm_id resolves to first_firm's pinned id when companies set isn't loaded", async () => {
+  it("createFixtures: signals37.firm_id resolves to first_firm's pinned id when companies set isn't loaded", async () => {
     const adapter = makeAdapter();
     const Account = makeModel("accounts");
     for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {
@@ -360,7 +380,7 @@ describe("accountFixtureData", () => {
       });
     }
 
-    await defineFixtures(adapter, Account, accountFixtureData);
+    await createFixtures(adapter, Account, accountFixtureData);
 
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("accounts"),
@@ -391,7 +411,7 @@ describe("developerFixtureData", () => {
     expect(developerFixtureData.poor_jamis.salary).toBe(9000);
   });
 
-  it("defineFixtures inserts david", async () => {
+  it("createFixtures inserts david", async () => {
     const adapter = makeAdapter();
     const Developer = makeModel("developers");
     Developer._reflections = {
@@ -417,7 +437,7 @@ describe("developerFixtureData", () => {
     for (const k of Object.keys(developerFixtureData) as Array<keyof typeof developerFixtureData>) {
       seedRows(Developer, k, developerFixtureData, { name: developerFixtureData[k].name });
     }
-    await defineFixtures(adapter, Developer, developerFixtureData);
+    await createFixtures(adapter, Developer, developerFixtureData);
     const insertSqls = executedStatements(adapter).filter(
       (s) => s.includes("INSERT INTO") && s.includes("developers"),
     );

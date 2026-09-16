@@ -5,7 +5,7 @@ import { Associations } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { defineFixtures, defineJoinTableFixtures } from "./fixtures.js";
+import { FixtureSet } from "./fixtures.js";
 import { reservedWordsGroupFixtureData } from "./test-helpers/fixtures/reserved-words/group.js";
 import { reservedWordsSelectFixtureData } from "./test-helpers/fixtures/reserved-words/select.js";
 import { reservedWordsValuesFixtureData } from "./test-helpers/fixtures/reserved-words/values.js";
@@ -74,20 +74,17 @@ afterAll(async () => {
   });
 });
 
-const fixtureLoaders = {
-  select: () => defineFixtures(Base.connection, Select, reservedWordsSelectFixtureData),
-  group: () => defineFixtures(Base.connection, Group, reservedWordsGroupFixtureData),
-  values: () => defineFixtures(Base.connection, Values, reservedWordsValuesFixtureData),
-  distinct: () => defineFixtures(Base.connection, Distinct, reservedWordsDistinctFixtureData),
-  distinct_select: () =>
-    defineJoinTableFixtures(
-      Base.connection,
-      "distinct_select",
-      reservedWordsDistinctSelectFixtureData,
-    ),
-} as const;
-async function createTestFixtures(...names: (keyof typeof fixtureLoaders)[]): Promise<void> {
-  for (const name of names) await fixtureLoaders[name]();
+const fixturesDirectory = {
+  select: reservedWordsSelectFixtureData,
+  group: reservedWordsGroupFixtureData,
+  values: reservedWordsValuesFixtureData,
+  distinct: reservedWordsDistinctFixtureData,
+  distinct_select: reservedWordsDistinctSelectFixtureData,
+};
+const fixtureClassNames = { select: Select, group: Group, values: Values, distinct: Distinct };
+async function createTestFixtures(...names: (keyof typeof fixturesDirectory)[]): Promise<void> {
+  FixtureSet.resetCache();
+  await FixtureSet.createFixtures(fixturesDirectory, names, fixtureClassNames);
 }
 
 describe("ReservedWordTest", () => {

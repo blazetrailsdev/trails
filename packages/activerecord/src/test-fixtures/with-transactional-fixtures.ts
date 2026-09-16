@@ -120,7 +120,7 @@ export interface WithTransactionalFixturesOptions {
   useTransactionalTests?: boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
+/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
 export function withTransactionalFixtures(
   getAdapter: () => TransactionalFixturesAdapter,
   options: WithTransactionalFixturesOptions = {},

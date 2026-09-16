@@ -68,26 +68,6 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export function throughJoinTableNames(ModelClass: BaseClass): string[] {
-  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
-  const names: string[] = [];
-  for (const refl of Object.values(reflections)) {
-    const r = refl as {
-      parentReflection?: { macro?: string } | null;
-      throughReflection?: { tableName?: string };
-    };
-    if (r.parentReflection?.macro !== "hasAndBelongsToMany") continue;
-    try {
-      const joinTable = r.throughReflection?.tableName;
-      if (typeof joinTable === "string") names.push(joinTable);
-    } catch {
-      continue;
-    }
-  }
-  return names;
-}
-
 interface PolymorphicBelongsTo {
   typeColumn: string;
   idColumn: string;
@@ -214,18 +194,7 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export async function defineFixtures<T extends BaseClass, K extends string>(
-  adapter: DatabaseAdapter,
-  ModelClass: T,
-  fixtures: Record<K, FixtureAttrs>,
-): Promise<{ [P in K]: InstanceType<T> }> {
-  const prepared = await prepareModelFixtures(adapter, ModelClass, fixtures);
-  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
-  return result as { [P in K]: InstanceType<T> };
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-set-insert-onto-table-rows */
 export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
   ModelClass: BaseClass,
@@ -390,18 +359,7 @@ export async function prepareModelFixtures(
   return { tables, serialReset, rollback: () => {}, rows: rowsByLabel, finalize };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export async function defineJoinTableFixtures(
-  adapter: DatabaseAdapter,
-  tableName: string,
-  fixtures: Record<string, FixtureAttrs>,
-): Promise<Record<string, FixtureAttrs>> {
-  const prepared = await prepareJoinTableFixtures(adapter, tableName, fixtures);
-  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
-  return result as Record<string, FixtureAttrs>;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-set-insert-onto-table-rows */
 export async function prepareJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,
