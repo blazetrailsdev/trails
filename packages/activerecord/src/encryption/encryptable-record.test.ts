@@ -795,7 +795,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     post.title = "changed";
     const errored: Array<[string, string]> = [];
     const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
-      errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+      _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
     });
     EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
     expect(errored).toEqual([["title", "can't be modified because it is encrypted"]]);
@@ -808,7 +808,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const post = new Post({});
     const errored: Array<[string, string]> = [];
     const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
-      errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+      _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
     });
     EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
     expect(errored).toEqual([]);

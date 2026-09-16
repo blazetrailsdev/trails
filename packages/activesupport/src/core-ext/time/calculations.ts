@@ -9,7 +9,6 @@ import { advance as dateAdvance } from "../date/calculations.js";
 import { compare as dateTimeCompare } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
 import { toTime } from "./compatibility.js";
-import * as DateAndTimeCalculations from "../date-and-time/calculations.js";
 
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -453,16 +452,3 @@ Object.assign(RubyTime.prototype, {
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
 RubyTime.at = atWithCoercion;
-
-// boundary: `include DateAndTime::Calculations` (time/calculations.rb:13) — the module sits below Time in the ancestor chain, so a name Time defines itself wins, and each module function takes the receiver Ruby passes as self as its first argument.
-for (const [name, member] of Object.entries(DateAndTimeCalculations)) {
-  if (typeof member !== "function") continue;
-  if (name in RubyTime.prototype) continue;
-  Object.defineProperty(RubyTime.prototype, name, {
-    value: function (this: RubyTime, ...args: unknown[]): unknown {
-      return (member as (...a: unknown[]) => unknown)(this, ...args);
-    },
-    writable: true,
-    configurable: true,
-  });
-}

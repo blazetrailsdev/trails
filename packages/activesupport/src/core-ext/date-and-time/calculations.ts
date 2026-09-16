@@ -5,6 +5,7 @@ import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
 import { cmp, fetch, Range } from "@blazetrails/ruby-compat";
 import { Object } from "../object/acts-like.js";
+import * as DateAndTimeCalculations from "./calculations.js";
 
 export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
 
@@ -541,5 +542,18 @@ function copyTimeTo(self: DateOrTime, other: DateOrInstant): DateOrInstant {
     min: min(self),
     sec: sec(self),
     nsec: nsec(self),
+  });
+}
+
+// boundary: `include DateAndTime::Calculations` (time/calculations.rb:12) — the module sits below Time in the ancestor chain, so a name Time defines itself wins, and each module function takes the receiver Ruby passes as self as its first argument. Installed from this module's own bottom, not from core-ext/time/calculations.ts where Rails spells the include, because an import edge in that direction closes a cycle through core-ext/date/calculations.ts and reads this module's bindings in TDZ.
+for (const [name, member] of globalThis.Object.entries(DateAndTimeCalculations)) {
+  if (typeof member !== "function") continue;
+  if (name in RubyTime.prototype) continue;
+  globalThis.Object.defineProperty(RubyTime.prototype, name, {
+    value: function (this: RubyTime, ...args: unknown[]): unknown {
+      return (member as (...a: unknown[]) => unknown)(this, ...args);
+    },
+    writable: true,
+    configurable: true,
   });
 }
