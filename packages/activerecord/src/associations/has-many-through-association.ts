@@ -13,9 +13,12 @@ import { runCallbacks } from "@blazetrails/activesupport";
 export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   _throughScope?: unknown;
+  /** @internal */
+  _throughRecords: Map<Base, Base>;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     super(owner, reflection);
+    this._throughRecords = new Map<Base, Base>();
   }
 
   /** @internal */
@@ -129,7 +132,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       throughBuildRecord(this, (attributes ??= {}));
       const record = super.buildRecord(attributes, block);
       if (!record) return record;
-      const built = buildThroughInverseFor(this.owner, this.reflection, record, this._throughScope);
+      const built = buildThroughInverseFor(this, record);
       if (built) {
         const inverseAssoc = (
           record as unknown as { association?: (n: string) => any }
@@ -275,17 +278,10 @@ export interface BuiltThroughInverse {
  * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function buildThroughInverseFor(
-  owner: Base,
-  reflection: AssociationDefinition,
+  assoc: HasManyThroughAssociation,
   record: Base,
-  throughScope?: unknown,
 ): BuiltThroughInverse | null {
-  const assoc = {
-    owner,
-    reflection,
-    _throughScope: throughScope,
-    ...throughAssociationMethods,
-  } as unknown as HasManyThroughAssociation;
+  const { owner, reflection } = assoc;
   const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(reflection.name);
   const sourceRefl = refl?.sourceReflection;
@@ -309,7 +305,7 @@ export function buildThroughInverseFor(
 
 /** @internal */
 function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base | null {
-  const cache = throughRecordsCache(this);
+  const cache = this._throughRecords;
   const cached = cache.get(record);
   if (cached) return cached;
 
@@ -373,22 +369,8 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
     await (joinRecord as any).saveBang();
     return true;
   } finally {
-    throughRecordsCache(this).delete(record);
+    this._throughRecords.delete(record);
   }
-}
-
-/** @internal */
-function throughRecordsCache(assoc: HasManyThroughAssociation): Map<Base, Base> {
-  const owner = assoc.owner as unknown as {
-    _throughRecordsCaches?: Map<string, Map<Base, Base>>;
-  };
-  const store = (owner._throughRecordsCaches ??= new Map<string, Map<Base, Base>>());
-  let cache = store.get(assoc.reflection.name);
-  if (!cache) {
-    cache = new Map<Base, Base>();
-    store.set(assoc.reflection.name, cache);
-  }
-  return cache;
 }
 
 /** @internal */
@@ -452,7 +434,7 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
   const throughName = this.reflection.options.through;
   if (!throughName) return;
   const proxy = throughProxy(this);
-  const cache = throughRecordsCache(this);
+  const cache = this._throughRecords;
   if (!proxy) return;
   for (const record of records) {
     const toDelete = this.throughRecordsFor(record);
