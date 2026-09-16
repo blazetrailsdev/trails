@@ -413,6 +413,22 @@ export class TimeWithZone {
     }
   }
 
+  toA(): [number, number, number, number, number, number, number, number, boolean, string] {
+    const time = this.time;
+    return [
+      time.sec,
+      time.min,
+      time.hour,
+      time.day,
+      time.mon,
+      time.year,
+      time.wday,
+      time.yday,
+      this.dst(),
+      this.zone,
+    ];
+  }
+
   toI(): number {
     return Math.floor(this._epochMs / 1000);
   }
@@ -545,8 +561,36 @@ export class TimeWithZone {
   }
 
   minus(interval: number | Duration): TimeWithZone;
-  minus(other: TimeWithZone | Date | Temporal.Instant): number;
-  minus(arg: number | Duration | TimeWithZone | Date | Temporal.Instant): TimeWithZone | number {
+  minus(
+    other:
+      | TimeWithZone
+      | Date
+      | Temporal.Instant
+      | Time
+      | Temporal.PlainDateTime
+      | Temporal.ZonedDateTime,
+  ): number;
+  minus(
+    arg:
+      | number
+      | Duration
+      | TimeWithZone
+      | Date
+      | Temporal.Instant
+      | Time
+      | Temporal.PlainDateTime
+      | Temporal.ZonedDateTime,
+  ): TimeWithZone | number {
+    if (arg instanceof Time) {
+      return this.getutc().minus(arg.getutc()) as number;
+    }
+    if (arg instanceof Temporal.PlainDateTime || arg instanceof Temporal.ZonedDateTime) {
+      const otherNs =
+        arg instanceof Temporal.PlainDateTime
+          ? arg.toZonedDateTime("UTC").epochNanoseconds
+          : arg.epochNanoseconds;
+      return nsDiffToSeconds(this._zoned.epochNanoseconds - otherNs);
+    }
     if (arg instanceof TimeWithZone) {
       return nsDiffToSeconds(this._zoned.epochNanoseconds - arg._zoned.epochNanoseconds);
     }
@@ -567,8 +611,8 @@ export class TimeWithZone {
     return this.plus(other);
   }
 
-  ago(other: number): TimeWithZone {
-    return this.since(-other);
+  ago(other: number | Duration): TimeWithZone {
+    return this.since(other instanceof Duration ? other.negate() : -other);
   }
 
   in(other: Parameters<TimeWithZone["plus"]>[0]): TimeWithZone {
@@ -621,6 +665,9 @@ export class TimeWithZone {
     }
     if (other instanceof Temporal.Instant) {
       return signOf(this._zoned.epochNanoseconds - other.epochNanoseconds);
+    }
+    if (other instanceof Time) {
+      return signOf(this._zoned.epochNanoseconds - other.toTime().epochNanoseconds);
     }
     // boundary: a JS `Date` compares at its own millisecond granularity.
     if (other instanceof Date) {

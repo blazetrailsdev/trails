@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DescendantsTracker } from "../descendants-tracker.js";
+import { assertNot } from "../testing/assertions.js";
 
 class Parent {}
 class Foo extends Parent {}
@@ -39,17 +40,19 @@ describe("ClassTest", () => {
   });
 
   it("descendants excludes singleton classes", () => {
-    const desc = DescendantsTracker.descendants(Parent);
-    for (const d of desc) {
-      expect(typeof d).toBe("function");
-    }
+    const klass = class extends Parent {};
+    assertNot(
+      DescendantsTracker.descendants(Parent).includes(klass),
+      "descendants should not include singleton classes",
+    );
   });
 
   it("subclasses excludes singleton classes", () => {
-    const subs = DescendantsTracker.subclasses(Parent);
-    for (const s of subs) {
-      expect(typeof s).toBe("function");
-    }
+    const klass = class extends Parent {};
+    assertNot(
+      DescendantsTracker.subclasses(Parent).includes(klass),
+      "subclasses should not include singleton classes",
+    );
   });
 
   it("subclasses exclude reloaded classes", () => {

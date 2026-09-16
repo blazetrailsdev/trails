@@ -610,11 +610,11 @@ function utcInstantOf(
 export class TimeZone {
   readonly name: string;
   readonly tzinfo: Timezone;
-  readonly #utcOffset: number | null;
+  private readonly _utcOffset: number | null;
 
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     this.name = name;
-    this.#utcOffset = utcOffset;
+    this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
   }
 
@@ -639,6 +639,14 @@ export class TimeZone {
         return null;
       }
       zoneCache.set(arg, tz);
+      return tz;
+    }
+    if (arg instanceof Timezone) {
+      let tz = zoneCache.get(arg.name);
+      if (!tz) {
+        tz = TimeZone.create(arg.name, null, arg);
+        zoneCache.set(arg.name, tz);
+      }
       return tz;
     }
     if (typeof arg === "number" || arg instanceof Duration) {
@@ -743,17 +751,19 @@ export class TimeZone {
   }
 
   get utcOffset(): number {
-    if (this.#utcOffset !== null) return this.#utcOffset;
-    const now = new Date();
+    if (this._utcOffset !== null) return this._utcOffset;
+    const now = currentTime();
+    const observed = getZoneInfo(this.tzinfo.identifier, now).utcOffsetSeconds;
+    if (!this.tzinfo.isDst(now)) return observed;
     const jan = getZoneInfo(
       this.tzinfo.identifier,
-      new Date(now.getFullYear(), 0, 1),
+      new Date(Date.UTC(now.getUTCFullYear(), 0, 1)),
     ).utcOffsetSeconds;
     const jul = getZoneInfo(
       this.tzinfo.identifier,
-      new Date(now.getFullYear(), 6, 1),
+      new Date(Date.UTC(now.getUTCFullYear(), 6, 1)),
     ).utcOffsetSeconds;
-    return Math.min(jan, jul);
+    return observed - Math.abs(jul - jan);
   }
 
   utcOffsetAt(date: Date | Temporal.Instant): number {

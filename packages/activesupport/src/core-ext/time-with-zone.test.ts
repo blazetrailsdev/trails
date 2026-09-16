@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
-import { TimeZone } from "../values/time-zone.js";
+import { TimeZone, Timezone, TimezonePeriod } from "../values/time-zone.js";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
@@ -16,18 +16,73 @@ import {
   ArgumentError,
 } from "../time-zone-config.js";
 import { inTimeZone } from "./date-and-time/zones.js";
+import { inTimeZone as stringInTimeZone } from "./string/zones.js";
+import { toTime as stringToTime } from "./string/conversions.js";
+import { toTime as dateToTime } from "./date/conversions.js";
 import { current } from "../time-ext.js";
+import "./time/calculations.js";
 import { setPreserveTimezone } from "./date-and-time/compatibility.js";
 import { Rational, rational } from "@blazetrails/ruby-compat";
 import { assertDeprecated } from "../testing/deprecation.js";
+import {
+  assert,
+  assertNot,
+  assertNotPredicate,
+  assertNotRespondTo,
+  assertPredicate,
+  assertRaise,
+  assertRespondTo,
+} from "../testing/assertions.js";
+import { Object as ObjectExt } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
+
+type MethodMissing = TimeWithZone &
+  Record<
+    "yearsSince" | "yearsAgo" | "monthsSince" | "monthsAgo" | "weeksSince" | "weeksAgo",
+    (n: number) => TimeWithZone
+  >;
+
+function withEnvTz<T>(newTz: string, fn: () => T): T {
+  const oldTz = process.env.TZ;
+  process.env.TZ = newTz;
+  resetLocalTimeZoneId();
+  try {
+    return fn();
+  } finally {
+    if (oldTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = oldTz;
+    }
+    resetLocalTimeZoneId();
+  }
+}
+
+function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
+  const oldTz = timeZone();
+  setZone(tz);
+  try {
+    return fn();
+  } finally {
+    setZone(oldTz);
+  }
+}
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
   let pacific: TimeZone;
   let utcZone: TimeZone;
 
+  let utc: RubyTime;
+  let timeZone: TimeZone;
+  let twz: TimeWithZone;
+  let dtTwz: TimeWithZone;
+
   beforeEach(() => {
+    utc = RubyTime.utc(2000, 1, 1, 0);
+    timeZone = TimeZone.find("Eastern Time (US & Canada)")!;
+    twz = new TimeWithZone(utc, timeZone);
+    dtTwz = new TimeWithZone(utc.toDatetime(), timeZone);
     eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     pacific = TimeZone.find("Pacific Time (US & Canada)")!;
     utcZone = TimeZone.find("UTC")!;
@@ -41,9 +96,9 @@ describe("TimeWithZoneTest", () => {
     new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
 
   it("utc", () => {
-    const twz = maketwz();
-    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.utc()).toEqual(utc);
     expect(twz.utc()).toBeInstanceOf(RubyTime);
+    expect(dtTwz.utc()).toBeInstanceOf(RubyTime);
   });
 
   it("time", () => {
@@ -58,19 +113,12 @@ describe("TimeWithZoneTest", () => {
 
   it("in time zone", () => {
     useZone("Alaska", () => {
-      const twz = maketwz();
-      const result = twz.inTimeZone();
-      expect(result.timeZone.name).toBe("Alaska");
-      expect(result.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
+      expect(twz.inTimeZone()).toEqual(new TimeWithZone(utc, TimeZone.find("Alaska")!));
     });
   });
 
   it("in time zone with argument", () => {
-    const twz = maketwz();
-    const alaska = TimeZone.find("Alaska")!;
-    const result = twz.inTimeZone("Alaska");
-    expect(result.timeZone.name).toBe(alaska.name);
-    expect(result.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
+    expect(twz.inTimeZone("Alaska")).toEqual(new TimeWithZone(utc, TimeZone.find("Alaska")!));
   });
 
   it("in time zone with new zone equal to old zone does not create new object", () => {
@@ -78,9 +126,10 @@ describe("TimeWithZoneTest", () => {
     expect(twz.inTimeZone(eastern)).toBe(twz);
   });
 
-  it("in time zone with bad argument", () => {
-    const twz = maketwz();
-    expect(() => twz.inTimeZone("No such timezone exists")).toThrow();
+  it("in time zone with bad argument", async () => {
+    await assertRaise([ArgumentError], {}, () => twz.inTimeZone("No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => twz.inTimeZone(Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => twz.inTimeZone({}));
   });
 
   it("in time zone with ambiguous time", () => {
@@ -90,9 +139,9 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("localtime", () => {
-    const twz = maketwz();
-    const local = twz.localtime();
-    expect(local).toBeInstanceOf(RubyTime);
+    expect(twz.utc().getlocal()).toEqual(twz.localtime());
+    expect(twz.localtime()).toBeInstanceOf(RubyTime);
+    expect(dtTwz.localtime()).toBeInstanceOf(RubyTime);
   });
 
   it("localtime with offset", () => {
@@ -109,10 +158,34 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("utc?", () => {
-    const twz = maketwz();
-    expect(twz.isUtc()).toBe(false);
-    expect(new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), utcZone).isUtc()).toBe(
+    expect(twz.isUtc()).toEqual(false);
+
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("UTC")!).isUtc()).toEqual(true);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Etc/UTC")!).isUtc()).toEqual(true);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Universal")!).isUtc()).toEqual(true);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("UCT")!).isUtc()).toEqual(true);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Etc/UCT")!).isUtc()).toEqual(true);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Etc/Universal")!).isUtc()).toEqual(
       true,
+    );
+
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Africa/Abidjan")!).isUtc()).toEqual(
+      false,
+    );
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Africa/Banjul")!).isUtc()).toEqual(
+      false,
+    );
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Africa/Freetown")!).isUtc()).toEqual(
+      false,
+    );
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("GMT")!).isUtc()).toEqual(false);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("GMT0")!).isUtc()).toEqual(false);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Greenwich")!).isUtc()).toEqual(
+      false,
+    );
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Iceland")!).isUtc()).toEqual(false);
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Africa/Monrovia")!).isUtc()).toEqual(
+      false,
     );
   });
 
@@ -138,8 +211,11 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("nsec", () => {
-    const twz = maketwz();
-    expect(twz.nsec).toBe(0);
+    const local = RubyTime.local(2011, 6, 7, 23, 59, 59, new Rational(999999999, 1000));
+    const withZone = new TimeWithZone(null, TimeZone.find("Hawaii")!, local);
+
+    expect(withZone.nsec).toEqual(local.nsec);
+    expect(withZone.nsec).toEqual(999999999);
   });
 
   it("strftime", () => {
@@ -154,8 +230,25 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("inspect", () => {
-    const twz = maketwz();
-    expect(twz.inspect()).toBe("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+
+    const nsec = new TimeWithZone(
+      RubyTime.utc(1986, 12, 12, 6, 23, 0, new Rational(1, 1000)),
+      timeZone,
+    );
+    expect(nsec.inspect()).toEqual("1986-12-12 01:23:00.000000001 EST -05:00");
+
+    const hundredNsec = new TimeWithZone(
+      RubyTime.utc(1986, 12, 12, 6, 23, 0, new Rational(100, 1000)),
+      timeZone,
+    );
+    expect(hundredNsec.inspect()).toEqual("1986-12-12 01:23:00.000000100 EST -05:00");
+
+    const oneThirdSec = new TimeWithZone(
+      RubyTime.utc(1986, 12, 12, 6, 23, 0, new Rational(1000000, 3)),
+      timeZone,
+    );
+    expect(oneThirdSec.inspect()).toEqual("1986-12-12 01:23:00.333333333 EST -05:00");
   });
 
   it("to s", () => {
@@ -190,13 +283,16 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("xmlschema with fractional seconds", () => {
-    const twz = maketwz().plus(0.123456);
-    expect(twz.xmlschema(3)).toBe("1999-12-31T19:00:00.123-05:00");
+    twz = twz.plus(0.1234560001);
+    expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.123-05:00");
+    expect(twz.xmlschema(6)).toEqual("1999-12-31T19:00:00.123456-05:00");
   });
 
   it("xmlschema with fractional seconds lower than hundred thousand", () => {
-    const twz = maketwz().plus(0.001234);
-    expect(twz.xmlschema(3)).toBe("1999-12-31T19:00:00.001-05:00");
+    twz = twz.plus(0.001234);
+    expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.001-05:00");
+    expect(twz.xmlschema(6)).toEqual("1999-12-31T19:00:00.001234-05:00");
+    expect(twz.xmlschema(12)).toEqual("1999-12-31T19:00:00.001234000000-05:00");
   });
 
   it("xmlschema with nil fractional seconds", () => {
@@ -258,19 +354,12 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("between?", () => {
-    const twz = maketwz();
+    assert(
+      twz.isBetween(RubyTime.utc(1999, 12, 31, 23, 59, 59), RubyTime.utc(2000, 1, 1, 0, 0, 1)),
+    );
     expect(
-      twz.isBetween(
-        new Date(Date.UTC(1999, 11, 31, 23, 59, 59)),
-        new Date(Date.UTC(2000, 0, 1, 0, 0, 1)),
-      ),
-    ).toBe(true);
-    expect(
-      twz.isBetween(
-        new Date(Date.UTC(2000, 0, 1, 0, 0, 1)),
-        new Date(Date.UTC(2000, 0, 1, 0, 0, 2)),
-      ),
-    ).toBe(false);
+      twz.isBetween(RubyTime.utc(2000, 1, 1, 0, 0, 1), RubyTime.utc(2000, 1, 1, 0, 0, 2)),
+    ).toEqual(false);
   });
 
   it("today", () => {
@@ -395,183 +484,136 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("eql?", () => {
-    const twz = maketwz();
-    expect(
-      twz.eql(new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern)),
-    ).toBe(true);
-    expect(twz.eql(new Date(Date.UTC(2000, 0, 1)))).toBe(true);
-    expect(
-      twz.eql(
-        new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), TimeZone.find("Hawaii")!),
-      ),
-    ).toBe(true);
-    expect(twz.eql(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(false);
+    expect(twz.eql(new TimeWithZone(twz.utc(), twz.timeZone))).toEqual(true);
+    expect(twz.eql(RubyTime.utc(2000))).toEqual(true);
+    expect(twz.eql(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Hawaii")!))).toEqual(true);
+    expect(twz.eql(RubyTime.utc(2000, 1, 1, 0, 0, 1))).toEqual(false);
+    expect(twz.eql(DateTime.civil(1999, 12, 31, 23, 59, 59))).toEqual(false);
+
+    const otherTwz = new TimeWithZone(RubyTime.now().getutc(), timeZone);
+    expect(otherTwz.eql(new TimeWithZone(otherTwz.utc(), otherTwz.timeZone))).toEqual(true);
   });
 
   it("plus with integer", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    const result = twz.plus(5);
-    expect(result.hour).toBe(19);
-    expect(result.min).toBe(0);
-    expect(result.sec).toBe(5);
+    expect(twz.plus(5).time).toEqual(RubyTime.utc(1999, 12, 31, 19, 0, 5));
   });
 
   it("plus with duration", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    const result = twz.plus(Duration.days(5));
-    expect(result.day).toBe(5);
-    expect(result.month).toBe(1);
-    expect(result.year).toBe(2000);
-    expect(result.hour).toBe(19);
+    expect(twz.plus(Duration.days(5)).time).toEqual(RubyTime.utc(2000, 1, 5, 19, 0, 0));
   });
 
   it("minus with integer", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    const result = twz.minus(5);
-    expect(result.hour).toBe(18);
-    expect(result.min).toBe(59);
-    expect(result.sec).toBe(55);
+    expect(twz.minus(5).time).toEqual(RubyTime.utc(1999, 12, 31, 18, 59, 55));
   });
 
   it("minus with duration", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    const result = twz.minus(Duration.days(5));
-    expect(result.day).toBe(26);
-    expect(result.month).toBe(12);
-    expect(result.hour).toBe(19);
+    expect(twz.minus(Duration.days(5)).time).toEqual(RubyTime.utc(1999, 12, 26, 19, 0, 0));
   });
 
   it("minus with time", () => {
-    const twz2 = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 2))), utcZone);
-    expect(twz2.minus(new Date(Date.UTC(2000, 0, 1)))).toBe(86400);
+    expect(
+      new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("UTC")!).minus(
+        RubyTime.utc(2000, 1, 1),
+      ),
+    ).toEqual(86_400.0);
+    expect(
+      new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("Hawaii")!).minus(
+        RubyTime.utc(2000, 1, 1),
+      ),
+    ).toEqual(86_400.0);
   });
 
   it("minus with time with zone", () => {
-    const twz1 = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), utcZone);
-    const twz2 = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 2))), utcZone);
-    expect(twz2.minus(twz1)).toBe(86400);
+    const twz1 = new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("UTC")!);
+    const twz2 = new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("UTC")!);
+    expect(twz2.minus(twz1)).toEqual(86_400.0);
   });
 
   it("plus and minus enforce spring dst rules", () => {
-    const utc = new Date(Date.UTC(2006, 3, 2, 6, 59, 59));
-    let twz = new TimeWithZone(instantFromDate(utc), eastern);
-    expect(twz.hour).toBe(1);
-    expect(twz.min).toBe(59);
-    expect(twz.sec).toBe(59);
-    expect(twz.dst()).toBe(false);
-    expect(twz.zone).toBe("EST");
-
+    const utc = RubyTime.utc(2006, 4, 2, 6, 59, 59);
+    let twz = new TimeWithZone(utc, timeZone);
+    expect(twz.time).toEqual(RubyTime.utc(2006, 4, 2, 1, 59, 59));
+    expect(twz.dst()).toEqual(false);
+    expect(twz.zone).toEqual("EST");
     twz = twz.plus(1);
-    expect(twz.hour).toBe(3);
-    expect(twz.min).toBe(0);
-    expect(twz.sec).toBe(0);
-    expect(twz.dst()).toBe(true);
-    expect(twz.zone).toBe("EDT");
-
+    expect(twz.time).toEqual(RubyTime.utc(2006, 4, 2, 3));
+    expect(twz.dst()).toEqual(true);
+    expect(twz.zone).toEqual("EDT");
     twz = twz.minus(1);
-    expect(twz.hour).toBe(1);
-    expect(twz.min).toBe(59);
-    expect(twz.sec).toBe(59);
-    expect(twz.dst()).toBe(false);
-    expect(twz.zone).toBe("EST");
+    expect(twz.time).toEqual(RubyTime.utc(2006, 4, 2, 1, 59, 59));
+    expect(twz.dst()).toEqual(false);
+    expect(twz.zone).toEqual("EST");
   });
 
   it("plus and minus enforce fall dst rules", () => {
-    const utc = new Date(Date.UTC(2006, 9, 29, 5, 59, 59));
-    let twz = new TimeWithZone(instantFromDate(utc), eastern);
-    expect(twz.hour).toBe(1);
-    expect(twz.min).toBe(59);
-    expect(twz.sec).toBe(59);
-    expect(twz.dst()).toBe(true);
-    expect(twz.zone).toBe("EDT");
-
+    const utc = RubyTime.utc(2006, 10, 29, 5, 59, 59);
+    let twz = new TimeWithZone(utc, timeZone);
+    expect(twz.time).toEqual(RubyTime.utc(2006, 10, 29, 1, 59, 59));
+    expect(twz.dst()).toEqual(true);
+    expect(twz.zone).toEqual("EDT");
     twz = twz.plus(1);
-    expect(twz.hour).toBe(1);
-    expect(twz.min).toBe(0);
-    expect(twz.sec).toBe(0);
-    expect(twz.dst()).toBe(false);
-    expect(twz.zone).toBe("EST");
-
+    expect(twz.time).toEqual(RubyTime.utc(2006, 10, 29, 1));
+    expect(twz.dst()).toEqual(false);
+    expect(twz.zone).toEqual("EST");
     twz = twz.minus(1);
-    expect(twz.hour).toBe(1);
-    expect(twz.min).toBe(59);
-    expect(twz.sec).toBe(59);
-    expect(twz.dst()).toBe(true);
-    expect(twz.zone).toBe("EDT");
+    expect(twz.time).toEqual(RubyTime.utc(2006, 10, 29, 1, 59, 59));
+    expect(twz.dst()).toEqual(true);
+    expect(twz.zone).toEqual("EDT");
   });
 
   it("to a", () => {
-    const hawaii = TimeZone.find("Hawaii")!;
-    const twzH = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 1, 1, 15, 30, 45))),
-      hawaii,
-    );
-    expect(twzH.sec).toBe(45);
-    expect(twzH.min).toBe(30);
-    expect(twzH.hour).toBe(5);
-    expect(twzH.day).toBe(1);
-    expect(twzH.month).toBe(2);
-    expect(twzH.year).toBe(2000);
-    expect(twzH.wday).toBe(2);
-    expect(twzH.yday).toBe(32);
-    expect(twzH.dst()).toBe(false);
-    expect(twzH.zone).toBe("HST");
+    expect(
+      new TimeWithZone(RubyTime.utc(2000, 2, 1, 15, 30, 45), TimeZone.find("Hawaii")!).toA(),
+    ).toEqual([45, 30, 5, 1, 2, 2000, 2, 32, false, "HST"]);
   });
 
   it("to f", () => {
-    const hawaii = TimeZone.find("Hawaii")!;
-    const twzH = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), hawaii);
-    expect(twzH.toF()).toBe(946684800.0);
+    const result = new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("Hawaii")!).toF();
+    expect(result).toEqual(946684800.0);
+    expect(Object(result)).toBeInstanceOf(Number);
   });
 
   it("to i", () => {
-    const hawaii = TimeZone.find("Hawaii")!;
-    const twzH = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), hawaii);
-    expect(twzH.toI()).toBe(946684800);
+    const result = new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("Hawaii")!).toI();
+    expect(result).toEqual(946684800);
+    expect(Object(result)).toBeInstanceOf(Number);
   });
 
   it("to date", () => {
-    const beforeMidnight = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1, 4, 59, 59))),
-      eastern,
-    );
-    expect(beforeMidnight.year).toBe(1999);
-    expect(beforeMidnight.month).toBe(12);
-    expect(beforeMidnight.day).toBe(31);
-
-    const atMidnight = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1, 5, 0, 0))),
-      eastern,
-    );
-    expect(atMidnight.year).toBe(2000);
-    expect(atMidnight.month).toBe(1);
-    expect(atMidnight.day).toBe(1);
-
-    const beforeMidnight2 = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 2, 4, 59, 59))),
-      eastern,
-    );
-    expect(beforeMidnight2.year).toBe(2000);
-    expect(beforeMidnight2.month).toBe(1);
-    expect(beforeMidnight2.day).toBe(1);
-
-    const atMidnight2 = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 2, 5, 0, 0))),
-      eastern,
-    );
-    expect(atMidnight2.year).toBe(2000);
-    expect(atMidnight2.month).toBe(1);
-    expect(atMidnight2.day).toBe(2);
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 1, 4, 59, 59),
+        TimeZone.find("Eastern Time (US & Canada)")!,
+      ).toDate(),
+    ).toEqual(new Temporal.PlainDate(1999, 12, 31));
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 1, 5, 0, 0),
+        TimeZone.find("Eastern Time (US & Canada)")!,
+      ).toDate(),
+    ).toEqual(new Temporal.PlainDate(2000, 1, 1));
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 2, 4, 59, 59),
+        TimeZone.find("Eastern Time (US & Canada)")!,
+      ).toDate(),
+    ).toEqual(new Temporal.PlainDate(2000, 1, 1));
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 2, 5, 0, 0),
+        TimeZone.find("Eastern Time (US & Canada)")!,
+      ).toDate(),
+    ).toEqual(new Temporal.PlainDate(2000, 1, 2));
   });
 
   it("acts like time", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    expect(twz.actsLikeTime()).toBe(true);
+    assertPredicate(twz, (t) => t.actsLikeTime());
+    assert(ObjectExt.actsLike(twz, "time"));
+    assert(ObjectExt.actsLike(new TimeWithZone(DateTime.civil(2000), timeZone), "time"));
   });
 
   it("blank?", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    expect(twz.isBlank()).toBe(false);
+    assertNotPredicate(twz, (t) => t.isBlank());
   });
 
   it("is a", () => {
@@ -580,11 +622,9 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("utc to local conversion with far future datetime", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2050, 0, 1, 0, 0, 0))), eastern);
-    expect(twz.year).toBe(2049);
-    expect(twz.month).toBe(12);
-    expect(twz.day).toBe(31);
-    expect(twz.hour).toBe(19);
+    expect(new TimeWithZone(DateTime.civil(2050), timeZone).toA().slice(0, 6)).toEqual([
+      0, 0, 19, 31, 12, 2049,
+    ]);
   });
 
   it("local to utc conversion with far future datetime", () => {
@@ -620,193 +660,331 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance", () => {
-    const twz = eastern.local(2024, 3, 15, 10, 0, 0);
-    const result = twz.advance({ years: 2 });
-    expect(result.year).toBe(2026);
-    expect(result.month).toBe(3);
-    expect(result.day).toBe(15);
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.advance({ years: 2 }).inspect()).toEqual("2001-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.advance({ months: 3 }).inspect()).toEqual(
+      "2000-03-31 19:00:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ days: 4 }).inspect()).toEqual("2000-01-04 19:00:00.000000000 EST -05:00");
+    expect(twz.advance({ hours: 6 }).inspect()).toEqual("2000-01-01 01:00:00.000000000 EST -05:00");
+    expect(twz.advance({ minutes: 15 }).inspect()).toEqual(
+      "1999-12-31 19:15:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ seconds: 30 }).inspect()).toEqual(
+      "1999-12-31 19:00:30.000000000 EST -05:00",
+    );
   });
 
   it("since", () => {
-    const twz = eastern.local(2024, 1, 15, 10, 0, 0);
-    expect(twz.since(60).min).toBe(1);
+    expect(twz.since(1).inspect()).toEqual("1999-12-31 19:00:01.000000000 EST -05:00");
   });
 
   it("ago", () => {
-    const twz = eastern.local(2024, 1, 15, 10, 0, 0);
-    expect(twz.ago(60).hour).toBe(9);
-    expect(twz.ago(60).min).toBe(59);
+    expect(twz.ago(1).inspect()).toEqual("1999-12-31 18:59:59.000000000 EST -05:00");
   });
 
   it("advance 1 year from leap day", () => {
-    const twz = eastern.local(2004, 2, 29);
-    const result = twz.advance({ years: 1 });
-    expect(result.year).toBe(2005);
-    expect(result.month).toBe(2);
-    expect(result.day).toBe(28);
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2004, 2, 29));
+    expect(twz.advance({ years: 1 }).inspect()).toEqual("2005-02-28 00:00:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.years(1)).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.years(1)).inspect()).toEqual("2005-02-28 00:00:00.000000000 EST -05:00");
+    expect(twz.plus(Duration.years(1)).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 month from last day of january", () => {
-    const twz = eastern.local(2005, 1, 31);
-    const result = twz.advance({ months: 1 });
-    expect(result.year).toBe(2005);
-    expect(result.month).toBe(2);
-    expect(result.day).toBe(28);
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2005, 1, 31));
+    expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.months(1)).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.months(1)).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.months(1)).inspect()).toEqual(
+      "2005-02-28 00:00:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 month from last day of january during leap year", () => {
-    const twz = eastern.local(2000, 1, 31);
-    const result = twz.advance({ months: 1 });
-    expect(result.year).toBe(2000);
-    expect(result.month).toBe(2);
-    expect(result.day).toBe(29);
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2000, 1, 31));
+    expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.months(1)).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.months(1)).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.months(1)).inspect()).toEqual(
+      "2000-02-29 00:00:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 day across spring dst transition", () => {
-    const twz = eastern.local(2006, 4, 1, 10, 30);
-    const result = twz.advance({ days: 1 });
-    expect(result.day).toBe(2);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
+    expect(twz.advance({ days: 1 }).inspect()).toEqual("2006-04-02 10:30:00.000000000 EDT -04:00");
+    expect(twz.since(Duration.days(1)).inspect()).toEqual(
+      "2006-04-02 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.days(1)).inspect()).toEqual("2006-04-02 10:30:00.000000000 EDT -04:00");
+    expect(twz.plus(Duration.days(1)).inspect()).toEqual(
+      "2006-04-02 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.days(1).plus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-04-02 10:30:01.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.days(1).plus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-04-02 10:30:01.000000000 EDT -04:00",
+    );
+    expect(twz.plus(Duration.days(1)).plus(Duration.seconds(1)).inspect()).toEqual(
+      "2006-04-02 10:30:01.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 day across spring dst transition backwards", () => {
-    const twz = eastern.local(2006, 4, 2, 10, 30);
-    const result = twz.advance({ days: -1 });
-    expect(result.day).toBe(1);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 2, 10, 30));
+    expect(twz.advance({ days: -1 }).inspect()).toEqual("2006-04-01 10:30:00.000000000 EST -05:00");
+    expect(twz.ago(Duration.days(1)).inspect()).toEqual("2006-04-01 10:30:00.000000000 EST -05:00");
+    expect(twz.minus(Duration.days(1)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(Duration.days(1).minus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-04-01 10:30:01.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 day across fall dst transition", () => {
-    const twz = eastern.local(2006, 10, 28, 10, 30);
-    const result = twz.advance({ days: 1 });
-    expect(result.day).toBe(29);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
+    expect(twz.advance({ days: 1 }).inspect()).toEqual("2006-10-29 10:30:00.000000000 EST -05:00");
+    expect(twz.since(Duration.days(1)).inspect()).toEqual(
+      "2006-10-29 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.days(1)).inspect()).toEqual("2006-10-29 10:30:00.000000000 EST -05:00");
+    expect(twz.plus(Duration.days(1)).inspect()).toEqual(
+      "2006-10-29 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.days(1).plus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-10-29 10:30:01.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.days(1).plus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-10-29 10:30:01.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.days(1)).plus(Duration.seconds(1)).inspect()).toEqual(
+      "2006-10-29 10:30:01.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 day across fall dst transition backwards", () => {
-    const twz = eastern.local(2006, 10, 29, 10, 30);
-    const result = twz.advance({ days: -1 });
-    expect(result.day).toBe(28);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 29, 10, 30));
+    expect(twz.advance({ days: -1 }).inspect()).toEqual("2006-10-28 10:30:00.000000000 EDT -04:00");
+    expect(twz.ago(Duration.days(1)).inspect()).toEqual("2006-10-28 10:30:00.000000000 EDT -04:00");
+    expect(twz.minus(Duration.days(1)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(Duration.days(1).minus(Duration.seconds(1))).inspect()).toEqual(
+      "2006-10-28 10:30:01.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 week across spring dst transition", () => {
-    const twz = eastern.local(2006, 4, 1, 10, 30);
-    const result = twz.advance({ weeks: 1 });
-    expect(result.day).toBe(8);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
+    expect(twz.advance({ weeks: 1 }).inspect()).toEqual("2006-04-08 10:30:00.000000000 EDT -04:00");
+    expect((twz as MethodMissing).weeksSince(1).inspect()).toEqual(
+      "2006-04-08 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.weeks(1)).inspect()).toEqual(
+      "2006-04-08 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.weeks(1)).inspect()).toEqual("2006-04-08 10:30:00.000000000 EDT -04:00");
+    expect(twz.plus(Duration.weeks(1)).inspect()).toEqual(
+      "2006-04-08 10:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 week across spring dst transition backwards", () => {
-    const twz = eastern.local(2006, 4, 8, 10, 30);
-    const result = twz.advance({ weeks: -1 });
-    expect(result.day).toBe(1);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 8, 10, 30));
+    expect(twz.advance({ weeks: -1 }).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).weeksAgo(1).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(Duration.weeks(1)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.minus(Duration.weeks(1)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 week across fall dst transition", () => {
-    const twz = eastern.local(2006, 10, 28, 10, 30);
-    const result = twz.advance({ weeks: 1 });
-    expect(result.month).toBe(11);
-    expect(result.day).toBe(4);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
+    expect(twz.advance({ weeks: 1 }).inspect()).toEqual("2006-11-04 10:30:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).weeksSince(1).inspect()).toEqual(
+      "2006-11-04 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.weeks(1)).inspect()).toEqual(
+      "2006-11-04 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.weeks(1)).inspect()).toEqual("2006-11-04 10:30:00.000000000 EST -05:00");
+    expect(twz.plus(Duration.weeks(1)).inspect()).toEqual(
+      "2006-11-04 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 week across fall dst transition backwards", () => {
-    const twz = eastern.local(2006, 11, 4, 10, 30);
-    const result = twz.advance({ weeks: -1 });
-    expect(result.month).toBe(10);
-    expect(result.day).toBe(28);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 11, 4, 10, 30));
+    expect(twz.advance({ weeks: -1 }).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).weeksAgo(1).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(Duration.weeks(1)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.minus(Duration.weeks(1)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 month across spring dst transition", () => {
-    const twz = eastern.local(2006, 4, 1, 10, 30);
-    const result = twz.advance({ months: 1 });
-    expect(result.month).toBe(5);
-    expect(result.day).toBe(1);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
+    expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.months(1)).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.months(1)).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.plus(Duration.months(1)).inspect()).toEqual(
+      "2006-05-01 10:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 month across spring dst transition backwards", () => {
-    const twz = eastern.local(2006, 5, 1, 10, 30);
-    const result = twz.advance({ months: -1 });
-    expect(result.month).toBe(4);
-    expect(result.day).toBe(1);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 5, 1, 10, 30));
+    expect(twz.advance({ months: -1 }).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsAgo(1).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(Duration.months(1)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.minus(Duration.months(1)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 month across fall dst transition", () => {
-    const twz = eastern.local(2006, 10, 28, 10, 30);
-    const result = twz.advance({ months: 1 });
-    expect(result.month).toBe(11);
-    expect(result.day).toBe(28);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EST");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
+    expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.months(1)).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.months(1)).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.months(1)).inspect()).toEqual(
+      "2006-11-28 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 month across fall dst transition backwards", () => {
-    const twz = eastern.local(2006, 11, 28, 10, 30);
-    const result = twz.advance({ months: -1 });
-    expect(result.month).toBe(10);
-    expect(result.day).toBe(28);
-    expect(result.hour).toBe(10);
-    expect(result.min).toBe(30);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 11, 28, 10, 30));
+    expect(twz.advance({ months: -1 }).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).monthsAgo(1).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(Duration.months(1)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.minus(Duration.months(1)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 year", () => {
-    const twz = eastern.local(2008, 2, 15, 10, 30);
-    const forward = twz.advance({ years: 1 });
-    expect(forward.year).toBe(2009);
-    expect(forward.month).toBe(2);
-    expect(forward.day).toBe(15);
-    expect(forward.hour).toBe(10);
-    expect(forward.min).toBe(30);
-
-    const backward = twz.advance({ years: -1 });
-    expect(backward.year).toBe(2007);
-    expect(backward.month).toBe(2);
-    expect(backward.day).toBe(15);
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2008, 2, 15, 10, 30));
+    expect(twz.advance({ years: 1 }).inspect()).toEqual("2009-02-15 10:30:00.000000000 EST -05:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2009-02-15 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.years(1)).inspect()).toEqual(
+      "2009-02-15 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.years(1)).inspect()).toEqual("2009-02-15 10:30:00.000000000 EST -05:00");
+    expect(twz.plus(Duration.years(1)).inspect()).toEqual(
+      "2009-02-15 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ years: -1 }).inspect()).toEqual(
+      "2007-02-15 10:30:00.000000000 EST -05:00",
+    );
+    expect((twz as MethodMissing).yearsAgo(1).inspect()).toEqual(
+      "2007-02-15 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.minus(Duration.years(1)).inspect()).toEqual(
+      "2007-02-15 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 year during dst", () => {
-    const twz = eastern.local(2008, 7, 15, 10, 30);
-    const forward = twz.advance({ years: 1 });
-    expect(forward.year).toBe(2009);
-    expect(forward.month).toBe(7);
-    expect(forward.day).toBe(15);
-    expect(forward.hour).toBe(10);
-    expect(forward.min).toBe(30);
-    expect(forward.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2008, 7, 15, 10, 30));
+    expect(twz.advance({ years: 1 }).inspect()).toEqual("2009-07-15 10:30:00.000000000 EDT -04:00");
+    expect((twz as MethodMissing).yearsSince(1).inspect()).toEqual(
+      "2009-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.years(1)).inspect()).toEqual(
+      "2009-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.years(1)).inspect()).toEqual("2009-07-15 10:30:00.000000000 EDT -04:00");
+    expect(twz.plus(Duration.years(1)).inspect()).toEqual(
+      "2009-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ years: -1 }).inspect()).toEqual(
+      "2007-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).yearsAgo(1).inspect()).toEqual(
+      "2007-07-15 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.minus(Duration.years(1)).inspect()).toEqual(
+      "2007-07-15 10:30:00.000000000 EDT -04:00",
+    );
   });
   it("plus with integer when self wraps datetime", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
-    const result = twz.plus(5);
-    expect(result.hour).toBe(19);
-    expect(result.min).toBe(0);
-    expect(result.sec).toBe(5);
+    const datetime = DateTime.civil(2000, 1, 1, 0);
+    const twz = new TimeWithZone(datetime, timeZone);
+    expect(twz.plus(5).time).toEqual(RubyTime.utc(1999, 12, 31, 19, 0, 5));
   });
 
   it("no limit on times", () => {
@@ -822,53 +1000,67 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("minus with integer when self wraps datetime", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
-    const result = twz.minus(5);
-    expect(result.hour).toBe(18);
-    expect(result.min).toBe(59);
-    expect(result.sec).toBe(55);
+    const datetime = DateTime.civil(2000, 1, 1, 0);
+    const twz = new TimeWithZone(datetime, timeZone);
+    expect(twz.minus(5).time).toEqual(RubyTime.utc(1999, 12, 31, 18, 59, 55));
   });
 
   it("minus with time precision", () => {
-    const twz2 = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 2, 23, 59, 59, 999))),
-      utcZone,
-    );
-    const t1 = new Date(Date.UTC(2000, 0, 2, 0, 0, 0, 1));
-    const diff = twz2.minus(t1);
-    expect(diff).toBeCloseTo(86399.998, 3);
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 2, 23, 59, 59, new Rational(999999999, 1000)),
+        TimeZone.find("UTC")!,
+      ).minus(RubyTime.utc(2000, 1, 2, 0, 0, 0, new Rational(1, 1000))),
+    ).toEqual(86_399.999999998);
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 2, 23, 59, 59, new Rational(999999999, 1000)),
+        TimeZone.find("Hawaii")!,
+      ).minus(RubyTime.utc(2000, 1, 2, 0, 0, 0, new Rational(1, 1000))),
+    ).toEqual(86_399.999999998);
   });
 
   it("minus with time with zone without preserve configured", () => {
-    const twz1 = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), utcZone);
-    const twz2 = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 2))), utcZone);
-    expect(twz2.minus(twz1)).toBe(86400);
+    setPreserveTimezone(null);
+    const twz1 = new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("UTC")!);
+    const twz2 = new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("UTC")!);
+
+    const difference = twz2.minus(twz1);
+    expect(difference).toEqual(86_400.0);
   });
 
   it("minus with time with zone precision", () => {
     const twz1 = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1))),
-      utcZone,
+      RubyTime.utc(2000, 1, 1, 0, 0, 0, new Rational(1, 1000)),
+      TimeZone.find("UTC")!,
     );
     const twz2 = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1, 23, 59, 59, 999))),
-      utcZone,
+      RubyTime.utc(2000, 1, 1, 23, 59, 59, new Rational(999999999, 1000)),
+      TimeZone.find("UTC")!,
     );
-    expect(twz2.minus(twz1)).toBeCloseTo(86399.998, 3);
+    expect(twz2.minus(twz1)).toEqual(86_399.999999998);
   });
 
   it("minus with datetime precision", () => {
-    const twz = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1, 23, 59, 59, 999))),
-      utcZone,
-    );
-    const dt = new Date(Date.UTC(2000, 0, 1));
-    expect(twz.minus(dt)).toBeCloseTo(86399.999, 3);
+    expect(
+      new TimeWithZone(
+        RubyTime.utc(2000, 1, 1, 23, 59, 59, new Rational(999999999, 1000)),
+        TimeZone.find("UTC")!,
+      ).minus(DateTime.civil(2000, 1, 1)),
+    ).toEqual(86_399.999999999);
   });
 
   it("minus with wrapped datetime", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 2))), utcZone);
-    expect(twz.minus(new Date(Date.UTC(2000, 0, 1)))).toBe(86400);
+    expect(
+      new TimeWithZone(DateTime.civil(2000, 1, 2), TimeZone.find("UTC")!).minus(
+        RubyTime.utc(2000, 1, 1),
+      ),
+    ).toEqual(86_400.0);
+    expect(
+      new TimeWithZone(DateTime.civil(2000, 1, 2), TimeZone.find("UTC")!).minus(
+        DateTime.civil(2000, 1, 1),
+      ),
+    ).toEqual(86_400.0);
   });
 
   it("to i with wrapped datetime", () => {
@@ -883,44 +1075,53 @@ describe("TimeWithZoneTest", () => {
 
   it("to time with preserve timezone using zone", () => {
     setPreserveTimezone(":zone");
-    const twz = maketwz();
     const time = twz.toTime();
-    expect(time).toBeInstanceOf(RubyTime);
+    const localTime = withEnvTz("US/Eastern", () => RubyTime.local(1999, 12, 31, 19));
+
+    expect(time.constructor).toEqual(RubyTime);
     expect(twz.toTime()).toBe(time);
-    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
-    expect(time.utcOffset).toBe(-18000);
-    expect(time.zone).toBe("EST");
+    expect(time).toEqual(localTime);
+    expect(time.utcOffset).toEqual(localTime.utcOffset);
+    expect(time.zone).toEqual(timeZone.tzinfo.abbr(time.toTime().toInstant()));
   });
 
   it("to time with preserve timezone using offset", () => {
     setPreserveTimezone(":offset");
-    const twz = maketwz();
-    const time = twz.toTime();
-    expect(time).toBeInstanceOf(RubyTime);
-    expect(twz.toTime()).toBe(time);
-    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
-    expect(time.utcOffset).toBe(-18000);
-    expect(time.zone).toBeNull();
+    withEnvTz("US/Eastern", () => {
+      const time = twz.toTime();
+
+      expect(time.constructor).toEqual(RubyTime);
+      expect(twz.toTime()).toBe(time);
+      expect(time.eql(RubyTime.local(1999, 12, 31, 19))).toEqual(true);
+      expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
+      expect(time.zone).toBeNull();
+    });
   });
 
   it("to time with preserve timezone using true", () => {
     setPreserveTimezone(true);
-    const twz = maketwz();
-    const time = twz.toTime();
-    expect(time).toBeInstanceOf(RubyTime);
-    expect(twz.toTime()).toBe(time);
-    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
-    expect(time.utcOffset).toBe(-18000);
-    expect(time.zone).toBeNull();
+    withEnvTz("US/Eastern", () => {
+      const time = twz.toTime();
+
+      expect(time.constructor).toEqual(RubyTime);
+      expect(twz.toTime()).toBe(time);
+      expect(time.eql(RubyTime.local(1999, 12, 31, 19))).toEqual(true);
+      expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
+      expect(time.zone).toBeNull();
+    });
   });
 
   it("to time without preserve timezone", () => {
     setPreserveTimezone(false);
-    const twz = maketwz();
-    const time = twz.toTime();
-    expect(time).toBeInstanceOf(RubyTime);
-    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
-    expect(time.zone).not.toBeNull();
+    withEnvTz("US/Eastern", () => {
+      const time = twz.toTime();
+
+      expect(time.constructor).toEqual(RubyTime);
+      expect(twz.toTime()).toBe(time);
+      expect(time.eql(RubyTime.local(1999, 12, 31, 19))).toEqual(true);
+      expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
+      expect(time.zone).toEqual(RubyTime.local(1999, 12, 31, 19).zone);
+    });
   });
 
   it("to time without preserve timezone configured", () => {
@@ -933,12 +1134,8 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("method missing with time return value", () => {
-    const twz = maketwz();
-    const result = twz.advance({ months: 1 });
-    expect(result).toBeInstanceOf(TimeWithZone);
-    expect(result.month).toBe(1);
-    expect(result.day).toBe(31);
-    expect(result.hour).toBe(19);
+    expect((twz as MethodMissing).monthsSince(1)).toBeInstanceOf(TimeWithZone);
+    expect((twz as MethodMissing).monthsSince(1).time).toEqual(RubyTime.utc(2000, 1, 31, 19, 0, 0));
   });
 
   it("marshal dump and load", () => {
@@ -973,9 +1170,8 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("freeze", () => {
-    const twz = maketwz();
-    const frozen = Object.freeze(twz);
-    expect(Object.isFrozen(frozen)).toBe(true);
+    twz.freeze();
+    assertPredicate(twz, Object.isFrozen);
   });
 
   it("freeze preloads instance variables", () => {
@@ -990,29 +1186,32 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("method missing with non time return value", () => {
-    const twz = maketwz();
-    expect(twz.toI()).toBe(946684800);
+    const time = twz.time;
+    Object.assign(time, { foo: () => "bar" });
+    expect((twz as unknown as { foo(): string }).foo()).toEqual("bar");
   });
 
   it("method missing works with kwargs", () => {
-    const twz = maketwz();
-    const result = twz.change({ hour: 6 });
-    expect(result.hour).toBe(6);
+    const time = twz.time;
+    Object.assign(time, { methodWithKwarg: ({ foo }: { foo: string }) => foo });
+    expect(
+      (twz as unknown as { methodWithKwarg(o: { foo: string }): string }).methodWithKwarg({
+        foo: "bar",
+      }),
+    ).toEqual("bar");
   });
 
   it("date part value methods", () => {
-    const twz = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(1999, 11, 31, 19, 18, 17, 0))),
-      eastern,
-    );
-    expect(twz.year).toBe(1999);
-    expect(twz.month).toBe(12);
-    expect(twz.day).toBe(31);
-    expect(twz.hour).toBe(14);
-    expect(twz.min).toBe(18);
-    expect(twz.sec).toBe(17);
-    expect(twz.wday).toBe(5);
-    expect(twz.yday).toBe(365);
+    const twz = new TimeWithZone(RubyTime.utc(1999, 12, 31, 19, 18, 17, 500), timeZone);
+    expect(twz.year).toEqual(1999);
+    expect(twz.month).toEqual(12);
+    expect(twz.day).toEqual(31);
+    expect(twz.hour).toEqual(14);
+    expect(twz.min).toEqual(18);
+    expect(twz.sec).toEqual(17);
+    expect(twz.usec).toEqual(500);
+    expect(twz.wday).toEqual(5);
+    expect(twz.yday).toEqual(365);
   });
 
   it("usec returns 0 when datetime is wrapped", () => {
@@ -1037,9 +1236,9 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("utc to local conversion saves period in instance variable", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);
-    expect(twz.utcOffset).toBe(-5 * 3600);
-    expect(twz.zone).toBe("EST");
+    expect(twz["_period"]).toBeUndefined();
+    void twz.time;
+    expect(twz["_period"]).toBeInstanceOf(TimezonePeriod);
   });
 
   it("instance created with local time returns correct utc time", () => {
@@ -1062,14 +1261,18 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("ruby 19 weekday name query methods", () => {
-    const twz = maketwz();
-    expect(twz.isFriday()).toBe(true);
-    expect(twz.isSunday()).toBe(false);
-    expect(twz.isMonday()).toBe(false);
-    expect(twz.isTuesday()).toBe(false);
-    expect(twz.isWednesday()).toBe(false);
-    expect(twz.isThursday()).toBe(false);
-    expect(twz.isSaturday()).toBe(false);
+    for (const name of [
+      "isSunday",
+      "isMonday",
+      "isTuesday",
+      "isWednesday",
+      "isThursday",
+      "isFriday",
+      "isSaturday",
+    ] as const) {
+      assertRespondTo(twz, name);
+      expect(twz[name].call(twz)).toEqual(twz[name]());
+    }
   });
 
   it("change at dst boundary", () => {
@@ -1091,15 +1294,13 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("beginning of year", () => {
-    const twz = maketwz();
-    const boy = twz.beginningOfYear();
-    expect(boy.inspect()).toBe("1999-01-01 00:00:00.000000000 EST -05:00");
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.beginningOfYear().inspect()).toEqual("1999-01-01 00:00:00.000000000 EST -05:00");
   });
 
   it("beginning of month", () => {
-    const twz = maketwz();
-    const bom = twz.beginningOfMonth();
-    expect(bom.inspect()).toBe("1999-12-01 00:00:00.000000000 EST -05:00");
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.beginningOfMonth().inspect()).toEqual("1999-12-01 00:00:00.000000000 EST -05:00");
   });
 
   it("in", () => {
@@ -1108,53 +1309,193 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 month into spring dst gap", () => {
-    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-03-02T02:00:00"));
-    const result = twz.advance({ months: 1 });
-    expect(result.hour).toBe(3);
-    expect(result.dst()).toBe(true);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 3, 2, 2));
+    expect(twz.advance({ months: 1 }).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect((twz as MethodMissing).monthsSince(1).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.months(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.months(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.plus(Duration.months(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 second into spring dst gap", () => {
-    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-04-02T01:59:59"));
-    const result = twz.advance({ seconds: 1 });
-    expect(result.hour).toBe(3);
-    expect(result.min).toBe(0);
-    expect(result.sec).toBe(0);
-    expect(result.dst()).toBe(true);
-    expect(result.zone).toBe("EDT");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 2, 1, 59, 59));
+    expect(twz.advance({ seconds: 1 }).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.plus(1).inspect()).toEqual("2006-04-02 03:00:00.000000000 EDT -04:00");
+    expect(twz.plus(Duration.seconds(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(1).inspect()).toEqual("2006-04-02 03:00:00.000000000 EDT -04:00");
+    expect(twz.since(Duration.seconds(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(1).inspect()).toEqual("2006-04-02 03:00:00.000000000 EDT -04:00");
+    expect(twz.in(Duration.seconds(1)).inspect()).toEqual(
+      "2006-04-02 03:00:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 day expressed as number of seconds minutes or hours across spring dst transition", () => {
-    const twz = eastern.local(2006, 4, 1, 10, 30);
-    expect(twz.plus(86400).inspect()).toContain("2006-04-02 11:30:00");
-    expect(twz.advance({ seconds: 86400 }).inspect()).toContain("2006-04-02 11:30:00");
-    expect(twz.advance({ minutes: 1440 }).inspect()).toContain("2006-04-02 11:30:00");
-    expect(twz.advance({ hours: 24 }).inspect()).toContain("2006-04-02 11:30:00");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 1, 10, 30));
+    expect(twz.plus(86400).inspect()).toEqual("2006-04-02 11:30:00.000000000 EDT -04:00");
+    expect(twz.plus(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(86400).inspect()).toEqual("2006-04-02 11:30:00.000000000 EDT -04:00");
+    expect(twz.since(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(86400).inspect()).toEqual("2006-04-02 11:30:00.000000000 EDT -04:00");
+    expect(twz.in(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ seconds: 86400 }).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.plus(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ minutes: 1440 }).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.plus(Duration.hours(24)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.since(Duration.hours(24)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.in(Duration.hours(24)).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ hours: 24 }).inspect()).toEqual(
+      "2006-04-02 11:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("advance 1 day expressed as number of seconds minutes or hours across spring dst transition backwards", () => {
-    const twz = eastern.local(2006, 4, 2, 11, 30);
-    expect(twz.minus(86400).inspect()).toContain("2006-04-01 10:30:00");
-    expect(twz.advance({ seconds: -86400 }).inspect()).toContain("2006-04-01 10:30:00");
-    expect(twz.advance({ minutes: -1440 }).inspect()).toContain("2006-04-01 10:30:00");
-    expect(twz.advance({ hours: -24 }).inspect()).toContain("2006-04-01 10:30:00");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 4, 2, 11, 30));
+    expect(twz.minus(86400).inspect()).toEqual("2006-04-01 10:30:00.000000000 EST -05:00");
+    expect(twz.minus(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(86400).inspect()).toEqual("2006-04-01 10:30:00.000000000 EST -05:00");
+    expect(twz.ago(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ seconds: -86400 }).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.minus(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ minutes: -1440 }).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.minus(Duration.hours(24)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.ago(Duration.hours(24)).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ hours: -24 }).inspect()).toEqual(
+      "2006-04-01 10:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 day expressed as number of seconds minutes or hours across fall dst transition", () => {
-    const twz = eastern.local(2006, 10, 28, 10, 30);
-    expect(twz.plus(86400).inspect()).toContain("2006-10-29 09:30:00");
-    expect(twz.advance({ seconds: 86400 }).inspect()).toContain("2006-10-29 09:30:00");
-    expect(twz.advance({ minutes: 1440 }).inspect()).toContain("2006-10-29 09:30:00");
-    expect(twz.advance({ hours: 24 }).inspect()).toContain("2006-10-29 09:30:00");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 28, 10, 30));
+    expect(twz.plus(86400).inspect()).toEqual("2006-10-29 09:30:00.000000000 EST -05:00");
+    expect(twz.plus(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(86400).inspect()).toEqual("2006-10-29 09:30:00.000000000 EST -05:00");
+    expect(twz.since(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(86400).inspect()).toEqual("2006-10-29 09:30:00.000000000 EST -05:00");
+    expect(twz.in(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ seconds: 86400 }).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ minutes: 1440 }).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.plus(Duration.hours(24)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.since(Duration.hours(24)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.in(Duration.hours(24)).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
+    expect(twz.advance({ hours: 24 }).inspect()).toEqual(
+      "2006-10-29 09:30:00.000000000 EST -05:00",
+    );
   });
 
   it("advance 1 day expressed as number of seconds minutes or hours across fall dst transition backwards", () => {
-    const twz = eastern.local(2006, 10, 29, 9, 30);
-    expect(twz.minus(86400).inspect()).toContain("2006-10-28 10:30:00");
-    expect(twz.advance({ seconds: -86400 }).inspect()).toContain("2006-10-28 10:30:00");
-    expect(twz.advance({ minutes: -1440 }).inspect()).toContain("2006-10-28 10:30:00");
-    expect(twz.advance({ hours: -24 }).inspect()).toContain("2006-10-28 10:30:00");
+    const twz = new TimeWithZone(null, timeZone, RubyTime.utc(2006, 10, 29, 9, 30));
+    expect(twz.minus(86400).inspect()).toEqual("2006-10-28 10:30:00.000000000 EDT -04:00");
+    expect(twz.minus(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(86400).inspect()).toEqual("2006-10-28 10:30:00.000000000 EDT -04:00");
+    expect(twz.ago(Duration.seconds(86400)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ seconds: -86400 }).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.minus(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(Duration.minutes(1440)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ minutes: -1440 }).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.minus(Duration.hours(24)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.ago(Duration.hours(24)).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
+    expect(twz.advance({ hours: -24 }).inspect()).toEqual(
+      "2006-10-28 10:30:00.000000000 EDT -04:00",
+    );
   });
 
   it("no method error has proper context", () => {
@@ -1184,44 +1525,72 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     setZone(null);
   });
 
-  const t = new Date(Date.UTC(2000, 0, 1));
+  const t = RubyTime.utc(2000);
+  const dt = DateTime.civil(2000);
 
   it("in time zone", () => {
     useZone("Alaska", () => {
-      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska")!);
-      expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
+      expect((inTimeZone(t) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((inTimeZone(dt) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
     });
     useZone("Hawaii", () => {
-      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii")!);
-      expect(result.inspect()).toBe("1999-12-31 14:00:00.000000000 HST -10:00");
+      expect((inTimeZone(t) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((inTimeZone(dt) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+    });
+    withTzDefault(null, () => {
+      expect(inTimeZone(t)).toEqual(t);
+      expect(inTimeZone(dt)).toEqual(dt);
     });
   });
 
   it("nil time zone", () => {
-    setZone(null);
-    const zone = timeZone();
-    expect(zone).toBeNull();
+    withTzDefault(null, () => {
+      assertNotRespondTo(inTimeZone(t), "period", "no period method");
+      assertNotRespondTo(inTimeZone(dt), "period", "no period method");
+    });
   });
 
   it("in time zone with argument", () => {
     useZone("Eastern Time (US & Canada)", () => {
-      const alaska = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska")!);
-      expect(alaska.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
-      const hawaii = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii")!);
-      expect(hawaii.inspect()).toBe("1999-12-31 14:00:00.000000000 HST -10:00");
-      const utcTwz = new TimeWithZone(instantFromDate(t), TimeZone.find("UTC")!);
-      expect(utcTwz.inspect()).toBe("2000-01-01 00:00:00.000000000 UTC +00:00");
+      expect((inTimeZone(t, "Alaska") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((inTimeZone(dt, "Alaska") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((inTimeZone(t, "Hawaii") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((inTimeZone(dt, "Hawaii") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((inTimeZone(t, "UTC") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect((inTimeZone(dt, "UTC") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect((inTimeZone(t, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
     });
   });
 
-  it("in time zone with invalid argument", () => {
-    const twz = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-      TimeZone.find("UTC")!,
-    );
-    expect(() => twz.inTimeZone("No such timezone exists")).toThrow(ArgumentError);
-    expect(() => twz.inTimeZone(Duration.hours(-15))).toThrow(ArgumentError);
-    expect(() => twz.inTimeZone({})).toThrow(ArgumentError);
+  it("in time zone with invalid argument", async () => {
+    await assertRaise([ArgumentError], {}, () => inTimeZone(t, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(t, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(t, {}));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, {}));
   });
 
   it("in time zone with time local instance", () => {
@@ -1299,19 +1668,20 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("time zone setter with tzinfo timezone object wraps in rails time zone", () => {
-    setZone("America/New_York");
-    const zone = timeZone()!;
-    expect(zone).toBeInstanceOf(TimeZone);
-    expect(zone.tzinfo.identifier).toBe("America/New_York");
-    expect(zone.name).toBe("America/New_York");
+    const tzinfo = Timezone.get("America/New_York");
+    setZone(tzinfo as unknown as string);
+    expect(timeZone()).toBeInstanceOf(TimeZone);
+    expect(timeZone()!.tzinfo).toEqual(tzinfo);
+    expect(timeZone()!.name).toEqual("America/New_York");
+    expect(timeZone()!.utcOffset).toEqual(-18_000);
   });
 
   it("time zone setter with tzinfo timezone identifier does lookup and wraps in rails time zone", () => {
     setZone("America/New_York");
-    const zone = timeZone()!;
-    expect(zone).toBeInstanceOf(TimeZone);
-    expect(zone.tzinfo.identifier).toBe("America/New_York");
-    expect(zone.name).toBe("America/New_York");
+    expect(timeZone()).toBeInstanceOf(TimeZone);
+    expect(timeZone()!.tzinfo.name).toEqual("America/New_York");
+    expect(timeZone()!.name).toEqual("America/New_York");
+    expect(timeZone()!.utcOffset).toEqual(-18_000);
   });
 
   it("time zone setter with invalid zone", () => {
@@ -1326,12 +1696,17 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     expect(findZone({})).toBeNull();
   });
 
-  it("find zone with bang raises if time zone can not be found", () => {
-    expect(() => findZoneBang("No such timezone exists")).toThrow(
-      "Invalid Timezone: No such timezone exists",
+  it("find zone with bang raises if time zone can not be found", async () => {
+    let error = await assertRaise([ArgumentError], {}, () =>
+      findZoneBang("No such timezone exists"),
     );
-    expect(() => findZoneBang(Duration.hours(-15))).toThrow("Invalid Timezone: -54000");
-    expect(() => findZoneBang({})).toThrow(/invalid argument to TimeZone\[\]/);
+    expect(error.message).toEqual("Invalid Timezone: No such timezone exists");
+
+    error = await assertRaise([ArgumentError], {}, () => findZoneBang(Duration.hours(-15)));
+    expect(error.message).toEqual("Invalid Timezone: -54000");
+
+    error = await assertRaise([ArgumentError], {}, () => findZoneBang({}));
+    expect(error.message).toMatch("invalid argument to TimeZone[]");
   });
 
   it("find zone with bang doesnt raises with nil and false", () => {
@@ -1340,38 +1715,41 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("time zone setter with find zone without bang", () => {
-    const result = findZone("No such timezone exists");
-    expect(result).toBeNull();
-    setZone(result);
+    setZone(findZone("No such timezone exists"));
+    expect(timeZone()).toBeNull();
+    setZone(findZone(Duration.hours(-15)));
+    expect(timeZone()).toBeNull();
+    setZone(findZone({}));
     expect(timeZone()).toBeNull();
   });
 
   it("current returns time now when zone not set", () => {
-    setZone(null);
-    travelTo(new Date(Date.UTC(2000, 0, 1)), {}, () => {
-      const c = current();
-      expect(c).toBeInstanceOf(Date);
-      expect(c instanceof TimeWithZone).toBe(false);
+    withEnvTz("US/Eastern", () => {
+      travelTo(RubyTime.local(2000).toTime(), {}, () => {
+        expect(current() instanceof TimeWithZone).toEqual(false);
+        expect(current()).toEqual(new Date(RubyTime.local(2000).toTime().epochMilliseconds));
+      });
     });
   });
 
   it("current returns time zone now when zone set", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
-    travelTo(new Date(Date.UTC(2000, 0, 1)), {}, () => {
-      const c = current();
-      expect(c).toBeInstanceOf(TimeWithZone);
-      expect((c as TimeWithZone).timeZone.name).toBe("Eastern Time (US & Canada)");
+    withEnvTz("US/Eastern", () => {
+      travelTo(RubyTime.local(2000).toTime(), {}, () => {
+        expect(current() instanceof TimeWithZone).toEqual(true);
+        expect((current() as TimeWithZone).timeZone.name).toEqual("Eastern Time (US & Canada)");
+        expect((current() as TimeWithZone).time).toEqual(RubyTime.utc(2000));
+      });
     });
   });
 
   it("time in time zone doesnt affect receiver", () => {
-    const time = new Date(Date.UTC(2000, 6, 1));
-    const twz = new TimeWithZone(
-      instantFromDate(time),
-      TimeZone.find("Eastern Time (US & Canada)")!,
-    );
-    expect(twz.utc().toTime().epochMilliseconds).toBe(time.getTime());
-    expect(time.getTime()).toBe(Date.UTC(2000, 6, 1));
+    withEnvTz("Europe/London", () => {
+      const time = RubyTime.local(2000, 7, 1);
+      const timeWithZone = inTimeZone(time, "Eastern Time (US & Canada)") as TimeWithZone;
+      expect(timeWithZone.eql(RubyTime.utc(2000, 6, 30, 23, 0, 0))).toEqual(true);
+      assertNot(time.isUtc(), "time expected to be local, but is UTC");
+    });
   });
 });
 
@@ -1380,38 +1758,43 @@ describe("TimeWithZoneMethodsForDate", () => {
     setZone(null);
   });
 
+  const d = new Temporal.PlainDate(2000, 1, 1);
+
   it("in time zone", () => {
-    useZone("Alaska", () => {
-      const result = inTimeZone(new Temporal.PlainDate(2000, 1, 1), timeZone()!);
-      expect(result.inspect()).toBe("2000-01-01 00:00:00.000000000 AKST -09:00");
+    withTzDefault("Alaska", () => {
+      expect(inTimeZone(d).inspect()).toEqual("2000-01-01 00:00:00.000000000 AKST -09:00");
     });
-    useZone("Hawaii", () => {
-      const result = inTimeZone(new Temporal.PlainDate(2000, 1, 1), timeZone()!);
-      expect(result.inspect()).toBe("2000-01-01 00:00:00.000000000 HST -10:00");
+    withTzDefault("Hawaii", () => {
+      expect(inTimeZone(d).inspect()).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
+    });
+    withTzDefault(null, () => {
+      expect(inTimeZone(d)).toEqual(dateToTime(d));
     });
   });
 
   it("nil time zone", () => {
-    setZone(null);
-    expect(timeZone()).toBeNull();
-  });
-
-  it("in time zone with argument", () => {
-    useZone("Eastern Time (US & Canada)", () => {
-      const alaska = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "Alaska");
-      expect(alaska.inspect()).toBe("2000-01-01 00:00:00.000000000 AKST -09:00");
-      const hawaii = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "Hawaii");
-      expect(hawaii.inspect()).toBe("2000-01-01 00:00:00.000000000 HST -10:00");
-      const utcTwz = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "UTC");
-      expect(utcTwz.inspect()).toBe("2000-01-01 00:00:00.000000000 UTC +00:00");
+    withTzDefault(null, () => {
+      assertNotRespondTo(inTimeZone(d), "period", "no period method");
     });
   });
 
-  it("in time zone with invalid argument", () => {
-    const d = new Temporal.PlainDate(2000, 1, 1);
-    expect(() => inTimeZone(d, "No such timezone exists")).toThrow(ArgumentError);
-    expect(() => inTimeZone(d, Duration.hours(-15))).toThrow(ArgumentError);
-    expect(() => inTimeZone(d, {})).toThrow(ArgumentError);
+  it("in time zone with argument", () => {
+    withTzDefault("Eastern Time (US & Canada)", () => {
+      expect(inTimeZone(d, "Alaska").inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 AKST -09:00",
+      );
+      expect(inTimeZone(d, "Hawaii").inspect()).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
+      expect(inTimeZone(d, "UTC").inspect()).toEqual("2000-01-01 00:00:00.000000000 UTC +00:00");
+      expect(inTimeZone(d, Duration.hours(-9)).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 AKST -09:00",
+      );
+    });
+  });
+
+  it("in time zone with invalid argument", async () => {
+    await assertRaise([ArgumentError], {}, () => inTimeZone(d, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(d, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone(d, {}));
   });
 });
 
@@ -1420,44 +1803,108 @@ describe("TimeWithZoneMethodsForString", () => {
     setZone(null);
   });
 
+  const s = "Sat, 01 Jan 2000 00:00:00";
+  const u = "Sat, 01 Jan 2000 00:00:00 UTC +00:00";
+  const z = "Fri, 31 Dec 1999 19:00:00 EST -05:00";
+
   it("in time zone", () => {
-    useZone("Alaska", () => {
-      const result = new TimeWithZone(
-        instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-        TimeZone.find("Alaska")!,
+    withTzDefault("Alaska", () => {
+      expect((stringInTimeZone(s) as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 AKST -09:00",
       );
-      expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
+      expect((stringInTimeZone(u) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(z) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+    });
+    withTzDefault("Hawaii", () => {
+      expect((stringInTimeZone(s) as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 HST -10:00",
+      );
+      expect((stringInTimeZone(u) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((stringInTimeZone(z) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+    });
+    withTzDefault(null, () => {
+      expect(stringInTimeZone(s)).toEqual(stringToTime(s));
+      expect(stringInTimeZone(u)).toEqual(stringToTime(u));
+      expect(stringInTimeZone(z)).toEqual(stringToTime(z));
     });
   });
 
   it("nil time zone", () => {
-    setZone(null);
-    expect(timeZone()).toBeNull();
-  });
-
-  it("in time zone with argument", () => {
-    useZone("Eastern Time (US & Canada)", () => {
-      const alaska = new TimeWithZone(
-        instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-        TimeZone.find("Alaska")!,
-      );
-      expect(alaska.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
+    withTzDefault(null, () => {
+      assertNotRespondTo(stringInTimeZone(s), "period", "no period method");
+      assertNotRespondTo(stringInTimeZone(u), "period", "no period method");
+      assertNotRespondTo(stringInTimeZone(z), "period", "no period method");
     });
   });
 
-  it("in time zone with invalid argument", () => {
-    const twz = new TimeWithZone(
-      instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-      TimeZone.find("UTC")!,
-    );
-    expect(() => twz.inTimeZone("No such timezone exists")).toThrow(ArgumentError);
-    expect(() => twz.inTimeZone(Duration.hours(-15))).toThrow(ArgumentError);
-    expect(() => twz.inTimeZone({})).toThrow(ArgumentError);
+  it("in time zone with argument", () => {
+    withTzDefault("Eastern Time (US & Canada)", () => {
+      expect((stringInTimeZone(s, "Alaska") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(u, "Alaska") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(z, "Alaska") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(s, "Hawaii") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 HST -10:00",
+      );
+      expect((stringInTimeZone(u, "Hawaii") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((stringInTimeZone(z, "Hawaii") as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 14:00:00.000000000 HST -10:00",
+      );
+      expect((stringInTimeZone(s, "UTC") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect((stringInTimeZone(u, "UTC") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect((stringInTimeZone(z, "UTC") as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect((stringInTimeZone(s, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
+        "2000-01-01 00:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(u, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+      expect((stringInTimeZone(z, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
+        "1999-12-31 15:00:00.000000000 AKST -09:00",
+      );
+    });
+  });
+
+  it("in time zone with invalid argument", async () => {
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(s, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(u, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(z, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(s, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(u, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(z, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(s, {}));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(u, {}));
+    await assertRaise([ArgumentError], {}, () => stringInTimeZone(z, {}));
   });
 
   it("in time zone with ambiguous time", () => {
-    const moscow = TimeZone.find("Moscow")!;
-    const twz = moscow.local(2014, 10, 26, 1, 0, 0);
-    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    withTzDefault("Moscow", () => {
+      expect(
+        (stringInTimeZone("2014-10-26 01:00:00") as TimeWithZone).eql(
+          RubyTime.utc(2014, 10, 25, 22, 0, 0),
+        ),
+      ).toEqual(true);
+    });
   });
 });

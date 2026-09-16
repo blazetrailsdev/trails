@@ -206,12 +206,12 @@ export function advance(this: RubyTime, options: AdvanceOptions): RubyTime {
   }
 }
 
-export function ago(this: RubyTime, seconds: number): RubyTime {
-  return since.call(this, -seconds);
+export function ago(this: RubyTime, seconds: number | Duration): RubyTime {
+  return since.call(this, seconds instanceof Duration ? seconds.negate() : -seconds);
 }
 
-export function since(this: RubyTime, seconds: number): RubyTime {
-  return this.plus(seconds);
+export function since(this: RubyTime, seconds: number | Duration): RubyTime {
+  return plusWithDuration.call(this, seconds);
 }
 
 export function beginningOfDay(this: RubyTime): RubyTime {
@@ -356,8 +356,8 @@ declare module "@blazetrails/date" {
     secFraction(): number;
     change(options: ChangeOptions): Time;
     advance(options: AdvanceOptions): Time;
-    ago(seconds: number): Time;
-    since(seconds: number): Time;
+    ago(seconds: number | Duration): Time;
+    since(seconds: number | Duration): Time;
     in(seconds: number): Time;
     beginningOfDay(): Time;
     midnight(): Time;

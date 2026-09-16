@@ -5,29 +5,32 @@ import {
   Time as RubyTime,
   resetLocalTimeZoneId,
 } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Range, Rational } from "@blazetrails/ruby-compat";
+import {
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+  assertRaises,
+} from "../testing/assertions.js";
+import { Duration } from "../duration.js";
+import { zone as timeZone, setZone } from "../time-zone-config.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import "./time/calculations.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Object as ObjectExt } from "./object/acts-like.js";
 import {
   nextDay,
   prevDay,
   advance,
   ago,
   since,
-  secondsSinceMidnight,
-  secondsUntilEndOfDay,
   secFraction,
   floor,
   ceil,
   change,
-  lastWeek,
   toDate,
   daysInMonth,
   daysInYear,
-  allDay,
   isPast,
   isFuture,
   nextWeek,
@@ -46,6 +49,20 @@ import {
   isTomorrow,
   isYesterday,
 } from "./date-and-time/calculations.js";
+
+type CalculationsTime = RubyTime & {
+  tomorrow(): RubyTime;
+  yesterday(): RubyTime;
+  lastWeek(startDay?: string): RubyTime;
+};
+
+expect.addEqualityTesters([
+  (a: unknown, b: unknown) => {
+    if (a instanceof RubyTime) return a.compareWithCoercion(b) === 0;
+    if (b instanceof RubyTime) return b.compareWithCoercion(a) === 0;
+    return undefined;
+  },
+]);
 
 function stubDateCurrent(): void {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -112,6 +129,16 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
       process.env.TZ = orig;
     }
     resetLocalTimeZoneId();
+  }
+}
+
+function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
+  const oldTz = timeZone();
+  setZone(tz);
+  try {
+    return fn();
+  } finally {
+    setZone(oldTz);
   }
 }
 
@@ -273,28 +300,126 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("seconds since midnight at daylight savings time start", () => {
-    withEnvTz("America/New_York", () => {
-      expect(secondsSinceMidnight(new Date(2005, 3, 3, 1, 59, 59))).toBe(2 * 3600 - 1);
-      expect(secondsSinceMidnight(new Date(2005, 3, 3, 3, 0, 1))).toBe(2 * 3600 + 1);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 4, 3, 1, 59, 59).secondsSinceMidnight(),
+        "just before DST start",
+      ).toEqual(2 * 3600 - 1);
+      expect(
+        RubyTime.local(2005, 4, 3, 3, 0, 1).secondsSinceMidnight(),
+        "just after DST start",
+      ).toEqual(2 * 3600 + 1);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 10, 1, 1, 59, 59).secondsSinceMidnight(),
+        "just before DST start",
+      ).toEqual(2 * 3600 - 1);
+      expect(
+        RubyTime.local(2006, 10, 1, 3, 0, 1).secondsSinceMidnight(),
+        "just after DST start",
+      ).toEqual(2 * 3600 + 1);
     });
   });
 
   it("seconds since midnight at daylight savings time end", () => {
-    withEnvTz("America/New_York", () => {
-      expect(secondsSinceMidnight(new Date(2005, 9, 30, 0, 59, 59))).toBe(1 * 3600 - 1);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 10, 30, 0, 59, 59).secondsSinceMidnight(),
+        "just before DST end",
+      ).toEqual(1 * 3600 - 1);
+      expect(
+        RubyTime.local(2005, 10, 30, 2, 0, 1).secondsSinceMidnight(),
+        "just after DST end",
+      ).toEqual(3 * 3600 + 1);
+      expect(
+        RubyTime.local(0, 30, 1, 30, 10, 2005, null, null, true, null).secondsSinceMidnight(),
+        "before DST end",
+      ).toEqual(1 * 3600 + 30 * 60);
+      expect(
+        RubyTime.local(0, 30, 1, 30, 10, 2005, null, null, false, null).secondsSinceMidnight(),
+        "after DST end",
+      ).toEqual(2 * 3600 + 30 * 60);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 1, 59, 59).secondsSinceMidnight(),
+        "just before DST end",
+      ).toEqual(2 * 3600 - 1);
+      expect(
+        RubyTime.local(2006, 3, 19, 3, 0, 1).secondsSinceMidnight(),
+        "just after DST end",
+      ).toEqual(4 * 3600 + 1);
+      expect(
+        RubyTime.local(0, 30, 2, 19, 3, 2006, null, null, true, null).secondsSinceMidnight(),
+        "before DST end",
+      ).toEqual(2 * 3600 + 30 * 60);
+      expect(
+        RubyTime.local(0, 30, 2, 19, 3, 2006, null, null, false, null).secondsSinceMidnight(),
+        "after DST end",
+      ).toEqual(3 * 3600 + 30 * 60);
     });
   });
 
   it("seconds until end of day at daylight savings time start", () => {
-    withEnvTz("America/New_York", () => {
-      expect(secondsUntilEndOfDay(new Date(2005, 3, 3, 1, 59, 59))).toBe(21 * 3600);
-      expect(secondsUntilEndOfDay(new Date(2005, 3, 3, 3, 0, 1))).toBe(21 * 3600 - 2);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 4, 3, 1, 59, 59).secondsUntilEndOfDay(),
+        "just before DST start",
+      ).toEqual(21 * 3600);
+      expect(
+        RubyTime.local(2005, 4, 3, 3, 0, 1).secondsUntilEndOfDay(),
+        "just after DST start",
+      ).toEqual(21 * 3600 - 2);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 10, 1, 1, 59, 59).secondsUntilEndOfDay(),
+        "just before DST start",
+      ).toEqual(21 * 3600);
+      expect(
+        RubyTime.local(2006, 10, 1, 3, 0, 1).secondsUntilEndOfDay(),
+        "just after DST start",
+      ).toEqual(21 * 3600 - 2);
     });
   });
 
   it("seconds until end of day at daylight savings time end", () => {
-    withEnvTz("America/New_York", () => {
-      expect(secondsUntilEndOfDay(new Date(2005, 9, 30, 0, 59, 59))).toBe(24 * 3600);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 10, 30, 0, 59, 59).secondsUntilEndOfDay(),
+        "just before DST end",
+      ).toEqual(24 * 3600);
+      expect(
+        RubyTime.local(2005, 10, 30, 2, 0, 1).secondsUntilEndOfDay(),
+        "just after DST end",
+      ).toEqual(22 * 3600 - 2);
+      expect(
+        RubyTime.local(0, 30, 1, 30, 10, 2005, null, null, true, null).secondsUntilEndOfDay(),
+        "before DST end",
+      ).toEqual(24 * 3600 - 30 * 60 - 1);
+      expect(
+        RubyTime.local(0, 30, 1, 30, 10, 2005, null, null, false, null).secondsUntilEndOfDay(),
+        "after DST end",
+      ).toEqual(23 * 3600 - 30 * 60 - 1);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 1, 59, 59).secondsUntilEndOfDay(),
+        "just before DST end",
+      ).toEqual(23 * 3600);
+      expect(
+        RubyTime.local(2006, 3, 19, 3, 0, 1).secondsUntilEndOfDay(),
+        "just after DST end",
+      ).toEqual(21 * 3600 - 2);
+      expect(
+        RubyTime.local(0, 30, 2, 19, 3, 2006, null, null, true, null).secondsUntilEndOfDay(),
+        "before DST end",
+      ).toEqual(23 * 3600 - 30 * 60 - 1);
+      expect(
+        RubyTime.local(0, 30, 2, 19, 3, 2006, null, null, false, null).secondsUntilEndOfDay(),
+        "after DST end",
+      ).toEqual(22 * 3600 - 30 * 60 - 1);
     });
   });
 
@@ -318,46 +443,142 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward start", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 3, 3, 4, 18, 0);
-      const result = asDate(ago(dt, 86400));
-      expect(result.getFullYear()).toBe(2005);
-      expect(result.getMonth()).toBe(3);
-      expect(result.getDate()).toBe(2);
-      expect(result.getHours()).toBe(3);
-      expect(result.getMinutes()).toBe(18);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 4, 3, 4, 18, 0).ago(Duration.hours(24)),
+        "dt-24.hours=>st",
+      ).toEqual(RubyTime.local(2005, 4, 2, 3, 18, 0));
+      expect(RubyTime.local(2005, 4, 3, 4, 18, 0).ago(86400), "dt-86400=>st").toEqual(
+        RubyTime.local(2005, 4, 2, 3, 18, 0),
+      );
+      expect(
+        RubyTime.local(2005, 4, 3, 4, 18, 0).ago(Duration.seconds(86400)),
+        "dt-86400.seconds=>st",
+      ).toEqual(RubyTime.local(2005, 4, 2, 3, 18, 0));
+      expect(
+        RubyTime.local(2005, 4, 2, 4, 18, 0).ago(Duration.hours(24)),
+        "st-24.hours=>st",
+      ).toEqual(RubyTime.local(2005, 4, 1, 4, 18, 0));
+      expect(RubyTime.local(2005, 4, 2, 4, 18, 0).ago(86400), "st-86400=>st").toEqual(
+        RubyTime.local(2005, 4, 1, 4, 18, 0),
+      );
+      expect(
+        RubyTime.local(2005, 4, 2, 4, 18, 0).ago(Duration.seconds(86400)),
+        "st-86400.seconds=>st",
+      ).toEqual(RubyTime.local(2005, 4, 1, 4, 18, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 10, 1, 4, 18, 0).ago(Duration.hours(24)),
+        "dt-24.hours=>st",
+      ).toEqual(RubyTime.local(2006, 9, 30, 3, 18, 0));
+      expect(RubyTime.local(2006, 10, 1, 4, 18, 0).ago(86400), "dt-86400=>st").toEqual(
+        RubyTime.local(2006, 9, 30, 3, 18, 0),
+      );
+      expect(
+        RubyTime.local(2006, 10, 1, 4, 18, 0).ago(Duration.seconds(86400)),
+        "dt-86400.seconds=>st",
+      ).toEqual(RubyTime.local(2006, 9, 30, 3, 18, 0));
+      expect(
+        RubyTime.local(2006, 9, 30, 4, 18, 0).ago(Duration.hours(24)),
+        "st-24.hours=>st",
+      ).toEqual(RubyTime.local(2006, 9, 29, 4, 18, 0));
+      expect(RubyTime.local(2006, 9, 30, 4, 18, 0).ago(86400), "st-86400=>st").toEqual(
+        RubyTime.local(2006, 9, 29, 4, 18, 0),
+      );
+      expect(
+        RubyTime.local(2006, 9, 30, 4, 18, 0).ago(Duration.seconds(86400)),
+        "st-86400.seconds=>st",
+      ).toEqual(RubyTime.local(2006, 9, 29, 4, 18, 0));
     });
   });
 
   it("daylight savings time crossings backward end", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 9, 30, 4, 3, 0);
-      const result = asDate(ago(st, 86400));
-      expect(result.getFullYear()).toBe(2005);
-      expect(result.getMonth()).toBe(9);
-      expect(result.getDate()).toBe(29);
-      expect(result.getHours()).toBe(5);
-      expect(result.getMinutes()).toBe(3);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 10, 30, 4, 3, 0).ago(Duration.hours(24)),
+        "st-24.hours=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 29, 5, 3));
+      expect(RubyTime.local(2005, 10, 30, 4, 3, 0).ago(86400), "st-86400=>dt").toEqual(
+        RubyTime.local(2005, 10, 29, 5, 3),
+      );
+      expect(
+        RubyTime.local(2005, 10, 30, 4, 3, 0).ago(Duration.seconds(86400)),
+        "st-86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 29, 5, 3));
+      expect(
+        RubyTime.local(2005, 10, 29, 4, 3, 0).ago(Duration.hours(24)),
+        "dt-24.hours=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 28, 4, 3));
+      expect(RubyTime.local(2005, 10, 29, 4, 3, 0).ago(86400), "dt-86400=>dt").toEqual(
+        RubyTime.local(2005, 10, 28, 4, 3),
+      );
+      expect(
+        RubyTime.local(2005, 10, 29, 4, 3, 0).ago(Duration.seconds(86400)),
+        "dt-86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 28, 4, 3));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 4, 3, 0).ago(Duration.hours(24)),
+        "st-24.hours=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 18, 5, 3));
+      expect(RubyTime.local(2006, 3, 19, 4, 3, 0).ago(86400), "st-86400=>dt").toEqual(
+        RubyTime.local(2006, 3, 18, 5, 3),
+      );
+      expect(
+        RubyTime.local(2006, 3, 19, 4, 3, 0).ago(Duration.seconds(86400)),
+        "st-86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 18, 5, 3));
+      expect(
+        RubyTime.local(2006, 3, 18, 4, 3, 0).ago(Duration.hours(24)),
+        "dt-24.hours=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 17, 4, 3));
+      expect(RubyTime.local(2006, 3, 18, 4, 3, 0).ago(86400), "dt-86400=>dt").toEqual(
+        RubyTime.local(2006, 3, 17, 4, 3),
+      );
+      expect(
+        RubyTime.local(2006, 3, 18, 4, 3, 0).ago(Duration.seconds(86400)),
+        "dt-86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 17, 4, 3));
     });
   });
 
   it("daylight savings time crossings backward start 1day", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 3, 3, 4, 18, 0);
-      const result = asDate(advance(dt, { days: -1 }));
-      expect(result.getDate()).toBe(2);
-      expect(result.getHours()).toBe(4);
-      expect(result.getMinutes()).toBe(18);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.local(2005, 4, 3, 4, 18, 0).ago(Duration.days(1)), "dt-1.day=>st").toEqual(
+        RubyTime.local(2005, 4, 2, 4, 18, 0),
+      );
+      expect(RubyTime.local(2005, 4, 2, 4, 18, 0).ago(Duration.days(1)), "st-1.day=>st").toEqual(
+        RubyTime.local(2005, 4, 1, 4, 18, 0),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect(RubyTime.local(2006, 10, 1, 4, 18, 0).ago(Duration.days(1)), "dt-1.day=>st").toEqual(
+        RubyTime.local(2006, 9, 30, 4, 18, 0),
+      );
+      expect(RubyTime.local(2006, 9, 30, 4, 18, 0).ago(Duration.days(1)), "st-1.day=>st").toEqual(
+        RubyTime.local(2006, 9, 29, 4, 18, 0),
+      );
     });
   });
 
   it("daylight savings time crossings backward end 1day", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 9, 30, 4, 3, 0);
-      const result = asDate(advance(st, { days: -1 }));
-      expect(result.getDate()).toBe(29);
-      expect(result.getHours()).toBe(4);
-      expect(result.getMinutes()).toBe(3);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.local(2005, 10, 30, 4, 3, 0).ago(Duration.days(1)), "st-1.day=>dt").toEqual(
+        RubyTime.local(2005, 10, 29, 4, 3),
+      );
+      expect(RubyTime.local(2005, 10, 29, 4, 3, 0).ago(Duration.days(1)), "dt-1.day=>dt").toEqual(
+        RubyTime.local(2005, 10, 28, 4, 3),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect(RubyTime.local(2006, 3, 19, 4, 3, 0).ago(Duration.days(1)), "st-1.day=>dt").toEqual(
+        RubyTime.local(2006, 3, 18, 4, 3),
+      );
+      expect(RubyTime.local(2006, 3, 18, 4, 3, 0).ago(Duration.days(1)), "dt-1.day=>dt").toEqual(
+        RubyTime.local(2006, 3, 17, 4, 3),
+      );
     });
   });
 
@@ -367,136 +588,337 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward start", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = asDate(since(st, 86400));
-      expect(result.getMonth()).toBe(3);
-      expect(result.getDate()).toBe(3);
-      expect(result.getHours()).toBe(20);
-      expect(result.getMinutes()).toBe(27);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 4, 2, 19, 27, 0).since(Duration.hours(24)),
+        "st+24.hours=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 20, 27, 0));
+      expect(RubyTime.local(2005, 4, 2, 19, 27, 0).since(86400), "st+86400=>dt").toEqual(
+        RubyTime.local(2005, 4, 3, 20, 27, 0),
+      );
+      expect(
+        RubyTime.local(2005, 4, 2, 19, 27, 0).since(Duration.seconds(86400)),
+        "st+86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 20, 27, 0));
+      expect(
+        RubyTime.local(2005, 4, 3, 19, 27, 0).since(Duration.hours(24)),
+        "dt+24.hours=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 4, 19, 27, 0));
+      expect(RubyTime.local(2005, 4, 3, 19, 27, 0).since(86400), "dt+86400=>dt").toEqual(
+        RubyTime.local(2005, 4, 4, 19, 27, 0),
+      );
+      expect(
+        RubyTime.local(2005, 4, 3, 19, 27, 0).since(Duration.seconds(86400)),
+        "dt+86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 4, 19, 27, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 9, 30, 19, 27, 0).since(Duration.hours(24)),
+        "st+24.hours=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 20, 27, 0));
+      expect(RubyTime.local(2006, 9, 30, 19, 27, 0).since(86400), "st+86400=>dt").toEqual(
+        RubyTime.local(2006, 10, 1, 20, 27, 0),
+      );
+      expect(
+        RubyTime.local(2006, 9, 30, 19, 27, 0).since(Duration.seconds(86400)),
+        "st+86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 20, 27, 0));
+      expect(
+        RubyTime.local(2006, 10, 1, 19, 27, 0).since(Duration.hours(24)),
+        "dt+24.hours=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 2, 19, 27, 0));
+      expect(RubyTime.local(2006, 10, 1, 19, 27, 0).since(86400), "dt+86400=>dt").toEqual(
+        RubyTime.local(2006, 10, 2, 19, 27, 0),
+      );
+      expect(
+        RubyTime.local(2006, 10, 1, 19, 27, 0).since(Duration.seconds(86400)),
+        "dt+86400.seconds=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 2, 19, 27, 0));
     });
   });
 
   it("daylight savings time crossings forward start 1day", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = asDate(advance(st, { days: 1 }));
-      expect(result.getDate()).toBe(3);
-      expect(result.getHours()).toBe(19);
-      expect(result.getMinutes()).toBe(27);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.local(2005, 4, 2, 19, 27, 0).since(Duration.days(1)), "st+1.day=>dt").toEqual(
+        RubyTime.local(2005, 4, 3, 19, 27, 0),
+      );
+      expect(RubyTime.local(2005, 4, 3, 19, 27, 0).since(Duration.days(1)), "dt+1.day=>dt").toEqual(
+        RubyTime.local(2005, 4, 4, 19, 27, 0),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 9, 30, 19, 27, 0).since(Duration.days(1)),
+        "st+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 19, 27, 0));
+      expect(
+        RubyTime.local(2006, 10, 1, 19, 27, 0).since(Duration.days(1)),
+        "dt+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 2, 19, 27, 0));
     });
   });
 
   it("daylight savings time crossings forward start tomorrow", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = asDate(nextDay(st));
-      expect(result.getDate()).toBe(3);
-      expect(result.getHours()).toBe(19);
-      expect(result.getMinutes()).toBe(27);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        (RubyTime.local(2005, 4, 2, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 19, 27, 0));
+      expect(
+        (RubyTime.local(2005, 4, 3, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 4, 19, 27, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        (RubyTime.local(2006, 9, 30, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 19, 27, 0));
+      expect(
+        (RubyTime.local(2006, 10, 1, 19, 27, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 2, 19, 27, 0));
     });
   });
 
   it("daylight savings time crossings backward start yesterday", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 3, 3, 19, 27, 0);
-      const result = asDate(prevDay(dt));
-      expect(result.getDate()).toBe(2);
-      expect(result.getHours()).toBe(19);
-      expect(result.getMinutes()).toBe(27);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        (RubyTime.local(2005, 4, 3, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>st",
+      ).toEqual(RubyTime.local(2005, 4, 2, 19, 27, 0));
+      expect(
+        (RubyTime.local(2005, 4, 4, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 4, 3, 19, 27, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        (RubyTime.local(2006, 10, 1, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>st",
+      ).toEqual(RubyTime.local(2006, 9, 30, 19, 27, 0));
+      expect(
+        (RubyTime.local(2006, 10, 2, 19, 27, 0) as CalculationsTime).yesterday(),
+        "dt-1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 10, 1, 19, 27, 0));
     });
   });
 
   it("daylight savings time crossings forward end", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = asDate(since(dt, 86400));
-      expect(result.getDate()).toBe(30);
-      expect(result.getHours()).toBe(23);
-      expect(result.getMinutes()).toBe(45);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 10, 30, 0, 45, 0).since(Duration.hours(24)),
+        "dt+24.hours=>st",
+      ).toEqual(RubyTime.local(2005, 10, 30, 23, 45, 0));
+      expect(RubyTime.local(2005, 10, 30, 0, 45, 0).since(86400), "dt+86400=>st").toEqual(
+        RubyTime.local(2005, 10, 30, 23, 45, 0),
+      );
+      expect(
+        RubyTime.local(2005, 10, 30, 0, 45, 0).since(Duration.seconds(86400)),
+        "dt+86400.seconds=>st",
+      ).toEqual(RubyTime.local(2005, 10, 30, 23, 45, 0));
+      expect(
+        RubyTime.local(2005, 10, 31, 0, 45, 0).since(Duration.hours(24)),
+        "st+24.hours=>st",
+      ).toEqual(RubyTime.local(2005, 11, 1, 0, 45, 0));
+      expect(RubyTime.local(2005, 10, 31, 0, 45, 0).since(86400), "st+86400=>st").toEqual(
+        RubyTime.local(2005, 11, 1, 0, 45, 0),
+      );
+      expect(
+        RubyTime.local(2005, 10, 31, 0, 45, 0).since(Duration.seconds(86400)),
+        "st+86400.seconds=>st",
+      ).toEqual(RubyTime.local(2005, 11, 1, 0, 45, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 1, 45, 0).since(Duration.hours(24)),
+        "dt+24.hours=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 0, 45, 0));
+      expect(RubyTime.local(2006, 3, 19, 1, 45, 0).since(86400), "dt+86400=>st").toEqual(
+        RubyTime.local(2006, 3, 20, 0, 45, 0),
+      );
+      expect(
+        RubyTime.local(2006, 3, 19, 1, 45, 0).since(Duration.seconds(86400)),
+        "dt+86400.seconds=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 0, 45, 0));
+      expect(
+        RubyTime.local(2006, 3, 20, 1, 45, 0).since(Duration.hours(24)),
+        "st+24.hours=>st",
+      ).toEqual(RubyTime.local(2006, 3, 21, 1, 45, 0));
+      expect(RubyTime.local(2006, 3, 20, 1, 45, 0).since(86400), "st+86400=>st").toEqual(
+        RubyTime.local(2006, 3, 21, 1, 45, 0),
+      );
+      expect(
+        RubyTime.local(2006, 3, 20, 1, 45, 0).since(Duration.seconds(86400)),
+        "st+86400.seconds=>st",
+      ).toEqual(RubyTime.local(2006, 3, 21, 1, 45, 0));
     });
   });
 
   it("daylight savings time crossings forward end 1day", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = asDate(advance(dt, { days: 1 }));
-      expect(result.getDate()).toBe(31);
-      expect(result.getHours()).toBe(0);
-      expect(result.getMinutes()).toBe(45);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2005, 10, 30, 0, 45, 0).since(Duration.days(1)),
+        "dt+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 10, 31, 0, 45, 0));
+      expect(
+        RubyTime.local(2005, 10, 31, 0, 45, 0).since(Duration.days(1)),
+        "st+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 11, 1, 0, 45, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(RubyTime.local(2006, 3, 19, 1, 45, 0).since(Duration.days(1)), "dt+1.day=>st").toEqual(
+        RubyTime.local(2006, 3, 20, 1, 45, 0),
+      );
+      expect(RubyTime.local(2006, 3, 20, 1, 45, 0).since(Duration.days(1)), "st+1.day=>st").toEqual(
+        RubyTime.local(2006, 3, 21, 1, 45, 0),
+      );
     });
   });
 
   it("daylight savings time crossings forward end tomorrow", () => {
-    withEnvTz("America/New_York", () => {
-      const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = asDate(nextDay(dt));
-      expect(result.getDate()).toBe(31);
-      expect(result.getHours()).toBe(0);
-      expect(result.getMinutes()).toBe(45);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        (RubyTime.local(2005, 10, 30, 0, 45, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 10, 31, 0, 45, 0));
+      expect(
+        (RubyTime.local(2005, 10, 31, 0, 45, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>st",
+      ).toEqual(RubyTime.local(2005, 11, 1, 0, 45, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        (RubyTime.local(2006, 3, 19, 1, 45, 0) as CalculationsTime).tomorrow(),
+        "dt+1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 1, 45, 0));
+      expect(
+        (RubyTime.local(2006, 3, 20, 1, 45, 0) as CalculationsTime).tomorrow(),
+        "st+1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 21, 1, 45, 0));
     });
   });
 
   it("daylight savings time crossings backward end yesterday", () => {
-    withEnvTz("America/New_York", () => {
-      const st = new Date(2005, 9, 31, 0, 45, 0);
-      const result = asDate(prevDay(st));
-      expect(result.getDate()).toBe(30);
-      expect(result.getHours()).toBe(0);
-      expect(result.getMinutes()).toBe(45);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        (RubyTime.local(2005, 10, 31, 0, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>dt",
+      ).toEqual(RubyTime.local(2005, 10, 30, 0, 45, 0));
+      expect(
+        (RubyTime.local(2005, 11, 1, 0, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>st",
+      ).toEqual(RubyTime.local(2005, 10, 31, 0, 45, 0));
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        (RubyTime.local(2006, 3, 20, 1, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>dt",
+      ).toEqual(RubyTime.local(2006, 3, 19, 1, 45, 0));
+      expect(
+        (RubyTime.local(2006, 3, 21, 1, 45, 0) as CalculationsTime).yesterday(),
+        "st-1.day=>st",
+      ).toEqual(RubyTime.local(2006, 3, 20, 1, 45, 0));
     });
   });
 
-  it("change", () => {
-    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { year: 2006 }))).toEqual(
-      d(2006, 2, 22, 15, 15, 10),
+  it("change", async () => {
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ year: 2006 })).toEqual(
+      RubyTime.local(2006, 2, 22, 15, 15, 10),
     );
-    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { month: 6 }))).toEqual(
-      d(2005, 6, 22, 15, 15, 10),
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ month: 6 })).toEqual(
+      RubyTime.local(2005, 6, 22, 15, 15, 10),
     );
-    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { year: 2012, month: 9 }))).toEqual(
-      d(2012, 9, 22, 15, 15, 10),
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ year: 2012, month: 9 })).toEqual(
+      RubyTime.local(2012, 9, 22, 15, 15, 10),
     );
-    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { hour: 16 }))).toEqual(
-      d(2005, 2, 22, 16, 0, 0),
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ hour: 16 })).toEqual(
+      RubyTime.local(2005, 2, 22, 16),
     );
-    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { min: 45 }))).toEqual(
-      d(2005, 2, 22, 15, 45, 0),
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ hour: 16, min: 45 })).toEqual(
+      RubyTime.local(2005, 2, 22, 16, 45),
     );
-
-    expect(() => change(d(2005, 1, 2, 11, 22, 33, 8), { usec: 1, nsec: 1 })).toThrow(ArgumentError);
-    expect(() => change(d(2005, 1, 2, 11, 22, 33, 8), { usec: 1, nsec: 1 })).toThrow(
-      "Can't change both :nsec and :usec at the same time: {usec: 1, nsec: 1}",
+    expect(RubyTime.local(2005, 2, 22, 15, 15, 10).change({ min: 45 })).toEqual(
+      RubyTime.local(2005, 2, 22, 15, 45),
     );
-    expect(() => change(zoned("+03:00", 2015, 5, 9, 10, 0, 0), { nsec: 999999999 })).not.toThrow();
+    expect(RubyTime.local(2005, 1, 2, 11, 22, 33, 44).change({ hour: 5 })).toEqual(
+      RubyTime.local(2005, 1, 2, 5, 0, 0, 0),
+    );
+    expect(RubyTime.local(2005, 1, 2, 11, 22, 33, 44).change({ min: 6 })).toEqual(
+      RubyTime.local(2005, 1, 2, 11, 6, 0, 0),
+    );
+    expect(RubyTime.local(2005, 1, 2, 11, 22, 33, 44).change({ sec: 7 })).toEqual(
+      RubyTime.local(2005, 1, 2, 11, 22, 7, 0),
+    );
+    expect(RubyTime.local(2005, 1, 2, 11, 22, 33, 44).change({ usec: 8 })).toEqual(
+      RubyTime.local(2005, 1, 2, 11, 22, 33, 8),
+    );
+    expect(RubyTime.local(2005, 1, 2, 11, 22, 33, 2).change({ nsec: 8000 })).toEqual(
+      RubyTime.local(2005, 1, 2, 11, 22, 33, 8),
+    );
+    await assertRaise([ArgumentError], {}, () =>
+      RubyTime.local(2005, 1, 2, 11, 22, 33, 8).change({ usec: 1, nsec: 1 }),
+    );
+    await assertNothingRaised(() =>
+      RubyTime.new(2015, 5, 9, 10, 0, 0, "+03:00").change({ nsec: 999999999 }),
+    );
   });
 
   it("utc change", () => {
-    const t1 = utc(2005, 2, 22, 15, 15, 10);
-    const result = asDate(change(t1, { year: 2006 }));
-    expect(result.getFullYear()).toBe(2006);
-
-    const t2 = zoned("UTC", 2005, 1, 2, 11, 22, 33, 2);
-    const changed = change(t2, { nsec: 8000 });
-    expect(changed.timeZoneId).toBe("UTC");
-    expect(changed.millisecond * 1000 + changed.microsecond).toBe(8);
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ year: 2006 })).toEqual(
+      RubyTime.utc(2006, 2, 22, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ month: 6 })).toEqual(
+      RubyTime.utc(2005, 6, 22, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ year: 2012, month: 9 })).toEqual(
+      RubyTime.utc(2012, 9, 22, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ hour: 16 })).toEqual(
+      RubyTime.utc(2005, 2, 22, 16),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ hour: 16, min: 45 })).toEqual(
+      RubyTime.utc(2005, 2, 22, 16, 45),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).change({ min: 45 })).toEqual(
+      RubyTime.utc(2005, 2, 22, 15, 45),
+    );
+    expect(RubyTime.utc(2005, 1, 2, 11, 22, 33, 2).change({ nsec: 8000 })).toEqual(
+      RubyTime.utc(2005, 1, 2, 11, 22, 33, 8),
+    );
   });
 
-  it("offset change", () => {
-    const t = zoned("-08:00", 2005, 2, 22, 15, 15, 10);
-    expect(change(t, { year: 2006 }).equals(zoned("-08:00", 2006, 2, 22, 15, 15, 10))).toBe(true);
-    expect(change(t, { month: 6 }).equals(zoned("-08:00", 2005, 6, 22, 15, 15, 10))).toBe(true);
-    expect(change(t, { hour: 16 }).equals(zoned("-08:00", 2005, 2, 22, 16, 0, 0))).toBe(true);
-    expect(change(t, { hour: 16, min: 45 }).equals(zoned("-08:00", 2005, 2, 22, 16, 45, 0))).toBe(
-      true,
+  it("offset change", async () => {
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ year: 2006 })).toEqual(
+      RubyTime.new(2006, 2, 22, 15, 15, 10, "-08:00"),
     );
-
-    const t2 = zoned("-08:00", 2005, 2, 22, 15, 15, 0);
-    const withUsec = change(t2, { usec: 10 });
-    expect(withUsec.millisecond * 1000 + withUsec.microsecond).toBe(10);
-    expect(change(t2, { nsec: 10 }).nanosecond).toBe(10);
-    expect(() => change(t2, { usec: 1000000 })).toThrow(ArgumentError);
-    expect(() => change(t2, { nsec: 1000000000 })).toThrow(ArgumentError);
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ month: 6 })).toEqual(
+      RubyTime.new(2005, 6, 22, 15, 15, 10, "-08:00"),
+    );
+    expect(
+      RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ year: 2012, month: 9 }),
+    ).toEqual(RubyTime.new(2012, 9, 22, 15, 15, 10, "-08:00"));
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ hour: 16 })).toEqual(
+      RubyTime.new(2005, 2, 22, 16, 0, 0, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ hour: 16, min: 45 })).toEqual(
+      RubyTime.new(2005, 2, 22, 16, 45, 0, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").change({ min: 45 })).toEqual(
+      RubyTime.new(2005, 2, 22, 15, 45, 0, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 0, "-08:00").change({ sec: 10 })).toEqual(
+      RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 0, "-08:00").change({ usec: 10 }).usec).toEqual(10);
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 0, "-08:00").change({ nsec: 10 }).nsec).toEqual(10);
+    await assertRaise([ArgumentError], {}, () =>
+      RubyTime.new(2005, 2, 22, 15, 15, 45, "-08:00").change({ usec: 1000000 }),
+    );
+    await assertRaise([ArgumentError], {}, () =>
+      RubyTime.new(2005, 2, 22, 15, 15, 45, "-08:00").change({ nsec: 1000000000 }),
+    );
   });
 
   it("change offset", () => {
@@ -637,21 +1059,156 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("utc advance", () => {
-    const t = utc(2005, 2, 22, 15, 15, 10);
-    expect(asDate(advance(t, { years: 1 })).getUTCFullYear()).toBe(2006);
-    expect(asDate(advance(t, { months: 4 })).getUTCMonth()).toBe(5);
-    expect(asDate(advance(t, { hours: 5 })).getUTCHours()).toBe(20);
-    expect(asDate(advance(t, { minutes: 7 })).getUTCMinutes()).toBe(22);
-    expect(asDate(advance(t, { seconds: 9 })).getUTCSeconds()).toBe(19);
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).advance({ years: 1 })).toEqual(
+      RubyTime.utc(2006, 2, 22, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).advance({ months: 4 })).toEqual(
+      RubyTime.utc(2005, 6, 22, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ weeks: 3 })).toEqual(
+      RubyTime.utc(2005, 3, 21, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ weeks: 3.5 })).toEqual(
+      RubyTime.utc(2005, 3, 25, 3, 15, 10),
+    );
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10)
+        .advance({ weeks: 3.7 })
+        .minus(RubyTime.utc(2005, 3, 26, 12, 51, 10)),
+    ).toBeCloseTo(0, 0);
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ days: 5 })).toEqual(
+      RubyTime.utc(2005, 3, 5, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ days: 5.5 })).toEqual(
+      RubyTime.utc(2005, 3, 6, 3, 15, 10),
+    );
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10)
+        .advance({ days: 5.7 })
+        .minus(RubyTime.utc(2005, 3, 6, 8, 3, 10)),
+    ).toBeCloseTo(0, 0);
+    expect(RubyTime.utc(2005, 2, 22, 15, 15, 10).advance({ years: 7, months: 7 })).toEqual(
+      RubyTime.utc(2012, 9, 22, 15, 15, 10),
+    );
+    expect(
+      RubyTime.utc(2005, 2, 22, 15, 15, 10).advance({ years: 7, months: 19, days: 11 }),
+    ).toEqual(RubyTime.utc(2013, 10, 3, 15, 15, 10));
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ years: 7, months: 19, weeks: 2, days: 5 }),
+    ).toEqual(RubyTime.utc(2013, 10, 17, 15, 15, 10));
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ years: -3, months: -2, days: -1 }),
+    ).toEqual(RubyTime.utc(2001, 12, 27, 15, 15, 10));
+    expect(RubyTime.utc(2004, 2, 29, 15, 15, 10).advance({ years: 1 })).toEqual(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ hours: 5 })).toEqual(
+      RubyTime.utc(2005, 2, 28, 20, 15, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ minutes: 7 })).toEqual(
+      RubyTime.utc(2005, 2, 28, 15, 22, 10),
+    );
+    expect(RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ seconds: 9 })).toEqual(
+      RubyTime.utc(2005, 2, 28, 15, 15, 19),
+    );
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ hours: 5, minutes: 7, seconds: 9 }),
+    ).toEqual(RubyTime.utc(2005, 2, 28, 20, 22, 19));
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({ hours: -5, minutes: -7, seconds: -9 }),
+    ).toEqual(RubyTime.utc(2005, 2, 28, 10, 8, 1));
+    expect(
+      RubyTime.utc(2005, 2, 28, 15, 15, 10).advance({
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+        hours: 5,
+        minutes: 7,
+        seconds: 9,
+      }),
+    ).toEqual(RubyTime.utc(2013, 10, 17, 20, 22, 19));
   });
 
   it("offset advance", () => {
-    const t = d(2005, 2, 22, 15, 15, 10);
-    expect(asDate(advance(t, { years: 1 })).getFullYear()).toBe(2006);
-    expect(asDate(advance(t, { months: 4 })).getMonth()).toBe(5);
-    expect(asDate(advance(t, { hours: 5 })).getHours()).toBe(20);
-    expect(asDate(advance(t, { minutes: 7 })).getMinutes()).toBe(22);
-    expect(asDate(advance(t, { seconds: 9 })).getSeconds()).toBe(19);
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").advance({ years: 1 })).toEqual(
+      RubyTime.new(2006, 2, 22, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").advance({ months: 4 })).toEqual(
+      RubyTime.new(2005, 6, 22, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ weeks: 3 })).toEqual(
+      RubyTime.new(2005, 3, 21, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ weeks: 3.5 })).toEqual(
+      RubyTime.new(2005, 3, 25, 3, 15, 10, "-08:00"),
+    );
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00")
+        .advance({ weeks: 3.7 })
+        .minus(RubyTime.new(2005, 3, 26, 12, 51, 10, "-08:00")),
+    ).toBeCloseTo(0, 0);
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ days: 5 })).toEqual(
+      RubyTime.new(2005, 3, 5, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ days: 5.5 })).toEqual(
+      RubyTime.new(2005, 3, 6, 3, 15, 10, "-08:00"),
+    );
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00")
+        .advance({ days: 5.7 })
+        .minus(RubyTime.new(2005, 3, 6, 8, 3, 10, "-08:00")),
+    ).toBeCloseTo(0, 0);
+    expect(
+      RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").advance({ years: 7, months: 7 }),
+    ).toEqual(RubyTime.new(2012, 9, 22, 15, 15, 10, "-08:00"));
+    expect(
+      RubyTime.new(2005, 2, 22, 15, 15, 10, "-08:00").advance({ years: 7, months: 19, days: 11 }),
+    ).toEqual(RubyTime.new(2013, 10, 3, 15, 15, 10, "-08:00"));
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+      }),
+    ).toEqual(RubyTime.new(2013, 10, 17, 15, 15, 10, "-08:00"));
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ years: -3, months: -2, days: -1 }),
+    ).toEqual(RubyTime.new(2001, 12, 27, 15, 15, 10, "-08:00"));
+    expect(RubyTime.new(2004, 2, 29, 15, 15, 10, "-08:00").advance({ years: 1 })).toEqual(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ hours: 5 })).toEqual(
+      RubyTime.new(2005, 2, 28, 20, 15, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ minutes: 7 })).toEqual(
+      RubyTime.new(2005, 2, 28, 15, 22, 10, "-08:00"),
+    );
+    expect(RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ seconds: 9 })).toEqual(
+      RubyTime.new(2005, 2, 28, 15, 15, 19, "-08:00"),
+    );
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({ hours: 5, minutes: 7, seconds: 9 }),
+    ).toEqual(RubyTime.new(2005, 2, 28, 20, 22, 19, "-08:00"));
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({
+        hours: -5,
+        minutes: -7,
+        seconds: -9,
+      }),
+    ).toEqual(RubyTime.new(2005, 2, 28, 10, 8, 1, "-08:00"));
+    expect(
+      RubyTime.new(2005, 2, 28, 15, 15, 10, "-08:00").advance({
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+        hours: 5,
+        minutes: 7,
+        seconds: 9,
+      }),
+    ).toEqual(RubyTime.new(2013, 10, 17, 20, 22, 19, "-08:00"));
   });
 
   it("advance with nsec", () => {
@@ -789,10 +1346,22 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    withEnvTz("America/New_York", () => {
-      const result = asDate(lastWeek(new Date(2005, 2, 1, 15, 15, 10), ":monday"));
-      expect(result.getDay()).toBe(1);
-      expect(result.getDate()).toBe(21);
+    withEnvTz("US/Eastern", () => {
+      expect((RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek()).toEqual(
+        RubyTime.local(2005, 2, 21),
+      );
+      expect(
+        (RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek(":tuesday"),
+      ).toEqual(RubyTime.local(2005, 2, 22));
+      expect(
+        (RubyTime.local(2005, 3, 1, 15, 15, 10) as CalculationsTime).lastWeek(":friday"),
+      ).toEqual(RubyTime.local(2005, 2, 25));
+      expect((RubyTime.local(2006, 11, 6, 0, 0, 0) as CalculationsTime).lastWeek()).toEqual(
+        RubyTime.local(2006, 10, 30),
+      );
+      expect(
+        (RubyTime.local(2006, 11, 23, 0, 0, 0) as CalculationsTime).lastWeek(":wednesday"),
+      ).toEqual(RubyTime.local(2006, 11, 15));
     });
   });
 
@@ -813,21 +1382,49 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    // boundary: a JS `Date` is Rails' `Time.utc` receiver here, and carries
-    const time = utc(2005, 2, 21, 17, 44, 30, 123);
-    expect(toFs(time, "doesnt_exist")).toBe("2005-02-21 17:44:30 UTC");
-    expect(toFs(time, "db")).toBe("2005-02-21 17:44:30");
-    expect(toFs(time, "short")).toBe("21 Feb 17:44");
-    expect(toFs(time, "time")).toBe("17:44");
-    expect(toFs(time, "number")).toBe("20050221174430");
-    expect(toFs(time, "nsec")).toBe("20050221174430123000000");
-    expect(toFs(time, "usec")).toBe("20050221174430123000");
-    expect(toFs(time, "long")).toBe("February 21, 2005 17:44");
-    expect(toFs(time, "long_ordinal")).toBe("February 21st, 2005 17:44");
-    expect(toFs(time, "rfc822")).toBe("Mon, 21 Feb 2005 17:44:30 +0000");
-    expect(toFs(time, "rfc2822")).toBe("Mon, 21 Feb 2005 17:44:30 -0000");
-    expect(toFs(time, "inspect")).toBe("2005-02-21 17:44:30.123000000 +0000");
-    expect(toFs(time, "iso8601")).toBe("2005-02-21T17:44:30Z");
+    const time = RubyTime.utc(2005, 2, 21, 17, 44, 30.12345678901);
+    expect(toFs(time, "doesnt_exist")).toEqual(time.toS());
+    expect(toFs(time, "db")).toEqual("2005-02-21 17:44:30");
+    expect(toFs(time, "short")).toEqual("21 Feb 17:44");
+    expect(toFs(time, "time")).toEqual("17:44");
+    expect(toFs(time, "number")).toEqual("20050221174430");
+    expect(toFs(time, "nsec")).toEqual("20050221174430123456789");
+    expect(toFs(time, "usec")).toEqual("20050221174430123456");
+    expect(toFs(time, "long")).toEqual("February 21, 2005 17:44");
+    expect(toFs(time, "long_ordinal")).toEqual("February 21st, 2005 17:44");
+    withEnvTz("UTC", () => {
+      expect(toFs(time, "rfc822")).toEqual("Mon, 21 Feb 2005 17:44:30 +0000");
+      expect(toFs(time, "rfc2822")).toEqual("Mon, 21 Feb 2005 17:44:30 -0000");
+      expect(toFs(time, "inspect")).toEqual("2005-02-21 17:44:30.123456789 +0000");
+    });
+    withEnvTz("US/Central", () => {
+      expect(toFs(RubyTime.local(2009, 2, 5, 14, 30, 5), "rfc822")).toEqual(
+        "Thu, 05 Feb 2009 14:30:05 -0600",
+      );
+      expect(toFs(RubyTime.local(2008, 6, 9, 4, 5, 1), "rfc822")).toEqual(
+        "Mon, 09 Jun 2008 04:05:01 -0500",
+      );
+      expect(toFs(RubyTime.local(2009, 2, 5, 14, 30, 5), "rfc2822")).toEqual(
+        "Thu, 05 Feb 2009 14:30:05 -0600",
+      );
+      expect(toFs(RubyTime.local(2008, 6, 9, 4, 5, 1), "rfc2822")).toEqual(
+        "Mon, 09 Jun 2008 04:05:01 -0500",
+      );
+      expect(toFs(RubyTime.local(2009, 2, 5, 14, 30, 5), "iso8601")).toEqual(
+        "2009-02-05T14:30:05-06:00",
+      );
+      expect(toFs(RubyTime.local(2008, 6, 9, 4, 5, 1), "iso8601")).toEqual(
+        "2008-06-09T04:05:01-05:00",
+      );
+      expect(toFs(RubyTime.utc(2009, 2, 5, 14, 30, 5), "iso8601")).toEqual("2009-02-05T14:30:05Z");
+      expect(toFs(RubyTime.local(2009, 2, 5, 14, 30, 5), "inspect")).toEqual(
+        "2009-02-05 14:30:05.000000000 -0600",
+      );
+      expect(toFs(RubyTime.local(2008, 6, 9, 4, 5, 1), "inspect")).toEqual(
+        "2008-06-09 04:05:01.000000000 -0500",
+      );
+    });
+    expect(toFs(time, "db")).toEqual("2005-02-21 17:44:30");
   });
 
   it("to fs custom date format", () => {
@@ -854,9 +1451,35 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const t = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
-    const result = toTime(t);
-    expect(result.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+    expect(RubyDateTime.civil(2005, 2, 21, 17, 44, 30, 0)).toEqual(
+      RubyTime.utc(2005, 2, 21, 17, 44, 30).toDatetime(),
+    );
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyDateTime.civil(
+          2005,
+          2,
+          21,
+          17,
+          44,
+          30,
+          new Rational(RubyTime.local(2005, 2, 21, 17, 44, 30).utcOffset, 86400),
+        ),
+      ).toEqual(RubyTime.local(2005, 2, 21, 17, 44, 30).toDatetime());
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyDateTime.civil(
+          2005,
+          2,
+          21,
+          17,
+          44,
+          30,
+          new Rational(RubyTime.local(2005, 2, 21, 17, 44, 30).utcOffset, 86400),
+        ),
+      ).toEqual(RubyTime.local(2005, 2, 21, 17, 44, 30).toDatetime());
+    });
   });
 
   it("to time", () => {
@@ -912,9 +1535,8 @@ describe("TimeExtCalculationsTest", () => {
     expect(daysInYear(2008)).toBe(366);
   });
 
-  it("xmlschema is available", () => {
-    const result = xmlschema(new Date());
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  it("xmlschema is available", async () => {
+    await assertNothingRaised(() => RubyTime.now().xmlschema());
   });
 
   it("today with time local", () => {
@@ -1006,22 +1628,21 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("acts like time", () => {
-    expect(ObjectExt.actsLike(RubyTime.now(), "time")).toBe(true);
+    assertPredicate(RubyTime.new(), (t) => t.actsLikeTime());
   });
 
   it("formatted offset with utc", () => {
-    withEnvTz("UTC", () => {
-      const t = new Date(2000, 0, 1);
-      expect(formattedOffset(t)).toBe("+00:00");
-    });
+    expect(formattedOffset(RubyTime.utc(2000))).toEqual("+00:00");
+    expect(formattedOffset(RubyTime.utc(2000), false)).toEqual("+0000");
+    expect(formattedOffset(RubyTime.utc(2000), true, "UTC")).toEqual("UTC");
   });
 
   it("formatted offset with local", () => {
-    withEnvTz("America/New_York", () => {
-      const t = new Date(2000, 0, 1);
-      expect(formattedOffset(t)).toBe("-05:00");
-      const t2 = new Date(2000, 6, 1);
-      expect(formattedOffset(t2)).toBe("-04:00");
+    withEnvTz("US/Eastern", () => {
+      expect(formattedOffset(RubyTime.local(2000))).toEqual("-05:00");
+      expect(formattedOffset(RubyTime.local(2000), false)).toEqual("-0500");
+      expect(formattedOffset(RubyTime.local(2000, 7))).toEqual("-04:00");
+      expect(formattedOffset(RubyTime.local(2000, 7), false)).toEqual("-0400");
     });
   });
 
@@ -1132,18 +1753,21 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with utc time", () => {
-    withEnvTz("America/New_York", () => {
-      const t = utc(2000);
-      expect(t.getUTCFullYear()).toBe(2000);
-      expect(t.getUTCMonth()).toBe(0);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.at(RubyTime.utc(2000))).toEqual(RubyTime.utc(2000));
+      expect(RubyTime.at(RubyTime.utc(2000)).zone).toEqual("UTC");
+      expect(RubyTime.at(RubyTime.utc(2000)).utcOffset).toEqual(0);
     });
   });
 
   it("at with local time", () => {
-    withEnvTz("America/New_York", () => {
-      const t = new Date(2000, 0, 1);
-      expect(t.getFullYear()).toBe(2000);
-      expect(t.getTimezoneOffset()).toBe(300);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.at(RubyTime.local(2000))).toEqual(RubyTime.local(2000));
+      expect(RubyTime.at(RubyTime.local(2000)).zone).toEqual("EST");
+      expect(RubyTime.at(RubyTime.local(2000)).utcOffset).toEqual(-18000);
+      expect(RubyTime.at(RubyTime.local(2000, 7, 1))).toEqual(RubyTime.local(2000, 7, 1));
+      expect(RubyTime.at(RubyTime.local(2000, 7, 1)).zone).toEqual("EDT");
+      expect(RubyTime.at(RubyTime.local(2000, 7, 1)).utcOffset).toEqual(-14400);
     });
   });
 
@@ -1176,9 +1800,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("time created with local constructor cannot represent times during hour skipped by dst", () => {
-    withEnvTz("America/New_York", () => {
-      const t = new Date(2006, 3, 2, 2, 0, 0);
-      expect(t.getHours()).toBe(3);
+    withEnvTz("US/Eastern", () => {
+      expect(RubyTime.local(2006, 4, 2, 2)).toEqual(RubyTime.local(2006, 4, 2, 3));
+      assertPredicate(RubyTime.local(2006, 4, 2, 2), (t) => t.isDst());
     });
   });
 
@@ -1188,27 +1812,52 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all day with timezone", () => {
-    const t = d(2011, 6, 7, 10, 10, 10);
-    const range = allDay(t);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
-    expect(asDate(start).getHours()).toBe(0);
-    expect(asDate(start).getMinutes()).toBe(0);
-    expect(asDate(end).getHours()).toBe(23);
-    expect(asDate(end).getMinutes()).toBe(59);
-    expect(asDate(end).getDate()).toBe(7);
+    const beginningOfDay = new TimeWithZone(
+      null,
+      TimeZone.find("Hawaii")!,
+      RubyTime.local(2011, 6, 7, 0, 0, 0),
+    );
+    const endOfDay = new TimeWithZone(
+      null,
+      TimeZone.find("Hawaii")!,
+      RubyTime.local(2011, 6, 7, 23, 59, 59, new Rational(999999999, 1000)),
+    );
+    expect(
+      (
+        new TimeWithZone(
+          RubyTime.local(2011, 6, 7, 10, 10, 10),
+          TimeZone.find("Hawaii")!,
+        ) as TimeWithZone & { allDay(): Range<TimeWithZone> }
+      ).allDay().begin,
+    ).toEqual(beginningOfDay);
+    expect(
+      (
+        new TimeWithZone(
+          RubyTime.local(2011, 6, 7, 10, 10, 10),
+          TimeZone.find("Hawaii")!,
+        ) as TimeWithZone & { allDay(): Range<TimeWithZone> }
+      ).allDay().end,
+    ).toEqual(endOfDay);
   });
 
-  it("rfc3339 parse", () => {
-    const str = "1999-12-31T19:00:00.125-05:00";
-    const t = new Date(str);
-    expect(t.getUTCFullYear()).toBe(2000);
-    expect(t.getUTCMonth()).toBe(0);
-    expect(t.getUTCDate()).toBe(1);
-    expect(t.getUTCHours()).toBe(0);
-    expect(t.getUTCMinutes()).toBe(0);
-    expect(t.getUTCSeconds()).toBe(0);
-    expect(t.getUTCMilliseconds()).toBe(125);
+  it("rfc3339 parse", async () => {
+    const time = RubyTime.rfc3339("1999-12-31T19:00:00.125-05:00");
+    expect(time.year).toEqual(1999);
+    expect(time.month).toEqual(12);
+    expect(time.day).toEqual(31);
+    expect(time.hour).toEqual(19);
+    expect(time.min).toEqual(0);
+    expect(time.sec).toEqual(0);
+    expect(time.usec).toEqual(125000);
+    expect(time.utcOffset).toEqual(-18000);
+    let exception = await assertRaises([ArgumentError], {}, () => RubyTime.rfc3339("1999-12-31"));
+    expect(exception.message).toEqual("invalid date");
+    exception = await assertRaises([ArgumentError], {}, () =>
+      RubyTime.rfc3339("1999-12-31T19:00:00"),
+    );
+    expect(exception.message).toEqual("invalid date");
+    exception = await assertRaises([ArgumentError], {}, () => RubyTime.rfc3339("foobar"));
+    expect(exception.message).toEqual("invalid date");
   });
 
   it("ago", () => {
@@ -1221,21 +1870,102 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("since", () => {
-    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
-    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 3600))).toEqual(d(2005, 2, 22, 11, 10, 10));
-    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2))).toEqual(
-      d(2005, 2, 24, 10, 10, 10),
+    expect(RubyTime.local(2005, 2, 22, 10, 10, 10).since(1)).toEqual(
+      RubyTime.local(2005, 2, 22, 10, 10, 11),
     );
-    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25))).toEqual(
-      d(2005, 2, 24, 11, 10, 35),
+    expect(RubyTime.local(2005, 2, 22, 10, 10, 10).since(3600)).toEqual(
+      RubyTime.local(2005, 2, 22, 11, 10, 10),
+    );
+    expect(RubyTime.local(2005, 2, 22, 10, 10, 10).since(86400 * 2)).toEqual(
+      RubyTime.local(2005, 2, 24, 10, 10, 10),
+    );
+    expect(RubyTime.local(2005, 2, 22, 10, 10, 10).since(86400 * 2 + 3600 + 25)).toEqual(
+      RubyTime.local(2005, 2, 24, 11, 10, 35),
+    );
+    expect(RubyTime.utc(2038, 1, 18, 11, 59, 59).since(86400 * 2)).toEqual(
+      RubyDateTime.civil(2038, 1, 20, 11, 59, 59),
     );
   });
 
   it("advance", () => {
-    const t = d(2005, 1, 22, 15, 15, 10);
-    expect(asDate(advance(t, { years: 1 }))).toEqual(d(2006, 1, 22, 15, 15, 10));
-    expect(asDate(advance(t, { months: 1 }))).toEqual(d(2005, 2, 22, 15, 15, 10));
-    expect(asDate(advance(t, { days: 1 }))).toEqual(d(2005, 1, 23, 15, 15, 10));
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: 1 })).toEqual(
+      RubyTime.local(2006, 2, 28, 15, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ months: 4 })).toEqual(
+      RubyTime.local(2005, 6, 28, 15, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ weeks: 3 })).toEqual(
+      RubyTime.local(2005, 3, 21, 15, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ weeks: 3.5 })).toEqual(
+      RubyTime.local(2005, 3, 25, 3, 15, 10),
+    );
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10)
+        .advance({ weeks: 3.7 })
+        .minus(RubyTime.local(2005, 3, 26, 12, 51, 10)),
+    ).toBeCloseTo(0, 0);
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ days: 5 })).toEqual(
+      RubyTime.local(2005, 3, 5, 15, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ days: 5.5 })).toEqual(
+      RubyTime.local(2005, 3, 6, 3, 15, 10),
+    );
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10)
+        .advance({ days: 5.7 })
+        .minus(RubyTime.local(2005, 3, 6, 8, 3, 10)),
+    ).toBeCloseTo(0, 0);
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: 7, months: 7 })).toEqual(
+      RubyTime.local(2012, 9, 28, 15, 15, 10),
+    );
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: 7, months: 19, days: 5 }),
+    ).toEqual(RubyTime.local(2013, 10, 3, 15, 15, 10));
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: 7, months: 19, weeks: 2, days: 5 }),
+    ).toEqual(RubyTime.local(2013, 10, 17, 15, 15, 10));
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: -3, months: -2, days: -1 }),
+    ).toEqual(RubyTime.local(2001, 12, 27, 15, 15, 10));
+    expect(RubyTime.local(2004, 2, 29, 15, 15, 10).advance({ years: 1 })).toEqual(
+      RubyTime.local(2005, 2, 28, 15, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ hours: 5 })).toEqual(
+      RubyTime.local(2005, 2, 28, 20, 15, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ minutes: 7 })).toEqual(
+      RubyTime.local(2005, 2, 28, 15, 22, 10),
+    );
+    expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ seconds: 9 })).toEqual(
+      RubyTime.local(2005, 2, 28, 15, 15, 19),
+    );
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ hours: 5, minutes: 7, seconds: 9 }),
+    ).toEqual(RubyTime.local(2005, 2, 28, 20, 22, 19));
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ hours: -5, minutes: -7, seconds: -9 }),
+    ).toEqual(RubyTime.local(2005, 2, 28, 10, 8, 1));
+    expect(
+      RubyTime.local(2005, 2, 28, 15, 15, 10).advance({
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+        hours: 5,
+        minutes: 7,
+        seconds: 9,
+      }),
+    ).toEqual(RubyTime.local(2013, 10, 17, 20, 22, 19));
+    expect(TimeZone.find("Moscow")!.local(2021, 5, 29, 0, 0, 0)).toEqual(
+      RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00"),
+    );
+    expect(TimeZone.find("Moscow")!.local(2021, 5, 29, 0, 0, 0).advance({ seconds: 60 })).toEqual(
+      RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00").advance({ seconds: 60 }),
+    );
+    expect(TimeZone.find("Moscow")!.local(2021, 5, 29, 0, 0, 0).advance({ days: 3 })).toEqual(
+      RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00").advance({ days: 3 }),
+    );
   });
 
   it("prev day with time local", () => {

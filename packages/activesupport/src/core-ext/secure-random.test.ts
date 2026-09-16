@@ -7,7 +7,7 @@ describe("SecureRandomTest", () => {
     const s2 = base58();
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(16);
+    expect(s1.length).toBe(16);
     expect(s1).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s2).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s1).toMatch(/^[^0OIl]+$/);
@@ -19,7 +19,7 @@ describe("SecureRandomTest", () => {
     const s2 = base58(24);
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(24);
+    expect(s1.length).toBe(24);
     expect(s1).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s2).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s1).toMatch(/^[^0OIl]+$/);
@@ -31,7 +31,7 @@ describe("SecureRandomTest", () => {
     const s2 = base58(null);
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(16);
+    expect(s1.length).toBe(16);
     expect(s1).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s2).toMatch(/^[a-zA-Z0-9]+$/);
     expect(s1).toMatch(/^[^0OIl]+$/);
@@ -43,7 +43,7 @@ describe("SecureRandomTest", () => {
     const s2 = base36();
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(16);
+    expect(s1.length).toBe(16);
     expect(s1).toMatch(/^[a-z0-9]+$/);
     expect(s2).toMatch(/^[a-z0-9]+$/);
   });
@@ -53,7 +53,7 @@ describe("SecureRandomTest", () => {
     const s2 = base36(24);
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(24);
+    expect(s1.length).toBe(24);
     expect(s1).toMatch(/^[a-z0-9]+$/);
     expect(s2).toMatch(/^[a-z0-9]+$/);
   });
@@ -63,7 +63,7 @@ describe("SecureRandomTest", () => {
     const s2 = base36(null);
 
     expect(s1).not.toEqual(s2);
-    expect(s1).toHaveLength(16);
+    expect(s1.length).toBe(16);
     expect(s1).toMatch(/^[a-z0-9]+$/);
     expect(s2).toMatch(/^[a-z0-9]+$/);
   });
