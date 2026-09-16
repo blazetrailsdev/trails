@@ -61,7 +61,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
         expect(await adapter.insert(`INSERT INTO pq_ddl (nick) VALUES ('a')`)).toBeUndefined();
       });
       const inserts = subscriber.logged.filter(([sql]) => sql.startsWith("INSERT"));
-      expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "SQL", []]]);
+      expect(inserts).toEqual([[`INSERT INTO pq_ddl (nick) VALUES ('a')`, "", []]]);
     } finally {
       subscriber.stop();
       await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);

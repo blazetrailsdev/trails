@@ -38,13 +38,13 @@ tester.run("require-canonical-rebuild", rule, {
     {
       code:
         "await adapter.execute(\"SELECT * FROM pg_class WHERE relname = 'people'\");\n" +
-        "await adapter.executeMutation(\"INSERT INTO logs (name) VALUES ('posts')\");",
+        "await adapter.execute(\"INSERT INTO logs (name) VALUES ('posts')\");",
       options,
     },
 
     {
       code:
-        "await adapter.executeMutation(\"INSERT INTO logs (name) VALUES ('posts')\");\n" +
+        "await adapter.execute(\"INSERT INTO logs (name) VALUES ('posts')\");\n" +
         'for (const t of names) { await adapter.exec(`DROP TABLE IF EXISTS "${t}"`); }',
       options,
     },
@@ -169,12 +169,12 @@ tester.run("require-canonical-rebuild", rule, {
   invalid: [
     {
       code:
-        'await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");\n' +
-        'await adapter.executeMutation("CREATE TABLE `subscribers` (`nick` VARCHAR(255))");\n' +
+        'await adapter.execute("DROP TABLE IF EXISTS `subscribers`");\n' +
+        'await adapter.execute("CREATE TABLE `subscribers` (`nick` VARCHAR(255))");\n' +
         "try {\n" +
         '  await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");\n' +
         "} finally {\n" +
-        '  await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");\n' +
+        '  await adapter.execute("DROP TABLE IF EXISTS `subscribers`");\n' +
         "}",
       options,
       errors: [{ messageId: "missingRebuild", data: { table: "subscribers" } }],
