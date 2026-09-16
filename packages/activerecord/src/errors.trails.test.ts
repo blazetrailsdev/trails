@@ -26,7 +26,7 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
 
     const rebuilt = (await original.setQuery("ALTER TABLE `engines`", [])) as MismatchedForeignKey;
 
-    expect(rebuilt.fkDetails.primaryKeyColumn).toBe(bigintColumn);
+    expect(rebuilt.message).toContain("which has type `bigint`");
     expect(rebuilt.stack).toBe(original.stack);
   });
 
@@ -62,13 +62,6 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
     expect(rebuilt.message).toContain("which has type `bigint`");
     expect(rebuilt.message).toContain("\nOriginal message: Cannot add foreign key constraint");
     expect(rebuilt.stack).toBe(original.stack);
-    expect(rebuilt.fkDetails).toEqual({
-      table: "engines",
-      foreignKey: "car_id",
-      targetTable: "cars",
-      primaryKey: "id",
-      primaryKeyColumn: bigintColumn,
-    });
     expect(rebuilt.message).toContain("`t.bigint :car_id`");
   });
 

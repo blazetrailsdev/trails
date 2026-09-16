@@ -9,7 +9,6 @@ import type {
   TableDefinitionConn,
 } from "../abstract/schema-definitions.js";
 import {
-  assertSafeMysqlIdentifier,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
@@ -130,11 +129,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addTableOptionsBang(createSql: string, o: TableDefinition): string {
     const mo = o as MysqlTableDef;
     if (mo.charset) {
-      assertSafeMysqlIdentifier(mo.charset, "charset");
       createSql += ` DEFAULT CHARSET=${mo.charset}`;
     }
     if (mo.collation) {
-      assertSafeMysqlIdentifier(mo.collation, "collation");
       createSql += ` COLLATE=${mo.collation}`;
     }
     return this.addSqlCommentBang(super.addTableOptionsBang(createSql, o), o.comment);
@@ -153,11 +150,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
       }
     }
     if (mo.charset) {
-      assertSafeMysqlIdentifier(mo.charset, "charset");
       sql += ` CHARACTER SET ${mo.charset}`;
     }
     if (mo.collation) {
-      assertSafeMysqlIdentifier(mo.collation, "collation");
       sql += ` COLLATE ${mo.collation}`;
     }
     if (mo.as) {

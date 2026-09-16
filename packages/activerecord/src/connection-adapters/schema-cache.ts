@@ -770,9 +770,9 @@ export function deepDeduplicate<T>(value: T): T {
   if (
     value !== null &&
     typeof value === "object" &&
-    typeof (value as unknown as Deduplicable).deduplicateKey === "function"
+    typeof (value as unknown as Deduplicable).deduplicated === "function"
   ) {
-    return deduplicate(value as unknown as Deduplicable) as unknown as T;
+    return deduplicate(value as unknown as Deduplicable & { hash(): number }) as unknown as T;
   }
   return value;
 }

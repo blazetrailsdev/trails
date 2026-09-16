@@ -79,7 +79,7 @@ interface EnumInstanceHost {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,

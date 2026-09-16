@@ -1,4 +1,5 @@
 import { deduplicate } from "./deduplicable.js";
+import { rbHash } from "@blazetrails/ruby-compat";
 import type { Deduplicable } from "./deduplicable.js";
 
 export class SqlTypeMetadata implements Deduplicable {
@@ -35,9 +36,15 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
-  deduplicateKey(): string {
-    return JSON.stringify(this.toJSON());
+  hash(): number {
+    return (
+      rbHash(SqlTypeMetadata) ^
+      rbHash(this.sqlType) ^
+      rbHash(this.type) ^
+      rbHash(this.limit) ^
+      (rbHash(this.precision) >> 1) ^
+      (rbHash(this.scale) >> 2)
+    );
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -51,7 +58,7 @@ export class SqlTypeMetadata implements Deduplicable {
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
     const klass = TYPE_METADATA_CLASSES[data.class ?? ""];
     if (klass) return klass.fromJSON(data);

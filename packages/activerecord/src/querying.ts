@@ -742,7 +742,7 @@ export function readonly<T extends typeof Base>(
   return this.all().readonly(value);
 }
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
 export function withCte<T extends typeof Base>(
   this: T,
   ...ctes: Parameters<Relation<InstanceType<T>>["with"]>

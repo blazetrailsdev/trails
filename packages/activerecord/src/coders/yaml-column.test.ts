@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
+import { DisallowedClass } from "@blazetrails/activesupport/yaml";
+import { YAMLColumn } from "./yaml-column.js";
 import { Temporal } from "@blazetrails/date";
 import { setUseYamlUnsafeLoad } from "../active-record.js";
 

@@ -638,7 +638,7 @@ export class AssociationReflection extends MacroReflection {
     return this.computeForeignKey();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
   computeForeignKey(inferFromInverseOf = true): string | string[] {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 

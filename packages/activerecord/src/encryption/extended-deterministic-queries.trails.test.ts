@@ -10,7 +10,7 @@ import { YAMLColumn } from "../coders/yaml-column.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { DisallowedClass } from "../coders/yaml-column.js";
+import { DisallowedClass } from "@blazetrails/activesupport/yaml";
 
 fixtures([], { useTransactionalTests: false });
 

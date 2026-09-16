@@ -307,7 +307,7 @@ type BaseSelectAll = (
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Result | Promise<Result> | FutureResult | FutureResultComplete;
 
-/** @noRailsEquivalent CONVERGEABLE fold-receipted-activerecord-root-and-adapter-names-remainder */
+/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
 export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   return function cachedSelectAll(
     this: QueryCacheHost,

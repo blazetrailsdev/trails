@@ -9,3 +9,10 @@ const yaml = await import("yaml").catch(() => {
 
 export const parse: typeof import("yaml").parse = yaml.parse;
 export const stringify: typeof import("yaml").stringify = yaml.stringify;
+
+export class DisallowedClass extends globalThis.Error {
+  constructor(action: string, klassName: string) {
+    super(`Tried to ${action} unspecified class: ${klassName}`);
+    this.name = "Psych::DisallowedClass";
+  }
+}

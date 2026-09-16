@@ -1,6 +1,7 @@
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { rbHash } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _autoIncrement: boolean;
@@ -42,14 +43,6 @@ export class Column extends BaseColumn {
     this._generatedType = options.generatedType ?? null;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  override deduplicateKey(): string {
-    return JSON.stringify([super.deduplicateKey(), this.isAutoIncrement(), this.rowid]);
-  }
-
   isAutoIncrement(): boolean {
     return this._autoIncrement;
   }
@@ -75,6 +68,12 @@ export class Column extends BaseColumn {
       other instanceof Column &&
       super.equals(other) &&
       this.isAutoIncrement() === other.isAutoIncrement()
+    );
+  }
+
+  override hash(): number {
+    return (
+      rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isAutoIncrement()) ^ rbHash(this.rowid)
     );
   }
 
