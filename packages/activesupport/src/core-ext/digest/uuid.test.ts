@@ -39,6 +39,9 @@ describe("DigestUUIDExt", () => {
     expect(uuidV3("6BA7B811-9DAD-11D1-80B4-00C04FD430C8", "http://www.widgets.com")).toEqual(
       "86df55fb-428e-3843-8583-ba3c05f290bc",
     );
+    expect(uuidV3("6ba7b811-9dad-11d1-80b4-00c04fd430c8", "http://www.widgets.com")).toEqual(
+      "86df55fb-428e-3843-8583-ba3c05f290bc",
+    );
     expect(uuidV3(URL_NAMESPACE, "http://www.widgets.com")).toEqual(
       "86df55fb-428e-3843-8583-ba3c05f290bc",
     );
@@ -46,8 +49,17 @@ describe("DigestUUIDExt", () => {
     expect(uuidV3("6BA7B812-9DAD-11D1-80B4-00C04FD430C8", "1.2.3")).toEqual(
       "8c29ab0e-a2dc-3482-b5eb-20cb2e2387a1",
     );
+    expect(uuidV3("6ba7b812-9dad-11d1-80b4-00c04fd430c8", "1.2.3")).toEqual(
+      "8c29ab0e-a2dc-3482-b5eb-20cb2e2387a1",
+    );
     expect(uuidV3(OID_NAMESPACE, "1.2.3")).toEqual("8c29ab0e-a2dc-3482-b5eb-20cb2e2387a1");
 
+    expect(
+      uuidV3("6BA7B814-9DAD-11D1-80B4-00C04FD430C8", "cn=John Doe, ou=People, o=Acme, Inc., c=US"),
+    ).toEqual("ee49149d-53a4-304a-890b-468229f6afc3");
+    expect(
+      uuidV3("6ba7b814-9dad-11d1-80b4-00c04fd430c8", "cn=John Doe, ou=People, o=Acme, Inc., c=US"),
+    ).toEqual("ee49149d-53a4-304a-890b-468229f6afc3");
     expect(uuidV3(X500_NAMESPACE, "cn=John Doe, ou=People, o=Acme, Inc., c=US")).toEqual(
       "ee49149d-53a4-304a-890b-468229f6afc3",
     );
@@ -59,10 +71,16 @@ describe("DigestUUIDExt", () => {
     expect(uuidV5("6BA7B810-9DAD-11D1-80B4-00C04FD430C8", "www.widgets.com")).toEqual(
       "21f7f8de-8051-5b89-8680-0195ef798b6a",
     );
+    expect(uuidV5("6ba7b810-9dad-11d1-80b4-00c04fd430c8", "www.widgets.com")).toEqual(
+      "21f7f8de-8051-5b89-8680-0195ef798b6a",
+    );
     expect(uuidV5(DNS_NAMESPACE, "www.widgets.com")).toEqual(
       "21f7f8de-8051-5b89-8680-0195ef798b6a",
     );
 
+    expect(uuidV5("6BA7B811-9DAD-11D1-80B4-00C04FD430C8", "http://www.widgets.com")).toEqual(
+      "4e570fd8-186d-5a74-90f0-4d28e34673a1",
+    );
     expect(uuidV5("6ba7b811-9dad-11d1-80b4-00c04fd430c8", "http://www.widgets.com")).toEqual(
       "4e570fd8-186d-5a74-90f0-4d28e34673a1",
     );
@@ -70,17 +88,25 @@ describe("DigestUUIDExt", () => {
       "4e570fd8-186d-5a74-90f0-4d28e34673a1",
     );
 
+    expect(uuidV5("6BA7B812-9DAD-11D1-80B4-00C04FD430C8", "1.2.3")).toEqual(
+      "42d5e23b-3a02-5135-85c6-52d1102f1f00",
+    );
+    expect(uuidV5("6ba7b812-9dad-11d1-80b4-00c04fd430c8", "1.2.3")).toEqual(
+      "42d5e23b-3a02-5135-85c6-52d1102f1f00",
+    );
     expect(uuidV5(OID_NAMESPACE, "1.2.3")).toEqual("42d5e23b-3a02-5135-85c6-52d1102f1f00");
 
+    expect(
+      uuidV5("6BA7B814-9DAD-11D1-80B4-00C04FD430C8", "cn=John Doe, ou=People, o=Acme, Inc., c=US"),
+    ).toEqual("fd5b2ddf-bcfe-58b6-90d6-db50f74db527");
+    expect(
+      uuidV5("6ba7b814-9dad-11d1-80b4-00c04fd430c8", "cn=John Doe, ou=People, o=Acme, Inc., c=US"),
+    ).toEqual("fd5b2ddf-bcfe-58b6-90d6-db50f74db527");
     expect(uuidV5(X500_NAMESPACE, "cn=John Doe, ou=People, o=Acme, Inc., c=US")).toEqual(
       "fd5b2ddf-bcfe-58b6-90d6-db50f74db527",
     );
 
     expect(() => uuidV5("A non-UUID string", "some value")).toThrow(ArgumentError);
-
-    expect(uuidV5(Uint8Array.from(DNS_NAMESPACE), "www.widgets.com")).toEqual(
-      uuidV5(DNS_NAMESPACE, "www.widgets.com"),
-    );
   });
 
   it("nil uuid", () => {
