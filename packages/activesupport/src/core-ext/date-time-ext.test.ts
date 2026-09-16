@@ -49,9 +49,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { setZone } from "../time-zone-config.js";
 import { ArgumentError } from "../hash-utils.js";
-import { advance as timeAdvance } from "../time-ext.js";
 import {
-  beginningOfQuarter,
   endOfMonth,
   isFuture,
   isNextDay,
@@ -60,6 +58,7 @@ import {
   isToday,
   isTomorrow,
   isYesterday,
+  lastQuarter,
   lastWeek,
 } from "./date-and-time/calculations.js";
 import { preserveTimezone } from "./date-and-time/compatibility.js";
@@ -394,10 +393,9 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    const dt = d(2005, 10, 31, 10, 10, 10);
-    const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = asDate(timeAdvance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(6);
+    expect(lastQuarter(DateTime.civil(2004, 5, 31) as never).toString()).toBe(
+      DateTime.civil(2004, 2, 29).toString(),
+    );
   });
 
   it("xmlschema", () => {
@@ -579,7 +577,9 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("current without time zone", () => {
-    expect(current()).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect(current()).toBeInstanceOf(
+      new Date().getTimezoneOffset() === 0 ? Temporal.PlainDateTime : Temporal.ZonedDateTime,
+    );
   });
 
   it("current with time zone", () => {

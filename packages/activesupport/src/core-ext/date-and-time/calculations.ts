@@ -93,7 +93,7 @@ function toInstant(dateOrTime: Comparable): Temporal.Instant {
 }
 
 function change(
-  dateOrTime: DateOrTime | Temporal.Instant,
+  dateOrTime: DateOrTime | DateTime | Temporal.Instant,
   options: {
     year?: number;
     month?: number;
@@ -104,6 +104,8 @@ function change(
     nsec?: number;
   },
 ): DateOrInstant {
+  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
+    return dateTime.change(dateOrTime, options) as never;
   dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
