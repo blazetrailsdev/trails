@@ -58,7 +58,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       hash = args[0] as AnyObject | Hash<unknown, unknown>;
     } else if (args.length === 1 && Array.isArray(args[0])) {
       hash = new Hash<unknown, unknown>();
-      for (const [key, value] of args[0] as [unknown, unknown][]) hash.set(key, value);
+      for (const pair of args[0] as unknown[][]) {
+        if (pair.length < 1 || pair.length > 2) {
+          throw new ArgumentError(`invalid number of elements (${pair.length} for 1..2)`);
+        }
+        hash.set(pair[0], pair[1] ?? null);
+      }
     } else {
       if (args.length % 2 !== 0) throw new ArgumentError("odd number of arguments for Hash");
       hash = new Hash<unknown, unknown>();
