@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { inspect } from "@blazetrails/ruby-compat";
 import { OrderedHash } from "./ordered-hash.js";
 import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { extractOptionsBang } from "./hash-utils.js";
@@ -91,26 +92,23 @@ describe("OrderedHashTest", () => {
 
   it("each key", () => {
     const eachKeys: string[] = [];
-    orderedHash.forEach((_, k) => eachKeys.push(k));
+    expect(orderedHash.eachKey((k) => eachKeys.push(k))).toEqual(orderedHash);
     expect(eachKeys).toEqual(keys);
-    expect([...orderedHash.keys()]).toEqual(eachKeys);
-    expect(orderedHash.keys()).toBeInstanceOf(Enumerator);
+    expect(orderedHash.eachKey()).toBeInstanceOf(Enumerator);
   });
 
   it("each value", () => {
     const eachValues: string[] = [];
-    orderedHash.forEach((v) => eachValues.push(v));
+    expect(orderedHash.eachValue((v) => eachValues.push(v))).toEqual(orderedHash);
     expect(eachValues).toEqual(values);
-    expect([...orderedHash.values()]).toEqual(eachValues);
-    expect(orderedHash.values()).toBeInstanceOf(Enumerator);
+    expect(orderedHash.eachValue()).toBeInstanceOf(Enumerator);
   });
 
   it("each", () => {
     const eachValues: string[] = [];
-    for (const [, value] of orderedHash) eachValues.push(value);
+    expect(orderedHash.each((_key, value) => eachValues.push(value))).toEqual(orderedHash);
     expect(eachValues).toEqual(values);
-    expect([...orderedHash.values()]).toEqual(eachValues);
-    expect(orderedHash[Symbol.iterator]()).toBeInstanceOf(Enumerator);
+    expect(orderedHash.each()).toBeInstanceOf(Enumerator);
   });
 
   it("each with index", () => {
@@ -120,13 +118,13 @@ describe("OrderedHashTest", () => {
   it("each pair", () => {
     const pairValues: string[] = [];
     const pairKeys: string[] = [];
-    for (const [key, value] of orderedHash.entries()) {
+    orderedHash.eachPair((key, value) => {
       pairKeys.push(key);
       pairValues.push(value);
-    }
+    });
     expect(pairValues).toEqual(values);
     expect(pairKeys).toEqual(keys);
-    expect(orderedHash.entries()).toBeInstanceOf(Enumerator);
+    expect(orderedHash.eachPair()).toBeInstanceOf(Enumerator);
   });
 
   it("find all", () => {
@@ -224,7 +222,7 @@ describe("OrderedHashTest", () => {
   });
 
   it("inspect", () => {
-    expect(orderedHash.inspect()).toContain(`"blue"=>"000099"`);
+    expect(orderedHash.inspect()).toContain(inspect(hash));
   });
 
   it("json", () => {
