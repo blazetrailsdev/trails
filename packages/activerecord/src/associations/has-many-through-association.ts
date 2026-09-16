@@ -132,7 +132,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       throughBuildRecord(this, (attributes ??= {}));
       const record = super.buildRecord(attributes, block);
       if (!record) return record;
-      const built = buildThroughInverseFor(this.owner, this.reflection, record, this._throughScope);
+      const built = buildThroughInverseFor(this, record);
       if (built) {
         const inverseAssoc = (
           record as unknown as { association?: (n: string) => any }
@@ -278,17 +278,10 @@ export interface BuiltThroughInverse {
  * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function buildThroughInverseFor(
-  owner: Base,
-  reflection: AssociationDefinition,
+  assoc: HasManyThroughAssociation,
   record: Base,
-  throughScope?: unknown,
 ): BuiltThroughInverse | null {
-  const assoc = {
-    owner,
-    reflection,
-    _throughScope: throughScope,
-    ...throughAssociationMethods,
-  } as unknown as HasManyThroughAssociation;
+  const { owner, reflection } = assoc;
   const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(reflection.name);
   const sourceRefl = refl?.sourceReflection;
