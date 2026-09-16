@@ -214,7 +214,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       }
     } else if (method === "nullify") {
       count = await scope.updateAll({
-        [sourceRefl?.foreignKey ?? `${underscore(singularize(this.reflection.name))}_id`]: null,
+        [sourceRefl?.foreignKey?.() ?? `${underscore(singularize(this.reflection.name))}_id`]: null,
       });
     } else {
       count = await scope.deleteAll();
@@ -257,7 +257,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
 /** @internal */
 interface SourceCounterReflection {
-  foreignKey?: string;
+  foreignKey?: () => string;
   options?: { counterCache?: unknown };
   counterCacheColumn?: () => string | null;
   klass?: unknown;
@@ -397,7 +397,7 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
   if (!throughRefl) return false;
   const throughAssoc = (assoc.owner as any).association?.(throughRefl);
   if (!throughAssoc) return false;
-  const fk = throughAssoc.reflection?.foreignKey;
+  const fk = throughAssoc.reflection?.foreignKey();
   if (!fk) return true;
   return !!(assoc.owner as any).readAttribute?.(fk as string);
 }

@@ -265,8 +265,8 @@ export class HasOneAssociation extends SingularAssociation {
     const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     const primaryKeyAttributeNames = arrayWrap(
       richReflection?.joinPrimaryKey?.() ??
-        (Array.isArray(this.reflection.foreignKey)
-          ? this.reflection.foreignKey
+        (Array.isArray(this.reflection.foreignKey())
+          ? this.reflection.foreignKey()
           : this.foreignKeyColumn()),
     );
     const foreignKeyAttributeNames = arrayWrap(richReflection?.joinForeignKey ?? configuredPk);
@@ -333,7 +333,7 @@ export class HasOneAssociation extends SingularAssociation {
       this.owner.constructor as typeof Base,
       this.reflection.name,
     );
-    const foreignKey = reflection?.foreignKey;
+    const foreignKey = reflection?.foreignKey();
     const primaryKey = (record.constructor as typeof Base).primaryKey;
     const primaryKeys =
       primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
@@ -369,11 +369,15 @@ async function preloadDestroyInverseBelongsTo(
   const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
 
   for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
-    const concrete = ref as unknown as { name: string; foreignKey: unknown; klass?: typeof Base };
+    const concrete = ref as unknown as {
+      name: string;
+      foreignKey: () => unknown;
+      klass?: typeof Base;
+    };
     let fk: unknown;
     let klass: typeof Base | undefined;
     try {
-      fk = concrete.foreignKey;
+      fk = concrete.foreignKey();
       klass = concrete.klass;
     } catch {
       continue;
@@ -406,12 +410,12 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
   const ctor = assoc.owner.constructor as {
     name: string;
     _reflectOnAssociation?: (n: string) => {
-      foreignKey?: string | string[];
+      foreignKey?: () => string | string[];
       foreignType?: string;
     } | null;
   };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
-  let foreignKey: string | string[] | undefined = refl?.foreignKey;
+  let foreignKey: string | string[] | undefined = refl?.foreignKey?.();
   const reflTypeCol: string | null = refl?.foreignType ?? null;
   if (foreignKey == null) {
     const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
@@ -424,7 +428,10 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
   }
   const asName = assoc.reflection.options.as;
   const typeCol = reflTypeCol ?? (asName ? `${underscore(asName)}_type` : null);
-  return ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol });
+  return ForeignAssociation.nullifiedOwnerAttributes({
+    foreignKey: () => foreignKey,
+    type: typeCol,
+  });
 }
 
 Object.assign(HasOneAssociation.prototype, { foreignKeyPresent });

@@ -69,7 +69,7 @@ export interface ConcreteReflection {
   readonly className: string;
   readonly klass: typeof Base;
   readonly type?: string;
-  readonly foreignKey?: string | string[];
+  foreignKey?(kwargs?: { inferFromInverseOf?: boolean }): string | string[];
   readonly scope?: ((...args: any[]) => any) | null;
   joinPrimaryKey?(klass?: typeof Base): string | string[];
   readonly joinForeignKey?: string | string[];
@@ -634,21 +634,21 @@ export class AssociationReflection extends MacroReflection {
     throw new Error("Subclass must implement macro");
   }
 
-  get foreignKey(): string | string[] {
-    return this.computeForeignKey();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
-  computeForeignKey(inferFromInverseOf = true): string | string[] {
+  foreignKey({ inferFromInverseOf = true }: { inferFromInverseOf?: boolean } = {}):
+    | string
+    | string[] {
     if (this._foreignKeyCache !== null) return this._foreignKeyCache;
 
     if (this.options.foreignKey) {
-      const fk = this.options.foreignKey;
-      this._foreignKeyCache = Array.isArray(fk) ? fk.map(String) : String(fk);
+      if (Array.isArray(this.options.foreignKey)) {
+        this._foreignKeyCache = this.options.foreignKey.map((fk) => String(fk));
+      } else {
+        this._foreignKeyCache = String(this.options.foreignKey);
+      }
     } else if (this.options.queryConstraints) {
-      this._foreignKeyCache = (this.options.queryConstraints as string[]).map(String);
+      this._foreignKeyCache = (this.options.queryConstraints as string[]).map((fk) => String(fk));
     } else {
-      let derivedFk: string | string[] = this.deriveForeignKey(inferFromInverseOf);
+      let derivedFk: string | string[] = this.deriveForeignKey({ inferFromInverseOf });
 
       if (hasQueryConstraints.call(this.activeRecord as any)) {
         derivedFk = this.deriveFkQueryConstraints(derivedFk);
@@ -660,12 +660,14 @@ export class AssociationReflection extends MacroReflection {
     return this._foreignKeyCache;
   }
 
-  private deriveForeignKey(inferFromInverseOf = true): string {
+  private deriveForeignKey({
+    inferFromInverseOf = true,
+  }: { inferFromInverseOf?: boolean } = {}): string {
     if (this.belongsTo()) return `${underscore(this.nameString)}_id`;
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
     if (this.options.inverseOf && inferFromInverseOf) {
       const inv = this.inverseOf();
-      if (inv) return String((inv as any).computeForeignKey?.(false) ?? (inv as any).foreignKey);
+      if (inv) return String(inv.foreignKey({ inferFromInverseOf: false }));
     }
     const baseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
     return `${underscore(demodulize(baseName))}_id`;
@@ -818,8 +820,8 @@ export class AssociationReflection extends MacroReflection {
     if (!reflection) return false;
     if ((reflection as AbstractReflection) === this) return false;
 
-    const reflFk = asConcrete(reflection).foreignKey;
-    const thisFk = this.foreignKey;
+    const reflFk = asConcrete(reflection).foreignKey?.();
+    const thisFk = this.foreignKey();
     if (JSON.stringify(reflFk) !== JSON.stringify(thisFk)) return false;
 
     const reflActiveRecord = asConcrete(reflection).activeRecord;
@@ -881,7 +883,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   joinPrimaryKey(_klass?: typeof Base): string | string[] {
-    return this.foreignKey;
+    return this.foreignKey();
   }
 
   get joinPrimaryType(): string | null {
@@ -931,7 +933,7 @@ export class AssociationReflection extends MacroReflection {
       !this.isPolymorphic() &&
       ((this.klass as any).compositePrimaryKey || (this.activeRecord as any).compositePrimaryKey)
     ) {
-      const fk = this.foreignKey;
+      const fk = this.foreignKey();
       if (this.hasOne() || this.isCollection()) {
         if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
           throw new CompositePrimaryKeyMismatchError(this);
@@ -1186,7 +1188,7 @@ export class BelongsToReflection extends AssociationReflection {
   }
 
   get joinForeignKey(): string | string[] {
-    return this.foreignKey;
+    return this.foreignKey();
   }
 
   get joinForeignType(): string | null {
@@ -1269,8 +1271,8 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.pluralName;
   }
 
-  get foreignKey(): string | string[] {
-    return this.sourceReflection?.foreignKey ?? this.delegateReflection.foreignKey;
+  foreignKey(kwargs?: { inferFromInverseOf?: boolean }): string | string[] {
+    return this.sourceReflection?.foreignKey(kwargs) ?? this.delegateReflection.foreignKey(kwargs);
   }
 
   get foreignType(): string | null {

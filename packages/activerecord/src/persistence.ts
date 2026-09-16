@@ -434,8 +434,7 @@ interface DeleteRecord {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
-export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
+async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
     const dm = new DeleteManager()
@@ -451,6 +450,8 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   this.freeze();
   return this;
 }
+
+export { deleteRow as delete };
 
 interface SaveRecord {
   _destroyed: boolean;

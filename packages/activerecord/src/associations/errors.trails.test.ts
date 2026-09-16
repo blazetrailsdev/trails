@@ -61,7 +61,7 @@ describe("AssociationErrors", () => {
       name: "order",
       associationPrimaryKey: () => ["shop_id", "status"],
       activeRecordPrimaryKey: "id",
-      foreignKey: "order_id",
+      foreignKey: () => "order_id",
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);
     expect(err.reflection).toBeNull();
@@ -77,7 +77,7 @@ describe("AssociationErrors", () => {
       isCollection: () => true,
       activeRecordPrimaryKey: ["shop_id", "status"],
       associationPrimaryKey: () => "id",
-      foreignKey: "cpk_broken_order_id",
+      foreignKey: () => "cpk_broken_order_id",
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);
     expect(err.message).toBe(
@@ -90,7 +90,7 @@ describe("AssociationErrors", () => {
       activeRecord: "CpkBrokenBook",
       name: "order",
       associationPrimaryKey: () => ["id"],
-      foreignKey: ["shop_id", "order_id"],
+      foreignKey: () => ["shop_id", "order_id"],
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);
     expect(err.message).toBe(

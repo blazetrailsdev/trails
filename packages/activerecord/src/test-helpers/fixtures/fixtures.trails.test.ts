@@ -401,14 +401,14 @@ describe("developerFixtureData", () => {
         options: { through: "computers_developers" },
         isThroughReflection: () => true,
         parentReflection: { macro: "hasAndBelongsToMany" },
-        foreignKey: "computer_id",
+        foreignKey: () => "computer_id",
         klass: {
           tableName: "computers",
           primaryKey: "id",
           typeForAttribute: () => ({ type: () => "integer" }),
         },
         throughReflection: {
-          foreignKey: "developer_id",
+          foreignKey: () => "developer_id",
           tableName: "computers_developers",
           klass: { _allTimestampAttributesInModel: [] },
         },

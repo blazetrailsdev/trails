@@ -275,7 +275,7 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
 export interface CompositePrimaryKeyMismatchReflection {
   activeRecord?: unknown;
   name?: string;
-  foreignKey?: string | string[];
+  foreignKey?: () => string | string[];
   hasOne?: () => boolean;
   isCollection?: () => boolean;
   activeRecordPrimaryKey?: string | string[];
@@ -307,14 +307,14 @@ export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
       reflection.activeRecord != null &&
       reflection.name !== undefined &&
       primaryKey !== undefined &&
-      reflection.foreignKey !== undefined
+      reflection.foreignKey?.() !== undefined
     ) {
       const owner =
         typeof reflection.activeRecord === "string"
           ? reflection.activeRecord
           : (reflection.activeRecord as { name?: string }).name;
       const pk = formatKey(primaryKey);
-      const fk = formatKey(reflection.foreignKey);
+      const fk = formatKey(reflection.foreignKey());
       message = `Association ${owner}#${reflection.name} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
     } else {
       message = "Association primary key doesn't match with foreign key.";

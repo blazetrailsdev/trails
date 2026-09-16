@@ -61,7 +61,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
       await BelongsToBuilder.touchRecord(
         this,
         (this as any).changesToSave ?? {},
-        r.foreignKey ?? r.options?.foreignKey,
+        r.foreignKey() ?? r.options?.foreignKey,
         r.name,
         touch,
       );

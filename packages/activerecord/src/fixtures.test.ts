@@ -103,7 +103,7 @@ describe("PrimaryKeyErrorTest", () => {
           isPolymorphic: () => false,
           joinPrimaryKey: () => "name",
           klass: { primaryKey: "id", name: "Essay" },
-          foreignKey: "owned_essay_id",
+          foreignKey: () => "owned_essay_id",
         },
       },
       findBy: vi.fn(async () => null),

@@ -324,12 +324,12 @@ function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, nul
   const ctor = assoc.owner.constructor as {
     name: string;
     _reflectOnAssociation?: (n: string) => {
-      foreignKey?: string | string[];
+      foreignKey?: () => string | string[];
       foreignType?: string;
     } | null;
   };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
-  let foreignKey: string | string[] | undefined = refl?.foreignKey;
+  let foreignKey: string | string[] | undefined = refl?.foreignKey?.();
   const typeCol: string | null = refl?.foreignType ?? null;
   if (foreignKey == null) {
     const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
@@ -341,7 +341,10 @@ function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, nul
       opts.foreignKey ?? (opts.as ? `${underscore(opts.as)}_id` : `${underscore(ctor.name)}_id`);
   }
   const polyType = typeCol ?? deriveAsTypeCol(assoc);
-  return ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: polyType });
+  return ForeignAssociation.nullifiedOwnerAttributes({
+    foreignKey: () => foreignKey,
+    type: polyType,
+  });
 }
 
 function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): string | null {
@@ -476,7 +479,7 @@ export function scope(
           activeRecord: ctor.name,
           name: assocName,
           associationPrimaryKey: () => pkCols,
-          foreignKey,
+          foreignKey: () => foreignKey,
         });
       }
       const conditions: Record<string, unknown> = {};

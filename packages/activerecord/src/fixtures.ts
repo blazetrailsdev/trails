@@ -100,12 +100,12 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
         macro?: string;
         isPolymorphic?: () => boolean;
         foreignType?: string;
-        foreignKey?: string | string[];
+        foreignKey?: () => string | string[];
       }
     | undefined;
   if (!refl || refl.macro !== "belongsTo" || !refl.isPolymorphic?.()) return null;
   const typeColumn: string = refl.foreignType ?? `${colName}_type`;
-  const rawFk: string | string[] = refl.foreignKey ?? `${colName}_id`;
+  const rawFk: string | string[] = refl.foreignKey?.() ?? `${colName}_id`;
   if (Array.isArray(rawFk)) {
     throw new Error(
       `defineFixtures: polymorphic association "${colName}" has a composite foreignKey — pass explicit ${typeColumn}, ${rawFk.join(", ")} instead`,
@@ -277,7 +277,7 @@ export async function prepareModelFixtures(
     for (const refl of Object.values(reflections) as {
       macro?: string;
       isPolymorphic?: () => boolean;
-      foreignKey?: string | string[];
+      foreignKey?: () => string | string[];
       joinPrimaryKey?: () => string | string[];
       klass?: { primaryKey?: unknown };
     }[]) {
@@ -288,7 +288,7 @@ export async function prepareModelFixtures(
       try {
         targetPk = refl.klass?.primaryKey;
         jpk = refl.joinPrimaryKey?.();
-        fk = refl.foreignKey;
+        fk = refl.foreignKey?.();
       } catch {
         continue;
       }

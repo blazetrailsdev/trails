@@ -18,9 +18,11 @@ export function ownerForeignKeyColumns(
 
   const reflectionFk = (
     ctor as unknown as {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+      _reflectOnAssociation?: (n: string) => { foreignKey?: () => string | string[] } | undefined;
     }
-  )._reflectOnAssociation?.(assocName)?.foreignKey;
+  )
+    ._reflectOnAssociation?.(assocName)
+    ?.foreignKey?.();
   if (typeof reflectionFk === "string") return [reflectionFk];
   if (Array.isArray(reflectionFk)) return reflectionFk;
 
@@ -48,9 +50,8 @@ export class ForeignAssociation {
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {
     const attrs: Record<string, null> = {};
-    const fks = Array.isArray(reflection.foreignKey)
-      ? reflection.foreignKey
-      : [reflection.foreignKey];
+    const foreignKey = reflection.foreignKey();
+    const fks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
     for (const fk of fks) attrs[fk] = null;
     if (reflection.type) attrs[reflection.type] = null;
     return attrs;

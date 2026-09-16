@@ -1702,9 +1702,7 @@ export class Base extends Model {
   declare static having: typeof Querying.having;
   declare static lock: typeof Querying.lock;
   declare static readonly: typeof Querying.readonly;
-  /** @noRailsEquivalent CONVERGEABLE converge-reserved-word-and-kwarg-renamed-members */
-  declare static withCte: typeof Querying.withCte;
-  declare static with: typeof Querying.withCte;
+  declare static with: typeof Querying.with;
   declare static withRecursive: typeof Querying.withRecursive;
   declare static annotate: typeof Querying.annotate;
   declare static excluding: typeof Querying.excluding;
@@ -2826,7 +2824,7 @@ include(Base, {
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
-  delete: _Persistence.deleteRow,
+  delete: _Persistence.delete,
   destroyRow: _Persistence.destroyRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,

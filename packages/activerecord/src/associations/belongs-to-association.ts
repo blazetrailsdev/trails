@@ -29,12 +29,13 @@ export class BelongsToAssociation extends SingularAssociation {
       case "destroyAsync": {
         let primaryKeyColumn: string | string[];
         let id: unknown;
-        if (Array.isArray(this.reflection.foreignKey)) {
+        const foreignKey = this.reflection.foreignKey();
+        if (Array.isArray(foreignKey)) {
           primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
-          id = this.reflection.foreignKey.map((col) => (this.owner as any)[col]);
+          id = foreignKey.map((col) => (this.owner as any)[col]);
         } else {
           primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
-          id = (this.owner as any)[this.reflection.foreignKey];
+          id = (this.owner as any)[foreignKey];
         }
 
         const associationClass = (this.reflection as any).isPolymorphic()
@@ -246,12 +247,12 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   private foreignKeyName(): string {
-    const fk = this.reflection.foreignKey ?? `${underscore(this.reflection.name)}_id`;
+    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
     return Array.isArray(fk) ? fk[0] : fk;
   }
 
   protected foreignKeyNames(): string[] {
-    const fk = this.reflection.foreignKey ?? `${underscore(this.reflection.name)}_id`;
+    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
     return Array.isArray(fk) ? fk : [fk];
   }
 

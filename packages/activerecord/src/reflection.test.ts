@@ -986,7 +986,7 @@ describe("ReflectionTest", () => {
     const reflection = reflectOnAssociation(Post, "author");
     expect(reflection).not.toBeNull();
     expect(reflection!.macro).toBe("belongsTo");
-    expect(reflection!.foreignKey).toBe("author_id");
+    expect(reflection!.foreignKey()).toBe("author_id");
   });
 
   it("reflections should return keys as strings", () => {
@@ -1053,7 +1053,7 @@ describe("ReflectionTest", () => {
       }
     }
     const reflection = reflectOnAssociation(Post, "author");
-    expect(reflection!.foreignKey).toBe("author_id");
+    expect(reflection!.foreignKey()).toBe("author_id");
   });
 
   it("foreign key is inferred from model name", () => {
@@ -1073,7 +1073,7 @@ describe("ReflectionTest", () => {
       }
     }
     const reflection = reflectOnAssociation(Comment, "post");
-    expect(reflection!.foreignKey).toBe("post_id");
+    expect(reflection!.foreignKey()).toBe("post_id");
   });
 
   it("reflection should not raise error when compared to other object", () => {
@@ -1381,7 +1381,7 @@ describe("ReflectionTest", () => {
     registerModel(RfComment);
 
     const ref = reflectOnAssociation(RfComment, "blogPost")!;
-    expect(ref.foreignKey).toBe("blog_post_id");
+    expect(ref.foreignKey()).toBe("blog_post_id");
     expect(ref.associationPrimaryKey()).toBe("id");
   });
 });

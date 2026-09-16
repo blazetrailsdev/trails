@@ -11,7 +11,7 @@ interface FixtureReflection {
   macro: string;
   options: { through?: unknown };
   joinTable?: string;
-  foreignKey: string | string[];
+  foreignKey(): string | string[];
   joinForeignKey: string | string[];
   joinForeignType: string | null;
   joinPrimaryKey(): string | string[];
@@ -43,11 +43,11 @@ export class ReflectionProxy {
 
 export class HasManyThroughProxy extends ReflectionProxy {
   get rhsKey(): string | string[] {
-    return this._association.foreignKey;
+    return this._association.foreignKey();
   }
 
   get lhsKey(): string | string[] {
-    return this._association.throughReflection.foreignKey;
+    return this._association.throughReflection.foreignKey();
   }
 
   override get joinTable(): string {
@@ -68,7 +68,7 @@ export class PrimaryKeyError extends Error {
         `To fix this, change your fixture from\n\n` +
         `${label}:\n  ${association.name}: ${String(value)}\n\n` +
         `to\n\n` +
-        `${label}:\n  ${String(association.foreignKey)}: **value**\n\n` +
+        `${label}:\n  ${String(association.foreignKey())}: **value**\n\n` +
         `where **value** is the ${String(association.joinPrimaryKey())} value for the\n` +
         `associated ${association.klass.name} record.\n`,
     );
