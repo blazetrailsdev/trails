@@ -383,7 +383,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "encryption/encrypted_fixtures.rb",
     reason:
-      "Encrypts YAML fixture rows on load. Behavior ported inline into defineFixtures() " +
+      "Encrypts YAML fixture rows on load. Behavior ported inline into FixtureSet.createFixtures() " +
       "(define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts.",
   },
   {

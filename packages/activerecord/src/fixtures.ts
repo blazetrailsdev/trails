@@ -68,26 +68,6 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export function throughJoinTableNames(ModelClass: BaseClass): string[] {
-  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
-  const names: string[] = [];
-  for (const refl of Object.values(reflections)) {
-    const r = refl as {
-      parentReflection?: { macro?: string } | null;
-      throughReflection?: { tableName?: string };
-    };
-    if (r.parentReflection?.macro !== "hasAndBelongsToMany") continue;
-    try {
-      const joinTable = r.throughReflection?.tableName;
-      if (typeof joinTable === "string") names.push(joinTable);
-    } catch {
-      continue;
-    }
-  }
-  return names;
-}
-
 interface PolymorphicBelongsTo {
   typeColumn: string;
   idColumn: string;
@@ -108,7 +88,7 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
   const rawFk: string | string[] = refl.foreignKey?.() ?? `${colName}_id`;
   if (Array.isArray(rawFk)) {
     throw new Error(
-      `defineFixtures: polymorphic association "${colName}" has a composite foreignKey — pass explicit ${typeColumn}, ${rawFk.join(", ")} instead`,
+      `FixtureSet.createFixtures: polymorphic association "${colName}" has a composite foreignKey — pass explicit ${typeColumn}, ${rawFk.join(", ")} instead`,
     );
   }
   return { typeColumn, idColumn: rawFk };
@@ -214,18 +194,7 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export async function defineFixtures<T extends BaseClass, K extends string>(
-  adapter: DatabaseAdapter,
-  ModelClass: T,
-  fixtures: Record<K, FixtureAttrs>,
-): Promise<{ [P in K]: InstanceType<T> }> {
-  const prepared = await prepareModelFixtures(adapter, ModelClass, fixtures);
-  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
-  return result as { [P in K]: InstanceType<T> };
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-set-insert-onto-table-rows */
 export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
   ModelClass: BaseClass,
@@ -247,7 +216,7 @@ export async function prepareModelFixtures(
       pkCol = schemaPk;
     } else if (declaredPk !== "id" && declaredPk !== schemaPk) {
       throw new Error(
-        `defineFixtures: ${ModelClass.name} declares primaryKey "${declaredPk}" but table "${tableName}" has primary key "${schemaPk}" — fix the model or the schema`,
+        `FixtureSet.createFixtures: ${ModelClass.name} declares primaryKey "${declaredPk}" but table "${tableName}" has primary key "${schemaPk}" — fix the model or the schema`,
       );
     } else {
       pkCol = schemaPk;
@@ -310,7 +279,7 @@ export async function prepareModelFixtures(
       if (isFixtureRef(val)) {
         if (poly) {
           throw new Error(
-            `defineFixtures: "${col}" is a polymorphic association — pass a model instance instead of ref(). ` +
+            `FixtureSet.createFixtures: "${col}" is a polymorphic association — pass a model instance instead of ref(). ` +
               `Use explicit ${poly.typeColumn}/${poly.idColumn} if you need to reference by ID.`,
           );
         }
@@ -327,7 +296,7 @@ export async function prepareModelFixtures(
         const instancePk = instanceClass.primaryKey;
         if (Array.isArray(instancePk)) {
           throw new Error(
-            `defineFixtures: polymorphic target "${col}" has a composite primary key — pass explicit ${poly.typeColumn} and ${poly.idColumn} instead`,
+            `FixtureSet.createFixtures: polymorphic target "${col}" has a composite primary key — pass explicit ${poly.typeColumn} and ${poly.idColumn} instead`,
           );
         }
         row[poly.idColumn] = (val as unknown as FixtureAttrs)[instancePk];
@@ -374,7 +343,7 @@ export async function prepareModelFixtures(
           : await find();
       if (!record) {
         throw new Error(
-          `defineFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, criteria: ${JSON.stringify(criteria)})`,
+          `FixtureSet.createFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, criteria: ${JSON.stringify(criteria)})`,
         );
       }
       result[label] = record;
@@ -390,18 +359,7 @@ export async function prepareModelFixtures(
   return { tables, serialReset, rollback: () => {}, rows: rowsByLabel, finalize };
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
-export async function defineJoinTableFixtures(
-  adapter: DatabaseAdapter,
-  tableName: string,
-  fixtures: Record<string, FixtureAttrs>,
-): Promise<Record<string, FixtureAttrs>> {
-  const prepared = await prepareJoinTableFixtures(adapter, tableName, fixtures);
-  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
-  return result as Record<string, FixtureAttrs>;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-fixtures-helper-surface-onto-rails-fixtures */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-set-insert-onto-table-rows */
 export async function prepareJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ref, isFixtureRef, defineFixtures, resolveModelForTable, FixtureSet } from "./fixtures.js";
+import { ref, isFixtureRef, resolveModelForTable, FixtureSet } from "./fixtures.js";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
@@ -49,6 +49,26 @@ function executedStatements(adapter: DatabaseAdapter): string[] {
   ).flatMap((c) => c[0] as string[]);
 }
 
+async function createFixtures(
+  adapter: DatabaseAdapter,
+  modelClass: any,
+  data: Record<string, Record<string, unknown>>,
+): Promise<Record<string, any>> {
+  const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
+  modelClass.connectionPool = () => pool;
+  FixtureSet.resetCache();
+  const [fixtureSet] = await FixtureSet.createFixtures(
+    { [modelClass.tableName]: data },
+    [modelClass.tableName],
+    { [modelClass.tableName]: modelClass },
+    modelClass,
+  );
+  const rows: Record<string, any> = {};
+  for (const [label, fixture] of Object.entries(fixtureSet.fixtures))
+    rows[label] = fixture.toHash();
+  return rows;
+}
+
 function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>>, pk = "id") {
   return {
     tableName,
@@ -88,7 +108,7 @@ describe("ref", () => {
   });
 });
 
-describe("defineFixtures", () => {
+describe("createFixtures", () => {
   it("inserts fixtures and returns keyed accessor", async () => {
     const adapter = makeAdapter();
     const rows = new Map([
@@ -97,7 +117,7 @@ describe("defineFixtures", () => {
     ]);
     const User = makeModel("users", rows);
 
-    const users = await defineFixtures(adapter, User, {
+    const users = await createFixtures(adapter, User, {
       david: { name: "David" },
       mary: { name: "Mary" },
     });
@@ -118,7 +138,7 @@ describe("defineFixtures", () => {
     const rows = new Map([[FixtureSet.identify("welcome"), welcomeRow]]);
     const Post = makeModel("posts", rows);
 
-    await defineFixtures(adapter, Post, {
+    await createFixtures(adapter, Post, {
       welcome: { title: "Welcome", author_id: ref("users", "david") },
     });
 
@@ -133,7 +153,7 @@ describe("defineFixtures", () => {
     const Post = makeModel("posts", rows);
 
     const davidInstance = { id: FixtureSet.identify("david"), name: "David" };
-    await defineFixtures(adapter, Post, {
+    await createFixtures(adapter, Post, {
       welcome: { title: "Welcome", author: davidInstance },
     });
 
@@ -141,14 +161,14 @@ describe("defineFixtures", () => {
     expect(insertSql).toContain(String(FixtureSet.identify("david")));
   });
 
-  it("deterministic IDs are stable across multiple defineFixtures calls", async () => {
+  it("deterministic IDs are stable across multiple createFixtures calls", async () => {
     const davidId = FixtureSet.identify("david");
     const rows = new Map([[davidId, { id: davidId }]]);
     const User = makeModel("users", rows);
     const adapter = makeAdapter();
 
-    const first = await defineFixtures(adapter, User, { david: {} });
-    const second = await defineFixtures(adapter, User, { david: {} });
+    const first = await createFixtures(adapter, User, { david: {} });
+    const second = await createFixtures(adapter, User, { david: {} });
 
     expect(first.david.id).toBe(davidId);
     expect(second.david.id).toBe(davidId);
@@ -165,7 +185,7 @@ describe("defineFixtures", () => {
       typeForAttribute: () => ({ type: () => "integer" }),
       findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
     } as any;
-    await defineFixtures(adapter, Model, { order1: { status: "paid" } });
+    await createFixtures(adapter, Model, { order1: { status: "paid" } });
     const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     const base = FixtureSet.identify("order1");
     expect(insertSql).toContain(String(base));
@@ -208,7 +228,7 @@ describe("defineFixtures", () => {
     (adapter as any).tableExists = vi.fn(async () => true);
     const Author = makePlainThroughAuthor();
 
-    await defineFixtures(adapter, Author, {
+    await createFixtures(adapter, Author, {
       david: { name: "David", categorizedPosts: ["welcome"] },
     });
 
@@ -220,13 +240,13 @@ describe("defineFixtures", () => {
     expect(joinInsert).toContain(String(FixtureSet.identify("welcome")));
   });
 
-  it("tableName registry: resolveModelForTable returns the model after defineFixtures", async () => {
+  it("tableName registry: resolveModelForTable returns the model after createFixtures", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[FixtureSet.identify("david"), { id: FixtureSet.identify("david") }]]);
     const User = makeModel("users", rows);
 
     expect(resolveModelForTable(adapter, "users")).toBeUndefined();
-    await defineFixtures(adapter, User, { david: {} });
+    await createFixtures(adapter, User, { david: {} });
     expect(resolveModelForTable(adapter, "users")).toBe(User);
   });
 
@@ -236,7 +256,7 @@ describe("defineFixtures", () => {
     const rows = new Map([[FixtureSet.identify("david"), { id: FixtureSet.identify("david") }]]);
     const User = makeModel("users", rows);
 
-    await defineFixtures(adapter1, User, { david: {} });
+    await createFixtures(adapter1, User, { david: {} });
     expect(resolveModelForTable(adapter1, "users")).toBe(User);
     expect(resolveModelForTable(adapter2, "users")).toBeUndefined();
   });
@@ -269,7 +289,7 @@ describe("defineFixtures", () => {
       },
     };
 
-    await defineFixtures(adapter, Tagging, {
+    await createFixtures(adapter, Tagging, {
       welcome_tag: { taggable: postInstance as any },
     });
 
@@ -291,7 +311,7 @@ describe("defineFixtures", () => {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };
 
-    await defineFixtures(adapter, Tagging, {
+    await createFixtures(adapter, Tagging, {
       welcome_tag: { taggable_type: "CustomPost", taggable_id: 999 },
     });
 
@@ -311,7 +331,7 @@ describe("defineFixtures", () => {
     };
 
     await expect(
-      defineFixtures(adapter, Tagging, { bad: { taggable: ref("posts", "welcome") as any } }),
+      createFixtures(adapter, Tagging, { bad: { taggable: ref("posts", "welcome") as any } }),
     ).rejects.toThrow(/polymorphic association.*model instance/);
   });
 
@@ -320,7 +340,7 @@ describe("defineFixtures", () => {
     const rows = new Map([["abc", { id: "abc", name: "x" }]]);
     const Model = makeModel("widgets", rows);
 
-    const result = await defineFixtures(adapter, Model, { thing: { id: "abc", name: "x" } });
+    const result = await createFixtures(adapter, Model, { thing: { id: "abc", name: "x" } });
     expect((result.thing as { id: string }).id).toBe("abc");
 
     const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
@@ -337,24 +357,13 @@ describe("defineFixtures", () => {
     ]);
     const User = makeModel("users", rows);
 
-    await defineFixtures(adapter, User, {
+    await createFixtures(adapter, User, {
       admin_user: { name: "Admin", type: "AdminUser" },
     });
 
     const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain("type");
     expect(insertSql).toContain("AdminUser");
-  });
-});
-
-describe("HABTM fixture reflection walking (trails)", () => {
-  it("throughJoinTableNames pulls in the anonymous HABTM join tables", async () => {
-    const { throughJoinTableNames } = await import("./fixtures.js");
-    const { Developer } = await import("./test-helpers/models/developer.js");
-
-    const names = throughJoinTableNames(Developer as never);
-    expect(names).toContain("developers_projects");
-    expect(names).toContain("computers_developers");
   });
 });
 

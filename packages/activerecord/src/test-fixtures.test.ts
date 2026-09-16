@@ -7,7 +7,7 @@ import { registerModel } from "./associations.js";
 import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js";
-import { defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
+import { isFixtureRef } from "./fixtures.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
@@ -19,10 +19,7 @@ import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import {
-  leaseFixtureConnection,
-  leaseFixtureConnectionFor,
-} from "./test-fixtures/fixture-connection.js";
+import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 
 async function resolvePrimaryModel(entry: {
   model: () => Promise<typeof Base | readonly (typeof Base)[]>;
@@ -677,13 +674,13 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
     for (const [name, entry] of Object.entries(fixtureRegistry)) {
       try {
         const data = (entry as { data: Record<string, Record<string, unknown>> }).data;
+        FixtureSet.resetCache();
         if (isJoinTableEntry(entry)) {
-          await defineJoinTableFixtures(Base.connection, entry.joinTable, data);
+          await FixtureSet.createFixtures({ [entry.joinTable]: data }, [entry.joinTable]);
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          const seedAdapter = await leaseFixtureConnectionFor(ModelClass, Base.connection);
-          await defineFixtures(seedAdapter, ModelClass, data);
+          await FixtureSet.createFixtures({ [name]: data }, [name], { [name]: ModelClass });
         }
       } catch (e) {
         failures.push(`${name}: ${(e as Error).message.split("\n")[0]}`);

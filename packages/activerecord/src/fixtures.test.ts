@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
 import { include } from "@blazetrails/ruby-compat";
-import { defineFixtures, FixtureSet, FixtureError } from "./fixtures.js";
+import { FixtureSet, FixtureError } from "./fixtures.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -16,7 +16,6 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
-import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
@@ -88,8 +87,10 @@ describe("PrimaryKeyErrorTest", () => {
       quoteTableName: (n: string) => `"${n}"`,
       quoteColumnName: (n: string) => `"${n}"`,
     } as unknown as DatabaseAdapter;
+    const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
 
     const AuthorModel = {
+      connectionPool: () => pool,
       tableName: "authors",
       primaryKey: "id",
       loadSchema: async () => {},
@@ -109,9 +110,12 @@ describe("PrimaryKeyErrorTest", () => {
       findBy: vi.fn(async () => null),
     } as any;
 
-    const e = await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData).catch(
-      (err: Error) => err,
-    );
+    const e = await FixtureSet.createFixtures(
+      { primary_key_error: primaryKeyErrorFixtureData },
+      "primary_key_error",
+      { primary_key_error: AuthorModel },
+      AuthorModel,
+    ).catch((err: Error) => err);
     expect(() => {
       throw e;
     }).toThrow(PrimaryKeyError);
@@ -130,12 +134,17 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     }
   }
 
+  afterEach(() => {
+    FixtureSet.resetCache();
+  });
+
   it("raises fk violations", async () => {
     await withVerifyForeignKeysForFixtures(async () => {
       const load = (): Promise<unknown> =>
-        defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
-          first: { fk_object_to_point_to_id: 4242 },
-        });
+        FixtureSet.createFixtures(
+          { fk_pointing_to_non_existent_objects: { first: { fk_object_to_point_to_id: 4242 } } },
+          ["fk_pointing_to_non_existent_objects"],
+        );
       if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
         const error = await load().catch((e: Error) => e);
         expect(() => {
@@ -152,16 +161,15 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
   });
 
   it("does not raise if no fk violations", async () => {
-    await defineJoinTableFixtures(
-      Base.connection,
+    await FixtureSet.createFixtures({ fk_object_to_point_tos: fkObjectToPointToFixtureData }, [
       "fk_object_to_point_tos",
-      fkObjectToPointToFixtureData,
-    );
+    ]);
     await withVerifyForeignKeysForFixtures(async () => {
       await expect(
-        defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
-          first: { fk_object_to_point_to_id: 1 },
-        }),
+        FixtureSet.createFixtures(
+          { fk_pointing_to_non_existent_objects: { first: { fk_object_to_point_to_id: 1 } } },
+          ["fk_pointing_to_non_existent_objects"],
+        ),
       ).resolves.not.toThrow();
     });
   });

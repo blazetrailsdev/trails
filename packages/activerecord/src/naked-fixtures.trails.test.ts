@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { defineJoinTableFixtures } from "./fixtures.js";
+import { FixtureSet } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
 import { Tree } from "./test-helpers/models/tree.js";
-import { Base } from "./base.js";
 import "./relation.js";
 import { nakedYmlAccountsFixtureData } from "./test-helpers/fixtures/naked/yml/accounts.js";
 import { nakedYmlCompaniesFixtureData } from "./test-helpers/fixtures/naked/yml/companies.js";
@@ -28,12 +27,9 @@ describe("tableless useFixtures (naked/yml)", () => {
 
   describe("test_yaml_file_with_invalid_column", () => {
     it("raises with Rails-mirrored message listing all unknown columns", async () => {
+      FixtureSet.resetCache();
       await expect(
-        defineJoinTableFixtures(
-          await Base.leaseConnection(),
-          "parrots",
-          nakedYmlParrotsFixtureData,
-        ),
+        FixtureSet.createFixtures({ parrots: nakedYmlParrotsFixtureData }, "parrots"),
       ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
     });
   });
