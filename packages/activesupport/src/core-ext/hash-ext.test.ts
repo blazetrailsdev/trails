@@ -5,11 +5,19 @@ import * as XmlMini from "../xml-mini.js";
 import * as XmlMini_REXML from "../xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "../xml-mini/nokogiri.js";
 import * as XmlMini_NokogiriSAX from "../xml-mini/nokogirisax.js";
-import { assertNothingRaised, assertRaises } from "../testing/assertions.js";
-import { Date as RubyDate, Temporal } from "@blazetrails/date";
+import {
+  assertNothingRaised,
+  assertRaise,
+  assertRaises,
+  assertPredicate,
+  assertRespondTo,
+} from "../testing/assertions.js";
+import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "./big-decimal/conversions.js";
 import { DisallowedType, XMLConverter } from "./hash/conversions.js";
 
+import * as HashExt from "../hash-utils.js";
+import { ArgumentError, FrozenError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
   fromXml,
   deepMerge,
@@ -25,12 +33,20 @@ import {
   deepSymbolizeKeysBang,
   deepStringifyKeys,
   reverseMerge,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaults,
+  withDefaultsBang,
+  deepTransformKeysBang,
+  deepTransformValuesBang,
+  stringifyKeysBang,
+  deepStringifyKeysBang,
   assertValidKeys,
   toParam,
   toXml,
   fromTrustedXml,
 } from "../hash-utils.js";
-import { Hash, except } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat";
 
 describe("HashExtTest", () => {
   const strings = () => ({ a: 1, b: 2 });
@@ -42,16 +58,44 @@ describe("HashExtTest", () => {
   const stringArrayOfHashes = () => ({ a: [{ b: 2 }, { c: 3 }, 4] });
   const symbolArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { ":c": 3 }, 4] });
   const mixedArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { c: 3 }, 4] });
+  const integers = () =>
+    new Map<unknown, unknown>([
+      [0, 1],
+      [1, 2],
+    ]);
+  const nestedIntegers = () => new Map<unknown, unknown>([[0, new Map([[1, new Map([[2, 3]])]])]]);
+  const illegalSymbols = () => new Map<unknown, unknown>([[[], 3]]);
+  const nestedIllegalSymbols = () => new Map<unknown, unknown>([[[], new Map([[[], 3]])]]);
+  const upcaseStrings = () => ({ A: 1, B: 2 });
+  const nestedUpcaseStrings = () => ({ A: { B: { C: 3 } } });
+  const upcaseArrayOfHashes = () => ({ A: [{ B: 2 }, { C: 3 }, 4] });
+  const upcase = (key: string) => (isSymbol(key) ? symbolToS(key) : String(key)).toUpperCase();
   it("methods", () => {
-    const h = { a: 1, b: 2 };
-    expect(Object.keys(h)).toContain("a");
-    expect(Object.keys(h)).toContain("b");
+    const h = HashExt;
+    assertRespondTo(h, "deepTransformKeys");
+    assertRespondTo(h, "deepTransformKeysBang");
+    assertRespondTo(h, "deepTransformValues");
+    assertRespondTo(h, "deepTransformValuesBang");
+    assertRespondTo(h, "symbolizeKeys");
+    assertRespondTo(h, "symbolizeKeysBang");
+    assertRespondTo(h, "deepSymbolizeKeys");
+    assertRespondTo(h, "deepSymbolizeKeysBang");
+    assertRespondTo(h, "stringifyKeys");
+    assertRespondTo(h, "stringifyKeysBang");
+    assertRespondTo(h, "deepStringifyKeys");
+    assertRespondTo(h, "deepStringifyKeysBang");
+    assertRespondTo(h, "toOptions");
+    assertRespondTo(h, "toOptionsBang");
+    assertRespondTo(h, "exceptBang");
   });
 
   it("deep transform keys", () => {
-    const nested = { a: { b: { c: 3 } } };
-    const result = deepTransformKeys(nested, (k) => k.toUpperCase());
-    expect(result).toEqual({ A: { B: { C: 3 } } });
+    expect(deepTransformKeys(nestedSymbols(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(nestedStrings(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(nestedMixed(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(stringArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
+    expect(deepTransformKeys(symbolArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
+    expect(deepTransformKeys(mixedArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
   });
 
   it("deep transform keys not mutates", () => {
@@ -61,15 +105,26 @@ describe("HashExtTest", () => {
   });
 
   it("deep transform keys!", () => {
-    const obj: Record<string, unknown> = { a: 1, b: 2 };
-    const result = deepTransformKeys(obj, (k) => k.toUpperCase()) as Record<string, unknown>;
-    expect(result["A"]).toBe(1);
+    expect(deepTransformKeysBang(deepDup(nestedSymbols()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(nestedStrings()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(nestedMixed()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(stringArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
+    expect(deepTransformKeysBang(deepDup(symbolArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
+    expect(deepTransformKeysBang(deepDup(mixedArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
   });
 
   it("deep transform keys with bang mutates", () => {
-    const obj: Record<string, unknown> = { a: { b: 1 } };
-    const result = deepTransformKeys(obj, (k) => k + "!") as Record<string, unknown>;
-    expect(result["a!"]).toEqual({ "b!": 1 });
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepTransformKeysBang(transformedHash, upcase);
+    expect(transformedHash).toEqual(nestedUpcaseStrings());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
   });
 
   it("deep transform values", () => {
@@ -89,15 +144,24 @@ describe("HashExtTest", () => {
   });
 
   it("deep transform values!", () => {
-    const obj = { a: 1, b: { c: 2 } };
-    const result = deepTransformValues(obj, (v) => String(v));
-    expect(result).toEqual({ a: "1", b: { c: "2" } });
+    expect(deepTransformValuesBang(strings(), (value) => String(value))).toEqual({
+      a: "1",
+      b: "2",
+    });
+    expect(deepTransformValuesBang(nestedStrings(), (value) => String(value))).toEqual({
+      a: { b: { c: "3" } },
+    });
+    expect(deepTransformValuesBang(stringArrayOfHashes(), (value) => String(value))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
   });
 
   it("deep transform values with bang mutates", () => {
-    const obj = { a: [1, 2, 3] };
-    const result = deepTransformValues(obj, (v) => (v as number) + 10) as Record<string, unknown>;
-    expect(result["a"]).toEqual([11, 12, 13]);
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepTransformValuesBang(transformedHash, (value) => String(value));
+    expect(transformedHash).toEqual({ a: { ":b": { c: "3" } } });
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
   });
 
   it("symbolize keys", () => {
@@ -159,82 +223,112 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys preserves keys that cant be symbolized", () => {
-    const key: unknown[] = [];
-    const h = new Map<unknown, number>([[key, 3]]);
-    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
-      key,
-    ]);
+    expect(symbolizeKeys(illegalSymbols() as never)).toEqual(illegalSymbols());
+    expect(symbolizeKeysBang(illegalSymbols() as never)).toEqual(illegalSymbols());
   });
 
   it("deep symbolize keys preserves keys that cant be symbolized", () => {
-    const key: unknown[] = [];
-    const h = new Map<unknown, unknown>([[key, 3]]);
-    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([key]);
+    expect(deepSymbolizeKeys(nestedIllegalSymbols())).toEqual(nestedIllegalSymbols());
+    expect(deepSymbolizeKeysBang(nestedIllegalSymbols() as never)).toEqual(nestedIllegalSymbols());
   });
 
   it("symbolize keys preserves integer keys", () => {
-    const h = new Map<unknown, number>([
-      [0, 1],
-      [1, 2],
-    ]);
-    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
-      0, 1,
-    ]);
+    expect(symbolizeKeys(integers() as never)).toEqual(integers());
+    expect(symbolizeKeysBang(integers() as never)).toEqual(integers());
   });
 
   it("deep symbolize keys preserves integer keys", () => {
-    const h = new Map<unknown, unknown>([[0, 1]]);
-    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([0]);
+    expect(deepSymbolizeKeys(nestedIntegers())).toEqual(nestedIntegers());
+    expect(deepSymbolizeKeysBang(nestedIntegers() as never)).toEqual(nestedIntegers());
   });
 
   it("stringify keys", () => {
-    const obj = { a: 1, b: 2 };
-    expect(stringifyKeys(obj)).toEqual({ a: 1, b: 2 });
+    expect(stringifyKeys(symbols())).toEqual(strings());
+    expect(stringifyKeys(strings())).toEqual(strings());
+    expect(stringifyKeys(mixed())).toEqual(strings());
   });
 
   it("stringify keys not mutates", () => {
-    const obj = { a: 1 };
-    stringifyKeys(obj);
-    expect(obj).toEqual({ a: 1 });
+    const transformedHash = mixed();
+    stringifyKeys(transformedHash);
+    expect(transformedHash).toEqual(mixed());
   });
 
   it("deep stringify keys", () => {
-    const obj = { a: { b: 1 } };
-    expect(deepStringifyKeys(obj)).toEqual({ a: { b: 1 } });
+    expect(deepStringifyKeys(nestedSymbols())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(nestedStrings())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(nestedMixed())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(stringArrayOfHashes())).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeys(symbolArrayOfHashes())).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeys(mixedArrayOfHashes())).toEqual(stringArrayOfHashes());
   });
 
   it("deep stringify keys not mutates", () => {
-    const obj = { a: { b: 1 } };
-    deepStringifyKeys(obj);
-    expect(obj).toEqual({ a: { b: 1 } });
+    const transformedHash = deepDup(nestedMixed());
+    deepStringifyKeys(transformedHash);
+    expect(transformedHash).toEqual(nestedMixed());
   });
 
   it("stringify keys!", () => {
-    const obj = { a: 1 };
-    expect(stringifyKeys(obj)).toEqual({ a: 1 });
+    expect(stringifyKeysBang(symbols())).toEqual(strings());
+    expect(stringifyKeysBang(strings())).toEqual(strings());
+    expect(stringifyKeysBang(mixed())).toEqual(strings());
   });
 
   it("stringify keys with bang mutates", () => {
-    const obj = { a: 1, b: 2 };
-    const result = stringifyKeys(obj);
-    expect(result).toEqual({ a: 1, b: 2 });
+    const original = mixed();
+    const transformedHash = { ...original };
+    stringifyKeysBang(transformedHash);
+    expect(transformedHash).toEqual(strings());
+    expect(original).toEqual({ ":a": 1, b: 2 });
   });
 
   it("deep stringify keys!", () => {
-    const obj = { a: { b: 1 } };
-    expect(deepStringifyKeys(obj)).toEqual({ a: { b: 1 } });
+    expect(deepStringifyKeysBang(deepDup(nestedSymbols()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(nestedStrings()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(nestedMixed()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(stringArrayOfHashes()))).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeysBang(deepDup(symbolArrayOfHashes()))).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeysBang(deepDup(mixedArrayOfHashes()))).toEqual(stringArrayOfHashes());
   });
 
   it("deep stringify keys with bang mutates", () => {
-    const obj = { a: { b: { c: 1 } } };
-    const result = deepStringifyKeys(obj);
-    expect(result).toEqual({ a: { b: { c: 1 } } });
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepStringifyKeysBang(transformedHash);
+    expect(transformedHash).toEqual(nestedStrings());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
   });
 
-  it("assert valid keys", () => {
-    const h = { name: "Alice", age: 30 };
-    expect(() => assertValidKeys(h, ["name", "age"])).not.toThrow();
-    expect(() => assertValidKeys(h, ["name"])).toThrow(/Unknown key/);
+  it("assert valid keys", async () => {
+    await assertNothingRaised(() => {
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"]);
+      assertValidKeys({ failure: "stuff", funny: "business" }, "failure", "funny");
+    });
+    await assertNothingRaised(() => {
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny", "sunny"]);
+      assertValidKeys({ failure: "stuff", funny: "business" }, "failure", "funny", "sunny");
+    });
+
+    let exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure, :funny");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, "failure", "funny");
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure, :funny");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure"]);
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, "failure");
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure");
   });
 
   it("deep merge", () => {
@@ -248,10 +342,21 @@ describe("HashExtTest", () => {
   });
 
   it("deep merge with block", () => {
-    const a = { x: 1 };
-    const b = { x: 2 };
-    const result = deepMerge(a, b);
-    expect(result.x).toBe(2);
+    const hash1 = {
+      ":a": "a",
+      ":b": "b",
+      ":c": { ":c1": "c1", ":c2": "c2", ":c3": { ":d1": "d1" } },
+    };
+    const hash2 = { ":a": 1, ":c": { ":c1": 2, ":c3": { ":d2": "d2" } } };
+    const expected = {
+      ":a": [":a", "a", 1],
+      ":b": "b",
+      ":c": { ":c1": [":c1", "c1", 2], ":c2": "c2", ":c3": { ":d1": "d1", ":d2": "d2" } },
+    };
+    expect(deepMerge(hash1, hash2, (k, o, n) => [k, o, n])).toEqual(expected);
+
+    deepMergeBang(hash1, hash2, (k, o, n) => [k, o, n]);
+    expect(hash1).toEqual(expected);
   });
 
   it("deep merge with falsey values", () => {
@@ -263,18 +368,35 @@ describe("HashExtTest", () => {
   });
 
   it("reverse merge", () => {
-    const h = { x: 1 };
-    const defaults = { x: 99, y: 2 };
-    const result = reverseMerge(h, defaults);
-    expect(result.x).toBe(1);
-    expect((result as Record<string, unknown>).y).toBe(2);
+    const defaults = Object.freeze({ ":d": 0, ":a": "x", ":b": "y", ":c": 10 });
+    const options = { ":a": 1, ":b": 2 };
+    const expected = { ":d": 0, ":a": 1, ":b": 2, ":c": 10 };
+
+    expect(reverseMerge(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    let merged = { ...options };
+    expect(reverseMergeBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+
+    expect(Object.keys(merged)).toEqual(Object.keys(expected));
+
+    merged = { ...options };
+    expect(reverseUpdate(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
   });
 
   it("with defaults aliases reverse merge", () => {
-    const h = { a: 1 };
-    const result = reverseMerge(h, { a: 100, b: 2 });
-    expect(result.a).toBe(1);
-    expect((result as Record<string, unknown>).b).toBe(2);
+    const defaults = Object.freeze({ ":a": "x", ":b": "y", ":c": 10 });
+    const options = { ":a": 1, ":b": 2 };
+    const expected = { ":a": 1, ":b": 2, ":c": 10 };
+
+    expect(withDefaults(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    const merged = { ...options };
+    expect(withDefaultsBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
   });
 
   it("slice inplace", () => {
@@ -359,10 +481,9 @@ describe("HashExtTest", () => {
     expect(original).toEqual(expected);
   });
 
-  it("except with original frozen", () => {
-    const h = Object.freeze({ a: 1, b: 2, c: 3 });
-    const result = except(h, "b");
-    expect(result).toEqual({ a: 1, c: 3 });
+  it("except with original frozen", async () => {
+    const original = Object.freeze({ ":a": "x", ":b": "y" });
+    await assertRaise([FrozenError], {}, () => exceptBang(original, ":a"));
   });
 });
 class ToParam extends String {
@@ -631,7 +752,7 @@ function hashToXmlTests(engine: string): void {
         replies_count: 0,
         replies_close_in: 2592000000,
         written_on: RubyDate.civil(2003, 7, 16),
-        viewed_at: Temporal.Instant.from("2003-07-16T09:28:00Z"),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
         content: "Have a nice day",
         author_email_address: "david@loudthinking.com",
         parent_id: null,
@@ -666,7 +787,7 @@ function hashToXmlTests(engine: string): void {
         replies_count: 0,
         replies_close_in: 2592000000,
         written_on: RubyDate.civil(2003, 7, 16),
-        viewed_at: Temporal.Instant.from("2003-07-16T09:28:00Z"),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
         author_email_address: "david@loudthinking.com",
         parent_id: null,
         ad_revenue: new BigDecimal("1.50"),
@@ -740,7 +861,7 @@ function hashToXmlTests(engine: string): void {
         replies_count: 0,
         replies_close_in: 2592000000,
         written_on: RubyDate.civil(2003, 7, 16),
-        viewed_at: Temporal.Instant.from("2003-07-16T09:28:00Z"),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
         content: "Have a nice day",
         author_email_address: "david@loudthinking.com",
         parent_id: null,
@@ -844,8 +965,8 @@ function hashToXmlTests(engine: string): void {
       </blog>
     `;
       const hash = (await fromXml(blogXml)) as any;
-      expect(Object.hasOwn(hash, "blog")).toBe(true);
-      expect(Object.hasOwn(hash["blog"], "logo")).toBe(true);
+      expect(Object.hasOwn(hash, "blog")).toBeTruthy();
+      expect(Object.hasOwn(hash["blog"], "logo")).toBeTruthy();
 
       const file = hash["blog"]["logo"];
       expect(file.originalFilename).toBe("logo.png");
@@ -898,7 +1019,7 @@ function hashToXmlTests(engine: string): void {
         weight: 0.5,
         chunky: true,
         price: new BigDecimal("12.50"),
-        expires_at: Temporal.Instant.from("2007-12-25T12:34:56Z"),
+        expires_at: RubyTime.utc(2007, 12, 25, 12, 34, 56),
         notes: "",
         illustration: "babe.png",
         caption: "That'll do, pig.",
@@ -1016,8 +1137,8 @@ function hashToXmlTests(engine: string): void {
       </alert>
     `;
       const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
-      expect(alertAt).toBeInstanceOf(Temporal.Instant);
-      expect(alertAt).toEqual(Temporal.Instant.from("2008-02-10T15:30:45Z"));
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt).toEqual(RubyTime.utc(2008, 2, 10, 15, 30, 45));
     });
 
     it("datetime xml type with non utc time", async () => {
@@ -1027,8 +1148,8 @@ function hashToXmlTests(engine: string): void {
       </alert>
     `;
       const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
-      expect(alertAt).toBeInstanceOf(Temporal.Instant);
-      expect(alertAt).toEqual(Temporal.Instant.from("2008-02-10T15:30:45Z"));
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt).toEqual(RubyTime.utc(2008, 2, 10, 15, 30, 45));
     });
 
     it("datetime xml type with far future date", async () => {
@@ -1038,14 +1159,13 @@ function hashToXmlTests(engine: string): void {
       </alert>
     `;
       const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
-      expect(alertAt).toBeInstanceOf(Temporal.Instant);
-      const utc = alertAt.toZonedDateTimeISO("UTC");
-      expect(utc.year).toBe(2050);
-      expect(utc.month).toBe(2);
-      expect(utc.day).toBe(10);
-      expect(utc.hour).toBe(15);
-      expect(utc.minute).toBe(30);
-      expect(utc.second).toBe(45);
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt.year).toEqual(2050);
+      expect(alertAt.month).toEqual(2);
+      expect(alertAt.day).toEqual(10);
+      expect(alertAt.hour).toEqual(15);
+      expect(alertAt.min).toEqual(30);
+      expect(alertAt.sec).toEqual(45);
     });
 
     it("to xml dups options", () => {

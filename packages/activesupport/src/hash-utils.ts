@@ -1,4 +1,12 @@
-import { ArgumentError, Hash, dup, isSymbol, valuesAt } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Hash,
+  dup,
+  hashDelete,
+  isSymbol,
+  symbolToS,
+  valuesAt,
+} from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
@@ -8,26 +16,30 @@ type AnyObject = Record<string, unknown>;
 
 export { ArgumentError, valuesAt };
 
-export function deepMerge<T extends AnyObject>(target: T, other: AnyObject): T {
-  const result = { ...target } as AnyObject;
-  for (const key of Object.keys(other)) {
-    const thisVal = result[key];
-    const otherVal = other[key];
-    if (isPlainObject(thisVal) && isPlainObject(otherVal)) {
-      result[key] = deepMerge(thisVal, otherVal);
-    } else {
-      result[key] = otherVal;
-    }
-  }
-  return result as T;
+export function deepMerge<T extends AnyObject>(
+  target: T,
+  other: AnyObject,
+  block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
+): T {
+  return deepMergeBang({ ...target }, other, block);
 }
 
-export function deepMergeBang<T extends AnyObject>(target: T, other: AnyObject): T {
+export function deepMergeBang<T extends AnyObject>(
+  target: T,
+  other: AnyObject,
+  block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
+): T {
   for (const key of Object.keys(other)) {
-    const thisVal = target[key as keyof T];
     const otherVal = other[key];
+    if (!Object.prototype.hasOwnProperty.call(target, key)) {
+      (target as AnyObject)[key] = otherVal;
+      continue;
+    }
+    const thisVal = target[key as keyof T];
     if (isPlainObject(thisVal) && isPlainObject(otherVal)) {
-      deepMergeBang(thisVal as AnyObject, otherVal);
+      (target as AnyObject)[key] = deepMerge(thisVal, otherVal, block);
+    } else if (block) {
+      (target as AnyObject)[key] = block(key, thisVal, otherVal);
     } else {
       (target as AnyObject)[key] = otherVal;
     }
@@ -119,7 +131,7 @@ export function extractOptionsBang<T>(args: T[]): AnyObject {
 }
 
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
-  return transformKeys(obj, (k) => String(k));
+  return transformKeys(obj, (k) => (isSymbol(k) ? symbolToS(k) : String(k)));
 }
 
 export function stringifyKeysBang<T extends Map<string, unknown>>(hash: T): T;
@@ -127,11 +139,13 @@ export function stringifyKeysBang<T extends AnyObject>(hash: T): T;
 export function stringifyKeysBang(
   hash: AnyObject | Map<string, unknown>,
 ): AnyObject | Map<string, unknown> {
-  return transformKeysBang(hash as Map<string, unknown>, (k) => String(k));
+  return transformKeysBang(hash as Map<string, unknown>, (k) =>
+    isSymbol(k) ? symbolToS(k) : String(k),
+  );
 }
 
 export function deepStringifyKeys(obj: unknown): unknown {
-  return deepTransformKeys(obj, (key) => String(key));
+  return deepTransformKeys(obj, (key) => (isSymbol(key) ? symbolToS(key) : String(key)));
 }
 
 export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
@@ -181,7 +195,9 @@ export function deepStringifyKeysBang<T extends AnyObject>(hash: T): T;
 export function deepStringifyKeysBang(
   hash: AnyObject | Map<string, unknown>,
 ): AnyObject | Map<string, unknown> {
-  return deepTransformKeysBang(hash as Map<string, unknown>, (k) => String(k));
+  return deepTransformKeysBang(hash as Map<string, unknown>, (k) =>
+    isSymbol(k) ? symbolToS(k) : String(k),
+  );
 }
 
 export function deepSymbolizeKeysBang<T extends Map<string, unknown>>(hash: T): T;
@@ -315,7 +331,7 @@ export const reverseUpdate = reverseMergeBang;
 export const withDefaultsBang = reverseMergeBang;
 
 export function exceptBang<T extends AnyObject>(hash: T, ...keys: string[]): T {
-  keys.forEach((key) => delete hash[key]);
+  keys.forEach((key) => hashDelete(hash, key));
   return hash;
 }
 
@@ -324,14 +340,17 @@ export {
   nestedUnderIndifferentAccess,
 } from "./core-ext/hash/indifferent-access.js";
 
-export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
+export function assertValidKeys(
+  obj: AnyObject,
+  ...validKeys: (string | readonly string[])[]
+): void {
   validKeys = validKeys.flat(Infinity);
   const inspect = (key: string): string =>
     /^[a-zA-Z_][a-zA-Z0-9_]*[?!=]?$/.test(key) ? `:${key}` : `:${JSON.stringify(key)}`;
   for (const key of Object.keys(obj)) {
     if (!validKeys.includes(key)) {
       throw new ArgumentError(
-        `Unknown key: ${inspect(key)}. Valid keys are: ${validKeys.map(inspect).join(", ")}`,
+        `Unknown key: ${inspect(key)}. Valid keys are: ${(validKeys as string[]).map(inspect).join(", ")}`,
       );
     }
   }
@@ -347,6 +366,20 @@ export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknow
       result[key] = deepTransformValues(obj[key], fn);
     }
     return result;
+  }
+  return fn(obj);
+}
+
+export function deepTransformValuesBang(obj: unknown, fn: (value: unknown) => unknown): unknown {
+  if (Array.isArray(obj)) {
+    obj.forEach((item, i) => (obj[i] = deepTransformValuesBang(item, fn)));
+    return obj;
+  }
+  if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
+    for (const key of Object.keys(obj)) {
+      obj[key] = deepTransformValuesBang(obj[key], fn);
+    }
+    return obj;
   }
   return fn(obj);
 }
