@@ -134,6 +134,10 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     }
   }
 
+  afterEach(() => {
+    FixtureSet.resetCache();
+  });
+
   it("raises fk violations", async () => {
     await withVerifyForeignKeysForFixtures(async () => {
       const load = (): Promise<unknown> =>
