@@ -1,9 +1,9 @@
 /**
  * ActiveSupport::Duration — mirrors the Rails API as closely as possible.
  *
- * @boundary-file: `since`/`ago`/`from_now`/`until`/`after`/`before` accept
- *   `Date | Temporal.Instant` (`Date` for ergonomic interop) but return
- *   `Temporal.Instant`. The default reference is `Temporal.Now.instant()`.
+ * @boundary-file: `since`/`ago`/`from_now`/`until`/`after`/`before` also accept
+ *   `Date | Temporal.Instant` (`Date` for ergonomic interop) and return
+ *   `Temporal.Instant` for them. The default reference is `Time.current`.
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -404,7 +404,7 @@ export class Duration {
         time instanceof Temporal.Instant ||
         time instanceof Temporal.PlainDate ||
         time instanceof RubyTime ||
-        time.actsLikeTime?.() === true
+        (time != null && time.actsLikeTime?.() === true)
       )
     ) {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);

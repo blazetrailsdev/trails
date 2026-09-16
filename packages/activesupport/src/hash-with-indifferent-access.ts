@@ -1,6 +1,7 @@
 import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import {
+  ArgumentError,
   type DefaultProc,
   Hash,
   KeyError,
@@ -52,9 +53,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   static get<V = unknown>(...args: unknown[]): HashWithIndifferentAccess<V> {
-    const hash: AnyObject = {};
-    for (let i = 0; i < args.length; i += 2) hash[args[i] as string] = args[i + 1];
-    return new this<V>().mergeBang(hash);
+    let hash: AnyObject | Hash<unknown, unknown>;
+    if (args.length === 1 && (isPlainObject(args[0]) || args[0] instanceof Hash)) {
+      hash = args[0] as AnyObject | Hash<unknown, unknown>;
+    } else {
+      if (args.length % 2 !== 0) throw new ArgumentError("odd number of arguments for Hash");
+      hash = new Hash<unknown, unknown>();
+      for (let i = 0; i < args.length; i += 2) hash.set(args[i], args[i + 1]);
+    }
+    return new this<V>().mergeBang(hash as AnyObject);
   }
 
   isExtractableOptions(): boolean {

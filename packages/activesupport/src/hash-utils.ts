@@ -37,8 +37,18 @@ export function deepMergeBang<T extends AnyObject>(
       continue;
     }
     const thisVal = target[key as keyof T];
-    if (isPlainObject(thisVal) && isPlainObject(otherVal)) {
-      (target as AnyObject)[key] = deepMerge(thisVal, otherVal, block);
+    if (thisVal instanceof Hash && rbObjRespondTo(thisVal, "deepMerge")) {
+      const deepMergeable = thisVal as unknown as {
+        isDeepMerge(other: unknown): boolean;
+        deepMerge(other: unknown, block?: unknown): unknown;
+      };
+      (target as AnyObject)[key] = deepMergeable.isDeepMerge(otherVal)
+        ? deepMergeable.deepMerge(otherVal, block)
+        : block
+          ? block(key, thisVal, otherVal)
+          : otherVal;
+    } else if (isPlainObject(thisVal) && (isPlainObject(otherVal) || otherVal instanceof Hash)) {
+      (target as AnyObject)[key] = deepMerge(thisVal, otherVal as AnyObject, block);
     } else if (block) {
       (target as AnyObject)[key] = block(key, thisVal, otherVal);
     } else {

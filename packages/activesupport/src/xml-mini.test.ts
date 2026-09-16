@@ -13,7 +13,8 @@ import {
 } from "./xml-mini.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { Temporal, Date as RubyDate } from "@blazetrails/date";
-import { Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
+import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
 
@@ -37,9 +38,9 @@ describe("ParsingTest", () => {
   it("datetime", () => {
     const parser = parsing["datetime"];
     expect(parser("2013-11-12T02:11:00Z")).toEqual(RubyTime.new(2013, 11, 12, 2, 11, 0, 0));
-    expect(parser("2013-11-12T0211Z")).toEqual(Temporal.Instant.from("2013-11-12T00:00:00Z"));
-    expect(parser("2013-11-12T02:11Z")).toEqual(Temporal.Instant.from("2013-11-12T02:11:00Z"));
-    expect(parser("2013-11-12T11:11+9")).toEqual(Temporal.Instant.from("2013-11-12T02:11:00Z"));
+    expect(parser("2013-11-12T0211Z")).toEqual(dateTimeUtc(DateTime.civil(2013, 11, 12)));
+    expect(parser("2013-11-12T02:11Z")).toEqual(dateTimeUtc(DateTime.civil(2013, 11, 12, 2, 11)));
+    expect(parser("2013-11-12T11:11+9")).toEqual(dateTimeUtc(DateTime.civil(2013, 11, 12, 2, 11)));
     expect(() => parser("1384190018")).toThrow();
   });
 

@@ -5,6 +5,7 @@ import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { LoadError, StringIO } from "@blazetrails/ruby-compat";
 import { Temporal, Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
+import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
 import { ArgumentError } from "./hash-utils.js";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
@@ -100,10 +101,7 @@ export const PARSING: Record<
     try {
       return RubyTime.xmlschema(time as string).getutc();
     } catch {
-      const parsed = DateTime.parse(String(time));
-      return parsed instanceof Temporal.ZonedDateTime
-        ? parsed.toInstant()
-        : parsed.toZonedDateTime("UTC").toInstant();
+      return dateTimeUtc(DateTime.parse(time as string));
     }
   },
   duration: (duration) => Duration.parse(String(duration)),
