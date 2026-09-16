@@ -301,6 +301,11 @@ describe("include", () => {
     const mod = new Module();
     expect(() => mod.removeMethod("missing")).toThrow(NameError);
     expect(() => mod.aliasMethod("x", "missing")).toThrow(NameError);
+    class User {}
+    mod.defineMethod("present", () => "here");
+    include(User, mod);
+    expect(() => mod.removeMethod("present", "missing")).toThrow(NameError);
+    expect((new User() as { present?: unknown }).present).toBeUndefined();
   });
 
   it("keeps a class-body method ahead of an included Module", () => {

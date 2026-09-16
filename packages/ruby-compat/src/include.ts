@@ -98,40 +98,6 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#alias_method — vendor/ruby/vm_method.c:2366
-   * `rb_mod_alias_method`.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  aliasMethod(newName: string, oldName: string): string {
-    const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
-    if (!descriptor) {
-      throw new NameError(`undefined method '${oldName}' for module '${String(this)}'`, oldName);
-    }
-    Object.defineProperty(carrierOf(this), newName, descriptor);
-    relinkIncluders(this);
-    return newName;
-  }
-
-  /**
-   * Mirrors: Ruby's Module#remove_method — vendor/ruby/vm_method.c:1728
-   * `rb_mod_remove_method`.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  removeMethod(...names: string[]): this {
-    const carrier = carrierOf(this);
-    for (const name of names) {
-      if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
-        throw new NameError(`method '${name}' not defined in ${String(this)}`, name);
-      }
-      delete carrier[name];
-    }
-    relinkIncluders(this);
-    return this;
-  }
-
-  /**
    * Mirrors: Ruby's Module#instance_method — the named method, detached from
    * this module. Ruby returns an `UnboundMethod`, which `define_method` binds
    * into another module; the TS carrier of that is the property descriptor,
@@ -157,6 +123,27 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's Module#remove_method — vendor/ruby/vm_method.c:1728
+   * `rb_mod_remove_method`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  removeMethod(...names: string[]): this {
+    const carrier = carrierOf(this);
+    try {
+      for (const name of names) {
+        if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
+          throw new NameError(`method '${name}' not defined in #<Module>`, name);
+        }
+        delete carrier[name];
+      }
+    } finally {
+      relinkIncluders(this);
+    }
+    return this;
+  }
+
+  /**
    * Mirrors: Ruby's Module#undef_method — vendor/ruby/vm_method.c:1973
    * `rb_mod_undef_method`.
    *
@@ -166,6 +153,22 @@ export class Module {
     const carrier = carrierOf(this);
     for (const name of names) delete carrier[name];
     relinkIncluders(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#alias_method — vendor/ruby/vm_method.c:2366
+   * `rb_mod_alias_method`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  aliasMethod(newName: string, oldName: string): string {
+    const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
+    if (!descriptor) {
+      throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
+    }
+    Object.defineProperty(carrierOf(this), newName, descriptor);
+    relinkIncluders(this);
+    return newName;
   }
 
   /**
