@@ -1449,7 +1449,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("rfc3339 with fractional seconds", () => {
     const time = RubyTime.new(1999, 12, 31, 19, 0, new Rational(1, 8), -18000);
-    expect(time.xmlschema(3)).toBe("1999-12-31T19:00:00.125-05:00");
+    expect(time.rfc3339(3)).toBe("1999-12-31T19:00:00.125-05:00");
   });
 
   it("to date", () => {
