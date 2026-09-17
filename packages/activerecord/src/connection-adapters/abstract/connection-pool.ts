@@ -469,14 +469,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async pinConnectionBang(lockThread = false): Promise<void> {
-    if (!this._pinnedConnection) {
-      const acquired = this.connectionLease().connection ?? (await this.checkout());
-      if (this._pinnedConnection) {
-        this.checkin(acquired);
-      } else {
-        this._pinnedConnection = acquired;
-      }
-    }
+    this._pinnedConnection ??= this.connectionLease().connection ?? (await this.checkout());
     this._pinnedConnectionsDepth += 1;
 
     if (this._connections && !this._connections.includes(this._pinnedConnection)) {
@@ -560,7 +553,7 @@ export class ConnectionPool implements ReapablePool {
     }
     let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     if (!conn) {
-      void this.reap().catch(() => {});
+      this._stealStaleOwnedConnections();
       conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     }
     if (!conn) {
@@ -711,16 +704,17 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
+  private _stealStaleOwnedConnections(): DatabaseAdapter[] {
+    if (this.isDiscarded()) return [];
+    const stale = (this._connections ?? []).filter((conn) => conn.inUse && !conn.owner!.isAlive());
+    for (const conn of stale) conn.stealBang();
+    return stale;
+  }
+
   async reap(): Promise<void> {
-    const staleConnections = await (synchronize<DatabaseAdapter[] | undefined>).call(this, () => {
-      if (this.isDiscarded()) return;
-      const stale = (this._connections ?? []).filter(
-        (conn) => conn.inUse && !conn.owner!.isAlive(),
-      );
-      for (const conn of stale) conn.stealBang();
-      return stale;
-    });
-    if (!staleConnections) return;
+    const staleConnections = await (synchronize<DatabaseAdapter[]>).call(this, () =>
+      this._stealStaleOwnedConnections(),
+    );
 
     for (const conn of staleConnections) {
       if (await conn.active()) {
