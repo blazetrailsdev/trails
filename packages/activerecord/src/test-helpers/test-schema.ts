@@ -683,6 +683,7 @@ export const TEST_SCHEMA: Schema = {
       sink_id: { type: "integer", null: false },
     },
     primaryKey: false,
+    indexes: [{ columns: ["source_id", "sink_id"], unique: true, name: "unique_edge_index" }],
   },
 
   editorships: {

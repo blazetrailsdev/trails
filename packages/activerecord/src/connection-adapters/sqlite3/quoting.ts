@@ -115,7 +115,6 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) return null;
     if (bindsAsFloat) return value;
     return Number.isInteger(value) ? BigInt(value) : value;
   }

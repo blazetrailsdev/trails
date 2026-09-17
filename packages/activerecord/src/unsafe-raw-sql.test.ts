@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
 import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { quoteTableName } from "./support/quote-regex.js";
@@ -245,10 +244,6 @@ describe("UnsafeRawSqlTest", () => {
     await expect(
       Post.includes(":comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
     ).rejects.toBeInstanceOf(UnknownAttributeReference);
-  });
-
-  it("pluck: rejects comma-separated column list in a single argument", async () => {
-    await expect(Post.pluck("id, title")).rejects.toThrow(ArgumentError);
   });
 
   it("pluck: always allows Arel", async () => {

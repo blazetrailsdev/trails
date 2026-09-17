@@ -1,8 +1,7 @@
 import { NumberConverter } from "./number-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
 import { NumberToDelimitedConverter } from "./number-to-delimited-converter.js";
-import { BigDecimal } from "@blazetrails/ruby-compat";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { BigDecimal, format, regexpEscape } from "@blazetrails/ruby-compat";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {
@@ -26,16 +25,20 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
         if (precision < 0) precision = 0;
       }
 
-      const s = (roundedNumber as BigDecimal).toString("F");
-      const dot = s.indexOf(".");
-      let a = s.slice(0, dot);
-      let b = s.slice(dot + 1);
-      if (precision !== 0) {
-        b += "0".repeat(precision);
-        a += ".";
-        a += b.slice(0, precision);
+      if ((roundedNumber as BigDecimal).isFinite()) {
+        const s = (roundedNumber as BigDecimal).toString("F");
+        const dot = s.indexOf(".");
+        let a = s.slice(0, dot);
+        let b = s.slice(dot + 1);
+        if (precision !== 0) {
+          b += "0".repeat(precision);
+          a += ".";
+          a += b.slice(0, precision);
+        }
+        formattedString = a;
+      } else {
+        formattedString = format("%f", (roundedNumber as BigDecimal).toF());
       }
-      formattedString = a;
     } else {
       formattedString = String(roundedNumber);
     }

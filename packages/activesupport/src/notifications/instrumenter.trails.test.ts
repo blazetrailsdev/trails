@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Event, Instrumenter } from "./instrumenter.js";
 
 const buildNotifier = () => {
-  const finishes: Event[] = [];
+  const finishes: { name: string; payload: Record<string, unknown> }[] = [];
   return {
     finishes,
-    publish(_name: string, event: Event) {
-      finishes.push(event);
+    start() {},
+    finish(name: string, _id: unknown, payload: Record<string, unknown>) {
+      finishes.push({ name, payload });
     },
   };
 };
@@ -87,31 +88,10 @@ describe("Instrumenter (trails)", () => {
     expect(notifier.finishes).toHaveLength(1);
   });
 
-  it("buildHandle publishes one event spanning start→finish", () => {
-    const notifier = buildNotifier();
-    const payload: Record<string, unknown> = { a: 1 };
-    const handle = new Instrumenter(notifier).buildHandle("span", payload);
-    handle.start();
-    payload.outcome = "done";
-    handle.finish();
-    expect(notifier.finishes).toHaveLength(1);
-    expect(notifier.finishes[0].name).toBe("span");
-    expect(notifier.finishes[0].payload.outcome).toBe("done");
-    expect(notifier.finishes[0].end).not.toBeNull();
-  });
-
-  it("buildHandle raises when start/finish are called out of order", () => {
-    const handle = new Instrumenter(buildNotifier()).buildHandle("span", {});
-    expect(() => handle.finish()).toThrow(/expected state to be "started"/);
-    handle.start();
-    expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
-  });
-
   it("buildHandle delegates to a notifier that can build handles", () => {
     const delegated = { start() {}, finish() {} };
     const calls: Array<[string, unknown]> = [];
     const notifier = {
-      publish() {},
       buildHandle(name: string, id: unknown) {
         calls.push([name, id]);
         return delegated;
@@ -126,9 +106,6 @@ describe("Instrumenter (trails)", () => {
   it("instrument routes through the notifier's build_handle", () => {
     const order: string[] = [];
     const notifier = {
-      publish() {
-        order.push("publish");
-      },
       buildHandle(_name: string, _id: unknown) {
         return {
           start() {

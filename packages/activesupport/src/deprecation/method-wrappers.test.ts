@@ -1,118 +1,98 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Deprecation } from "../deprecation.js";
+import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
+import { assert } from "../testing/assertions.js";
 
 describe("MethodWrappersTest", () => {
-  function deprecateMethod(obj: Record<string, unknown>, name: string, message?: string) {
-    const original = obj[name] as (...args: unknown[]) => unknown;
-    obj[name] = function (...args: unknown[]) {
-      console.warn(message ?? `${name} is deprecated`);
-      return original.apply(this, args);
-    };
-  }
+  let klass: any;
+  let deprecator: Deprecation;
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    klass = class {
+      newMethod() {
+        return "abc";
+      }
+
+      protected newProtectedMethod() {
+        return "abc";
+      }
+
+      private newPrivateMethod() {
+        return "abc";
+      }
+    };
+    klass.prototype.oldMethod = klass.prototype.newMethod;
+    klass.prototype.oldProtectedMethod = klass.prototype.newProtectedMethod;
+    klass.prototype.oldPrivateMethod = klass.prototype.newPrivateMethod;
+
+    deprecator = new Deprecation();
   });
 
-  it("deprecate methods without alternate method", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const obj: Record<string, unknown> = {
-      old_method() {
-        return "result";
-      },
-    };
-    deprecateMethod(obj, "old_method");
-    (obj.old_method as () => string)();
-    expect(spy).toHaveBeenCalled();
-    expect(spy.mock.calls[0][0]).toContain("old_method");
+  it("deprecate methods without alternate method", async () => {
+    deprecator.deprecateMethods(klass.prototype, "oldMethod");
+
+    await assertDeprecated("oldMethod", deprecator, () => {
+      expect(new klass().oldMethod()).toEqual(new klass().newMethod());
+    });
   });
 
-  it("deprecate methods warning default", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const obj: Record<string, unknown> = {
-      foo() {
-        return 1;
-      },
-    };
-    deprecateMethod(obj, "foo");
-    (obj.foo as () => number)();
-    expect(spy).toHaveBeenCalled();
+  it("deprecate methods warning default", async () => {
+    deprecator.deprecateMethods(klass.prototype, { oldMethod: ":newMethod" });
+
+    await assertDeprecated(/oldMethod .* \(use newMethod instead\)/, deprecator, () => {
+      expect(new klass().oldMethod()).toEqual(new klass().newMethod());
+    });
   });
 
-  it("deprecate methods warning with optional deprecator", () => {
-    const collected: string[] = [];
-    const obj: Record<string, unknown> = {
-      bar() {
-        return 2;
-      },
-    };
-    const original = obj.bar as (...args: unknown[]) => unknown;
-    obj.bar = function () {
-      collected.push("bar is deprecated, use baz");
-      return original.call(this);
-    };
-    expect((obj.bar as () => number)()).toBe(2);
-    expect(collected[0]).toContain("deprecated");
+  it("deprecate methods warning with optional deprecator", async () => {
+    deprecator = new Deprecation("next-release", "MyGem");
+    const otherDeprecator = new Deprecation();
+    otherDeprecator.deprecateMethods(klass.prototype, "oldMethod", { deprecator });
+
+    await assertDeprecated(/oldMethod .* MyGem next-release/, deprecator, async () => {
+      await assertNotDeprecated(otherDeprecator, () => {
+        expect(new klass().oldMethod()).toEqual(new klass().newMethod());
+      });
+    });
   });
 
   it("deprecate methods protected method", () => {
-    class MyClass {
-      protected_method() {
-        return "protected";
-      }
-    }
-    const proto = MyClass.prototype as unknown as Record<string, unknown>;
-    const orig = proto.protected_method as (...args: unknown[]) => unknown;
-    const warnings: string[] = [];
-    proto.protected_method = function () {
-      warnings.push("protected_method deprecated");
-      return orig.call(this);
-    };
-    const inst = new MyClass();
-    expect(inst.protected_method()).toBe("protected");
-    expect(warnings[0]).toContain("deprecated");
+    deprecator.deprecateMethods(klass.prototype, { oldProtectedMethod: ":newProtectedMethod" });
+
+    assert("oldProtectedMethod" in klass.prototype);
   });
 
   it("deprecate methods private method", () => {
-    class MyClass {
-      private_method() {
-        return "private";
-      }
-    }
-    const proto = MyClass.prototype as unknown as Record<string, unknown>;
-    deprecateMethod(proto, "private_method");
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const inst = new MyClass();
-    inst.private_method();
-    expect(spy).toHaveBeenCalled();
+    deprecator.deprecateMethods(klass.prototype, { oldPrivateMethod: ":newPrivateMethod" });
+
+    assert("oldPrivateMethod" in klass.prototype);
   });
 
-  it("deprecate class method", () => {
-    class MyClass {
-      static class_method() {
-        return "class";
-      }
-    }
-    const cls = MyClass as unknown as Record<string, unknown>;
-    deprecateMethod(cls, "class_method");
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    (MyClass as unknown as { class_method(): string }).class_method();
-    expect(spy).toHaveBeenCalled();
-  });
-
-  it("deprecate method when class extends module", () => {
-    class Base {
-      shared() {
-        return "base";
-      }
-    }
-    class Child extends Base {}
-    const proto = Child.prototype as unknown as Record<string, unknown>;
-    proto.shared = function () {
-      console.warn("shared is deprecated");
-      return Base.prototype.shared.call(this);
+  it("deprecate class method", async () => {
+    const mod = {
+      oldMethod() {
+        return "abc";
+      },
     };
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    new Child().shared();
-    expect(spy).toHaveBeenCalledWith("shared is deprecated");
+    deprecator.deprecateMethods(mod, "oldMethod");
+
+    await assertDeprecated("oldMethod", deprecator, () => {
+      expect(mod.oldMethod()).toEqual("abc");
+    });
+  });
+
+  it("deprecate method when class extends module", async () => {
+    const mod = {
+      oldMethod() {
+        return "abc";
+      },
+    };
+    const klass = class {};
+    Object.setPrototypeOf(klass, mod);
+    deprecator.deprecateMethods(mod, "oldMethod");
+
+    await assertDeprecated("oldMethod", deprecator, () => {
+      expect((klass as any).oldMethod()).toEqual("abc");
+    });
   });
 });

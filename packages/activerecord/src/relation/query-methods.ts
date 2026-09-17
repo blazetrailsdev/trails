@@ -1944,11 +1944,15 @@ export function arelColumn(
 /** @internal */
 export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
-    if (field instanceof Nodes.Node) return [field];
-    if (typeof field === "string") return [arelColumn.call(this, field)];
-    if (typeof field === "function") return [field()];
-    if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
-    return [field];
+    if (typeof field === "string" || field instanceof Nodes.SqlLiteral) {
+      return arelColumn.call(this, String(field));
+    } else if (typeof field === "function") {
+      return field();
+    } else if (isPlainObject(field)) {
+      return arelColumnsFromHash.call(this, field);
+    } else {
+      return field;
+    }
   });
 }
 

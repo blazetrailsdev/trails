@@ -37,23 +37,23 @@ export class Configuration {
   }
 
   beforeConfiguration(block: ConfigurationBlock): void {
-    onLoad("before_configuration", block);
+    onLoad("before_configuration", { yield: true }, block);
   }
 
   beforeEagerLoad(block: ConfigurationBlock): void {
-    onLoad("before_eager_load", block);
+    onLoad("before_eager_load", { yield: true }, block);
   }
 
   beforeInitialize(block: ConfigurationBlock): void {
-    onLoad("before_initialize", block);
+    onLoad("before_initialize", { yield: true }, block);
   }
 
   afterInitialize(block: ConfigurationBlock): void {
-    onLoad("after_initialize", block);
+    onLoad("after_initialize", { yield: true }, block);
   }
 
   afterRoutesLoaded(block: ConfigurationBlock): void {
-    onLoad("after_routes_loaded", block);
+    onLoad("after_routes_loaded", { yield: true }, block);
   }
 
   appMiddleware(): MiddlewareStackProxy {

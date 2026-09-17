@@ -526,98 +526,82 @@ describe("ActiveSupport::Notifications", () => {
 });
 
 describe("Instrumenter", () => {
-  it("publishes an event", () => {
-    const published: Event[] = [];
-    const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
+  const buildNotifier = () => {
+    const finishes: unknown[][] = [];
+    return {
+      finishes,
+      start(..._args: unknown[]) {},
+      finish(...args: unknown[]) {
+        finishes.push(args);
       },
     };
-    const inst = new Instrumenter(notifier);
-    inst.instrument("test.event");
-    expect(published).toHaveLength(1);
-    expect(published[0].name).toBe("test.event");
-    expect(published[0].end).not.toBeNull();
-  });
+  };
 
   it("returns the block's return value", () => {
-    const notifier = { publish() {} };
-    const inst = new Instrumenter(notifier);
+    const inst = new Instrumenter(buildNotifier());
     const result = inst.instrument("test.event", {}, () => 42);
     expect(result).toBe(42);
   });
 
-  it("publishes even when callback throws", () => {
-    const published: Event[] = [];
-    const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
-      },
-    };
+  it("finishes even when callback throws", () => {
+    const notifier = buildNotifier();
     const inst = new Instrumenter(notifier);
     expect(() =>
       inst.instrument("test.event", {}, () => {
         throw new Error("boom");
       }),
     ).toThrow("boom");
-    expect(published).toHaveLength(1);
+    expect(notifier.finishes).toHaveLength(1);
   });
 
-  it("instrument publishes after promise resolves", async () => {
-    const published: Event[] = [];
-    const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
-      },
-    };
+  it("instrument finishes after promise resolves", async () => {
+    const notifier = buildNotifier();
     const inst = new Instrumenter(notifier);
     const result = await inst.instrument("async.event", {}, async () => {
       return 99;
     });
     expect(result).toBe(99);
-    expect(published).toHaveLength(1);
-    expect(published[0].end).not.toBeNull();
+    expect(notifier.finishes).toHaveLength(1);
   });
 
-  it("instrument publishes on rejection", async () => {
-    const published: Event[] = [];
-    const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
-      },
-    };
+  it("instrument finishes on rejection", async () => {
+    const notifier = buildNotifier();
     const inst = new Instrumenter(notifier);
     await expect(
       inst.instrument("async.fail", {}, async () => {
         throw new Error("async boom");
       }),
     ).rejects.toThrow("async boom");
-    expect(published).toHaveLength(1);
+    expect(notifier.finishes).toHaveLength(1);
   });
 });
 
 describe("LegacyHandle", () => {
-  it("finish publishes the event", () => {
-    const published: Event[] = [];
+  it("passes the start listener state to finish", () => {
+    const calls: unknown[][] = [];
     const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
+      start(name: string, id: unknown, payload: unknown) {
+        calls.push(["start", name, id, payload]);
+        return "state";
+      },
+      finish(...args: unknown[]) {
+        calls.push(["finish", ...args]);
       },
     };
-    const event = new Event("legacy.event", null, null, randomId(), {});
-    const handle = new LegacyHandle(event, notifier);
+    const payload = {};
+    const handle = new LegacyHandle(notifier, "legacy.event", "id", payload);
+    handle.start();
     handle.finish();
-    expect(published).toHaveLength(1);
-    expect(published[0].name).toBe("legacy.event");
-    expect(published[0].end).not.toBeNull();
+    expect(calls).toEqual([
+      ["start", "legacy.event", "id", payload],
+      ["finish", "legacy.event", "id", payload, "state"],
+    ]);
   });
 });
 
 describe("Wrapper", () => {
-  it("returns a stable Instrumenter instance", () => {
-    const notifier = { publish() {} };
-    const wrapper = new Wrapper(notifier);
-    expect(wrapper.instrumenter).toBeInstanceOf(Instrumenter);
-    expect(wrapper.instrumenter).toBe(wrapper.instrumenter);
+  it("builds legacy handles", () => {
+    const wrapper = new Wrapper({ start() {}, finish() {} });
+    expect(wrapper.buildHandle("a", "id", {})).toBeInstanceOf(LegacyHandle);
   });
 });

@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { StandardError } from "./standard-error.js";
 
 /**
@@ -33,9 +34,24 @@ export class NameError extends StandardError {
    */
   readonly constantName?: string;
 
-  constructor(message: string, constantName?: string) {
+  #receiver: unknown;
+  #hasReceiver: boolean;
+
+  constructor(message: string, constantName?: string, options: { receiver?: unknown } = {}) {
     super(message);
     this.constantName = constantName;
+    this.#hasReceiver = "receiver" in options;
+    this.#receiver = options.receiver;
+  }
+
+  /**
+   * Ruby's `NameError#receiver` (`vendor/ruby/error.c:2433` `name_err_receiver`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  receiver(): unknown {
+    if (this.#hasReceiver) return this.#receiver;
+    throw new ArgumentError("no receiver is available");
   }
 }
 

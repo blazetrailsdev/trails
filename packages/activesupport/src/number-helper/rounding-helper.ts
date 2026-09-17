@@ -3,7 +3,7 @@ import { BigDecimal } from "@blazetrails/ruby-compat";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
 
 function bigDecimal(value: string): BigDecimal {
-  if (!BIGDECIMAL_STRING.test(value)) {
+  if (!BIGDECIMAL_STRING.test(value) && !/^\s*(?:[+-]?Infinity|NaN)\s*$/.test(value)) {
     throw new ArgumentError(`invalid value for BigDecimal(): "${value}"`);
   }
   return new BigDecimal(value.trim());

@@ -205,12 +205,17 @@ export function _resetConstants(): void {
 }
 
 /** @internal */
-function missingSegment(path: string): string {
+function missingSegment(path: string): [string, unknown] {
   const segments = path.split("::");
   for (let i = 1; i <= segments.length; i++) {
-    if (!_constants.has(segments.slice(0, i).join("::"))) return segments[i - 1];
+    if (!_constants.has(segments.slice(0, i).join("::"))) {
+      return [
+        segments[i - 1],
+        i === 1 ? Object : _constants.get(segments.slice(0, i - 1).join("::")),
+      ];
+    }
   }
-  return segments[segments.length - 1];
+  return [segments[segments.length - 1], Object];
 }
 
 function isValidConstantPath(path: string): boolean {
@@ -224,7 +229,8 @@ export function constantize(camelCasedWord: string): unknown {
     throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
   if (!_constants.has(path)) {
-    throw new NameError(`uninitialized constant ${path}`, missingSegment(path));
+    const [name, receiver] = missingSegment(path);
+    throw new NameError(`uninitialized constant ${path}`, name, { receiver });
   }
   return _constants.get(path);
 }
