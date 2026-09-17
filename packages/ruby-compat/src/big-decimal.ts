@@ -2,6 +2,14 @@ import { FloatDomainError } from "./float-domain-error.js";
 
 const BASE_FIG = 9;
 
+const VP_SIGN_NaN = 0;
+const VP_SIGN_POSITIVE_ZERO = 1;
+const VP_SIGN_NEGATIVE_ZERO = -1;
+const VP_SIGN_POSITIVE_FINITE = 2;
+const VP_SIGN_NEGATIVE_FINITE = -2;
+const VP_SIGN_POSITIVE_INFINITE = 3;
+const VP_SIGN_NEGATIVE_INFINITE = -3;
+
 const NON_FINITE_REGEX = /^\s*(?:(NaN)|([+-]?)Infinity)\s*$/;
 
 type RationalLike = { numerator: bigint; denominator: bigint };
@@ -135,20 +143,6 @@ export class BigDecimal {
     return Number(this.toString("F"));
   }
 
-  /**
-   * Ruby's `BigDecimal#sign` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:3818`
-   * `BigDecimal_sign`), answering the `VP_SIGN_*` code
-   * (`vendor/ruby/ext/bigdecimal/bigdecimal.h:148-154`).
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  sign(): number {
-    const s = this._sign === "-" ? -1 : 1;
-    if (this.nonFinite === "NaN") return 0;
-    if (this.nonFinite !== null) return 3 * s;
-    return this.digits === "" ? s : 2 * s;
-  }
-
   /** @noRailsEquivalent PERMANENT */
   isZero(): boolean {
     if (this.nonFinite !== null) return false;
@@ -259,6 +253,22 @@ export class BigDecimal {
   /** @noRailsEquivalent PERMANENT */
   exponent(): number {
     return this.digits === "" ? 0 : this.exp;
+  }
+
+  /**
+   * Ruby's `BigDecimal#sign` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:3818`
+   * `BigDecimal_sign`), answering the `VP_SIGN_*` code
+   * (`vendor/ruby/ext/bigdecimal/bigdecimal.h:148-154`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  sign(): number {
+    const negative = this._sign === "-";
+    if (this.nonFinite === "NaN") return VP_SIGN_NaN;
+    if (this.nonFinite !== null)
+      return negative ? VP_SIGN_NEGATIVE_INFINITE : VP_SIGN_POSITIVE_INFINITE;
+    if (this.digits === "") return negative ? VP_SIGN_NEGATIVE_ZERO : VP_SIGN_POSITIVE_ZERO;
+    return negative ? VP_SIGN_NEGATIVE_FINITE : VP_SIGN_POSITIVE_FINITE;
   }
 
   private unscaled(signum = 1): bigint {
