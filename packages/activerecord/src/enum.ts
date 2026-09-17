@@ -7,7 +7,7 @@ import {
   pluralize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
@@ -266,11 +266,10 @@ export function _enum(
     this.attribute(name);
   }
 
-  const klass = this;
   this.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
     if (subtype === defaultValue()) {
       throw new RuntimeError(
-        `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
+        `Undeclared attribute type for enum '${name}' in ${this.name}. Enums must be` +
           " backed by a database column or declared with an explicit type" +
           " via `attribute`.",
       );
@@ -508,16 +507,18 @@ export function assertValidEnumDefinitionValues(
 ): Record<string, string | number | boolean | null> | string[] {
   if (Array.isArray(values)) {
     if (values.length === 0) {
-      throw new ArgumentError("Enum values must not be empty.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
     }
     const allValid =
       values.every((v) => typeof v === "string" && v.startsWith(":")) ||
       values.every((v) => typeof v === "string" && !v.startsWith(":"));
     if (!allValid) {
-      throw new ArgumentError("Enum values must only contain symbols or strings.");
+      throw new ArgumentError(
+        `Enum values ${rbInspect(values)} must only contain symbols or strings.`,
+      );
     }
     if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
-      throw new ArgumentError("Enum values must not contain a blank name.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
     }
     return values;
   }
@@ -525,10 +526,10 @@ export function assertValidEnumDefinitionValues(
   if (isPlainHash(values)) {
     const keys = Object.keys(values as object);
     if (keys.length === 0) {
-      throw new ArgumentError("Enum values must not be empty.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
     }
     if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
-      throw new ArgumentError("Enum values must not contain a blank name.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
     }
     for (const k of keys) {
       const value = (values as Record<string, unknown>)[k];
@@ -542,16 +543,17 @@ export function assertValidEnumDefinitionValues(
         )
       ) {
         throw new ArgumentError(
-          `Enum values must be only booleans, finite numbers, strings, or null, got: ${
-            typeof value === "number" ? String(value) : typeof value
-          }`,
+          `Enum values ${rbInspect(values)} must be only booleans, finite numbers,` +
+            ` strings, or null, got: ${typeof value === "number" ? String(value) : typeof value}`,
         );
       }
     }
     return values;
   }
 
-  throw new ArgumentError("Enum values must be either a non-empty hash or an array.");
+  throw new ArgumentError(
+    `Enum values ${rbInspect(values)} must be either a non-empty hash or an array.`,
+  );
 }
 
 function isPlainHash(value: unknown): boolean {

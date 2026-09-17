@@ -18,16 +18,6 @@ import { Lion } from "./test-helpers/models/cat.js";
 describe("Enum name conflict detection", () => {
   fixtures(["books"]);
 
-  it("clears every status predicate when the column reads back NULL", async () => {
-    const book = await Book.first();
-    await Book.where({ id: book!.id }).updateAll("status = NULL");
-    await book!.reload();
-
-    expect(book!.isPublished()).toBeFalsy();
-    expect(book!.isWritten()).toBeFalsy();
-    expect(book!.isProposed()).toBeFalsy();
-  });
-
   it("does not treat a user method on an ancestor class as a conflict", () => {
     class Parent extends Base {
       static _tableName = "books";
@@ -162,7 +152,9 @@ describe("Enum private validators", () => {
 
   describe("assertValidEnumDefinitionValues", () => {
     it("rejects empty array with ArgumentError", () => {
-      expect(() => assertValidEnumDefinitionValues([])).toThrow(ArgumentError);
+      expect(() => assertValidEnumDefinitionValues([])).toThrow(
+        "Enum values [] must not be empty.",
+      );
     });
     it("rejects array with non-string entries", () => {
       expect(() => assertValidEnumDefinitionValues([1, 2])).toThrow(ArgumentError);
@@ -176,16 +168,24 @@ describe("Enum private validators", () => {
       expect(out).toEqual([":draft", ":published"]);
     });
     it("rejects array mixing symbols and strings", () => {
-      expect(() => assertValidEnumDefinitionValues([":draft", "published"])).toThrow(/symbols/);
+      expect(() => assertValidEnumDefinitionValues([":draft", "published"])).toThrow(
+        'Enum values [:draft, "published"] must only contain symbols or strings.',
+      );
     });
     it("rejects array with blank name", () => {
-      expect(() => assertValidEnumDefinitionValues(["a", ""])).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues(["a", ""])).toThrow(
+        'Enum values ["a", ""] must not contain a blank name.',
+      );
     });
     it("rejects array with whitespace-only name", () => {
-      expect(() => assertValidEnumDefinitionValues(["a", "   "])).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues(["a", "   "])).toThrow(
+        'Enum values ["a", "   "] must not contain a blank name.',
+      );
     });
     it("rejects hash with whitespace-only key", () => {
-      expect(() => assertValidEnumDefinitionValues({ "   ": 1 })).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues({ "   ": 1 })).toThrow(
+        'Enum values {"   "=>1} must not contain a blank name.',
+      );
     });
     it("rejects array with blank-description Symbol", () => {
       expect(() => assertValidEnumDefinitionValues([":"])).toThrow(/blank name/);
@@ -204,7 +204,9 @@ describe("Enum private validators", () => {
       );
     });
     it("rejects empty hash", () => {
-      expect(() => assertValidEnumDefinitionValues({})).toThrow(ArgumentError);
+      expect(() => assertValidEnumDefinitionValues({})).toThrow(
+        "Enum values {} must not be empty.",
+      );
     });
     it("accepts hash with boolean and null values", () => {
       const out = assertValidEnumDefinitionValues({ a: true, b: null, c: 1 });

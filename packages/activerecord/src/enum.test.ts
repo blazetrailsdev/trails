@@ -485,7 +485,9 @@ describe("EnumTest", () => {
     e = await assertRaises([ArgumentError], {}, () =>
       defineStatusEnum([{ proposed: 1, written: 2, published: 3 }]),
     );
-    expect(e.message).toMatch(/^Enum values must only contain symbols or strings\.$/);
+    expect(e.message).toMatch(
+      /^Enum values \[\{"proposed"=>1, "written"=>2, "published"=>3\}\] must only contain symbols or strings\.$/,
+    );
 
     e = await assertRaises([ArgumentError], {}, () => defineStatusEnum({ "": 1, active: 2 }));
     expect(e.message).toMatch(/must not contain a blank name\.$/);
