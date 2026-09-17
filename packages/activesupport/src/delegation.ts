@@ -19,6 +19,23 @@ export interface DelegateOptions {
   allowNil?: boolean;
 }
 
+function receiverValue(self: Record<string, unknown>, receiver: string): unknown {
+  let value: unknown = self;
+  for (const segment of receiver.split(".")) {
+    if (value == null) return value;
+    let descriptor: PropertyDescriptor | undefined;
+    for (let o: object | null = Object(value); o && !descriptor; o = Object.getPrototypeOf(o)) {
+      descriptor = Object.getOwnPropertyDescriptor(o, segment);
+    }
+    const member = (value as Record<string, unknown>)[segment];
+    value =
+      descriptor && "value" in descriptor && typeof member === "function"
+        ? member.call(value)
+        : member;
+  }
+  return value;
+}
+
 export namespace Delegation {
   // prettier-ignore
   export const RUBY_RESERVED_KEYWORDS = ["__ENCODING__", "__LINE__", "__FILE__", "alias", "and", "BEGIN", "begin", "break",
@@ -74,28 +91,59 @@ export namespace Delegation {
 
     const methodNames: string[] = [];
 
+    const receiverClass =
+      typeof to !== "string"
+        ? to
+        : receiver === "self.class"
+          ? (owner as { constructor?: unknown }).constructor
+          : undefined;
+
     for (const method of methods) {
       const methodName = `${methodPrefix}${method}`;
       methodNames.push(methodName);
 
+      const resolve = (self: Record<string, unknown>): unknown => {
+        const _ = receiver.startsWith("::")
+          ? constantize(receiver)
+          : receiverValue(self, receiverName);
+        if (_ == null) {
+          if (allowNil) return undefined;
+          throw DelegationError.nilTarget(methodName, receiver);
+        }
+        return _;
+      };
+
+      if (/[^\]]=$/.test(method)) {
+        const attr = method.slice(0, -1);
+        Object.defineProperty(owner, methodName.slice(0, -1), {
+          configurable: true,
+          enumerable: false,
+          set(this: Record<string, unknown>, arg: unknown) {
+            const _ = resolve(this);
+            if (_ != null) (_ as Record<string, unknown>)[attr] = arg;
+          },
+        });
+        continue;
+      }
+
+      const value = function (this: Record<string, unknown>, ...args: unknown[]) {
+        const _ = resolve(this);
+        if (_ == null) return undefined;
+        if (!(method in Object(_))) {
+          throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+        }
+        const member = (_ as Record<string, unknown>)[method];
+        return typeof member === "function" ? member.apply(_, args) : member;
+      };
+      const methodObject = (receiverClass as Record<string, unknown> | undefined)?.[method];
+      if (typeof methodObject === "function") {
+        Object.defineProperty(value, "length", { value: methodObject.length });
+      }
       Object.defineProperty(owner, methodName, {
         configurable: true,
         enumerable: false,
         writable: true,
-        value(...args: unknown[]) {
-          const _ = receiver.startsWith("::")
-            ? constantize(receiver)
-            : (this as Record<string, unknown>)[receiverName];
-          if (_ == null) {
-            if (allowNil) return undefined;
-            throw DelegationError.nilTarget(methodName, receiver);
-          }
-          if (!(method in Object(_))) {
-            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
-          }
-          const member = (_ as Record<string, unknown>)[method];
-          return typeof member === "function" ? member.apply(_, args) : member;
-        },
+        value,
       });
     }
 

@@ -344,7 +344,7 @@ export async function validateHasOneAssociation(
   reflection: any,
 ): Promise<void> {
   const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  const record = inst?.target;
+  const record = inst && (await inst.reader);
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
@@ -370,7 +370,7 @@ export async function validateBelongsToAssociation(
   reflection: any,
 ): Promise<void> {
   const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  const record = inst?.target;
+  const record = inst && (await inst.reader);
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
@@ -600,19 +600,19 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
   if (isCollection) {
     this.aroundSave(":aroundSaveCollectionAssociation");
     defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
-      return saveCollectionAssociation.call(this, reflection);
+      return this.saveCollectionAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else if (isHasOne) {
     defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
-      return saveHasOneAssociation.call(this, reflection);
+      return this.saveHasOneAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else {
     defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
-      if ((await Promise.resolve(saveBelongsToAssociation.call(this, reflection))) === false) {
+      if ((await this.saveBelongsToAssociation(reflection)) === false) {
         kernelThrow(":abort");
       }
     });

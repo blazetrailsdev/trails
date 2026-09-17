@@ -1,47 +1,68 @@
 import { describe, expect, it } from "vitest";
+import { assertNotPredicate, assertPredicate } from "../../testing/assertions.js";
+
+class Content {
+  title: string | null = null;
+  Data: string | null = null;
+
+  isTitle(): boolean {
+    return this.title !== null;
+  }
+
+  isData(): boolean {
+    return this.Data !== null;
+  }
+}
+
+class Email extends Content {
+  get subject() {
+    return this.title;
+  }
+  set subject(v) {
+    this.title = v;
+  }
+  isSubject() {
+    return this.isTitle();
+  }
+
+  get body() {
+    return this.Data;
+  }
+  set body(v) {
+    this.Data = v;
+  }
+  isBody() {
+    return this.isData();
+  }
+}
 
 describe("AttributeAliasingTest", () => {
   it("attribute alias", () => {
-    class Person {
-      private _name = "";
-      get name() {
-        return this._name;
-      }
-      set name(v: string) {
-        this._name = v;
-      }
-      get alias_name() {
-        return this._name;
-      }
-      set alias_name(v: string) {
-        this._name = v;
-      }
-    }
-    const p = new Person();
-    p.name = "david";
-    expect(p.alias_name).toBe("david");
-    p.alias_name = "alice";
-    expect(p.name).toBe("alice");
+    const e = new Email();
+
+    assertNotPredicate(e, (e) => e.isSubject());
+
+    e.title = "Upgrade computer";
+    expect(e.subject).toEqual("Upgrade computer");
+    assertPredicate(e, (e) => e.isSubject());
+
+    e.subject = "We got a long way to go";
+    expect(e.title).toEqual("We got a long way to go");
+    assertPredicate(e, (e) => e.isTitle());
   });
 
   it("aliasing to uppercase attributes", () => {
-    class Config {
-      private _URL = "";
-      get URL() {
-        return this._URL;
-      }
-      set URL(v: string) {
-        this._URL = v;
-      }
-      get url() {
-        return this._URL;
-      }
-      set url(v: string) {
-        this._URL = v;
-      }
-    }
-    const c = new Config();
-    c.URL = "https://example.com";
-    expect(c.url).toBe("https://example.com");
+    const e = new Email();
+
+    assertNotPredicate(e, (e) => e.isBody());
+    assertNotPredicate(e, (e) => e.isData());
+
+    e.body = "No, really, this is not a joke.";
+    expect(e.Data).toEqual("No, really, this is not a joke.");
+    assertPredicate(e, (e) => e.isData());
+
+    e.Data = "Uppercased methods are the suck";
+    expect(e.body).toEqual("Uppercased methods are the suck");
+    assertPredicate(e, (e) => e.isBody());
   });
 });

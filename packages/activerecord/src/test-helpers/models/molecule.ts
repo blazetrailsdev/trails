@@ -2,6 +2,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Electron } from "./electron.js";
 import type { Liquid } from "./liquid.js";
 import { Base } from "../../base.js";
+import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Molecule extends Base {
@@ -19,3 +20,5 @@ export interface Molecule {
   get liquid(): Liquid | null | Promise<Liquid | null>;
   set liquid(value: Liquid | null);
 }
+
+acceptsNestedAttributesFor(Molecule, "electrons");

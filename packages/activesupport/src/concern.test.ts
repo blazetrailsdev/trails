@@ -1,448 +1,245 @@
-import { describe, it, expect, vi } from "vitest";
-import { concern, includeConcern, hasConcern } from "./concern.js";
-import { extended } from "@blazetrails/ruby-compat/include";
+import { beforeEach, describe, it, expect } from "vitest";
+import { Module, extend, include } from "@blazetrails/ruby-compat";
+import { includedModules, prepend } from "@blazetrails/ruby-compat/include";
+import { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
+import { assertNotRespondTo, assertNothingRaised, assertRaises } from "./testing/assertions.js";
 
-describe("Concern", () => {
-  it("mixes instance methods into class prototype", () => {
-    const Greetable = concern({
-      instanceMethods: {
-        greet() {
-          return "hello";
-        },
+function newConcern(): any {
+  const mod = new Module();
+  extend(mod, Concern);
+  return mod;
+}
+
+const Baz = newConcern();
+Baz.classMethods((mod: Record<string, unknown>) => {
+  Object.defineProperties(mod, {
+    includedRan: {
+      get(this: any) {
+        return this["@included_ran"] ?? null;
       },
-    });
-
-    class User {}
-    includeConcern(User, Greetable);
-
-    const user = new User() as any;
-    expect(user.greet()).toBe("hello");
-  });
-
-  it("mixes class methods as static methods", () => {
-    const Findable = concern({
-      classMethods: {
-        findByName(name: string) {
-          return `found:${name}`;
-        },
+      set(this: any, value) {
+        this["@included_ran"] = value;
       },
-    });
-
-    class User {}
-    includeConcern(User, Findable);
-
-    expect((User as any).findByName("dean")).toBe("found:dean");
-  });
-
-  it("runs included block", () => {
-    const fn = vi.fn();
-    const Trackable = concern({ included: fn });
-
-    class User {}
-    includeConcern(User, Trackable);
-
-    expect(fn).toHaveBeenCalledWith(User);
-  });
-
-  it("resolves dependencies", () => {
-    const order: string[] = [];
-
-    const Base = concern({
-      included: () => order.push("base"),
-      instanceMethods: {
-        base() {
-          return true;
-        },
+      enumerable: true,
+      configurable: true,
+    },
+    prependedRan: {
+      get(this: any) {
+        return this["@prepended_ran"] ?? null;
       },
-    });
-
-    const Extended = concern({
-      dependencies: [Base],
-      included: () => order.push("extended"),
-      instanceMethods: {
-        extended() {
-          return true;
-        },
+      set(this: any, value) {
+        this["@prepended_ran"] = value;
       },
-    });
-
-    class User {}
-    includeConcern(User, Extended);
-
-    expect(order).toEqual(["base", "extended"]);
-    const user = new User() as any;
-    expect(user.base()).toBe(true);
-    expect(user.extended()).toBe(true);
+      enumerable: true,
+      configurable: true,
+    },
   });
-
-  it("does not include the same concern twice", () => {
-    const fn = vi.fn();
-    const Trackable = concern({ included: fn });
-
-    class User {}
-    includeConcern(User, Trackable);
-    includeConcern(User, Trackable);
-
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it("hasConcern returns correct value", () => {
-    const Trackable = concern({ instanceMethods: {} });
-
-    class User {}
-    expect(hasConcern(User, Trackable)).toBe(false);
-
-    includeConcern(User, Trackable);
-    expect(hasConcern(User, Trackable)).toBe(true);
-  });
-
-  it("dependencies are only included once even if multiple concerns depend on them", () => {
-    const fn = vi.fn();
-    const Base = concern({ included: fn });
-    const A = concern({ dependencies: [Base] });
-    const B = concern({ dependencies: [Base] });
-
-    class User {}
-    includeConcern(User, A);
-    includeConcern(User, B);
-
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it("prepend: true wraps existing prototype method and saves original as _super_<name>", () => {
-    class User {
-      greet() {
-        return "hello";
-      }
-    }
-
-    const Decorated = concern({
-      prepend: true,
-      instanceMethods: {
-        greet(this: any) {
-          return `[decorated] ${this._super_greet()}`;
-        },
-      },
-    });
-
-    includeConcern(User, Decorated);
-    const u = new User() as any;
-    expect(u.greet()).toBe("[decorated] hello");
-    expect(typeof u._super_greet).toBe("function");
-  });
-
-  it("prepend: false does not save _super_ method", () => {
-    class User {
-      greet() {
-        return "hello";
-      }
-    }
-
-    const Override = concern({
-      instanceMethods: {
-        greet() {
-          return "overridden";
-        },
-      },
-    });
-
-    includeConcern(User, Override);
-    const u = new User() as any;
-    expect(u.greet()).toBe("overridden");
-    expect(u._super_greet).toBeUndefined();
-  });
-
-  it("can include multiple concerns each providing different methods", () => {
-    const Serializable = concern({
-      instanceMethods: {
-        serialize() {
-          return JSON.stringify({ type: "User" });
-        },
-      },
-    });
-
-    const Auditable = concern({
-      instanceMethods: {
-        auditLog() {
-          return "audit";
-        },
-      },
-      classMethods: {
-        auditedFields() {
-          return ["name", "email"];
-        },
-      },
-    });
-
-    class User {}
-    includeConcern(User, Serializable);
-    includeConcern(User, Auditable);
-
-    const u = new User() as any;
-    expect(u.serialize()).toContain("User");
-    expect(u.auditLog()).toBe("audit");
-    expect((User as any).auditedFields()).toEqual(["name", "email"]);
-  });
+  mod.baz = function () {
+    return "baz";
+  };
+});
+Baz.included(null, function (this: any) {
+  this.includedRan = true;
+});
+Baz.prepended(null, function (this: any) {
+  this.prependedRan = true;
+});
+Baz.defineMethod("baz", function () {
+  return "baz";
 });
 
+const Bar = newConcern();
+include(Bar, Baz);
+Bar.ClassMethods = {
+  baz(this: any) {
+    return "bar's baz + " + Baz.ClassMethods.baz.call(this);
+  },
+};
+Bar.defineMethod("bar", function () {
+  return "bar";
+});
+Bar.defineMethod("baz", function (this: any) {
+  return "bar+" + Baz.instanceMethod("baz").value.call(this);
+});
+
+const Foo = newConcern();
+include(Foo, Bar);
+include(Foo, Baz);
+
+const Qux: any = { ClassMethods: {} };
+
 describe("ConcernTest", () => {
+  let klass: any;
+
+  beforeEach(() => {
+    klass = class {};
+  });
+
   it("module is included normally", () => {
-    class Base {}
-    const m = concern({
-      instanceMethods: {
-        greet() {
-          return "hello";
-        },
-      },
-    });
-    includeConcern(Base, m);
-    expect(new (Base as any)().greet()).toBe("hello");
+    include(klass, Baz);
+    expect(new klass().baz()).toEqual("baz");
+    expect(includedModules(klass)).toContain(Baz);
   });
+
   it("module is prepended normally", () => {
-    class Base {
-      greet() {
-        return "base";
-      }
-    }
-    const m = concern({
-      prepend: true,
-      instanceMethods: {
-        greet() {
-          return "prepended";
-        },
-      },
-    });
-    includeConcern(Base, m);
-    expect(new (Base as any)().greet()).toBe("prepended");
+    prepend(klass, Baz);
+    expect(new klass().baz()).toEqual("baz");
+    expect(includedModules(klass)).toContain(Baz);
   });
+
+  it("class methods are extended", () => {
+    include(klass, Baz);
+    expect(klass.baz()).toEqual("baz");
+    expect(includedModules({ prototype: klass })[0]).toEqual(Baz.ClassMethods);
+  });
+
   it("class methods are extended when prepended", () => {
-    class Base {}
-    const m = concern({
-      classMethods: {
-        myClassMethod() {
-          return "class-method";
-        },
-      },
-    });
-    includeConcern(Base, m);
-    expect((Base as any).myClassMethod()).toBe("class-method");
+    prepend(klass, Baz);
+    expect(klass.baz()).toEqual("baz");
+    expect(includedModules({ prototype: klass })[0]).toEqual(Baz.ClassMethods);
   });
+
   it("class methods are extended only on expected objects", () => {
-    class A {}
-    class B {}
-    const m = concern({
-      classMethods: {
-        cm() {
-          return "cm";
-        },
-      },
+    include(Object, Qux);
+    extend(Object, Qux.ClassMethods);
+    const testModule = newConcern();
+    testModule.classMethods((mod: Record<string, unknown>) => {
+      mod.test = function () {};
     });
-    includeConcern(A, m);
-    expect((A as any).cm()).toBe("cm");
-    expect((B as any).cm).toBeUndefined();
+    include(klass, testModule);
+    assertNotRespondTo(Object, "test");
+    delete Qux.ClassMethods;
   });
+
+  it("included block is ran", () => {
+    include(klass, Baz);
+    expect(klass.includedRan).toEqual(true);
+  });
+
   it("included block is not ran when prepended", () => {
-    const log: string[] = [];
-    class Base {}
-    const m = concern({
-      prepend: true,
-      included: () => {
-        log.push("included");
-      },
-    });
-    includeConcern(Base, m);
-    expect(Array.isArray(log)).toBe(true);
+    prepend(klass, Baz);
+    expect(klass.includedRan).toBeNull();
   });
+
   it("prepended block is ran", () => {
-    const log: string[] = [];
-    class Base {}
-    const m = concern({
-      included: () => {
-        log.push("included");
-      },
-    });
-    includeConcern(Base, m);
-    expect(log).toContain("included");
+    prepend(klass, Baz);
+    expect(klass.prependedRan).toEqual(true);
   });
+
   it("prepended block is not ran when included", () => {
-    const log: string[] = [];
-    class Base {}
-    const m = concern({
-      included: (klass) => {
-        log.push("ran");
-      },
-    });
-    includeConcern(Base, m);
-    expect(log.length).toBeGreaterThanOrEqual(0);
+    include(klass, Baz);
+    expect(klass.prependedRan).toBeNull();
   });
+
   it("modules dependencies are met", () => {
-    class Base {}
-    const dep = concern({
-      instanceMethods: {
-        dep() {
-          return "dep";
-        },
-      },
-    });
-    const m = concern({
-      dependencies: [dep],
-      instanceMethods: {
-        main() {
-          return "main";
-        },
-      },
-    });
-    includeConcern(Base, m);
-    const inst = new (Base as any)();
-    expect(inst.dep()).toBe("dep");
-    expect(inst.main()).toBe("main");
+    include(klass, Bar);
+    expect(new klass().bar()).toEqual("bar");
+    expect(new klass().baz()).toEqual("bar+baz");
+    expect(klass.baz()).toEqual("bar's baz + baz");
+    expect(includedModules(klass)).toContain(Bar);
   });
+
   it("dependencies with multiple modules", () => {
-    class Base {}
-    const dep1 = concern({
-      instanceMethods: {
-        d1() {
-          return 1;
-        },
-      },
-    });
-    const dep2 = concern({
-      instanceMethods: {
-        d2() {
-          return 2;
-        },
-      },
-    });
-    const m = concern({ dependencies: [dep1, dep2] });
-    includeConcern(Base, m);
-    const inst = new (Base as any)();
-    expect(inst.d1()).toBe(1);
-    expect(inst.d2()).toBe(2);
+    include(klass, Foo);
+    expect(includedModules(klass).slice(0, 3)).toEqual([Foo, Bar, Baz]);
   });
+
   it("dependencies with multiple modules when prepended", () => {
-    class Base {}
-    const dep = concern({
-      instanceMethods: {
-        depMethod() {
-          return "dep";
-        },
-      },
-    });
-    const m = concern({ dependencies: [dep], prepend: true });
-    includeConcern(Base, m);
-    expect(new (Base as any)().depMethod()).toBe("dep");
+    prepend(klass, Foo);
+    expect(includedModules(klass).slice(0, 3)).toEqual([Foo, Bar, Baz]);
   });
-  it("raise on multiple included calls", () => {
-    const log: string[] = [];
-    class Base {}
-    const m = concern({
-      included: () => {
-        log.push("inc");
-      },
+
+  it("raise on multiple included calls", async () => {
+    await assertRaises([MultipleIncludedBlocks], {}, () => {
+      const mod = newConcern();
+
+      mod.included(null, () => {});
+
+      mod.included(null, () => {
+        return undefined;
+      });
     });
-    includeConcern(Base, m);
-    includeConcern(Base, m);
-    expect(log.length).toBe(1);
   });
-  it("raise on multiple prepended calls", () => {
-    class Base {}
-    const m = concern({
-      prepend: true,
-      instanceMethods: {
-        x() {
-          return 1;
-        },
-      },
+
+  it("raise on multiple prepended calls", async () => {
+    await assertRaises([MultiplePrependBlocks], {}, () => {
+      const mod = newConcern();
+
+      mod.prepended(null, () => {});
+
+      mod.prepended(null, () => {
+        return undefined;
+      });
     });
-    includeConcern(Base, m);
-    includeConcern(Base, m);
-    expect(hasConcern(Base, m)).toBe(true);
   });
-  it("no raise on same included or prepended call", () => {
-    class Base {}
-    const m = concern({
-      instanceMethods: {
-        foo() {
-          return "foo";
-        },
-      },
-    });
-    expect(() => {
-      includeConcern(Base, m);
-      includeConcern(Base, m);
-    }).not.toThrow();
-  });
-  it("prepended and included methods", () => {
-    class Base {
-      original() {
-        return "original";
+
+  it("no raise on same included or prepended call", async () => {
+    await assertNothingRaised(() => {
+      const someConcern = newConcern();
+      for (let i = 0; i < 2; i++) {
+        someConcern.included(null, function () {});
+        someConcern.prepended(null, function () {});
       }
-    }
-    const m = concern({
-      prepend: true,
-      instanceMethods: {
-        prepended() {
-          return "prepended";
-        },
-      },
     });
-    includeConcern(Base, m);
-    const inst = new (Base as any)();
-    expect(inst.prepended()).toBe("prepended");
-    expect(inst.original()).toBe("original");
   });
+
+  it("prepended and included methods", () => {
+    const includedMod = newConcern();
+    const prependedMod = newConcern();
+
+    klass = class {
+      "@foo": unknown[] = [];
+    };
+    includedMod.defineMethod("foo", function (this: any) {
+      this["@foo"].push("included");
+      return this["@foo"];
+    });
+    const classFoo = function (this: any) {
+      includedMod.instanceMethod("foo").value.call(this);
+      this["@foo"].push("class");
+      return this["@foo"];
+    };
+    klass.prototype.foo = classFoo;
+    prependedMod.defineMethod("foo", function (this: any) {
+      classFoo.call(this);
+      this["@foo"].push("prepended");
+      return this["@foo"];
+    });
+
+    include(klass, includedMod);
+    prepend(klass, prependedMod);
+
+    expect(new klass().foo()).toEqual(["included", "class", "prepended"]);
+  });
+
   it("prepended and included class methods", () => {
-    class Base {}
-    const m = concern({
-      classMethods: {
-        classMethod() {
-          return "class";
-        },
-      },
-      instanceMethods: {
-        instMethod() {
-          return "inst";
-        },
-      },
-    });
-    includeConcern(Base, m);
-    expect((Base as any).classMethod()).toBe("class");
-    expect(new (Base as any)().instMethod()).toBe("inst");
-  });
+    const includedMod = newConcern();
+    const prependedMod = newConcern();
 
-  it("fires Symbol extended hook on classMethods when concern is included", () => {
-    const calls: any[] = [];
-    class Base {}
-    const m = concern({
-      classMethods: {
-        classMethod() {
-          return "class";
-        },
-        [extended](base: any) {
-          calls.push(base);
-        },
-      },
+    klass["@foo"] = [];
+    includedMod.classMethods((mod: Record<string, unknown>) => {
+      mod.foo = function (this: any) {
+        this["@foo"].push("included");
+        return this["@foo"];
+      };
     });
-    includeConcern(Base, m);
-    expect((Base as any).classMethod()).toBe("class");
-    expect(calls).toEqual([Base]);
-  });
+    const classFoo = function (this: any) {
+      includedMod.ClassMethods.foo.call(this);
+      this["@foo"].push("class");
+      return this["@foo"];
+    };
+    prependedMod.classMethods((mod: Record<string, unknown>) => {
+      mod.foo = function (this: any) {
+        classFoo.call(this);
+        this["@foo"].push("prepended");
+        return this["@foo"];
+      };
+    });
 
-  it("fires Symbol extended hook on instanceMethods when concern is included", () => {
-    const calls: any[] = [];
-    class Base {}
-    const m = concern({
-      instanceMethods: {
-        instMethod() {
-          return "inst";
-        },
-        [extended](base: any) {
-          calls.push(base);
-        },
-      },
-    });
-    includeConcern(Base, m);
-    expect(new (Base as any)().instMethod()).toBe("inst");
-    expect(calls).toEqual([Base.prototype]);
+    include(klass, includedMod);
+    klass.foo = classFoo;
+    prepend(klass, prependedMod);
+
+    expect(klass.foo()).toEqual(["included", "class", "prepended"]);
   });
 });

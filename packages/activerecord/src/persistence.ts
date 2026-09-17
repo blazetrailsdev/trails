@@ -674,7 +674,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     }
     const attrType = known ? ctor.typeForAttribute(key) : undefined;
     const cast = attrType ? attrType.cast(value) : value;
-    this._attributes.writeCastValue(key, cast);
+    this._attributes.writeCastValue(key, value);
     const type = attrType as
       | {
           serializeCastValue(v: unknown): unknown;

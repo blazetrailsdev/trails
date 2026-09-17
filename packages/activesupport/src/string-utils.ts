@@ -1,7 +1,8 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
 export function squish(str: string): string {
-  return str.trim().replace(/\s+/g, " ");
+  return str.replace(/[\s\u0085]+/g, " ").replace(/^[\s\u0085]+|[\s\u0085]+$/g, "");
 }
 
 export function truncate(
@@ -54,24 +55,34 @@ export function truncateWords(
 
 export function truncateBytes(
   str: string,
-  byteLimit: number,
-  options: { omission?: string | null } = {},
+  truncateTo: number,
+  { omission = "\u2026" }: { omission?: string | null } = {},
 ): string {
-  const omission = options.omission === undefined ? "…" : options.omission;
-  const encoder = new TextEncoder();
-  const strBytes = encoder.encode(str);
-  if (strBytes.length <= byteLimit) return str;
+  omission ||= "";
+  const bytesize = (s: string) => new TextEncoder().encode(s).length;
 
-  if (byteLimit <= 0) return "";
-  const omissionBytes = omission ? encoder.encode(omission).length : 0;
-  if (omissionBytes > byteLimit) return "";
-  const available = byteLimit - omissionBytes;
+  if (bytesize(str) <= truncateTo) {
+    return str;
+  } else if (bytesize(omission) > truncateTo) {
+    throw new ArgumentError(
+      `Omission ${JSON.stringify(omission)} is ${bytesize(omission)}, larger than the truncation length of ${truncateTo} bytes`,
+    );
+  } else if (bytesize(omission) === truncateTo) {
+    return omission;
+  } else {
+    let cut = "";
+    const cutAt = truncateTo - bytesize(omission);
 
-  const truncated = new Uint8Array(strBytes.buffer, 0, available);
-  let decoded = new TextDecoder().decode(truncated);
-  decoded = decoded.replace(/\uFFFD+$/, "");
+    for (const { segment: grapheme } of new Intl.Segmenter().segment(str)) {
+      if (bytesize(cut) + bytesize(grapheme) <= cutAt) {
+        cut += grapheme;
+      } else {
+        break;
+      }
+    }
 
-  return decoded + (omission || "");
+    return cut + omission;
+  }
 }
 
 export function remove(str: string, ...patterns: (string | RegExp)[]): string {
@@ -142,18 +153,24 @@ export function to(str: string, pos: number): string {
   return str.slice(0, idx + 1);
 }
 
+export function indentBang(
+  str: string,
+  amount: number,
+  indentString: string | null = null,
+  indentEmptyLines: boolean = false,
+): string | null {
+  indentString = indentString || str.match(/^[ \t]/m)?.[0] || " ";
+  const re = indentEmptyLines ? /^/gm : /^(?!$)/gm;
+  if (!re.test(str)) return null;
+  re.lastIndex = 0;
+  return str.replace(re, indentString.repeat(amount));
+}
+
 export function indent(
   str: string,
-  n: number,
-  char: string = " ",
+  amount: number,
+  indentString: string | null = null,
   indentEmptyLines: boolean = false,
 ): string {
-  const pad = char.repeat(n);
-  return str
-    .split("\n")
-    .map((line) => {
-      if (line.length === 0 && !indentEmptyLines) return line;
-      return pad + line;
-    })
-    .join("\n");
+  return indentBang(str, amount, indentString, indentEmptyLines) ?? str;
 }

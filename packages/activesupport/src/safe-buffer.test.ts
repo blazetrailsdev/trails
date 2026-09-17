@@ -1,132 +1,60 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
+import { Range } from "@blazetrails/ruby-compat";
 import { titleize, underscore } from "./inflector.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "./core-ext/string/output-safety.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
+import {
+  assert,
+  assertNot,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaise,
+} from "./testing/assertions.js";
 
 describe("SafeBufferTest", () => {
-  it("Should look like a string", () => {
-    const buf = htmlSafe("hello");
-    expect(buf.toString()).toBe("hello");
-    expect(String(buf)).toBe("hello");
-  });
+  let buffer: SafeBuffer;
 
-  it("Should escape a raw string which is passed to them", () => {
-    const safe = htmlSafe("");
-    const result = safe.concat("<script>alert('xss')</script>");
-    expect(result.toString()).toBe("&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;");
-    expect(result.htmlSafe).toBe(true);
-  });
-
-  it("Should NOT escape a safe value passed to it", () => {
-    const safe = htmlSafe("Hello ");
-    const alsoSafe = htmlSafe("<b>World</b>");
-    const result = safe.concat(alsoSafe);
-    expect(result.toString()).toBe("Hello <b>World</b>");
-    expect(result.htmlSafe).toBe(true);
-  });
-
-  it("Should not mess with an innocuous string", () => {
-    const safe = htmlSafe("hello world");
-    expect(safe.toString()).toBe("hello world");
-  });
-
-  it("Should not mess with a previously escape test", () => {
-    const escaped = htmlEscape("<b>bold</b>");
-    const safe = htmlSafe("");
-    const result = safe.concat(escaped);
-    expect(result.toString()).toBe("&lt;b&gt;bold&lt;/b&gt;");
-  });
-
-  it("Should be considered safe", () => {
-    const buf = htmlSafe("test");
-    expect(buf.htmlSafe).toBe(true);
-    expect(isHtmlSafe(buf)).toBe(true);
-  });
-
-  it("Should return a safe buffer when calling to_s", () => {
-    const buf = htmlSafe("test");
-    const newBuffer = buf.toS();
-    expect(newBuffer).toBeInstanceOf(SafeBuffer);
-  });
-
-  it("Should escape dirty buffers on add", () => {
-    const safe = htmlSafe("prefix: ");
-    const unsafe = new SafeBuffer("<danger>", false);
-    const result = safe.concat(unsafe);
-    expect(result.toString()).toContain("&lt;danger&gt;");
-    expect(result.htmlSafe).toBe(true);
-  });
-
-  it("Should concat as a normal string when safe", () => {
-    const a = htmlSafe("hello ");
-    const b = htmlSafe("world");
-    const result = a.concat(b);
-    expect(result.toString()).toBe("hello world");
-  });
-
-  it("Should preserve html_safe? status on copy", () => {
-    const buf = htmlSafe("test");
-    expect(buf.htmlSafe).toBe(true);
-  });
-
-  it("Can call html_safe on a safe buffer", () => {
-    const buf = htmlSafe("test");
-    const again = buf.htmlSafeBuffer();
-    expect(again.htmlSafe).toBe(true);
-    expect(again.toString()).toBe("test");
-  });
-
-  it("Should return safe buffer when added with another safe buffer", () => {
-    const a = htmlSafe("foo");
-    const b = htmlSafe("bar");
-    const result = a.concat(b);
-    expect(result.htmlSafe).toBe(true);
-    expect(result.toString()).toBe("foobar");
-  });
-
-  it("Should raise an error when safe_concat is called on unsafe buffers", () => {
-    const unsafe = new SafeBuffer("test", false);
-    expect(() => unsafe.safeConcat("more")).toThrow();
-  });
-
-  it("Should be safe when sliced if original value was safe", () => {
-    const buf = htmlSafe("hello world");
-    const sliced = buf.slice(0, 5);
-    expect(sliced.htmlSafe).toBe(true);
-    expect(sliced.toString()).toBe("hello");
-  });
-
-  it("Should continue unsafe on slice", () => {
-    const buf = new SafeBuffer("hello world", false);
-    const sliced = buf.slice(0, 5);
-    expect(sliced.htmlSafe).toBe(false);
-  });
-
-  it("Should continue safe on slice", () => {
-    const buf = htmlSafe("hello world");
-    const sliced = buf.slice(6);
-    expect(sliced.htmlSafe).toBe(true);
-    expect(sliced.toString()).toBe("world");
-  });
-
-  it("Should escape unsafe interpolated args", () => {
-    const x = htmlSafe("foo %{x} bar").format({ x: "<br/>" });
-    expect(x.toString()).toBe("foo &lt;br/&gt; bar");
-  });
-
-  it("Should not escape safe interpolated args", () => {
-    const x = htmlSafe("foo %{x} bar").format({ x: htmlSafe("<br/>") });
-    expect(x.toString()).toBe("foo <br/> bar");
-  });
-
-  it("Should interpolate to a safe string", () => {
-    const x = htmlSafe("foo %{x} bar").format({ x: "qux" });
-    expect(x.htmlSafe).toBe(true);
+  beforeEach(() => {
+    buffer = new SafeBuffer();
   });
 
   it("titleize", () => {
-    const buf = htmlSafe("foo");
-    expect(titleize(buf.toString())).toBe("Foo");
+    expect(titleize(htmlSafe("foo").toStr())).toEqual("Foo");
+  });
+
+  it("Should look like a string", () => {
+    assert(typeof buffer.toStr() === "string");
+    expect(buffer.toString()).toEqual("");
+  });
+
+  it("Should escape a raw string which is passed to them", () => {
+    buffer.concat("<script>");
+    expect(buffer.toString()).toEqual("&lt;script&gt;");
+  });
+
+  it("Should NOT escape a safe value passed to it", () => {
+    buffer.concat(htmlSafe("<script>"));
+    buffer.concat(htmlSafe("hello &amp; goodbye"));
+    expect(buffer.toString()).toEqual("<script>hello &amp; goodbye");
+  });
+
+  it("Should not mess with an innocuous string", () => {
+    buffer.concat("Hello");
+    expect(buffer.toString()).toEqual("Hello");
+  });
+
+  it("Should not mess with a previously escape test", () => {
+    buffer.concat(htmlEscape("<script>"));
+    expect(buffer.toString()).toEqual("&lt;script&gt;");
+  });
+
+  it("Should be considered safe", () => {
+    assertPredicate(buffer, isHtmlSafe);
+  });
+
+  it("Should return a safe buffer when calling to_s", () => {
+    const newBuffer = buffer.toS();
+    expect(newBuffer.constructor).toEqual(SafeBuffer);
   });
 
   it.skip("Should be converted to_yaml");
@@ -134,91 +62,175 @@ describe("SafeBufferTest", () => {
   it.skip("Should work with primitive-like-strings in to_yaml conversion");
 
   it("Should work with underscore", () => {
-    const buf = htmlSafe("MyTest");
-    expect(underscore(buf.toString())).toBe("my_test");
+    const str = underscore(htmlSafe("MyTest").toStr());
+    expect(str).toEqual("my_test");
   });
 
   it("can assign value into zero-index", () => {
-    const buffer = new SafeBuffer("012345", true);
+    const buffer = new SafeBuffer("012345");
+
     buffer.set(0, "<");
-    expect(buffer.toString()).toBe("&lt;12345");
+
+    expect(buffer.toString()).toEqual("&lt;12345");
   });
 
   it("can assign value into non zero-index", () => {
-    const buffer = new SafeBuffer("012345", true);
+    const buffer = new SafeBuffer("012345");
+
     buffer.set(2, "<");
-    expect(buffer.toString()).toBe("01&lt;345");
+
+    expect(buffer.toString()).toEqual("01&lt;345");
   });
 
   it("can assign value into slice", () => {
-    const buffer = new SafeBuffer("012345", true);
-    buffer.set(0, "<", 3);
-    expect(buffer.toString()).toBe("&lt;345");
+    const buffer = new SafeBuffer("012345");
+
+    buffer.set(0, 3, "<");
+
+    expect(buffer.toString()).toEqual("&lt;345");
   });
 
   it("can assign value into offset slice", () => {
-    const buffer = new SafeBuffer("012345", true);
-    buffer.set(1, "<", 3);
-    expect(buffer.toString()).toBe("0&lt;45");
+    const buffer = new SafeBuffer("012345");
+
+    buffer.set(1, 3, "<");
+
+    expect(buffer.toString()).toEqual("0&lt;45");
+  });
+
+  it("Should escape dirty buffers on add", () => {
+    const clean = htmlSafe("hello");
+    buffer = new SafeBuffer("<>", false);
+    expect(clean.plus(buffer).toString()).toEqual("hello&lt;&gt;");
   });
 
   it("Should preserve html_safe? status on multiplication", () => {
-    const safe = htmlSafe("<br />");
-    const repeated = safe.repeat(2);
-    expect(repeated.htmlSafe).toBe(true);
-    expect(repeated.toString()).toBe("<br /><br />");
+    const multipliedSafeBuffer = htmlSafe("<br />").repeat(2);
+    assertPredicate(multipliedSafeBuffer, isHtmlSafe);
 
-    const unsafe = new SafeBuffer("<>", false);
-    const repeatedUnsafe = unsafe.repeat(2);
-    expect(repeatedUnsafe.htmlSafe).toBe(false);
+    const multipliedUnsafeBuffer = new SafeBuffer("<>", false).repeat(2);
+    assertNotPredicate(multipliedUnsafeBuffer, isHtmlSafe);
+  });
+
+  it("Should concat as a normal string when safe", () => {
+    const clean = htmlSafe("hello");
+    buffer = new SafeBuffer("<>", false);
+    expect(buffer.plus(clean).toString()).toEqual("<>hello");
+  });
+
+  it("Should preserve html_safe? status on copy", () => {
+    buffer = new SafeBuffer("<>", false);
+    assertNotPredicate(buffer.dup(), isHtmlSafe);
+  });
+
+  it("Can call html_safe on a safe buffer", () => {
+    buffer = htmlSafe("hello");
+    const extraSafe = buffer.htmlSafeBuffer();
+    expect(extraSafe.toString()).toEqual("hello");
+    assertPredicate(extraSafe, isHtmlSafe);
+  });
+
+  it("Should return safe buffer when added with another safe buffer", () => {
+    const clean = htmlSafe("<script>");
+    const resultBuffer = buffer.plus(clean);
+    assertPredicate(resultBuffer, isHtmlSafe);
+    expect(resultBuffer.toString()).toEqual("<script>");
+  });
+
+  it("Should raise an error when safe_concat is called on unsafe buffers", async () => {
+    buffer = new SafeBuffer("<>", false);
+    await assertRaise([SafeBuffer.SafeConcatError], {}, () => buffer.safeConcat("BUSTED"));
   });
 
   it("Should not fail if the returned object is not a string", () => {
-    const buf = htmlSafe("");
-    const result = buf.slice(0, 0);
-    expect(result).toBeDefined();
+    expect(buffer.slice("chipchop")).toBeNull();
+  });
+
+  it("Should be safe when sliced if original value was safe", () => {
+    const newBuffer = buffer.get(0, 0);
+    expect(newBuffer).not.toBeNull();
+    assertPredicate(newBuffer, isHtmlSafe, "should be safe");
+  });
+
+  it("Should continue unsafe on slice", () => {
+    const safeString = new SafeBuffer('<script>alert("lolpwnd");</script>oo', false);
+
+    assertNot(isHtmlSafe(safeString), "should not be safe");
+
+    assertNot(isHtmlSafe(safeString.get(new Range(0, -1))), "should not be safe");
+    assertNot(isHtmlSafe(safeString.slice(new Range(0, -1))), "should not be safe");
+    assertNot(isHtmlSafe(safeString.sliceBang(new Range(0, -1))), "should not be safe");
+    assertNot(isHtmlSafe(safeString), "should not be safe");
+  });
+
+  it("Should continue safe on slice", () => {
+    const safeString = htmlSafe("<div>foo</div>");
+
+    assertPredicate(safeString, isHtmlSafe);
+
+    assertPredicate(safeString.get(new Range(0, -1)), isHtmlSafe);
+    assertPredicate(safeString.slice(new Range(0, -1)), isHtmlSafe);
+    assertPredicate(safeString.sliceBang(new Range(0, 1, true)), isHtmlSafe);
+
+    assertPredicate(safeString, isHtmlSafe);
   });
 
   it("Should continue safe on chr", () => {
-    const safe = htmlSafe("<div>foo</div>");
-    expect(safe.htmlSafe).toBe(true);
-    expect(safe.chr().htmlSafe).toBe(true);
+    const safeString = htmlSafe("<div>foo</div>");
+
+    assertPredicate(safeString, isHtmlSafe);
+    assertPredicate(safeString.chr(), isHtmlSafe);
   });
 
   it("Should continue unsafe on chr", () => {
-    const unsafe = new SafeBuffer("<div>foo</div>", false);
-    expect(unsafe.htmlSafe).toBe(false);
-    expect(unsafe.chr().htmlSafe).toBe(false);
+    const safeString = "<div>foo</div>";
+
+    assertNot(isHtmlSafe(safeString), "should not be safe");
+    assertNot(isHtmlSafe(safeString.charAt(0)), "should not be safe");
   });
 
   it("Should return a SafeBuffer on slice! if original value was safe", () => {
-    const safe = htmlSafe("<div>foo</div>");
-    const sliced = safe.slice(0, 1);
-    expect(sliced instanceof SafeBuffer).toBe(true);
+    const safeString = htmlSafe("<div>foo</div>");
+
+    assert(safeString.sliceBang(new Range(0, 1, true)) instanceof SafeBuffer);
   });
 
   it("Should return a String on slice! if original value was not safe", () => {
-    const unsafe = new SafeBuffer('<script>alert("XSS");</script>', false);
-    const sliced = unsafe.slice(0, 1);
-    expect(sliced instanceof SafeBuffer).toBe(true);
-    expect(sliced.htmlSafe).toBe(false);
+    const unsafeString = new SafeBuffer('<script>alert("XSS");</script>', false);
+
+    const slicedString = unsafeString.sliceBang(new Range(0, 1, true));
+    assertNot(slicedString instanceof SafeBuffer);
+    assert(typeof slicedString === "string");
   });
 
   it("Should work with interpolation (array argument)", () => {
-    const buf = htmlSafe("foo %s bar");
-    const result = buf.format(["qux"]);
-    expect(result.toString()).toBe("foo qux bar");
+    const x = htmlSafe("foo %s bar").format(["qux"]);
+    expect(x.toString()).toEqual("foo qux bar");
   });
 
   it("Should work with interpolation (hash argument)", () => {
-    const buf = htmlSafe("foo %{x} bar");
-    const result = buf.format({ x: "qux" });
-    expect(result.toString()).toBe("foo qux bar");
+    const x = htmlSafe("foo %{x} bar").format({ x: "qux" });
+    expect(x.toString()).toEqual("foo qux bar");
+  });
+
+  it("Should escape unsafe interpolated args", () => {
+    const x = htmlSafe("foo %{x} bar").format({ x: "<br/>" });
+    expect(x.toString()).toEqual("foo &lt;br/&gt; bar");
+  });
+
+  it("Should not escape safe interpolated args", () => {
+    const x = htmlSafe("foo %{x} bar").format({ x: htmlSafe("<br/>") });
+    expect(x.toString()).toEqual("foo <br/> bar");
+  });
+
+  it("Should interpolate to a safe string", () => {
+    const x = htmlSafe("foo %{x} bar").format({ x: "qux" });
+    assertPredicate(x, isHtmlSafe, "should be safe");
   });
 
   it("Should not affect frozen objects when accessing characters", () => {
     const x = htmlSafe("Hello");
-    expect(x.slice(0, 1).toString()).toBe("H");
+    expect(x.get(/a/, 1)).toBeNull();
   });
 
   it.skip("Should set back references");

@@ -695,18 +695,23 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Ruby module-body metaprogramming DSLs. `alias_attribute` " +
+      "Ruby module-body metaprogramming DSL. `alias_attribute` " +
       "(core_ext/module/aliasing.rb) defines reader/writer/predicate methods by " +
-      "`module_eval`ing generated source; `concerning`/`concern` " +
-      "(core_ext/module/concerning.rb:104-114) create an anonymous nested " +
-      "`Module` from a block, name it as a constant on the host and `include` it. " +
-      "Both need runtime source evaluation and constant assignment into a module " +
-      "namespace, neither of which exists in TypeScript; trails' equivalent is " +
-      "`Concern` + the `include()`/`Included<>` mixin idiom, which the callers " +
-      "already use directly. (ActiveRecord's own `alias_attribute` is a separate " +
-      "method on ActiveRecord::Base and is ported there.)",
-    names: ["alias_attribute", "concerning", "concern"],
-    rubyFiles: ["core_ext/module/aliasing.rb", "core_ext/module/concerning.rb"],
+      "`module_eval`ing generated source, which needs runtime source evaluation " +
+      "that does not exist in TypeScript. (ActiveRecord's own `alias_attribute` is " +
+      "a separate method on ActiveRecord::Base and is ported there.)",
+    names: ["alias_attribute"],
+    rubyFiles: ["core_ext/module/aliasing.rb"],
+  },
+  {
+    reason:
+      "`class Module; include Concerning; end` (core_ext/module/concerning.rb:136) " +
+      "credits `Module::Concerning#concern`/`#concerning` to `Module`, whose first " +
+      "file is aliasing.rb. The methods are defined in concerning.rb:114,132 and " +
+      "ported at core-ext/module/concerning.ts, where they are matched; scoped to " +
+      "aliasing.rb so only the duplicate credit is dropped.",
+    names: ["concerning", "concern"],
+    rubyFiles: ["core_ext/module/aliasing.rb"],
   },
   {
     reason:

@@ -1,12 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { isDuplicable, Method, UnboundMethod, Singleton } from "./duplicable.js";
+import { assertNotPredicate, assertPredicate } from "../../testing/assertions.js";
 
 describe("DuplicableTest", () => {
+  const OBJECTS: unknown[] = [
+    () => {},
+    "1",
+    {},
+    /foo/,
+    [],
+    new Date(),
+    new WeakMap(),
+    true,
+    false,
+    1,
+    2.3,
+  ];
+
   it("#duplicable? matches #dup behavior", () => {
-    const obj = { x: 1 };
-    const dup = { ...obj };
-    expect(dup).toEqual(obj);
-    expect(dup).not.toBe(obj);
+    for (const v of OBJECTS) {
+      let duplicable: boolean;
+      try {
+        structuredClone(v);
+        duplicable = true;
+      } catch {
+        duplicable = false;
+      }
+
+      if (duplicable) {
+        assertPredicate(v, isDuplicable);
+      } else {
+        assertNotPredicate(v, isDuplicable);
+      }
+    }
   });
 
   it("isDuplicable for objects and arrays", () => {

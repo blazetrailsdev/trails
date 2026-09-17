@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LoadError } from "./load-error.js";
 
 describe("TestLoadError", () => {
   it("with require", async () => {
@@ -12,19 +13,17 @@ describe("TestLoadError", () => {
   });
 
   it("path", async () => {
-    const mod = "nor/this/one";
-    await expect(import(mod)).rejects.toThrow(/nor\/this\/one/);
+    const mod = "nor/this/one.rb";
+    try {
+      await import(mod);
+    } catch (e) {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect((e as Error).message.match(/'([^']*)'/)![1]).toEqual("nor/this/one.rb");
+    }
   });
 
   it("is missing with nil path", () => {
-    const error = new Error() as Error & { code?: string; path?: string };
-    error.code = "MODULE_NOT_FOUND";
-    error.path = undefined as unknown as string;
-    expect(error.code).toBe("MODULE_NOT_FOUND");
-    expect(error.path).toBeUndefined();
-    expect(() => {
-      const isMissing = error.code === "MODULE_NOT_FOUND";
-      if (isMissing) return true;
-    }).not.toThrow();
+    const error = new LoadError();
+    expect(() => error.isMissing("anything")).not.toThrow();
   });
 });

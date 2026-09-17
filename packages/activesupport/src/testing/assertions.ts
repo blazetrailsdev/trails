@@ -338,8 +338,10 @@ function _callableToSourceString(callable: unknown): string {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function assert(value: boolean, message: string | (() => string) = ""): void {
-  if (!value) throw new Assertion(typeof message === "function" ? message() : message);
+export function assert(value: unknown, message: string | (() => string) = ""): void {
+  if (value == null || value === false) {
+    throw new Assertion(typeof message === "function" ? message() : message);
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -370,15 +372,37 @@ export function assertNotPredicate<T>(
 
 /** @noRailsEquivalent PERMANENT */
 export function assertRespondTo(actual: unknown, name: string, message?: string): void {
-  assert(name in Object(actual), message ?? `Expected ${inspect(actual)} to respond to ${name}`);
+  assert(
+    respondsTo(Object(actual), name),
+    message ?? `Expected ${inspect(actual)} to respond to ${name}`,
+  );
 }
 
 /** @noRailsEquivalent PERMANENT */
 export function assertNotRespondTo(actual: unknown, name: string, message?: string): void {
   assert(
-    !(name in Object(actual)),
+    !respondsTo(Object(actual), name),
     message ?? `Expected ${inspect(actual)} to not respond to ${name}`,
   );
+}
+
+function respondsTo(object: object, name: string): boolean {
+  if (name in object) {
+    const descriptor = findDescriptor(object, name);
+    if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;
+    return !(descriptor && descriptor.set !== undefined && descriptor.get === undefined);
+  }
+  if (!name.endsWith("=")) return false;
+  const descriptor = findDescriptor(object, name.slice(0, -1));
+  return descriptor?.set !== undefined;
+}
+
+function findDescriptor(object: object, name: string): PropertyDescriptor | undefined {
+  for (let o: object | null = object; o; o = Object.getPrototypeOf(o)) {
+    const descriptor = Object.getOwnPropertyDescriptor(o, name);
+    if (descriptor) return descriptor;
+  }
+  return undefined;
 }
 
 /** @noRailsEquivalent PERMANENT */

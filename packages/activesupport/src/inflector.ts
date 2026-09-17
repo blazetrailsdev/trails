@@ -141,7 +141,7 @@ export function downcaseFirst(string: string): string {
 
 export function titleize(word: string, options: { keepIdSuffix?: boolean } = {}): string {
   return humanize(underscore(word), { keepIdSuffix: options.keepIdSuffix }).replace(
-    /\b(?<![''`])[a-z]/g,
+    /\b(?<!\w['’`()])[a-z]/g,
     (match) => match.toUpperCase(),
   );
 }

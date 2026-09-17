@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { classAttribute } from "../../class-attribute.js";
+import { assertNotRespondTo, assertPredicate } from "../../testing/assertions.js";
 
 describe("ClassAttributeTest", () => {
   let Klass: any;
@@ -75,39 +76,37 @@ describe("ClassAttributeTest", () => {
     expect(() => {
       object.setting = "boom";
     }).toThrow(TypeError);
-    expect(
-      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(object), "setting")?.set,
-    ).toBeUndefined();
+    assertNotRespondTo(object, "setting=");
   });
 
   it("disabling instance reader", () => {
     const Cls = class {};
     classAttribute.call(Cls, "setting", { instanceReader: false });
     const object = new (Cls as any)();
-    expect(object.setting).toBeUndefined();
-    expect(
-      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(object), "setting")?.get,
-    ).toBeUndefined();
-    expect(object.isSetting).toBeUndefined();
-    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
+    expect(() => object.setting()).toThrow(TypeError);
+    assertNotRespondTo(object, "setting");
+    expect(() => object.isSetting()).toThrow(TypeError);
+    assertNotRespondTo(object, "isSetting");
   });
 
   it("disabling both instance writer and reader", () => {
     const Cls = class {};
     classAttribute.call(Cls, "setting", { instanceAccessor: false });
     const object = new (Cls as any)();
-    expect(object.setting).toBeUndefined();
-    expect(Object.getPrototypeOf(object)).not.toHaveProperty("setting");
-    expect(object.isSetting).toBeUndefined();
-    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
+    expect(() => object.setting()).toThrow(TypeError);
+    assertNotRespondTo(object, "setting");
+    expect(() => object.isSetting()).toThrow(TypeError);
+    assertNotRespondTo(object, "isSetting");
+    expect(() => object["setting="]("boom")).toThrow(TypeError);
+    assertNotRespondTo(object, "setting=");
   });
 
   it("disabling instance predicate", () => {
     const Cls = class {};
     classAttribute.call(Cls, "setting", { instancePredicate: false });
     const object = new (Cls as any)();
-    expect(object.isSetting).toBeUndefined();
-    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
+    expect(() => object.isSetting()).toThrow(TypeError);
+    assertNotRespondTo(object, "isSetting");
   });
 
   it("setter returns set value", () => {
@@ -122,7 +121,7 @@ describe("ClassAttributeTest", () => {
 
     const instance = new Klass();
     expect(instance.system).toBe(1);
-    expect(new Klass().isSystem).toBe(true);
+    assertPredicate(new Klass(), (k: any) => k.isSystem);
     instance.system = 2;
     expect(instance.system).toBe(2);
   });

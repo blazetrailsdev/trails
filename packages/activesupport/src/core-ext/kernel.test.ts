@@ -1,80 +1,88 @@
 import { describe, it, expect } from "vitest";
+import { enableWarnings, silenceWarnings } from "./kernel/reporting.js";
+import { suppress } from "../module-ext.js";
+import { ArgumentError, LoadError, verbose } from "@blazetrails/ruby-compat";
 
 describe("KernelTest", () => {
   it("silence warnings", () => {
-    const original = console.warn;
-    const captured: string[] = [];
-    console.warn = (...args: unknown[]) => {
-      captured.push(args.join(" "));
-    };
-    console.warn("test warning");
-    console.warn = original;
-    expect(captured).toContain("test warning");
+    silenceWarnings(() => expect(verbose()).toBeNull());
+    expect(silenceWarnings(() => 1234)).toEqual(1234);
   });
 
   it("silence warnings verbose invariant", () => {
-    const original = console.log;
-    let called = false;
-    console.log = () => {
-      called = true;
-    };
-    console.log("info");
-    console.log = original;
-    expect(called).toBe(true);
+    const oldVerbose = verbose();
+    try {
+      silenceWarnings(() => {
+        throw new Error();
+      });
+      expect.unreachable();
+    } catch {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(verbose()).toEqual(oldVerbose);
+    }
   });
 
   it("enable warnings", () => {
-    const captured: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => captured.push(args.join(" "));
-    console.warn("enabled warning");
-    console.warn = original;
-    expect(captured).toContain("enabled warning");
+    enableWarnings(() => expect(verbose()).toEqual(true));
+    expect(enableWarnings(() => 1234)).toEqual(1234);
   });
 
   it("enable warnings verbose invariant", () => {
-    expect(typeof console.warn).toBe("function");
+    const oldVerbose = verbose();
+    try {
+      enableWarnings(() => {
+        throw new Error();
+      });
+      expect.unreachable();
+    } catch {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(verbose()).toEqual(oldVerbose);
+    }
   });
 
   it("class eval", () => {
-    class Foo {
-      greet() {
-        return "hello";
-      }
-    }
-    const inst = new Foo();
-    const method = "greet";
-    expect((inst as unknown as Record<string, () => string>)[method]()).toBe("hello");
+    const o = class {
+      static x = 1;
+    };
+    expect(
+      function (this: { x: number }) {
+        return this.x;
+      }.call(o),
+    ).toEqual(1);
   });
 });
 
 describe("KernelSuppressTest", () => {
-  function suppress<T extends new (...a: any[]) => Error>(...types: T[]) {
-    return (fn: () => void) => {
-      try {
-        fn();
-      } catch (e) {
-        if (types.some((t) => e instanceof t)) return;
-        throw e;
-      }
-    };
-  }
-
   it("reraise", () => {
-    const suppresser = suppress(TypeError);
     expect(() =>
-      suppresser(() => {
-        throw new RangeError("boom");
-      }),
-    ).toThrow(RangeError);
+      suppress(() => {
+        throw new LoadError();
+      }, ArgumentError),
+    ).toThrow(LoadError);
   });
 
   it("suppression", () => {
-    const suppresser = suppress(Error);
-    expect(() =>
-      suppresser(() => {
-        throw new Error("suppressed");
-      }),
-    ).not.toThrow();
+    expect(() => {
+      suppress(() => {
+        throw new ArgumentError();
+      }, ArgumentError);
+      suppress(() => {
+        throw new LoadError();
+      }, LoadError);
+      suppress(
+        () => {
+          throw new LoadError();
+        },
+        LoadError,
+        ArgumentError,
+      );
+      suppress(
+        () => {
+          throw new ArgumentError();
+        },
+        LoadError,
+        ArgumentError,
+      );
+    }).not.toThrow();
   });
 });
