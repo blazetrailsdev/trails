@@ -71,10 +71,9 @@ function strAref(str: string, args: ArefArgs): string | null {
 function strRange(str: string, args: ArefArgs): [number, number] {
   const [first, second] = args;
   if (first instanceof RegExp) {
-    const match = first.exec(str)!;
-    const capture = second ?? 0;
-    const start = match.index + match[0].indexOf(match[capture]);
-    return [start, match[capture].length];
+    const match = new RegExp(first.source, first.flags.replace("g", "") + "d").exec(str)!;
+    const [start, end] = match.indices![second ?? 0];
+    return [start, end - start];
   }
   if (typeof first === "string") return [str.indexOf(first), first.length];
   if (first instanceof Range) {

@@ -77,7 +77,10 @@ export const Concern = {
   included(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
       if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
-        if (sourceLocation(this._includedBlock!) !== sourceLocation(block!)) {
+        if (
+          sourceLocation(this._includedBlock!) !== sourceLocation(block!) ||
+          this._includedBlock!.toString() !== block!.toString()
+        ) {
           throw new MultipleIncludedBlocks();
         }
       } else {
@@ -90,7 +93,10 @@ export const Concern = {
   prepended(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
       if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
-        if (sourceLocation(this._prependedBlock!) !== sourceLocation(block!)) {
+        if (
+          sourceLocation(this._prependedBlock!) !== sourceLocation(block!) ||
+          this._prependedBlock!.toString() !== block!.toString()
+        ) {
           throw new MultiplePrependBlocks();
         }
       } else {
