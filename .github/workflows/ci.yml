@@ -957,6 +957,16 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
+    # postgres-tests job below for the rationale. That story left this lane
+    # unsharded as "not on the critical path"; sharding the other two made it
+    # the critical path, so the exemption no longer holds. No service
+    # container to duplicate here, and the `needs` graph keys on the job id,
+    # so the `ci` aggregator still sees one merged result for both legs.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
@@ -983,9 +993,14 @@ jobs:
       # running, rather than pulling the whole ~10.5k-test unit job onto every
       # activerecord PR.
       # (Guard: scripts/ci-suite-coverage.test.ts.)
-      - run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - run: pnpm vitest run packages/activerecord/
-      - run: pnpm vitest run packages/activerecord-cli
+      # Not sharded — run once, on shard 1 only, to avoid a redundant
+      # double-run across the two legs.
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      # CLI E2E is not sharded — run it once, on shard 1 only.
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm vitest run packages/activerecord-cli
 
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
