@@ -1539,9 +1539,7 @@ describe("CalculationsTest", () => {
         ["SpecialPost", 1],
         ["StiPost", 2],
       ]);
-      const actual = await (Post.group("type").order(":count" as any) as any)
-        .limit(2)
-        .maximum("comments_count");
+      const actual = await Post.group("type").order(":count").limit(2).maximum("comments_count");
       expect(actual).toEqual(expected);
     },
   );
@@ -1997,11 +1995,13 @@ GROUP BY firm_id
 LIMIT 1
 `;
 
-    const account = (await Account.findBySql([sql, railsCore.id]))[0] as any;
+    const account = (await Account.findBySql([sql, railsCore.id]))[0] as Account & {
+      avg_credit_limit: unknown;
+    };
 
     expect(account.id).toBeNull();
 
-    expect((await account.firm).id).toEqual(railsCore.id);
+    expect((await account.firm)!.id).toEqual(railsCore.id);
 
     expect(account.avg_credit_limit).toEqual(52.5);
   });
@@ -2012,11 +2012,11 @@ LIMIT 1
     const account = (await Account.select("firm_id", "AVG(credit_limit) AS avg_credit_limit")
       .where({ firm: railsCore })
       .group("firm_id")
-      .takeBang()) as any;
+      .takeBang()) as Account & { avg_credit_limit: unknown };
 
     expect(account.id).toBeNull();
 
-    expect((await account.firm).id).toEqual(railsCore.id);
+    expect((await account.firm)!.id).toEqual(railsCore.id);
 
     expect(account.avg_credit_limit).toEqual(52.5);
   });
@@ -2032,7 +2032,9 @@ GROUP BY companies.id
 LIMIT 1
 `;
 
-    const firm = (await DependentFirm.findBySql([sql, railsCore.id]))[0] as any;
+    const firm = (await DependentFirm.findBySql([sql, railsCore.id]))[0] as DependentFirm & {
+      avg_credit_limit: unknown;
+    };
 
     expect(firm.id).toEqual(railsCore.id);
     expect(firm.name).toEqual(railsCore.name);
@@ -2050,7 +2052,7 @@ LIMIT 1
       .where({ id: railsCore.id })
       .joins(":account")
       .group("id")
-      .takeBang()) as any;
+      .takeBang()) as DependentFirm & { avg_credit_limit: unknown };
 
     expect(firm.id).toEqual(railsCore.id);
     expect(firm.name).toEqual(railsCore.name);
