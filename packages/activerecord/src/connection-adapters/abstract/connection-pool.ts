@@ -469,7 +469,14 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async pinConnectionBang(lockThread = false): Promise<void> {
-    this._pinnedConnection ??= this.connectionLease().connection ?? (await this.checkout());
+    if (!this._pinnedConnection) {
+      const acquired = this.connectionLease().connection ?? (await this.checkout());
+      if (this._pinnedConnection) {
+        this.checkin(acquired);
+      } else {
+        this._pinnedConnection = acquired;
+      }
+    }
     this._pinnedConnectionsDepth += 1;
 
     if (this._connections && !this._connections.includes(this._pinnedConnection)) {
