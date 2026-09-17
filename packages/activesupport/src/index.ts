@@ -560,6 +560,7 @@ export {
   assertNotPredicate,
   assertRespondTo,
   assertNotRespondTo,
+  assertInDelta,
   assertEmpty,
   assertNotEmpty,
   assertSame,

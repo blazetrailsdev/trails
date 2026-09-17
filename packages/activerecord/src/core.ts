@@ -44,7 +44,7 @@ export interface Core {
   isReadonly(): boolean;
   readonlyBang(): this;
   isStrictLoading(): boolean;
-  strictLoadingBang(value?: boolean, options?: { mode?: StrictLoadingMode }): this;
+  strictLoadingBang(value?: boolean, options?: { mode?: StrictLoadingMode }): boolean;
   strictLoadingMode(): StrictLoadingMode;
   isStrictLoadingAll(): boolean;
   isStrictLoadingNPlusOneOnly(): boolean;
@@ -238,7 +238,7 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   this: T,
   value: boolean = true,
   options: { mode?: StrictLoadingMode } = {},
-): T {
+): boolean {
   const mode = options.mode ?? "all";
   if (mode !== "all" && mode !== "n_plus_one_only") {
     throw new ArgumentError(
@@ -247,7 +247,7 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   }
   this._strictLoadingMode = mode;
   this._strictLoading = value;
-  return this;
+  return value;
 }
 
 export function initWithAttributes(

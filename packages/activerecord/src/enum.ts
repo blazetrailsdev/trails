@@ -6,7 +6,8 @@ import {
   isBlank,
   pluralize,
 } from "@blazetrails/activesupport";
-import { ArgumentError, ValueType, defaultValue } from "@blazetrails/activemodel";
+import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
+import { isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
@@ -18,59 +19,6 @@ import { Relation } from "./relation.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 type EnumValue = number | string | boolean | null;
-
-/**
- * Register an EnumType in the attribute set and install the label-returning
- * accessor, the single Rails-faithful storage model used by the `Base.enum`
- * macro (`_enum`). After this, the attribute
- * stores the label string (via EnumType.cast on write), the getter returns it,
- * and assignment runs `assertValidValue`.
- *
- * Mirrors: ActiveRecord::Enum#_enum calling `attribute(name, **options)` then
- * `decorate_attributes([name]) { |_n, subtype| EnumType.new(...) }` (enum.rb:238-247).
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the attribute(...) + decorate_attributes pair of Enum#_enum (enum.rb:222-247), extracted from the macro body.
- */
-export function installEnumAttribute(
-  klass: typeof Base,
-  name: string,
-  mapping: Record<string, EnumValue>,
-  raiseOnInvalidValues: boolean,
-  attributeOptions?: { default?: unknown },
-): void {
-  if (attributeOptions && "default" in attributeOptions) {
-    klass.attribute(name, { default: attributeOptions.default });
-  } else {
-    klass.attribute(name);
-  }
-  klass.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
-    if (subtype === defaultValue()) {
-      throw new Error(
-        `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
-          " backed by a database column or declared with an explicit type" +
-          " via `attribute`.",
-      );
-    }
-    if (subtype instanceof EnumType) subtype = subtype.subtype;
-    return new EnumType(
-      name,
-      new HashWithIndifferentAccess<EnumValue>(mapping),
-      subtype!,
-      raiseOnInvalidValues,
-    );
-  });
-
-  Object.defineProperty(klass.prototype, name, {
-    get(this: Base) {
-      return (this as unknown as EnumInstanceHost).readAttribute(name);
-    },
-    set(this: Base, value: unknown) {
-      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
-    },
-    configurable: true,
-  });
-}
 
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
@@ -125,7 +73,7 @@ export class EnumType extends ValueType<string> {
 
   cast(value: unknown): string | null {
     if (this._mapping.hasKey(value as string)) {
-      return value as string;
+      return isSymbol(value) ? symbolToS(value) : (value as string);
     }
     if (this._reverseMapping.has(value as EnumValue)) {
       return this._reverseMapping.get(value as EnumValue)!;
@@ -259,6 +207,9 @@ export function enumMethod(
   values: string[] | Record<string, EnumValue>,
   options?: EnumMacroOptions,
 ): void {
+  if (values == null || (values as unknown) === false) {
+    [values, options] = [(options ?? {}) as Record<string, EnumValue>, {}];
+  }
   _enum.call(this, name, values, options);
 }
 
@@ -274,7 +225,6 @@ export function _enum(
   values: string[] | Record<string, string | number | boolean | null>,
   options?: EnumMacroOptions,
 ): void {
-  if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
   assertValidEnumDefinitionValues(values);
   assertValidEnumOptions(options ?? {});
 
@@ -309,13 +259,39 @@ export function _enum(
   const toCamel = (s: string) => camelize(s, false);
 
   const validate = options?.validate ?? false;
-  installEnumAttribute(
-    this,
-    name,
-    mapping,
-    !validate,
-    options && "default" in options ? { default: options.default } : undefined,
-  );
+
+  if (options && "default" in options) {
+    this.attribute(name, { default: options.default });
+  } else {
+    this.attribute(name);
+  }
+
+  this.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
+    if (subtype === defaultValue()) {
+      throw new RuntimeError(
+        `Undeclared attribute type for enum '${name}' in ${this.name}. Enums must be` +
+          " backed by a database column or declared with an explicit type" +
+          " via `attribute`.",
+      );
+    }
+    if (subtype instanceof EnumType) subtype = subtype.subtype;
+    return new EnumType(
+      name,
+      new HashWithIndifferentAccess<EnumValue>(mapping),
+      subtype!,
+      !validate,
+    );
+  });
+
+  Object.defineProperty(this.prototype, name, {
+    get(this: Base) {
+      return (this as unknown as EnumInstanceHost).readAttribute(name);
+    },
+    set(this: Base, value: unknown) {
+      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
+    },
+    configurable: true,
+  });
 
   const scopes = options?.scopes !== false;
   const instanceMethods = options?.instanceMethods !== false;
@@ -529,56 +505,38 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
 export function assertValidEnumDefinitionValues(
   values: any,
 ): Record<string, string | number | boolean | null> | string[] {
+  if (isPlainHash(values)) {
+    const keys = Object.keys(values as object);
+    if (keys.length === 0) {
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
+    }
+    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
+    }
+    return values;
+  }
+
   if (Array.isArray(values)) {
     if (values.length === 0) {
-      throw new ArgumentError("Enum values must not be empty.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
     }
     const allValid =
       values.every((v) => typeof v === "string" && v.startsWith(":")) ||
       values.every((v) => typeof v === "string" && !v.startsWith(":"));
     if (!allValid) {
       throw new ArgumentError(
-        `Enum values must only contain strings or symbols, got: ${Array.from(
-          new Set(values.map((v) => typeof v)),
-        ).join(", ")}`,
+        `Enum values ${rbInspect(values)} must only contain symbols or strings.`,
       );
     }
     if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
-      throw new ArgumentError("Enum values must not contain a blank name.");
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
     }
     return values;
   }
 
-  if (isPlainHash(values)) {
-    const keys = Object.keys(values as object);
-    if (keys.length === 0) {
-      throw new ArgumentError("Enum values must not be empty.");
-    }
-    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
-      throw new ArgumentError("Enum values must not contain a blank name.");
-    }
-    for (const k of keys) {
-      const value = (values as Record<string, unknown>)[k];
-      const isFiniteNumber = typeof value === "number" && Number.isFinite(value);
-      if (
-        !(
-          typeof value === "string" ||
-          isFiniteNumber ||
-          typeof value === "boolean" ||
-          value === null
-        )
-      ) {
-        throw new ArgumentError(
-          `Enum values must be only booleans, finite numbers, strings, or null, got: ${
-            typeof value === "number" ? String(value) : typeof value
-          }`,
-        );
-      }
-    }
-    return values;
-  }
-
-  throw new ArgumentError("Enum values must be either a non-empty hash or an array.");
+  throw new ArgumentError(
+    `Enum values ${rbInspect(values)} must be either a non-empty hash or an array.`,
+  );
 }
 
 function isPlainHash(value: unknown): boolean {

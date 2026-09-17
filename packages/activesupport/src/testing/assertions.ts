@@ -386,6 +386,11 @@ export function assertNotRespondTo(actual: unknown, name: string, message?: stri
   );
 }
 
+export function assertInDelta(exp: number, act: number, delta: number = 0.001, msg?: string): void {
+  const n = Math.abs(exp - act);
+  assert(delta >= n, msg ?? `Expected |${exp} - ${act}| (${n}) to be <= ${delta}`);
+}
+
 function respondsTo(object: object, name: string): boolean {
   if (name in object) {
     const descriptor = findDescriptor(object, name);

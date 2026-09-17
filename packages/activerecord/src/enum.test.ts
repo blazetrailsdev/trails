@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
-import { ArgumentError } from "@blazetrails/activemodel";
-import { Book } from "./test-helpers/models/book.js";
+import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
+import { assertRespondTo, assertRaises, assertEmpty } from "@blazetrails/activesupport";
+import { Book, PublishedBook } from "./test-helpers/models/book.js";
+import { Author } from "./test-helpers/models/author.js";
 import { fixtures } from "./test-fixtures.js";
 
 describe("EnumTest", () => {
-  const { books } = fixtures(["books"]);
+  const { books, authors } = fixtures(["books", "authors", "authorAddresses"]);
 
   beforeAll(() => {
     registerModel(Book);
+    registerModel(PublishedBook);
+    registerModel(Author);
   });
 
   let book: Book;
@@ -23,10 +27,15 @@ describe("EnumTest", () => {
     expect(type.serialize(1)).toBe(1);
     expect(type.serialize(2)).toBe(2);
 
+    expect(type.serialize(":proposed")).toBe(0);
+    expect(type.serialize(":written")).toBe(1);
+    expect(type.serialize(":published")).toBe(2);
+
     expect(type.serialize("proposed")).toBe(0);
     expect(type.serialize("written")).toBe(1);
     expect(type.serialize("published")).toBe(2);
 
+    expect(type.serialize(":unknown")).toBeNull();
     expect(type.serialize("unknown")).toBeNull();
   });
 
@@ -35,23 +44,27 @@ describe("EnumTest", () => {
     expect(type.cast(0)).toBe("proposed");
     expect(type.cast(1)).toBe("written");
     expect(type.cast(2)).toBe("published");
+    expect(type.cast(":proposed")).toBe("proposed");
+    expect(type.cast(":written")).toBe("written");
+    expect(type.cast(":published")).toBe("published");
     expect(type.cast("proposed")).toBe("proposed");
     expect(type.cast("written")).toBe("written");
     expect(type.cast("published")).toBe("published");
+    expect(type.cast(":unknown")).toBe(":unknown");
     expect(type.cast("unknown")).toBe("unknown");
   });
 
   it("query state by predicate", () => {
-    expect((book as any).isPublished()).toBe(true);
-    expect((book as any).isWritten()).toBe(false);
-    expect((book as any).isProposed()).toBe(false);
+    expect((book as any).isPublished()).toBeTruthy();
+    expect((book as any).isWritten()).toBeFalsy();
+    expect((book as any).isProposed()).toBeFalsy();
 
-    expect((book as any).isRead()).toBe(true);
-    expect((book as any).isInEnglish()).toBe(true);
-    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
-    expect((book as any).isIllustratorVisibilityVisible()).toBe(true);
-    expect((book as any).isWithMediumFontSize()).toBe(true);
-    expect((book as any).isMediumToRead()).toBe(true);
+    expect((book as any).isRead()).toBeTruthy();
+    expect((book as any).isInEnglish()).toBeTruthy();
+    expect((book as any).isAuthorVisibilityVisible()).toBeTruthy();
+    expect((book as any).isIllustratorVisibilityVisible()).toBeTruthy();
+    expect((book as any).isWithMediumFontSize()).toBeTruthy();
+    expect((book as any).isMediumToRead()).toBeTruthy();
   });
 
   it("query state with strings", () => {
@@ -61,6 +74,7 @@ describe("EnumTest", () => {
     expect((book as any).author_visibility).toBe("visible");
     expect((book as any).illustrator_visibility).toBe("visible");
     expect((book as any).difficulty).toBe("medium");
+    expect((book as any).cover).toBe("soft");
   });
 
   it("find via scope", async () => {
@@ -71,13 +85,15 @@ describe("EnumTest", () => {
     expect((await (Book as any).authorVisibilityVisible().first())?.id).toBe(book.id);
     expect((await (Book as any).illustratorVisibilityVisible().first())?.id).toBe(book.id);
     expect((await (Book as any).mediumToRead().first())?.id).toBe(book.id);
+    expect((await (Book as any).forgotten().first())?.id).toBe(books("ddd").id);
+    expect((await authors("david").unpublishedBooks.first())?.id).toBe(books("rfr").id);
   });
 
   it("find via negative scope", async () => {
     const notPublished = await (Book as any).notPublished().toArray();
-    expect(notPublished.some((b: Book) => b.id === book.id)).toBe(false);
+    expect(notPublished.every((b: Book) => b.id !== book.id)).toBeTruthy();
     const notProposed = await (Book as any).notProposed().toArray();
-    expect(notProposed.some((b: Book) => b.id === book.id)).toBe(true);
+    expect(notProposed.some((b: Book) => b.id === book.id)).toBeTruthy();
   });
 
   it("find via where with values", async () => {
@@ -145,7 +161,7 @@ describe("EnumTest", () => {
 
   it("find via where should be type casted", async () => {
     const created = await (Book as any).enabled().create();
-    expect(created.isEnabled()).toBe(true);
+    expect(created.isEnabled()).toBeTruthy();
 
     const enabled = String((Book as any).boolean_statuses.enabled);
     expect((await Book.where({ boolean_status: enabled }).last())?.id).toBe(created.id);
@@ -154,48 +170,60 @@ describe("EnumTest", () => {
   });
 
   it("build from scope", () => {
-    expect((Book as any).written().build().isWritten()).toBe(true);
-    expect((Book as any).written().build().isProposed()).toBe(false);
+    expect((Book as any).written().build().isWritten()).toBeTruthy();
+    expect((Book as any).written().build().isProposed()).toBeFalsy();
+    expect((PublishedBook as any).hard().build().isHard()).toBeTruthy();
+    expect((PublishedBook as any).hard().build().isSoft()).toBeFalsy();
   });
 
   it("build from where", () => {
     expect(
       (Book.where({ status: (Book as any).statuses.written }).build() as any).isWritten(),
-    ).toBe(true);
+    ).toBeTruthy();
     expect(
       (Book.where({ status: (Book as any).statuses.written }).build() as any).isProposed(),
-    ).toBe(false);
-    expect((Book.where({ status: "written" }).build() as any).isWritten()).toBe(true);
-    expect((Book.where({ status: "written" }).build() as any).isProposed()).toBe(false);
+    ).toBeFalsy();
+    expect((Book.where({ status: ":written" }).build() as any).isWritten()).toBeTruthy();
+    expect((Book.where({ status: ":written" }).build() as any).isProposed()).toBeFalsy();
+    expect((Book.where({ status: "written" }).build() as any).isWritten()).toBeTruthy();
+    expect((Book.where({ status: "written" }).build() as any).isProposed()).toBeFalsy();
   });
 
   it("update by declaration", async () => {
     await (book as any).writtenBang();
-    expect((book as any).isWritten()).toBe(true);
+    expect((book as any).isWritten()).toBeTruthy();
     await (book as any).inEnglishBang();
-    expect((book as any).isInEnglish()).toBe(true);
+    expect((book as any).isInEnglish()).toBeTruthy();
     await (book as any).authorVisibilityVisibleBang();
-    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
+    expect((book as any).isAuthorVisibilityVisible()).toBeTruthy();
+    await (book as any).hardBang();
+    expect((book as any).isHard()).toBeTruthy();
   });
 
   it("update by setter", async () => {
     await book.updateBang({ status: "written" });
-    expect((book as any).isWritten()).toBe(true);
+    expect((book as any).isWritten()).toBeTruthy();
+    await book.updateBang({ cover: "hard" });
+    expect((book as any).isHard()).toBeTruthy();
   });
 
   it("enum methods are overwritable", async () => {
     expect(await (book as any).publishedBang()).toBe("do publish work...");
-    expect((book as any).isPublished()).toBe(true);
+    expect((book as any).isPublished()).toBeTruthy();
   });
 
   it("direct assignment", () => {
     (book as any).status = "written";
-    expect((book as any).isWritten()).toBe(true);
+    expect((book as any).isWritten()).toBeTruthy();
+    (book as any).cover = "hard";
+    expect((book as any).isHard()).toBeTruthy();
   });
 
   it("assign string value", () => {
     (book as any).status = "written";
-    expect((book as any).isWritten()).toBe(true);
+    expect((book as any).isWritten()).toBeTruthy();
+    (book as any).cover = "hard";
+    expect((book as any).isHard()).toBeTruthy();
   });
 
   it("enum changed attributes", () => {
@@ -238,15 +266,15 @@ describe("EnumTest", () => {
   it("enum attribute changed", () => {
     (book as any).status = "proposed";
     (book as any).language = "french";
-    expect(book.attributeChanged("status")).toBe(true);
-    expect(book.attributeChanged("language")).toBe(true);
+    expect(book.attributeChanged("status")).toBeTruthy();
+    expect(book.attributeChanged("language")).toBeTruthy();
   });
 
   it("enum attribute changed to", () => {
     (book as any).status = "proposed";
     (book as any).language = "french";
-    expect(book.attributeChanged("status", { to: "proposed" })).toBe(true);
-    expect(book.attributeChanged("language", { to: "french" })).toBe(true);
+    expect(book.attributeChanged("status", { to: "proposed" })).toBeTruthy();
+    expect(book.attributeChanged("language", { to: "french" })).toBeTruthy();
   });
 
   it("enum attribute changed from", () => {
@@ -254,8 +282,8 @@ describe("EnumTest", () => {
     const oldLanguage = (book as any).language;
     (book as any).status = "proposed";
     (book as any).language = "french";
-    expect(book.attributeChanged("status", { from: oldStatus })).toBe(true);
-    expect(book.attributeChanged("language", { from: oldLanguage })).toBe(true);
+    expect(book.attributeChanged("status", { from: oldStatus })).toBeTruthy();
+    expect(book.attributeChanged("language", { from: oldLanguage })).toBeTruthy();
   });
 
   it("enum attribute changed from old status to new status", () => {
@@ -263,43 +291,44 @@ describe("EnumTest", () => {
     const oldLanguage = (book as any).language;
     (book as any).status = "proposed";
     (book as any).language = "french";
-    expect(book.attributeChanged("status", { from: oldStatus, to: "proposed" })).toBe(true);
-    expect(book.attributeChanged("language", { from: oldLanguage, to: "french" })).toBe(true);
+    expect(book.attributeChanged("status", { from: oldStatus, to: "proposed" })).toBeTruthy();
+    expect(book.attributeChanged("language", { from: oldLanguage, to: "french" })).toBeTruthy();
   });
 
   it("enum didn't change", () => {
     const oldStatus = (book as any).status;
     (book as any).status = oldStatus;
-    expect(book.attributeChanged("status")).toBe(false);
+    expect(book.attributeChanged("status")).toBeFalsy();
   });
 
   it("persist changes that are dirty", () => {
     (book as any).status = "proposed";
-    expect(book.attributeChanged("status")).toBe(true);
+    expect(book.attributeChanged("status")).toBeTruthy();
     (book as any).status = "written";
-    expect(book.attributeChanged("status")).toBe(true);
+    expect(book.attributeChanged("status")).toBeTruthy();
   });
 
   it("reverted changes that are not dirty", () => {
     const oldStatus = (book as any).status;
     (book as any).status = "proposed";
-    expect(book.attributeChanged("status")).toBe(true);
+    expect(book.attributeChanged("status")).toBeTruthy();
     (book as any).status = oldStatus;
-    expect(book.attributeChanged("status")).toBe(false);
+    expect(book.attributeChanged("status")).toBeFalsy();
   });
 
   it("reverted changes are not dirty going from nil to value and back", async () => {
     const created = await Book.createBang({ nullable_status: null });
     (created as any).nullable_status = "married";
-    expect(created.attributeChanged("nullable_status")).toBe(true);
+    expect(created.attributeChanged("nullable_status")).toBeTruthy();
     (created as any).nullable_status = null;
-    expect(created.attributeChanged("nullable_status")).toBe(false);
+    expect(created.attributeChanged("nullable_status")).toBeFalsy();
   });
 
-  it("assign non existing value raises an error", () => {
-    expect(() => {
+  it("assign non existing value raises an error", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
       (book as any).status = "unknown";
-    }).toThrow("'unknown' is not a valid status");
+    });
+    expect(e.message).toEqual("'unknown' is not a valid status");
   });
 
   it("validation with 'validate: true' option", async () => {
@@ -311,16 +340,16 @@ describe("EnumTest", () => {
     }
 
     let validBook = new K({ status: "proposed" } as any);
-    expect(await (validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBeTruthy();
 
     validBook = new K({ status: "written" } as any);
-    expect(await (validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBeTruthy();
 
     let invalidBook = new K({ status: null } as any);
-    expect(await (invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBeFalsy();
 
     invalidBook = new K({ status: "unknown" } as any);
-    expect(await (invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBeFalsy();
   });
 
   it("validation with 'validate: hash' option", async () => {
@@ -332,25 +361,22 @@ describe("EnumTest", () => {
     }
 
     let validBook = new K({ status: "proposed" } as any);
-    expect(await (validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBeTruthy();
 
     validBook = new K({ status: "written" } as any);
-    expect(await (validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBeTruthy();
 
     validBook = new K({ status: null } as any);
-    expect(await (validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBeTruthy();
 
     const invalidBook = new K({ status: "unknown" } as any);
-    expect(await (invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBeFalsy();
   });
 
   it("NULL values from database should be casted to nil", async () => {
     await Book.where({ id: book.id }).updateAll("status = NULL");
     await book.reload();
     expect((book as any).status).toBeNull();
-    expect((book as any).isPublished()).toBe(false);
-    expect((book as any).isWritten()).toBe(false);
-    expect((book as any).isProposed()).toBe(false);
   });
 
   it("deserialize nil value to enum which defines nil value to hash", () => {
@@ -394,23 +420,23 @@ describe("EnumTest", () => {
   });
 
   it("building new objects with enum scopes", () => {
-    expect((Book as any).written().build().isWritten()).toBe(true);
-    expect((Book as any).read().build().isRead()).toBe(true);
-    expect((Book as any).inSpanish().build().isInSpanish()).toBe(true);
+    expect((Book as any).written().build().isWritten()).toBeTruthy();
+    expect((Book as any).read().build().isRead()).toBeTruthy();
+    expect((Book as any).inSpanish().build().isInSpanish()).toBeTruthy();
     expect(
       (Book as any).illustratorVisibilityInvisible().build().isIllustratorVisibilityInvisible(),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("creating new objects with enum scopes", async () => {
-    expect((await (Book as any).written().create()).isWritten()).toBe(true);
-    expect((await (Book as any).read().create()).isRead()).toBe(true);
-    expect((await (Book as any).inSpanish().create()).isInSpanish()).toBe(true);
+    expect((await (Book as any).written().create()).isWritten()).toBeTruthy();
+    expect((await (Book as any).read().create()).isRead()).toBeTruthy();
+    expect((await (Book as any).inSpanish().create()).isInSpanish()).toBeTruthy();
     expect(
       (
         await (Book as any).illustratorVisibilityInvisible().create()
       ).isIllustratorVisibilityInvisible(),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("attribute_before_type_cast", () => {
@@ -439,23 +465,41 @@ describe("EnumTest", () => {
     expect((book as any).attributesForDatabase().status).toBe(2);
   });
 
-  it("invalid definition values raise an ArgumentError", () => {
+  it("invalid definition values raise an ArgumentError", async () => {
     const defineStatusEnum = (values: unknown) => {
       class K extends Base {
         static _tableName = "books";
       }
       (K as any).enum("status", values);
     };
-    expect(() => defineStatusEnum(undefined)).toThrow(ArgumentError);
-    expect(() => defineStatusEnum({})).toThrow(ArgumentError);
-    expect(() => defineStatusEnum([])).toThrow(ArgumentError);
-    expect(() => defineStatusEnum([{ proposed: 1, written: 2 }])).toThrow(ArgumentError);
-    expect(() => defineStatusEnum({ "": 1, active: 2 })).toThrow(ArgumentError);
-    expect(() => defineStatusEnum(["active", ""])).toThrow(ArgumentError);
-    expect(() => defineStatusEnum(new (class {})())).toThrow(ArgumentError);
+
+    let e = await assertRaises([ArgumentError], {}, () => defineStatusEnum(undefined));
+    expect(e.message).toMatch(/must not be empty\.$/);
+
+    e = await assertRaises([ArgumentError], {}, () => defineStatusEnum({}));
+    expect(e.message).toMatch(/must not be empty\.$/);
+
+    e = await assertRaises([ArgumentError], {}, () => defineStatusEnum([]));
+    expect(e.message).toMatch(/must not be empty\.$/);
+
+    e = await assertRaises([ArgumentError], {}, () =>
+      defineStatusEnum([{ proposed: 1, written: 2, published: 3 }]),
+    );
+    expect(e.message).toMatch(
+      /^Enum values \[\{"proposed"=>1, "written"=>2, "published"=>3\}\] must only contain symbols or strings\.$/,
+    );
+
+    e = await assertRaises([ArgumentError], {}, () => defineStatusEnum({ "": 1, active: 2 }));
+    expect(e.message).toMatch(/must not contain a blank name\.$/);
+
+    e = await assertRaises([ArgumentError], {}, () => defineStatusEnum(["active", ""]));
+    expect(e.message).toMatch(/must not contain a blank name\.$/);
+
+    e = await assertRaises([ArgumentError], {}, () => defineStatusEnum(new (class {})()));
+    expect(e.message).toMatch(/must be either a non-empty hash or an array\.$/);
   });
 
-  it("reserved enum names", () => {
+  it("reserved enum names", async () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
@@ -464,13 +508,16 @@ describe("EnumTest", () => {
     }
 
     const conflicts = ["column", "logger", "attributes"];
-    conflicts.forEach((name, i) => {
-      expect(() => (Klass as any).enum(name, [`value_${i}`])).toThrow(
+    for (const [i, name] of conflicts.entries()) {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        (Klass as any).enum(name, [`value_${i}`]),
+      );
+      expect(e.message).toMatch(
         new RegExp(`You tried to define an enum named "${name}" on the model`),
       );
-    });
+    }
   });
-  it("reserved enum values", () => {
+  it("reserved enum values", async () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
@@ -479,22 +526,24 @@ describe("EnumTest", () => {
     }
 
     const conflicts = ["new", "valid", "save", "proposed", "id"];
-    conflicts.forEach((value, i) => {
-      expect(() => (Klass as any).enum(`status_${i}`, [value])).toThrow(
-        /You tried to define an enum named .* on the model/,
+    for (const [i, value] of conflicts.entries()) {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        (Klass as any).enum(`status_${i}`, [value]),
       );
-    });
+      expect(e.message).toMatch(/You tried to define an enum named .* on the model/);
+    }
   });
-  it("reserved enum values for relation", () => {
+  it("reserved enum values for relation", async () => {
     const relationMethodSamples = ["records", "scoping", "scope_for_create"];
-    relationMethodSamples.forEach((value) => {
-      expect(() => {
+    for (const value of relationMethodSamples) {
+      const e = await assertRaises([ArgumentError], {}, () => {
         class Klass extends Base {
           static _tableName = "books";
         }
         (Klass as any).enum("category", ["other", value]);
-      }).toThrow(/You tried to define an enum named .* on the model/);
-    });
+      });
+      expect(e.message).toMatch(/You tried to define an enum named .* on the model/);
+    }
   });
   it("can use id as a value with a prefix or suffix", () => {
     expect(() => {
@@ -538,9 +587,9 @@ describe("EnumTest", () => {
     await (Klass as any).deleteAll();
     await Klass.createBang({ status: "proposed" });
     const book = new Klass({ status: "written" }) as any;
-    expect(await book.isValid()).toBe(true);
+    expect(await book.isValid()).toBeTruthy();
     book.status = "proposed";
-    expect(await book.isValid()).toBe(false);
+    expect(await book.isValid()).toBeFalsy();
   });
 
   it("validate inclusion of value in array", async () => {
@@ -552,9 +601,9 @@ describe("EnumTest", () => {
       }
     }
     const invalidBook = new Klass({ status: "proposed" }) as any;
-    expect(await invalidBook.isValid()).toBe(false);
+    expect(await invalidBook.isValid()).toBeFalsy();
     const validBook = new Klass({ status: "written" }) as any;
-    expect(await validBook.isValid()).toBe(true);
+    expect(await validBook.isValid()).toBeTruthy();
   });
 
   it("enums are distinct per class", async () => {
@@ -597,14 +646,16 @@ describe("EnumTest", () => {
     expect(book2.statusChange).toEqual(["drafted", "uploaded"]);
   });
 
-  it("attempting to modify enum raises error", () => {
-    expect(() => {
+  it("attempting to modify enum raises error", async () => {
+    let e = await assertRaises([TypeError], {}, () => {
       (Book as any).statuses["bad_enum"] = 40;
-    }).toThrow(TypeError);
+    });
+    expect(e.message).toMatch(/Cannot add property bad_enum, object is not extensible/);
 
-    expect(() => {
+    e = await assertRaises([TypeError], {}, () => {
       delete (Book as any).statuses["published"];
-    }).toThrow(TypeError);
+    });
+    expect(e.message).toMatch(/Cannot delete property 'published'/);
   });
 
   it("declare multiple enums with prefix: true", () => {
@@ -618,8 +669,8 @@ describe("EnumTest", () => {
       }
     }
     const instance = new K();
-    expect(typeof (instance as any).isStatusValue1).toBe("function");
-    expect(typeof (instance as any).isLastReadValue1).toBe("function");
+    assertRespondTo(instance, "isStatusValue1");
+    assertRespondTo(instance, "isLastReadValue1");
   });
 
   it("declare multiple enums with suffix: true", () => {
@@ -633,8 +684,8 @@ describe("EnumTest", () => {
       }
     }
     const instance = new K();
-    expect(typeof (instance as any).isValue1Status).toBe("function");
-    expect(typeof (instance as any).isValue1LastRead).toBe("function");
+    assertRespondTo(instance, "isValue1Status");
+    assertRespondTo(instance, "isValue1LastRead");
   });
 
   it("enum with alias_attribute", async () => {
@@ -648,11 +699,11 @@ describe("EnumTest", () => {
     registerModel(Klass);
 
     let record: any = await (Klass as any).proposed().create();
-    expect(record.isProposed()).toBe(true);
+    expect(record.isProposed()).toBeTruthy();
     expect(record.aliased_status).toBe("proposed");
 
     record = await (Klass as any).find(record.id);
-    expect(record.isProposed()).toBe(true);
+    expect(record.isProposed()).toBeTruthy();
     expect(record.aliased_status).toBe("proposed");
   });
 
@@ -729,67 +780,67 @@ describe("EnumTest", () => {
   });
 
   it("query state by predicate with prefix", () => {
-    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
-    expect((book as any).isAuthorVisibilityInvisible()).toBe(false);
-    expect((book as any).isIllustratorVisibilityVisible()).toBe(true);
-    expect((book as any).isIllustratorVisibilityInvisible()).toBe(false);
+    expect((book as any).isAuthorVisibilityVisible()).toBeTruthy();
+    expect((book as any).isAuthorVisibilityInvisible()).toBeFalsy();
+    expect((book as any).isIllustratorVisibilityVisible()).toBeTruthy();
+    expect((book as any).isIllustratorVisibilityInvisible()).toBeFalsy();
   });
 
   it("query state by predicate with custom prefix", () => {
-    expect((book as any).isInEnglish()).toBe(true);
-    expect((book as any).isInSpanish()).toBe(false);
-    expect((book as any).isInFrench()).toBe(false);
+    expect((book as any).isInEnglish()).toBeTruthy();
+    expect((book as any).isInSpanish()).toBeFalsy();
+    expect((book as any).isInFrench()).toBeFalsy();
   });
 
   it("query state by predicate with custom suffix", () => {
-    expect((book as any).isMediumToRead()).toBe(true);
-    expect((book as any).isEasyToRead()).toBe(false);
-    expect((book as any).isHardToRead()).toBe(false);
+    expect((book as any).isMediumToRead()).toBeTruthy();
+    expect((book as any).isEasyToRead()).toBeFalsy();
+    expect((book as any).isHardToRead()).toBeFalsy();
   });
 
   it("enum methods with custom suffix defined", () => {
-    expect(typeof (Book as any).easyToRead).toBe("function");
-    expect(typeof (Book as any).mediumToRead).toBe("function");
-    expect(typeof (Book as any).hardToRead).toBe("function");
+    assertRespondTo(Book, "easyToRead");
+    assertRespondTo(Book, "mediumToRead");
+    assertRespondTo(Book, "hardToRead");
 
-    expect(typeof (book as any).isEasyToRead).toBe("function");
-    expect(typeof (book as any).isMediumToRead).toBe("function");
-    expect(typeof (book as any).isHardToRead).toBe("function");
+    assertRespondTo(book, "isEasyToRead");
+    assertRespondTo(book, "isMediumToRead");
+    assertRespondTo(book, "isHardToRead");
 
-    expect(typeof (book as any).easyToReadBang).toBe("function");
-    expect(typeof (book as any).mediumToReadBang).toBe("function");
-    expect(typeof (book as any).hardToReadBang).toBe("function");
+    assertRespondTo(book, "easyToReadBang");
+    assertRespondTo(book, "mediumToReadBang");
+    assertRespondTo(book, "hardToReadBang");
   });
 
   it("update enum attributes with custom suffix", async () => {
     await (book as any).mediumToReadBang();
-    expect((book as any).isEasyToRead()).toBe(false);
-    expect((book as any).isMediumToRead()).toBe(true);
-    expect((book as any).isHardToRead()).toBe(false);
+    expect((book as any).isEasyToRead()).toBeFalsy();
+    expect((book as any).isMediumToRead()).toBeTruthy();
+    expect((book as any).isHardToRead()).toBeFalsy();
 
     await (book as any).easyToReadBang();
-    expect((book as any).isEasyToRead()).toBe(true);
-    expect((book as any).isMediumToRead()).toBe(false);
-    expect((book as any).isHardToRead()).toBe(false);
+    expect((book as any).isEasyToRead()).toBeTruthy();
+    expect((book as any).isMediumToRead()).toBeFalsy();
+    expect((book as any).isHardToRead()).toBeFalsy();
 
     await (book as any).hardToReadBang();
-    expect((book as any).isEasyToRead()).toBe(false);
-    expect((book as any).isMediumToRead()).toBe(false);
-    expect((book as any).isHardToRead()).toBe(true);
+    expect((book as any).isEasyToRead()).toBeFalsy();
+    expect((book as any).isMediumToRead()).toBeFalsy();
+    expect((book as any).isHardToRead()).toBeTruthy();
   });
 
   it("uses default status when no status is provided in fixtures", () => {
     const tlg = books("tlg");
-    expect((tlg as any).isProposed()).toBe(true);
-    expect((tlg as any).isInEnglish()).toBe(true);
+    expect((tlg as any).isProposed()).toBeTruthy();
+    expect((tlg as any).isInEnglish()).toBeTruthy();
   });
 
   it("uses default value from database on initialization", () => {
-    expect((new Book() as any).isProposed()).toBe(true);
+    expect((new Book() as any).isProposed()).toBeTruthy();
   });
 
   it("uses default value from database on initialization when using custom mapping", () => {
-    expect((new Book() as any).isHard()).toBe(true);
+    expect((new Book() as any).isHard()).toBeTruthy();
   });
 
   it("data type of Enum type", () => {
@@ -819,8 +870,8 @@ describe("EnumTest", () => {
     expect((new K() as any).status).toBe("published");
   });
 
-  it(":_default is invalid in the new API", () => {
-    expect(() => {
+  it(":_default is invalid in the new API", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
@@ -830,11 +881,12 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-    }).toThrow(/invalid option\(s\): :_default/);
+    });
+    expect(error.message).toMatch(/invalid option\(s\): :_default/);
   });
 
-  it(":_prefix is invalid in the new API", () => {
-    expect(() => {
+  it(":_prefix is invalid in the new API", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
@@ -842,11 +894,12 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-    }).toThrow(/invalid option\(s\): :_prefix/);
+    });
+    expect(error.message).toMatch(/invalid option\(s\): :_prefix/);
   });
 
-  it(":_suffix is invalid in the new API", () => {
-    expect(() => {
+  it(":_suffix is invalid in the new API", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
@@ -854,11 +907,12 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-    }).toThrow(/invalid option\(s\): :_suffix/);
+    });
+    expect(error.message).toMatch(/invalid option\(s\): :_suffix/);
   });
 
-  it(":_scopes is invalid in the new API", () => {
-    expect(() => {
+  it(":_scopes is invalid in the new API", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
@@ -866,11 +920,12 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-    }).toThrow(/invalid option\(s\): :_scopes/);
+    });
+    expect(error.message).toMatch(/invalid option\(s\): :_scopes/);
   });
 
-  it(":_instance_methods is invalid in the new API", () => {
-    expect(() => {
+  it(":_instance_methods is invalid in the new API", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
@@ -880,7 +935,8 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-    }).toThrow(/invalid option\(s\): :_instance_methods/);
+    });
+    expect(error.message).toMatch(/invalid option\(s\): :_instance_methods/);
   });
 
   it("scopes can be disabled by :scopes", () => {
@@ -891,7 +947,7 @@ describe("EnumTest", () => {
         this.enum("status", ["proposed", "written"], { scopes: false });
       }
     }
-    expect((K as any).proposed).toBeUndefined();
+    expect(() => (K as any).proposed()).toThrow(TypeError);
   });
 
   it("default methods can be disabled by :instance_methods", () => {
@@ -903,8 +959,8 @@ describe("EnumTest", () => {
       }
     }
     const instance = new K();
-    expect((instance as any).isProposed).toBeUndefined();
-    expect((instance as any).proposedBang).toBeUndefined();
+    expect(() => (instance as any).isProposed()).toThrow(TypeError);
+    expect(() => (instance as any).proposedBang()).toThrow(TypeError);
   });
 
   it("query state by predicate with :prefix", () => {
@@ -918,8 +974,8 @@ describe("EnumTest", () => {
       }
     }
     const instance = new K();
-    expect(typeof (instance as any).isStatusProposed).toBe("function");
-    expect(typeof (instance as any).isBeingUnread).toBe("function");
+    assertRespondTo(instance, "isStatusProposed");
+    assertRespondTo(instance, "isBeingUnread");
   });
 
   it("query state by predicate with :suffix", () => {
@@ -933,8 +989,8 @@ describe("EnumTest", () => {
       }
     }
     const instance = new K();
-    expect(typeof (instance as any).isHardCover).toBe("function");
-    expect(typeof (instance as any).isEasyToRead).toBe("function");
+    assertRespondTo(instance, "isHardCover");
+    assertRespondTo(instance, "isEasyToRead");
   });
 
   it("enum labels as keyword arguments", () => {
@@ -945,8 +1001,8 @@ describe("EnumTest", () => {
       }
     }
     const book = new K();
-    expect((book as any).isActive()).toBe(true);
-    expect((book as any).isArchived()).toBe(false);
+    expect((book as any).isActive()).toBeTruthy();
+    expect((book as any).isArchived()).toBeFalsy();
   });
 
   it("option names can be used as label", () => {
@@ -957,10 +1013,10 @@ describe("EnumTest", () => {
       }
     }
     const book = new K();
-    expect((book as any).isDefault()).toBe(true);
-    expect((book as any).isScopes()).toBe(false);
-    expect((book as any).isPrefix()).toBe(false);
-    expect((book as any).isSuffix()).toBe(false);
+    expect((book as any).isDefault()).toBeTruthy();
+    expect((book as any).isScopes()).toBeFalsy();
+    expect((book as any).isPrefix()).toBeFalsy();
+    expect((book as any).isSuffix()).toBeFalsy();
   });
 
   it("scopes are named like methods", () => {
@@ -971,8 +1027,8 @@ describe("EnumTest", () => {
         this.enum("breed", { "American Bobtail": 0, "Balinese-Javanese": 1 });
       }
     }
-    expect(typeof (K as any).americanBobtail).toBe("function");
-    expect(typeof (K as any).balineseJavanese).toBe("function");
+    assertRespondTo(K, "americanBobtail");
+    assertRespondTo(K, "balineseJavanese");
   });
 
   it("capital characters for enum names", () => {
@@ -983,8 +1039,8 @@ describe("EnumTest", () => {
       }
     }
     const computer = (Klass as any).extendedSilver().build();
-    expect(computer.isExtendedSilver()).toBe(true);
-    expect(computer.isExtendedGold()).toBe(false);
+    expect(computer.isExtendedSilver()).toBeTruthy();
+    expect(computer.isExtendedGold()).toBeFalsy();
   });
 
   it("unicode characters for enum names", () => {
@@ -995,8 +1051,8 @@ describe("EnumTest", () => {
       }
     }
     const book = (Klass as any)["🇺🇸"]().build();
-    expect(book["is🇺🇸"]()).toBe(true);
-    expect(book["is🇪🇸"]()).toBe(false);
+    expect(book["is🇺🇸"]()).toBeTruthy();
+    expect(book["is🇪🇸"]()).toBeFalsy();
   });
 
   it("mangling collision for enum names", () => {
@@ -1007,8 +1063,8 @@ describe("EnumTest", () => {
       }
     }
     const computer = (Klass as any)["etc::Gmt+1"]().build();
-    expect(computer["isEtc/GMT+1"]()).toBe(true);
-    expect(computer["isEtc/GMT-1"]()).toBe(false);
+    expect(computer["isEtc/GMT+1"]()).toBeTruthy();
+    expect(computer["isEtc/GMT-1"]()).toBeFalsy();
   });
 
   it("deserialize enum value to original hash key", async () => {
@@ -1022,8 +1078,8 @@ describe("EnumTest", () => {
     registerModel(K);
     const b = await K.create({ status: 0 });
     expect((b as any).status).toBe("proposed");
-    expect((b as any).isProposed()).toBe(true);
-    expect((b as any).isWritten()).toBe(false);
+    expect((b as any).isProposed()).toBeTruthy();
+    expect((b as any).isWritten()).toBeFalsy();
   });
   it("serializable? with large number label", async () => {
     class Klass extends Base {
@@ -1034,11 +1090,11 @@ describe("EnumTest", () => {
     }
     const type = (Klass as any).typeForAttribute("status")!;
 
-    expect(type.isSerializable("9223372036854775808")).toBe(true);
-    expect(type.isSerializable("-9223372036854775809")).toBe(true);
+    expect(type.isSerializable("9223372036854775808")).toBeTruthy();
+    expect(type.isSerializable("-9223372036854775809")).toBeTruthy();
 
-    expect(type.isSerializable(9223372036854775808n)).toBe(false);
-    expect(type.isSerializable(-9223372036854775809n)).toBe(false);
+    expect(type.isSerializable(9223372036854775808n)).toBeFalsy();
+    expect(type.isSerializable(-9223372036854775809n)).toBeFalsy();
 
     const book1 = await Klass.createBang({ status: "9223372036854775808" });
     const book2 = await Klass.createBang({ status: "-9223372036854775809" });
@@ -1052,6 +1108,9 @@ describe("EnumTest", () => {
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const expectedMessage1 =
+      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
+      "while positive form 'sent' also exists.";
     try {
       class K extends Base {
         static _tableName = "books";
@@ -1061,7 +1120,7 @@ describe("EnumTest", () => {
         }
       }
       void K;
-      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+      expect(spy.mock.calls.flat()).toContain(expectedMessage1);
     } finally {
       spy.mockRestore();
     }
@@ -1069,6 +1128,9 @@ describe("EnumTest", () => {
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const expectedMessage1 =
+      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
+      "while positive form 'sent' also exists.";
     try {
       class K extends Base {
         static _tableName = "books";
@@ -1078,7 +1140,7 @@ describe("EnumTest", () => {
         }
       }
       void K;
-      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+      expect(spy.mock.calls.flat()).toContain(expectedMessage1);
     } finally {
       spy.mockRestore();
     }
@@ -1095,7 +1157,7 @@ describe("EnumTest", () => {
         }
       }
       void Klass;
-      expect(spy).not.toHaveBeenCalled();
+      assertEmpty(spy.mock.calls);
     } finally {
       spy.mockRestore();
     }
@@ -1112,22 +1174,23 @@ describe("EnumTest", () => {
         }
       }
       void K;
-      expect(spy).not.toHaveBeenCalled();
+      assertEmpty(spy.mock.calls);
     } finally {
       spy.mockRestore();
     }
   });
 
-  it("raises for attributes with undeclared type", () => {
+  it("raises for attributes with undeclared type", async () => {
     class Klass extends Book {
       static {
         this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }
 
-    expect(() => (Klass as any).typeForAttribute("typeless_genre")).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in/,
+    const error = await assertRaises([RuntimeError], {}, () =>
+      (Klass as any).typeForAttribute("typeless_genre"),
     );
+    expect(error.message).toMatch("Undeclared attribute type for enum 'typeless_genre' in Klass");
   });
   it("supports attributes declared with a explicit type", () => {
     class Klass extends Book {
