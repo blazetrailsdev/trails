@@ -20,8 +20,21 @@ import { Contract, NewContract } from "./test-helpers/models/contract.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
-import { Ship as CanonicalShip, ShipWithoutNestedAttributes } from "./test-helpers/models/ship.js";
-import { Developer } from "./test-helpers/models/developer.js";
+import {
+  Prisoner,
+  Ship as CanonicalShip,
+  ShipWithoutNestedAttributes,
+} from "./test-helpers/models/ship.js";
+import { AuditLog, Developer } from "./test-helpers/models/developer.js";
+import { Tag } from "./test-helpers/models/tag.js";
+import { Tagging } from "./test-helpers/models/tagging.js";
+import { Mouse } from "./test-helpers/models/mouse.js";
+import { Molecule } from "./test-helpers/models/molecule.js";
+import { Electron } from "./test-helpers/models/electron.js";
+import { Guitar } from "./test-helpers/models/guitar.js";
+import { TuningPeg } from "./test-helpers/models/tuning-peg.js";
+import { Squeak } from "./test-helpers/models/squeak.js";
+import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
@@ -35,7 +48,19 @@ import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import { computePrimaryKey, addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import { fixtures } from "./test-fixtures.js";
-import { assertNoQueries } from "./testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
+import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
+import { Chef, ChefWithPolymorphicInverseOf } from "./test-helpers/models/chef.js";
+import {
+  assert,
+  assertNot,
+  assertNoDifference,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertPredicate,
+  getCallbackChains,
+  isPresent,
+} from "@blazetrails/activesupport";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 function setAssociationTarget(record: Base, name: string, value: unknown) {
@@ -1071,10 +1096,14 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures([]);
+  fixtures(["companies", "accounts"]);
   beforeAll(() => {
+    registerModel(CanonicalCompany);
     registerModel(Firm);
     registerModel(Account);
+    registerModel(DrinkDesigner);
+    registerModel(Chef);
+    registerModel(ChefWithPolymorphicInverseOf);
     registerModel(Eye);
     registerModel(Iris);
     registerModel(IrisWithReadOnlyForeignKey);
@@ -1085,125 +1114,113 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
 
   it("should save parent but not invalid child", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PFirm extends Base {
-      declare name: string | null;
+    const firm = new Firm({ name: "GlobalMegaCorp" }) as any;
+    assertPredicate(await firm.isValid(), (v) => v);
 
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.hasOne("pAccount", { foreignKey: "firm_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PFirm {
-      get pAccount(): PAccount | null | Promise<PAccount | null>;
-      set pAccount(value: PAccount | null);
-    }
-    class PAccount extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
+    await firm.buildAccountUsingPrimaryKey();
+    assertNotPredicate(await (await firm.buildAccountUsingPrimaryKey()).isValid(), (v) => v);
 
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-        this.validates("credit_limit", { presence: true });
-      }
-    }
-    registerModel("PFirm", PFirm);
-    registerModel("PAccount", PAccount);
-
-    const firm = new PFirm({ name: "GlobalMegaCorp" });
-    expect(await firm.isValid()).toBe(true);
-
-    const account = new PAccount({});
-    cacheAssoc(firm, "pAccount", account);
-    expect(await account.isValid()).toBe(false);
-
-    const saved = await firm.save();
-    expect(saved).toBe(true);
-    expect(account.isPersisted()).toBe(false);
+    assert(await firm.save());
+    assertNotPredicate(await firm.accountUsingPrimaryKey, (a: any) => a.isPersisted());
   });
 
   it("save fails for invalid has one", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = await Firm.create({ name: "Acme" });
-    const account = new Account({});
-    cacheAssoc(firm, "account", account);
-    const saved = await firm.save();
-    expect(saved).toBe(false);
+    const firm = (await Firm.first()) as any;
+    assertPredicate(await firm.isValid(), (v) => v);
+
+    await firm.buildAccount();
+
+    assertNotPredicate(await (await firm.account).isValid(), (v) => v);
+    assertNotPredicate(await firm.isValid(), (v) => v);
+    assertNot(await firm.save());
+    expect(firm.errors.get("account")).toEqual(["is invalid"]);
   });
 
   it("save succeeds for invalid has one with validate false", async () => {
-    const { Firm } = makeModels();
-    class LooseAccount extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
+    const firm = (await Firm.first()) as any;
+    assertPredicate(await firm.isValid(), (v) => v);
 
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    registerModel("LooseAccount", LooseAccount);
-    Associations.hasOne.call(Firm, "looseAccount", { autosave: true, foreignKey: "firm_id" });
-    const firm = await Firm.create({ name: "Acme" });
-    const account = new LooseAccount({});
-    cacheAssoc(firm, "looseAccount", account);
-    const saved = await firm.save();
-    expect(saved).toBe(true);
+    await firm.buildUnvalidatedAccount();
+
+    assertNotPredicate(await (await firm.unvalidatedAccount).isValid(), (v) => v);
+    assertPredicate(await firm.isValid(), (v) => v);
+    assert(await firm.save());
   });
 
   it("build before child saved", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = await Firm.create({ name: "Acme" });
-    const account = new Account({ credit_limit: 100 });
-    cacheAssoc(firm, "account", account);
-    await firm.save();
-    expect(account.isNewRecord()).toBe(false);
-    expect(account.firm_id).toBe(firm.id);
+    const firm = (await Firm.find(1)) as any;
+
+    const account = await firm.buildAccount({ credit_limit: 1000 });
+    expect(await firm.account).toBe(account);
+    assertNotPredicate(account, (a: any) => a.isPersisted());
+    assert(await firm.save());
+    expect(await firm.account).toBe(account);
+    assertPredicate(account, (a: any) => a.isPersisted());
   });
 
   it("build before either saved", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = new Firm({ name: "Acme" });
-    const account = new Account({ credit_limit: 200 });
-    cacheAssoc(firm, "account", account);
-    await firm.save();
-    expect(firm.isNewRecord()).toBe(false);
-    expect(account.isNewRecord()).toBe(false);
-    expect(account.firm_id).toBe(firm.id);
+    const firm = new Firm({ name: "GlobalMegaCorp" }) as any;
+
+    const account = new Account({ credit_limit: 1000 });
+    await firm.setAccount(account);
+    expect(await firm.account).toBe(account);
+    assertNotPredicate(account, (a) => a.isPersisted());
+    assert(await firm.save());
+    expect(await firm.account).toBe(account);
+    assertPredicate(account, (a) => a.isPersisted());
   });
 
   it("assignment before parent saved", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = new Firm({ name: "Corp" });
-    const account = new Account({ credit_limit: 300 });
-    cacheAssoc(firm, "account", account);
-    await firm.save();
-    expect(account.firm_id).toBe(firm.id);
+    const firm = new Firm({ name: "GlobalMegaCorp" }) as any;
+    const a = await Account.find(1);
+    await firm.setAccount(a);
+    assertNotPredicate(firm, (f: any) => f.isPersisted());
+    expect(await firm.account).toBe(a);
+    assert(await firm.save());
+    expect(await firm.account).toBe(a);
+    await firm.association("account").reload();
+    expect((await firm.account).equals(a)).toBe(true);
   });
 
   it("assignment before either saved", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = new Firm({ name: "LLC" });
-    const account = new Account({ credit_limit: 400 });
-    cacheAssoc(firm, "account", account);
-    await firm.save();
-    expect(firm.isNewRecord()).toBe(false);
-    expect(account.isNewRecord()).toBe(false);
+    const firm = new Firm({ name: "GlobalMegaCorp" }) as any;
+    const a = new Account({ credit_limit: 1000 });
+    await firm.setAccount(a);
+    assertNotPredicate(firm, (f: any) => f.isPersisted());
+    assertNotPredicate(a, (r) => r.isPersisted());
+    expect(await firm.account).toBe(a);
+    assert(await firm.save());
+    assertPredicate(firm, (f: any) => f.isPersisted());
+    assertPredicate(a, (r) => r.isPersisted());
+    expect(await firm.account).toBe(a);
+    await firm.association("account").reload();
+    expect((await firm.account).equals(a)).toBe(true);
   });
 
   it("not resaved when unchanged", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = await Firm.create({ name: "Acme" });
-    const account = await Account.create({ credit_limit: 500, firm_id: firm.id });
-    cacheAssoc(firm, "account", account);
-    const saved = await firm.save();
-    expect(saved).toBe(true);
-    expect(account.isDestroyed()).toBe(false);
+    let firm = (await Firm.all().merge({ includes: "account" }).first()) as any;
+    firm.name += "-changed";
+    await assertQueriesCount(3, false, async () => {
+      await firm.saveBang();
+    });
+
+    firm = await Firm.first();
+    await firm.setAccount(await Account.first());
+    await assertQueriesCount(Firm.partialUpdates ? 0 : 1, false, async () => {
+      await firm.saveBang();
+    });
+
+    firm = (await Firm.first())!.dup();
+    await firm.setAccount(await Account.first());
+    await assertQueriesCount(4, false, async () => {
+      await firm.saveBang();
+    });
+
+    firm = (await Firm.first())!.dup();
+    await firm.setAccount((await Account.first())!.dup());
+    await assertQueriesCount(4, false, async () => {
+      await firm.saveBang();
+    });
   });
 
   it("should not load the associated model", async () => {
@@ -1257,116 +1274,25 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(iris2.afterSaveCallbacksCounter).toBe(1);
   });
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
-    const log: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PolyParent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("polyChild", {
-          as: "employable",
-          autosave: true,
-          className: "PolyChild",
-          inverseOf: "employable",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PolyParent {
-      get polyChild(): PolyChild | null | Promise<PolyChild | null>;
-      set polyChild(value: PolyChild | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PolyChild extends Base {
-      declare employable_id: number | null;
-      declare employable_type: string | null;
-
-      static {
-        this._tableName = "chefs";
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-        this.beforeValidation(function () {
-          log.push("before_validation");
-        });
-        this.afterValidation(function () {
-          log.push("after_validation");
-        });
-        this.beforeSave(function () {
-          log.push("before_save");
-        });
-        this.afterSave(function () {
-          log.push("after_save");
-        });
-        this.belongsTo("employable", {
-          polymorphic: true,
-          inverseOf: "polyChild",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PolyChild {
-      get employable(): Base | null | Promise<Base | null>;
-      set employable(value: Base | null);
-    }
-    registerModel("PolyParent", PolyParent);
-    registerModel("PolyChild", PolyChild);
-    const parent = new PolyParent({ name: "P" });
-    const child = new PolyChild({});
-    child._writeAttribute("employable_type", "PolyParent");
-    cacheAssoc(parent, "polyChild", child);
-    await parent.save();
-    expect(log).toContain("before_validation");
-    expect(log).toContain("after_validation");
-    expect(log).toContain("before_save");
-    expect(log).toContain("after_save");
-    expect(child.isNewRecord()).toBe(false);
-    expect(child._readAttribute("employable_id")).toBe(parent.id);
-    expect(child._readAttribute("employable_type")).toBe("PolyParent");
+    const drinkDesigner = (await DrinkDesigner.createBang({
+      chef: new ChefWithPolymorphicInverseOf(),
+    })) as any;
+    const chef = await drinkDesigner.chef;
+    expect(chef.beforeValidationCallbacksCounter).toEqual(1);
+    expect(chef.beforeCreateCallbacksCounter).toEqual(1);
+    expect(chef.beforeSaveCallbacksCounter).toEqual(1);
+    expect(chef.afterValidationCallbacksCounter).toEqual(1);
+    expect(chef.afterCreateCallbacksCounter).toEqual(1);
+    expect(chef.afterSaveCallbacksCounter).toEqual(1);
   });
   it("callbacks on child when child autosaves parent", async () => {
-    const log: string[] = [];
-    class CbOwner extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.afterSave(function () {
-          log.push("owner_after_save");
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class CbPet extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("cbOwner", {
-          autosave: true,
-          className: "CbOwner",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface CbPet {
-      get cbOwner(): CbOwner | null | Promise<CbOwner | null>;
-      set cbOwner(value: CbOwner | null);
-    }
-    registerModel("CbOwner", CbOwner);
-    registerModel("CbPet", CbPet);
-    const owner = new CbOwner({ name: "Alice" });
-    const pet = new CbPet({ name: "cat" });
-    cacheAssoc(pet, "cbOwner", owner);
-    await pet.save();
-    expect(log).toContain("owner_after_save");
-    expect(owner.isNewRecord()).toBe(false);
+    const iris = await Iris.createBang({ eye: new Eye() });
+    expect(iris.beforeValidationCallbacksCounter).toEqual(1);
+    expect(iris.beforeCreateCallbacksCounter).toEqual(1);
+    expect(iris.beforeSaveCallbacksCounter).toEqual(1);
+    expect(iris.afterValidationCallbacksCounter).toEqual(1);
+    expect(iris.afterCreateCallbacksCounter).toEqual(1);
+    expect(iris.afterSaveCallbacksCounter).toEqual(1);
   });
   it("callbacks on child when child autosaves parent twice", async () => {
     const iris = new Iris();
@@ -1383,73 +1309,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(iris.afterSaveCallbacksCounter).toBe(2);
   });
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
-    const log: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PolyAsParent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.beforeValidation(function () {
-          log.push("parent_before_validation");
-        });
-        this.afterValidation(function () {
-          log.push("parent_after_validation");
-        });
-        this.beforeSave(function () {
-          log.push("parent_before_save");
-        });
-        this.afterSave(function () {
-          log.push("parent_after_save");
-        });
-        this.hasOne("polyAsChild", {
-          as: "employable",
-          className: "PolyAsChild",
-          inverseOf: "employable",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PolyAsParent {
-      get polyAsChild(): PolyAsChild | null | Promise<PolyAsChild | null>;
-      set polyAsChild(value: PolyAsChild | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PolyAsChild extends Base {
-      declare employable_id: number | null;
-      declare employable_type: string | null;
-
-      static {
-        this._tableName = "chefs";
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-        this.belongsTo("employable", {
-          autosave: true,
-          polymorphic: true,
-          inverseOf: "polyAsChild",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PolyAsChild {
-      get employable(): Base | null | Promise<Base | null>;
-      set employable(value: Base | null);
-    }
-    registerModel("PolyAsParent", PolyAsParent);
-    registerModel("PolyAsChild", PolyAsChild);
-    const parent = new PolyAsParent({ name: "P" });
-    const child = new PolyAsChild({});
-    child._writeAttribute("employable_type", "PolyAsParent");
-    cacheAssoc(child, "employable", parent);
-    await child.save();
-    expect(log).toContain("parent_before_validation");
-    expect(log).toContain("parent_after_validation");
-    expect(log).toContain("parent_before_save");
-    expect(log).toContain("parent_after_save");
-    expect(parent.isNewRecord()).toBe(false);
-    expect(child._readAttribute("employable_id")).toBe(parent.id);
-    expect(child._readAttribute("employable_type")).toBe("PolyAsParent");
+    const chef = await ChefWithPolymorphicInverseOf.createBang({
+      employable: new DrinkDesigner(),
+    });
+    expect(chef.beforeValidationCallbacksCounter).toEqual(1);
+    expect(chef.beforeCreateCallbacksCounter).toEqual(1);
+    expect(chef.beforeSaveCallbacksCounter).toEqual(1);
+    expect(chef.afterValidationCallbacksCounter).toEqual(1);
+    expect(chef.afterCreateCallbacksCounter).toEqual(1);
+    expect(chef.afterSaveCallbacksCounter).toEqual(1);
   });
 
   it("foreign key attribute is not set unless changed", async () => {
@@ -1814,7 +1682,23 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures([]);
+  const { tags, posts } = fixtures(["companies", "posts", "tags", "taggings"]);
+  beforeAll(() => {
+    registerModel(CanonicalCompany);
+    registerModel(Firm);
+    registerModel(Client);
+    registerModel(AuditLog);
+    registerModel(Developer);
+    registerModel(CanonicalOrder);
+    registerModel(CanonicalCustomer);
+    registerModel(Tag);
+    registerModel(Tagging);
+    registerModel(CanonicalPost);
+    registerModel(Mouse);
+    registerModel(Squeak);
+    registerModel(CpkOrder);
+    registerModel(CpkBook);
+  });
 
   function makeModels() {
     class Author extends Base {
@@ -1859,87 +1743,83 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   }
 
   it("should save parent but not invalid child", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "" });
-    const post = new Post({ name: "Hello" });
-    cacheAssoc(post, "author", author);
-    const saved = await post.save();
-    expect(saved).toBe(false);
+    const client = new Client({ name: "Joe (the Plumber)" }) as any;
+    assertPredicate(await client.isValid(), (v) => v);
+
+    client.buildFirm();
+    assertNotPredicate(await (await client.firm).isValid(), (v) => v);
+
+    assert(await client.save());
+    assertNotPredicate(await client.firm, (f: any) => f.isPersisted());
   });
 
   it("save fails for invalid belongs to", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "" });
-    const post = new Post({ name: "Test" });
-    cacheAssoc(post, "author", author);
-    const saved = await post.save();
-    expect(saved).toBe(false);
+    const log = (await AuditLog.create({ developer_id: 0, message: " " })) as any;
+    assert(log);
+
+    log.developer = new Developer();
+    assertNotPredicate(await (await log.developer).isValid(), (v) => v);
+    assertNotPredicate(await log.isValid(), (v) => v);
+    assertNot(await log.save());
+    expect(log.errors.get("developer")).toEqual(["is invalid"]);
   });
 
   it("save succeeds for invalid belongs to with validate false", async () => {
-    class FlexAuthor extends Base {
-      declare name: string | null;
+    const log = (await AuditLog.create({ developer_id: 0, message: " " })) as any;
+    assert(log);
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("FlexAuthor", FlexAuthor);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class FlexPost extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("flexAuthor", { autosave: true, foreignKey: "author_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface FlexPost {
-      get flexAuthor(): FlexAuthor | null | Promise<FlexAuthor | null>;
-      set flexAuthor(value: FlexAuthor | null);
-    }
-    registerModel("FlexPost", FlexPost);
-    const author = new FlexAuthor({ name: "" });
-    const post = new FlexPost({ name: "Test" });
-    cacheAssoc(post, "flexAuthor", author);
-    const saved = await post.save();
-    expect(saved).toBe(true);
+    log.unvalidatedDeveloper = new Developer();
+    assertNotPredicate(await (await log.unvalidatedDeveloper).isValid(), (v) => v);
+    assertPredicate(await log.isValid(), (v) => v);
+    assert(await log.save());
   });
 
   it("assignment before parent saved", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "Dean" });
-    const post = new Post({ name: "Hello" });
-    cacheAssoc(post, "author", author);
-    await post.save();
-    expect(author.isNewRecord()).toBe(false);
-    expect(post.author_id).toBe(author.id);
+    const client = (await Client.first()) as any;
+    const apple = new Firm({ name: "Apple" });
+    client.firm = apple;
+    expect((await client.firm).equals(apple)).toBe(true);
+    assertNotPredicate(apple, (a) => a.isPersisted());
+    assert(await client.save());
+    assert(await apple.save());
+    assertPredicate(apple, (a) => a.isPersisted());
+    expect((await client.firm).equals(apple)).toBe(true);
+    await client.association("firm").reload();
+    expect((await client.firm).equals(apple)).toBe(true);
   });
 
   it("assignment before either saved", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "Dean" });
-    const post = new Post({ name: "Hello" });
-    cacheAssoc(post, "author", author);
-    await post.save();
-    expect(post.isNewRecord()).toBe(false);
-    expect(author.isNewRecord()).toBe(false);
+    const finalCut = new Client({ name: "Final Cut" }) as any;
+    const apple = new Firm({ name: "Apple" });
+    finalCut.firm = apple;
+    assertNotPredicate(finalCut, (c: any) => c.isPersisted());
+    assertNotPredicate(apple, (a) => a.isPersisted());
+    assert(await finalCut.save());
+    assertPredicate(finalCut, (c: any) => c.isPersisted());
+    assertPredicate(apple, (a) => a.isPersisted());
+    expect((await finalCut.firm).equals(apple)).toBe(true);
+    await finalCut.association("firm").reload();
+    expect((await finalCut.firm).equals(apple)).toBe(true);
   });
 
   it("store two association with one save", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "Author" });
-    const post = new Post({ name: "Post" });
-    cacheAssoc(post, "author", author);
-    await post.save();
-    expect(post.isNewRecord()).toBe(false);
-    expect(author.isNewRecord()).toBe(false);
-    expect(post.author_id).toBe(author.id);
+    const numOrders = Number(await CanonicalOrder.count());
+    const numCustomers = Number(await CanonicalCustomer.count());
+    const order = new CanonicalOrder() as any;
+
+    const customer1 = (order.billing = new CanonicalCustomer());
+    const customer2 = (order.shipping = new CanonicalCustomer());
+    assert(await order.save());
+    expect((await order.billing).equals(customer1)).toBe(true);
+    expect((await order.shipping).equals(customer2)).toBe(true);
+
+    await order.reload();
+
+    expect((await order.billing).equals(customer1)).toBe(true);
+    expect((await order.shipping).equals(customer2)).toBe(true);
+
+    expect(Number(await CanonicalOrder.count())).toEqual(numOrders + 1);
+    expect(Number(await CanonicalCustomer.count())).toEqual(numCustomers + 2);
   });
 
   it("store association in two relations with one save", async () => {
@@ -2000,49 +1880,18 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("store association with a polymorphic relationship", async () => {
-    class PolyMember extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "members";
-        this.attribute("name", "string");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PolySponsor extends Base {
-      declare sponsorable_id: number | null;
-      declare sponsorable_type: string | null;
-
-      static {
-        this._tableName = "sponsors";
-        this.attribute("sponsorable_id", "integer");
-        this.attribute("sponsorable_type", "string");
-        this.belongsTo("sponsorable", { polymorphic: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PolySponsor {
-      get sponsorable(): Base | null | Promise<Base | null>;
-      set sponsorable(value: Base | null);
-    }
-    registerModel(PolyMember);
-    registerModel(PolySponsor);
-    const member = await PolyMember.create({ name: "Alice" });
-    const sponsor = new PolySponsor({});
-    (sponsor as any).sponsorable = member;
-    await sponsor.save();
-    const reloaded = await PolySponsor.find(sponsor.id!);
-    expect(reloaded.sponsorable_id).toBe(member.id);
-    expect(reloaded.sponsorable_type).toBe("PolyMember");
+    const numTagging = Number(await Tagging.count());
+    await (tags("misc") as any).createTagging({ taggable: posts("thinking") });
+    expect(Number(await Tagging.count())).toEqual(numTagging + 1);
   });
 
   it("build and then save parent should not reload target", async () => {
-    const { Author, Post } = makeModels();
-    const author = new Author({ name: "Built" });
-    const post = new Post({ name: "NoReload" });
-    cacheAssoc(post, "author", author);
-    await post.save();
-    expect(author.isNewRecord()).toBe(false);
+    const client = (await Client.first()) as any;
+    const apple = client.buildFirm({ name: "Apple" });
+    await client.saveBang();
+    await assertNoQueries(false, async () => {
+      expect((await client.firm).equals(apple)).toBe(true);
+    });
   });
 
   it("validation does not validate stale association target", async () => {
@@ -2054,65 +1903,23 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("validation does not validate non dirty association target", async () => {
-    const { Author, Post } = makeModels();
-    const author = await Author.create({ name: "Clean" });
-    const post = await Post.create({ name: "Clean", author_id: author.id });
-    cacheAssoc(post, "author", author);
-    const saved = await post.save();
-    expect(saved).toBe(true);
+    const mouse = (await Mouse.createBang({ name: "Will" })) as any;
+    await Squeak.createBang({ mouse });
+
+    mouse.name = null;
+    await mouse.saveBang({ validate: false });
+
+    const squeak = (await Squeak.last()) as any;
+
+    expect(await squeak.isValid()).toEqual(true);
+    expect(isPresent(await squeak.mouse)).toEqual(true);
+    expect(await squeak.isValid()).toEqual(true);
   });
 
   it("composite primary key autosave", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class CpkOrder2 extends Base {
-      declare shop_id: number | null;
-      declare status: string | null;
-
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasOne("cpkBook2", {
-          className: "CpkBook2",
-          autosave: true,
-          foreignKey: ["shop_id", "order_id"],
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface CpkOrder2 {
-      get cpkBook2(): CpkBook2 | null | Promise<CpkBook2 | null>;
-      set cpkBook2(value: CpkBook2 | null);
-    }
-    class CpkBook2 extends Base {
-      declare author_id: number | null;
-      declare shop_id: number | null;
-      declare order_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "cpk_books";
-        this.attribute("author_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.attribute("title", "string");
-        this.primaryKey = ["author_id", "id"] as any;
-      }
-    }
-    registerModel("CpkOrder2", CpkOrder2);
-    registerModel("CpkBook2", CpkBook2);
-    const order = new CpkOrder2({ id: [1, 2], status: "pending" });
-    const book = new CpkBook2({ id: [77, 77], title: "Composite Key Book" });
-    cacheAssoc(order, "cpkBook2", book);
-    const saved = await order.save();
-    expect(saved).toBe(true);
-    expect(order.isNewRecord()).toBe(false);
-    expect(book.isNewRecord()).toBe(false);
-    expect(book.shop_id).toBe(1);
-    expect(book.order_id).toBe(2);
+    await assertNothingRaised(() =>
+      CpkOrder.createBang({ id: [1, 2], book: new CpkBook({ title: "Book", id: [3, 4] }) }),
+    );
   });
 
   it("should not load the associated model", async () => {
@@ -2295,6 +2102,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     setAssociationTarget(record, name, value);
   }
   fixtures([]);
+  beforeAll(() => {
+    registerModel(Molecule);
+    registerModel(Electron);
+    registerModel(Guitar);
+    registerModel(TuningPeg);
+  });
 
   function makeModels() {
     registerModel(CanonicalPirate);
@@ -2303,38 +2116,59 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   }
 
   it("valid adding with nested attributes", async () => {
-    const { Pirate, Bird } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    await (pirate as any).setBirdsAttributes([{ name: "Polly" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("Polly");
+    const molecule = new Molecule();
+    const validElectron = new Electron({ name: "electron" });
+
+    await molecule.electrons.replace([validElectron]);
+    await molecule.save();
+
+    assertPredicate(await validElectron.isValid(), (v) => v);
+    assertPredicate(molecule, (m) => m.isPersisted());
+    expect(await molecule.electrons.count()).toEqual(1);
   });
 
   it("invalid adding with nested attributes", async () => {
-    const { Pirate, Bird } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    await (pirate as any).setBirdsAttributes([{ name: "" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBeLessThanOrEqual(1);
+    const molecule = new Molecule();
+    const validElectron = new Electron({ name: "electron" });
+    const invalidElectron = new Electron();
+
+    await molecule.electrons.replace([validElectron, invalidElectron]);
+    await molecule.save();
+
+    assertNotPredicate(await invalidElectron.isValid(), (v) => v);
+    assertPredicate(await validElectron.isValid(), (v) => v);
+    assertNot(
+      molecule.isPersisted(),
+      "Molecule should not be persisted when its electrons are invalid",
+    );
   });
 
   it("errors details should be set", async () => {
-    const { Pirate, Bird } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const invalidBird = new Bird({ name: "" });
-    cacheAssoc(pirate, "birds", [invalidBird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
+    const molecule = new Molecule();
+    const validElectron = new Electron({ name: "electron" });
+    const invalidElectron = new Electron();
+
+    await molecule.electrons.replace([validElectron, invalidElectron]);
+
+    assertNotPredicate(await invalidElectron.isValid(), (v) => v);
+    assertPredicate(await validElectron.isValid(), (v) => v);
+    assertNotPredicate(await molecule.isValid(), (v) => v);
+    expect(molecule.errors.details.get("electrons.name")).toEqual([{ error: ":blank" }]);
   });
 
   it("errors should be indexed when passed as array", async () => {
-    const { Pirate, Bird } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    await (pirate as any).setBirdsAttributes([{ name: "Valid" }, { name: "" }]);
-    expect(await pirate.save()).toBe(false);
+    const guitar = new Guitar();
+    const tuningPegValid = new TuningPeg() as any;
+    tuningPegValid.pitch = 440.0;
+    const tuningPegInvalid = new TuningPeg();
+
+    await guitar.tuningPegs.replace([tuningPegValid, tuningPegInvalid]);
+
+    assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
+    assertPredicate(await tuningPegValid.isValid(), (v) => v);
+    assertNotPredicate(await guitar.isValid(), (v) => v);
+    expect(guitar.errors.get("tuningPegs[1].pitch")).toEqual(["is not a number"]);
+    expect(guitar.errors.get("tuningPegs.pitch")).not.toEqual(["is not a number"]);
   });
 
   function makeIndexedHasMany(opts: { indexErrors?: boolean } = {}) {
@@ -2366,61 +2200,72 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {
-    const old = indexNestedAttributeErrors();
+    const oldAttributeConfig = indexNestedAttributeErrors();
     setIndexNestedAttributeErrors(true);
     try {
-      const { Parent, Child } = makeIndexedHasMany();
-      const parent = new Parent({ name: "p" });
-      cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-      expect(await parent.isValid()).toBe(false);
-      expect(parent.errors.where("children[1].name")).toHaveLength(1);
-      expect(parent.errors.where("children.name")).toHaveLength(0);
+      const molecule = new Molecule();
+      const validElectron = new Electron({ name: "electron" });
+      const invalidElectron = new Electron();
+
+      await molecule.electrons.replace([validElectron, invalidElectron]);
+
+      assertNotPredicate(await invalidElectron.isValid(), (v) => v);
+      assertPredicate(await validElectron.isValid(), (v) => v);
+      assertNotPredicate(await molecule.isValid(), (v) => v);
+      expect(molecule.errors.get("electrons[1].name")).toEqual(["can't be blank"]);
+      expect(molecule.errors.get("electrons.name")).not.toEqual(["can't be blank"]);
     } finally {
-      setIndexNestedAttributeErrors(old);
+      setIndexNestedAttributeErrors(oldAttributeConfig);
     }
   });
   it("errors details should be indexed when passed as array", async () => {
-    const { Parent, Child } = makeIndexedHasMany({ indexErrors: true });
-    const parent = new Parent({ name: "p" });
-    cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-    expect(await parent.isValid()).toBe(false);
-    expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
-    expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
+    const guitar = new Guitar();
+    const tuningPegValid = new TuningPeg() as any;
+    tuningPegValid.pitch = 440.0;
+    const tuningPegInvalid = new TuningPeg();
+
+    await guitar.tuningPegs.replace([tuningPegValid, tuningPegInvalid]);
+
+    assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
+    assertPredicate(await tuningPegValid.isValid(), (v) => v);
+    assertNotPredicate(await guitar.isValid(), (v) => v);
+    expect(guitar.errors.details.get("tuningPegs[1].pitch")).toEqual([
+      { error: ":not_a_number", value: null },
+    ]);
+    expect(guitar.errors.details.get("tuningPegs.pitch") ?? []).toEqual([]);
   });
   it("errors details with error on base should be indexed when passed as array", async () => {
-    class P extends Base {
-      declare name: string | null;
-      declare kids: AssociationProxy<C>;
-
+    const reference = class extends Base {
       static {
-        this.attribute("name", "string");
-        this.hasMany("kids", {
-          autosave: true,
-          indexErrors: true,
-          className: "BaseErrC",
-        });
+        this.tableName = "references";
       }
-    }
-    class C extends Base {
-      declare favorite: boolean | null;
-      declare p_id: number | null;
 
+      shouldBeFavorite(this: any) {
+        if (!this.favorite) this.errors.add("base", "should be favorite");
+      }
+    };
+    Object.defineProperty(reference, "name", { value: "Reference" });
+    reference.validate(":shouldBeFavorite");
+
+    const person = class extends Base {
       static {
-        this.attribute("favorite", "boolean");
-        this.attribute("p_id", "integer");
+        this.tableName = "people";
       }
-      override async isValid(): Promise<boolean> {
-        this.errors.clear();
-        if (!(this as any).favorite) this.errors.add("base", "should be favorite");
-        return this.errors.empty;
-      }
-    }
-    registerModel("BaseErrP", P);
-    registerModel("BaseErrC", C);
-    const parent = new P({ name: "p" });
-    cacheAssoc(parent, "kids", [new C({ favorite: true }), new C({ favorite: false })]);
-    expect(await parent.isValid()).toBe(false);
-    expect(parent.errors.details.get("kids[1].base")?.length ?? 0).toBeGreaterThan(0);
+    };
+    person.hasMany("references", { autosave: true, indexErrors: true, anonymousClass: reference });
+    Object.defineProperty(person, "name", { value: "Person" });
+
+    const p = new person() as any;
+    const referenceValid = new reference({ favorite: true });
+    const referenceInvalid = new reference({ favorite: false });
+    await p.references.replace([referenceValid, referenceInvalid]);
+
+    assertPredicate(await referenceValid.isValid(), (v) => v);
+    assertNotPredicate(await referenceInvalid.isValid(), (v) => v);
+    assertNotPredicate(await p.isValid(), (v) => v);
+    expect(p.errors.details.get("references[1].base")).toEqual([{ error: "should be favorite" }]);
+    expect(p.errors.get("references[1].base")[0]).toEqual("should be favorite");
+    expect(p.errors.fullMessages).toEqual(["References[1] should be favorite"]);
   });
   it("indexed errors should be properly translated", async () => {
     const oldCustomize = ModelError.i18nCustomizeFullMessage;
@@ -2547,453 +2392,191 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     }
   });
   it("errors details should be indexed when global flag is set", async () => {
-    const old = indexNestedAttributeErrors();
+    const oldAttributeConfig = indexNestedAttributeErrors();
     setIndexNestedAttributeErrors(true);
     try {
-      const { Parent, Child } = makeIndexedHasMany();
-      const parent = new Parent({ name: "p" });
-      cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-      expect(await parent.isValid()).toBe(false);
-      expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
-      expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
+      const molecule = new Molecule();
+      const validElectron = new Electron({ name: "electron" });
+      const invalidElectron = new Electron();
+
+      await molecule.electrons.replace([validElectron, invalidElectron]);
+
+      assertNotPredicate(await invalidElectron.isValid(), (v) => v);
+      assertPredicate(await validElectron.isValid(), (v) => v);
+      assertNotPredicate(await molecule.isValid(), (v) => v);
+      expect(molecule.errors.details.get("electrons[1].name")).toEqual([{ error: ":blank" }]);
+      expect(molecule.errors.details.get("electrons.name") ?? []).toEqual([]);
     } finally {
-      setIndexNestedAttributeErrors(old);
+      setIndexNestedAttributeErrors(oldAttributeConfig);
     }
   });
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
   fixtures([]);
+  beforeAll(() => {
+    registerModel(CanonicalShip);
+    registerModel(CanonicalPirate);
+    registerModel(ShipPart);
+    registerModel(Prisoner);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalParrot);
+  });
+
   it("autosave works even when other callbacks update the parent model", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class CallbackPirate extends Base {
-      declare catchphrase: string | null;
-
+    const reference = class extends Base {
       static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.beforeSave(function (record: any) {
-          record.catchphrase = "Ahoy!";
-        });
-        this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
+        this.tableName = "references";
       }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface CallbackPirate {
-      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
-      set ship(value: CanonicalShip | null);
-    }
-    registerModel("CallbackPirate", CallbackPirate);
+    };
+    Object.defineProperty(reference, "name", { value: "Reference" });
 
-    const pirate = await CallbackPirate.create({ catchphrase: "Yarr" });
-    const ship = new CanonicalShip({ name: "Pearl" });
-    cacheAssoc(pirate, "ship", ship);
-    pirate.catchphrase = "trigger save";
-    await pirate.save();
-    expect(pirate.catchphrase).toBe("Ahoy!");
-    expect(ship.isNewRecord()).toBe(false);
-    expect(ship.pirate_id).toBe(pirate.id);
+    const person = class extends Base {
+      static {
+        this.tableName = "people";
+      }
+    };
+    Object.defineProperty(person, "name", { value: "Person" });
+    person.afterCreate(async function (this: any) {
+      await this.update({ first_name: "first name" });
+    });
+    person.hasMany("references", { autosave: true, anonymousClass: reference });
+
+    const referenceInstance = (await reference.createBang()) as any;
+    const personInstance = (await person.createBang({
+      first_name: "foo",
+      references: [referenceInstance],
+    })) as any;
+
+    await referenceInstance.reload();
+    expect(referenceInstance.person_id).toEqual(personInstance.id);
+    expect(personInstance.first_name).toEqual("first name");
   });
 
   it("autosave does not pass through non custom validation contexts", async () => {
-    class ContextPerson extends Base {
-      declare first_name: string | null;
-
+    const person = class extends Base {
       static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-        this.validate(
-          function (record: any) {
-            if (record.first_name !== "cool") {
-              record.errors.add("first_name", "not cool");
-            }
-          },
-          { on: "create" },
-        );
+        this.tableName = "people";
       }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class ContextReference extends Base {
-      declare person_id: number | null;
 
+      shouldBeCool(this: any) {
+        if (this.first_name !== "cool") {
+          this.errors.add("first_name", "not cool");
+        }
+      }
+    };
+    person.validate(":shouldBeCool", { on: "create" });
+    Object.defineProperty(person, "name", { value: "Person" });
+    const reference = class extends Base {
       static {
-        this._tableName = "references";
-        this.attribute("person_id", "integer");
-        this.belongsTo("person", {
-          autosave: true,
-          className: "ContextPerson",
-          foreignKey: "person_id",
-        });
+        this.tableName = "references";
       }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface ContextReference {
-      get person(): ContextPerson | null | Promise<ContextPerson | null>;
-      set person(value: ContextPerson | null);
-    }
-    registerModel("ContextPerson", ContextPerson);
-    registerModel("ContextReference", ContextReference);
+    };
+    Object.defineProperty(reference, "name", { value: "Reference" });
+    reference.belongsTo("person", { autosave: true, anonymousClass: person });
 
-    const person = await ContextPerson.create({ first_name: "cool" });
-    person.first_name = "nah";
-    expect(await person.isValid()).toBe(true);
+    const u = (await person.createBang({ first_name: "cool" })) as any;
+    u.first_name = "nah";
 
-    const ref = new ContextReference({ person });
-    cacheAssoc(ref, "person", person);
-    const valid = await ref.isValid();
-    expect(valid).toBe(true);
+    assertPredicate(await u.isValid(), (v) => v);
+    const r = new reference({ person: u });
+    assertPredicate(await r.isValid(), (v) => v);
   });
 
   it("autosave collection association callbacks get called once", async () => {
-    let saveCount = 0;
-    class Book extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    const shipWithSavingStack = class extends CanonicalShip {
+      count?: number;
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.beforeSave(() => {
-          saveCount++;
-        });
+      saveCollectionAssociation(reflection: any) {
+        this.count ??= 0;
+        if (reflection.name === "parts") this.count += 1;
+        return super.saveCollectionAssociation(reflection);
       }
-    }
-    class Author extends Base {
-      declare name: string | null;
+    };
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("CallbacksOnceBook", Book);
-    registerModel("CallbacksOnceAuthor", Author);
-    Associations.hasMany.call(Author, "books", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "CallbacksOnceBook",
-    });
-
-    const author = await Author.create({ name: "Test" });
-    const book = new Book({ name: "My Book" });
-    cacheAssoc(author, "books", [book]);
-    author.name = "trigger save";
-    await author.save();
-    expect(book.isNewRecord()).toBe(false);
-    expect(saveCount).toBe(1);
-    expect(book.author_id).toBe(author.id);
+    const ship = new shipWithSavingStack({ name: "Nights Dirty Lightning" });
+    ship.parts.build({ name: "part" });
+    await ship.saveBang();
+    expect(ship.count).toEqual(1);
   });
 
   it("autosave has one association callbacks get called once", async () => {
-    let saveCount = 0;
-    class Profile extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    assert(CanonicalShip.reflectOnAssociation("pirate")!.options.autosave);
+    assert(CanonicalPirate.reflectOnAssociation("ship")!.options.autosave);
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.beforeSave(() => {
-          saveCount++;
-        });
+    const pirateWithSavingStack = class extends CanonicalPirate {
+      count?: number;
+
+      saveHasOneAssociation(reflection: any) {
+        this.count ??= 0;
+        if (reflection.name === "ship") this.count += 1;
+        return super.saveHasOneAssociation(reflection);
       }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class AutosaveProfileUser extends Base {
-      declare name: string | null;
+    };
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("profile", {
-          autosave: true,
-          foreignKey: "author_id",
-          className: "Profile",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface AutosaveProfileUser {
-      get profile(): Profile | null | Promise<Profile | null>;
-      set profile(value: Profile | null);
-    }
-    registerModel("Profile", Profile);
-    registerModel("AutosaveProfileUser", AutosaveProfileUser);
-
-    const user = await AutosaveProfileUser.create({ name: "Test" });
-    const profile = new Profile({ name: "Hello" });
-    cacheAssoc(user, "profile", profile);
-    user.name = "trigger save";
-    await user.save();
-    expect(profile.isNewRecord()).toBe(false);
-    expect(saveCount).toBe(1);
-    expect(profile.author_id).toBe(user.id);
+    const pirate = new pirateWithSavingStack({ catchphrase: "Aye" });
+    (pirate as any).buildShip({ name: "Nights Dirty Lightning" });
+    await pirate.saveBang();
+    expect(pirate.count).toEqual(1);
   });
 
   it("autosave belongs to association callbacks get called once", async () => {
-    let saveCount = 0;
-    class Author extends Base {
-      declare name: string | null;
+    const shipWithSavingStack = class extends CanonicalShip {
+      count?: number;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          saveCount++;
-        });
+      saveBelongsToAssociation(reflection: any) {
+        this.count ??= 0;
+        if (reflection.name === "pirate") this.count += 1;
+        return super.saveBelongsToAssociation(reflection);
       }
-    }
-    class Post extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    };
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel("BelongsToCallbacksOnceAuthor", Author);
-    registerModel("BelongsToCallbacksOncePost", Post);
-    Associations.belongsTo.call(Post, "author", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "BelongsToCallbacksOnceAuthor",
-    });
-
-    const author = new Author({ name: "New Author" });
-    const post = await Post.create({ name: "Test" });
-    cacheAssoc(post, "author", author);
-    post.name = "trigger save";
-    await post.save();
-    expect(author.isNewRecord()).toBe(false);
-    expect(saveCount).toBe(1);
-    expect(post.author_id).toBe(author.id);
+    const ship = new shipWithSavingStack({ name: "Nights Dirty Lightning" });
+    (ship as any).buildPirate({ catchphrase: "Aye" });
+    await ship.saveBang();
+    expect(ship.count).toEqual(1);
   });
 
   it("should not add the same callbacks multiple times for has one", async () => {
-    let saveCount = 0;
-    class Profile extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.beforeSave(() => {
-          saveCount++;
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class DuplicateCallbackProfileUser extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("profile", {
-          autosave: true,
-          foreignKey: "author_id",
-          className: "Profile",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface DuplicateCallbackProfileUser {
-      get profile(): Profile | null | Promise<Profile | null>;
-      set profile(value: Profile | null);
-    }
-    registerModel("Profile", Profile);
-    registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
-    const reflection = (DuplicateCallbackProfileUser as any)._reflectOnAssociation("profile");
-    addAutosaveAssociationCallbacks.call(DuplicateCallbackProfileUser, reflection);
-
-    const user = await DuplicateCallbackProfileUser.create({ name: "Test" });
-    const profile = new Profile({ name: "Hello" });
-    profile.name = "Changed";
-    cacheAssoc(user, "profile", profile);
-    user.name = "trigger";
-    await user.save();
-    expect(saveCount).toBe(1);
+    await assertNoDifferenceWhenAddingCallbacksTwiceFor(CanonicalPirate, "ship");
   });
 
   it("should not add the same callbacks multiple times for belongs to", async () => {
-    let saveCount = 0;
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          saveCount++;
-        });
-      }
-    }
-    class Post extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel("DuplicateCallbacksBelongsToAuthor", Author);
-    registerModel("DuplicateCallbacksBelongsToPost", Post);
-    Associations.belongsTo.call(Post, "author", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "DuplicateCallbacksBelongsToAuthor",
-    });
-    const reflection = (Post as any)._reflectOnAssociation("author");
-    addAutosaveAssociationCallbacks.call(Post, reflection);
-
-    const author = new Author({ name: "New" });
-    const post = await Post.create({ name: "Test" });
-    cacheAssoc(post, "author", author);
-    post.name = "trigger";
-    await post.save();
-    expect(saveCount).toBe(1);
+    await assertNoDifferenceWhenAddingCallbacksTwiceFor(CanonicalShip, "pirate");
   });
 
   it("should not add the same callbacks multiple times for has many", async () => {
-    let saveCount = 0;
-    class Book extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.beforeSave(() => {
-          saveCount++;
-        });
-      }
-    }
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("DuplicateCallbacksHasManyBook", Book);
-    registerModel("DuplicateCallbacksHasManyAuthor", Author);
-    Associations.hasMany.call(Author, "books", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "DuplicateCallbacksHasManyBook",
-    });
-    const reflection = (Author as any)._reflectOnAssociation("books");
-    addAutosaveAssociationCallbacks.call(Author, reflection);
-
-    const author = await Author.create({ name: "Test" });
-    const book = new Book({ name: "My Book" });
-    cacheAssoc(author, "books", [book]);
-    author.name = "trigger";
-    await author.save();
-    expect(saveCount).toBe(1);
+    await assertNoDifferenceWhenAddingCallbacksTwiceFor(CanonicalPirate, "birds");
   });
 
   it("should not add the same callbacks multiple times for has and belongs to many", async () => {
-    let saveCount = 0;
-    class DupCbParrot extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "parrots";
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          saveCount++;
-        });
-      }
-    }
-    class DupCbPirate extends Base {
-      declare catchphrase: string | null;
-      declare parrots: AssociationProxy<DupCbParrot>;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.hasAndBelongsToMany("parrots", {
-          autosave: true,
-          className: "DupCbParrot",
-          joinTable: "parrots_pirates",
-          foreignKey: "pirate_id",
-          associationForeignKey: "parrot_id",
-        });
-      }
-    }
-    registerModel("DupCbParrot", DupCbParrot);
-    registerModel("DupCbPirate", DupCbPirate);
-    const reflection = (DupCbPirate as any)._reflectOnAssociation("parrots");
-    expect(reflection).toBeDefined();
-    addAutosaveAssociationCallbacks.call(DupCbPirate, reflection);
-
-    const pirate = await DupCbPirate.create({ catchphrase: "Arrr" });
-    const parrot = await DupCbParrot.create({ name: "Polly" });
-    saveCount = 0;
-    const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
-    parrot.name = "Polly Updated";
-    pirate.catchphrase = "trigger";
-    await pirate.save();
-    expect(saveCount).toBe(1);
+    await assertNoDifferenceWhenAddingCallbacksTwiceFor(CanonicalPirate, "parrots");
   });
 
   it("cyclic autosaves do not add multiple validations", async () => {
-    class ShipCyclic extends Base {
-      declare name: string | null;
-      declare prisoners: AssociationProxy<PrisonerCyclic>;
+    const ship = new ShipWithoutNestedAttributes();
+    ship.prisoners.build();
 
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-        this.validates("name", { presence: true });
-        this.hasMany("prisoners", { className: "PrisonerCyclic", foreignKey: "ship_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class PrisonerCyclic extends Base {
-      declare ship_id: number | null;
-
-      static {
-        this._tableName = "prisoners";
-        this.attribute("ship_id", "integer");
-        this.belongsTo("ship", {
-          className: "ShipCyclic",
-          autosave: true,
-          inverseOf: "prisoners",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface PrisonerCyclic {
-      get ship(): ShipCyclic | null | Promise<ShipCyclic | null>;
-      set ship(value: ShipCyclic | null);
-    }
-    registerModel("ShipCyclic", ShipCyclic);
-    registerModel("PrisonerCyclic", PrisonerCyclic);
-    const prisonersRef = ShipCyclic.reflectOnAssociation("prisoners");
-    addAutosaveAssociationCallbacks.call(ShipCyclic, prisonersRef);
-
-    const ship = new ShipCyclic({ name: "" });
-    const prisoner = new PrisonerCyclic({});
-    cacheAssoc(ship, "prisoners", [prisoner]);
-    cacheAssoc(prisoner, "ship", ship);
-
-    expect(await ship.isValid()).toBeFalsy();
-    expect(ship.errors.where("name").length).toBe(1);
+    assertNotPredicate(await ship.isValid(), (v) => v);
+    expect(ship.errors.get("name").length).toEqual(1);
   });
+
+  async function assertNoDifferenceWhenAddingCallbacksTwiceFor(
+    model: typeof Base,
+    associationName: string,
+  ) {
+    const reflection = model.reflectOnAssociation(associationName);
+    expect(reflection).not.toBeNull();
+    await assertNoDifference(
+      () => callbacksForModel(model).length,
+      null,
+      () => addAutosaveAssociationCallbacks.call(model, reflection),
+    );
+  }
+
+  function callbacksForModel(model: typeof Base) {
+    return [...getCallbackChains(model.prototype).values()].flatMap((chain) => chain.entries);
+  }
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
