@@ -180,9 +180,16 @@ export interface Book {
 }
 
 export class PublishedBook extends Base {
+  declare cover: "hard" | "soft" | null;
+  declare isHard: () => boolean;
+  declare isSoft: () => boolean;
+  declare static hard: () => Relation<PublishedBook>;
+  declare static soft: () => Relation<PublishedBook>;
+
   static _tableName = "books";
 
   static {
     this.validates("isbn", { uniqueness: true });
+    this.enum("cover", { hard: "0", soft: "1" }, { default: "hard" });
   }
 }

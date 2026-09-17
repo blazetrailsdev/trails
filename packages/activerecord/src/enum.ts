@@ -7,6 +7,7 @@ import {
   pluralize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType, defaultValue } from "@blazetrails/activemodel";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
@@ -125,7 +126,7 @@ export class EnumType extends ValueType<string> {
 
   cast(value: unknown): string | null {
     if (this._mapping.hasKey(value as string)) {
-      return value as string;
+      return isSymbol(value) ? symbolToS(value) : (value as string);
     }
     if (this._reverseMapping.has(value as EnumValue)) {
       return this._reverseMapping.get(value as EnumValue)!;
@@ -259,6 +260,9 @@ export function enumMethod(
   values: string[] | Record<string, EnumValue>,
   options?: EnumMacroOptions,
 ): void {
+  if (values == null) {
+    [values, options] = [(options ?? {}) as Record<string, EnumValue>, {}];
+  }
   _enum.call(this, name, values, options);
 }
 
@@ -274,7 +278,6 @@ export function _enum(
   values: string[] | Record<string, string | number | boolean | null>,
   options?: EnumMacroOptions,
 ): void {
-  if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
   assertValidEnumDefinitionValues(values);
   assertValidEnumOptions(options ?? {});
 
@@ -537,11 +540,7 @@ export function assertValidEnumDefinitionValues(
       values.every((v) => typeof v === "string" && v.startsWith(":")) ||
       values.every((v) => typeof v === "string" && !v.startsWith(":"));
     if (!allValid) {
-      throw new ArgumentError(
-        `Enum values must only contain strings or symbols, got: ${Array.from(
-          new Set(values.map((v) => typeof v)),
-        ).join(", ")}`,
-      );
+      throw new ArgumentError("Enum values must only contain symbols or strings.");
     }
     if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
       throw new ArgumentError("Enum values must not contain a blank name.");
