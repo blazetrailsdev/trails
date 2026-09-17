@@ -44,10 +44,10 @@ describe("ModuleConcernTest", () => {
   it("concern creates a module extended with active support concern", () => {
     const klass: any = class {};
     concern.call(klass, "Baz", (mod: any) => {
-      mod.included(function (this: any) {
+      mod.included(null, function (this: any) {
         this["@foo"] = 1;
       });
-      mod.prepended(function (this: any) {
+      mod.prepended(null, function (this: any) {
         this["@foo"] = 2;
       });
       mod.defineMethod("shouldBePublic", function () {});

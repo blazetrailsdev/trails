@@ -38,10 +38,10 @@ Baz.classMethods((mod: Record<string, unknown>) => {
     return "baz";
   };
 });
-Baz.included(function (this: any) {
+Baz.included(null, function (this: any) {
   this.includedRan = true;
 });
-Baz.prepended(function (this: any) {
+Baz.prepended(null, function (this: any) {
   this.prependedRan = true;
 });
 Baz.defineMethod("baz", function () {
@@ -153,9 +153,9 @@ describe("ConcernTest", () => {
     await assertRaises([MultipleIncludedBlocks], {}, () => {
       const mod = newConcern();
 
-      mod.included(() => {});
+      mod.included(null, () => {});
 
-      mod.included(() => {
+      mod.included(null, () => {
         return undefined;
       });
     });
@@ -165,9 +165,9 @@ describe("ConcernTest", () => {
     await assertRaises([MultiplePrependBlocks], {}, () => {
       const mod = newConcern();
 
-      mod.prepended(() => {});
+      mod.prepended(null, () => {});
 
-      mod.prepended(() => {
+      mod.prepended(null, () => {
         return undefined;
       });
     });
@@ -177,8 +177,8 @@ describe("ConcernTest", () => {
     await assertNothingRaised(() => {
       const someConcern = newConcern();
       for (let i = 0; i < 2; i++) {
-        someConcern.included(function () {});
-        someConcern.prepended(function () {});
+        someConcern.included(null, function () {});
+        someConcern.prepended(null, function () {});
       }
     });
   });

@@ -279,10 +279,12 @@ export class SafeBuffer {
     return new SafeBuffer(this._value, true);
   }
 
+  /** @missingRailsArgs html_safe? — PERMANENT */
   private explicitHtmlEscapeInterpolatedArgument(arg: unknown): unknown {
     return !this._htmlSafe || isHtmlSafe(arg) ? arg : escapeHTML(String(arg));
   }
 
+  /** @missingRailsArgs html_safe? — PERMANENT */
   private implicitHtmlEscapeInterpolatedArgument(arg: unknown): unknown {
     if (!this._htmlSafe || isHtmlSafe(arg)) {
       return arg;

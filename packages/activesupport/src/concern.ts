@@ -63,23 +63,27 @@ export const Concern = {
     }
   },
 
-  included(this: ConcernHost, block: (this: any) => void): void {
-    if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
-      if (this._includedBlock!.toString() !== block.toString()) {
-        throw new MultipleIncludedBlocks();
+  included(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
+    if (base == null) {
+      if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
+        if (this._includedBlock!.toString() !== block!.toString()) {
+          throw new MultipleIncludedBlocks();
+        }
+      } else {
+        this._includedBlock = block;
       }
-    } else {
-      this._includedBlock = block;
     }
   },
 
-  prepended(this: ConcernHost, block: (this: any) => void): void {
-    if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
-      if (this._prependedBlock!.toString() !== block.toString()) {
-        throw new MultiplePrependBlocks();
+  prepended(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
+    if (base == null) {
+      if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
+        if (this._prependedBlock!.toString() !== block!.toString()) {
+          throw new MultiplePrependBlocks();
+        }
+      } else {
+        this._prependedBlock = block;
       }
-    } else {
-      this._prependedBlock = block;
     }
   },
 
