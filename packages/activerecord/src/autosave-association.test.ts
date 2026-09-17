@@ -1,10 +1,9 @@
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
-import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
-import { Base, registerModel, acceptsNestedAttributesFor, RecordInvalid } from "./index.js";
+import { Base, registerModel, RecordInvalid } from "./index.js";
 import { Associations, collectionProxyFor as association } from "./associations.js";
 
 import {
@@ -81,6 +80,7 @@ import {
   assertPredicate,
   deepDup,
   getCallbackChains,
+  humanize,
   isPresent,
 } from "@blazetrails/activesupport";
 import { resetI18n } from "./test-helpers/i18n.js";
@@ -3087,10 +3087,10 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   it("should not reversed has one through model", async () => {
     const author = (await createAuthorWithPostWithComment()) as any;
 
-    const comment = await author.commentOnFirstPost;
-    const save = comment.save.bind(comment);
+    const comment = (await author.commentOnFirstPost) ?? Object.create(null);
+    const save = comment.save?.bind(comment);
     comment.save = async (options?: any) => {
-      await save(options);
+      await save?.(options);
       throw new Error("Oh noes!");
     };
     await assertNothingRaised(() => author.save());
@@ -3260,520 +3260,223 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
   });
 });
 
-describe("should update children when autosave is true and parent is new but child is not", () => {
+describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
   fixtures([]);
-  it("should update children when autosave is true and parent is new but child is not", async () => {
-    class UcParent extends Base {
-      declare name: string | null;
-      declare ucChildren: AssociationProxy<UcChild>;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("ucChildren", {
-          className: "UcChild",
-          foreignKey: "author_id",
-          autosave: true,
-        });
-      }
-    }
-    class UcChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel("UcParent", UcParent);
-    registerModel("UcChild", UcChild);
-    const child = await UcChild.create({ name: "existing" });
-    const parent = new UcParent({ name: "new parent" });
-    child.name = "updated";
-    cacheAssoc(parent, "ucChildren", [child]);
-    const saved = await parent.save();
-    expect(saved).toBe(true);
-    expect(parent.isNewRecord()).toBe(false);
-    const reloaded = await UcChild.find(child.id);
-    expect(reloaded.name).toBe("updated");
-    expect(reloaded.readAttribute("author_id")).toBe(parent.id);
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalParrot);
+    registerModel(CanonicalShip);
   });
+
+  const associationName = "birds";
+  const associatedModelName = "bird";
+  let pirate: any;
+  let child1: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    child1 = await pirate.birds.create({ name: "Posideons Killer" });
+    await pirate.birds.create({ name: "Killer bandita Dionne" });
+  });
+
   it("should automatically save the associated models", async () => {
-    class NAutoTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    const newNames = ["Grace OMalley", "Privateers Greed"];
+    (await pirate[associationName]).forEach((child: any, i: number) => {
+      child.name = newNames[i];
+    });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class NAutoArticle extends Base {
-      declare name: string | null;
-      declare nautoTags: AssociationProxy<NAutoTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("nautoTags", {
-          className: "NAutoTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(NAutoArticle, "nautoTags");
-    registerModel(NAutoTag);
-    registerModel(NAutoArticle);
-    const article = await NAutoArticle.create({ name: "auto save" });
-    await (article as any).setNautoTagsAttributes([{ name: "saved" }]);
-    await article.save();
-    const tags = await NAutoTag.where({ author_id: article.id });
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("saved");
-    expect(tags[0].isPersisted()).toBe(true);
+    await pirate.save();
+    expect((await (await pirate.reload())[associationName]).map((c: any) => c.name).sort()).toEqual(
+      [...newNames].sort(),
+    );
   });
 
   it("should automatically save bang the associated models", async () => {
-    class ASB1Tag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    const newNames = ["Grace OMalley", "Privateers Greed"];
+    (await pirate[associationName]).forEach((child: any, i: number) => {
+      child.name = newNames[i];
+    });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class ASB1Article extends Base {
-      declare name: string | null;
-      declare asb1Tags: AssociationProxy<ASB1Tag>;
+    await pirate.saveBang();
+    expect((await (await pirate.reload())[associationName]).map((c: any) => c.name).sort()).toEqual(
+      [...newNames].sort(),
+    );
+  });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("asb1Tags", {
-          className: "ASB1Tag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(ASB1Article, "asb1Tags");
-    registerModel(ASB1Tag);
-    registerModel(ASB1Article);
-    const article = await ASB1Article.create({ name: "bang save" });
-    await (article as any).setAsb1TagsAttributes([{ name: "banged" }]);
-    await article.save();
-    const tags = await ASB1Tag.where({ author_id: article.id });
-    expect(tags.length).toBe(1);
-    expect(tags[0].isPersisted()).toBe(true);
+  it("should update children when autosave is true and parent is new but child is not", async () => {
+    const parrot = await CanonicalParrot.createBang({ name: "Polly" });
+    parrot.name = "Squawky";
+    const pirate = new CanonicalPirate({ parrots: [parrot], catchphrase: "Arrrr" });
+
+    await pirate.saveBang();
+
+    expect((await parrot.reload()).name).toEqual("Squawky");
   });
 
   it("should not update children when parent creation with no reason", async () => {
-    class NUCTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    const parrot = (await CanonicalParrot.createBang({ name: "Polly" })) as any;
+    expect(parrot.updated_count).toEqual(0);
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class NUCArticle extends Base {
-      declare name: string | null;
-      declare nucTags: AssociationProxy<NUCTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("nucTags", {
-          className: "NUCTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(NUCArticle, "nucTags");
-    registerModel(NUCTag);
-    registerModel(NUCArticle);
-    const article = await NUCArticle.create({ name: "parent" });
-    const tag = await NUCTag.create({ name: "child", author_id: article.id });
-    await article.save();
-    const reloaded = await NUCTag.find(tag.id);
-    expect(reloaded.name).toBe("child");
+    const newPirate = new CanonicalPirate({ catchphrase: "Arrrr" });
+    await newPirate.setAttributes({ parrotIds: [parrot.id] });
+    await newPirate.saveBang();
+    expect((await parrot.reload()).updated_count).toEqual(0);
   });
 
   it("should automatically validate the associated models", async () => {
-    class AVTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    for (const child of await pirate[associationName]) child.name = "";
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class AVArticle extends Base {
-      declare name: string | null;
-      declare avTags: AssociationProxy<AVTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("avTags", {
-          className: "AVTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(AVArticle, "avTags");
-    registerModel(AVTag);
-    registerModel(AVArticle);
-    const invalidTag = new AVTag({ name: "" });
-    const valid = await invalidTag.isValid();
-    expect(valid).toBe(false);
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+    expect(pirate.errors.get(`${associationName}.name`)).toEqual(["can't be blank"]);
+    assertEmpty(pirate.errors.get(associationName));
   });
 
   it("should not use default invalid error on associated models", async () => {
-    class NDITag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    pirate[associationName].build({ name: "" });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class NDIArticle extends Base {
-      declare name: string | null;
-      declare ndiTags: AssociationProxy<NDITag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("ndiTags", {
-          className: "NDITag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(NDIArticle, "ndiTags");
-    registerModel(NDITag);
-    registerModel(NDIArticle);
-    const tag = new NDITag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
-    const nameMessages = tag.errors.fullMessagesFor("name");
-    expect(nameMessages.length).toBeGreaterThan(0);
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+    expect(pirate.errors.get(`${associationName}.name`)).toEqual(["can't be blank"]);
+    assertEmpty(pirate.errors.get(associationName));
   });
 
   it("should default invalid error from i18n", async () => {
-    class DITag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    I18n.backend().storeTranslations("en", {
+      activerecord: { errors: { models: { [associatedModelName]: { blank: "cannot be blank" } } } },
+    });
+    try {
+      pirate[associationName].build({ name: "" });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
+      assertNotPredicate(await pirate.isValid(), (v) => v);
+      expect(pirate.errors.get(`${associationName}.name`)).toEqual(["cannot be blank"]);
+      expect(pirate.errors.fullMessages).toEqual([
+        `${humanize(associationName)} name cannot be blank`,
+      ]);
+      assertEmpty(pirate.errors.get(associationName));
+    } finally {
+      resetI18n();
     }
-    class DIArticle extends Base {
-      declare name: string | null;
-      declare diTags: AssociationProxy<DITag>;
+  });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("diTags", {
-          className: "DITag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(DIArticle, "diTags");
-    registerModel(DITag);
-    registerModel(DIArticle);
-    const tag = new DITag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
-    expect(tag.errors.size).toBeGreaterThan(0);
+  it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
+    for (const child of await pirate[associationName]) child.name = "";
+    pirate.catchphrase = null;
+
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+    expect(pirate.errors.get(`${associationName}.name`)).toEqual(["can't be blank"]);
+    assertPredicate(pirate.errors.get("catchphrase"), (e: string[]) => e.length > 0);
   });
 
   it("should allow to bypass validations on the associated models on update", async () => {
-    class BVUTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    pirate.catchphrase = "";
+    for (const child of await pirate[associationName]) child.name = "";
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class BVUArticle extends Base {
-      declare name: string | null;
-      declare bvuTags: AssociationProxy<BVUTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("bvuTags", {
-          className: "BVUTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(BVUArticle, "bvuTags");
-    registerModel(BVUTag);
-    registerModel(BVUArticle);
-    const article = await BVUArticle.create({ name: "test" });
-    const tag = await BVUTag.create({ name: "original", author_id: article.id });
-    await (article as any).setBvuTagsAttributes([{ id: tag.id, name: "updated" }]);
-    await article.save();
-    const reloaded = await BVUTag.find(tag.id);
-    expect(reloaded.name).toBe("updated");
+    assert(await pirate.save({ validate: false }));
+    expect([
+      (await pirate.reload()).catchphrase,
+      (await pirate[associationName].first()).name,
+      (await pirate[associationName].last()).name,
+    ]).toEqual(["", "", ""]);
   });
 
   it("should validation the associated models on create", async () => {
-    class VCTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class VCArticle extends Base {
-      declare name: string | null;
-      declare vcTags: AssociationProxy<VCTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("vcTags", {
-          className: "VCTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(VCArticle, "vcTags");
-    registerModel(VCTag);
-    registerModel(VCArticle);
-    const tag = new VCTag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
+    await assertNoDifference(
+      async () => Number(await CanonicalBird.count()),
+      null,
+      async () => {
+        for (let i = 0; i < 2; i++) pirate[associationName].build();
+        await pirate.save();
+      },
+    );
   });
 
   it("should allow to bypass validations on the associated models on create", async () => {
-    class BVTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class BVArticle extends Base {
-      declare name: string | null;
-      declare bvTags: AssociationProxy<BVTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("bvTags", {
-          className: "BVTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(BVArticle, "bvTags");
-    registerModel(BVTag);
-    registerModel(BVArticle);
-    const article = await BVArticle.create({ name: "test" });
-    await (article as any).setBvTagsAttributes([{ name: "valid" }]);
-    await article.save();
-    const tags = await BVTag.where({ author_id: article.id });
-    expect(tags.length).toBe(1);
+    await assertDifference(
+      async () => Number(await CanonicalBird.count()),
+      2,
+      null,
+      async () => {
+        for (let i = 0; i < 2; i++) pirate[associationName].build();
+        await pirate.save({ validate: false });
+      },
+    );
   });
 
   it("should not save and return false if a callback cancelled saving in either create or update", async () => {
-    class CBTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    pirate.catchphrase = "Changed";
+    child1.name = "Changed";
+    child1.cancelSaveFromCallback = true;
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.beforeSave(function (record: any) {
-          if (record.name === "cancel") kernelThrow(":abort");
-        });
-      }
-    }
-    class CBArticle extends Base {
-      declare name: string | null;
+    assertNot(await pirate.save());
+    expect((await pirate.reload()).catchphrase).toEqual("Don' botharrr talkin' like one, savvy?");
+    expect((await child1.reload()).name).toEqual("Posideons Killer");
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CBTag);
-    registerModel(CBArticle);
-    const tag = new CBTag({ name: "cancel" });
-    const result = await tag.save();
-    expect(result).toBe(false);
-  });
+    const newPirate = new CanonicalPirate({ catchphrase: "Arr" }) as any;
+    const newChild = newPirate[associationName].build({ name: "Grace OMalley" });
+    newChild.cancelSaveFromCallback = true;
 
-  it("should not load the associated models if they were not loaded yet", async () => {
-    class NLTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class NLArticle extends Base {
-      declare name: string | null;
-      declare nlTags: AssociationProxy<NLTag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("nlTags", {
-          className: "NLTag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(NLArticle, "nlTags");
-    registerModel(NLTag);
-    registerModel(NLArticle);
-    const article = await NLArticle.create({ name: "no load" });
-    const saved = await article.save();
-    expect(saved).toBe(true);
-  });
-  it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
-    class METag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class MEArticle extends Base {
-      declare name: string | null;
-      declare meTags: AssociationProxy<METag>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("meTags", {
-          className: "METag",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(MEArticle, "meTags");
-    registerModel(METag);
-    registerModel(MEArticle);
-    const invalidTag = new METag({ name: "" });
-    const valid = await invalidTag.isValid();
-    expect(valid).toBe(false);
-    expect(invalidTag.errors.size).toBeGreaterThan(0);
+    await assertNoDifference(
+      async () => Number(await CanonicalPirate.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await newChild.constructor.count()),
+          null,
+          async () => {
+            assertNot(await newPirate.save());
+          },
+        );
+      },
+    );
   });
 
   it("should rollback any changes if an exception occurred while saving", async () => {
-    class RBTag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    const before = [pirate.catchphrase, ...(await pirate[associationName]).map((c: any) => c.name)];
+    const newNames = ["Grace OMalley", "Privateers Greed"];
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class RBArticle extends Base {
-      declare name: string | null;
-      declare rbTags: AssociationProxy<RBTag>;
+    pirate.catchphrase = "Arr";
+    (await pirate[associationName]).forEach((child: any, i: number) => {
+      child.name = newNames[i];
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("rbTags", {
-          className: "RBTag",
-          foreignKey: "author_id",
-          autosave: true,
-        });
-      }
-    }
-    acceptsNestedAttributesFor(RBArticle, "rbTags");
-    registerModel(RBTag);
-    registerModel(RBArticle);
-    const article = await RBArticle.create({ name: "rollback test" });
-    expect(() =>
-      (article as any).setRbTagsAttributes([{ name: "good" }, { name: "bad", unknownCol: "boom" }]),
-    ).toThrow(/unknown attribute/);
-    const tags = await RBTag.where({ author_id: article.id });
-    expect(tags.length).toBeLessThanOrEqual(1);
+    const first = await pirate[associationName].first();
+    const save = first.save.bind(first);
+    first.save = async (options?: any) => {
+      await save(options);
+      throw new Error("Oh noes!");
+    };
+
+    await assertRaise([Error], {}, async () => assertNot(await pirate.save()));
+    expect([
+      (await pirate.reload()).catchphrase,
+      ...(await pirate[associationName]).map((c: any) => c.name),
+    ]).toEqual(before);
   });
 
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
-    class RITag extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    for (const child of await pirate[associationName]) child.name = "";
+    await assertRaise([RecordInvalid], {}, () => pirate.saveBang());
+  });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class RIArticle extends Base {
-      declare name: string | null;
-      declare riTags: AssociationProxy<RITag>;
+  it("should not load the associated models if they were not loaded yet", async () => {
+    await assertQueriesCount(3, false, async () => {
+      pirate.catchphrase = "Arr";
+      await pirate.saveBang();
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("riTags", {
-          className: "RITag",
-          foreignKey: "author_id",
-          autosave: true,
-        });
-      }
-    }
-    registerModel(RITag);
-    registerModel(RIArticle);
-    const article = await RIArticle.create({ name: "test" });
-    const tag = await RITag.create({ name: "valid", author_id: article.id });
-    tag.name = "";
-    cacheAssoc(article, "riTags", [tag]);
-    await expect(article.saveBang()).rejects.toThrow(RecordInvalid);
+    await pirate[associationName].loadTarget();
+
+    await assertQueriesCount(5, false, async () => {
+      pirate.catchphrase = "Yarr";
+      const newNames = ["Grace OMalley", "Privateers Greed"];
+      (await pirate[associationName]).forEach((child: any, i: number) => {
+        child.name = newNames[i];
+      });
+      await pirate.saveBang();
+    });
   });
 });
 
