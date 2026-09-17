@@ -255,7 +255,7 @@ describe("StringConversionsTest", () => {
   it("string to time utc offset", () => {
     withEnvTz("US/Eastern", () => {
       const utcOffset = (time: Temporal.ZonedDateTime | Time | undefined) =>
-        time!.offsetNanoseconds / 1_000_000_000;
+        (time as Temporal.ZonedDateTime).offsetNanoseconds / 1_000_000_000;
       /* eslint-disable vitest/no-conditional-expect */
       if (toTimePreservesTimezone()) {
         expect(utcOffset(toTime("2005-02-27 23:50", "utc"))).toEqual(0);

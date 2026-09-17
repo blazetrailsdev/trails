@@ -338,8 +338,10 @@ function _callableToSourceString(callable: unknown): string {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function assert(value: boolean, message: string | (() => string) = ""): void {
-  if (!value) throw new Assertion(typeof message === "function" ? message() : message);
+export function assert(value: unknown, message: string | (() => string) = ""): void {
+  if (value == null || value === false) {
+    throw new Assertion(typeof message === "function" ? message() : message);
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */

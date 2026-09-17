@@ -2,7 +2,7 @@ import { Module, extend, include } from "@blazetrails/ruby-compat";
 import { prepend as prependModule } from "@blazetrails/ruby-compat/include";
 import { Concern } from "../../concern.js";
 
-type AnyClass = abstract new (...args: any[]) => any;
+type AnyClass = new (...args: never[]) => unknown;
 
 export function concerning(
   this: AnyClass,

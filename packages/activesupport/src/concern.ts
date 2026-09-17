@@ -15,7 +15,7 @@ export class MultiplePrependBlocks extends Error {
   }
 }
 
-type AnyClass = abstract new (...args: any[]) => any;
+type AnyClass = new (...args: never[]) => unknown;
 
 interface ConcernHost extends Module {
   _dependencies?: ConcernHost[];

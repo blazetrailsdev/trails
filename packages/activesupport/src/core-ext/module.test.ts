@@ -395,12 +395,12 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to with reserved methods", () => {
-    expect(delegateMissingTo(new DecoratedReserved(david), "case").name).toEqual("David");
+    expect((delegateMissingTo(new DecoratedReserved(david), "case") as any).name).toEqual("David");
   });
 
   it("delegate missing to with keyword methods", () => {
     expect(
-      delegateMissingTo(new DecoratedReserved(david), "case").kwSend({ method: "name" }),
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).kwSend({ method: "name" }),
     ).toEqual("David");
   });
 

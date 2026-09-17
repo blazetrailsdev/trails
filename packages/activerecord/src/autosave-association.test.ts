@@ -833,13 +833,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("invalid build", async () => {
-    const newClient = companies("first_firm").clientsOfFirm.build();
+    const newClient = (companies("first_firm") as Firm).clientsOfFirm.build();
     assertNotPredicate(newClient, (r) => r.isPersisted());
     assertNotPredicate(await newClient.isValid(), (v) => v);
-    expect(await companies("first_firm").clientsOfFirm.last()).toBe(newClient);
-    assertNot(await companies("first_firm").save());
+    expect(await (companies("first_firm") as Firm).clientsOfFirm.last()).toBe(newClient);
+    assertNot(await (companies("first_firm") as Firm).save());
     assertNotPredicate(newClient, (r) => r.isPersisted());
-    expect(await (await companies("first_firm").clientsOfFirm.reload()).size()).toEqual(2);
+    expect(await (await (companies("first_firm") as Firm).clientsOfFirm.reload()).size()).toEqual(
+      2,
+    );
   });
 
   it("adding before save", async () => {
@@ -936,7 +938,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build before save", async () => {
-    const company = companies("first_firm");
+    const company = companies("first_firm") as Firm;
 
     let newClient!: Client;
     await assertQueriesCount(0, false, () => {
@@ -953,7 +955,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build many before save", async () => {
-    const company = companies("first_firm");
+    const company = companies("first_firm") as Firm;
 
     await assertQueriesCount(0, false, () => {
       company.clientsOfFirm.build([{ name: "Another Client" }, { name: "Another Client II" }]);
@@ -967,7 +969,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build via block before save", async () => {
-    const company = companies("first_firm");
+    const company = companies("first_firm") as Firm;
 
     let newClient!: Client;
     await assertQueriesCount(0, false, () => {
@@ -986,7 +988,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build many via block before save", async () => {
-    const company = companies("first_firm");
+    const company = companies("first_firm") as Firm;
 
     await assertQueriesCount(0, false, () => {
       company.clientsOfFirm.build(
@@ -1006,7 +1008,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("replace on new object", async () => {
     const firm = new Firm({ name: "New Firm" });
-    await firm.clients.replace([companies("second_client"), new Client({ name: "New Client" })]);
+    await firm.clients.replace([
+      companies("second_client") as Client,
+      new Client({ name: "New Client" }),
+    ]);
     assert(await firm.save());
     await firm.reload();
     expect((await firm.clients).length).toEqual(2);
@@ -1017,7 +1022,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("replace on duplicated object", async () => {
     const firm = (await Firm.createBang({ name: "New Firm" })).dup();
-    await firm.clients.replace([companies("second_client"), new Client({ name: "New Client" })]);
+    await firm.clients.replace([
+      companies("second_client") as Client,
+      new Client({ name: "New Client" }),
+    ]);
     assert(await firm.save());
     await firm.reload();
     expect((await firm.clients).length).toEqual(2);
@@ -1027,7 +1035,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    const firm = await Firm.find(companies("first_firm").id);
+    const firm = await Firm.find((companies("first_firm") as Firm).id);
     firm.clients.reset();
     await assertNoQueries(false, async () => {
       await firm.saveBang();
@@ -1141,7 +1149,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("not resaved when unchanged", async () => {
-    let firm = (await Firm.all().merge({ includes: "account" }).first()) as any;
+    let firm = (await Firm.all()
+      .merge({ includes: "account" } as any)
+      .first()) as any;
     firm.name += "-changed";
     await assertQueriesCount(3, false, async () => {
       await firm.saveBang();
@@ -2245,13 +2255,14 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave collection association callbacks get called once", async () => {
     const shipWithSavingStack = class extends CanonicalShip {
       count?: number;
-
-      saveCollectionAssociation(reflection: any) {
+    };
+    Object.defineProperty(shipWithSavingStack.prototype, "saveCollectionAssociation", {
+      value(this: any, reflection: any) {
         this.count ??= 0;
         if (reflection.name === "parts") this.count += 1;
-        return super.saveCollectionAssociation(reflection);
-      }
-    };
+        return CanonicalShip.prototype.saveCollectionAssociation.call(this, reflection);
+      },
+    });
 
     const ship = new shipWithSavingStack({ name: "Nights Dirty Lightning" });
     ship.parts.build({ name: "part" });
@@ -2265,13 +2276,14 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
     const pirateWithSavingStack = class extends CanonicalPirate {
       count?: number;
-
-      saveHasOneAssociation(reflection: any) {
+    };
+    Object.defineProperty(pirateWithSavingStack.prototype, "saveHasOneAssociation", {
+      value(this: any, reflection: any) {
         this.count ??= 0;
         if (reflection.name === "ship") this.count += 1;
-        return super.saveHasOneAssociation(reflection);
-      }
-    };
+        return CanonicalPirate.prototype.saveHasOneAssociation.call(this, reflection);
+      },
+    });
 
     const pirate = new pirateWithSavingStack({ catchphrase: "Aye" });
     (pirate as any).buildShip({ name: "Nights Dirty Lightning" });
@@ -2282,13 +2294,14 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave belongs to association callbacks get called once", async () => {
     const shipWithSavingStack = class extends CanonicalShip {
       count?: number;
-
-      saveBelongsToAssociation(reflection: any) {
+    };
+    Object.defineProperty(shipWithSavingStack.prototype, "saveBelongsToAssociation", {
+      value(this: any, reflection: any) {
         this.count ??= 0;
         if (reflection.name === "pirate") this.count += 1;
-        return super.saveBelongsToAssociation(reflection);
-      }
-    };
+        return CanonicalShip.prototype.saveBelongsToAssociation.call(this, reflection);
+      },
+    });
 
     const ship = new shipWithSavingStack({ name: "Nights Dirty Lightning" });
     (ship as any).buildPirate({ catchphrase: "Aye" });
