@@ -3,11 +3,16 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
-import { adapterType } from "./test-adapter.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { Current } from "./migration.js";
+import type { TableDefinition as PostgreSQLTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import {
   dumpAllTableSchema,
@@ -697,18 +702,28 @@ describe("SchemaDumperTest", () => {
       [...output.matchAll(/^\s*await ctx\.addForeignKey\("([^"]+)".+$/gm)].map((m) => m[1]),
     ).toEqual(["authors"]);
   });
-  itIfSupports("foreign_keys", "do not dump foreign keys when bypassed by config", async () => {
-    const source = {
-      tables: async () => ["authors", "books"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-    };
-    const output = (await SchemaDumper.dump(source as any)).string();
-    expect(output).not.toMatch(
-      /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
-    );
-  });
+  itIfSupports.skipIf(inMemoryDb())(
+    "foreign_keys",
+    "do not dump foreign keys when bypassed by config",
+    async () => {
+      const storage = await mkdtemp(join(tmpdir(), "trails-schema-dumper-"));
+      try {
+        await Base.establishConnection({
+          adapter: "sqlite3",
+          database: join(storage, "test.sqlite3"),
+          foreignKeys: false,
+        });
+
+        const output = await dumpAllTableSchema([], await Base.leaseConnection());
+        expect(output).not.toMatch(
+          /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
+        );
+      } finally {
+        await Base.establishConnection(ambientPoolConfiguration());
+        await rm(storage, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("schema dump with table name prefix and suffix", async () => {
     const prefixWas = Base.tableNamePrefix;
@@ -810,7 +825,7 @@ describe("SchemaDumperTest", () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
         await Base.connection.createTable("timestamps", { force: true }, (t) => {
           t.datetime("this_should_remain_datetime");
-          (t as any).timestamptz("this_is_an_alias_of_datetime");
+          (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
           t.column("without_time_zone", "timestamp");
           t.column("with_time_zone", "timestamptz");
         });
@@ -824,21 +839,13 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
     ctx.skip();
-    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-    const output = "";
-    expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
-    expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
-    expect(output.includes('t.datetime("this_is_also_an_alias_of_datetime"')).toBeTruthy();
+    // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
   });
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      const output = "";
-      expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-      expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-      expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -872,7 +879,7 @@ describe("SchemaDumperTest", () => {
         t.datetime("default_format");
         t.datetime("without_time_zone");
         t.timestamp("also_without_time_zone");
-        (t as any).timestamptz("with_time_zone");
+        (t as PostgreSQLTableDefinition).timestamptz("with_time_zone");
       });
       const output = await dumpTableSchema(Base.connection, "timestamps");
       expect(output.includes('t.datetime("default_format"')).toBeTruthy();
@@ -904,21 +911,14 @@ describe("SchemaDumperTest", () => {
     "schema dump with correct timestamp types via add column before rails 7",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-      const output = "";
-      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      const output = "";
-      expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-      expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
 
