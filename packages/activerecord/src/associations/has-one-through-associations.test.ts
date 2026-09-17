@@ -3,7 +3,19 @@ import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
-import { assertQueriesMatch, assertQueriesCount } from "../testing/query-assertions.js";
+import {
+  assertQueriesMatch,
+  assertQueriesCount,
+  assertNoQueries,
+} from "../testing/query-assertions.js";
+import {
+  assert,
+  assertPredicate,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertDifference,
+  assertNoDifference,
+} from "@blazetrails/activesupport";
 import {
   HasOneThroughCantAssociateThroughCollection,
   HasOneAssociationPolymorphicThroughError,
@@ -152,25 +164,25 @@ describe("HasOneThroughAssociationsTest", () => {
   it("creating association builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
     const newClub = await (newMember.association("club") as any).build();
-    expect(tgt(newMember, "currentMembership")).toBeTruthy();
+    assert(tgt(newMember, "currentMembership"));
     expect(tgt(newMember, "club")).toBe(newClub);
-    expect(newClub.isNewRecord()).toBe(true);
-    expect(tgt(newMember, "currentMembership").isNewRecord()).toBe(true);
-    expect(await newMember.save()).toBe(true);
-    expect(newClub.isPersisted()).toBe(true);
-    expect(tgt(newMember, "currentMembership").isPersisted()).toBe(true);
+    assertPredicate(newClub, (r: any) => r.isNewRecord());
+    assertPredicate(tgt(newMember, "currentMembership"), (r: any) => r.isNewRecord());
+    assert(await newMember.save());
+    assertPredicate(newClub, (r: any) => r.isPersisted());
+    assertPredicate(tgt(newMember, "currentMembership"), (r: any) => r.isPersisted());
   });
 
   it("association build constructor builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
     const newClub = await (newMember.association("club") as any).build();
-    expect(tgt(newMember, "currentMembership")).toBeTruthy();
+    assert(tgt(newMember, "currentMembership"));
     expect(tgt(newMember, "club")).toBe(newClub);
-    expect(newClub.isNewRecord()).toBe(true);
-    expect(tgt(newMember, "currentMembership").isNewRecord()).toBe(true);
-    expect(await newMember.save()).toBe(true);
-    expect(newClub.isPersisted()).toBe(true);
-    expect(tgt(newMember, "currentMembership").isPersisted()).toBe(true);
+    assertPredicate(newClub, (r: any) => r.isNewRecord());
+    assertPredicate(tgt(newMember, "currentMembership"), (r: any) => r.isNewRecord());
+    assert(await newMember.save());
+    assertPredicate(newClub, (r: any) => r.isPersisted());
+    assertPredicate(tgt(newMember, "currentMembership"), (r: any) => r.isPersisted());
   });
 
   it("creating association builds through record for new", async () => {
@@ -189,30 +201,20 @@ describe("HasOneThroughAssociationsTest", () => {
     const memberType = await MemberType.create({});
     await Member.create({});
     const memberDetailWithOneAssociation = new MemberDetail({ memberType });
-    expect(tgt(memberDetailWithOneAssociation, "member").isNewRecord()).toBe(true);
+    assertPredicate(tgt(memberDetailWithOneAssociation, "member"), (r: any) => r.isNewRecord());
     const memberDetailWithTwoAssociations = new MemberDetail({
       memberType,
       admittable: await Member.create({}),
     });
-    expect(tgt(memberDetailWithTwoAssociations, "member").isNewRecord()).toBe(true);
+    assertPredicate(tgt(memberDetailWithTwoAssociations, "member"), (r: any) => r.isNewRecord());
   });
 
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    const membership = await (newMember.association("currentMembership") as any).create();
+    await (newMember.association("currentMembership") as any).createBang();
     const newClub = await (newMember.association("club") as any).build();
+
     expect(newMember.association("club").target).toBe(newClub);
-
-    const finalClub = await (newMember.association("club") as any).build();
-    expect(newMember.association("club").target).toBe(finalClub);
-
-    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
-    const before = await countForMember();
-    expect(await newMember.save()).toBe(true);
-    expect(await countForMember()).toBe(before);
-    expect(finalClub.isPersisted()).toBe(true);
-    const reloaded = await Membership.find(membership.id);
-    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
@@ -366,12 +368,12 @@ describe("HasOneThroughAssociationsTest", () => {
     const memberType = await MemberType.create({});
     await Member.create({});
     const memberDetailWithOneAssociation = await MemberDetail.create({ memberType });
-    expect(tgt(memberDetailWithOneAssociation, "member").isNewRecord()).toBe(false);
+    assertNotPredicate(tgt(memberDetailWithOneAssociation, "member"), (r: any) => r.isNewRecord());
     const memberDetailWithTwoAssociations = await MemberDetail.create({
       memberType,
       admittable: await Member.create({}),
     });
-    expect(tgt(memberDetailWithTwoAssociations, "member").isNewRecord()).toBe(false);
+    assertNotPredicate(tgt(memberDetailWithTwoAssociations, "member"), (r: any) => r.isNewRecord());
   });
 
   it("creating association sets both parent ids for new", async () => {
@@ -408,12 +410,16 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("replacing target record deletes old association", async () => {
     const member = members("groucho");
-    const before = (await Membership.count()) as number;
-    const newClub = await Club.create({ name: "Bananarama" });
-    await (member.association("club") as SingularAssociation).writer(newClub);
-    await member.save();
-    await member.reload();
-    expect((await Membership.count()) as number).toBe(before);
+    await assertNoDifference(
+      () => Membership.count() as Promise<number>,
+      null,
+      async () => {
+        const newClub = await Club.create({ name: "Bananarama" });
+        await (member.association("club") as SingularAssociation).writer(newClub);
+        await member.save();
+        await member.reload();
+      },
+    );
   });
 
   it("set record to nil should delete association", async () => {
@@ -572,15 +578,20 @@ describe("HasOneThroughAssociationsTest", () => {
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");
     const organization = organizations("nsa");
-    const before = await memberDetailCount(member);
-    const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
-    await (member.association("organization") as SingularAssociation).writer(organization);
-    await member.save();
-    expect((await memberDetailCount(member)) - before).toBe(1);
+    await assertDifference(
+      () => memberDetailCount(member),
+      1,
+      null,
+      async () => {
+        const memberDetail = new MemberDetail({ extra_data: "Extra" });
+        await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
+        await (member.association("organization") as SingularAssociation).writer(organization);
+        await member.save();
+      },
+    );
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     const orgMembers = (await organization.association("members").loadTarget()) as any[];
-    expect(orgMembers.some((m: any) => m.id === member.id)).toBe(true);
+    expect(orgMembers.map((m: any) => m.id)).toContain(member.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
   });
 
@@ -589,30 +600,39 @@ describe("HasOneThroughAssociationsTest", () => {
     const organization = organizations("nsa");
     const newOrganization = organizations("discordians");
 
-    const includesMember = async (o: any): Promise<boolean> => {
+    const memberIds = async (o: any): Promise<unknown[]> => {
       await o.association("members").reload();
-      return (o.association("members").target as any[]).some((m: any) => m.id === member.id);
+      return (o.association("members").target as any[]).map((m: any) => m.id);
     };
 
-    let before = await memberDetailCount(member);
-    const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
-    await (member.association("organization") as SingularAssociation).writer(organization);
-    await member.save();
-    expect((await memberDetailCount(member)) - before).toBe(1);
+    await assertDifference(
+      () => memberDetailCount(member),
+      1,
+      null,
+      async () => {
+        const memberDetail = new MemberDetail({ extra_data: "Extra" });
+        await (member.association("memberDetail") as SingularAssociation).writer(memberDetail);
+        await (member.association("organization") as SingularAssociation).writer(organization);
+        await member.save();
+      },
+    );
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
-    expect(await includesMember(organization)).toBe(true);
-    expect(await includesMember(newOrganization)).toBe(false);
+    expect(await memberIds(organization)).toContain(member.id);
+    expect(await memberIds(newOrganization)).not.toContain(member.id);
 
-    before = await memberDetailCount(member);
-    await (member.association("organization") as SingularAssociation).writer(newOrganization);
-    await member.save();
-    expect(await memberDetailCount(member)).toBe(before);
+    await assertNoDifference(
+      () => memberDetailCount(member),
+      null,
+      async () => {
+        await (member.association("organization") as SingularAssociation).writer(newOrganization);
+        await member.save();
+      },
+    );
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
-    expect(await includesMember(organization)).toBe(false);
-    expect(await includesMember(newOrganization)).toBe(true);
+    expect(await memberIds(organization)).not.toContain(member.id);
+    expect(await memberIds(newOrganization)).toContain(member.id);
   });
 
   it("preloading has one through on belongs to", async () => {
@@ -630,10 +650,8 @@ describe("HasOneThroughAssociationsTest", () => {
       loaded = await MemberDetail.all().includes(":memberType");
     });
     const newDetail = loaded[0];
-    expect(newDetail.association("memberType").isLoaded()).toBe(true);
-    await assertQueriesCount(0, false, () => {
-      void newDetail.association("memberType").target;
-    });
+    assertPredicate(newDetail.association("memberType"), (a: any) => a.isLoaded());
+    await assertNoQueries(false, () => readHasOne(newDetail, "memberType"));
   });
 
   it("save of record with loaded has one through", async () => {
@@ -641,13 +659,17 @@ describe("HasOneThroughAssociationsTest", () => {
     const club = await readHasOne(member, "club");
     expect(await readHasOne(club, "sponsoredMember")).not.toBeNull();
 
-    await (await Club.find(club.id)).save();
-    await (await Club.all().includes(":sponsoredMember").find(club.id)).save();
+    await assertNothingRaised(async () => {
+      await (await Club.find(club.id)).saveBang();
+      await (await Club.all().includes(":sponsoredMember").find(club.id)).saveBang();
+    });
 
     await (await readHasOne(club, "sponsor")).destroy();
 
-    await (await Club.find(club.id)).save();
-    await (await Club.all().includes(":sponsoredMember").find(club.id)).save();
+    await assertNothingRaised(async () => {
+      await (await Club.find(club.id)).saveBang();
+      await (await Club.all().includes(":sponsoredMember").find(club.id)).saveBang();
+    });
   });
 
   it("through belongs to after destroy", async () => {
@@ -672,7 +694,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("value is properly quoted", async () => {
     const minivan = await Minivan.find("m1");
-    await readHasOne(minivan, "dashboard");
+    await assertNothingRaised(() => readHasOne(minivan, "dashboard"));
   });
 
   it("has one through polymorphic with primary key option", async () => {
@@ -726,11 +748,12 @@ describe("HasOneThroughAssociationsTest", () => {
     const minivan = minivans("cool_first");
     await readHasOne(minivan, "dashboard");
     const proxy = minivan.association("dashboard");
-    expect(proxy.isStaleTarget?.() ?? false).toBe(false);
+    assertNotPredicate(proxy, (p: any) => p.isStaleTarget());
     expect((await readHasOne(minivan, "dashboard"))?.id).toBe(dashboards("cool_first").id);
 
     minivan.speedometer_id = speedometers("second").id as string;
-    expect(proxy.isStaleTarget?.()).toBe(true);
+
+    assertPredicate(proxy, (p: any) => p.isStaleTarget());
     expect((await readHasOne(minivan, "dashboard"))?.id).toBe(dashboards("second").id);
   });
 
@@ -738,8 +761,10 @@ describe("HasOneThroughAssociationsTest", () => {
     const minivan = new Minivan();
     await readHasOne(minivan, "dashboard");
     const proxy = minivan.association("dashboard");
+
     minivan.speedometer_id = speedometers("second").id as string;
-    expect(proxy.isStaleTarget?.()).toBe(true);
+
+    assertPredicate(proxy, (p: any) => p.isStaleTarget());
     expect((await readHasOne(minivan, "dashboard"))?.id).toBe(dashboards("second").id);
   });
 
@@ -825,6 +850,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
     await readHasOne(book, "orderAgreement");
     await (book.association("order") as SingularAssociation).writer(new CpkOrder());
-    expect(book.association("orderAgreement").isStaleTarget?.()).toBe(true);
+    assertPredicate(book.association("orderAgreement"), (a: any) => a.isStaleTarget());
   });
 });

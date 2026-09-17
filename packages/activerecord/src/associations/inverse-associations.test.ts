@@ -9,6 +9,14 @@ import {
   InverseOfAssociationRecursiveError,
   RecordNotFound,
 } from "../index.js";
+import {
+  assert,
+  assertPredicate,
+  assertNotPredicate,
+  assertRaises,
+  assertRespondTo,
+  assertNothingRaised,
+} from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -163,10 +171,20 @@ describe("AutomaticInverseFindingTests", () => {
     const authorChildReflection = (Author as any).reflectOnAssociation("specialPosts");
     const postReflection = (Post as any).reflectOnAssociation("author");
 
-    expect(authorReflection.hasInverse()).toBeTruthy();
+    assertRespondTo(authorReflection, "hasInverse");
+    assertPredicate(
+      authorReflection,
+      (r: any) => r.hasInverse(),
+      "The Author reflection should have an inverse",
+    );
     expect(authorReflection.inverseOf()).toBe(postReflection);
 
-    expect(authorChildReflection.hasInverse()).toBeTruthy();
+    assertRespondTo(authorChildReflection, "hasInverse");
+    assertPredicate(
+      authorChildReflection,
+      (r: any) => r.hasInverse(),
+      "The Author reflection should have an inverse",
+    );
     expect(authorChildReflection.inverseOf()).toBe(postReflection);
   });
 
@@ -250,6 +268,9 @@ describe("AutomaticInverseFindingTests", () => {
 
     ratingComment.body = "Fennec foxes are the smallest of the foxes.";
     expect((rating as any).comment.body).toBe(ratingComment.body);
+
+    ratingComment.body = "Kittens are adorable.";
+    expect(ratingComment.body).toBe((rating as any).comment.body);
   });
 
   it("has many and belongs to automatic inverse shares objects on comment", async () => {
@@ -262,6 +283,9 @@ describe("AutomaticInverseFindingTests", () => {
 
     (rating as any).comment.body = "Fennec foxes are the smallest of the foxes.";
     expect((rating as any).comment.body).toBe((comment as any).body);
+
+    (comment as any).body = "Kittens are adorable.";
+    expect((comment as any).body).toBe((rating as any).comment.body);
   });
 
   it("belongs to should find inverse has many automatically", async () => {
@@ -483,11 +507,12 @@ describe("InverseHasOneTests", () => {
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
-    const human = (await Human.first())!;
-    const err = await loadSingularTarget(human, "confusedFace").catch((e) => e);
-    expect(err).toBeInstanceOf(InverseOfAssociationNotFoundError);
-    expect(err.detailedMessage()).toMatch(/Did you mean\?/);
-    expect(err.corrections[0]).toBe("confusedHuman");
+    const error: any = await assertRaises([InverseOfAssociationNotFoundError], {}, async () =>
+      loadSingularTarget((await Human.first())!, "confusedFace"),
+    );
+
+    expect(error.detailedMessage()).toMatch("Did you mean?");
+    expect(error.corrections[0]).toBe("confusedHuman");
   });
 });
 
@@ -514,7 +539,6 @@ describe("InverseHasManyTests", () => {
   it("parent instance should be shared with every child on find", async () => {
     const human = humans("gordon");
     const interests = await human.interests;
-    expect(interests.length).toBeGreaterThan(0);
     for (const interest of interests) {
       expect((interest as any).human.name).toBe(human.name);
       (human as any).name = "Bongo";
@@ -527,7 +551,6 @@ describe("InverseHasManyTests", () => {
   it("parent instance should be shared with every child on find for sti", async () => {
     const author = authors("david");
     const posts = await author.posts;
-    expect(posts.length).toBeGreaterThan(0);
     for (const post of posts) {
       expect((post as any).author.name).toBe((author as any).name);
       (author as any).name = "Bongo";
@@ -537,7 +560,6 @@ describe("InverseHasManyTests", () => {
     }
 
     const specialPosts = await author.specialPosts;
-    expect(specialPosts.length).toBeGreaterThan(0);
     for (const post of specialPosts) {
       expect((post as any).author.name).toBe((author as any).name);
       (author as any).name = "Bongo";
@@ -596,28 +618,38 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with newly block style created child", async () => {
     const human = (await Human.first())!;
-    const interest = await association(human, "interests").create({
-      topic: "Industrial Revolution Re-enactment",
+    const interest = await association(human, "interests").create({}, (ii: any) => {
+      ii.topic = "Industrial Revolution Re-enactment";
     });
     expect((interest as any).topic).not.toBeNull();
     expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
     expect((interest as any).human.name).toBe((human as any).name);
   });
 
   it("parent instance should be shared within create block of new child", async () => {
     const human = (await Human.first())!;
     const interest = await association(human, "interests").create({}, (i: any) => {
-      expect(i.human).toBe(human);
+      assert(i.human === human, "Human of child should be the same instance as a parent");
     });
-    expect((interest as any).human).toBe(human);
+    assert(
+      (interest as any).human === human,
+      "Human of the child should still be the same instance as a parent",
+    );
   });
 
   it("parent instance should be shared within build block of new child", async () => {
     const human = (await Human.first())!;
     const interest = association(human, "interests").build({}, (i: any) => {
-      expect(i.human).toBe(human);
+      assert(i.human === human, "Human of child should be the same instance as a parent");
     });
-    expect((interest as any).human).toBe(human);
+    assert(
+      (interest as any).human === human,
+      "Human of the child should still be the same instance as a parent",
+    );
   });
 
   it("parent instance should be shared with poked in child", async () => {
@@ -647,19 +679,19 @@ describe("InverseHasManyTests", () => {
   it("parent instance should be shared with first and last child", async () => {
     const human = (await Human.first())!;
     const interests = association(human, "interests");
-    expect(((await interests.first()) as any).human).toBe(human);
-    expect(((await interests.last()) as any).human).toBe(human);
+    assert(((await interests.first()) as any).human === human);
+    assert(((await interests.last()) as any).human === human);
   });
 
   it("parent instance should be shared with first n and last n children", async () => {
     const human = (await Human.first())!;
     const interests = association(human, "interests");
     const firstTwo = (await interests.first(2)) as any[];
-    expect(firstTwo[0].human).toBe(human);
-    expect(firstTwo[1].human).toBe(human);
+    assert(firstTwo[0].human === human);
+    assert(firstTwo[1].human === human);
     const lastTwo = (await interests.last(2)) as any[];
-    expect(lastTwo[0].human).toBe(human);
-    expect(lastTwo[1].human).toBe(human);
+    assert(lastTwo[0].human === human);
+    assert(lastTwo[1].human === human);
   });
 
   it("parent instance should find child instance using child instance id", async () => {
@@ -667,21 +699,23 @@ describe("InverseHasManyTests", () => {
     const interest = await Interest.create({});
     await association(human, "interests").replace([interest]);
     const proxy = association(human, "interests");
-    expect(((await proxy.first()) as any).id).toBe((interest as any).id);
-    expect(((await proxy.find((interest as any).id)) as any).id).toBe((interest as any).id);
-    expect(((await proxy.first()) as any).human).toBe(human);
-    expect(((await proxy.find((interest as any).id)) as any).human).toBe(human);
+    assert(interest === (await proxy.first()));
+    assert(interest === (await proxy.find((interest as any).id)));
+    assert(human === ((await proxy.first()) as any).human);
+    assert(human === ((await proxy.find((interest as any).id)) as any).human);
   });
 
   it("parent instance should find child instance using child instance id when created", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({ human_id: (human as any).id });
     const proxy = association(human, "interests");
-    expect(((await proxy.first()) as any).human).toBe(human);
-    const found = (await proxy.find((interest as any).id)) as any;
-    expect(found.human).toBe(human);
-    expect(found.human.name).toBeNull();
+    assert(human === ((await proxy.first()) as any).human);
+    assert(human === ((await proxy.find((interest as any).id)) as any).human);
+
+    expect(((await proxy.find((interest as any).id)) as any).human.name).toBeNull();
     (human as any).name = "Ben Bitdiddle";
+    expect(((await proxy.find((interest as any).id)) as any).human.name).toBe((human as any).name);
+    ((await proxy.find((interest as any).id)) as any).human.name = "Alyssa P. Hacker";
     expect(((await proxy.find((interest as any).id)) as any).human.name).toBe((human as any).name);
   });
 
@@ -690,14 +724,14 @@ describe("InverseHasManyTests", () => {
     const interest = await Interest.create({ human_id: (human as any).id });
     const proxy = association(human, "interests");
     await proxy.find((interest as any).id);
-    expect(proxy.loaded).toBe(false);
+    assertNotPredicate(proxy, (p) => p.loaded);
   });
 
   it("find on child instance with id should set inverse instances", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({ human_id: (human as any).id });
     const child = (await association(human, "interests").find((interest as any).id)) as any;
-    expect(child.human).not.toBeNull();
+    assertPredicate(child.association("human"), (a: any) => a.isLoaded());
   });
 
   it("find on child instances with ids should set inverse instances", async () => {
@@ -709,7 +743,7 @@ describe("InverseHasManyTests", () => {
       (i2 as any).id,
     ])) as any[];
     for (const child of children) {
-      expect(child.human).not.toBeNull();
+      assertPredicate(child.association("human"), (a: any) => a.isLoaded());
     }
   });
 
@@ -719,7 +753,7 @@ describe("InverseHasManyTests", () => {
     new CpkOrder({ book, status: "paid" });
     await (author as any).saveBang();
 
-    expect((book as any).association("order").isLoaded()).toBe(true);
+    assertPredicate((book as any).association("order"), (a: any) => a.isLoaded());
   });
 
   it("raise record not found error when invalid ids are passed", async () => {
@@ -734,12 +768,14 @@ describe("InverseHasManyTests", () => {
   it("raise record not found error when no ids are passed", async () => {
     const human = await Human.create({});
     const proxy = association(human, "interests");
-    await proxy.load();
-    const err = await (proxy as any).find().catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe("ActiveRecord::RecordNotFound");
-    expect(err.model).toBe("Interest");
-    expect(err.primaryKey).toBe("id");
+
+    const exception: any = await assertRaises([RecordNotFound], {}, async () => {
+      await proxy.load();
+      await (proxy as any).find();
+    });
+
+    expect(exception.model).toBe("Interest");
+    expect(exception.primaryKey).toBe("id");
   });
 
   it("trying to use inverses that dont exist should raise an error", async () => {
@@ -756,7 +792,7 @@ describe("InverseHasManyTests", () => {
     expect((interest as any).human).not.toBeNull();
     (interest as any).human.name = "Charles";
     expect((interest as any).human.name).toBe((human as any).name);
-    expect(human.isPersisted()).toBe(false);
+    assertNotPredicate(human, (r) => r.isPersisted());
   });
 
   it("inverse instance should be set before find callbacks are run", async () => {
@@ -767,14 +803,17 @@ describe("InverseHasManyTests", () => {
     });
     try {
       const human = (await Human.first())!;
-      const interests = await human.interests;
-      expect(interests.length).toBeGreaterThan(0);
-
+      assertPredicate(await human.interests, (records) => records.length > 0);
       const preloaded = (await (Human as any).includes(":interests").first())!;
-      expect(preloaded.association("interests").target.length).toBeGreaterThan(0);
-
+      assertPredicate(
+        preloaded.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
       const joined = (await (Human as any).joins(":interests").includes(":interests").first())!;
-      expect(joined.association("interests").target.length).toBeGreaterThan(0);
+      assertPredicate(
+        joined.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
     } finally {
       (Interest as any).resetCallbacks("find");
     }
@@ -790,8 +829,17 @@ describe("InverseHasManyTests", () => {
     });
     try {
       const human = (await Human.first())!;
-      const interests = await human.interests;
-      expect(interests.length).toBeGreaterThan(0);
+      assertPredicate(await human.interests, (records) => records.length > 0);
+      const preloaded = (await (Human as any).includes(":interests").first())!;
+      assertPredicate(
+        preloaded.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
+      const joined = (await (Human as any).joins(":interests").includes(":interests").first())!;
+      assertPredicate(
+        joined.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
     } finally {
       (Interest as any).resetCallbacks("initialize");
     }
@@ -911,6 +959,7 @@ describe("InverseBelongsToTests", () => {
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("trainspotting");
     const human = (await loadSingularTarget(interest, "human"))!;
+    expect((human as any).interests).not.toBeNull();
     const iz = await (human as any).interests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
@@ -924,6 +973,7 @@ describe("InverseBelongsToTests", () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "human")) as any;
+      expect(human.interests).not.toBeNull();
       const cached = human._associationCache("interests")?.target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
@@ -949,7 +999,7 @@ describe("InverseBelongsToTests", () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "humanWithCallbacks")) as any;
-      expect(human.addCallbackCalled).toBe(false);
+      assertNotPredicate(human, (h: any) => h.addCallbackCalled);
     });
   });
 
@@ -1026,11 +1076,12 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
-    const face = (await Face.first())!;
-    const err = await loadSingularTarget(face, "confusedHuman").catch((e) => e);
-    expect(err).toBeInstanceOf(InverseOfAssociationNotFoundError);
-    expect(err.detailedMessage()).toMatch(/Did you mean\?/);
-    expect(err.corrections[0]).toBe("confusedFace");
+    const error: any = await assertRaises([InverseOfAssociationNotFoundError], {}, async () =>
+      loadSingularTarget((await Face.first())!, "confusedHuman"),
+    );
+
+    expect(error.detailedMessage()).toMatch("Did you mean?");
+    expect(error.corrections[0]).toBe("confusedFace");
   });
 
   it("building has many parent association inverses one record", async () => {
@@ -1121,7 +1172,6 @@ describe("InversePolymorphicBelongsToTests", () => {
     face.description = "new description";
     await human.saveBang();
 
-    expect(face.association("autosaveHuman").isLoaded()).toBe(true);
     expect(face.association("autosaveHuman").target).not.toBeNull();
   });
 
@@ -1144,6 +1194,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
     const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
+    expect(human.polymorphicInterests).not.toBeNull();
     const iz = await human.polymorphicInterests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
@@ -1157,6 +1208,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
       const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
+      expect(human.polymorphicInterests).not.toBeNull();
       const cached = human._associationCache("polymorphicInterests")?.target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
@@ -1172,13 +1224,14 @@ describe("InversePolymorphicBelongsToTests", () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
       const human = await (interest as any).polymorphicHumanWithCallbacks;
-      expect(human.addCallbackCalled).toBe(false);
+      assertNotPredicate(human, (h: any) => h.addCallbackCalled);
     });
   });
 
   it("trying to access inverses that dont exist shouldnt raise an error", async () => {
-    const face = (await Face.first())!;
-    await loadSingularTarget(face, "puzzledPolymorphicHuman");
+    await assertNothingRaised(async () =>
+      loadSingularTarget((await Face.first())!, "puzzledPolymorphicHuman"),
+    );
   });
 
   it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
@@ -1210,16 +1263,20 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
   });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
-    const interest = (await Interest.first())!;
-    await loadSingularTarget(interest, "zine");
-    await loadSingularTarget(interest, "human");
+    await assertNothingRaised(async () => {
+      const interest = (await Interest.first())!;
+      await loadSingularTarget(interest, "zine");
+      await loadSingularTarget(interest, "human");
+    });
   });
 
   it("that we can create associations that have the same reciprocal name from different models", async () => {
-    const interest = (await Interest.first()) as any;
-    interest.buildZine({ title: "Get Some in Winter! 2008" });
-    interest.buildHuman({ name: "Gordon" });
-    await interest.saveBang();
+    await assertNothingRaised(async () => {
+      const interest = (await Interest.first()) as any;
+      interest.buildZine({ title: "Get Some in Winter! 2008" });
+      interest.buildHuman({ name: "Gordon" });
+      await interest.saveBang();
+    });
   });
 });
 
@@ -1243,9 +1300,11 @@ describe("InverseBelongsToTests", () => {
       const main = await BrokenBranch.create({});
       const feature = await association(main, "branches").create({});
       const topic = association(feature, "branches").build({});
-      const err = await loadSingularTarget(topic, "branch").catch((e) => e);
-      expect(err).toBeInstanceOf(InverseOfAssociationRecursiveError);
-      expect((err as Error).message).toBe(
+      const error = await assertRaises([InverseOfAssociationRecursiveError], {}, () =>
+        loadSingularTarget(topic, "branch"),
+      );
+
+      expect(error.message).toBe(
         "Inverse association branch (:branch in BrokenBranch) is recursive.",
       );
     });

@@ -224,7 +224,7 @@ export class Association {
     const validOptions = this.validDependentOptions();
     if (!validOptions.includes(dependent)) {
       throw new ArgumentError(
-        `The :dependent option must be one of ${validOptions.join(", ")}, but is :${dependent}`,
+        `The :dependent option must be one of [${validOptions.map((option) => `:${option}`).join(", ")}], but is :${dependent}`,
       );
     }
   }
