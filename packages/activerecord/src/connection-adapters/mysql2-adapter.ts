@@ -247,15 +247,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       waitTimeout,
       variables,
     };
-    const _charset = mysqlConfig.charset ?? (mysqlConfig as { encoding?: string }).encoding;
-    const _collation = (mysqlConfig as { collation?: string }).collation;
-    const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
-    if (_charset && !SAFE_CHARSET_RE.test(_charset)) {
-      throw new Error(`Invalid MySQL charset: ${JSON.stringify(_charset)}`);
-    }
-    if (_collation && !SAFE_CHARSET_RE.test(_collation)) {
-      throw new Error(`Invalid MySQL collation: ${JSON.stringify(_collation)}`);
-    }
     if (fake) {
       this._isFakeConnection = true;
     }
