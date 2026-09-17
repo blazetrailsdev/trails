@@ -714,7 +714,7 @@ describe("SchemaDumperTest", () => {
           foreignKeys: false,
         });
 
-        const output = await dumpAllTableSchema([], await Base.leaseConnection());
+        const output = await dumpAllTableSchema();
         expect(output).not.toMatch(
           /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
         );
