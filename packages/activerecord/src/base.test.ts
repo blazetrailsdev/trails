@@ -769,7 +769,9 @@ describe("BasicsTest", () => {
   it("hashing", async () => {
     const topic1 = await Topic.find(1);
     const topic = await ((await Topic.find(2)) as any).topic;
-    expect([topic].filter((t: any) => t.equals(topic1))).toEqual([topic1]);
+    expect(
+      [topic].filter((t: any) => [topic1].some((o: any) => o.hash() === t.hash() && t.equals(o))),
+    ).toEqual([topic1]);
   });
 
   it("successful comparison of like class records", async () => {
