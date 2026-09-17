@@ -123,6 +123,22 @@ describe("main", () => {
     expect(await main(false, paths)).toBe(1);
   });
 
+  it("reports the slack on a FAILING run too, where it matters most", async () => {
+    await writeFixtures({ activerecord: [10, 23, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain(
+      "assertion-value-mismatch: 0 (mark 3, 3 unguarded)",
+    );
+  });
+
+  it("reports no slack for a partial-scope run, which has none to report honestly", async () => {
+    await writeFixtures({ activerecord: [1, 1, 1] }, { activerecord: [1, 1, 1], arel: [0, 0, 0] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
+  });
+
   it("gates normally when the marker cannot be read, which the gate does not depend on", async () => {
     await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
     await fs.writeFile(paths.freeze, "   \n");

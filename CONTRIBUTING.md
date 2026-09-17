@@ -329,8 +329,9 @@ nothing the gate was providing: the mark only shrinks, so one sitting above the
 measurement stays green, and the campaign lowers it in one pass at the end. What
 it does cost is ENFORCEMENT on the ground already converged: a regression inside
 the accumulated slack does not fail the gate. So a freeze is scoped to one
-campaign and deleted with it, and while it is up the gate prints the slack it is
-carrying, per package and per counter — the protection currently suspended,
+campaign and deleted with it, and while it is up every gate run over a
+complete artifact prints the slack it is carrying, per package and per counter —
+including a run that FAILS on some other counter — the protection currently suspended,
 stated in the run that is not enforcing it. Those numbers only ever fall; one
 that rises is a regression the gate deliberately let through, and the reviewer of
 the converging PR is who catches it.

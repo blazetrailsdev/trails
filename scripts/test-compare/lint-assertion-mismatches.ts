@@ -150,6 +150,12 @@ export const DEFAULT_PATHS: Paths = {
  * gate arm keeps running either way: a frozen mark is one carrying slack, which
  * this ratchet reports as green. It reads the marker only to report that slack,
  * so a marker that cannot be read costs the report and never the gate.
+ *
+ * The slack is reported AHEAD of the failure arms: a run that fails on one
+ * counter is exactly when a reviewer needs to see what the other counters are
+ * no longer enforcing. It sits behind the `missing` bail alone, because a
+ * partial-scope artifact has no honest slack to report for the packages it
+ * omits.
  */
 export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promise<number> {
   const markRel = path.relative(ROOT_DIR, paths.mark);
@@ -178,20 +184,18 @@ export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promis
     return 0;
   }
 
+  const frozen = await loadFreezeForReport(paths.freeze);
+  if (frozen !== null) {
+    const entries = slack(current, mark);
+    if (entries.length > 0) console.log(renderFrozenSlack(entries, frozen, markRel));
+  }
+
   const { exceeded, unmarked } = violations(current, mark);
   if (unmarked.length > 0) console.error(renderUnmarked(unmarked, markRel));
   if (exceeded.length > 0) console.error(renderExceeded(exceeded, markRel));
   if (exceeded.length > 0 || unmarked.length > 0) return 1;
 
   console.log("assertion-mismatch ratchet: OK (no counter exceeds its high-water mark).");
-
-  const frozen = await loadFreezeForReport(paths.freeze);
-  if (frozen !== null) {
-    const entries = slack(current, mark);
-    if (entries.length > 0) {
-      console.log(renderFrozenSlack(entries, frozen, markRel));
-    }
-  }
   return 0;
 }
 
