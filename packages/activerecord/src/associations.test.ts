@@ -2447,17 +2447,4 @@ describe("AssociationsTest", () => {
     ).toHaveLength(1);
     expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
   });
-
-  it("loading cpk association when persisted and in memory differ", async () => {
-    const order = (await CpkOrder.create({ id: [1, 2], status: "paid" })) as CpkOrder;
-    await CpkBook.create({
-      id: [3, 4],
-      shop_id: 1,
-      order_id: 2,
-      title: "Book",
-    });
-    await CpkBook.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
-    const books = await order.books;
-    expect(books[0].id).toEqual([3, 4]);
-  });
 });

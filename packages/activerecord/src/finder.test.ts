@@ -549,18 +549,6 @@ describe("FinderTest", () => {
     expect(count).toBe(before + 1);
   });
 
-  it("bind variables", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "hello" });
-    const results = await Topic.where("title = ?", "hello");
-    expect(results.length).toBe(1);
-  });
-
   it("named bind variables", async () => {
     class Topic extends Base {
       declare title: string;
@@ -570,18 +558,6 @@ describe("FinderTest", () => {
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.where("title = :title", { title: "hello" });
-    expect(results.length).toBe(1);
-  });
-
-  it("condition interpolation", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "hello" });
-    const results = await Topic.where("title = ?", "hello");
     expect(results.length).toBe(1);
   });
 
@@ -693,17 +669,6 @@ describe("FinderTest", () => {
       expect(e.model).toBe("Car");
       expect(e.message).toBe("Couldn't find Car with 'id'=0");
     }
-  });
-
-  it("condition array interpolation", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Topic.where("title = ?", "hello").toSql();
-    expect(sql).toContain("hello");
   });
 
   it("find by one attribute with conditions", async () => {
@@ -924,51 +889,6 @@ describe("FinderTest", () => {
     const found = await Post.findBy({ title: "proc_test" });
     expect(found).toBeDefined();
   });
-  it("include on unloaded relation with mismatched class", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mis" });
-    const found = await Post.where({ title: "mis" }).first();
-    expect(found).toBeDefined();
-  });
-  it.skipIf(adapterType === "postgres")(
-    "include on unloaded relation with having referencing aliased select",
-    async () => {
-      const { Post } = makeModel();
-      await Post.create({ title: "alias_sel" });
-      const count = await Post.count();
-      expect(count).toBe(1);
-    },
-  );
-  it("include on unloaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "cpk_unloaded" });
-    const first = await Post.first();
-    expect(first).toBeDefined();
-  });
-  it("include on loaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "cpk_loaded" });
-    const posts = await Post.all();
-    expect(posts.length).toBe(1);
-  });
-  it("member on unloaded relation with mismatched class", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_unloaded" });
-    const found = await Post.findBy({ title: "mem_unloaded" });
-    expect(found).toBeDefined();
-  });
-  it("member on unloaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_cpk" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
-  it("member on loaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_cpk_loaded" });
-    const posts = await Post.all();
-    expect(posts.length).toBe(1);
-  });
   it("implicit order column is configurable", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "implicit" });
@@ -1055,18 +975,6 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const results = await Post.where({ title: [] });
     expect(results.length).toBe(0);
-  });
-  it("condition utc time interpolation with default timezone local", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "utc_local" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
-  it("condition local time interpolation with default timezone utc", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "local_utc" });
-    const count = await Post.count();
-    expect(count).toBe(1);
   });
   it("find by one attribute that is an aggregate with one attribute difference", async () => {
     const { Post } = makeModel();
@@ -1280,13 +1188,6 @@ describe("FinderTest", () => {
     await Post.create({ title: "agg1" });
     const found = await Post.findBy({ title: "agg1" });
     expect(found).not.toBeNull();
-  });
-
-  it("bind variables with quotes", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" });
-    expect(results.length).toBe(1);
   });
 
   it("find by one attribute that is an aggregate", async () => {

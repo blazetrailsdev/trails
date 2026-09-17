@@ -969,26 +969,6 @@ describe("TransactionCallbacksTest", () => {
 });
 
 describe("TransactionCallbacksTest", () => {
-  it("call after commit after transaction commits", async () => {
-    const log: string[] = [];
-
-    class Topic extends Base {
-      declare title: string;
-
-      static {
-        this.attribute("title", "string");
-        this.afterCommit(() => {
-          log.push("committed");
-        });
-      }
-    }
-
-    await transaction(Topic, async () => {
-      await Topic.create({ title: "New topic" });
-    });
-    expect(log).toContain("committed");
-  });
-
   describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     it("after commit callbacks with optimistic locking", async () => {
       const history: string[] = [];

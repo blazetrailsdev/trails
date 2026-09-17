@@ -756,15 +756,6 @@ describe("InverseHasManyTests", () => {
     assertPredicate((book as any).association("order"), (a: any) => a.isLoaded());
   });
 
-  it("raise record not found error when invalid ids are passed", async () => {
-    await Interest.deleteAll();
-    const human = await Human.create({});
-    await expect(association(human, "interests").find(245324523)).rejects.toThrow();
-    await expect(
-      association(human, "interests").find([8432342, 2390102913, 2453245234523452]),
-    ).rejects.toThrow();
-  });
-
   it("raise record not found error when no ids are passed", async () => {
     const human = await Human.create({});
     const proxy = association(human, "interests");
@@ -875,24 +866,6 @@ describe("InverseHasManyTests", () => {
 
     const invalidIds = [8432342, 2390102913, 2453245234523452];
     await expect((human as any).interests.find(invalidIds)).rejects.toThrow(RecordNotFound);
-  });
-
-  it("raise record not found error when no ids are passed", async () => {
-    const human = await Human.createBang();
-
-    const exception = await (async () => {
-      try {
-        await (human as any).interests.load();
-        await (human as any).interests.find();
-      } catch (e) {
-        return e as RecordNotFound;
-      }
-      throw new Error("expected RecordNotFound");
-    })();
-
-    expect(exception).toBeInstanceOf(RecordNotFound);
-    expect(exception.model).toBe("Interest");
-    expect(exception.primaryKey).toBe("id");
   });
 });
 

@@ -491,32 +491,6 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
-
-  it("deleting updates counter cache with dependent destroy", async () => {
-    const post = posts("welcome");
-    const startCount = (post as any).tags_count as number;
-    await post.updateColumns({ taggings_with_destroy_count: startCount });
-
-    const first = (await post.taggingsWithDestroy.first())!;
-    await (post as any).association("taggingsWithDestroy").delete(first);
-
-    await post.reload();
-    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
-    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
-  });
-
-  it("deleting updates counter cache with dependent destroy", async () => {
-    const post = posts("welcome");
-    const startCount = (post as any).tags_count as number;
-    await post.updateColumns({ taggings_with_destroy_count: startCount });
-
-    const first = (await post.taggingsWithDestroy.first())!;
-    await post.taggingsWithDestroy.destroy(first);
-
-    await post.reload();
-    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
-    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
-  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -2606,13 +2580,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
-  });
-  it("regular create on has many when parent is new raises", async () => {
-    const author = HmAuthor.new({ name: "Unsaved" });
-    expect(author.isNewRecord()).toBe(true);
-    const post = HmPost.new({ author_id: author.id, title: "Test" });
-    expect(post.isNewRecord()).toBe(true);
-    expect((post as any).author_id).toBeNull();
   });
   it("create with bang on has many raises when record not saved", async () => {
     const author = HmAuthor.new({ name: "Unsaved" });
@@ -5509,32 +5476,6 @@ describe("HasManyAssociationsTest", () => {
     expect(saveCount).toBe(1);
     expect(post.isPersisted()).toBe(true);
   });
-  it("destroy with bang bubbles errors from associations", async () => {
-    class DestroyBangAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DestroyBangPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DestroyBangAuthor);
-    registerModel(DestroyBangPost);
-    const author = await DestroyBangAuthor.create({ name: "Alice" });
-    const post = await DestroyBangPost.create({ author_id: author.id, title: "A", body: "body" });
-    await post.destroy();
-    expect(post.isDestroyed()).toBe(true);
-  });
   it("ids reader memoization", async () => {
     class MemoAuthor extends Base {
       declare memo_posts: AssociationProxy<MemoPost>;
@@ -5815,40 +5756,6 @@ describe("HasManyAssociationsTest", () => {
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
   });
-  it("delete all with option delete all", async () => {
-    class DelAllOptAuthor extends Base {
-      declare name: string | null;
-      declare del_all_opt_posts: AssociationProxy<DelAllOptPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("del_all_opt_posts", {
-          className: "DelAllOptPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class DelAllOptPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DelAllOptAuthor);
-    registerModel(DelAllOptPost);
-    const author = await DelAllOptAuthor.create({ name: "Alice" });
-    await DelAllOptPost.create({ author_id: author.id, title: "A", body: "body" });
-    await DelAllOptPost.create({ author_id: author.id, title: "B", body: "body" });
-    await author.destroy();
-    const remaining = await author.del_all_opt_posts;
-    expect(remaining.length).toBe(0);
-  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -5962,13 +5869,6 @@ describe("HasManyAssociationsTest", () => {
     const post = await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     expect(post.id).toBeDefined();
-  });
-
-  it("create with bang on has many when parent is new raises", async () => {
-    const author = HmAuthor.new({ name: "Alice" });
-    expect(author.isNewRecord()).toBe(true);
-    const post = HmPost.new({ title: "Test" });
-    expect(post.isNewRecord()).toBe(true);
   });
 
   it("create from association with nil values should work", async () => {

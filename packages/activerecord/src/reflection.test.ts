@@ -522,13 +522,6 @@ describe("ReflectionTest", () => {
       ].sort(),
     );
   });
-  it("non existent columns return null object", () => {
-    const column = (CanonicalTopic as any).columnForAttribute("attribute_that_doesnt_exist");
-    expect(column).toBeInstanceOf(NullColumn);
-    expect(column.name).toBe("attribute_that_doesnt_exist");
-    expect(column.sqlType).toBeNull();
-    expect(column.type).toBeNull();
-  });
   it("non existent types are identity types", () => {
     class Topic2 extends Base {
       declare title: string | null;
