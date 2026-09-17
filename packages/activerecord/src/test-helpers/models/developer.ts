@@ -40,7 +40,7 @@ export class Developer extends Base {
   declare ratings: AssociationProxy<Rating>;
   declare contractedProjects: AssociationProxy<Project>;
   declare static jamises: () => Relation<Developer>;
-  declare lastName: string;
+  declare last_name: unknown;
   declare firm_id: number;
   declare first_name: string;
   declare legacy_created_at: RubyTime | Temporal.PlainDateTime;
@@ -174,7 +174,7 @@ export class Developer extends Base {
       (developer as any).auditLogs.build({ message: "Computer created" });
     });
 
-    this.attribute("lastName", "string");
+    this.attribute("last_name");
 
     this.afterFind(function (this: Developer) {
       Developer.instanceCount = (Developer.instanceCount ?? 0) + 1;
@@ -219,12 +219,12 @@ export class SpecialDeveloper extends Base {
 }
 
 export class SymbolIgnoredDeveloper extends Base {
-  declare lastName: string;
+  declare last_name: unknown;
 
   static {
     this.tableName = "developers";
     this.ignoredColumns = ["first_name", "last_name"];
-    this.attribute("lastName", "string");
+    this.attribute("last_name");
   }
 }
 
@@ -597,6 +597,7 @@ export class AttributedDeveloper extends Base {
 export class ColumnNamesCachedDeveloper extends Base {
   static {
     this.tableName = "developers";
+    if (this.columnNames().includes("name")) this.ignoredColumns = [...this.ignoredColumns, "name"];
   }
 }
 

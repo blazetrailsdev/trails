@@ -727,7 +727,7 @@ export function tableName(this: SchemaHost, value?: string | null): string {
     return this._tableName ?? "";
   }
   if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
-  return this._tableName ?? "";
+  return this._tableName as string;
 }
 
 export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {

@@ -218,6 +218,7 @@ import {
   getPrimaryKeyAttr as _getPrimaryKeyAttr,
   getPrimaryKey as _getPrimaryKey,
   resetPrimaryKey as _resetPrimaryKey,
+  quotedPrimaryKey as _quotedPrimaryKey,
   setPrimaryKeyAttr as _setPrimaryKeyAttr,
   isInstanceMethodAlreadyImplemented as _pkIsInstanceMethodAlreadyImplemented,
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
@@ -2267,6 +2268,8 @@ export class Base extends Model {
   static getPrimaryKey = _getPrimaryKey;
 
   static resetPrimaryKey = _resetPrimaryKey;
+
+  static quotedPrimaryKey = _quotedPrimaryKey;
 
   static implicitOrderColumn: string | null = null;
 

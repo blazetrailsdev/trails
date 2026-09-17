@@ -94,6 +94,9 @@ class TableBuilder {
   integer(name: string, o?: ColOpts): void {
     this.col(name, "integer", o);
   }
+  references(name: string): void {
+    this.t.references(name, { index: false });
+  }
   bigInteger(name: string, o?: ColOpts): void {
     this.col(name, "big_integer", o);
   }
@@ -1254,7 +1257,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("posts", {}, (t) => {
-    t.bigInteger("author_id");
+    t.references("author");
     t.index("author_id", { name: "index_posts_on_author_id" });
     t.string("title", { null: false });
     t.text("body", { null: false });
@@ -2085,6 +2088,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   for (const def of await buildCanonicalRegistry()) {
     const probe = {
       column: () => {},
+      references: () => {},
       checkConstraint: () => {},
       foreignKey: (toTable: string) => {
         const children = dependents.get(toTable) ?? [];
@@ -2106,6 +2110,9 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     const probe = {
       column: (name: string, type: string, options: Record<string, unknown> = {}) => {
         columns[name] = specFromColumnCall(type, options);
+      },
+      references: (name: string) => {
+        columns[`${name}_id`] = specFromColumnCall("bigint", {});
       },
       checkConstraint: () => {},
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {

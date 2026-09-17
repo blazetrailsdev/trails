@@ -1,30 +1,65 @@
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
-import { Base, NotImplementedError, ReadonlyAttributeError } from "./index.js";
-import { TableNotSpecified, ActiveRecordError } from "./errors.js";
+import {
+  Base,
+  NotImplementedError,
+  ReadonlyAttributeError,
+  Relation,
+  composedOf,
+} from "./index.js";
+import {
+  TableNotSpecified,
+  ActiveRecordError,
+  RecordNotFound,
+  StatementInvalid,
+} from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
-import { quoteColumnName } from "./support/quote-regex.js";
-import { collectionProxyFor as association } from "./associations.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
+import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
-import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import {
+  Logger,
+  TimeWithZone,
+  assert,
+  assertNot,
+  assertNotEmpty,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaises,
+  assertRespondTo,
+  assertNotRespondTo,
+  assertDifference,
+} from "@blazetrails/activesupport";
+import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { IntegerType, ValueType } from "@blazetrails/activemodel";
-import { CpkBook } from "./test-helpers/models/cpk.js";
-import { Company as CanonicalCompany } from "./test-helpers/models/company.js";
-import { PostRecord } from "./test-helpers/models/post.js";
+import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
+import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
+import { Post, PostRecord } from "./test-helpers/models/post.js";
+import { Author } from "./test-helpers/models/author.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
 import {
-  Developer as CanonicalDeveloper,
+  Developer,
   SubDeveloper,
   SymbolIgnoredDeveloper,
   AttributedDeveloper,
+  ColumnNamesCachedDeveloper,
 } from "./test-helpers/models/developer.js";
-import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Car } from "./test-helpers/models/car.js";
-import { Bulb } from "./test-helpers/models/bulb.js";
+import { Bulb, CustomBulb } from "./test-helpers/models/bulb.js";
+import { Edge } from "./test-helpers/models/edge.js";
+import { Joke, GoodJoke } from "./test-helpers/models/joke.js";
+import { ColumnName } from "./test-helpers/models/column-name.js";
+import { AutoId } from "./test-helpers/models/auto-id.js";
+import { Default } from "./test-helpers/models/default.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { Bird } from "./test-helpers/models/bird.js";
+import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 import { Range as ArRange } from "@blazetrails/ruby-compat";
@@ -32,703 +67,149 @@ import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./a
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
+expect.addEqualityTesters([
+  function rubyEquals(a: unknown, b: unknown): boolean | undefined {
+    if (a instanceof Base && b instanceof Base) return a.equals(b);
+    const toTime = (x: unknown) => (x instanceof TimeWithZone ? x.utc() : x);
+    const ta = toTime(a);
+    const tb = toTime(b);
+    if (ta instanceof RubyTime && tb instanceof RubyTime) return ta.toR().cmp(tb.toR()) === 0;
+    return undefined;
+  },
+]);
+
+class FirstAbstractClass extends Base {
+  static {
+    this.abstractClass = true;
+    this.connectionClass = true;
+  }
+}
+
+class SecondAbstractClass extends FirstAbstractClass {
+  static {
+    this.abstractClass = true;
+    this.connectionClass = true;
+  }
+}
+
+class ThirdAbstractClass extends SecondAbstractClass {
+  static {
+    this.abstractClass = true;
+  }
+}
+
+class Photo extends SecondAbstractClass {}
+class Smarts extends Base {}
+class CreditCard extends Base {}
+class PinNumber extends Base {
+  static moduleName = "CreditCard";
+}
+class CvvCode extends Base {
+  static moduleName = "CreditCard::PinNumber";
+}
+class SubPinNumber extends PinNumber {}
+class Brand extends Category {
+  static moduleName = "CreditCard";
+}
+class MasterCreditCard extends Base {}
+registerModel(CreditCard);
+registerModel("CreditCard::PinNumber", PinNumber);
+class NonExistentTable extends Base {}
+
+class ReadonlyTitlePost extends Post {
+  static {
+    this.attrReadonly("title");
+  }
+}
+
+class ReadonlyTitleAbstractPost extends Base {
+  static {
+    this.abstractClass = true;
+    this.attrReadonly("title");
+  }
+}
+
+class ReadonlyTitlePostWithAbstractParent extends ReadonlyTitleAbstractPost {
+  static {
+    this.tableName = "posts";
+  }
+}
+
+const previousValue = raiseOnAssignToAttrReadonly();
+setRaiseOnAssignToAttrReadonly(false);
+
+class NonRaisingPost extends Post {
+  static {
+    this.attrReadonly("title");
+  }
+}
+
+setRaiseOnAssignToAttrReadonly(previousValue);
+
+class ReadonlyAuthorPost extends Post {
+  static {
+    this.attrReadonly("author_id");
+  }
+}
+
+class Weird extends Base {}
+
+function withEnvTz<T>(newTz: string, fn: () => Promise<T>): Promise<T> {
+  vi.stubEnv("TZ", newTz);
+  resetLocalTimeZoneId();
+  return fn().finally(() => {
+    vi.stubEnv("TZ", undefined as unknown as string);
+    resetLocalTimeZoneId();
+  });
+}
+
+function timeToA(time: any): unknown[] {
+  return [
+    time.sec,
+    time.min,
+    time.hour,
+    time.day,
+    time.mon,
+    time.year,
+    time.wday,
+    time.yday,
+    time.isdst,
+    time.zone,
+  ];
+}
+
 describe("BasicsTest", () => {
-  fixtures([]);
+  const { topics, posts, authors, developers, cpkBooks } = fixtures([
+    "topics",
+    "companies",
+    "developers",
+    "projects",
+    "computers",
+    "accounts",
+    "minimalistics",
+    "warehouseThings",
+    "authors",
+    "authorAddresses",
+    "categorizations",
+    "categories",
+    "posts",
+    "cpkBooks",
+  ]);
   const cleanupConnections: Array<() => unknown> = [];
   afterEach(async () => {
     vi.restoreAllMocks();
     while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
-  it("table name based on model name", () => {
-    expect(PostRecord.tableName).toBe("posts");
-  });
-
-  it("switching between table name", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.tableName = "people";
-      }
-    }
-    expect(User.tableName).toBe("people");
-  });
-
-  it("auto id", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-    }
-    expect(User.primaryKey).toBe("id");
-  });
-
-  it("has attribute", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "test" });
-    expect(u.hasAttribute("name")).toBe(true);
-    expect(u.hasAttribute("nonexistent")).toBe(false);
-  });
-
-  it("initialize with attributes", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "test" });
-    expect(u.name).toBe("test");
-    expect(u.isNewRecord()).toBe(true);
-  });
-
-  it("equality", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u1 = await User.create({ name: "a" });
-    const u2 = await User.find(u1.id);
-    expect(u1.equals(u2)).toBe(true);
-  });
-
-  it("equality of new records", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u1 = new User({ name: "a" });
-    const u2 = new User({ name: "a" });
-    expect(u1.equals(u2)).toBe(false);
-  });
-
-  it("all", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "a" });
-    const all = await User.all();
-    expect(all.length).toBe(1);
-  });
-
-  it("null fields", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.where({ name: null }).toSql();
-    expect(sql).toContain("IS NULL");
-  });
-
-  it("select symbol", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.select("name").toSql();
-    expect(sql).toContain("name");
-  });
-
-  it("previously new record returns boolean", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "a" });
-    expect(u.isPreviouslyNewRecord()).toBe(false);
-    await u.save();
-    expect(u.isPreviouslyNewRecord()).toBe(true);
-  });
-
-  it("previously changed", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "old" });
-    u.name = "new";
-    await u.save();
-    const sc = u.savedChanges;
-    expect(sc).toHaveProperty("name");
-  });
-
-  it("records without an id have unique hashes", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u1 = new User({ name: "a" });
-    const u2 = new User({ name: "a" });
-    expect(u1.equals(u2)).toBe(false);
-  });
-
-  it("distinct delegates to scoped", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.distinct().toSql();
-    expect(sql).toContain("DISTINCT");
-  });
-
-  it("#present? and #blank? on ActiveRecord::Base classes", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const blank = await User.all().isBlank();
-    expect(blank).toBe(true);
-    const present = await User.all().isPresent();
-    expect(present).toBe(false);
-  });
-
-  it("limit should take value from latest limit", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.limit(5).limit(3).toSql();
-    expect(sql).toContain("3");
-  });
-
-  it("create after initialize without block", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "test" });
-    await u.save();
-    expect(u.isPersisted()).toBe(true);
-  });
-
-  it("readonly attributes", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const rel = User.all().readonly();
-    expect(rel.isReadonly).toBe(true);
-  });
-
-  it("scoped can take a values hash", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const rel = User.where({ name: "test" });
-    const attrs = rel.scopeForCreate();
-    expect(attrs.name).toBe("test");
-  });
-
-  it("abstract class table name", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    expect(AbstractModel.abstractClass).toBe(true);
-  });
-
-  it("many mutations", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "a" });
-    u.name = "b";
-    u.name = "c";
-    u.name = "d";
-    expect(u.name).toBe("d");
-  });
-
-  it("custom mutator", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User();
-    u.name = "test";
-    expect(u.name).toBe("test");
-  });
-
-  it("equality of destroyed records", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "a" });
-    const id = u.id;
-    await u.destroy();
-    expect(u.isDestroyed()).toBe(true);
-  });
-
-  it("hashing", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u1 = new User({ name: "a" });
-    const u2 = new User({ name: "a" });
-    expect(u1.equals(u2)).toBe(false);
-  });
-
-  it("create after initialize with block", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "test" });
-    await u.save();
-    expect(u.isPersisted()).toBe(true);
-  });
-
-  it("previously changed dup", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "old" });
-    u.name = "new";
-    await u.save();
-    expect(u.savedChanges).toHaveProperty("name");
-  });
-
-  it("default values on empty strings", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string", { default: "default" });
-      }
-    }
-    const u = new User();
-    expect(u.name).toBe("default");
-  });
-
-  it("successful comparison of like class records", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u1 = await User.create({ name: "a" });
-    const u2 = await User.find(u1.id);
-    expect(u1.equals(u2)).toBe(true);
-  });
-
-  it("failed comparison of unlike class records", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const u = new User({ name: "a" });
-    const p = new Post({ title: "a" });
-    expect(u.equals(p as any)).toBe(false);
-  });
-
-  it("table name guesses with inherited prefixes and suffixes", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.tableNamePrefix = "app_";
-      }
-    }
-    expect(User.tableName).toBe("app_users");
-  });
-
-  it("limit without comma", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.limit(5).toSql();
-    expect(sql).toContain("LIMIT");
-    expect(sql).toContain("5");
-  });
-
-  it("singular table name guesses for individual table", () => {
-    class Person extends Base {}
-    expect(Person.tableName).toBe("people");
-  });
-
-  it("columns should obey set primary key", () => {
-    const pk = Subscriber.columnsHash()[Subscriber.primaryKey as string];
-    expect(pk.name, "nick should be primary key").toBe("nick");
-  });
-  it("comparison with different objects", async () => {
-    const topic = await CanonicalTopic.create({});
-    const category = await Category.create({ name: "comparison" });
-    expect(topic.compare(category)).toBeUndefined();
-    expect(topic.equals(category)).toBe(false);
-  });
-
-  it("comparison with different objects in array", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = (await Topic.create({ title: "a" })) as any;
-    const p2 = (await Topic.create({ title: "b" })) as any;
-    expect(p1.id).not.toBe(p2.id);
-  });
-
-  it("equality with blank ids", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = Post.new({}) as any;
-    const p2 = Post.new({}) as any;
-    expect(p1).not.toBe(p2);
-  });
-
-  it("previously new record on destroyed record", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Topic.create({ title: "destroy me" })) as any;
-    expect(p.isNewRecord()).toBe(false);
-    expect(p.isPreviouslyNewRecord()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-    expect(p.isPreviouslyNewRecord()).toBe(false);
-  });
-
-  it("create after initialize with array param", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Topic.create({ title: "from array" })) as any;
-    expect(p.id).toBeDefined();
-  });
-
-  it("load with condition", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "match" });
-    await Topic.create({ title: "no-match" });
-    const results = await Topic.where({ title: "match" });
-    expect(results.length).toBe(1);
-  });
-
-  it("find by slug", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "The First Topic" });
-    const bySlug = (await Topic.find(`${t.id}-meowmeow`)) as any;
-    const byId = (await Topic.find(t.id)) as any;
-    expect(bySlug.id).toBe(byId.id);
-  });
-
-  it("group weirds by from", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.group("title").from('"posts"').toSql();
-    expect(sql).toContain("GROUP BY");
-  });
-
-  it("preserving date objects", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const created = await Topic.create({ title: "date-test", last_read: "2004-06-24" });
-    const p = await Topic.find(created.id);
-    expect(p.readAttribute("last_read")).toBeInstanceOf(Temporal.PlainDate);
-  });
-
-  it("quoted table name after set table name", () => {
-    class BlogPost extends Base {
-      static tableName = "blog_posts";
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(BlogPost.tableName).toBe("blog_posts");
-    const sql = BlogPost.all().toSql();
-    expect(sql).toContain("blog_posts");
-  });
-
-  it("create without prepared statement", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Topic.create({ title: "no-prep" })) as any;
-    expect(p.id).toBeDefined();
-  });
-
-  it("destroy without prepared statement", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Topic.create({ title: "destroy-no-prep" })) as any;
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-  });
-
   it("arel attribute normalization", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const table = Post.arelTable;
-    expect(table).toBeTruthy();
-  });
-
-  it("equality of relation and array", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const arr = await Topic.all();
-    expect(Array.isArray(arr)).toBe(true);
-    expect(arr.length).toBe(1);
-  });
-
-  it("find reverse ordered last", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("salary", "integer");
-      }
-    }
-    await Developer.create({ salary: 10 });
-    await Developer.create({ salary: 20 });
-    const last = await Developer.order("developers.salary DESC").last();
-    expect(last).not.toBeNull();
-  });
-
-  it("find keeps multiple group values", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const sql = Post.group("title").group("body").toSql();
-    expect(sql).toContain("GROUP BY");
-  });
-
-  it("find symbol ordered last", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("salary", "integer");
-      }
-    }
-    await Developer.create({ salary: 5 });
-    await Developer.create({ salary: 15 });
-    const last = await Developer.order("salary").last();
-    expect(last).not.toBeNull();
-    expect((last as any).salary).toBe(15);
-  });
-
-  it("attribute names on table not exists", () => {
-    class Ghost extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const names = Ghost.attributeNames();
-    expect(Array.isArray(names)).toBe(true);
-  });
-
-  it("column types typecast", async () => {
-    class Topic extends Base {
-      declare title: string;
-    }
-    const seed = await Topic.create({
-      title: "The First Topic",
-      author_name: "David",
-    } as any);
-    expect((seed as any).author_name).not.toBe("t.lo");
-
-    const attrs = { ...(seed as any).attributes };
-    delete attrs.id;
-
-    class Typecast extends ValueType {
-      readonly name = "typecast";
-      cast() {
-        return "t.lo";
-      }
-    }
-
-    const topic = Topic.instantiate(attrs, { author_name: new Typecast() }) as any;
-    expect(topic.author_name).toBe("t.lo");
-  });
-
-  it("dont clear inheritance column when setting explicitly", () => {
-    class Animal extends Base {
-      static {
-        this.attribute("type", "string");
-      }
-    }
-    Animal.tableName = "animals";
-    expect(Animal.tableName).toBe("animals");
-    expect(Animal.hasAttribute("type")).toBe(true);
-  });
-
-  it("resetting column information doesn't remove attribute methods", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.hasAttribute("title")).toBe(true);
-  });
-
-  it("ignored columns don't prevent explicit declaration of attribute methods", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("internal_flag", "boolean");
-      }
-    }
-    expect(Post.hasAttribute("title")).toBe(true);
-    expect(Post.hasAttribute("internal_flag")).toBe(true);
-  });
-
-  it("ignored columns not included in SELECT", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "hello" });
-    const results = await Topic.select("title");
-    expect(results.length).toBe(1);
-  });
-
-  it("column names are escaped", () => {
-    class User extends Base {
-      declare active: boolean;
-      static {
-        this.attribute("order", "string");
-      }
-    }
-    const sql = User.where({ order: "test" }).toSql();
-    expect(sql).toContain("order");
+    expect(Post.arelTable.get("body")).toEqual(Post.arelTable.get("body"));
+    expect(Post.arelTable.get("text")).toEqual(Post.arelTable.get("body"));
   });
 
   it("incomplete schema loading", async () => {
-    const Topic = CanonicalTopic;
+    const topic = (await Topic.first()) as any;
     const payload = { foo: 42 };
-    const topic = await Topic.create({ content: payload as any });
-    expect((topic as any).content).toEqual(payload);
+    await topic.updateBang({ content: payload });
 
     void Topic.resetColumnInformation();
 
@@ -736,230 +217,427 @@ describe("BasicsTest", () => {
     vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
       throw new Error("Some Error");
     });
-    expect(() => (Topic as any).columnsHash()).toThrow("Some Error");
+    await assertRaises([Error], {}, () => (Topic as any).columnsHash());
     vi.restoreAllMocks();
 
-    const reloaded = await Topic.first();
-    expect((reloaded as any).content).toEqual(payload);
+    expect(((await Topic.first()) as any).content).toEqual(payload);
   });
+
+  it("column names are escaped", () => {
+    const conn = Base.connection as any;
+    const badchar = adapterType === "mysql" ? "`" : '"';
+
+    const quoted = conn.quoteColumnName(`foo${badchar}bar`);
+    expect(quoted).toEqual(`${badchar}foo${badchar.repeat(2)}bar${badchar}`);
+  });
+
+  it("columns should obey set primary key", () => {
+    const pk = Subscriber.columnsHash()[Subscriber.primaryKey as string];
+    expect(pk.name, "nick should be primary key").toBe("nick");
+  });
+
   it("primary key with no id", () => {
-    class Widget extends Base {
-      declare name: string;
-      static {
-        this.primaryKey = "widget_id";
-      }
-    }
-    expect(Widget.primaryKey).toBe("widget_id");
+    expect(Edge.primaryKey).toBeNull();
   });
-  it("primary key and references columns should be identical type", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    await Author.create({ name: "Alice" });
-    const pk = Author.columnsHash()["id"];
-    const ref = Post.columnsHash()["author_id"];
-    expect(ref).toBeDefined();
-    expect(ref.type).toBeDefined();
-    expect(ref.type).toMatch(/integer|bigint|int/i);
-    const pkTypes = pk?.type == null ? [ref.type] : [pk.type];
-    expect(pkTypes[0]).toBe(ref.type);
+
+  it("primary key and references columns should be identical type", () => {
+    const pk = Author.columnsHash()["id"] as any;
+    const ref = Post.columnsHash()["author_id"] as any;
+
+    expect(ref.sqlType).toEqual(pk.sqlType);
   });
-  it("invalid limit", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(() => User.limit("asdfadf").toSql()).toThrow(/invalid value for Integer/i);
+
+  it("many mutations", async () => {
+    const car = new Car({ name: "<3<3<3" }) as any;
+    car.engines_count = 0;
+    for (let i = 0; i < 20_000; i++) car.engines_count += 1;
+    assert(await car.save());
   });
-  it("limit should sanitize sql injection for limit without commas", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(() => User.limit("1 select * from schema").toSql()).toThrow(
-      /invalid value for Integer/i,
-    );
+
+  it("limit without comma", async () => {
+    expect((await Topic.limit("1")).length).toEqual(1);
+    expect((await Topic.limit(1)).length).toEqual(1);
   });
-  it("limit should sanitize sql injection for limit with commas", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(() => User.limit("1, 7 procedure help()").toSql()).toThrow(/invalid value for Integer/i);
+
+  it("limit should take value from latest limit", async () => {
+    expect((await Topic.limit(2).limit(1)).length).toEqual(1);
   });
+
+  it("invalid limit", async () => {
+    await assertRaises([ArgumentError], {}, () => Topic.limit("asdfadf").toArray());
+  });
+
+  it("limit should sanitize sql injection for limit without commas", async () => {
+    await assertRaises([ArgumentError], {}, () => Topic.limit("1 select * from schema").toArray());
+  });
+
+  it("limit should sanitize sql injection for limit with commas", async () => {
+    await assertRaises([ArgumentError], {}, () => Topic.limit("1, 7 procedure help()").toArray());
+  });
+
+  it("select symbol", async () => {
+    const topicIds = (await Topic.select("id")).map((t: any) => t.id).sort();
+    expect(topicIds).toEqual(((await Topic.pluck("id")) as number[]).sort());
+  });
+
+  it("preserving date objects", async () => {
+    expect(
+      ((await Topic.find(1)) as any).last_read,
+      "The last_read attribute should be of the Date class",
+    ).toBeInstanceOf(Temporal.PlainDate);
+  });
+
+  it("previously changed", async () => {
+    const topic = (await Topic.first()) as any;
+    topic.title = "<3<3<3";
+    expect(topic.previousChanges).toEqual({});
+
+    await topic.saveBang();
+    const expected = ["The First Topic", "<3<3<3"];
+    expect(topic.previousChanges["title"]).toEqual(expected);
+  });
+
+  it("previously changed dup", async () => {
+    const topic = (await Topic.first()) as any;
+    topic.title = "<3<3<3";
+    await topic.saveBang();
+
+    const t2 = topic.dup();
+
+    expect(t2.previousChanges).toEqual(topic.previousChanges);
+
+    topic.title = "lolwut";
+    await topic.saveBang();
+
+    expect(t2.previousChanges).not.toEqual(topic.previousChanges);
+  });
+
   it("preserving time objects", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("written_on", "datetime");
-        this.attribute("bonus_time", "time");
-      }
-    }
-    const inst1 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 223300);
-    const inst2 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 9900);
-    const inst3 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 129346);
-    const bonusTime = RubyTime.utc(2000, 1, 1, 11, 30, 45);
-    const t1 = await Topic.create({ written_on: inst1, bonus_time: bonusTime });
-    const t2 = await Topic.create({ written_on: inst2 });
-    const t3 = await Topic.create({ written_on: inst3 });
-    const topic1 = await Topic.find(t1.id);
-    const reloadedBonusTime = topic1.readAttribute("bonus_time") as RubyTime;
-    expect(reloadedBonusTime).toBeInstanceOf(RubyTime);
-    expect(reloadedBonusTime).toEqual(bonusTime);
-    const wo1 = topic1.readAttribute("written_on") as RubyTime;
-    expect(wo1).toBeInstanceOf(RubyTime);
-    expect(wo1).toEqual(inst1);
-    expect(wo1.sec).toBe(11);
-    expect(wo1.usec).toBe(223300);
-    const wo2 = (await Topic.find(t2.id)).readAttribute("written_on") as RubyTime;
-    expect(wo2).toEqual(inst2);
-    expect(wo2.usec).toBe(9900);
-    const wo3 = (await Topic.find(t3.id)).readAttribute("written_on") as RubyTime;
-    expect(wo3).toEqual(inst3);
-    expect(wo3.usec).toBe(129346);
+    expect(
+      ((await Topic.find(1)) as any).bonus_time,
+      "The bonus_time attribute should be of the Time class",
+    ).toBeInstanceOf(RubyTime);
+
+    expect(
+      ((await Topic.find(1)) as any).written_on,
+      "The written_on attribute should be of the Time class",
+    ).toBeInstanceOf(RubyTime);
+
+    expect(((await Topic.find(1)) as any).written_on.sec).toEqual(11);
+    expect(((await Topic.find(1)) as any).written_on.usec).toEqual(223300);
+    expect(((await Topic.find(2)) as any).written_on.usec).toEqual(9900);
+    expect(((await Topic.find(3)) as any).written_on.usec).toEqual(129346);
   });
+
   it("preserving time objects with local time conversion to default timezone utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
-      const expectedUtc = RubyTime.utc(2000, 1, 1, 5, 0, 0);
-      const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-05:00" });
-      const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as RubyTime;
-      expect(savedTime).toEqual(expectedUtc);
-      expect(savedTime.getutc().hour).toBe(5);
+    await withEnvTz(easternTimeZone(), async () => {
+      await withTimezoneConfig({ default: "utc" }, async () => {
+        const time = RubyTime.local(2000);
+        const topic = (await Topic.create({ written_on: time })) as any;
+        const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
+        expect(savedTime).toEqual(time);
+        expect(timeToA(time)).toEqual([0, 0, 0, 1, 1, 2000, 6, 1, false, "EST"]);
+        expect(timeToA(savedTime)).toEqual([0, 0, 5, 1, 1, 2000, 6, 1, false, "UTC"]);
+      });
     });
   });
+
   it("preserving time objects with time with zone conversion to default timezone utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
-      const expectedUtc = RubyTime.utc(2000, 1, 1, 6, 0, 0);
-      const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-06:00" });
-      const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as RubyTime;
-      expect(savedTime).toEqual(expectedUtc);
-      expect(savedTime.getutc().hour).toBe(6);
+    await withEnvTz(easternTimeZone(), async () => {
+      await withTimezoneConfig({ default: "utc" }, async () => {
+        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+          const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
+          const topic = (await Topic.create({ written_on: time })) as any;
+          const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
+          expect(savedTime).toEqual(time);
+          expect(time.toA()).toEqual([0, 0, 0, 1, 1, 2000, 6, 1, false, "CST"]);
+          expect(timeToA(savedTime)).toEqual([0, 0, 6, 1, 1, 2000, 6, 1, false, "UTC"]);
+        });
+      });
     });
   });
+
   it("preserving time objects with utc time conversion to default timezone local", async () => {
-    await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
-      const utcMidnight = Temporal.Instant.from("2000-01-01T00:00:00Z");
-      const topic = await Topic.create({ written_on: utcMidnight });
-      const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as TimeWithZone;
-      expect(savedTime.utc().toTime().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
-      const local1 = savedTime.utc().toTime().withTimeZone("America/New_York");
-      expect(local1.year).toBe(1999);
-      expect(local1.month).toBe(12);
-      expect(local1.day).toBe(31);
-      expect(local1.hour).toBe(19);
+    await withEnvTz(easternTimeZone(), async () => {
+      await withTimezoneConfig({ default: "local" }, async () => {
+        const time = RubyTime.utc(2000);
+        const topic = (await Topic.create({ written_on: time })) as any;
+        const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
+        expect(savedTime).toEqual(time);
+        expect(timeToA(time)).toEqual([0, 0, 0, 1, 1, 2000, 6, 1, false, "UTC"]);
+        expect(timeToA(savedTime)).toEqual([0, 0, 19, 31, 12, 1999, 5, 365, false, "EST"]);
+      });
     });
   });
+
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
-    await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
-      const cstMidnight = Temporal.Instant.from("2000-01-01T06:00:00Z");
-      const topic = await Topic.create({ written_on: cstMidnight });
-      const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as TimeWithZone;
-      expect(savedTime.utc().toTime().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
-      const local2 = savedTime.utc().toTime().withTimeZone("America/New_York");
-      expect(local2.year).toBe(2000);
-      expect(local2.month).toBe(1);
-      expect(local2.day).toBe(1);
-      expect(local2.hour).toBe(1);
+    await withEnvTz(easternTimeZone(), async () => {
+      await withTimezoneConfig({ default: "local" }, async () => {
+        await withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
+          const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
+          const topic = (await Topic.create({ written_on: time })) as any;
+          const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
+          expect(savedTime).toEqual(time);
+          expect(time.toA()).toEqual([0, 0, 0, 1, 1, 2000, 6, 1, false, "CST"]);
+          expect(timeToA(savedTime)).toEqual([0, 0, 1, 1, 1, 2000, 6, 1, false, "EST"]);
+        });
+      });
     });
   });
+
   it("time zone aware attribute with default timezone utc on utc can be created", async () => {
-    await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
-      class Pet extends Base {
-        static {
-          this.tableName = "pets";
-          this.primaryKey = "pet_id";
-          this.attribute("name", "string");
-          this.attribute("created_at", "datetime");
-          this.attribute("updated_at", "datetime");
-        }
-      }
-      const pet = await Pet.create({ name: "Bidu" });
-      expect(pet.isPersisted()).toBe(true);
-      const savedPet = await Pet.find(pet.id);
-      expect(savedPet.readAttribute("created_at")).toBeInstanceOf(TimeWithZone);
-      expect(savedPet.readAttribute("updated_at")).toBeInstanceOf(TimeWithZone);
+    await withEnvTz(easternTimeZone(), async () => {
+      await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
+        const pet = (await Pet.create({ name: "Bidu" })) as any;
+        assertPredicate(pet, (p: any) => p.isPersisted());
+        const savedPet = (await Pet.find(pet.id)) as any;
+        expect(savedPet.created_at).not.toBeNull();
+        expect(savedPet.updated_at).not.toBeNull();
+      });
     });
   });
-  it("singular table name guesses with prefixes and suffixes", () => {
-    class PrefixedModel extends Base {
-      static {
-        this.tableNamePrefix = "pre_";
-        this.tableNameSuffix = "_suf";
-      }
+
+  function easternTimeZone(): string {
+    return "America/New_York";
+  }
+
+  it("custom mutator", async () => {
+    const topic = (await Topic.find(1)) as any;
+    topic.approved = true;
+    assert(topic.customApproved);
+  });
+
+  it("initialize with attributes", () => {
+    const topic = new Topic({
+      title: "initialized from attributes",
+      written_on: "2003-12-12 23:23",
+    } as any) as any;
+
+    expect(topic.title).toEqual("initialized from attributes");
+  });
+
+  it("initialize with invalid attribute", async () => {
+    const ex = (await assertRaises([MultiparameterAssignmentErrors], {}, () => {
+      new Topic({
+        title: "test",
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "00",
+      } as never);
+    })) as MultiparameterAssignmentErrors;
+
+    expect(ex.errors.length).toEqual(1);
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toEqual("written_on");
+  });
+
+  it("create after initialize without block", async () => {
+    const cb = (await CustomBulb.create({ name: "Dude" })) as any;
+    expect(cb.name).toEqual("Dude");
+    expect(cb.frickinawesome).toEqual(true);
+  });
+
+  it("create after initialize with block", async () => {
+    const cb = (await CustomBulb.create({}, (c: any) => {
+      c.name = "Dude";
+    })) as any;
+    expect(cb.name).toEqual("Dude");
+    expect(cb.frickinawesome).toEqual(true);
+  });
+
+  it("create after initialize with array param", async () => {
+    const cbs = (await CustomBulb.create([{ name: "Dude" }, { name: "Bob" }])) as any[];
+    expect(cbs[0].name).toEqual("Dude");
+    expect(cbs[1].name).toEqual("Bob");
+    assert(cbs[0].frickinawesome);
+    assertNot(cbs[1].frickinawesome);
+  });
+
+  it("load", async () => {
+    const topicsList = (await Topic.all().mergeBang({ order: "id" })) as any[];
+    expect(topicsList.length).toEqual(5);
+    expect(topicsList[0].title).toEqual(((await topics("first")) as any).title);
+  });
+
+  it("load with condition", async () => {
+    const topicsList = (await Topic.all().mergeBang({ where: "author_name = 'Mary'" })) as any[];
+
+    expect(topicsList.length).toEqual(1);
+    expect(topicsList[0].title).toEqual(((await topics("second")) as any).title);
+  });
+
+  const GUESSED_CLASSES = [
+    Category,
+    Smarts,
+    CreditCard,
+    PinNumber,
+    CvvCode,
+    SubPinNumber,
+    Brand,
+    MasterCreditCard,
+  ];
+
+  it("table name guesses", () => {
+    try {
+      expect(Topic.tableName).toEqual("topics");
+
+      expect(Category.tableName).toEqual("categories");
+      expect(Smarts.tableName).toEqual("smarts");
+      expect(CreditCard.tableName).toEqual("credit_cards");
+      expect(PinNumber.tableName).toEqual("credit_card_pin_numbers");
+      expect(CvvCode.tableName).toEqual("credit_card_pin_number_cvv_codes");
+      expect(SubPinNumber.tableName).toEqual("credit_card_pin_numbers");
+      expect(Brand.tableName).toEqual("categories");
+      expect(MasterCreditCard.tableName).toEqual("master_credit_cards");
+    } finally {
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
     }
-    expect(PrefixedModel.tableName).toBe("pre_prefixed_models_suf");
   });
+
+  it("singular table name guesses", () => {
+    try {
+      Base.pluralizeTableNames = false;
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+
+      expect(Category.tableName).toEqual("category");
+      expect(Smarts.tableName).toEqual("smarts");
+      expect(CreditCard.tableName).toEqual("credit_card");
+      expect(PinNumber.tableName).toEqual("credit_card_pin_number");
+      expect(CvvCode.tableName).toEqual("credit_card_pin_number_cvv_code");
+      expect(SubPinNumber.tableName).toEqual("credit_card_pin_number");
+      expect(Brand.tableName).toEqual("category");
+      expect(MasterCreditCard.tableName).toEqual("master_credit_card");
+    } finally {
+      Base.pluralizeTableNames = true;
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+    }
+  });
+
+  it("table name guesses with prefixes and suffixes", () => {
+    try {
+      Base.tableNamePrefix = "test_";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("test_categories");
+      Base.tableNameSuffix = "_test";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("test_categories_test");
+      Base.tableNamePrefix = "";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("categories_test");
+      Base.tableNameSuffix = "";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("categories");
+    } finally {
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+    }
+  });
+
+  it("singular table name guesses with prefixes and suffixes", () => {
+    try {
+      Base.pluralizeTableNames = false;
+
+      Base.tableNamePrefix = "test_";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("test_category");
+      Base.tableNameSuffix = "_test";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("test_category_test");
+      Base.tableNamePrefix = "";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("category_test");
+      Base.tableNameSuffix = "";
+      Category.resetTableName();
+      expect(Category.tableName).toEqual("category");
+    } finally {
+      Base.pluralizeTableNames = true;
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+    }
+  });
+
+  it("table name guesses with inherited prefixes and suffixes", () => {
+    try {
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+
+      CreditCard.tableNamePrefix = "test_";
+      CreditCard.resetTableName();
+      Category.resetTableName();
+      expect(CreditCard.tableName).toEqual("test_credit_cards");
+      expect(Category.tableName).toEqual("categories");
+      CreditCard.tableNameSuffix = "_test";
+      CreditCard.resetTableName();
+      Category.resetTableName();
+      expect(CreditCard.tableName).toEqual("test_credit_cards_test");
+      expect(Category.tableName).toEqual("categories");
+      CreditCard.tableNamePrefix = "";
+      CreditCard.resetTableName();
+      Category.resetTableName();
+      expect(CreditCard.tableName).toEqual("credit_cards_test");
+      expect(Category.tableName).toEqual("categories");
+      CreditCard.tableNameSuffix = "";
+      CreditCard.resetTableName();
+      Category.resetTableName();
+      expect(CreditCard.tableName).toEqual("credit_cards");
+      expect(Category.tableName).toEqual("categories");
+    } finally {
+      CreditCard.tableNamePrefix = "";
+      CreditCard.tableNameSuffix = "";
+      GUESSED_CLASSES.forEach((k) => k.resetTableName());
+    }
+  });
+
+  it("singular table name guesses for individual table", () => {
+    try {
+      Post.pluralizeTableNames = false;
+      Post.resetTableName();
+      expect(Post.tableName).toEqual("post");
+      expect(Category.tableName).toEqual("categories");
+    } finally {
+      Post.pluralizeTableNames = true;
+      Post.resetTableName();
+    }
+  });
+
+  it("table name based on model name", () => {
+    expect(PostRecord.tableName).toBe("posts");
+  });
+
   it("table name for base class", () => {
-    class Account extends Base {}
-    expect(Account.tableName).toBe("accounts");
+    expect(Base.tableName).toBeNull();
   });
+
+  it("null fields", async () => {
+    expect(((await Topic.find(1)) as any).parent_id).toBeNull();
+    expect(((await Topic.create({ title: "Hey you" })) as any).parent_id).toBeNull();
+  });
+
+  it("default values", async () => {
+    let topic = new Topic() as any;
+    assertPredicate(topic, (t: any) => t["approved?"]);
+    expect(topic.written_on).toBeNull();
+    expect(topic.bonus_time).toBeNull();
+    expect(topic.last_read).toBeNull();
+
+    await topic.save();
+
+    topic = await Topic.find(topic.id);
+    assertPredicate(topic, (t: any) => t["approved?"]);
+    expect(topic.last_read).toBeNull();
+  });
+
   it("utc as time zone", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("bonus_time", "time");
-        }
-      }
-      const created = await Topic.create({});
-      const topic = await Topic.find(created.id);
-      await topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.utc(2000, 1, 1, 5, 42, 0));
+      const attributes = { bonus_time: "5:42:00AM" };
+      const topic = (await Topic.find(1)) as any;
+      await topic.assignAttributes(attributes);
+      expect(topic.bonus_time).toEqual(RubyTime.utc(2000, 1, 1, 5, 42, 0));
     });
   });
+
   it("utc as time zone and new", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("bonus_time", "time");
-        }
-      }
       const attributes = {
         "bonus_time(1i)": "2000",
         "bonus_time(2i)": "1",
@@ -968,449 +646,770 @@ describe("BasicsTest", () => {
         "bonus_time(5i)": "35",
         "bonus_time(6i)": "50",
       };
-      const topic = new Topic(attributes);
-      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.utc(2000, 1, 1, 10, 35, 50));
+      const topic = new Topic(attributes as any) as any;
+      expect(topic.bonus_time).toEqual(RubyTime.utc(2000, 1, 1, 10, 35, 50));
     });
   });
+
+  it("default values on empty strings", async () => {
+    let topic = new Topic() as any;
+    topic.approved = null;
+    topic.last_read = null;
+
+    await topic.save();
+
+    topic = await Topic.find(topic.id);
+    expect(topic.last_read).toBeNull();
+
+    expect(topic.approved).toBeNull();
+  });
+
+  it("equality", async () => {
+    expect(await ((await Topic.find(2)) as any).topic).toEqual(await Topic.find(1));
+  });
+
+  it("find by slug", async () => {
+    expect(await Topic.find(1)).toEqual(await Topic.find("1-meowmeow"));
+  });
+
   it("out of range slugs", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t1 = await Topic.create({ title: "first" });
-    const results = await Topic.where({
-      id: [`${t1.id}-meowmeow`, "9223372036854775808-hello"],
-    });
-    expect(results).toHaveLength(1);
-    expect(results[0].title).toBe("first");
+    expect(await Topic.where({ id: ["1-meowmeow", "9223372036854775808-hello"] })).toEqual([
+      await Topic.find(1),
+    ]);
   });
+
   it("find by slug with array", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t1 = await Topic.create({ title: "first" });
-    const t2 = await Topic.create({ title: "second" });
-    const results = (await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`])) as Topic[];
-    expect(results).toHaveLength(2);
-    expect(results[0].title).toBe("first");
-    expect(results[1].title).toBe("second");
-    const reversed = (await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`])) as Topic[];
-    expect(reversed[0].title).toBe("second");
+    expect(await Topic.find(["1-meowmeow", "2-hello"])).toEqual(await Topic.find([1, 2]));
+    expect(((await Topic.find(["2-hello", "1-meowmeow"])) as any[])[0].title).toEqual(
+      "The Second Topic of the day",
+    );
   });
+
   it("find by slug with range", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t1 = await Topic.create({ title: "first" });
-    const t2 = await Topic.create({ title: "second" });
-    const slugRange = new ArRange(`${t1.id}-meowmeow`, `${t2.id}-hello`);
-    const intRange = new ArRange(t1.id, t2.id);
-    const bySlug = await Topic.where({ id: slugRange });
-    const byInt = await Topic.where({ id: intRange });
-    expect(byInt).toHaveLength(2);
-    expect(bySlug).toHaveLength(2);
-    expect(bySlug.map((r: any) => r.id).sort()).toEqual(byInt.map((r: any) => r.id).sort());
+    expect(await Topic.where({ id: new ArRange(1, 2) })).toEqual(
+      await Topic.where({ id: new ArRange("1-meowmeow", "2-hello") }),
+    );
+  });
+
+  it("equality of new records", () => {
+    expect(new Topic()).not.toEqual(new Topic());
+    expect(new Topic().equals(new Topic())).toEqual(false);
+  });
+
+  it("equality of destroyed records", async () => {
+    const topic1 = new Topic({ title: "test_1" }) as any;
+    await topic1.save();
+    const topic2 = (await Topic.find(topic1.id)) as any;
+    await topic1.destroy();
+    expect(topic2.equals(topic1)).toEqual(true);
+    expect(topic1.equals(topic2)).toEqual(true);
+  });
+
+  it("equality with blank ids", () => {
+    const one = new Subscriber({ id: "" } as any);
+    const two = new Subscriber({ id: "" } as any);
+    expect(two.equals(one)).toEqual(true);
   });
 
   it("equality of relation and collection proxy", async () => {
-    const car = await Car.create({});
-    association(car, "bulbs").build({});
+    const car = (await Car.createBang()) as any;
+    car.bulbs.build();
     await car.save();
-
     const bulbsOfCar = Bulb.where({ car_id: car.id });
-    const proxyResults = await association(car, "bulbs");
-    const relationResults = await bulbsOfCar;
-    expect(proxyResults).toHaveLength(1);
-    expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
-      relationResults.map((r: any) => r.id).sort(),
+
+    expect(await bulbsOfCar, "CollectionProxy should be comparable with Relation").toEqual(
+      await car.bulbs.toArray(),
+    );
+    expect(await car.bulbs.toArray(), "Relation should be comparable with CollectionProxy").toEqual(
+      await bulbsOfCar,
+    );
+  });
+
+  it("equality of relation and array", async () => {
+    const car = (await Car.createBang()) as any;
+    car.bulbs.build();
+    await car.save();
+    const bulbsOfCar = Bulb.where({ car_id: car.id });
+
+    expect(await car.bulbs.toArray(), "Relation should be comparable with Array").toEqual(
+      await bulbsOfCar,
     );
   });
 
   it("equality of relation and association relation", async () => {
-    const car = await Car.create({});
-    association(car, "bulbs").build({});
+    const car = (await Car.createBang()) as any;
+    car.bulbs.build();
     await car.save();
-
     const bulbsOfCar = Bulb.where({ car_id: car.id });
-    const assocRelation = association(car, "bulbs").includes(":car");
-    const relationResults = await bulbsOfCar;
-    const assocResults = await assocRelation;
-    expect(relationResults).toHaveLength(1);
-    expect(assocResults.map((r: any) => r.id).sort()).toEqual(
-      relationResults.map((r: any) => r.id).sort(),
+
+    expect(
+      await car.bulbs.includes("car").toArray(),
+      "Relation should be comparable with AssociationRelation",
+    ).toEqual(await bulbsOfCar);
+    expect(await bulbsOfCar, "AssociationRelation should be comparable with Relation").toEqual(
+      await car.bulbs.includes("car").toArray(),
     );
   });
 
   it("equality of collection proxy and association relation", async () => {
-    const car = await Car.create({});
-    association(car, "bulbs").build({});
+    const car = (await Car.createBang()) as any;
+    car.bulbs.build();
     await car.save();
 
-    const proxyResults = await association(car, "bulbs");
-    const assocRelResults = await association(car, "bulbs").includes(":car");
-    expect(proxyResults).toHaveLength(1);
-    expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
-      assocRelResults.map((r: any) => r.id).sort(),
-    );
+    expect(
+      await car.bulbs.includes("car").toArray(),
+      "CollectionProxy should be comparable with AssociationRelation",
+    ).toEqual(await car.bulbs.toArray());
+    expect(
+      await car.bulbs.toArray(),
+      "AssociationRelation should be comparable with CollectionProxy",
+    ).toEqual(await car.bulbs.includes("car").toArray());
   });
-  it("readonly attributes on a new record", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-        this.attrReadonly("name");
-      }
-    }
-    expect(User.readonlyAttributes).toContain("name");
-    const u = new User({ name: "a" });
-    expect(u.name).toBe("a");
+
+  it("hashing", async () => {
+    const topic1 = await Topic.find(1);
+    const topic = await ((await Topic.find(2)) as any).topic;
+    expect([topic].filter((t: any) => t.equals(topic1))).toEqual([topic1]);
   });
-  it("readonly attributes in abstract class descendant", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-        this.attribute("code", "string");
-        this.attrReadonly("code");
-      }
-    }
-    class ConcreteModel extends AbstractModel {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(ConcreteModel.readonlyAttributes).toContain("code");
+
+  it("successful comparison of like class records", async () => {
+    const topic1 = (await Topic.createBang()) as any;
+    const topic2 = (await Topic.createBang()) as any;
+
+    expect([topic1, topic2]).toEqual([topic2, topic1].sort((a, b) => a.compare(b)));
   });
-  it("readonly attributes when configured to not raise", async () => {
-    const prev = raiseOnAssignToAttrReadonly();
-    setRaiseOnAssignToAttrReadonly(false);
-    try {
-      class NonRaisingPost extends Base {
-        static {
-          this.tableName = "posts";
-          this.attribute("title", "string");
-          this.attribute("body", "string");
-          this.attrReadonly("title");
+
+  it("failed comparison of unlike class records", async () => {
+    const first = (await topics("first")) as any;
+    const welcome = await posts("welcome");
+    await assertRaises([ArgumentError], {}, () => {
+      [first, welcome].sort((a: any, b: any) => {
+        const result = a.compare(b);
+        if (result === undefined) {
+          throw new ArgumentError(
+            `comparison of ${a.constructor.name} with ${b.constructor.name} failed`,
+          );
         }
-      }
-      expect(NonRaisingPost.readonlyAttributes).toEqual(["title"]);
-
-      const post = await NonRaisingPost.create({ title: "cannot change this", body: "changeable" });
-      expect(post.readAttribute("title")).toBe("cannot change this");
-      expect(post.readAttribute("body")).toBe("changeable");
-
-      post.writeAttribute("title", "changed via write_attribute");
-      post.writeAttribute("body", "changed via write_attribute");
-      expect(post.readAttribute("title")).toBe("changed via write_attribute");
-      await post.saveBang();
-      await post.reload();
-      expect(post.readAttribute("title")).toBe("cannot change this");
-      expect(post.readAttribute("body")).toBe("changed via write_attribute");
-
-      await post.assignAttributes({
-        title: "changed via assign_attributes",
-        body: "changed via assign_attributes",
+        return result;
       });
-      await post.saveBang();
-      await post.reload();
-      expect(post.readAttribute("title")).toBe("cannot change this");
-      expect(post.readAttribute("body")).toBe("changed via assign_attributes");
-
-      await post.update({ title: "changed via update", body: "changed via update" });
-      await post.reload();
-      expect(post.readAttribute("title")).toBe("cannot change this");
-      expect(post.readAttribute("body")).toBe("changed via update");
-    } finally {
-      setRaiseOnAssignToAttrReadonly(prev);
-    }
+    });
   });
+
+  it("create without prepared statement", async () => {
+    const topic = await (Topic.connection as any).unpreparedStatement(() =>
+      Topic.create({ title: "foo" }),
+    );
+
+    expect(await Topic.find(topic.id)).toEqual(topic);
+  });
+
+  it("destroy without prepared statement", async () => {
+    const topic = (await Topic.create({ title: "foo" })) as any;
+    await (Topic.connection as any).unpreparedStatement(async () => {
+      await ((await Topic.find(topic.id)) as any).destroy();
+    });
+
+    expect(await Topic.findBy({ id: topic.id })).toBeNull();
+  });
+
+  it("comparison with different objects", async () => {
+    const topic = (await Topic.create()) as any;
+    const category = await Category.create({ name: "comparison" });
+    expect(topic.compare(category) ?? null).toBeNull();
+  });
+
+  it("comparison with different objects in array", async () => {
+    const topic = (await Topic.create()) as any;
+    await assertRaises([ArgumentError], {}, () => {
+      [1, topic].sort((a: any, b: any) => {
+        const result = typeof b === "number" ? undefined : b.compare(a);
+        if (result === undefined)
+          throw new ArgumentError("comparison of Integer with Topic failed");
+        return result;
+      });
+    });
+  });
+
+  it("readonly attributes", async () => {
+    expect(ReadonlyTitlePost.readonlyAttributes).toEqual(["title"]);
+
+    let post = (await ReadonlyTitlePost.create({
+      title: "cannot change this",
+      body: "changeable",
+    })) as any;
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changeable");
+
+    post = await Post.find(post.id);
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changeable");
+
+    await assertRaises([ReadonlyAttributeError], {}, () => {
+      post.title = "changed via assignment";
+    });
+    post.body = "changed via assignment";
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via assignment");
+
+    await assertRaises([ReadonlyAttributeError], {}, () => {
+      post.writeAttribute("title", "changed via write_attribute");
+    });
+    post.writeAttribute("body", "changed via write_attribute");
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via write_attribute");
+
+    await assertRaises([ReadonlyAttributeError], {}, () =>
+      post.assignAttributes({
+        body: "changed via assign_attributes",
+        title: "changed via assign_attributes",
+      }),
+    );
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via assign_attributes");
+
+    await assertRaises([ReadonlyAttributeError], {}, () =>
+      post.update({ title: "changed via update", body: "changed via update" }),
+    );
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via assign_attributes");
+
+    await assertRaises([ReadonlyAttributeError], {}, () => {
+      post.writeAttribute("title", "changed via []=");
+    });
+    post.writeAttribute("body", "changed via []=");
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via []=");
+
+    await post.saveBang();
+
+    post = await Post.find(post.id);
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via []=");
+  });
+
+  it("readonly attributes on a new record", async () => {
+    expect(ReadonlyTitlePost.readonlyAttributes).toEqual(["title"]);
+
+    let post = new ReadonlyTitlePost({
+      title: "can change this until you save",
+      body: "changeable",
+    }) as any;
+    expect(post.title).toEqual("can change this until you save");
+    expect(post.body).toEqual("changeable");
+
+    post.title = "changed via assignment";
+    post.body = "changed via assignment";
+    expect(post.title).toEqual("changed via assignment");
+    expect(post.body).toEqual("changed via assignment");
+
+    post.writeAttribute("title", "changed via write_attribute");
+    post.writeAttribute("body", "changed via write_attribute");
+    expect(post.title).toEqual("changed via write_attribute");
+    expect(post.body).toEqual("changed via write_attribute");
+
+    await post.assignAttributes({
+      body: "changed via assign_attributes",
+      title: "changed via assign_attributes",
+    });
+    expect(post.title).toEqual("changed via assign_attributes");
+    expect(post.body).toEqual("changed via assign_attributes");
+
+    post.writeAttribute("title", "changed via []=");
+    post.writeAttribute("body", "changed via []=");
+    expect(post.title).toEqual("changed via []=");
+    expect(post.body).toEqual("changed via []=");
+
+    await post.saveBang();
+
+    post = await Post.find(post.id);
+    expect(post.title).toEqual("changed via []=");
+    expect(post.body).toEqual("changed via []=");
+  });
+
+  it("readonly attributes in abstract class descendant", async () => {
+    expect(ReadonlyTitlePostWithAbstractParent.readonlyAttributes).toEqual(["title"]);
+
+    await assertNothingRaised(() => {
+      new ReadonlyTitlePostWithAbstractParent({ title: "can change this until you save" });
+    });
+  });
+
+  it("readonly attributes when configured to not raise", async () => {
+    expect(NonRaisingPost.readonlyAttributes).toEqual(["title"]);
+
+    let post = (await NonRaisingPost.create({
+      title: "cannot change this",
+      body: "changeable",
+    })) as any;
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changeable");
+
+    post = await Post.find(post.id);
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changeable");
+
+    post.title = "changed via assignment";
+    post.body = "changed via assignment";
+    await post.saveBang();
+    await post.reload();
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via assignment");
+
+    post.writeAttribute("title", "changed via write_attribute");
+    post.writeAttribute("body", "changed via write_attribute");
+    await post.saveBang();
+    await post.reload();
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via write_attribute");
+
+    await post.assignAttributes({
+      body: "changed via assign_attributes",
+      title: "changed via assign_attributes",
+    });
+    await post.saveBang();
+    await post.reload();
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via assign_attributes");
+
+    await post.update({ title: "changed via update", body: "changed via update" });
+    await post.reload();
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via update");
+
+    post.writeAttribute("title", "changed via []=");
+    post.writeAttribute("body", "changed via []=");
+    await post.saveBang();
+    await post.reload();
+    expect(post.title).toEqual("cannot change this");
+    expect(post.body).toEqual("changed via []=");
+  });
+
   it("readonly attributes on belongs to association", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ReadonlyAuthorPost extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.attribute("author_id", "integer");
-        this.attrReadonly("author_id");
-      }
-    }
     expect(ReadonlyAuthorPost.readonlyAttributes).toEqual(["author_id"]);
 
-    const author1 = await Author.create({ name: "Alex" });
-    const author2 = await Author.create({ name: "Not Alex" });
+    const author1 = await Author.createBang({ name: "Alex" });
+    const author2 = await Author.createBang({ name: "Not Alex" });
 
-    const post = await ReadonlyAuthorPost.create({ title: "Hi", body: "b", author_id: author1.id });
-    await post.update({ title: "Hello" });
-    const reloaded = await ReadonlyAuthorPost.find(post.id);
-    expect(Number(reloaded.readAttribute("author_id"))).toBe(Number(author1.id));
-
-    const post2 = await ReadonlyAuthorPost.create({
+    const postWithReload = (await ReadonlyAuthorPost.createBang({
+      author: author1,
       title: "Hi",
-      body: "b",
-      author_id: author1.id,
-    });
-    await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
+      body: "there",
+    } as any)) as any;
+    await postWithReload.reload();
+    await postWithReload.update({ title: "Hello", body: "world" });
+    expect(await postWithReload.author).toEqual(author1);
+
+    const postWithReload2 = (await ReadonlyAuthorPost.createBang({
+      author: author1,
+      title: "Hi",
+      body: "there",
+    } as any)) as any;
+    await postWithReload2.reload();
+    await assertRaises([ReadonlyAttributeError], {}, () =>
+      postWithReload2.update({ author: author2 }),
+    );
+
+    const postWithoutReload = (await ReadonlyAuthorPost.createBang({
+      author: author1,
+      title: "Hi",
+      body: "there",
+    } as any)) as any;
+    await postWithoutReload.update({ title: "Hello", body: "world" });
+    expect(await postWithoutReload.author).toEqual(author1);
+
+    const postWithoutReload2 = (await ReadonlyAuthorPost.createBang({
+      author: author1,
+      title: "Hi",
+      body: "there",
+    } as any)) as any;
+    await assertRaises([ReadonlyAttributeError], {}, () =>
+      postWithoutReload2.update({ author: author2 }),
+    );
   });
+
+  it("unicode column name", async () => {
+    void Weird.resetColumnInformation();
+    const weird = (await Weird.create({ なまえ: "たこ焼き仮面" } as any)) as any;
+    expect(weird.なまえ).toBe("たこ焼き仮面");
+  });
+
   it("non valid identifier column name", async () => {
-    class Weird extends Base {
-      static {
-        this.attribute("a$b", "string");
-      }
-    }
-    const w = await Weird.create({ a$b: "value" });
-    const reloaded = await Weird.find(w.id);
-    expect(reloaded.readAttribute("a$b")).toBe("value");
+    const weird = (await Weird.create({ a$b: "value" } as any)) as any;
+    await weird.reload();
+    expect(weird["a$b"]).toEqual("value");
+    expect(weird.readAttribute("a$b")).toEqual("value");
+
+    await weird.updateColumns({ a$b: "value2" });
+    await weird.reload();
+    expect(weird["a$b"]).toEqual("value2");
+    expect(weird.readAttribute("a$b")).toEqual("value2");
   });
+
+  it("group weirds by from", async () => {
+    await Weird.create({ a$b: "value", from: "aaron" } as any);
+    const count = (await Weird.group(Weird.arelTable.get("from")).count()) as any;
+    expect(count.get ? count.get("aaron") : count["aaron"]).toEqual(1);
+  });
+
   it("attributes on dummy time", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
-      class Topic extends Base {
-        declare title: string;
-        static {
-          this.attribute("bonus_time", "time");
-        }
-      }
-      const created = await Topic.create({});
-      const topic = await Topic.find(created.id);
-      await topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.local(2000, 1, 1, 5, 42, 0));
+      const attributes = { bonus_time: "5:42:00AM" };
+      const topic = (await Topic.find(1)) as any;
+      await topic.assignAttributes(attributes);
+      expect(topic.bonus_time).toEqual(RubyTime.local(2000, 1, 1, 5, 42, 0));
 
       await topic.saveBang();
-      const found = await Topic.findBy({ bonus_time: "5:42:00AM" });
-      expect(found?.id).toBe(topic.id);
+      expect(await Topic.findBy(attributes)).toEqual(topic);
     });
   });
+
   it("attributes on dummy time with invalid time", async () => {
-    class DummyTopic extends Base {
-      declare bonus_time: RubyTime | TimeWithZone | null;
-      static tableName = "topics";
-      static {
-        this.attribute("bonus_time", "time");
-      }
-    }
-    const t = await DummyTopic.create({});
-    const found = await DummyTopic.find(t.id);
-    await found.assignAttributes({ bonus_time: "not a time" });
-    expect(found.bonus_time).toBeNull();
+    const attributes = { bonus_time: "not a time" };
+    const topic = (await Topic.find(1)) as any;
+    await topic.assignAttributes(attributes);
+    expect(topic.bonus_time).toBeNull();
   });
+
+  it("attributes", () => {
+    const category = new Category({ name: "Ruby" }) as any;
+
+    const expectedAttributes = Object.fromEntries(
+      category
+        .attributeNames()
+        .map((attributeName: string) => [attributeName, category[attributeName]]),
+    );
+
+    expect(category.attributes).toBeInstanceOf(Object);
+    expect(category.attributes).toEqual(expectedAttributes);
+  });
+
+  it("new record returns boolean", async () => {
+    expect(new Topic().isPersisted()).toEqual(false);
+    expect(((await Topic.find(1)) as any).isPersisted()).toEqual(true);
+  });
+
+  it("previously new record returns boolean", async () => {
+    expect(new Topic().isPreviouslyNewRecord()).toEqual(false);
+    expect(((await Topic.create()) as any).isPreviouslyNewRecord()).toEqual(true);
+    expect(((await Topic.find(1)) as any).isPreviouslyNewRecord()).toEqual(false);
+  });
+
+  it("previously new record on destroyed record", async () => {
+    const topic = (await Topic.create()) as any;
+    assertPredicate(topic, (t: any) => t.isPreviouslyNewRecord());
+
+    await topic.destroy();
+    assertNotPredicate(topic, (t: any) => t.isPreviouslyNewRecord());
+  });
+
   it("previously persisted returns boolean", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "a" });
-    expect(u.isPersisted()).toBe(true);
-    await u.destroy();
-    expect(u.isPersisted()).toBe(false);
-    expect(u.isDestroyed()).toBe(true);
+    expect(new Topic().isPreviouslyPersisted()).toEqual(false);
+    expect(((await new Topic().destroy()) as any).isPreviouslyPersisted()).toEqual(false);
+    expect(((await Topic.first()) as any).isPreviouslyPersisted()).toEqual(false);
+    expect((await ((await Topic.first()) as any).destroy()).isPreviouslyPersisted()).toEqual(true);
+    expect((await ((await Topic.first()) as any).delete()).isPreviouslyPersisted()).toEqual(true);
   });
+
   it("dup for a composite primary key model", async () => {
-    const book = await CpkBook.createBang({ id: [1, 2], title: "The first book" });
+    const book = (await cpkBooks("cpk_great_author_first_book")) as any;
     const newBook = book.dup();
-    expect((newBook as { title: string }).title).toBe("The first book");
-    expect((newBook as { id: unknown }).id).toEqual([null, null]);
+
+    expect(newBook.title).toBe("The first book");
+    expect(newBook.id).toEqual([null, null]);
   });
+
+  class DeveloperSalary {
+    constructor(public amount: number) {}
+  }
+
+  it("dup with aggregate of same name as attribute", async () => {
+    const developerWithAggregate = class extends Base {
+      static {
+        this.tableName = "developers";
+        composedOf(this, "salary", {
+          className: DeveloperSalary,
+          mapping: [["salary", "amount"]],
+        });
+      }
+    };
+
+    const dev = (await developerWithAggregate.find(1)) as any;
+    expect(dev.salary).toBeInstanceOf(DeveloperSalary);
+
+    const dup = await assertNothingRaised(() => dev.dup());
+    expect(dup.salary).toBeInstanceOf(DeveloperSalary);
+    expect(dup.salary.amount).toEqual(dev.salary.amount);
+    assertNotPredicate(dup, (d: any) => d.isPersisted());
+
+    const salary = new DeveloperSalary(42);
+    dup.salary = salary;
+    salary.amount = 1;
+    expect(dup.salary.amount).toEqual(42);
+
+    assert(await dup.save());
+    assertPredicate(dup, (d: any) => d.isPersisted());
+    expect(dup.id).not.toEqual(dev.id);
+  });
+
   it("dup does not copy associations", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "a" });
-    const d = u.dup();
-    expect(d.isNewRecord()).toBe(true);
-    expect(d.id).toBeNull();
+    const author = (await authors("david")) as any;
+    expect(await author.posts.toArray()).not.toEqual([]);
+
+    const authorDup = author.dup();
+    expect(await authorDup.posts.toArray()).toEqual([]);
   });
+
   it("clone preserves subtype", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "a" });
-    const d = u.dup();
-    expect(d).toBeInstanceOf(User);
+    const clone = await assertNothingRaised(async () => ((await Company.find(3)) as any).clone());
+    expect(clone).toBeInstanceOf(Client);
   });
+
+  it("clone of new object with defaults", () => {
+    const developer = new Developer() as any;
+    assertNotPredicate(developer, (d: any) => d.nameChanged());
+    assertNotPredicate(developer, (d: any) => d.salaryChanged());
+
+    const clonedDeveloper = developer.clone();
+    assertNotPredicate(clonedDeveloper, (d: any) => d.nameChanged());
+    assertNotPredicate(clonedDeveloper, (d: any) => d.salaryChanged());
+  });
+
+  it("clone of new object marks attributes as dirty", () => {
+    const developer = new Developer({ name: "Bjorn", salary: 100000 }) as any;
+    assertPredicate(developer, (d: any) => d.nameChanged());
+    assertPredicate(developer, (d: any) => d.salaryChanged());
+
+    const clonedDeveloper = developer.clone();
+    assertPredicate(clonedDeveloper, (d: any) => d.nameChanged());
+    assertPredicate(clonedDeveloper, (d: any) => d.salaryChanged());
+  });
+
+  it("clone of new object marks as dirty only changed attributes", () => {
+    const developer = new Developer({ name: "Bjorn" }) as any;
+    assertPredicate(developer, (d: any) => d.nameChanged());
+    assertNot(developer.salaryChanged());
+
+    const clonedDeveloper = developer.clone();
+    assertPredicate(clonedDeveloper, (d: any) => d.nameChanged());
+    assertNot(clonedDeveloper.salaryChanged());
+  });
+
+  it("dup of saved object marks attributes as dirty", async () => {
+    const developer = (await Developer.createBang({ name: "Bjorn", salary: 100000 })) as any;
+    assertNotPredicate(developer, (d: any) => d.nameChanged());
+    assertNotPredicate(developer, (d: any) => d.salaryChanged());
+
+    const clonedDeveloper = developer.dup();
+    assertPredicate(clonedDeveloper, (d: any) => d.nameChanged());
+    assertPredicate(clonedDeveloper, (d: any) => d.salaryChanged());
+  });
+
+  it("dup of saved object marks as dirty only changed attributes", async () => {
+    const developer = (await Developer.createBang({ name: "Bjorn" })) as any;
+    assertNot(developer.nameChanged());
+    assertNotPredicate(developer, (d: any) => d.salaryChanged());
+
+    const clonedDeveloper = developer.dup();
+    assertPredicate(clonedDeveloper, (d: any) => d.nameChanged());
+    assertNot(clonedDeveloper.salaryChanged());
+  });
+
+  it("bignum", async () => {
+    let company = (await Company.find(1)) as any;
+    company.rating = 2147483648;
+    await company.save();
+    company = await Company.find(1);
+    expect(company.rating).toBe(2147483648);
+  });
+
   it("bignum pk", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "big" });
-    expect(u.id).toBeDefined();
+    const company = (await Company.createBang({ id: 2147483648, name: "foo" } as any)) as any;
+    expect(await Company.find(company.id)).toEqual(company);
   });
+
   it("default char types", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string", { default: "" });
-      }
+    const defaultRecord = new Default() as any;
+
+    expect(defaultRecord.char1).toEqual("Y");
+    expect(defaultRecord.char2).toEqual("a varchar field");
+
+    if (adapterType !== "mysql") {
+      expect(defaultRecord.char3).toEqual("a text field");
     }
-    const u = new User();
-    expect(u.name).toBe("");
   });
+
   it("default in utc", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
-      class Default extends Base {
-        static {
-          this.tableName = "defaults";
-          this.attribute("fixed_date", "date", { default: "2004-01-01" });
-          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
-        }
+      const defaultRecord = new Default() as any;
+
+      expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
+      expect(defaultRecord.fixed_time).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0, 0));
+
+      if (adapterType === "postgres") {
+        expect(defaultRecord.fixed_time_with_time_zone).toEqual(
+          RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
+        );
       }
-      const d = new Default();
-      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
-      expect(fd.year).toBe(2004);
-      expect(fd.month).toBe(1);
-      expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as RubyTime;
-      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
     });
   });
+
   it("default in utc with time zone", async () => {
-    await withTimezoneConfig({ default: "utc", zone: "America/Chicago" }, () => {
-      class Default extends Base {
-        static {
-          this.tableName = "defaults";
-          this.attribute("fixed_date", "date", { default: "2004-01-01" });
-          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
-        }
-      }
-      const d = new Default();
-      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
-      expect(fd.year).toBe(2004);
-      expect(fd.month).toBe(1);
-      expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as RubyTime;
-      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
-    });
-  });
-  it("connection in local time", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
-      class Default extends Base {
-        static {
-          this.tableName = "defaults";
-          this.attribute("fixed_date", "date", { default: "2004-01-01" });
-          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
-        }
-      }
-      const newConfig = {
-        ...Base.connectionDbConfig().configurationHash,
-        default_timezone: "local",
-      };
-      await Default.establishConnection(
-        newConfig as Parameters<typeof Default.establishConnection>[0],
-      );
-      cleanupConnections.push(() => Default.removeConnection());
+    await withTimezoneConfig({ default: "utc", zone: "Central Time (US & Canada)" }, () => {
+      const defaultRecord = new Default() as any;
 
-      const d = new Default();
-      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
-      expect(fd.year).toBe(2004);
-      expect(fd.month).toBe(1);
-      expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as RubyTime;
-      expect(ft).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0));
-    });
-  });
-  it("connection in utc time", async () => {
-    await withTimezoneConfig({ default: "local" }, async () => {
-      class Default extends Base {
-        static {
-          this.tableName = "defaults";
-          this.attribute("fixed_date", "date", { default: "2004-01-01" });
-          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
-        }
-      }
-      const newConfig = {
-        ...Base.connectionDbConfig().configurationHash,
-        default_timezone: "utc",
-      };
-      await Default.establishConnection(
-        newConfig as Parameters<typeof Default.establishConnection>[0],
-      );
-      cleanupConnections.push(() => Default.removeConnection());
+      expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
+      expect(defaultRecord.fixed_time).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0, 0));
 
-      const d = new Default();
-      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
-      expect(fd.year).toBe(2004);
-      expect(fd.month).toBe(1);
-      expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as RubyTime;
-      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
+      if (adapterType === "postgres") {
+        expect(defaultRecord.fixed_time_with_time_zone).toEqual(
+          RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
+        );
+      }
     });
   });
-  it("column name properly quoted", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.where({ name: "test" }).toSql();
-    expect(sql).toContain(quoteColumnName("name"));
+
+  it("auto id", async () => {
+    const auto = new AutoId() as any;
+    await auto.save();
+    assert(auto.id > 0);
   });
+
+  it("sql injection via find", async () => {
+    await assertRaises([RecordNotFound, StatementInvalid], {}, () =>
+      Topic.find("123456 OR id > 0"),
+    );
+  });
+
+  it("column name properly quoted", async () => {
+    const colRecord = new ColumnName() as any;
+    colRecord.references = 40;
+    assert(await colRecord.save());
+    colRecord.references = 41;
+    assert(await colRecord.save());
+    const c2 = (await ColumnName.find(colRecord.id)) as any;
+    expect(c2).not.toBeNull();
+    expect(c2.references).toEqual(41);
+  });
+
   it("quoting arrays", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const r1 = await Topic.create({ title: "first" });
-    const r2 = await Topic.create({ title: "second" });
-    await Topic.create({ title: "third" });
-    const results = await Topic.where({ id: [r1.id, r2.id] });
-    expect(results).toHaveLength(2);
-    const emptyResults = await Topic.where({ id: [] });
-    expect(emptyResults).toHaveLength(0);
+    const first = (await topics("first")) as any;
+    const firstReplies = await first.replies.toArray();
+    let replies = await Reply.all().mergeBang({
+      where: ["id IN (?)", firstReplies.map((r: any) => r.id)],
+    });
+    expect(replies.length).toEqual(await first.replies.size());
+
+    replies = await Reply.all().mergeBang({ where: ["id IN (?)", []] });
+    expect(replies.length).toEqual(0);
   });
+
+  it("quote", async () => {
+    const authorName = "\\ \u0001 ' \n \\n \"";
+    const topic = (await Topic.create({ author_name: authorName })) as any;
+    expect(((await Topic.find(topic.id)) as any).author_name).toEqual(authorName);
+  });
+
+  it("toggle attribute", async () => {
+    assertNotPredicate(await topics("first"), (t: any) => t["approved?"]);
+    await ((await topics("first")) as any).toggleBang("approved");
+    assertPredicate(await topics("first"), (t: any) => t["approved?"]);
+    const topic = (await topics("first")) as any;
+    topic.toggle("approved");
+    assertNotPredicate(topic, (t: any) => t["approved?"]);
+    await topic.reload();
+    assertPredicate(topic, (t: any) => t["approved?"]);
+  });
+
+  it("reload", async () => {
+    const t1 = (await Topic.find(1)) as any;
+    const t2 = (await Topic.find(1)) as any;
+    t1.title = "something else";
+    await t1.save();
+    await t2.reload();
+    expect(t2.title).toEqual(t1.title);
+  });
+
+  it("switching between table name", async () => {
+    const k = class extends Joke {};
+
+    await assertDifference(
+      new Map([[() => GoodJoke.count() as Promise<number>, 1]]),
+      null,
+      async () => {
+        k.tableName = "cold_jokes";
+        await k.create();
+
+        k.tableName = "funny_jokes";
+        await k.create();
+      },
+    );
+  });
+
+  it("clear cache when setting table name", async () => {
+    const originalTableName = Joke.tableName;
+    try {
+      Joke.tableName = "funny_jokes";
+      const beforeColumns = await Joke.columns();
+      const beforeSeq = Joke.sequenceName;
+
+      Joke.tableName = "cold_jokes";
+      const afterColumns = await Joke.columns();
+      const afterSeq = Joke.sequenceName;
+
+      expect(afterColumns).not.toEqual(beforeColumns);
+      if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).not.toEqual(beforeSeq);
+    } finally {
+      Joke.tableName = originalTableName;
+    }
+  });
+
   it("dont clear sequence name when setting explicitly", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.sequenceName = "my_seq";
-      }
-    }
-    expect(User.sequenceName).toBe("my_seq");
-    User.tableName = "people";
-    expect(User.sequenceName).toBe("my_seq");
+    const k = class extends Joke {};
+    k.sequenceName = "black_jokes_seq";
+    k.tableName = "cold_jokes";
+    const beforeSeq = k.sequenceName;
+
+    k.tableName = "funny_jokes";
+    const afterSeq = k.sequenceName;
+
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' trailing `unless before_seq.nil? && after_seq.nil?` (base_test.rb:1322)
+    if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).toEqual(beforeSeq);
   });
+
+  it("dont clear inheritance column when setting explicitly", () => {
+    const k = class extends Joke {};
+    k.inheritanceColumn = "my_type";
+    const beforeInherit = k.inheritanceColumn;
+
+    void k.resetColumnInformation();
+    const afterInherit = k.inheritanceColumn;
+
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' trailing `unless before_inherit.blank? && after_inherit.blank?` (base_test.rb:1333)
+    if (!(!beforeInherit && !afterInherit)) expect(afterInherit).toEqual(beforeInherit);
+  });
+
   it("set table name symbol converted to string", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.tableName = "custom_table";
-      }
-    }
-    expect(typeof User.tableName).toBe("string");
-    expect(User.tableName).toBe("custom_table");
+    const k = class extends Joke {};
+    k.tableName = "cold_jokes";
+    expect(k.tableName).toEqual("cold_jokes");
   });
+
+  it("quoted table name after set table name", () => {
+    const klass = class extends Base {};
+
+    klass.tableName = "foo";
+    expect(klass.tableName).toEqual("foo");
+    expect(klass.quotedTableName()).toEqual(
+      (klass.adapterClassSync() as any).quoteTableName("foo"),
+    );
+
+    klass.tableName = "bar";
+    expect(klass.tableName).toEqual("bar");
+    expect(klass.quotedTableName()).toEqual(
+      (klass.adapterClassSync() as any).quoteTableName("bar"),
+    );
+  });
+
   it("set table name with inheritance", () => {
     class k extends Base {
       static get tableName(): string {
@@ -1420,6 +1419,7 @@ describe("BasicsTest", () => {
     Object.defineProperty(k, "name", { value: "Foo" });
     expect(k.tableName).toBe("foosks");
   });
+
   it("sequence name with abstract class", () => {
     class AbstractModel extends Base {
       static {
@@ -1429,6 +1429,7 @@ describe("BasicsTest", () => {
     class ConcreteModel extends AbstractModel {}
     expect(ConcreteModel.sequenceName).toBe("concrete_models_id_seq");
   });
+
   it("sequence name for cpk model", () => {
     class CpkModel extends Base {
       static {
@@ -1437,73 +1438,157 @@ describe("BasicsTest", () => {
     }
     expect(CpkModel.sequenceName).toBeNull();
   });
+
+  const QUOTED_TYPE = () => (Base.connection as any).quoteColumnName("type");
+
+  it("count with join", async () => {
+    const res = await Post.countBySql(
+      `SELECT COUNT(*) FROM posts LEFT JOIN comments ON posts.id=comments.post_id WHERE posts.${QUOTED_TYPE()} = 'Post'`,
+    );
+    const res2 = await Post.where(`posts.${QUOTED_TYPE()} = 'Post'`)
+      .joins("LEFT JOIN comments ON posts.id=comments.post_id")
+      .count();
+    expect(res2).toEqual(res);
+
+    const res4 = await Post.countBySql(
+      `SELECT COUNT(p.id) FROM posts p, comments co WHERE p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
+    );
+    const res5 = await Post.where(`p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
+      .joins("p, comments co")
+      .select("p.id")
+      .count();
+    expect(res5).toEqual(res4);
+
+    const res6 = await Post.countBySql(
+      `SELECT COUNT(DISTINCT p.id) FROM posts p, comments co WHERE p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
+    );
+    const res7 = await Post.where(`p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
+      .joins("p, comments co")
+      .select("p.id")
+      .distinct()
+      .count();
+    expect(res7).toEqual(res6);
+  });
+
+  it("no limit offset", async () => {
+    await assertNothingRaised(() => Developer.all().mergeBang({ offset: 2 }).toArray());
+  });
+
+  it("all", async () => {
+    const developersRel = Developer.all();
+    expect(developersRel).toBeInstanceOf(Relation);
+    expect(await developersRel).toEqual(await Developer.all());
+  });
+
+  it("all with conditions", async () => {
+    expect(await Developer.order("id desc")).toEqual(
+      await Developer.all().mergeBang({ order: "id desc" }),
+    );
+  });
+
+  it("find ordered last", async () => {
+    const last = await Developer.order("developers.salary ASC").last();
+    expect((await Developer.order({ "developers.salary": "ASC" })).at(-1)).toEqual(last);
+  });
+
+  it("find reverse ordered last", async () => {
+    const last = await Developer.order("developers.salary DESC").last();
+    expect((await Developer.order({ "developers.salary": "DESC" })).at(-1)).toEqual(last);
+  });
+
   it("find multiple ordered last", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "a" });
-    await User.create({ name: "b" });
-    await User.create({ name: "c" });
-    const lastTwo = await User.last(2);
-    expect(Array.isArray(lastTwo)).toBe(true);
-    expect((lastTwo as any[]).length).toBe(2);
+    const last = await Developer.order("developers.name, developers.salary DESC").last();
+    expect(
+      (await Developer.order("developers.name", { "developers.salary": "DESC" })).at(-1),
+    ).toEqual(last);
   });
-  it("find on abstract base class doesnt use type condition", () => {
-    class ApplicationRecord extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class Post extends ApplicationRecord {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().toSql();
-    expect(sql).not.toContain("type");
+
+  it("find keeps multiple order values", async () => {
+    const combined = await Developer.order("developers.name, developers.salary");
+    expect(await Developer.order("developers.name", "developers.salary")).toEqual(combined);
   });
+
+  it("find keeps multiple group values", async () => {
+    const combined = await (Developer.all() as any)
+      .merge({
+        group:
+          "developers.name, developers.salary, developers.id, developers.legacy_created_at, developers.legacy_updated_at, developers.legacy_created_on, developers.legacy_updated_on",
+      })
+      .toArray();
+    expect(
+      await (Developer.all() as any)
+        .merge({
+          group: [
+            "developers.name",
+            "developers.salary",
+            "developers.id",
+            "developers.created_at",
+            "developers.updated_at",
+            "developers.created_on",
+            "developers.updated_on",
+          ],
+        })
+        .toArray(),
+    ).toEqual(combined);
+  });
+
+  it("find symbol ordered last", async () => {
+    const last = await Developer.all().mergeBang({ order: "salary" }).last();
+    expect((await Developer.all().mergeBang({ order: "salary" })).at(-1)).toEqual(last);
+  });
+
+  it("abstract class table name", () => {
+    expect(AbstractCompany.tableName).toBeNull();
+  });
+
+  it("find on abstract base class doesnt use type condition", async () => {
+    const descendant = (await LooseDescendant.createBang({ first_name: "bob" } as any)) as any;
+    expect(
+      await LoosePerson.find(descendant.id),
+      `Should have found instance of LooseDescendant when finding abstract LoosePerson: ${descendant.inspect()}`,
+    ).not.toBeNull();
+  });
+
   it("assert queries count", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    let count = 0;
-    const sub = Notifications.subscribe("sql.active_record", () => {
-      count++;
+    const query = () => (Base.connection as any).execute("select count(*) from developers");
+    await assertQueriesCount(2, false, async () => {
+      for (let i = 0; i < 2; i++) await query();
     });
+    await assertQueriesCount(1, false, query);
+    await assertNoQueries(false, () => {
+      assert(true);
+    });
+  });
+
+  it("benchmark with log level", async () => {
+    const originalLogger = Base.logger;
+    const log: string[] = [];
     try {
-      await Topic.count();
-      await Topic.count();
+      Base.logger = new Logger({ write: (s: string) => log.push(s) }) as any;
+      (Base.logger as any).level = Logger.WARN;
+      await Base.benchmark("Debug Topic Count", { level: "debug" }, () => Topic.count());
+      await Base.benchmark("Warn Topic Count", { level: "warn" }, () => Topic.count());
+      await Base.benchmark("Error Topic Count", { level: "error" }, () => Topic.count());
+      expect(log.join("")).not.toMatch(/Debug Topic Count/);
+      expect(log.join("")).toMatch(/Warn Topic Count/);
+      expect(log.join("")).toMatch(/Error Topic Count/);
     } finally {
-      Notifications.unsubscribe(sub);
+      Base.logger = originalLogger;
     }
-    expect(count).toBe(2);
   });
 
   it("benchmark with use silence", async () => {
+    const originalLogger = Base.logger;
     const log: string[] = [];
-    const savedLogger = Base.logger;
-    const logger = new Logger({ write: (s: string) => log.push(s) });
-    logger.level = Logger.DEBUG;
-    Base.logger = logger as any;
     try {
+      Base.logger = new Logger({ write: (s: string) => log.push(s) }) as any;
+      (Base.logger as any).level = Logger.DEBUG;
       await Base.benchmark("Logging", { level: "debug", silence: false }, () => {
         Base.logger?.debug?.("Quiet");
       });
-      expect(log.some((m) => m.includes("Quiet"))).toBe(true);
-      log.length = 0;
-      await Base.benchmark("Logging2", { level: "debug", silence: true }, () => {
-        Base.logger?.debug?.("Suppressed");
-      });
-      expect(log.some((m) => m.includes("Suppressed"))).toBe(false);
+      expect(log.join("")).toMatch(/Quiet/);
     } finally {
-      Base.logger = savedLogger;
+      Base.logger = originalLogger;
     }
   });
 
@@ -1523,91 +1608,186 @@ describe("BasicsTest", () => {
 
     await cache.addAll(conn.pool);
   });
-  it("attribute names on abstract class", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-        this.attribute("name", "string");
-      }
-    }
-    expect(AbstractModel.attributeNames()).toEqual([]);
+
+  it("has attribute", async () => {
+    await Company.loadSchema();
+    assert(Company.hasAttribute("id"));
+    assert(Company.hasAttribute("type"));
+    assert(Company.hasAttribute("name"));
+    assert(Company.hasAttribute("new_name"));
+    assert(Company.hasAttribute("metadata"));
+    assertNot(Company.hasAttribute("lastname"));
+    assertNot(Company.hasAttribute("age"));
+
+    const company = new Company() as any;
+    assert(company.hasAttribute("id"));
+    assert(company.hasAttribute("type"));
+    assert(company.hasAttribute("name"));
+    assert(company.hasAttribute("new_name"));
+    assert(company.hasAttribute("metadata"));
+    assertNot(company.hasAttribute("lastname"));
+    assertNot(company.hasAttribute("age"));
   });
+
+  it("has attribute with symbol", async () => {
+    await Company.loadSchema();
+    assert(Company.hasAttribute("id"));
+    assert(Company.hasAttribute("type"));
+    assert(Company.hasAttribute("name"));
+    assert(Company.hasAttribute("new_name"));
+    assert(Company.hasAttribute("metadata"));
+    assertNot(Company.hasAttribute("lastname"));
+    assertNot(Company.hasAttribute("age"));
+
+    const company = new Company() as any;
+    assert(company.hasAttribute("id"));
+    assert(company.hasAttribute("type"));
+    assert(company.hasAttribute("name"));
+    assert(company.hasAttribute("new_name"));
+    assert(company.hasAttribute("metadata"));
+    assertNot(company.hasAttribute("lastname"));
+    assertNot(company.hasAttribute("age"));
+  });
+
   it("attribute names on table not exists", () => {
-    class NonExistentTable extends Base {}
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
+
+  it("attribute names on abstract class", () => {
+    expect(AbstractCompany.attributeNames()).toEqual([]);
+  });
+
+  it("touch should raise error on a new object", async () => {
+    const company = new Company({ rating: 1, name: "37signals", firm_name: "37signals" } as any);
+    await assertRaises([ActiveRecordError], {}, () => company.touch("updated_at"));
+  });
+
+  it("distinct delegates to scoped", () => {
+    expect(Bird.distinct().toSql()).toEqual(Bird.all().distinct().toSql());
+  });
+
   it("table name with 2 abstract subclasses", () => {
-    class FirstAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class SecondAbstractClass extends FirstAbstractClass {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class Photo extends SecondAbstractClass {}
     expect(Photo.tableName).toBe("photos");
   });
-  it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
-    const pgAdapter = Base.connection;
-    const result = await pgAdapter.execQuery("SELECT 1 AS test");
-    expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
+
+  it("column types typecast", async () => {
+    let topic = (await Topic.first()) as any;
+    expect(topic.author_name).not.toBe("t.lo");
+
+    const attrs = { ...topic.attributes };
+    delete attrs.id;
+
+    class Typecast extends ValueType {
+      readonly name = "typecast";
+      cast() {
+        return "t.lo";
+      }
+    }
+
+    const types = { author_name: new Typecast() };
+    topic = Topic.instantiate(attrs, types);
+
+    expect(topic.author_name).toBe("t.lo");
   });
+
+  it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
+    const result = await (Base.connection as any).execQuery("SELECT 1 AS test");
+    expect(result.columnTypes["test"].constructor).toEqual(IntegerType);
+  });
+
+  it("typecasting aliases", async () => {
+    const topic = await Topic.select("10 as tenderlove").first();
+    expect((topic as any).tenderlove).toBe(10);
+  });
+
+  it("default values are deeply dupped", () => {
+    const company = new Company() as any;
+    company.description += "foo";
+    expect((new Company() as any).description).toEqual("");
+  });
+
+  it("scoped can take a values hash", () => {
+    const klass = class extends Base {};
+    klass.tableName = "bar";
+    expect(klass.all().mergeBang({ select: "foo" }).selectValues).toEqual(["foo"]);
+  });
+
+  it("records without an id have unique hashes", () => {
+    expect(new Post().hash()).not.toEqual(new Post().hash());
+  });
+
+  it("records of different classes have different hashes", () => {
+    expect(new Post({ id: 1 } as any).hash()).not.toEqual(new Developer({ id: 1 } as any).hash());
+  });
+
+  it("resetting column information doesn't remove attribute methods", async () => {
+    const topic = (await topics("first")) as any;
+
+    assertNotPredicate(topic, (t: any) => t.idChanged());
+
+    void Topic.resetColumnInformation();
+
+    assertNotPredicate(topic, (t: any) => t.idChanged());
+  });
+
   it("ignored columns are not present in columns_hash", async () => {
     const conn = Base.connection;
-    const cacheColumns = await conn.internalSchemaCache.columnsHash(
-      conn.pool,
-      CanonicalDeveloper.tableName,
-    );
+    const cacheColumns = await conn.internalSchemaCache.columnsHash(conn.pool, Developer.tableName);
     expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
-    expect(Object.keys(CanonicalDeveloper.columnsHash())).not.toContain("first_name");
+    expect(Object.keys(Developer.columnsHash())).not.toContain("first_name");
     expect(Object.keys(SubDeveloper.columnsHash())).not.toContain("first_name");
     expect(Object.keys(SymbolIgnoredDeveloper.columnsHash())).not.toContain("first_name");
   });
-  it(".columns_hash raises an error if the record has an empty table name", () => {
-    class FirstAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
+
+  it(".columns_hash raises an error if the record has an empty table name", async () => {
     const expectedMessage =
       "FirstAbstractClass has no table configured. Set one with FirstAbstractClass.table_name=";
-    expect(() => FirstAbstractClass.columnsHash()).toThrow(TableNotSpecified);
-    expect(() => FirstAbstractClass.columnsHash()).toThrow(expectedMessage);
+    const exception = await assertRaises([TableNotSpecified], {}, () =>
+      FirstAbstractClass.columnsHash(),
+    );
+    expect(exception.message).toEqual(expectedMessage);
   });
+
   it("ignored columns have no attribute methods", () => {
-    class Developer extends Base {
-      static {
-        this.ignoredColumns = ["first_name"];
-      }
-    }
-    expect(Developer.columnNames()).not.toContain("first_name");
-    expect(Developer.columnNames()).toContain("salary");
-    const u = new Developer();
-    expect("salary" in u).toBe(true);
-    expect("first_name" in u).toBe(false);
+    assertNotRespondTo(new Developer(), "first_name");
+    assertNotRespondTo(new Developer(), "first_name=");
+    assertNotRespondTo(new Developer(), "first_name?");
+    assertNotRespondTo(new SubDeveloper(), "first_name");
+    assertNotRespondTo(new SubDeveloper(), "first_name=");
+    assertNotRespondTo(new SubDeveloper(), "first_name?");
+    assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name");
+    assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name=");
+    assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name?");
   });
+
+  it("ignored columns don't prevent explicit declaration of attribute methods", () => {
+    assertRespondTo(new Developer(), "last_name");
+    assertRespondTo(new Developer(), "last_name=");
+    assertRespondTo(new Developer(), "last_name?");
+    assertRespondTo(new SubDeveloper(), "last_name");
+    assertRespondTo(new SubDeveloper(), "last_name=");
+    assertRespondTo(new SubDeveloper(), "last_name?");
+    assertRespondTo(new SymbolIgnoredDeveloper(), "last_name");
+    assertRespondTo(new SymbolIgnoredDeveloper(), "last_name=");
+    assertRespondTo(new SymbolIgnoredDeveloper(), "last_name?");
+  });
+
   it("ignored columns are stored as an array of string", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.ignoredColumns = ["col1", "col2"];
-      }
-    }
-    expect(Array.isArray(User.ignoredColumns)).toBe(true);
-    expect(User.ignoredColumns).toEqual(["col1", "col2"]);
+    expect(Developer.ignoredColumns).toEqual(["first_name", "last_name"]);
+    expect(SymbolIgnoredDeveloper.ignoredColumns).toEqual(["first_name", "last_name"]);
   });
+
   it("when #reload called, ignored columns' attribute methods are not defined", async () => {
-    const developer = await CanonicalDeveloper.create({ name: "Developer" });
-    expect("first_name" in developer).toBe(false);
+    const developer = await Developer.createBang({ name: "Developer" });
+    assertNotRespondTo(developer, "first_name");
+    assertNotRespondTo(developer, "first_name=");
 
     await developer.reload();
 
-    expect("first_name" in developer).toBe(false);
+    assertNotRespondTo(developer, "first_name");
+    assertNotRespondTo(developer, "first_name=");
   });
+
   it("when ignored attribute is loaded, cast type should be preferred over DB type", async () => {
     const developer = await AttributedDeveloper.create();
     await developer.updateColumn("name", "name");
@@ -1617,548 +1797,221 @@ describe("BasicsTest", () => {
       .first();
     expect(loadedDeveloper!.name).toBe("Developer: name");
   });
+
   it("when assigning new ignored columns it invalidates cache for column names", () => {
-    class Developer extends Base {
-      static {
-        this._tableName = "developers";
-      }
-    }
-    expect(Developer.columnNames()).toContain("first_name");
-    Developer.ignoredColumns = ["first_name"];
-    expect(Developer.columnNames()).not.toContain("first_name");
-    Developer.ignoredColumns = ["first_name", "salary"];
-    expect(Developer.columnNames()).not.toContain("salary");
+    expect(ColumnNamesCachedDeveloper.columnNames()).not.toContain("name");
   });
+
+  it("ignored columns not included in SELECT", () => {
+    const query = Developer.all().toSql().toLowerCase();
+
+    assertNot(query.includes("first_name"));
+
+    assert(query.includes("name"));
+  });
+
   it("column names are quoted when using #from clause and model has ignored columns", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
-      }
-    }
-    const sql = User.from("users").toSql();
-    expect(sql).not.toContain("secret");
+    assertNotEmpty(Developer.ignoredColumns);
+    const query = Developer.from("developers").toSql();
+    const quotedId = `${Developer.quotedTableName()}.${Developer.quotedPrimaryKey()}`;
+
+    expect(query).toMatch(
+      new RegExp(`SELECT ${quotedId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.* FROM developers`),
+    );
   });
-  it("using table name qualified column names unless having SELECT list explicitly", () => {
-    class Developer extends Base {
-      static {
-        this.ignoredColumns = ["first_name"];
-      }
-    }
-    const sql = Developer.all().toSql();
-    expect(sql).not.toContain("first_name");
-    expect(sql).toContain("salary");
+
+  it("using table name qualified column names unless having SELECT list explicitly", async () => {
+    expect(await Developer.from("developers").joins(":sharedComputers").take()).toEqual(
+      await developers("david"),
+    );
   });
+
   it("protected environments by default is an array with production", () => {
     expect(Base.protectedEnvironments).toEqual(["production"]);
   });
+
   it("protected environments are stored as an array of string", () => {
-    const original = Base.protectedEnvironments;
+    const previousProtectedEnvironments = Base.protectedEnvironments;
     try {
-      Base.protectedEnvironments = ["production", "staging"];
-      expect(Base.protectedEnvironments).toEqual(["production", "staging"]);
+      Base.protectedEnvironments = ["staging", "production"];
+      expect(Base.protectedEnvironments).toEqual(["staging", "production"]);
     } finally {
-      Base.protectedEnvironments = original;
+      Base.protectedEnvironments = previousProtectedEnvironments;
     }
   });
+
+  it("#present? and #blank? on ActiveRecord::Base classes", async () => {
+    const { isPresent, isBlank } = await import("@blazetrails/activesupport");
+    assertNotEmpty(await Topic.all());
+    await assertNoQueries(false, () => {
+      assertPredicate(Topic, (t) => isPresent(t));
+      assertNot(isBlank(Topic));
+    });
+
+    await Topic.deleteAll();
+    await assertNoQueries(false, () => {
+      assertPredicate(Topic, (t) => isPresent(t));
+      assertNot(isBlank(Topic));
+    });
+  });
+
   it("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", async () => {
-    class Bird extends Base {}
-    await expect(Bird.connectsTo({ database: { writing: "arunit" } })).rejects.toThrow(
-      NotImplementedError,
+    const error = await assertRaises([NotImplementedError], {}, () =>
+      Bird.connectsTo({ database: { writing: "arunit" } }),
     );
-    await expect(Bird.connectsTo({ database: { writing: "arunit" } })).rejects.toThrow(
+
+    expect(error.message).toEqual(
       "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
     );
   });
-  it("cannot call connected_to with role and shard on non-abstract classes", () => {
-    class Bird extends Base {}
-    expect(() => Bird.connectedTo({ role: "reading", shard: "default" }, () => {})).toThrow(
-      NotImplementedError,
+
+  it("cannot call connected_to with role and shard on non-abstract classes", async () => {
+    const error = await assertRaises([NotImplementedError], {}, () =>
+      Bird.connectedTo({ role: "reading", shard: "default" }, () => {}),
     );
-    expect(() => Bird.connectedTo({ role: "reading", shard: "default" }, () => {})).toThrow(
+
+    expect(error.message).toEqual(
       "calling `connected_to` is only allowed on ActiveRecord::Base or abstract classes.",
     );
   });
+
   it("can call connected_to with role and shard on abstract classes", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     SecondAbstractClass.connectedTo({ role: "reading", shard: "default" }, () => {
-      expect(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+      assert(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" }));
     });
   });
-  it("cannot call connected_to on the abstract class that did not establish the connection", () => {
-    class ThirdAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    expect(() => ThirdAbstractClass.connectedTo({ role: "reading" }, () => {})).toThrow(
-      NotImplementedError,
+
+  it("cannot call connected_to on the abstract class that did not establish the connection", async () => {
+    const error = await assertRaises([NotImplementedError], {}, () =>
+      ThirdAbstractClass.connectedTo({ role: "reading" }, () => {}),
     );
-    expect(() => ThirdAbstractClass.connectedTo({ role: "reading" }, () => {})).toThrow(
+
+    expect(error.message).toEqual(
       "calling `connected_to` is only allowed on the abstract class that established the connection.",
     );
   });
+
   it("#connecting_to with role", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
-    SecondAbstractClass.connectingTo({ role: "reading" });
     try {
-      expect(SecondAbstractClass.connectedToQ({ role: "reading" })).toBe(true);
-      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+      SecondAbstractClass.connectingTo({ role: "reading" });
+
+      assert(SecondAbstractClass.connectedToQ({ role: "reading" }));
+      assert(SecondAbstractClass.currentPreventingWrites());
     } finally {
       connectedToStack().pop();
     }
   });
+
   it("#connecting_to with role and shard", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
-    SecondAbstractClass.connectingTo({ role: "reading", shard: "default" });
     try {
-      expect(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+      SecondAbstractClass.connectingTo({ role: "reading", shard: "default" });
+
+      assert(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" }));
     } finally {
       connectedToStack().pop();
     }
   });
+
   it("#connecting_to with prevent_writes", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
-    SecondAbstractClass.connectingTo({ role: "writing", preventWrites: true });
     try {
-      expect(SecondAbstractClass.connectedToQ({ role: "writing" })).toBe(true);
-      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+      SecondAbstractClass.connectingTo({ role: "writing", preventWrites: true });
+
+      assert(SecondAbstractClass.connectedToQ({ role: "writing" }));
+      assert(SecondAbstractClass.currentPreventingWrites());
     } finally {
       connectedToStack().pop();
     }
   });
+
   it("#connected_to_many cannot be called on anything but ActiveRecord::Base", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     expect(() =>
       SecondAbstractClass.connectedToMany([SecondAbstractClass], { role: "writing" }, () => {}),
     ).toThrow(NotImplementedError);
   });
+
   it("#connected_to_many cannot be called with classes that include ActiveRecord::Base", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     expect(() => Base.connectedToMany([Base], { role: "writing" }, () => {})).toThrow(
       NotImplementedError,
     );
   });
+
   it("#connected_to_many sets prevent_writes if role is reading", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     Base.connectedToMany([SecondAbstractClass], { role: "reading" }, () => {
-      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
-      expect(Base.currentPreventingWrites()).toBe(false);
+      assert(SecondAbstractClass.currentPreventingWrites());
+      assertNot(Base.currentPreventingWrites());
     });
   });
+
   it("#connected_to_many with a single argument for classes", () => {
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     Base.connectedToMany(SecondAbstractClass, { role: "reading" }, () => {
-      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
-      expect(Base.currentPreventingWrites()).toBe(false);
+      assert(SecondAbstractClass.currentPreventingWrites());
+      assertNot(Base.currentPreventingWrites());
     });
   });
+
   it("#connected_to_many with a multiple classes without brackets works", () => {
-    class FirstAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
-    class SecondAbstractClass extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
     Base.connectedToMany(FirstAbstractClass, SecondAbstractClass, { role: "reading" }, () => {
-      expect(FirstAbstractClass.currentPreventingWrites()).toBe(true);
-      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
-      expect(Base.currentPreventingWrites()).toBe(false);
+      assert(FirstAbstractClass.currentPreventingWrites());
+      assert(SecondAbstractClass.currentPreventingWrites());
+      assertNot(Base.currentPreventingWrites());
     });
   });
-  it("singular table name guesses", () => {
-    class Mouse extends Base {}
-    expect(Mouse.tableName).toBe("mice");
-  });
-  it("default values", () => {
-    class Widget extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string", { default: "unnamed" });
-      }
-    }
-    const w = new Widget();
-    expect(w.name).toBe("unnamed");
-  });
-  it("quote", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.where({ name: "test" }).toSql();
-    expect(sql).toContain("name");
-    expect(sql).toContain("test");
-  });
-
-  it("toggle attribute", async () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("active", "boolean", { default: false });
-      }
-    }
-    const u = await User.create({ active: false });
-    u.toggle("active");
-    expect(u.active).toBe(true);
-  });
-
-  it("has attribute with symbol", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(User.hasAttribute("name")).toBe(true);
-    expect(User.hasAttribute("nonexistent")).toBe(false);
-  });
-
-  it("no limit offset", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = User.all().toSql();
-    expect(sql).not.toContain("LIMIT");
-    expect(sql).not.toContain("OFFSET");
-  });
-
-  function makeTopic() {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("approved", "boolean");
-        this.attribute("written_on", "date");
-      }
-    }
-    return Topic;
-  }
-
-  it("new record returns boolean", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "New" });
-    expect(t.isNewRecord()).toBe(true);
-    await t.save();
-    expect(t.isNewRecord()).toBe(false);
-  });
-
-  it("load", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    await Topic.create({ title: "Two" });
-    const all = await Topic.all();
-    expect(all.length).toBe(2);
-  });
-
-  it("all with conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A", approved: true });
-    await Topic.create({ title: "B", approved: false });
-    const approved = await Topic.where({ approved: true });
-    expect(approved.length).toBe(1);
-  });
-
-  it("find ordered last", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "First" });
-    const second = await Topic.create({ title: "Second" });
-    const last = await Topic.order("id").last();
-    expect(last!.id).toBe(second.id);
-  });
-
-  it("count with join", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Join" });
-    const count = await Topic.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
-  it("find keeps multiple order values", async () => {
-    const Topic = makeTopic();
-    const sql = Topic.order("title").order("author_name").toSql();
-    expect(sql).toMatch(/ORDER BY/i);
-  });
-
-  it("benchmark with log level", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const log: string[] = [];
-    const savedLogger = Base.logger;
-    const logger = new Logger({ write: (s: string) => log.push(s) });
-    logger.level = Logger.WARN;
-    Base.logger = logger;
-    try {
-      await Base.benchmark("Debug Topic Count", { level: "debug" }, () => Topic.count());
-      await Base.benchmark("Warn Topic Count", { level: "warn" }, () => Topic.count());
-      await Base.benchmark("Error Topic Count", { level: "error" }, () => Topic.count());
-    } finally {
-      Base.logger = savedLogger;
-    }
-    expect(log.some((m) => m.includes("Debug Topic Count"))).toBe(false);
-    expect(log.some((m) => m.includes("Warn Topic Count"))).toBe(true);
-    expect(log.some((m) => m.includes("Error Topic Count"))).toBe(true);
-  });
 });
 
 describe("BasicsTest", () => {
-  fixtures([]);
-
-  class PostInner extends Base {
-    declare title: string;
-    static {
-      this.tableName = "topics";
-      this.attribute("title", "string");
-    }
-  }
-  const Post = PostInner;
-
-  it("attributes", async () => {
-    const p = new Post({ title: "hello" });
-    expect(p.title).toBe("hello");
+  const cleanupConnections: Array<() => unknown> = [];
+  afterEach(async () => {
+    while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
-  it("clone of new object with defaults", () => {
-    class Item extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string", { default: "default" });
+  it.skipIf(inMemoryDb())("connection in local time", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      await Default.loadSchema();
+      const newConfig = {
+        ...Base.connectionDbConfig().configurationHash,
+        default_timezone: "local",
+      };
+      await Default.establishConnection(
+        newConfig as Parameters<typeof Default.establishConnection>[0],
+      );
+      cleanupConnections.push(() => Default.removeConnection());
+
+      const defaultRecord = new Default() as any;
+
+      expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
+      expect(defaultRecord.fixed_time).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0, 0));
+
+      if (adapterType === "postgres") {
+        expect(defaultRecord.fixed_time_with_time_zone).toEqual(
+          RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
+        );
       }
-    }
-    const i = new Item();
-    const c = i.dup();
-    expect(c.name).toBe("default");
+    });
   });
 
-  it("clone of new object marks attributes as dirty", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
+  it.skipIf(inMemoryDb())("connection in utc time", async () => {
+    await withTimezoneConfig({ default: "local" }, async () => {
+      await Default.loadSchema();
+      const newConfig = {
+        ...Base.connectionDbConfig().configurationHash,
+        default_timezone: "utc",
+      };
+      await Default.establishConnection(
+        newConfig as Parameters<typeof Default.establishConnection>[0],
+      );
+      cleanupConnections.push(() => Default.removeConnection());
+
+      const defaultRecord = new Default() as any;
+
+      expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
+      expect(defaultRecord.fixed_time).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0, 0));
+
+      if (adapterType === "postgres") {
+        expect(defaultRecord.fixed_time_with_time_zone).toEqual(
+          RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
+        );
       }
-    }
-    const i = new Item({ name: "test" });
-    const c = i.dup();
-    expect(c.isNewRecord()).toBe(true);
-  });
-
-  it("dup of saved object marks attributes as dirty", async () => {
-    const p = await Post.create({ title: "saved" });
-    const d = p.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("has attribute", async () => {
-    await CanonicalCompany.loadSchema();
-    expect(CanonicalCompany.hasAttribute("id")).toBe(true);
-    expect(CanonicalCompany.hasAttribute("type")).toBe(true);
-    expect(CanonicalCompany.hasAttribute("name")).toBe(true);
-    expect(CanonicalCompany.hasAttribute("new_name")).toBe(true);
-    expect(CanonicalCompany.hasAttribute("metadata")).toBe(true);
-    expect(CanonicalCompany.hasAttribute("lastname")).toBe(false);
-    expect(CanonicalCompany.hasAttribute("age")).toBe(false);
-
-    const company = CanonicalCompany.new();
-    expect(company.hasAttribute("id")).toBe(true);
-    expect(company.hasAttribute("type")).toBe(true);
-    expect(company.hasAttribute("name")).toBe(true);
-    expect(company.hasAttribute("new_name")).toBe(true);
-    expect(company.hasAttribute("metadata")).toBe(true);
-    expect(company.hasAttribute("lastname")).toBe(false);
-    expect(company.hasAttribute("age")).toBe(false);
-  });
-
-  it("clear cache when setting table name", () => {
-    class MyModel extends Base {}
-    MyModel.tableName = "my_table";
-    expect(MyModel.tableName).toBe("my_table");
-  });
-
-  it("touch should raise error on a new object", async () => {
-    const p = new Post({ title: "unsaved" });
-    await expect(p.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
-  });
-
-  it("default values are deeply dupped", () => {
-    class M extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string", { default: "val" });
-      }
-    }
-    const a = new M();
-    const b = new M();
-    expect(a.name).toBe("val");
-    expect(b.name).toBe("val");
-  });
-
-  it("records of different classes have different hashes", () => {
-    class A extends Base {}
-    class B extends Base {}
-    const a = new A();
-    const b = new B();
-    expect(a.equals(b as any)).toBe(false);
-  });
-
-  it("dup with aggregate of same name as attribute", async () => {
-    const p = await Post.create({ title: "orig" });
-    const d = p.dup();
-    expect(d.title).toBe("orig");
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("clone of new object marks as dirty only changed attributes", () => {
-    const p = new Post({ title: "t" });
-    const d = p.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup of saved object marks as dirty only changed attributes", async () => {
-    const p = await Post.create({ title: "saved" });
-    const d = p.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("sql injection via find", async () => {
-    await expect(Post.find("1 OR 1=1" as any)).rejects.toThrow();
-  });
-
-  it("unicode column name", async () => {
-    class Weird extends Base {}
-    const weird = await Weird.create({ なまえ: "たこ焼き仮面" });
-    expect((weird as any).なまえ).toBe("たこ焼き仮面");
-  });
-});
-
-describe("BasicsTest", () => {
-  fixtures([]);
-
-  it("table name guesses", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-    }
-    expect(User.tableName).toBe("users");
-  });
-
-  it("reload", async () => {
-    class Topic extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const u = await Topic.create({ title: "Original" });
-    const u2 = await Topic.find(u.id);
-    await u2.update({ title: "Modified" });
-
-    expect(u.title).toBe("Original");
-    await u.reload();
-    expect(u.title).toBe("Modified");
-  });
-  it("table name guesses with prefixes and suffixes", () => {
-    class User extends Base {
-      declare active: boolean;
-      declare name: string;
-      static {
-        this.tableNamePrefix = "app_";
-      }
-    }
-    expect(User.tableName).toBe("app_users");
-  });
-});
-
-describe("BasicsTest", () => {
-  fixtures(["companies", "topics"]);
-
-  it("initialize with invalid attribute", () => {
-    let ex: MultiparameterAssignmentErrors | undefined;
-    try {
-      new CanonicalTopic({
-        title: "test",
-        "written_on(4i)": "16",
-        "written_on(5i)": "24",
-        "written_on(6i)": "00",
-      } as never);
-    } catch (e) {
-      ex = e as MultiparameterAssignmentErrors;
-    }
-    expect(ex).toBeInstanceOf(MultiparameterAssignmentErrors);
-    expect(ex!.errors.length).toBe(1);
-    expect((ex!.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
-  });
-
-  it("typecasting aliases", async () => {
-    const topic = await CanonicalTopic.select("10 as tenderlove").first();
-    expect((topic as any).tenderlove).toBe(10);
-  });
-
-  it("bignum", async () => {
-    let company = await CanonicalCompany.find(1);
-    (company as any).rating = 2147483648;
-    await company.save();
-    company = await CanonicalCompany.find(1);
-    expect((company as any).rating).toBe(2147483648);
+    });
   });
 });
 

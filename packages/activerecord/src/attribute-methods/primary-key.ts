@@ -1,9 +1,9 @@
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { foreignKey } from "@blazetrails/activesupport";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
 } from "../attribute-methods.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
 
@@ -234,13 +234,8 @@ export function isDangerousAttributeMethod(this: PrimaryKeyHost, methodName: str
   return dangerousAttributeMethods().has(methodName) && !ID_ATTRIBUTE_METHODS.has(methodName);
 }
 
-export function quotedPrimaryKey(this: PrimaryKeyHost & { connection?: DatabaseAdapter }): string {
-  const primaryKey = this.primaryKey;
-  const quoter = this.connection;
-  const fallback = (k: string) => `"${k.replace(/"/g, '""')}"`;
-  if (Array.isArray(primaryKey))
-    return primaryKey.map((k) => (quoter ? quoter.quoteColumnName(k) : fallback(k))).join(", ");
-  return quoter ? quoter.quoteColumnName(primaryKey) : fallback(primaryKey);
+export function quotedPrimaryKey(this: PrimaryKeyHost & { adapterClassSync(): unknown }): string {
+  return (this.adapterClassSync() as typeof AbstractAdapter).quoteColumnName(this.primaryKey);
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {
