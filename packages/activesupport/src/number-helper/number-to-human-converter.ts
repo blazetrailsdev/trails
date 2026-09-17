@@ -2,7 +2,7 @@ import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
-import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { BigDecimal } from "@blazetrails/ruby-compat";
 import { kernelFloat } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import type { NumberToHumanOptions } from "../number-helper.js";

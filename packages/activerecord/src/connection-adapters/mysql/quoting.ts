@@ -84,7 +84,7 @@ export function castBoundValue(value: unknown): unknown {
     return Number.isInteger(f) ? `${f}.0` : String(f);
   }
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  if (value instanceof BigDecimal) return value.toString("E");
+  if (value instanceof BigDecimal) return value.toString("F");
   if (value === true) return "1";
   if (value === false) return "0";
   return value;
