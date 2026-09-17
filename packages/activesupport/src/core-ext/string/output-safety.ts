@@ -162,7 +162,6 @@ export class SafeBuffer {
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   dup(): SafeBuffer {
     return new SafeBuffer(this._value, this._htmlSafe);
   }
