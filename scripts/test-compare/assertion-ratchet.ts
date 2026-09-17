@@ -240,14 +240,27 @@ export function renderWriteSummary(mark: AssertionMark, markPath: string): strin
  * package in the artifact, so one reflexive reseed during a convergence
  * campaign both re-serializes the stories onto this file and tightens unrelated
  * packages in a diff nobody reviewed.
+ *
+ * An EMPTY marker raises rather than freezing silently: a freeze nobody can
+ * trace to a campaign is one nobody knows to lift.
  */
 export async function loadFreeze(file: string): Promise<string | null> {
+  let text: string;
   try {
-    return (await fs.readFile(file, "utf-8")).trim();
+    text = await fs.readFile(file, "utf-8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw e;
   }
+  const reason = text.trim();
+  if (reason === "") {
+    throw new Error(
+      `the freeze marker ${file} is empty. Its contents ARE the refusal, so an empty one ` +
+        "suspends reseeding while naming no campaign and no story to lift it. Write why the " +
+        "mark is frozen, or delete the file to thaw it.",
+    );
+  }
+  return reason;
 }
 
 export function renderFrozen(reason: string, freezePath: string, markPath: string): string {

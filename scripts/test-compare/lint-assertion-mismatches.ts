@@ -50,11 +50,29 @@ const MARK_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.json");
 const FREEZE_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.freeze");
 
 export const NO_REGEN_FLAG = "--no-regen";
+export const WRITE_FLAG = "--write";
 export const REGEN_SKIP_ENV = "TEST_COMPARE_SKIP_REGEN";
 
 export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
   if (argv.includes(NO_REGEN_FLAG)) return false;
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
+}
+
+/**
+ * Whether the artifact is worth regenerating for this invocation.
+ *
+ * A frozen reseed is refused whatever the artifact says, so regenerating first
+ * would spend a full `parity:test` on an answer already decided. The gate arm
+ * still regenerates while frozen: it reads the counters, and a stale artifact
+ * would report movement that never happened.
+ */
+export function shouldRegenerateForRun(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  frozen: boolean,
+): boolean {
+  if (!shouldRegenerate(argv, env)) return false;
+  return !(argv.includes(WRITE_FLAG) && frozen);
 }
 
 export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
@@ -152,22 +170,20 @@ async function runAsScript(): Promise<void> {
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
-  const write = argv.includes("--write");
-  // A frozen reseed is refused whatever the artifact says, so regenerating it
-  // first would spend a full `parity:test` on an answer already decided.
-  if (shouldRegenerate(argv, process.env) && !(write && (await loadFreeze(FREEZE_PATH)) !== null)) {
-    console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
-    try {
-      await regenerateArtifact(process.env);
-    } catch (e) {
-      console.error(
-        `\nassertion-mismatch ratchet: could not regenerate the artifact: ${(e as Error).message}\n` +
-          `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
-      );
-      process.exit(2);
-    }
-  }
+  const write = argv.includes(WRITE_FLAG);
   try {
+    if (shouldRegenerateForRun(argv, process.env, (await loadFreeze(FREEZE_PATH)) !== null)) {
+      console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
+      try {
+        await regenerateArtifact(process.env);
+      } catch (e) {
+        console.error(
+          `\nassertion-mismatch ratchet: could not regenerate the artifact: ${(e as Error).message}\n` +
+            `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
+        );
+        process.exit(2);
+      }
+    }
     process.exit(await main(write));
   } catch (e) {
     console.error(`\nassertion-mismatch ratchet: ${(e as Error).message}\n`);

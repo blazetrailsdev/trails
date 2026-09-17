@@ -8,6 +8,8 @@ import {
   NO_REGEN_FLAG,
   REGEN_SKIP_ENV,
   shouldRegenerate,
+  shouldRegenerateForRun,
+  WRITE_FLAG,
 } from "./lint-assertion-mismatches.js";
 
 let dir: string;
@@ -140,5 +142,24 @@ describe("shouldRegenerate", () => {
   it("does not regenerate under --no-regen or the skip env", () => {
     expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
     expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
+  });
+});
+
+describe("shouldRegenerateForRun", () => {
+  it("skips the regeneration a frozen reseed would throw away", () => {
+    expect(shouldRegenerateForRun([WRITE_FLAG], {}, true)).toBe(false);
+  });
+
+  it("still regenerates for the gate arm while frozen, which reads the counters", () => {
+    expect(shouldRegenerateForRun([], {}, true)).toBe(true);
+  });
+
+  it("regenerates for a reseed once the mark is thawed", () => {
+    expect(shouldRegenerateForRun([WRITE_FLAG], {}, false)).toBe(true);
+  });
+
+  it("never overrides an explicit opt-out", () => {
+    expect(shouldRegenerateForRun([NO_REGEN_FLAG], {}, false)).toBe(false);
+    expect(shouldRegenerateForRun([], { CI: "true" }, false)).toBe(false);
   });
 });
