@@ -217,9 +217,9 @@ describe("MySQL quoting — castBoundValue", () => {
     expect(castBoundValue("hello")).toBe("hello");
   });
 
-  it("renders a BigDecimal in Ruby's engineering-notation default", () => {
-    expect(castBoundValue(new BigDecimal("123456.789"))).toBe("0.123456789e6");
-    expect(castBoundValue(new BigDecimal("1234.5"))).toBe("0.12345e4");
+  it("renders a BigDecimal in the fixed form ActiveSupport's prepend defaults to_s to", () => {
+    expect(castBoundValue(new BigDecimal("123456.789"))).toBe("123456.789");
+    expect(castBoundValue(new BigDecimal("1234.5"))).toBe("1234.5");
     expect(castBoundValue(new BigDecimal(0))).toBe("0.0");
   });
 
