@@ -211,7 +211,7 @@ describe("BasicsTest", () => {
     const payload = { foo: 42 };
     await topic.updateBang({ content: payload });
 
-    void Topic.resetColumnInformation();
+    await Topic.resetColumnInformation();
 
     const adapter = Topic.connection as any;
     vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
@@ -1030,7 +1030,7 @@ describe("BasicsTest", () => {
   });
 
   it("unicode column name", async () => {
-    void Weird.resetColumnInformation();
+    await Weird.resetColumnInformation();
     const weird = (await Weird.create({ なまえ: "たこ焼き仮面" } as any)) as any;
     expect(weird.なまえ).toBe("たこ焼き仮面");
   });
@@ -1378,12 +1378,12 @@ describe("BasicsTest", () => {
     if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).toEqual(beforeSeq);
   });
 
-  it("dont clear inheritance column when setting explicitly", () => {
+  it("dont clear inheritance column when setting explicitly", async () => {
     const k = class extends Joke {};
     k.inheritanceColumn = "my_type";
     const beforeInherit = k.inheritanceColumn;
 
-    void k.resetColumnInformation();
+    await k.resetColumnInformation();
     const afterInherit = k.inheritanceColumn;
 
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' trailing `unless before_inherit.blank? && after_inherit.blank?` (base_test.rb:1333)
@@ -1727,7 +1727,7 @@ describe("BasicsTest", () => {
 
     assertNotPredicate(topic, (t: any) => t.idChanged());
 
-    void Topic.resetColumnInformation();
+    await Topic.resetColumnInformation();
 
     assertNotPredicate(topic, (t: any) => t.idChanged());
   });
@@ -1968,15 +1968,17 @@ describe("BasicsTest", () => {
 
   it.skipIf(inMemoryDb())("connection in local time", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
-      await Default.loadSchema();
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         default_timezone: "local",
       };
-      await Default.establishConnection(
-        newConfig as Parameters<typeof Default.establishConnection>[0],
-      );
-      cleanupConnections.push(() => Default.removeConnection());
+      await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
+      cleanupConnections.push(async () => {
+        await Base.establishConnection("arunit");
+        await Default.resetColumnInformation();
+      });
+      await Default.resetColumnInformation();
+      await Default.loadSchema();
 
       const defaultRecord = new Default() as any;
 
@@ -1993,15 +1995,17 @@ describe("BasicsTest", () => {
 
   it.skipIf(inMemoryDb())("connection in utc time", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
-      await Default.loadSchema();
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
         default_timezone: "utc",
       };
-      await Default.establishConnection(
-        newConfig as Parameters<typeof Default.establishConnection>[0],
-      );
-      cleanupConnections.push(() => Default.removeConnection());
+      await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
+      cleanupConnections.push(async () => {
+        await Base.establishConnection("arunit");
+        await Default.resetColumnInformation();
+      });
+      await Default.resetColumnInformation();
+      await Default.loadSchema();
 
       const defaultRecord = new Default() as any;
 
