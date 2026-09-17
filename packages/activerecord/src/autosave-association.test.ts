@@ -29,6 +29,7 @@ import { AuditLog, Developer } from "./test-helpers/models/developer.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Mouse } from "./test-helpers/models/mouse.js";
+import { Author } from "./test-helpers/models/author.js";
 import { Molecule } from "./test-helpers/models/molecule.js";
 import { Electron } from "./test-helpers/models/electron.js";
 import { Guitar } from "./test-helpers/models/guitar.js";
@@ -2920,169 +2921,93 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   fixtures([]);
+  beforeAll(() => {
+    registerModel(CanonicalCompany);
+    registerModel(Firm);
+    registerModel(Account);
+    registerModel(CanonicalPost);
+    registerModel(PostWithAfterCreateCallback);
+    registerModel(CanonicalComment);
+    registerModel(Author);
+    registerModel(CanonicalCategory);
+  });
   it("autosave new record on belongs to can be disabled per relationship", async () => {
-    class Author extends Base {
-      declare name: string | null;
+    let newAccount = new Account({ credit_limit: 1000 }) as any;
+    const newFirm = new Firm({ name: "some firm" });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    assertNotPredicate(newFirm, (r) => r.isPersisted());
+    newAccount.firm = newFirm;
+    await newAccount.saveBang();
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel("NewRecordBelongsToAuthor", Author);
-    registerModel("NewRecordBelongsToPost", Post);
-    Associations.belongsTo.call(Post, "author", {
-      autosave: false,
-      foreignKey: "author_id",
-      className: "NewRecordBelongsToAuthor",
-    });
+    assertPredicate(newFirm, (r) => r.isPersisted());
 
-    const author = new Author({ name: "Unsaved" });
-    const post = await Post.create({ name: "test" });
-    cacheAssoc(post, "author", author);
-    post.name = "trigger save";
-    await post.save();
-    expect(author.isNewRecord()).toBe(true);
-    expect(post.author_id).toBeNull();
+    newAccount = new Account({ credit_limit: 1000 });
+    const newAutosavedFirm = new Firm({ name: "some firm" });
+
+    assertNotPredicate(newAutosavedFirm, (r) => r.isPersisted());
+    newAccount.unautosavedFirm = newAutosavedFirm;
+    await newAccount.saveBang();
+
+    assertNotPredicate(newAutosavedFirm, (r) => r.isPersisted());
   });
 
   it("autosave new record on has one can be disabled per relationship", async () => {
-    class Profile extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    let firm = new Firm({ name: "some firm" }) as any;
+    let account = new Account({ credit_limit: 1000 });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class DisabledProfileUser extends Base {
-      declare name: string | null;
+    assertNotPredicate(account, (r) => r.isPersisted());
+    await firm.setAccount(account);
+    await firm.saveBang();
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("profile", {
-          autosave: false,
-          foreignKey: "author_id",
-          className: "Profile",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface DisabledProfileUser {
-      get profile(): Profile | null | Promise<Profile | null>;
-      set profile(value: Profile | null);
-    }
-    registerModel("Profile", Profile);
-    registerModel("DisabledProfileUser", DisabledProfileUser);
+    assertPredicate(account, (r) => r.isPersisted());
 
-    const user = await DisabledProfileUser.create({ name: "test" });
-    const profile = new Profile({ name: "Unsaved" });
-    cacheAssoc(user, "profile", profile);
-    user.name = "trigger save";
-    await user.save();
-    expect(profile.isNewRecord()).toBe(true);
-    expect(profile.author_id).toBeNull();
+    firm = new Firm({ name: "some firm" });
+    account = new Account({ credit_limit: 1000 });
+
+    await firm.setUnautosavedAccount(account);
+
+    assertNotPredicate(account, (r) => r.isPersisted());
+    await firm.setUnautosavedAccount(account);
+    await firm.saveBang();
+
+    assertNotPredicate(account, (r) => r.isPersisted());
   });
 
   it("autosave new record on has many can be disabled per relationship", async () => {
-    class Book extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
+    let firm = new Firm({ name: "some firm" });
+    let account = new Account({ credit_limit: 1000 });
 
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class Author extends Base {
-      declare name: string | null;
+    assertNotPredicate(account, (r) => r.isPersisted());
+    await firm.accounts.push(account);
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("NewRecordHasManyBook", Book);
-    registerModel("NewRecordHasManyAuthor", Author);
-    Associations.hasMany.call(Author, "books", {
-      autosave: false,
-      foreignKey: "author_id",
-      className: "NewRecordHasManyBook",
-    });
+    await firm.saveBang();
+    assertPredicate(account, (r) => r.isPersisted());
 
-    const author = await Author.create({ name: "test" });
-    const book = new Book({ name: "Unsaved" });
-    cacheAssoc(author, "books", [book]);
-    author.name = "trigger save";
-    await author.save();
-    expect(book.isNewRecord()).toBe(true);
-    expect(book.author_id).toBeNull();
+    firm = new Firm({ name: "some firm" });
+    account = new Account({ credit_limit: 1000 });
+
+    assertNotPredicate(account, (r) => r.isPersisted());
+    await firm.unautosavedAccounts.push(account);
+
+    await firm.saveBang();
+    assertNotPredicate(account, (r) => r.isPersisted());
   });
 
   it("autosave new record with after create callback", async () => {
-    const log: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class AcPirate extends Base {
-      declare catchphrase: string | null;
+    const post = new PostWithAfterCreateCallback({ title: "Captain Murphy", body: "is back" });
+    (post as any).comments.build({ body: "foo" });
+    await post.saveBang();
 
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.afterCreate(() => {
-          log.push("pirate_created");
-        });
-        this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface AcPirate {
-      get ship(): CanonicalShip | null | Promise<CanonicalShip | null>;
-      set ship(value: CanonicalShip | null);
-    }
-    registerModel("AcPirate", AcPirate);
-
-    const pirate = new AcPirate({ catchphrase: "Yarr" });
-    const ship = new CanonicalShip({ name: "Pearl" });
-    cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
-    expect(log).toContain("pirate_created");
-    expect(pirate.isNewRecord()).toBe(false);
-    expect(ship.pirate_id).toBe(pirate.id);
-    expect(ship.isNewRecord()).toBe(false);
+    expect((post as any).author_id).not.toBeNull();
   });
 
   it("autosave new record with after create callback and habtm association", async () => {
-    registerModel(PostWithAfterCreateCallback);
-    registerModel(CanonicalPost);
-    registerModel(CanonicalComment);
-    registerModel(CanonicalCategory);
-
-    const post = new PostWithAfterCreateCallback({
-      title: "Captain Murphy",
-      body: "is back",
-    });
+    const post = new PostWithAfterCreateCallback({ title: "Captain Murphy", body: "is back" });
     (post as any).comments.build({ body: "foo" });
     (post as any).categories.build({ name: "bar" });
-    await post.save();
+    await post.saveBang();
 
-    const fresh = await PostWithAfterCreateCallback.find(post.id!);
-    const categories = (await fresh.association("categories").loadTarget()) as Base[];
-    expect(categories.length).toBe(1);
+    expect(await (await (post as any).categories.reload()).length()).toEqual(1);
   });
 });
 
