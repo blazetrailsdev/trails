@@ -1,4 +1,4 @@
-import { NoMethodError, Range, rbObjClass, regexpEscape } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range, rbObjClass } from "@blazetrails/ruby-compat";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
@@ -258,33 +258,6 @@ export class SafeBuffer {
     return this.toStr();
   }
 
-  gsub(pattern: string | RegExp, replacement: string): string {
-    return this.toStr().replace(
-      typeof pattern === "string" ? new RegExp(regexpEscape(pattern), "g") : withGlobal(pattern),
-      replacement,
-    );
-  }
-
-  gsubBang(pattern: string | RegExp, replacement: string): this | null {
-    this._htmlSafe = false;
-    const result = this.gsub(pattern, replacement);
-    if (result === this._value) return null;
-    this._value = result;
-    return this;
-  }
-
-  sub(pattern: string | RegExp, replacement: string): string {
-    return this.toStr().replace(pattern, replacement);
-  }
-
-  subBang(pattern: string | RegExp, replacement: string): this | null {
-    this._htmlSafe = false;
-    const result = this.sub(pattern, replacement);
-    if (result === this._value) return null;
-    this._value = result;
-    return this;
-  }
-
   toString(): string {
     return this._value;
   }
@@ -321,10 +294,6 @@ export class SafeBuffer {
   private stringIntoSafeBuffer(newString: string, isHtmlSafe: boolean): SafeBuffer {
     return new SafeBuffer(newString, isHtmlSafe);
   }
-}
-
-function withGlobal(pattern: RegExp): RegExp {
-  return pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
 }
 
 export function htmlSafe(str: string): SafeBuffer {

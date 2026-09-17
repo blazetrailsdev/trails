@@ -100,7 +100,7 @@ describe("SafeBufferTest", () => {
 
   it("Should escape dirty buffers on add", () => {
     const clean = htmlSafe("hello");
-    buffer.gsubBang("", "<>");
+    buffer = new SafeBuffer("<>", false);
     expect(clean.plus(buffer).toString()).toEqual("hello&lt;&gt;");
   });
 
@@ -108,18 +108,18 @@ describe("SafeBufferTest", () => {
     const multipliedSafeBuffer = htmlSafe("<br />").repeat(2);
     assertPredicate(multipliedSafeBuffer, isHtmlSafe);
 
-    const multipliedUnsafeBuffer = new SafeBuffer(buffer.gsub("", "<>"), false).repeat(2);
+    const multipliedUnsafeBuffer = new SafeBuffer("<>", false).repeat(2);
     assertNotPredicate(multipliedUnsafeBuffer, isHtmlSafe);
   });
 
   it("Should concat as a normal string when safe", () => {
     const clean = htmlSafe("hello");
-    buffer.gsubBang("", "<>");
+    buffer = new SafeBuffer("<>", false);
     expect(buffer.plus(clean).toString()).toEqual("<>hello");
   });
 
   it("Should preserve html_safe? status on copy", () => {
-    buffer.gsubBang("", "<>");
+    buffer = new SafeBuffer("<>", false);
     assertNotPredicate(buffer.dup(), isHtmlSafe);
   });
 
@@ -138,7 +138,7 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should raise an error when safe_concat is called on unsafe buffers", async () => {
-    buffer.gsubBang("", "<>");
+    buffer = new SafeBuffer("<>", false);
     await assertRaise([SafeBuffer.SafeConcatError], {}, () => buffer.safeConcat("BUSTED"));
   });
 
@@ -153,7 +153,7 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should continue unsafe on slice", () => {
-    const safeString = htmlSafe("foo").gsubBang("f", '<script>alert("lolpwnd");</script>')!;
+    const safeString = new SafeBuffer('<script>alert("lolpwnd");</script>oo', false);
 
     assertNot(isHtmlSafe(safeString), "should not be safe");
 
