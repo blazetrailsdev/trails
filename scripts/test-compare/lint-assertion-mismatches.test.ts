@@ -8,10 +8,12 @@ import {
   NO_REGEN_FLAG,
   REGEN_SKIP_ENV,
   shouldRegenerate,
+  shouldRegenerateForRun,
+  WRITE_FLAG,
 } from "./lint-assertion-mismatches.js";
 
 let dir: string;
-let paths: { artifact: string; mark: string };
+let paths: { artifact: string; mark: string; freeze: string };
 
 async function writeFixtures(
   artifact: Record<string, [number, number, number]>,
@@ -49,7 +51,11 @@ async function readMark(): Promise<Record<string, Counts>> {
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), "assertion-ratchet-"));
-  paths = { artifact: path.join(dir, "artifact.json"), mark: path.join(dir, "mark.json") };
+  paths = {
+    artifact: path.join(dir, "artifact.json"),
+    mark: path.join(dir, "mark.json"),
+    freeze: path.join(dir, "mark.freeze"),
+  };
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -97,6 +103,65 @@ describe("main", () => {
     expect(await readMark()).toHaveProperty("arel");
   });
 
+  it("refuses to reseed while the mark is frozen", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(true, paths)).toBe(1);
+    expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("Frozen for RFC 0132.");
+    expect(await readMark()).toEqual({ activerecord: { assertionCount: 10, kind: 20, value: 3 } });
+  });
+
+  it("still gates a frozen mark, whose slack reads as green", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(0);
+  });
+
+  it("still fails a frozen mark whose counters grew past it", async () => {
+    await writeFixtures({ activerecord: [10, 23, 3] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
+  });
+
+  it("reports the slack on a FAILING run too, where it matters most", async () => {
+    await writeFixtures({ activerecord: [10, 23, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain(
+      "assertion-value-mismatch: 0 (mark 3, 3 unguarded)",
+    );
+  });
+
+  it("reports no slack for a partial-scope run, which has none to report honestly", async () => {
+    await writeFixtures({ activerecord: [1, 1, 1] }, { activerecord: [1, 1, 1], arel: [0, 0, 0] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
+  });
+
+  it("gates normally when the marker cannot be read, which the gate does not depend on", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "   \n");
+    expect(await main(false, paths)).toBe(0);
+  });
+
+  it("reports the slack a frozen mark is carrying, which is the suspended protection", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(0);
+    const out = vi.mocked(console.log).mock.calls.join("\n");
+    expect(out).toContain("assertion-count-mismatch: 4 (mark 10, 6 unguarded)");
+    expect(out).toContain("assertion-value-mismatch: 0 (mark 3, 3 unguarded)");
+    expect(out).not.toContain("assertion-kind-mismatch");
+    expect(out).toContain("Frozen for RFC 0132.");
+  });
+
+  it("reports no slack while the mark is live", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    expect(await main(false, paths)).toBe(0);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
+  });
+
   it("names the missing artifact rather than surfacing a bare ENOENT", async () => {
     await writeFixtures({}, {});
     await fs.rm(paths.artifact);
@@ -116,5 +181,24 @@ describe("shouldRegenerate", () => {
   it("does not regenerate under --no-regen or the skip env", () => {
     expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
     expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
+  });
+});
+
+describe("shouldRegenerateForRun", () => {
+  it("skips the regeneration a frozen reseed would throw away", () => {
+    expect(shouldRegenerateForRun([WRITE_FLAG], {}, true)).toBe(false);
+  });
+
+  it("still regenerates for the gate arm while frozen, which reads the counters", () => {
+    expect(shouldRegenerateForRun([], {}, true)).toBe(true);
+  });
+
+  it("regenerates for a reseed once the mark is thawed", () => {
+    expect(shouldRegenerateForRun([WRITE_FLAG], {}, false)).toBe(true);
+  });
+
+  it("never overrides an explicit opt-out", () => {
+    expect(shouldRegenerateForRun([NO_REGEN_FLAG], {}, false)).toBe(false);
+    expect(shouldRegenerateForRun([], { CI: "true" }, false)).toBe(false);
   });
 });

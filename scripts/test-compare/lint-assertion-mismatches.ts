@@ -10,6 +10,10 @@
  *   pnpm parity:test:assertions:reseed     # lower the mark after convergence
  *   pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
  *
+ * Reseeding is refused while assertion-mismatch-mark.freeze exists; see
+ * `loadFreeze` in assertion-ratchet.ts for why a convergence campaign wants the
+ * mark held still.
+ *
  * A plain run regenerates the artifact via `pnpm parity:test --json`: gating a
  * STALE convention-comparison.json reports movement that never happened, and
  * `--write` would commit that fiction as the new mark. Opt out with
@@ -26,13 +30,17 @@ import { fileURLToPath } from "url";
 import {
   type ComparisonArtifact,
   countsFromArtifact,
+  loadFreeze,
   loadMark,
   missingFromArtifact,
   nextMark,
   renderExceeded,
+  renderFrozen,
+  renderFrozenSlack,
   renderMissing,
   renderUnmarked,
   renderWriteSummary,
+  slack,
   violations,
   writeMark,
 } from "./assertion-ratchet.js";
@@ -41,13 +49,32 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const ARTIFACT_PATH = path.join(SCRIPT_DIR, "output", "convention-comparison.json");
 const MARK_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.json");
+const FREEZE_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.freeze");
 
 export const NO_REGEN_FLAG = "--no-regen";
+export const WRITE_FLAG = "--write";
 export const REGEN_SKIP_ENV = "TEST_COMPARE_SKIP_REGEN";
 
 export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
   if (argv.includes(NO_REGEN_FLAG)) return false;
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
+}
+
+/**
+ * Whether the artifact is worth regenerating for this invocation.
+ *
+ * A frozen reseed is refused whatever the artifact says, so regenerating first
+ * would spend a full `parity:test` on an answer already decided. The gate arm
+ * still regenerates while frozen: it reads the counters, and a stale artifact
+ * would report movement that never happened.
+ */
+export function shouldRegenerateForRun(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  frozen: boolean,
+): boolean {
+  if (!shouldRegenerate(argv, env)) return false;
+  return !(argv.includes(WRITE_FLAG) && frozen);
 }
 
 export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
@@ -80,13 +107,35 @@ async function loadArtifact(file: string): Promise<ComparisonArtifact> {
   return JSON.parse(text) as ComparisonArtifact;
 }
 
+/**
+ * The marker as the GATE arm reads it: a malformed or unreadable one costs the
+ * slack report and nothing else. The gate's answer does not depend on the
+ * marker, so letting a bad marker fail it would suspend the very protection the
+ * freeze is supposed to leave running.
+ */
+async function loadFreezeForReport(file: string): Promise<string | null> {
+  try {
+    return await loadFreeze(file);
+  } catch (e) {
+    console.error(
+      `assertion-mismatch ratchet: ignoring the freeze marker — ${(e as Error).message}`,
+    );
+    return null;
+  }
+}
+
 /** File pair the gate reads/writes; overridable so tests can drive `main`. */
 export interface Paths {
   artifact: string;
   mark: string;
+  freeze: string;
 }
 
-export const DEFAULT_PATHS: Paths = { artifact: ARTIFACT_PATH, mark: MARK_PATH };
+export const DEFAULT_PATHS: Paths = {
+  artifact: ARTIFACT_PATH,
+  mark: MARK_PATH,
+  freeze: FREEZE_PATH,
+};
 
 /**
  * Gate (or, under `write`, reseed) the mark against the artifact on disk.
@@ -95,9 +144,30 @@ export const DEFAULT_PATHS: Paths = { artifact: ARTIFACT_PATH, mark: MARK_PATH }
  * A marked package missing from the artifact means a partial-scope run, and
  * reseeding from one would drop that package's mark entirely — so both arms
  * bail on it before either touches the file.
+ *
+ * A freeze marker suspends the `write` arm only, and is read STRICTLY there —
+ * a malformed one must not be mistaken for a live mark and reseeded over. The
+ * gate arm keeps running either way: a frozen mark is one carrying slack, which
+ * this ratchet reports as green. It reads the marker only to report that slack,
+ * so a marker that cannot be read costs the report and never the gate.
+ *
+ * The slack is reported AHEAD of the failure arms: a run that fails on one
+ * counter is exactly when a reviewer needs to see what the other counters are
+ * no longer enforcing. It sits behind the `missing` bail alone, because a
+ * partial-scope artifact has no honest slack to report for the packages it
+ * omits.
  */
 export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promise<number> {
   const markRel = path.relative(ROOT_DIR, paths.mark);
+
+  if (write) {
+    const frozen = await loadFreeze(paths.freeze);
+    if (frozen !== null) {
+      console.error(renderFrozen(frozen, path.relative(ROOT_DIR, paths.freeze), markRel));
+      return 1;
+    }
+  }
+
   const current = countsFromArtifact(await loadArtifact(paths.artifact));
   const mark = await loadMark(paths.mark);
 
@@ -114,6 +184,12 @@ export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promis
     return 0;
   }
 
+  const frozen = await loadFreezeForReport(paths.freeze);
+  if (frozen !== null) {
+    const entries = slack(current, mark);
+    if (entries.length > 0) console.log(renderFrozenSlack(entries, frozen, markRel));
+  }
+
   const { exceeded, unmarked } = violations(current, mark);
   if (unmarked.length > 0) console.error(renderUnmarked(unmarked, markRel));
   if (exceeded.length > 0) console.error(renderExceeded(exceeded, markRel));
@@ -128,20 +204,22 @@ async function runAsScript(): Promise<void> {
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
-  if (shouldRegenerate(argv, process.env)) {
-    console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
-    try {
-      await regenerateArtifact(process.env);
-    } catch (e) {
-      console.error(
-        `\nassertion-mismatch ratchet: could not regenerate the artifact: ${(e as Error).message}\n` +
-          `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
-      );
-      process.exit(2);
-    }
-  }
+  const write = argv.includes(WRITE_FLAG);
   try {
-    process.exit(await main(argv.includes("--write")));
+    const frozen = write && (await loadFreeze(FREEZE_PATH)) !== null;
+    if (shouldRegenerateForRun(argv, process.env, frozen)) {
+      console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
+      try {
+        await regenerateArtifact(process.env);
+      } catch (e) {
+        console.error(
+          `\nassertion-mismatch ratchet: could not regenerate the artifact: ${(e as Error).message}\n` +
+            `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
+        );
+        process.exit(2);
+      }
+    }
+    process.exit(await main(write));
   } catch (e) {
     console.error(`\nassertion-mismatch ratchet: ${(e as Error).message}\n`);
     process.exit(2);
