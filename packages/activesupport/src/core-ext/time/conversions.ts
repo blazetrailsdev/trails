@@ -93,3 +93,11 @@ export function xmlschema(date: Date): string {
 }
 
 export { xmlschema as rfc3339 };
+
+declare module "@blazetrails/date" {
+  interface Time {
+    rfc3339(fractionDigits?: number): string;
+  }
+}
+
+RubyTime.prototype.rfc3339 = RubyTime.prototype.xmlschema;
