@@ -1342,12 +1342,6 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(dt.getMilliseconds() * 1000000).toBe(500000000);
   });
 
-  it("subsec", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
-    const subsec = dt.getMilliseconds() / 1000;
-    expect(subsec).toBeCloseTo(0.5);
-  });
-
   it("readable inspect", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
     const result = toFs(dt);

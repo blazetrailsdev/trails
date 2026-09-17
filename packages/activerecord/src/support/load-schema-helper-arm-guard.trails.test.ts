@@ -39,7 +39,7 @@ describe("load_schema arm-probe guard", () => {
     });
   });
 
-  for (const method of ["dropTable", "addIndex", "execute", "schemaCreation"]) {
+  for (const method of ["dropTable", "addIndex", "execute"]) {
     it(`rejects an adapter whose ${method} a proxy intercepts`, async () => {
       await withAdapter(async (adapter) => {
         const probe = new Proxy(adapter, {

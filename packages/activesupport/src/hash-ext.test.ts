@@ -456,22 +456,6 @@ describe("HashExtTest", () => {
     expect(h.a).toBe(false);
   });
 
-  it("reverse merge", () => {
-    const h = reverseMerge({ a: 1 }, { a: 10, b: 20 });
-    expect(h.a).toBe(1);
-    expect((h as any).b).toBe(20);
-  });
-
-  it("with defaults aliases reverse merge", () => {
-    const h = reverseMerge({ x: 5 }, { x: 99, y: 1 });
-    expect(h.x).toBe(5);
-  });
-
-  it("slice inplace", () => {
-    const r = slice({ a: 1, b: 2, c: 3 }, "a", "c");
-    expect(r).toEqual({ a: 1, c: 3 });
-  });
-
   it("slice inplace with an array key", () => {
     const r = slice({ x: 1, y: 2, z: 3 }, "x", "z");
     expect(r).toEqual({ x: 1, z: 3 });

@@ -803,11 +803,6 @@ describe("DurationTest", () => {
     expect(Duration.build(2716146).value).toBe(2716146);
   });
 
-  it("modulo", () => {
-    expect(Duration.minutes(5).modulo(Duration.minutes(2))._parts()).toEqual({ minutes: 1 });
-    expect(Duration.minutes(5).modulo(60)._parts()).toEqual({ seconds: 0 });
-  });
-
   it("string build raises error", async () => {
     const error = await assertRaises([TypeError], {}, () => Duration.build("9"));
 

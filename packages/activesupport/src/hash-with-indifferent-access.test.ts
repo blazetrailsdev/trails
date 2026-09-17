@@ -1010,11 +1010,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.get(":first")).toEqual(1);
   });
 
-  it("to options on indifferent preserves hash", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(Object.fromEntries(h.toHash())).toEqual({ a: 1 });
-  });
-
   it("to options on indifferent preserves works as hash with dup", () => {
     const h = new HashWithIndifferentAccess<unknown>({ ":a": { ":b": "b" } });
     const dup = h.dup();

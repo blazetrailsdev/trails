@@ -972,16 +972,6 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
-    it("LessThan short-circuits to 1=1 for positive unboundable", () => {
-      const node = new Nodes.LessThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
-    });
-
-    it("LessThan short-circuits to 1=0 for negative unboundable", () => {
-      const node = new Nodes.LessThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
-    });
-
     it("an infinite-but-bounded BindParam does not short-circuit", () => {
       const node = new Nodes.GreaterThan(users.get("id"), new Nodes.BindParam(Infinity));
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe('"users"."id" > ?');

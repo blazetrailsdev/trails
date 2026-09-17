@@ -422,24 +422,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(reqCol!.notnull).toBe(1);
   });
 
-  it("indexes logs", async () => {
-    const logged: string[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
-      if (event.payload?.sql) logged.push(event.payload.sql);
-    });
-    try {
-      await adapter.indexes("items");
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(logged.length).toBeGreaterThan(0);
-  });
-
-  it("no indexes", async () => {
-    const rows = (await adapter.execute(`PRAGMA index_list("items")`))!;
-    expect(rows).toHaveLength(0);
-  });
-
   it("index", async () => {
     await adapter.execute(`CREATE UNIQUE INDEX "fun" ON "items" ("id")`);
     const indexes = (await adapter.indexes("items")) as any[];

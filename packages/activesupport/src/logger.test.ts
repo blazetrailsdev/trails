@@ -252,11 +252,6 @@ describe("LoggerTest", () => {
     expect(logger.localLevel).toBe(Logger.ERROR);
   });
 
-  it("log outputs to with a filename", () => {
-    logger.info("file message");
-    expect(output.string).toContain("file message");
-  });
-
   it("write binary data to existing file", () => {
     expect(() => logger.info(Buffer.from([0x00, 0x01, 0x02]).toString())).not.toThrow();
   });

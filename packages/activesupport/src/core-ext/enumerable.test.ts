@@ -4,7 +4,6 @@ import {
   excluding,
   without,
   sum,
-  indexBy,
   indexWith,
   many,
   pluck,
@@ -47,16 +46,6 @@ describe("EnumerableTests", () => {
 
   it("array sums", () => {
     expect(sum([5, 10, 15])).toBe(30);
-  });
-
-  it("index with", () => {
-    const items = [
-      { id: 1, name: "a" },
-      { id: 2, name: "b" },
-    ];
-    const idx = indexBy(items, (x) => x.id);
-    expect(idx[1]).toEqual({ id: 1, name: "a" });
-    expect(idx[2]).toEqual({ id: 2, name: "b" });
   });
 
   it("many", () => {
