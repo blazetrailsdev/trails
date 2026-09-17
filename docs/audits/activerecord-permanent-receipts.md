@@ -79,7 +79,7 @@ total 370`. Manifests were rebuilt first with
 for the call artifacts. The extractor's freshness guard passed.
 
 ```ts
-// scripts/audit-tmp/receipt-ab.ts — run: pnpm tsx scripts/audit-tmp/receipt-ab.ts activerecord > ab.json
+// not committed: save under scripts/ (e.g. scripts/receipt-ab.ts), adjust the two relative imports, run with pnpm tsx <file> activerecord > ab.json
 // A/B every @noRailsEquivalent receipt in one package by scoring the TS
 // manifest with ALL receipts stripped, then looking up each tagged key's verdict.
 import fs from "node:fs";
@@ -221,8 +221,7 @@ in this package are almost all bare. Only 1 of 264 call receipts and the
 `@noRailsEquivalent` ones carry at most a `MOVED-BY-SHORT-NAME:` list (`no-freeform-comments` strips it).
 So no receipt cites a section: fit was judged from the code.
 
-The classifier's rules, file lists and per-site notes live in the audit
-scratch scripts (`classify.py`, `call-tags.py`). Every row it produced is
+The classifier's rules, file lists and per-site notes were applied by uncommitted scratch scripts (`classify.py`, `call-tags.py`); every row they produced, with its bucket and note, is
 listed in the inventory below.
 
 ## Counts per bucket (names)
