@@ -389,6 +389,7 @@ export function assertNotRespondTo(actual: unknown, name: string, message?: stri
 function respondsTo(object: object, name: string): boolean {
   if (name in object) {
     const descriptor = findDescriptor(object, name);
+    if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;
     return !(descriptor && descriptor.set !== undefined && descriptor.get === undefined);
   }
   if (!name.endsWith("=")) return false;

@@ -161,8 +161,9 @@ export function indentBang(
 ): string | null {
   indentString = indentString || str.match(/^[ \t]/m)?.[0] || " ";
   const re = indentEmptyLines ? /^/gm : /^(?!$)/gm;
-  const result = str.replace(re, indentString.repeat(amount));
-  return result === str ? null : result;
+  if (!re.test(str)) return null;
+  re.lastIndex = 0;
+  return str.replace(re, indentString.repeat(amount));
 }
 
 export function indent(

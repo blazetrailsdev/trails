@@ -24,6 +24,17 @@ interface ConcernHost extends Module {
   ClassMethods?: Record<string, unknown>;
 }
 
+const blockLocations = new WeakMap<object, string>();
+
+function sourceLocation(block: object): string {
+  let location = blockLocations.get(block);
+  if (location === undefined) {
+    location = new Error().stack?.split("\n")[3]?.trim() ?? "";
+    blockLocations.set(block, location);
+  }
+  return location;
+}
+
 export const Concern = {
   [extended](base: ConcernHost): void {
     base._dependencies = [];
@@ -66,10 +77,11 @@ export const Concern = {
   included(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
       if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
-        if (this._includedBlock!.toString() !== block!.toString()) {
+        if (sourceLocation(this._includedBlock!) !== sourceLocation(block!)) {
           throw new MultipleIncludedBlocks();
         }
       } else {
+        sourceLocation(block!);
         this._includedBlock = block;
       }
     }
@@ -78,10 +90,11 @@ export const Concern = {
   prepended(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
       if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
-        if (this._prependedBlock!.toString() !== block!.toString()) {
+        if (sourceLocation(this._prependedBlock!) !== sourceLocation(block!)) {
           throw new MultiplePrependBlocks();
         }
       } else {
+        sourceLocation(block!);
         this._prependedBlock = block;
       }
     }
