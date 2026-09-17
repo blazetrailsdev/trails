@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { BigDecimal, toD } from "./big-decimal.js";
 
 describe("BigDecimal", () => {
+  it("sign answers the VP_SIGN code", () => {
+    expect(
+      ["NaN", "0", "-0", "1.5", "-1.5", "Infinity", "-Infinity"].map((v) =>
+        new BigDecimal(v).sign(),
+      ),
+    ).toEqual([0, 1, -1, 2, -2, 3, -3]);
+  });
+
   it("formats engineering notation, Ruby's bare to_s", () => {
     expect(new BigDecimal("123456.789").toString("E")).toBe("0.123456789e6");
     expect(new BigDecimal("-1.5").toString("E")).toBe("-0.15e1");

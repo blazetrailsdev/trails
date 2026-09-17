@@ -19,8 +19,7 @@ type Parsed = {
  * @noRailsEquivalent PERMANENT
  */
 export class BigDecimal {
-  /** @noRailsEquivalent PERMANENT */
-  readonly sign: "" | "-";
+  private _sign: "" | "-";
   private digits: string;
   private exp: number;
   private readonly nonFinite: "NaN" | "Infinity" | null;
@@ -37,13 +36,13 @@ export class BigDecimal {
     if (parsed === null) {
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }
-    this.sign = parsed.sign;
+    this._sign = parsed.sign;
     this.digits = parsed.digits;
     this.exp = parsed.exp;
     this.nonFinite = parsed.nonFinite;
     if (parsed.nonFinite === null && ndigits > 0 && (isRational || typeof value === "number")) {
       const rounded = this.round(ndigits - this.exponent());
-      this.sign = rounded.sign;
+      this._sign = rounded._sign;
       this.digits = rounded.digits;
       this.exp = rounded.exp;
     }
@@ -68,7 +67,7 @@ export class BigDecimal {
   /** @noRailsEquivalent PERMANENT */
   isInfinite(): number | null {
     if (this.nonFinite !== "Infinity") return null;
-    return this.sign === "-" ? -1 : 1;
+    return this._sign === "-" ? -1 : 1;
   }
 
   /**
@@ -82,7 +81,7 @@ export class BigDecimal {
   toString(format = "E"): string {
     const { signFlag, group, scientific } = parseFormat(format);
     let prefix = "";
-    if (this.sign === "-") prefix = "-";
+    if (this._sign === "-") prefix = "-";
     else if (signFlag === "+") prefix = "+";
     else if (signFlag === " ") prefix = " ";
     if (this.nonFinite !== null) {
@@ -118,7 +117,7 @@ export class BigDecimal {
       throw new FloatDomainError("Computation results in 'NaN' (Not a Number)");
     }
     if (this.nonFinite !== null) {
-      throw new FloatDomainError(`Computation results in '${this.sign}Infinity'`);
+      throw new FloatDomainError(`Computation results in '${this._sign}Infinity'`);
     }
     const magnitude =
       this.exp <= 0
@@ -126,7 +125,7 @@ export class BigDecimal {
         : this.exp >= this.digits.length
           ? BigInt(this.digits) * 10n ** BigInt(this.exp - this.digits.length)
           : BigInt(this.digits.slice(0, this.exp));
-    const signed = this.sign === "-" ? -magnitude : magnitude;
+    const signed = this._sign === "-" ? -magnitude : magnitude;
     const num = Number(signed);
     return Number.isSafeInteger(num) ? num : (signed as unknown as number);
   }
@@ -134,6 +133,20 @@ export class BigDecimal {
   /** @noRailsEquivalent PERMANENT */
   toF(): number {
     return Number(this.toString("F"));
+  }
+
+  /**
+   * Ruby's `BigDecimal#sign` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:3818`
+   * `BigDecimal_sign`), answering the `VP_SIGN_*` code
+   * (`vendor/ruby/ext/bigdecimal/bigdecimal.h:148-154`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  sign(): number {
+    const s = this._sign === "-" ? -1 : 1;
+    if (this.nonFinite === "NaN") return 0;
+    if (this.nonFinite !== null) return 3 * s;
+    return this.digits === "" ? s : 2 * s;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -144,14 +157,14 @@ export class BigDecimal {
 
   /** @noRailsEquivalent PERMANENT */
   isNegative(): boolean {
-    return this.sign === "-" && !this.isZero();
+    return this._sign === "-" && !this.isZero();
   }
 
   /** @noRailsEquivalent PERMANENT */
   abs(): BigDecimal {
     if (this.isNan()) return this;
     if (this.nonFinite !== null) return BigDecimal.INFINITY;
-    return this.sign === "-" ? BigDecimal.fromUnscaled(this.unscaled(-1), this.scale()) : this;
+    return this._sign === "-" ? BigDecimal.fromUnscaled(this.unscaled(-1), this.scale()) : this;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -162,7 +175,7 @@ export class BigDecimal {
         ? new BigDecimal("-Infinity")
         : BigDecimal.INFINITY;
     }
-    const negative = (this.sign === "-") !== (other.sign === "-");
+    const negative = (this._sign === "-") !== (other._sign === "-");
     return BigDecimal.fromUnscaled(
       this.unscaled() * other.unscaled(),
       this.scale() + other.scale(),
@@ -209,8 +222,8 @@ export class BigDecimal {
       const otherRank = other.isInfinite() ?? 0;
       return thisRank < otherRank ? -1 : thisRank > otherRank ? 1 : 0;
     }
-    const thisSign = this.isZero() ? 0 : this.sign === "-" ? -1 : 1;
-    const otherSign = other.isZero() ? 0 : other.sign === "-" ? -1 : 1;
+    const thisSign = this.isZero() ? 0 : this._sign === "-" ? -1 : 1;
+    const otherSign = other.isZero() ? 0 : other._sign === "-" ? -1 : 1;
     if (thisSign !== otherSign) return thisSign < otherSign ? -1 : 1;
     if (thisSign === 0) return 0;
     if (this.exp !== other.exp) return this.exp < other.exp ? -thisSign : thisSign;
@@ -224,7 +237,7 @@ export class BigDecimal {
   round(n = 0, mode = ":default"): BigDecimal {
     if (this.nonFinite !== null) return this;
     if (n >= this.scale()) return this;
-    const negative = this.sign === "-";
+    const negative = this._sign === "-";
     const f = mode.replace(/^:/, "");
     const exponent = Math.ceil(this.exp / BASE_FIG);
     const frac = "0".repeat(exponent * BASE_FIG - this.exp) + this.digits;
@@ -253,7 +266,7 @@ export class BigDecimal {
       this.digits === ""
         ? 0n
         : BigInt(this.digits) * 10n ** BigInt(Math.max(this.exp - this.digits.length, 0));
-    return this.sign === "-" && signum > 0 ? -magnitude : magnitude;
+    return this._sign === "-" && signum > 0 ? -magnitude : magnitude;
   }
 
   private scale(): number {
