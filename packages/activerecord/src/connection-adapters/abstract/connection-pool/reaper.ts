@@ -85,8 +85,10 @@ export class Reaper {
             for (const ref of alive) {
               const p = ref.deref();
               if (p) {
-                void p.reap?.()?.catch(() => {});
-                void p.flush?.()?.catch(() => {});
+                void (async () => {
+                  await p.reap?.();
+                  await p.flush?.();
+                })();
               }
             }
           }, frequency * 1000);

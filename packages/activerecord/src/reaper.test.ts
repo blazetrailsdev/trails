@@ -65,46 +65,46 @@ describe("ReaperTest", () => {
     expect(reaper.frequency).toBe(10.01);
   });
 
-  it("connection pool starts reaper", () => {
+  it("connection pool starts reaper", async () => {
     const pool = makePool();
     const reaper = new Reaper(pool, 60);
     reaper.run();
     expect((Reaper as any)._pools.size).toBe(1);
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool.reaped).toBe(1);
     expect(pool.flushed).toBe(1);
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool.reaped).toBe(2);
     expect(pool.flushed).toBe(2);
   });
 
-  it("reaper works after pool discard", () => {
+  it("reaper works after pool discard", async () => {
     const pool1 = makePool();
     const pool2 = makePool();
 
     new Reaper(pool1, 60).run();
     new Reaper(pool2, 60).run();
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool1.reaped).toBe(1);
     expect(pool2.reaped).toBe(1);
 
     pool1._discarded = true;
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool1.reaped).toBe(1);
     expect(pool2.reaped).toBe(2);
   });
 
-  it("reap flush on discarded pool", () => {
+  it("reap flush on discarded pool", async () => {
     const pool = makePool();
     pool._discarded = true;
     const reaper = new Reaper(pool, 60);
     reaper.run();
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool.reaped).toBe(0);
     expect(pool.flushed).toBe(0);
   });
@@ -113,14 +113,14 @@ describe("ReaperTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
-  it("reaper does not reap discarded connection pools", () => {
+  it("reaper does not reap discarded connection pools", async () => {
     const pool = makePool();
     const reaper = new Reaper(pool, 60);
     reaper.run();
 
     pool._discarded = true;
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(pool.reaped).toBe(0);
     expect(pool.flushed).toBe(0);
   });
