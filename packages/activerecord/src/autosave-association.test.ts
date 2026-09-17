@@ -1167,10 +1167,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    const { Firm } = makeModels();
-    const firm = await Firm.create({ name: "Acme" });
-    const saved = await firm.save();
-    expect(saved).toBe(true);
+    const firm = (await Firm.find(1)) as any;
+    firm.resetUnvalidatedAccount();
+    await assertNoQueries(false, async () => {
+      await firm.saveBang();
+    });
   });
 
   it("callbacks firing order on create", async () => {
@@ -1264,12 +1265,13 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("foreign key attribute is not set unless changed", async () => {
-    const { Firm, Account } = makeModels();
-    const firm = await Firm.create({ name: "Acme" });
-    const account = await Account.create({ credit_limit: 600, firm_id: firm.id });
-    cacheAssoc(firm, "account", account);
-    await firm.save();
-    expect(account.firm_id).toBe(firm.id);
+    const eye = await Eye.createBang({
+      irisWithReadOnlyForeignKeyAttributes: { color: "honey" },
+    });
+    await assertNothingRaised(() => {
+      eye.overrideIrisWithReadOnlyForeignKeyColor = true;
+      return eye.saveBang();
+    });
   });
 });
 
@@ -1487,7 +1489,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  const { tags, posts } = fixtures(["companies", "posts", "tags", "taggings"]);
+  const { tags, posts, taggings } = fixtures(["companies", "posts", "tags", "taggings"]);
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
@@ -1628,60 +1630,63 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("store association in two relations with one save", async () => {
-    const { Customer, Order } = makeOrderModels();
-    const numOrders = (await Order.count()) as number;
-    const numCustomers = (await Customer.count()) as number;
-    const order = new Order({});
-    const customer = new Customer({ name: "C" });
-    await setBilling(order, customer);
-    await setShipping(order, customer);
-    expect(await order.save()).toBe(true);
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    const numOrders = Number(await CanonicalOrder.count());
+    const numCustomers = Number(await CanonicalCustomer.count());
+    const order = new CanonicalOrder() as any;
+
+    const customer = (order.billing = order.shipping = new CanonicalCustomer());
+    assert(await order.save());
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
     await order.reload();
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
-    expect(await Order.count()).toBe(numOrders + 1);
-    expect(await Customer.count()).toBe(numCustomers + 1);
+
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
+    expect(Number(await CanonicalOrder.count())).toEqual(numOrders + 1);
+    expect(Number(await CanonicalCustomer.count())).toEqual(numCustomers + 1);
   });
   it("store association in two relations with one save in existing object", async () => {
-    const { Customer, Order } = makeOrderModels();
-    const numOrders = (await Order.count()) as number;
-    const numCustomers = (await Customer.count()) as number;
-    const order = await Order.create({});
-    const customer = new Customer({ name: "C" });
-    await setBilling(order, customer);
-    await setShipping(order, customer);
-    expect(await order.save()).toBe(true);
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    const numOrders = Number(await CanonicalOrder.count());
+    const numCustomers = Number(await CanonicalCustomer.count());
+    const order = (await CanonicalOrder.create()) as any;
+
+    const customer = (order.billing = order.shipping = new CanonicalCustomer());
+    assert(await order.save());
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
     await order.reload();
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
-    expect(await Order.count()).toBe(numOrders + 1);
-    expect(await Customer.count()).toBe(numCustomers + 1);
+
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
+    expect(Number(await CanonicalOrder.count())).toEqual(numOrders + 1);
+    expect(Number(await CanonicalCustomer.count())).toEqual(numCustomers + 1);
   });
   it("store association in two relations with one save in existing object with values", async () => {
-    const { Customer, Order } = makeOrderModels();
-    const numOrders = (await Order.count()) as number;
-    const numCustomers = (await Customer.count()) as number;
-    const order = await Order.create({});
-    let customer = new Customer({ name: "C" });
-    await setBilling(order, customer);
-    await setShipping(order, customer);
-    expect(await order.save()).toBe(true);
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    const numOrders = Number(await CanonicalOrder.count());
+    const numCustomers = Number(await CanonicalCustomer.count());
+    const order = (await CanonicalOrder.create()) as any;
+
+    let customer = (order.billing = order.shipping = new CanonicalCustomer());
+    assert(await order.save());
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
     await order.reload();
-    customer = new Customer({ name: "C2" });
-    await setBilling(order, customer);
-    await setShipping(order, customer);
-    expect(await order.save()).toBe(true);
+
+    customer = order.billing = order.shipping = new CanonicalCustomer();
+
+    assert(await order.save());
     await order.reload();
-    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
-    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
-    expect(await Order.count()).toBe(numOrders + 1);
-    expect(await Customer.count()).toBe(numCustomers + 2);
+
+    expect((await order.billing).equals(customer)).toBe(true);
+    expect((await order.shipping).equals(customer)).toBe(true);
+
+    expect(Number(await CanonicalOrder.count())).toEqual(numOrders + 1);
+    expect(Number(await CanonicalCustomer.count())).toEqual(numCustomers + 2);
   });
 
   it("store association with a polymorphic relationship", async () => {
@@ -1700,11 +1705,14 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("validation does not validate stale association target", async () => {
-    const { Author, Post } = makeModels();
-    const author = await Author.create({ name: "Valid" });
-    const post = await Post.create({ name: "Test", author_id: author.id });
-    const saved = await post.save();
-    expect(saved).toBe(true);
+    const validDeveloper = await Developer.createBang({ name: "Dude", salary: 50_000 });
+    const invalidDeveloper = new Developer();
+
+    const auditlog = new AuditLog({ message: "foo" }) as any;
+    auditlog.developer = invalidDeveloper;
+    auditlog.developer_id = validDeveloper.id;
+
+    assertPredicate(await auditlog.isValid(), (v) => v);
   });
 
   it("validation does not validate non dirty association target", async () => {
@@ -1728,10 +1736,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    const { Post } = makeModels();
-    const post = await Post.create({ name: "Alone" });
-    const saved = await post.save();
-    expect(saved).toBe(true);
+    const tagging = taggings("welcome_general") as any;
+    tagging.resetTag();
+    await assertNoQueries(false, async () => {
+      await tagging.saveBang();
+    });
   });
 });
 
@@ -2035,121 +2044,104 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     expect(p.errors.fullMessages).toEqual(["References[1] should be favorite"]);
   });
   it("indexed errors should be properly translated", async () => {
-    const oldCustomize = ModelError.i18nCustomizeFullMessage;
+    const oldI18nCustomizeFullMessage = ModelError.i18nCustomizeFullMessage;
     ModelError.i18nCustomizeFullMessage = true;
-    I18n.backend().storeTranslations("en", {
-      activerecord: {
-        errors: {
-          models: {
-            "index_errors_person/references": { format: "%{message}" },
+    try {
+      I18n.backend().storeTranslations("en", {
+        activerecord: {
+          errors: {
+            models: {
+              "person/references": {
+                format: "%{message}",
+              },
+            },
           },
         },
-      },
-    });
-    try {
-      class IndexErrorsReference extends Base {
-        declare favorite: boolean | null;
-        declare job_id: number | null;
-        declare person_id: number | null;
-
+      });
+      const reference = class extends Base {
         static {
-          this.attribute("favorite", "boolean");
-          this.attribute("job_id", "integer");
-          this.attribute("person_id", "integer");
-          this.validate(function (record: any) {
-            if (!record.favorite) record.errors.add("base", "should be favorite");
-          });
-          this.validates("job_id", { presence: true });
+          this.tableName = "references";
         }
-      }
-      class IndexErrorsPerson extends Base {
-        declare name: string | null;
-        declare references: AssociationProxy<IndexErrorsReference>;
 
+        shouldBeFavorite(this: any) {
+          if (!this.favorite) this.errors.add("base", "should be favorite");
+        }
+      };
+      Object.defineProperty(reference, "name", { value: "Reference" });
+      reference.validate(":shouldBeFavorite");
+      reference.validatesPresenceOf("job_id");
+
+      const person = class extends Base {
         static {
-          this._tableName = "people";
-          this.attribute("name", "string");
-          this.hasMany("references", {
-            autosave: true,
-            indexErrors: true,
-            className: "IndexErrorsReference",
-            foreignKey: "person_id",
-          });
+          this.tableName = "people";
         }
-      }
-      registerModel("IndexErrorsPerson", IndexErrorsPerson);
-      registerModel("IndexErrorsReference", IndexErrorsReference);
+      };
+      person.hasMany("references", {
+        autosave: true,
+        indexErrors: true,
+        anonymousClass: reference,
+      });
+      Object.defineProperty(person, "name", { value: "Person" });
 
-      const refValid = new IndexErrorsReference({ favorite: true, job_id: 1 });
-      const refInvalid = new IndexErrorsReference({ favorite: false });
-      const p = new IndexErrorsPerson({});
-      cacheAssoc(p, "references", [refValid, refInvalid]);
+      const p = new person() as any;
+      const referenceValid = new reference({ favorite: true, job_id: 1 });
+      const referenceInvalid = new reference({ favorite: false });
+      await p.references.replace([referenceValid, referenceInvalid]);
 
-      expect(await refValid.isValid()).toBe(true);
-      expect(await refInvalid.isValid()).toBe(false);
-      expect(await p.isValid()).toBe(false);
+      assertPredicate(await referenceValid.isValid(), (v) => v);
+      assertNotPredicate(await referenceInvalid.isValid(), (v) => v);
+      assertNotPredicate(await p.isValid(), (v) => v);
       expect(p.errors.fullMessages).toEqual(["should be favorite", "can't be blank"]);
     } finally {
-      ModelError.i18nCustomizeFullMessage = oldCustomize;
+      ModelError.i18nCustomizeFullMessage = oldI18nCustomizeFullMessage;
       resetI18n();
     }
   });
   it("indexed errors on base attribute should be properly translated", async () => {
-    I18n.backend().storeTranslations("en", {
-      activerecord: {
-        attributes: {
-          base_errors_person: { reference: "Super reference" },
-          reference: { base: "" },
-        },
-      },
-    });
     try {
-      class BaseErrorsReference extends Base {
-        declare favorite: boolean | null;
-        declare job_id: number | null;
-        declare person_id: number | null;
-
+      I18n.backend().storeTranslations("en", {
+        activerecord: {
+          attributes: {
+            person: {
+              reference: "Super reference",
+            },
+            reference: {
+              base: "",
+            },
+          },
+        },
+      });
+      const reference = class extends Base {
         static {
-          this.attribute("favorite", "boolean");
-          this.attribute("job_id", "integer");
-          this.attribute("person_id", "integer");
-          this.validate(function (record: any) {
-            if (!record.favorite) record.errors.add("base", "should be favorite");
-          });
-          this.validates("job_id", { presence: true });
+          this.tableName = "references";
         }
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-      class BaseErrorsPerson extends Base {
-        declare name: string | null;
 
+        shouldBeFavorite(this: any) {
+          if (!this.favorite) this.errors.add("base", "should be favorite");
+        }
+      };
+      Object.defineProperty(reference, "name", { value: "Reference" });
+      reference.validate(":shouldBeFavorite");
+      reference.validatesPresenceOf("job_id");
+
+      const person = class extends Base {
         static {
-          this._tableName = "people";
-          this.attribute("name", "string");
-          this.validates("reference", { presence: true });
-          this.hasOne("reference", {
-            autosave: true,
-            className: "BaseErrorsReference",
-            foreignKey: "person_id",
-          });
+          this.tableName = "people";
         }
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-      interface BaseErrorsPerson {
-        get reference(): BaseErrorsReference | null | Promise<BaseErrorsReference | null>;
-        set reference(value: BaseErrorsReference | null);
-      }
-      registerModel("BaseErrorsPerson", BaseErrorsPerson);
-      registerModel("BaseErrorsReference", BaseErrorsReference);
+      };
+      Object.defineProperty(person, "name", { value: "Person" });
+      person.hasOne("reference", { autosave: true, anonymousClass: reference });
+      person.validates("reference", { presence: true });
 
-      const p = new BaseErrorsPerson({});
-      expect(await p.isValid()).toBe(false);
+      const p = new person() as any;
+      assertNotPredicate(await p.isValid(), (v) => v);
       expect(p.errors.fullMessages).toEqual(["Super reference can't be blank"]);
 
-      const refInvalid = new BaseErrorsReference({ favorite: false });
-      cacheAssoc(p, "reference", refInvalid);
-      expect(await refInvalid.isValid()).toBe(false);
-      expect(await p.isValid()).toBe(false);
+      const referenceInvalid = new reference({ favorite: false });
+      await p.setReference(referenceInvalid);
+
+      assertNotPredicate(await referenceInvalid.isValid(), (v) => v);
+      assertNotPredicate(await p.isValid(), (v) => v);
       expect(p.errors.fullMessages).toEqual([
         " should be favorite",
         "Reference job can't be blank",

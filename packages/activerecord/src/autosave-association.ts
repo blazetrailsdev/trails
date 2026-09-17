@@ -344,7 +344,7 @@ export async function validateHasOneAssociation(
   reflection: any,
 ): Promise<void> {
   const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  const record = inst?.target;
+  const record = inst && (await inst.reader);
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
@@ -370,7 +370,7 @@ export async function validateBelongsToAssociation(
   reflection: any,
 ): Promise<void> {
   const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  const record = inst?.target;
+  const record = inst && (await inst.reader);
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
