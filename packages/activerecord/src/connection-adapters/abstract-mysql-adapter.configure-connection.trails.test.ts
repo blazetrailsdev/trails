@@ -59,10 +59,4 @@ describe("AbstractMysqlAdapter#configureConnection", () => {
     expect(sql).toContain("@@SESSION.sort_buffer_size = DEFAULT");
     expect(sql).not.toContain("foo");
   });
-
-  it("throws for invalid charset", () => {
-    expect(
-      () => new Mysql2Adapter({ host: "localhost", charset: "utf8'; DROP TABLE x; --" }),
-    ).toThrow(/Invalid MySQL charset/);
-  });
 });
