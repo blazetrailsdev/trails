@@ -1381,6 +1381,8 @@ describe("TestDateParse", () => {
         const h2 = Date._parse(x[0], x[1]);
         // eslint-disable-next-line vitest/no-conditional-expect -- Ruby's `if y[6]` guards it too
         expect(h2.zone, l).toBe(y[6]);
+        // eslint-disable-next-line vitest/no-conditional-expect -- Ruby's `if y[6]` guards it too
+        expect(typeof h2.zone, l).toBe(typeof y[6]);
       }
     }
   });

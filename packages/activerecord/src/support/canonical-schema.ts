@@ -332,6 +332,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.index("author_address_extra_id");
     t.string("organization_id");
     t.string("owned_essay_id");
+    t.foreignKey("author_addresses", {
+      column: "author_address_id",
+      deferrable: "immediate",
+    });
   });
 
   await define("author_favorites", {}, (t) => {
