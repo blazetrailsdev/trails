@@ -189,7 +189,7 @@ export class PublishedBook extends Base {
   static _tableName = "books";
 
   static {
-    this.validates("isbn", { uniqueness: true });
     this.enum("cover", { hard: "0", soft: "1" }, { default: "hard" });
+    this.validates("isbn", { uniqueness: true });
   }
 }

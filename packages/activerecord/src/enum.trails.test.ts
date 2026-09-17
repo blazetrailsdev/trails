@@ -18,6 +18,16 @@ import { Lion } from "./test-helpers/models/cat.js";
 describe("Enum name conflict detection", () => {
   fixtures(["books"]);
 
+  it("clears every status predicate when the column reads back NULL", async () => {
+    const book = await Book.first();
+    await Book.where({ id: book!.id }).updateAll("status = NULL");
+    await book!.reload();
+
+    expect(book!.isPublished()).toBeFalsy();
+    expect(book!.isWritten()).toBeFalsy();
+    expect(book!.isProposed()).toBeFalsy();
+  });
+
   it("does not treat a user method on an ancestor class as a conflict", () => {
     class Parent extends Base {
       static _tableName = "books";

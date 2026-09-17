@@ -386,6 +386,17 @@ export function assertNotRespondTo(actual: unknown, name: string, message?: stri
   );
 }
 
+/** @noRailsEquivalent PERMANENT */
+export function assertInDelta(
+  expected: number,
+  actual: number,
+  delta: number = 0.001,
+  message?: string,
+): void {
+  const n = Math.abs(expected - actual);
+  assert(delta >= n, message ?? `Expected |${expected} - ${actual}| (${n}) to be <= ${delta}`);
+}
+
 function respondsTo(object: object, name: string): boolean {
   if (name in object) {
     const descriptor = findDescriptor(object, name);

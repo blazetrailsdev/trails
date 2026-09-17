@@ -383,7 +383,7 @@ describe("StrictLoadingTest", () => {
     const loaded = await Developer.all().strictLoading().includes(":firms").first();
     expect(loaded!.isStrictLoading()).toBeTruthy();
 
-    const firms = (loaded as any).association("firms").target ?? [];
+    const firms = (loaded as any).association("firms").target;
 
     for (const block of [
       () => association(firms[0], "contracts").first(),
@@ -406,7 +406,7 @@ describe("StrictLoadingTest", () => {
       (computer as any).developer,
     );
 
-    await expect(computer.save()).resolves.not.toThrow();
+    await expect(computer.saveBang()).resolves.not.toThrow();
   });
 
   it("preload audit logs are strict loading because parent is strict loading", async () => {
@@ -418,7 +418,7 @@ describe("StrictLoadingTest", () => {
     const dev = (await Developer.all().includes(":auditLogs").strictLoading().first())!;
     expect(dev.isStrictLoading()).toBeTruthy();
 
-    const logs = (dev as any).association("auditLogs").target ?? [];
+    const logs = (dev as any).association("auditLogs").target;
     expect(logs.every((l: any) => l._strictLoading)).toBeTruthy();
   });
 
@@ -432,7 +432,7 @@ describe("StrictLoadingTest", () => {
       const dev = (await Developer.all().includes(":auditLogs").first())!;
       expect(dev.isStrictLoading()).toBeFalsy();
 
-      const logs = (dev as any).association("auditLogs").target ?? [];
+      const logs = (dev as any).association("auditLogs").target;
       expect(logs.every((l: any) => l._strictLoading)).toBeTruthy();
     });
   });
@@ -444,11 +444,11 @@ describe("StrictLoadingTest", () => {
     }
 
     const dev = (await Developer.all().eagerLoad(":strictLoadingAuditLogs").first())!;
-    const logs = (dev as any).association("strictLoadingAuditLogs").target ?? [];
+    const logs = (dev as any).association("strictLoadingAuditLogs").target;
     expect(logs.every((l: any) => l._strictLoading)).toBeTruthy();
 
     const dev2 = (await Developer.all().eagerLoad(":auditLogs").strictLoading(false).first())!;
-    const logs2 = (dev2 as any).association("auditLogs").target ?? [];
+    const logs2 = (dev2 as any).association("auditLogs").target;
     expect(logs2.every((l: any) => !l._strictLoading)).toBeTruthy();
   });
 
@@ -460,12 +460,12 @@ describe("StrictLoadingTest", () => {
 
     const dev = (await Developer.all().eagerLoad(":auditLogs").strictLoading().first())!;
     expect(dev.isStrictLoading()).toBeTruthy();
-    const logs = (dev as any).association("auditLogs").target ?? [];
+    const logs = (dev as any).association("auditLogs").target;
     expect(logs.every((l: any) => l._strictLoading)).toBeTruthy();
 
     const dev2 = (await Developer.all().eagerLoad(":auditLogs").strictLoading(false).first())!;
     expect(dev2.isStrictLoading()).toBeFalsy();
-    const logs2 = (dev2 as any).association("auditLogs").target ?? [];
+    const logs2 = (dev2 as any).association("auditLogs").target;
     expect(logs2.every((l: any) => !l._strictLoading)).toBeTruthy();
   });
 
@@ -480,7 +480,7 @@ describe("StrictLoadingTest", () => {
       expect(dev.isStrictLoading()).toBeFalsy();
       expect((await AuditLog.last())?.isStrictLoading()).toBeTruthy();
 
-      const logs = (dev as any).association("auditLogs").target ?? [];
+      const logs = (dev as any).association("auditLogs").target;
       expect(logs.every((l: Base) => l.isStrictLoading())).toBeTruthy();
     });
   });

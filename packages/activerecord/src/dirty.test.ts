@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { TimeWithZone, zone as timeZone, assertEmpty } from "@blazetrails/activesupport";
+import {
+  TimeWithZone,
+  zone as timeZone,
+  assertEmpty,
+  assertInDelta,
+} from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
@@ -1008,9 +1013,10 @@ describe("DirtyTest", () => {
       await aircraft.reload();
 
       expect(aircraft.name).toBe("Boeing");
-      expect((aircraft.manufactured_at as RubyTime).toF()).toBeCloseTo(
+      assertInDelta(
         Temporal.Now.instant().epochMilliseconds / 1000,
-        -1,
+        (aircraft.manufactured_at as RubyTime).toF(),
+        1.1,
       );
     });
   });

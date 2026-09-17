@@ -20,59 +20,6 @@ import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 type EnumValue = number | string | boolean | null;
 
-/**
- * Register an EnumType in the attribute set and install the label-returning
- * accessor, the single Rails-faithful storage model used by the `Base.enum`
- * macro (`_enum`). After this, the attribute
- * stores the label string (via EnumType.cast on write), the getter returns it,
- * and assignment runs `assertValidValue`.
- *
- * Mirrors: ActiveRecord::Enum#_enum calling `attribute(name, **options)` then
- * `decorate_attributes([name]) { |_n, subtype| EnumType.new(...) }` (enum.rb:238-247).
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the attribute(...) + decorate_attributes pair of Enum#_enum (enum.rb:222-247), extracted from the macro body.
- */
-export function installEnumAttribute(
-  klass: typeof Base,
-  name: string,
-  mapping: Record<string, EnumValue>,
-  raiseOnInvalidValues: boolean,
-  attributeOptions?: { default?: unknown },
-): void {
-  if (attributeOptions && "default" in attributeOptions) {
-    klass.attribute(name, { default: attributeOptions.default });
-  } else {
-    klass.attribute(name);
-  }
-  klass.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
-    if (subtype === defaultValue()) {
-      throw new RuntimeError(
-        `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
-          " backed by a database column or declared with an explicit type" +
-          " via `attribute`.",
-      );
-    }
-    if (subtype instanceof EnumType) subtype = subtype.subtype;
-    return new EnumType(
-      name,
-      new HashWithIndifferentAccess<EnumValue>(mapping),
-      subtype!,
-      raiseOnInvalidValues,
-    );
-  });
-
-  Object.defineProperty(klass.prototype, name, {
-    get(this: Base) {
-      return (this as unknown as EnumInstanceHost).readAttribute(name);
-    },
-    set(this: Base, value: unknown) {
-      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
-    },
-    configurable: true,
-  });
-}
-
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
   readAttribute(name: string): unknown;
@@ -260,7 +207,7 @@ export function enumMethod(
   values: string[] | Record<string, EnumValue>,
   options?: EnumMacroOptions,
 ): void {
-  if (values == null) {
+  if (values == null || (values as unknown) === false) {
     [values, options] = [(options ?? {}) as Record<string, EnumValue>, {}];
   }
   _enum.call(this, name, values, options);
@@ -312,13 +259,40 @@ export function _enum(
   const toCamel = (s: string) => camelize(s, false);
 
   const validate = options?.validate ?? false;
-  installEnumAttribute(
-    this,
-    name,
-    mapping,
-    !validate,
-    options && "default" in options ? { default: options.default } : undefined,
-  );
+
+  if (options && "default" in options) {
+    this.attribute(name, { default: options.default });
+  } else {
+    this.attribute(name);
+  }
+
+  const klass = this;
+  this.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
+    if (subtype === defaultValue()) {
+      throw new RuntimeError(
+        `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
+          " backed by a database column or declared with an explicit type" +
+          " via `attribute`.",
+      );
+    }
+    if (subtype instanceof EnumType) subtype = subtype.subtype;
+    return new EnumType(
+      name,
+      new HashWithIndifferentAccess<EnumValue>(mapping),
+      subtype!,
+      !validate,
+    );
+  });
+
+  Object.defineProperty(this.prototype, name, {
+    get(this: Base) {
+      return (this as unknown as EnumInstanceHost).readAttribute(name);
+    },
+    set(this: Base, value: unknown) {
+      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
+    },
+    configurable: true,
+  });
 
   const scopes = options?.scopes !== false;
   const instanceMethods = options?.instanceMethods !== false;
