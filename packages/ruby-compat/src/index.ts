@@ -113,6 +113,7 @@ export {
   include,
   included,
   initialize,
+  includedModules,
   initializeIncludedModules,
   isModuleIncluded,
   moduleVisibility,

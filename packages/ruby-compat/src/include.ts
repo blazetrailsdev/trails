@@ -172,6 +172,46 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's Module#append_features — vendor/ruby/eval.c:1110
+   * `rb_mod_append_features`, the splice `include` runs before `included`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  appendFeatures(base: AnyClass): void {
+    trackIncludedModule(base.prototype, this);
+    const instanceInitializer = (this as ModuleHooks)[initialize];
+    if (typeof instanceInitializer === "function") {
+      trackInstanceInitializer(base.prototype, instanceInitializer);
+    }
+    const proto = base.prototype as object;
+    const link = Object.create(Object.getPrototypeOf(proto)) as object;
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
+    let links = includerCarriers.get(this);
+    if (!links) includerCarriers.set(this, (links = []));
+    links.push(link);
+    Object.setPrototypeOf(proto, link);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#prepend_features — vendor/ruby/eval.c:1175
+   * `rb_mod_prepend_features`, the splice `prepend` runs before `prepended`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  prependFeatures(base: AnyClass): void {
+    trackIncludedModule(base.prototype, this);
+    const instanceInitializer = (this as ModuleHooks)[initialize];
+    if (typeof instanceInitializer === "function") {
+      trackInstanceInitializer(base.prototype, instanceInitializer, prependedInstanceInitializers);
+    }
+    const source = carrierOf(this);
+    for (const key of Object.getOwnPropertyNames(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (descriptor) Object.defineProperty(base.prototype, key, descriptor);
+    }
+  }
+
+  /**
    * Mirrors: Ruby's Module#method_defined? — vendor/ruby/vm_method.c:2055
    * `rb_mod_method_defined`.
    *
@@ -320,7 +360,7 @@ const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
-const includedModules = Symbol.for("@blazetrails/ruby-compat:includedModules");
+const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
@@ -339,10 +379,10 @@ function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string
 }
 
 function trackIncludedModule(proto: object, mod: unknown): void {
-  let set = (proto as Record<symbol, unknown>)[includedModules] as Set<unknown> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) {
+  let set = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown> | undefined;
+  if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) {
     set = new Set<unknown>();
-    Object.defineProperty(proto, includedModules, {
+    Object.defineProperty(proto, includedModulesKey, {
       value: set,
       writable: true,
       configurable: true,
@@ -358,8 +398,9 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
-    if (((proto as Record<symbol, unknown>)[includedModules] as Set<unknown>).has(mod)) return true;
+    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
+    if (((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod))
+      return true;
   }
   return false;
 }
@@ -397,11 +438,36 @@ export function isModuleIncluded(
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
-    const mods = (proto as Record<symbol, unknown>)[includedModules] as Set<unknown>;
+    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
+    const mods = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>;
     for (const m of mods) if (eq.call(mod, m)) return true;
   }
   return false;
+}
+
+/**
+ * Ruby's `Module#included_modules`: every module in `mod`'s ancestry, most
+ * recently mixed in first. A class's singleton ancestry is its constructor's
+ * static chain, so `includedModules({ prototype: klass })` answers
+ * `klass.singleton_class.included_modules`.
+ *
+ * Mirrors: Ruby's Module#included_modules — vendor/ruby/class.c:1508
+ * `rb_mod_included_modules`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function includedModules(mod: { prototype: object }): unknown[] {
+  const result: unknown[] = [];
+  for (
+    let proto: object | null = mod.prototype;
+    proto;
+    proto = Object.getPrototypeOf(proto) as object | null
+  ) {
+    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
+    const mods = [...((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
+    for (const m of mods.reverse()) if (!result.includes(m)) result.push(m);
+  }
+  return result;
 }
 
 /**
@@ -535,6 +601,7 @@ export type Included<M extends object> = CallableMethods<M>;
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) return undefined;
   const hook = (mod as unknown as Record<string, unknown>)[name];
+  if (hook === (Module.prototype as unknown as Record<string, unknown>)[name]) return undefined;
   return typeof hook === "function" ? (hook as (base: unknown) => void).bind(mod) : undefined;
 }
 
@@ -554,23 +621,17 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
     }
     return;
   }
-  trackIncludedModule(klass.prototype, mod);
-  const instanceInitializer = (mod as ModuleHooks)[initialize];
-  if (typeof instanceInitializer === "function") {
-    trackInstanceInitializer(klass.prototype, instanceInitializer);
-  }
   if (mod instanceof Module) {
-    const proto = klass.prototype as object;
-    const link = Object.create(Object.getPrototypeOf(proto)) as object;
-    Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(mod)));
-    let links = includerCarriers.get(mod);
-    if (!links) includerCarriers.set(mod, (links = []));
-    links.push(link);
-    Object.setPrototypeOf(proto, link);
+    mod.appendFeatures(klass);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
     }
     return;
+  }
+  trackIncludedModule(klass.prototype, mod);
+  const instanceInitializer = (mod as ModuleHooks)[initialize];
+  if (typeof instanceInitializer === "function") {
+    trackInstanceInitializer(klass.prototype, instanceInitializer);
   }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);
@@ -663,17 +724,13 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
   if (isModuleMethodTablePresent(klass, mod)) return;
+  if (mod instanceof Module) return mod.prependFeatures(klass);
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     trackInstanceInitializer(klass.prototype, instanceInitializer, prependedInstanceInitializers);
   }
-  const source =
-    mod instanceof Module
-      ? carrierOf(mod)
-      : typeof mod === "function"
-        ? (mod as AnyClass).prototype
-        : mod;
+  const source = typeof mod === "function" ? (mod as AnyClass).prototype : mod;
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
@@ -750,6 +807,7 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
     }
   }
 
+  trackIncludedModule(klass, mod);
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }

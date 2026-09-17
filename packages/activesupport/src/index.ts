@@ -316,9 +316,6 @@ export type {
   CallbackObject,
 } from "./callbacks.js";
 
-export { concern, includeConcern, hasConcern } from "./concern.js";
-export type { ConcernDefinition, ConcernMixin } from "./concern.js";
-
 export { classAttribute } from "./class-attribute.js";
 export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";

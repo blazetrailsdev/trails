@@ -1,4 +1,5 @@
-import { extend as extendModule, extended } from "@blazetrails/ruby-compat";
+import { Module, extend, extended, include } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, prepend } from "@blazetrails/ruby-compat/include";
 
 export class MultipleIncludedBlocks extends Error {
   constructor() {
@@ -14,128 +15,81 @@ export class MultiplePrependBlocks extends Error {
   }
 }
 
-export interface ConcernDefinition {
-  dependencies?: ConcernMixin[];
-  included?: (base: any) => void;
-  prepended?: (base: any) => void;
-  classMethods?: Record<string, (...args: any[]) => any>;
-  instanceMethods?: Record<string, (...args: any[]) => any>;
-  prepend?: boolean;
+type AnyClass = abstract new (...args: any[]) => any;
+
+interface ConcernHost extends Module {
+  _dependencies?: ConcernHost[];
+  _includedBlock?: (this: any) => void;
+  _prependedBlock?: (this: any) => void;
+  ClassMethods?: Record<string, unknown>;
 }
 
-export interface ConcernMixin {
-  __concern: true;
-  definition: ConcernDefinition;
-}
+export const Concern = {
+  [extended](base: ConcernHost): void {
+    base._dependencies = [];
+  },
 
-const INCLUDED_CONCERNS = Symbol("includedConcerns");
-const INCLUDED_BLOCK = Symbol("includedBlock");
-const PREPENDED_BLOCK = Symbol("prependedBlock");
-
-function prependMethods(klass: any, methods: Record<string, (...args: any[]) => any>): void {
-  const descriptor = {
-    value: undefined as any,
-    writable: true,
-    configurable: true,
-    enumerable: false,
-  };
-  for (const [name, fn] of Object.entries(methods)) {
-    const existing = klass.prototype[name];
-    if (existing) {
-      descriptor.value = existing;
-      Object.defineProperty(klass.prototype, `_super_${name}`, descriptor);
-    }
-    descriptor.value = fn;
-    Object.defineProperty(klass.prototype, name, descriptor);
-  }
-}
-
-export namespace Concern {
-  export function define(definition: ConcernDefinition): ConcernMixin {
-    return { __concern: true, definition };
-  }
-
-  export function include(klass: any, mixin: ConcernMixin): void {
-    if (!Object.prototype.hasOwnProperty.call(klass, INCLUDED_CONCERNS)) {
-      const inherited: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
-      klass[INCLUDED_CONCERNS] = inherited ? new Set(inherited) : new Set<ConcernMixin>();
-    }
-    const includedSet: Set<ConcernMixin> = klass[INCLUDED_CONCERNS];
-
-    if (includedSet.has(mixin)) return;
-    includedSet.add(mixin);
-
-    const def = mixin.definition;
-
-    if (def.dependencies) {
-      for (const dep of def.dependencies) {
-        include(klass, dep);
+  appendFeatures(this: ConcernHost, base: AnyClass | ConcernHost): boolean | void {
+    if (Object.prototype.hasOwnProperty.call(base, "_dependencies")) {
+      (base as ConcernHost)._dependencies!.push(this);
+      return false;
+    } else {
+      if (isModuleIncluded(base as AnyClass, this)) return false;
+      for (const dep of this._dependencies!) include(base as AnyClass, dep);
+      Module.prototype.appendFeatures.call(this, base as AnyClass);
+      if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
+        extend(base as AnyClass, this.ClassMethods!);
+      }
+      if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
+        this._includedBlock!.call(base);
       }
     }
+  },
 
-    if (def.instanceMethods) {
-      if (def.prepend) {
-        prependMethods(klass, def.instanceMethods);
-      } else {
-        for (const [name, method] of Object.entries(def.instanceMethods)) {
-          Object.defineProperty(klass.prototype, name, {
-            value: method,
-            writable: true,
-            configurable: true,
-            enumerable: false,
-          });
-        }
-        if (typeof (def.instanceMethods as any)[extended] === "function") {
-          (def.instanceMethods as any)[extended](klass.prototype);
-        }
+  prependFeatures(this: ConcernHost, base: AnyClass | ConcernHost): boolean | void {
+    if (Object.prototype.hasOwnProperty.call(base, "_dependencies")) {
+      (base as ConcernHost)._dependencies!.unshift(this);
+      return false;
+    } else {
+      if (isModuleIncluded(base as AnyClass, this)) return false;
+      for (const dep of this._dependencies!) prepend(base as AnyClass, dep);
+      Module.prototype.prependFeatures.call(this, base as AnyClass);
+      if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
+        prepend({ prototype: base } as unknown as AnyClass, this.ClassMethods!);
+      }
+      if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
+        this._prependedBlock!.call(base);
       }
     }
+  },
 
-    if (def.classMethods) {
-      extendModule(klass, def.classMethods);
-    }
-
-    const includedBlock = def.included ?? (mixin as any)[INCLUDED_BLOCK];
-    if (includedBlock) {
-      includedBlock(klass);
-    }
-
-    if (def.prepend) {
-      const prependedBlock = def.prepended ?? (mixin as any)[PREPENDED_BLOCK];
-      if (prependedBlock) {
-        prependedBlock(klass);
+  included(this: ConcernHost, block: (this: any) => void): void {
+    if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
+      if (this._includedBlock!.toString() !== block.toString()) {
+        throw new MultipleIncludedBlocks();
       }
+    } else {
+      this._includedBlock = block;
     }
-  }
+  },
 
-  export function hasConcern(klass: any, mixin: ConcernMixin): boolean {
-    const includedSet: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
-    return includedSet?.has(mixin) ?? false;
-  }
-
-  export function setIncludedBlock(target: any, block: (base: any) => void): void {
-    if (Object.prototype.hasOwnProperty.call(target, INCLUDED_BLOCK)) {
-      throw new MultipleIncludedBlocks();
+  prepended(this: ConcernHost, block: (this: any) => void): void {
+    if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
+      if (this._prependedBlock!.toString() !== block.toString()) {
+        throw new MultiplePrependBlocks();
+      }
+    } else {
+      this._prependedBlock = block;
     }
-    target[INCLUDED_BLOCK] = block;
-  }
+  },
 
-  export function setPrependedBlock(target: any, block: (base: any) => void): void {
-    if (Object.prototype.hasOwnProperty.call(target, PREPENDED_BLOCK)) {
-      throw new MultiplePrependBlocks();
-    }
-    target[PREPENDED_BLOCK] = block;
-  }
-}
-
-export function concern(definition: ConcernDefinition): ConcernMixin {
-  return Concern.define(definition);
-}
-
-export function includeConcern(klass: any, mixin: ConcernMixin): void {
-  Concern.include(klass, mixin);
-}
-
-export function hasConcern(klass: any, mixin: ConcernMixin): boolean {
-  return Concern.hasConcern(klass, mixin);
-}
+  classMethods(
+    this: ConcernHost,
+    classMethodsModuleDefinition: (mod: Record<string, unknown>) => void,
+  ): void {
+    const mod = Object.prototype.hasOwnProperty.call(this, "ClassMethods")
+      ? this.ClassMethods!
+      : (this.ClassMethods = {});
+    classMethodsModuleDefinition(mod);
+  },
+};
