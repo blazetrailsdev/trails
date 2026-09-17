@@ -553,7 +553,7 @@ export class ConnectionPool implements ReapablePool {
     }
     let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     if (!conn) {
-      this._stealStaleOwnedConnections();
+      void this.reap().catch(() => {});
       conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     }
     if (!conn) {
@@ -704,17 +704,15 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
-  private _stealStaleOwnedConnections(): DatabaseAdapter[] {
-    if (this.isDiscarded()) return [];
-    const stale = (this._connections ?? []).filter((conn) => conn.inUse && !conn.owner!.isAlive());
-    for (const conn of stale) conn.stealBang();
-    return stale;
-  }
-
   async reap(): Promise<void> {
-    const staleConnections = await (synchronize<DatabaseAdapter[]>).call(this, () =>
-      this._stealStaleOwnedConnections(),
-    );
+    const staleConnections = await (synchronize<DatabaseAdapter[]>).call(this, () => {
+      if (this.isDiscarded()) return [];
+      const stale = (this._connections ?? []).filter(
+        (conn) => conn.inUse && !conn.owner!.isAlive(),
+      );
+      for (const conn of stale) conn.stealBang();
+      return stale;
+    });
 
     for (const conn of staleConnections) {
       if (await conn.active()) {
