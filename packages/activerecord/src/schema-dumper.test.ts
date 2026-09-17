@@ -7,6 +7,7 @@ import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
+import { Current } from "./migration.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import {
   dumpAllTableSchema,
@@ -42,6 +43,24 @@ function columnDefinitionLines(output: string): string[][] {
   return [...output.matchAll(/^( *)createTable.*?\n([\s\S]*?)^\1\}\);$/gm)].map((m) =>
     m[2].split(/\n/),
   );
+}
+
+class CreateCatMigration extends Current {
+  override async up(): Promise<void> {
+    await this.createTable("cat_owners", {}, () => {});
+
+    await this.createTable("cats", {}, (t) => {
+      t.column("name", "string");
+      t.references("owner");
+      t.index(["name"]);
+      t.foreignKey("cat_owners", { column: "owner_id" });
+    });
+  }
+  override async down(): Promise<void> {
+    // eslint-disable-next-line blazetrails/require-table-teardown -- CreateCatMigration#down drops the two in order, the child first
+    await this.dropTable("cats");
+    await this.dropTable("cat_owners");
+  }
 }
 
 const PRIMARY_KEY_ADAPTER = {
@@ -442,46 +461,7 @@ describe("SchemaDumperTest", () => {
   );
 
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
-    const testAdapter = Base.connection;
-    await testAdapter.createTable("test_exclusion_constraints", { id: false, force: true }, (t) => {
-      t.date("start_date");
-      t.date("end_date");
-      t.date("valid_from");
-      t.date("valid_to");
-      t.date("transaction_from");
-      t.date("transaction_to");
-    });
-    await (testAdapter as any).addExclusionConstraint(
-      "test_exclusion_constraints",
-      "daterange(start_date, end_date) WITH &&",
-      {
-        where: "(start_date IS NOT NULL) AND (end_date IS NOT NULL)",
-        using: "gist",
-        name: "test_exclusion_constraints_date_overlap",
-      },
-    );
-    await (testAdapter as any).addExclusionConstraint(
-      "test_exclusion_constraints",
-      "daterange(valid_from, valid_to) WITH &&",
-      {
-        where: "(valid_from IS NOT NULL) AND (valid_to IS NOT NULL)",
-        using: "gist",
-        deferrable: ":immediate",
-        name: "test_exclusion_constraints_valid_overlap",
-      },
-    );
-    await (testAdapter as any).addExclusionConstraint(
-      "test_exclusion_constraints",
-      "daterange(transaction_from, transaction_to) WITH &&",
-      {
-        where: "(transaction_from IS NOT NULL) AND (transaction_to IS NOT NULL)",
-        using: "gist",
-        deferrable: ":deferred",
-        name: "test_exclusion_constraints_transaction_overlap",
-      },
-    );
-
-    const output = await dumpTableSchema(testAdapter, "test_exclusion_constraints");
+    const output = await dumpTableSchema(Base.connection, "test_exclusion_constraints");
     const constraintDefinitions = output
       .split(/\n/)
       .filter((line) => /test_exclusion_constraints_.*_overlap/.test(line));
@@ -498,30 +478,7 @@ describe("SchemaDumperTest", () => {
     );
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
-    const testAdapter = Base.connection;
-    await testAdapter.createTable("test_unique_constraints", { force: true }, (t) => {
-      t.integer("position_1");
-      t.integer("position_2");
-      t.integer("position_3");
-      t.integer("position_4");
-    });
-    await (testAdapter as any).addUniqueConstraint("test_unique_constraints", ["position_1"], {
-      name: "test_unique_constraints_position_deferrable_false",
-    });
-    await (testAdapter as any).addUniqueConstraint("test_unique_constraints", ["position_2"], {
-      deferrable: ":immediate",
-      name: "test_unique_constraints_position_deferrable_immediate",
-    });
-    await (testAdapter as any).addUniqueConstraint("test_unique_constraints", ["position_3"], {
-      deferrable: ":deferred",
-      name: "test_unique_constraints_position_deferrable_deferred",
-    });
-    await (testAdapter as any).addUniqueConstraint("test_unique_constraints", ["position_4"], {
-      nullsNotDistinct: true,
-      name: "test_unique_constraints_position_nulls_not_distinct",
-    });
-
-    const output = await dumpTableSchema(testAdapter, "test_unique_constraints");
+    const output = await dumpTableSchema(Base.connection, "test_unique_constraints");
     const constraintDefinitions = output
       .split(/\n/)
       .filter((line) => /t\.uniqueConstraint/.test(line));
@@ -544,15 +501,7 @@ describe("SchemaDumperTest", () => {
     "unique_constraints",
     "schema does not dump unique constraints as indexes",
     async () => {
-      const testAdapter = Base.connection;
-      await testAdapter.createTable("test_unique_constraints", { force: true }, (t) => {
-        t.integer("position_1");
-      });
-      await (testAdapter as any).addUniqueConstraint("test_unique_constraints", ["position_1"], {
-        name: "test_unique_constraints_position_deferrable_false",
-      });
-
-      const output = await dumpTableSchema(testAdapter, "test_unique_constraints");
+      const output = await dumpTableSchema(Base.connection, "test_unique_constraints");
       const uniqueIndexDefinitions = output
         .split(/\n/)
         .filter((line) => /t\.index.*unique: true/.test(line));
@@ -761,29 +710,13 @@ describe("SchemaDumperTest", () => {
     );
   });
 
-  async function createCatTables(prefix: string, suffix: string): Promise<void> {
-    const owners = `${prefix}cat_owners${suffix}`;
-    const cats = `${prefix}cats${suffix}`;
-    await Base.connection.createTable(owners, { force: true }, () => {});
-    await Base.connection.createTable(cats, { force: true }, (t) => {
-      t.column("name", "string");
-      t.references("owner");
-      t.index(["name"]);
-      t.foreignKey(owners, { column: "owner_id" });
-    });
-  }
-
-  async function dropCatTables(prefix: string, suffix: string): Promise<void> {
-    await Base.connection.dropTable(`${prefix}cats${suffix}`, { ifExists: true });
-    await Base.connection.dropTable(`${prefix}cat_owners${suffix}`, { ifExists: true });
-  }
-
   it("schema dump with table name prefix and suffix", async () => {
-    await createCatTables("foo_", "_bar");
     const prefixWas = Base.tableNamePrefix;
     const suffixWas = Base.tableNameSuffix;
     Base.tableNamePrefix = "foo_";
     Base.tableNameSuffix = "_bar";
+    const migration = new CreateCatMigration();
+    await migration.migrate("up");
     try {
       const output = await dumpTableSchema(Base.connection, "foo_cat_owners_bar", "foo_cats_bar");
 
@@ -801,18 +734,19 @@ describe("SchemaDumperTest", () => {
         expect(output).not.toMatch(/addForeignKey\("[^"]+", "foo_.+_bar"/);
       }
     } finally {
+      await migration.migrate("down");
       Base.tableNamePrefix = prefixWas;
       Base.tableNameSuffix = suffixWas;
-      await dropCatTables("foo_", "_bar");
     }
   });
 
   it("schema dump with table name prefix and suffix regexp escape", async () => {
-    await createCatTables("foo$", "$bar");
     const prefixWas = Base.tableNamePrefix;
     const suffixWas = Base.tableNameSuffix;
     Base.tableNamePrefix = "foo$";
     Base.tableNameSuffix = "$bar";
+    const migration = new CreateCatMigration();
+    await migration.migrate("up");
     try {
       const output = await dumpTableSchema(Base.connection, "foo$cat_owners$bar", "foo$cats$bar");
 
@@ -830,9 +764,9 @@ describe("SchemaDumperTest", () => {
         expect(output).not.toMatch(/addForeignKey\("[^"]+", "foo\$.+\$bar"/);
       }
     } finally {
+      await migration.migrate("down");
       Base.tableNamePrefix = prefixWas;
       Base.tableNameSuffix = suffixWas;
-      await dropCatTables("foo$", "$bar");
     }
   });
   it("schema dump with table name prefix and ignoring tables", async () => {
@@ -1083,11 +1017,5 @@ afterAll(async () => {
   await Base.connection.dropTable("dump_string_key_objects", o);
   await Base.connection.dropTable("infinity_defaults", o);
   await Base.connection.dropTable("schema_dump_probe", o);
-  await Base.connection.dropTable("test_exclusion_constraints", o);
-  await Base.connection.dropTable("test_unique_constraints", o);
-  await Base.connection.dropTable("foo_cats_bar", o);
-  await Base.connection.dropTable("foo_cat_owners_bar", o);
-  await Base.connection.dropTable("foo$cats$bar", o);
-  await Base.connection.dropTable("foo$cat_owners$bar", o);
   await Base.connection.dropTable("timestamps", o);
 });

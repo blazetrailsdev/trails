@@ -16,7 +16,6 @@ import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/ruby-com
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
@@ -37,16 +36,12 @@ function configFor(envName: string, name: string): HashConfig | undefined {
   return DatabaseTasks.databaseConfiguration!.configsFor({ envName, name });
 }
 
-function describeArg(arg: unknown): unknown {
-  const config = arg as DatabaseConfig | null;
-  if (config != null && typeof config === "object" && "envName" in config && "name" in config) {
-    return `${config.envName}:${config.name}:${config.database}`;
-  }
-  return arg;
+function sameCall(actual: unknown[], expected: unknown[]): boolean {
+  return actual.length === expected.length && expected.every((arg, i) => Object.is(arg, actual[i]));
 }
 
 function assertCalledWith(spy: MockInstance<any>, args: unknown[]): void {
-  expect(spy.mock.calls.map((call) => call.map(describeArg))).toContainEqual(args.map(describeArg));
+  expect(spy.mock.calls.some((call) => sameCall(call, args))).toBeTruthy();
 }
 
 async function assertCalledForConfigs(
@@ -59,10 +54,12 @@ async function assertCalledForConfigs(
   try {
     await block();
   } finally {
-    calls = mock.mock.calls.map((call) => call.map(describeArg));
+    calls = [...mock.mock.calls];
     mock.mockRestore();
   }
-  expect(calls!).toEqual(configs.map((call) => call.map(describeArg)));
+  expect(
+    calls!.length === configs.length && configs.every((call, i) => sameCall(calls[i], call)),
+  ).toBeTruthy();
 }
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
