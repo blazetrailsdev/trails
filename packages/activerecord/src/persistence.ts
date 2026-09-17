@@ -44,7 +44,7 @@ import {
 import { ScopeRegistry } from "./scoping.js";
 
 interface PersistenceHost {
-  new (attrs?: Record<string, unknown>): any;
+  new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
   _instantiate(
     row: Record<string, unknown>,
     block?: (record: any) => void,
@@ -73,8 +73,7 @@ export async function create(
   }
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
-  const record = new this(mergedAttrs);
-  if (block) block(record);
+  const record = new this(mergedAttrs, block);
   await record.save();
   return record;
 }
@@ -93,8 +92,7 @@ export async function createBang(
   }
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
-  const record = new this(mergedAttrs);
-  if (block) block(record);
+  const record = new this(mergedAttrs, block);
   await record.saveBang();
   return record;
 }

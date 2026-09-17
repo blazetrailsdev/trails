@@ -38,7 +38,7 @@ export class Topic extends Base {
   declare openReplies: AssociationProxy<Reply>;
   declare uniqueReplies: AssociationProxy<UniqueReply>;
   declare sillyUniqueReplies: AssociationProxy<SillyUniqueReply>;
-  declare approved: boolean | null;
+  declare customApproved: unknown;
   declare author_email_address: string;
   declare author_name: string;
   declare binary_content: Uint8Array;
@@ -167,6 +167,15 @@ export class Topic extends Base {
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
     stats.count = (await this.count()) as number;
     return this;
+  }
+
+  get approved(): boolean | null {
+    return this.readAttribute("approved") as boolean | null;
+  }
+
+  set approved(val: boolean | null) {
+    this.customApproved = val;
+    this.writeAttribute("approved", val);
   }
 
   static nestedScoping(scope: any): Relation<Topic> {
