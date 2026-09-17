@@ -34,7 +34,12 @@ import { Electron } from "./test-helpers/models/electron.js";
 import { Guitar } from "./test-helpers/models/guitar.js";
 import { TuningPeg } from "./test-helpers/models/tuning-peg.js";
 import { Squeak } from "./test-helpers/models/squeak.js";
-import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
+import {
+  CpkBook,
+  CpkOrder,
+  CpkOrderAgreement,
+  CpkOrderWithPrimaryKeyAssociatedBook,
+} from "./test-helpers/models/cpk.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
@@ -53,7 +58,9 @@ import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
 import { Chef, ChefWithPolymorphicInverseOf } from "./test-helpers/models/chef.js";
 import {
   assert,
+  assertEmpty,
   assertNot,
+  assertNotEmpty,
   assertNoDifference,
   assertNotPredicate,
   assertNothingRaised,
@@ -612,8 +619,18 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  const { companies, developers } = fixtures(["companies", "developers"]);
+  const { companies, developers, cpkOrderAgreements, cpkOrders, cpkBooks } = fixtures([
+    "companies",
+    "developers",
+    "cpkOrderAgreements",
+    "cpkOrders",
+    "cpkBooks",
+  ]);
   beforeAll(() => {
+    registerModel(CpkOrder);
+    registerModel(CpkBook);
+    registerModel(CpkOrderAgreement);
+    registerModel(CpkOrderWithPrimaryKeyAssociatedBook);
     registerModel(CanonicalCompany);
     registerModel(Firm);
     registerModel(Client);
@@ -627,25 +644,25 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("invalid adding", async () => {
-    const firm = await Firm.find(companies("first_firm").id);
+    const firm = await Firm.find(1);
     const c = new Client();
-    expect(await firm.clientsOfFirm.push(c)).toBeFalsy();
-    expect(c.isPersisted()).toBe(false);
-    expect(await firm.isValid()).toBe(false);
-    expect(await firm.save()).toBe(false);
-    expect(c.isPersisted()).toBe(false);
+    assertNot(await firm.clientsOfFirm.push(c));
+    assertNotPredicate(c, (r) => r.isPersisted());
+    assertNotPredicate(await firm.isValid(), (v) => v);
+    assertNot(await firm.save());
+    assertNotPredicate(c, (r) => r.isPersisted());
   });
 
   it("invalid adding before save", async () => {
     const newFirm = new Firm({ name: "A New Firm, Inc" });
     const c = new Client();
     await newFirm.clientsOfFirm.concat(c, new Client({ name: "Apple" }));
-    expect(c.isPersisted()).toBe(false);
-    expect(await c.isValid()).toBe(false);
-    expect(await newFirm.isValid()).toBe(false);
-    expect(await newFirm.save()).toBe(false);
-    expect(c.isPersisted()).toBe(false);
-    expect(newFirm.isPersisted()).toBe(false);
+    assertNotPredicate(c, (r) => r.isPersisted());
+    assertNotPredicate(await c.isValid(), (v) => v);
+    assertNotPredicate(await newFirm.isValid(), (v) => v);
+    assertNot(await newFirm.save());
+    assertNotPredicate(c, (r) => r.isPersisted());
+    assertNotPredicate(newFirm, (r) => r.isPersisted());
   });
 
   it("adding unsavable association", async () => {
@@ -653,22 +670,22 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const client = newFirm.clients.build({ name: "Apple" });
     client.throwOnSave = true;
 
-    expect(await client.isValid()).toBe(true);
-    expect(await newFirm.isValid()).toBe(true);
-    expect(await newFirm.save()).toBe(false);
-    expect(newFirm.isPersisted()).toBe(false);
-    expect(client.isPersisted()).toBe(false);
+    assertPredicate(await client.isValid(), (v) => v);
+    assertPredicate(await newFirm.isValid(), (v) => v);
+    assertNot(await newFirm.save());
+    assertNotPredicate(newFirm, (r) => r.isPersisted());
+    assertNotPredicate(client, (r) => r.isPersisted());
   });
 
   it("invalid adding with validate false", async () => {
     const firm = (await Firm.first())!;
     const client = new Client();
-    await firm.unvalidatedClientsOfFirm.concat(client);
+    await firm.unvalidatedClientsOfFirm.push(client);
 
-    expect(await firm.isValid()).toBe(true);
-    expect(await client.isValid()).toBe(false);
-    expect(await firm.save()).toBe(true);
-    expect(client.isPersisted()).toBe(false);
+    assertPredicate(await firm.isValid(), (v) => v);
+    assertNotPredicate(await client.isValid(), (v) => v);
+    assert(await firm.save());
+    assertNotPredicate(client, (r) => r.isPersisted());
   });
 
   it("valid adding with validate false", async () => {
@@ -677,96 +694,91 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const firm = (await Firm.first())!;
     const client = new Client({ name: "Apple" });
 
-    expect(await firm.isValid()).toBe(true);
-    expect(await client.isValid()).toBe(true);
-    expect(client.isPersisted()).toBe(false);
+    assertPredicate(await firm.isValid(), (v) => v);
+    assertPredicate(await client.isValid(), (v) => v);
+    assertNotPredicate(client, (r) => r.isPersisted());
 
-    await firm.unvalidatedClientsOfFirm.concat(client);
+    await firm.unvalidatedClientsOfFirm.push(client);
 
-    expect(await firm.save()).toBe(true);
-    expect(client.isPersisted()).toBe(true);
-    expect(Number(await Client.count())).toBe(noOfClients + 1);
+    assert(await firm.save());
+    assertPredicate(client, (r) => r.isPersisted());
+    expect(Number(await Client.count())).toEqual(noOfClients + 1);
   });
 
   it("circular autosave does not validate children", async () => {
-    class CircularReader extends Base {
-      declare catch_phrase: string | null;
-      declare reader_id: number | null;
-      declare post_id: number | null;
-      declare person_id: number | null;
-      declare children: AssociationProxy<CircularReader>;
-
+    const person = class extends Base {
       static {
-        this._tableName = "readers";
-        this.attribute("catch_phrase", "string");
-        this.attribute("reader_id", "integer");
-        this.hasMany("children", {
-          className: "CircularReader",
-          foreignKey: "reader_id",
-          autosave: true,
-        });
-        this.belongsTo("parent", { className: "CircularReader", autosave: true });
-        this.validate(":shouldBeFunny");
+        this.tableName = "readers";
       }
 
-      shouldBeFunny() {
+      shouldBeFunny(this: any) {
         if (this.catch_phrase !== "funny") {
           this.errors.add("base", "not funny");
         }
       }
-    }
-    registerModel("CircularReader", CircularReader);
+    };
+    person.validate(":shouldBeFunny");
+    Object.defineProperty(person, "name", { value: "Reader" });
 
-    const c = new CircularReader({ catch_phrase: "boring" });
-    await c.children.concat(c);
+    person.attribute("catch_phrase", "string");
+    person.attribute("reader_id");
+
+    person.hasMany("children", { autosave: true, anonymousClass: person });
+    person.belongsTo("parent", { autosave: true, anonymousClass: person });
+
+    const c = new person({ catch_phrase: "boring" }) as any;
+    await c.children.push(c);
     c.post_id = 0;
     c.person_id = 0;
     await c.save();
 
-    expect(c.isPersisted()).toBe(false);
-    expect(await c.isValid()).toBe(false);
+    assertNotPredicate(c, (r: any) => r.isPersisted());
+    assertNotPredicate(await c.isValid(), (v) => v);
   });
 
   it("parent should save children record with foreign key validation set in before save callback", async () => {
     const company = new NewlyContractedCompany({ name: "test" });
 
-    expect(await company.save()).toBe(true);
-    await company.reload();
-    expect(await company.newContracts).not.toHaveLength(0);
+    assert(await company.save());
+    assertNotEmpty(await (await company.reload()).newContracts);
   });
 
   it("parent should not get saved with duplicate children records", async () => {
-    const repliesBefore = Number(await Reply.count());
-    const sillyBefore = Number(await SillyUniqueReply.count());
+    await assertNoDifference(
+      async () => Number(await Reply.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await SillyUniqueReply.count()),
+          null,
+          async () => {
+            const reply = new Reply();
+            reply.sillyUniqueReplies.build([
+              { content: "Best content" },
+              { content: "Best content" },
+            ]);
 
-    const reply = new Reply();
-    reply.sillyUniqueReplies.build([{ content: "Best content" }, { content: "Best content" }]);
+            assertNot(await reply.save());
+            expect(reply.errors.get("silly_unique_replies")).toEqual(["is invalid"]);
+            assertEmpty((await reply.sillyUniqueReplies.first())!.errors);
 
-    expect(await reply.save()).toBe(false);
-    expect(reply.errors.messagesFor("silly_unique_replies")).toEqual(["is invalid"]);
-
-    const built = await reply.sillyUniqueReplies;
-    expect(built[0].errors.empty).toBe(true);
-    expect(built[built.length - 1].errors.messagesFor("content")).toEqual([
-      "has already been taken",
-    ]);
-
-    expect(Number(await Reply.count())).toBe(repliesBefore);
-    expect(Number(await SillyUniqueReply.count())).toBe(sillyBefore);
+            expect((await reply.sillyUniqueReplies.last())!.errors.get("content")).toEqual([
+              "has already been taken",
+            ]);
+          },
+        );
+      },
+    );
   });
 
   it("invalid build", async () => {
-    const firstFirm = await Firm.find(companies("first_firm").id);
-    const newClient = firstFirm.clientsOfFirm.build();
-    expect(newClient.isPersisted()).toBe(false);
-    expect(await newClient.isValid()).toBe(false);
-    const cached = await firstFirm.clientsOfFirm;
-    expect(cached[cached.length - 1]).toBe(newClient);
-    expect(await firstFirm.save()).toBe(false);
-    expect(newClient.isPersisted()).toBe(false);
-    const clientsOfFirm = firstFirm.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(2);
+    const newClient = companies("first_firm").clientsOfFirm.build();
+    assertNotPredicate(newClient, (r) => r.isPersisted());
+    assertNotPredicate(await newClient.isValid(), (v) => v);
+    expect(await companies("first_firm").clientsOfFirm.last()).toBe(newClient);
+    assertNot(await companies("first_firm").save());
+    assertNotPredicate(newClient, (r) => r.isPersisted());
+    expect(await (await companies("first_firm").clientsOfFirm.reload()).size()).toEqual(2);
   });
 
   it("adding before save", async () => {
@@ -777,310 +789,180 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const c = new Client({ name: "Apple" });
 
     await newFirm.clientsOfFirm.push(new Client({ name: "Natural Company" }));
-    expect(await newFirm.clientsOfFirm).toHaveLength(1);
-    await newFirm.clientsOfFirm.concat(c);
-    expect(await newFirm.clientsOfFirm).toHaveLength(2);
+    expect(await newFirm.clientsOfFirm.size()).toEqual(1);
+    await newFirm.clientsOfFirm.push(c);
+    expect(await newFirm.clientsOfFirm.size()).toEqual(2);
 
-    expect(Number(await Firm.count())).toBe(noOfFirms);
-    expect(Number(await Client.count())).toBe(noOfClients);
-    expect(await newFirm.save()).toBe(true);
-    expect(newFirm.isPersisted()).toBe(true);
-    expect(c.isPersisted()).toBe(true);
-    expect(await c.firm).toEqual(newFirm);
-    expect(Number(await Firm.count())).toBe(noOfFirms + 1);
-    expect(Number(await Client.count())).toBe(noOfClients + 2);
+    expect(Number(await Firm.count())).toEqual(noOfFirms);
+    expect(Number(await Client.count())).toEqual(noOfClients);
+    assert(await newFirm.save());
+    assertPredicate(newFirm, (r) => r.isPersisted());
+    assertPredicate(c, (r) => r.isPersisted());
+    expect((await c.firm)!.equals(newFirm)).toBe(true);
+    expect(Number(await Firm.count())).toEqual(noOfFirms + 1);
+    expect(Number(await Client.count())).toEqual(noOfClients + 2);
 
-    expect(await newFirm.clientsOfFirm).toHaveLength(2);
-    const clientsOfFirm = newFirm.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(2);
+    expect(await newFirm.clientsOfFirm.size()).toEqual(2);
+    expect(await (await newFirm.clientsOfFirm.reload()).size()).toEqual(2);
   });
 
   it("assign ids", async () => {
     const firm = new Firm({ name: "Apple" });
     await (firm as any)
       .association("clients")
-      .idsWriter([companies("first_client").id as number, companies("second_client").id as number]);
+      .idsWriter([companies("first_client").id, companies("second_client").id]);
     await firm.save();
     await firm.reload();
-    const clients = await firm.clients;
-    expect(clients).toHaveLength(2);
-    expect(clients.map((c) => c.id)).toContain(companies("second_client").id);
+    expect((await firm.clients).length).toEqual(2);
+    expect((await firm.clients).map((c) => c.id)).toContain(companies("second_client").id);
   });
   it("assign ids with belongs to cpk model", async () => {
-    class AiCpkOrder extends Base {
-      declare orderAgreementIds: any;
-      declare shop_id: number | null;
-      declare status: string | null;
-      declare orderAgreements: AssociationProxy<AiCpkOrderAgreement>;
+    const orderAgreements = [
+      cpkOrderAgreements("order_agreement_one").id,
+      cpkOrderAgreements("order_agreement_two").id,
+    ];
+    const order = cpkOrders("cpk_groceries_order_1") as any;
 
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasMany("orderAgreements", {
-          className: "AiCpkOrderAgreement",
-          foreignKey: "order_id",
-          primaryKey: "id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class AiCpkOrderAgreement extends Base {
-      declare order_id: number | null;
-      declare signature: string | null;
+    assertEmpty(await order.orderAgreements);
 
-      static {
-        this._tableName = "cpk_order_agreements";
-        this.attribute("order_id", "integer");
-        this.attribute("signature", "string");
-        this.belongsTo("order", {
-          className: "AiCpkOrder",
-          primaryKey: "id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface AiCpkOrderAgreement {
-      get order(): AiCpkOrder | null | Promise<AiCpkOrder | null>;
-      set order(value: AiCpkOrder | null);
-    }
-    registerModel("AiCpkOrder", AiCpkOrder);
-    registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
-
-    const order = await AiCpkOrder.create({ id: [1, 1], status: "paid" });
-    const a1 = await AiCpkOrderAgreement.create({ signature: "signed" });
-    const a2 = await AiCpkOrderAgreement.create({ signature: "signed" });
-    const orderAgreements = [a1.id, a2.id];
-
-    const proxy = association(order, "orderAgreements");
-    expect(await proxy).toHaveLength(0);
-
-    await (order as any).association("orderAgreements").idsWriter(orderAgreements as number[]);
+    await order.association("orderAgreements").idsWriter(orderAgreements);
     await order.save();
     await order.reload();
 
     expect(await order.orderAgreementIds).toEqual(orderAgreements);
-    const loadedAgreements = await association(order, "orderAgreements");
-    expect(loadedAgreements).toHaveLength(2);
-    expect(loadedAgreements.map((a) => a.id)).toContain(a2.id);
+    expect((await order.orderAgreements).length).toEqual(2);
+    expect((await order.orderAgreements).map((a: any) => a.id)).toContain(
+      cpkOrderAgreements("order_agreement_two").id,
+    );
   });
   it("assign ids with cpk for two models", async () => {
-    class AiCpkTwoOrder extends Base {
-      declare bookIds: any;
-      declare shop_id: number | null;
-      declare status: string | null;
-      declare books: AssociationProxy<AiCpkTwoBook>;
+    const bookIds = [
+      cpkBooks("cpk_great_author_first_book").id,
+      cpkBooks("cpk_great_author_second_book").id,
+    ];
+    const order = cpkOrders("cpk_groceries_order_1") as any;
 
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasMany("books", {
-          className: "AiCpkTwoBook",
-          foreignKey: ["shop_id", "order_id"],
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class AiCpkTwoBook extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-      declare order_id: number | null;
-      declare shop_id: number | null;
+    assertEmpty(await order.books);
 
-      static {
-        this._tableName = "cpk_books";
-        this.attribute("author_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("order_id", "integer");
-        this.attribute("shop_id", "integer");
-        this.primaryKey = ["author_id", "id"];
-        this.belongsTo("order", {
-          className: "AiCpkTwoOrder",
-          foreignKey: ["shop_id", "order_id"],
-          primaryKey: ["shop_id", "id"],
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface AiCpkTwoBook {
-      get order(): AiCpkTwoOrder | null | Promise<AiCpkTwoOrder | null>;
-      set order(value: AiCpkTwoOrder | null);
-    }
-    registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
-    registerModel("AiCpkTwoBook", AiCpkTwoBook);
-
-    const order = await AiCpkTwoOrder.create({ id: [1, 1], status: "paid" });
-    const b1 = await AiCpkTwoBook.create({
-      id: [1, 1],
-      title: "First",
-      shop_id: 0,
-      order_id: 0,
-    });
-    const b2 = await AiCpkTwoBook.create({
-      id: [1, 2],
-      title: "Second",
-      shop_id: 0,
-      order_id: 0,
-    });
-    const bookIds = [b1.id, b2.id];
-
-    const proxy = association(order, "books");
-    expect(await proxy).toHaveLength(0);
-
-    await (order as any).association("books").idsWriter(bookIds as number[][]);
+    await order.association("books").idsWriter(bookIds);
     await order.save();
     await order.reload();
 
     expect(await order.bookIds).toEqual(bookIds);
-    const loadedBooks = await association(order, "books");
-    expect(loadedBooks).toHaveLength(2);
-    const loadedTitles = loadedBooks.map((b) => (b as AiCpkTwoBook).title);
-    expect(loadedTitles).toContain("First");
-    expect(loadedTitles).toContain("Second");
+    expect((await order.books).length).toEqual(2);
+    expect((await order.books).map((b: any) => b.id)).toContainEqual(
+      cpkBooks("cpk_great_author_first_book").id,
+    );
+    expect((await order.books).map((b: any) => b.id)).toContainEqual(
+      cpkBooks("cpk_great_author_second_book").id,
+    );
   });
   it("has one cpk has one autosave with id", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class CpkOrderPk extends Base {
-      declare shop_id: number | null;
-      declare status: string | null;
+    const book = await CpkBook.createBang({ id: [1, 3], shop_id: 2 });
+    const order = await CpkOrderWithPrimaryKeyAssociatedBook.createBang({ book, shop_id: 2 });
 
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasOne("cpkBookFk", {
-          className: "CpkBookFk",
-          foreignKey: "order_id",
-          autosave: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface CpkOrderPk {
-      get cpkBookFk(): CpkBookFk | null | Promise<CpkBookFk | null>;
-      set cpkBookFk(value: CpkBookFk | null);
-    }
-    class CpkBookFk extends Base {
-      declare order_id: number | null;
-      declare signature: string | null;
-
-      static {
-        this._tableName = "cpk_order_agreements";
-        this.attribute("order_id", "integer");
-        this.attribute("signature", "string");
-      }
-    }
-    registerModel("CpkOrderPk", CpkOrderPk);
-    registerModel("CpkBookFk", CpkBookFk);
-    const order = new CpkOrderPk({ id: [5, 7], status: "open" });
-    const book = new CpkBookFk({ signature: "My Book" });
-    cacheAssoc(order, "cpkBookFk", book);
-    const saved = await order.save();
-    expect(saved).toBe(true);
-    expect(order.isNewRecord()).toBe(false);
-    expect(book.isNewRecord()).toBe(false);
-    expect(book.order_id).toBe(7);
+    expect((await (book as any).order).id).toEqual(order.id);
   });
   it("assign ids for through a belongs to", async () => {
     const firm = new Firm({ name: "Apple" });
     await (firm as any)
       .association("developers")
-      .idsWriter([developers("david").id as number, developers("jamis").id as number]);
+      .idsWriter([developers("david").id, developers("jamis").id]);
     await firm.save();
     await firm.reload();
-    const devs = await firm.developers;
-    expect(devs).toHaveLength(2);
-    expect(devs.map((d) => d.id)).toContain(developers("david").id);
+    expect((await firm.developers).length).toEqual(2);
+    expect((await firm.developers).map((d) => d.id)).toContain(developers("david").id);
   });
 
   it("build before save", async () => {
-    const company = await Firm.find(companies("first_firm").id);
+    const company = companies("first_firm");
 
-    const newClient = company.clientsOfFirm.build({ name: "Another Client" });
-    expect(company.clientsOfFirm.loaded).toBeFalsy();
+    let newClient!: Client;
+    await assertQueriesCount(0, false, () => {
+      newClient = company.clientsOfFirm.build({ name: "Another Client" });
+    });
+    assertNotPredicate(company.clientsOfFirm, (p) => p.loaded);
 
     company.name += "-changed";
-    expect(await company.save()).toBeTruthy();
-    expect(newClient.isPersisted()).toBeTruthy();
-    const clientsOfFirm = company.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(3);
+    await assertQueriesCount(4, false, async () => {
+      assert(await company.save());
+    });
+    assertPredicate(newClient, (r) => r.isPersisted());
+    expect(await (await company.clientsOfFirm.reload()).size()).toEqual(3);
   });
 
   it("build many before save", async () => {
-    const company = await Firm.find(companies("first_firm").id);
+    const company = companies("first_firm");
 
-    company.clientsOfFirm.build([{ name: "Another Client" }, { name: "Another Client II" }]);
+    await assertQueriesCount(0, false, () => {
+      company.clientsOfFirm.build([{ name: "Another Client" }, { name: "Another Client II" }]);
+    });
 
     company.name += "-changed";
-    expect(await company.save()).toBeTruthy();
-    const clientsOfFirm = company.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(4);
+    await assertQueriesCount(5, false, async () => {
+      assert(await company.save());
+    });
+    expect(await (await company.clientsOfFirm.reload()).size()).toEqual(4);
   });
 
   it("build via block before save", async () => {
-    const company = await Firm.find(companies("first_firm").id);
+    const company = companies("first_firm");
 
-    const newClient = company.clientsOfFirm.build({}, (client: any) => {
-      client.name = "Another Client";
+    let newClient!: Client;
+    await assertQueriesCount(0, false, () => {
+      newClient = company.clientsOfFirm.build({}, (client: any) => {
+        client.name = "Another Client";
+      });
     });
-    expect(company.clientsOfFirm.loaded).toBeFalsy();
+    assertNotPredicate(company.clientsOfFirm, (p) => p.loaded);
 
     company.name += "-changed";
-    expect(await company.save()).toBeTruthy();
-    expect(newClient.isPersisted()).toBeTruthy();
-    const clientsOfFirm = company.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(3);
+    await assertQueriesCount(4, false, async () => {
+      assert(await company.save());
+    });
+    assertPredicate(newClient, (r) => r.isPersisted());
+    expect(await (await company.clientsOfFirm.reload()).size()).toEqual(3);
   });
 
   it("build many via block before save", async () => {
-    const company = await Firm.find(companies("first_firm").id);
+    const company = companies("first_firm");
 
-    company.clientsOfFirm.build(
-      [{ name: "Another Client" }, { name: "Another Client II" }],
-      (client: any) => {
-        client.name = "changed";
-      },
-    );
+    await assertQueriesCount(0, false, () => {
+      company.clientsOfFirm.build(
+        [{ name: "Another Client" }, { name: "Another Client II" }],
+        (client: any) => {
+          client.name = "changed";
+        },
+      );
+    });
 
     company.name += "-changed";
-    expect(await company.save()).toBeTruthy();
-    const clientsOfFirm = company.clientsOfFirm;
-    await clientsOfFirm.reload();
-    expect(await clientsOfFirm).toHaveLength(4);
+    await assertQueriesCount(5, false, async () => {
+      assert(await company.save());
+    });
+    expect(await (await company.clientsOfFirm.reload()).size()).toEqual(4);
   });
 
   it("replace on new object", async () => {
     const firm = new Firm({ name: "New Firm" });
-    const secondClient = await Client.find(companies("second_client").id);
-    await firm.clients.replace([secondClient, new Client({ name: "New Client" })]);
-    expect(await firm.save()).toBeTruthy();
+    await firm.clients.replace([companies("second_client"), new Client({ name: "New Client" })]);
+    assert(await firm.save());
     await firm.reload();
-    const clients = await firm.clients;
-    expect(clients).toHaveLength(2);
-    expect(clients.map((c) => c.name)).toContain("New Client");
+    expect((await firm.clients).length).toEqual(2);
+    expect((await firm.clients).map((c) => c.id)).toContain(
+      (await Client.findBy({ name: "New Client" }))!.id,
+    );
   });
 
   it("replace on duplicated object", async () => {
     const firm = (await Firm.createBang({ name: "New Firm" })).dup();
-    const secondClient = await Client.find(companies("second_client").id);
-    await firm.clients.replace([secondClient, new Client({ name: "New Client" })]);
-    expect(await firm.save()).toBeTruthy();
+    await firm.clients.replace([companies("second_client"), new Client({ name: "New Client" })]);
+    assert(await firm.save());
     await firm.reload();
-    const clients = await firm.clients;
-    expect(clients).toHaveLength(2);
-    expect(clients.map((c) => c.name)).toContain("New Client");
+    expect((await firm.clients).length).toEqual(2);
+    expect((await firm.clients).map((c) => c.id)).toContain(
+      (await Client.findBy({ name: "New Client" }))!.id,
+    );
   });
 
   it("should not load the associated model", async () => {
