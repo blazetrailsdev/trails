@@ -26,7 +26,7 @@ import { connectionPool, withConnection, connectedQ } from "./connection-handlin
 
 function reflectionAdapter(klass: any): any {
   const pool = connectionPool.call(klass);
-  return pool.activeConnection ?? pool.leaseConnectionSync();
+  return pool.withConnectionSync((connection: any) => connection);
 }
 
 /** @internal */
@@ -443,16 +443,13 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
 }
 
 function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
-  let adapter: SchemaHost["connection"] | undefined;
+  let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
-    adapter = reflectionAdapter(host);
+    cache = connectionPool.call(host as unknown as typeof Base).schemaCache as typeof cache;
   } catch {
     return;
   }
   const table = (host as unknown as { tableName?: string }).tableName;
-  const cache = (
-    adapter as unknown as { schemaCache?: { columns?: (t: string) => Promise<unknown> } }
-  )?.schemaCache;
   if (!table || typeof cache?.columns !== "function") return;
   let started: Promise<void> | undefined;
   return {
@@ -603,11 +600,9 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  *
  * Rails' `schema_cache` is a POOL read (`load_schema!`, model_schema.rb:591) and
  * never checks a connection out permanently, so the warm runs inside a
- * `with_connection` scope: `reflectionAdapter`'s last resort is
- * `leaseConnectionSync`, whose lease is permanent and trips
- * `permanent_connection_checkout = :deprecated | :disallowed` on every save. The
- * re-entry is the scope — inside it the connection is threaded, so the guard is
- * false and the body runs once. A model with a directly-assigned adapter has no
+ * `with_connection` scope, so the connection `reflectionAdapter` reads through
+ * `withConnectionSync` stays threaded for the whole warm and the guard is false
+ * on re-entry, so the body runs once. A model with a directly-assigned adapter has no
  * pool to scope against and skips it, as does a pool-less model, whose
  * `connection_pool` throws where Ruby's always answers.
  *
@@ -793,7 +788,11 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
-  return (await reflectionAdapter(this).schemaCache.dataSourceExists(this.tableName)) ?? false;
+  return (
+    (await connectionPool
+      .call(this as unknown as typeof Base)
+      .schemaCache.dataSourceExists(this.tableName)) ?? false
+  );
 }
 
 export interface ModelSchema {

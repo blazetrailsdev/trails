@@ -180,7 +180,6 @@ export class UniquenessValidator extends EachValidator {
     const pb = (
       base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
     ).predicateBuilder;
-    const adapter = klass.connection ?? null;
     const hasCsKey = hasKey(this.options, "caseSensitive");
     const typeObj =
       typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
@@ -192,26 +191,29 @@ export class UniquenessValidator extends EachValidator {
     if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
       const attr = arel.get(attribute);
       const bind = pb.buildBindAttribute(attribute, value);
-      let comparison: any = null;
-      if (!hasCsKey || value == null) {
-        comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
-      } else if (this.options.caseSensitive) {
-        comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
-      } else {
-        const colType =
-          typeObj == null
-            ? null
-            : typeof typeObj.type === "function"
-              ? typeObj.type()
-              : typeObj.type;
-        if (colType !== "uuid") {
-          comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
-          if (comparison == null && typeof value === "string") {
-            const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
-            comparison = attr.lower().eq(lowerBind);
+      const comparison: any = await klass.withConnection(async (adapter: any) => {
+        let comparison: any = null;
+        if (!hasCsKey || value == null) {
+          comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
+        } else if (this.options.caseSensitive) {
+          comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
+        } else {
+          const colType =
+            typeObj == null
+              ? null
+              : typeof typeObj.type === "function"
+                ? typeObj.type()
+                : typeObj.type;
+          if (colType !== "uuid") {
+            comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
+            if (comparison == null && typeof value === "string") {
+              const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
+              comparison = attr.lower().eq(lowerBind);
+            }
           }
         }
-      }
+        return comparison;
+      });
       if (comparison != null && typeof base.where === "function") {
         return [base.whereBang(comparison)];
       }
@@ -301,13 +303,12 @@ async function isCoveredByUniqueIndex(
 async function tableIndexes(
   klass: any,
 ): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
-  const adapter = klass && (connectionPool.call(klass).activeConnection ?? klass.connection);
   const tableName = klass?.tableName;
-  if (!adapter || !tableName) return [];
+  if (!klass || !tableName) return [];
 
   type Index = { unique?: boolean; where?: string | null; columns?: unknown };
 
-  const cache = adapter.schemaCache;
+  const cache = connectionPool.call(klass).schemaCache as any;
   if (!cache || typeof cache.indexes !== "function") return [];
   return (await cache.indexes(tableName)) as Index[];
 }

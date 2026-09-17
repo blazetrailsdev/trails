@@ -122,39 +122,27 @@ export class PoolConfig {
     });
   }
 
-  private _discardPoolBangSync(): Array<Promise<void>> {
-    const pool = this._pool;
-    if (!pool) return [];
-    const drains = pool.discardBangDraining();
-    this._pool = null;
-    return drains;
-  }
-
   async discardPoolBang(): Promise<void> {
     if (!this._pool) return;
 
-    const drains = (await synchronize.call(this, () => {
-      if (!this._pool) return [];
+    await synchronize.call(this, async () => {
+      if (!this._pool) return;
 
-      return this._discardPoolBangSync();
-    })) as Array<Promise<void>>;
-    await Promise.all(drains);
+      await this._pool.discardBang();
+      this._pool = null;
+    });
   }
 
   /** @missingRailsCall each_key — PERMANENT */
   static async discardPoolsBang(): Promise<void> {
-    const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
       const config = ref.deref();
       if (!config) {
         INSTANCES.delete(ref);
         continue;
       }
-      await synchronize.call(config, () => {
-        drains.push(...config._discardPoolBangSync());
-      });
+      await config.discardPoolBang();
     }
-    await Promise.all(drains);
   }
 
   /** @missingRailsCall each_key — PERMANENT */

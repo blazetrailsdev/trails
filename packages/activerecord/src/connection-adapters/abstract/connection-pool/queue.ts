@@ -113,14 +113,22 @@ export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: ()
     previousCond = this._cond;
     this._cond = newCond = new BiasedConditionVariable(this._lock, this._cond, thread);
   });
-  try {
-    return fn();
-  } finally {
+  const restore = () => {
     synchronize(this, () => {
       if (previousCond) this._cond = previousCond;
       if (newCond) newCond.broadcastOnBiased();
     });
+  };
+  let result: T;
+  try {
+    result = fn();
+  } catch (error) {
+    restore();
+    throw error;
   }
+  if (result instanceof Promise) return result.finally(restore) as T;
+  restore();
+  return result;
 }
 
 export const BiasableQueue = {

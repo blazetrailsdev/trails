@@ -633,30 +633,24 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
-  }
-
-  private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
-    const draining: Array<Promise<void>> = [];
-    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
-      for (const conn of this._connections ?? []) {
-        if (conn.inUse) {
-          conn.stealBang();
-          this.checkin(conn);
+    await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
+      synchronize.call(this, async () => {
+        for (const conn of this._connections ?? []) {
+          if (conn.inUse) {
+            conn.stealBang();
+            this.checkin(conn);
+          }
+          await (
+            conn as unknown as { disconnectBang?: () => void | Promise<void> }
+          ).disconnectBang?.();
+          await (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         }
-        const closed = (
-          conn as unknown as { disconnectBang?: () => void | Promise<void> }
-        ).disconnectBang?.();
-        if (closed) draining.push(closed);
-        const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-        if (drain) draining.push(drain);
-      }
-      if (this._connections) this._connections.length = 0;
-      this._available?.clear();
-      this._checkedOut.clear();
-      this._leases?.clear();
-    });
-    return draining;
+        if (this._connections) this._connections.length = 0;
+        this._leases?.clear();
+        this._available?.clear();
+        this._checkedOut.clear();
+      }),
+    );
   }
 
   async disconnectBang(): Promise<void> {
@@ -664,66 +658,46 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async discardBang(): Promise<void> {
-    await Promise.all(this._discardBang());
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  discardBangDraining(): Array<Promise<void>> {
-    return this._discardBang();
-  }
-
-  private _discardBang(): Array<Promise<void>> {
-    if (this.isDiscarded()) return [];
-    const draining: Array<Promise<void>> = [];
-    for (const conn of this._connections ?? []) {
-      (conn as unknown as { discardBang?: () => void }).discardBang?.();
-      const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-      if (drain) draining.push(drain);
-    }
-    this._connections = null;
-    this._available?.clear();
-    this._available = null;
-    this._leases = null;
-    this._checkedOut.clear();
-    return draining;
+    await synchronize.call(this, async () => {
+      if (this.isDiscarded()) return;
+      const draining: Array<Promise<void>> = [];
+      for (const conn of this._connections ?? []) {
+        (conn as unknown as { discardBang?: () => void }).discardBang?.();
+        const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+        if (drain) draining.push(drain);
+      }
+      this._connections = null;
+      this._available?.clear();
+      this._available = null;
+      this._leases = null;
+      this._checkedOut.clear();
+      await Promise.all(draining);
+    });
   }
 
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
-  }
-
-  private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
-    const draining: Array<Promise<void>> = [];
-    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
-      const reloadable = new Set<DatabaseAdapter>();
-      for (const conn of this._connections ?? []) {
-        if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
-          reloadable.add(conn);
+    await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
+      synchronize.call(this, async () => {
+        for (const conn of this._connections ?? []) {
+          if (conn.inUse) {
+            conn.stealBang();
+            this.checkin(conn);
+          }
+          if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
+            await (
+              conn as unknown as { disconnectBang?: () => void | Promise<void> }
+            ).disconnectBang?.();
+          }
         }
-      }
-      for (const conn of this._connections ?? []) {
-        if (conn.inUse) {
-          conn.stealBang();
-          this.checkin(conn);
+        if (this._connections) {
+          this._connections = this._connections.filter(
+            (conn) =>
+              !(conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.(),
+          );
         }
-        if (reloadable.has(conn)) {
-          const closed = (
-            conn as unknown as { disconnectBang?: () => void | Promise<void> }
-          ).disconnectBang?.();
-          if (closed) draining.push(closed);
-          const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
-          if (drain) draining.push(drain);
-        }
-      }
-      if (this._connections) {
-        this._connections = this._connections.filter((c) => !reloadable.has(c));
-      }
-      this._available?.clear();
-    });
-    return draining;
+        this._available?.clear();
+      }),
+    );
   }
 
   async clearReloadableConnectionsBang(): Promise<void> {
@@ -784,14 +758,6 @@ export class ConnectionPool implements ReapablePool {
       this._pendingCloseDrains.delete(drain);
     };
     drain.then(forget, forget);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  async drainPendingCloses(): Promise<void> {
-    await Promise.all(this._pendingCloseDrains);
   }
 
   newConnection(): DatabaseAdapter {
@@ -982,85 +948,100 @@ function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
 }
 
 /** @internal */
-function withExclusivelyAcquiredAllConnections<R>(
+async function withExclusivelyAcquiredAllConnections<R>(
   this: Pool,
   raiseOnAcquisitionTimeout: boolean,
-  block: () => R,
-): R {
-  return this.withNewConnectionsBlocked(() => {
-    this.attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout);
+  block: () => R | Promise<R>,
+): Promise<R> {
+  return this.withNewConnectionsBlocked(async () => {
+    await this.attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout);
     return block();
   });
 }
 
 /** @internal */
-function attemptToCheckoutAllExistingConnections(
+async function attemptToCheckoutAllExistingConnections(
   this: Pool,
-  raiseOnAcquisitionTimeout: boolean,
-): void {
-  this.reap();
-  const conns = this._connections ? [...this._connections] : [];
+  raiseOnAcquisitionTimeout: boolean = true,
+): Promise<void> {
+  let releaseNewlyCheckedOut = false;
   const newlyCheckedOut: DatabaseAdapter[] = [];
-  let release = false;
   try {
-    for (const conn of conns) {
-      if (this._checkedOut.has(conn)) continue;
-      try {
-        if (this._available && this._available.delete(conn) === undefined) {
-          const acquired = checkoutForExclusiveAccess(this, this.checkoutTimeout);
-          if (acquired) newlyCheckedOut.push(acquired);
-          continue;
-        }
-        this._checkedOut.add(conn);
-        (conn as unknown as PoolManagedConnection).lease?.();
-        newlyCheckedOut.push(conn);
-      } catch (innerErr) {
-        if (innerErr instanceof ConnectionTimeoutError) {
-          throw new ExclusiveConnectionTimeoutError(
-            `could not obtain ownership of all database connections in ${this.checkoutTimeout} seconds`,
-            { connectionPool: this },
-          );
-        }
-        throw innerErr;
+    const collectedConns = await (synchronize<DatabaseAdapter[]>).call(this, () => {
+      this.reap();
+
+      return (this._connections as DatabaseAdapter[]).filter(
+        (conn) =>
+          (conn as unknown as { owner: unknown }).owner === IsolatedExecutionState.context(),
+      );
+    });
+
+    const timeoutTime = performance.now() / 1000 + this.checkoutTimeout * 2;
+
+    await this._available.withABiasFor(IsolatedExecutionState.context(), async () => {
+      for (;;) {
+        const done = await (synchronize<boolean>).call(this, async () => {
+          if (collectedConns.length === this._connections.length) return true;
+
+          let remainingTimeout = timeoutTime - performance.now() / 1000;
+          if (remainingTimeout < 0) remainingTimeout = 0;
+          const conn = await checkoutForExclusiveAccess(this, remainingTimeout);
+          collectedConns.push(conn);
+          newlyCheckedOut.push(conn);
+          return false;
+        });
+        if (done) return;
       }
-    }
+    });
   } catch (err) {
     if (err instanceof ExclusiveConnectionTimeoutError) {
       if (raiseOnAcquisitionTimeout) {
-        release = true;
+        releaseNewlyCheckedOut = true;
         throw err;
       }
       return;
     }
-    release = true;
+    releaseNewlyCheckedOut = true;
     throw err;
   } finally {
-    if (release) {
+    if (releaseNewlyCheckedOut) {
       for (const conn of newlyCheckedOut) this.checkin(conn);
     }
   }
 }
 
 /** @internal */
-function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
+async function checkoutForExclusiveAccess(
+  pool: Pool,
+  checkoutTimeout: number,
+): Promise<DatabaseAdapter> {
   try {
-    return pool.acquireConnectionSync(checkoutTimeout);
+    return await pool.checkout(checkoutTimeout);
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {
-      throw new ExclusiveConnectionTimeoutError(
-        `could not obtain ownership of all database connections in ${checkoutTimeout} seconds`,
-        { connectionPool: pool },
-      );
+      let msg = `could not obtain ownership of all database connections in ${checkoutTimeout} seconds`;
+
+      const threadReport: string[] = [];
+      for (const conn of pool._connections as DatabaseAdapter[]) {
+        const owner = (conn as unknown as { owner: unknown }).owner;
+        if (owner !== IsolatedExecutionState.context()) {
+          threadReport.push(`${String(conn)} is owned by ${String(owner)}`);
+        }
+      }
+
+      if (threadReport.length > 0) msg += ` (${threadReport.join(", ")})`;
+
+      throw new ExclusiveConnectionTimeoutError(msg, { connectionPool: pool });
     }
     throw err;
   }
 }
 
 /** @internal */
-function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
+async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>): Promise<R> {
   this._threadsBlockingNewConnections = (this._threadsBlockingNewConnections ?? 0) + 1;
   try {
-    return block();
+    return await block();
   } finally {
     this._threadsBlockingNewConnections! -= 1;
     if (this._threadsBlockingNewConnections === 0) {

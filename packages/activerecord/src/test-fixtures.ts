@@ -281,7 +281,7 @@ async function loadFixturesOnce<T>(
 /** @internal */
 function useTablelessFixtures(
   entries: readonly TablelessFixtureEntry[],
-  getAdapter: () => DatabaseAdapter,
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
   options: WithTransactionalFixturesOptions,
 ): Record<string, unknown> {
   const seenTables = new Set<string>();
@@ -300,7 +300,7 @@ function useTablelessFixtures(
   const fixtureCacheKey = {};
 
   beforeEach(async (ctx) => {
-    const adapter = getAdapter();
+    const adapter = await getAdapter();
     const loadFixtures = async () => {
       const fixtureSets = entries.map(({ table, data }) => new FixtureSet(null, table, null, data));
       const tableRowsForConnection: Record<string, Record<string, unknown>[]> = {};
@@ -355,22 +355,22 @@ function useTablelessFixtures(
 /** @internal */
 function useFixtures<M extends FixtureMap>(
   fixtures: M,
-  getAdapter: () => DatabaseAdapter,
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
   options: WithTransactionalFixturesOptions,
 ): UseFixturesResult<M>;
 function useFixtures<const N extends FixtureName>(
   names: readonly N[],
-  getAdapter: () => DatabaseAdapter,
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
   options: WithTransactionalFixturesOptions,
 ): UseFixturesByNameResult<N>;
 function useFixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
-  getAdapter: () => DatabaseAdapter,
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
   options: WithTransactionalFixturesOptions,
 ): UseTablelessFixturesResult<T>;
 function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
-  getAdapter: () => DatabaseAdapter,
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
   options: WithTransactionalFixturesOptions,
 ): Record<string, unknown> {
   if (
@@ -442,12 +442,13 @@ function useFixtures(
       fixtureClassNames[fsName] = model;
       fixtureSetNames.push(fsName);
     }
-    const fixturePool = getAdapter().pool;
+    const adapter = await getAdapter();
+    const fixturePool = adapter.pool;
     const config =
       fixturePool instanceof NullPool
         ? Base
         : ({ connectionPool: () => fixturePool } as unknown as typeof Base);
-    const fixtureSets = await loadFixturesOnce(fixtureCacheKey, ctx, getAdapter(), options, () => {
+    const fixtureSets = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, () => {
       FixtureSet.resetCache();
       return FixtureSet.createFixtures(
         fixturesDirectories,

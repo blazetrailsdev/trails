@@ -125,7 +125,7 @@ describe("PoolConfig", () => {
     it("excludes a concurrent discardPoolBang while the disconnect is in flight", async () => {
       const pool = config.pool;
       let discardedDuringDisconnect = false;
-      const discardSpy = vi.spyOn(pool, "discardBangDraining").mockReturnValue([]);
+      const discardSpy = vi.spyOn(pool, "discardBang").mockResolvedValue(undefined);
       vi.spyOn(pool, "disconnectBang").mockImplementation(async () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
         discardedDuringDisconnect = discardSpy.mock.calls.length > 0;
@@ -156,10 +156,8 @@ describe("PoolConfig", () => {
     it("discards and nulls the pool", async () => {
       const pool = config.pool;
       expect(config["_pool"]).not.toBeNull();
-      const spy = vi.spyOn(pool, "discardBangDraining");
-      const promise = config.discardPoolBang();
-      expect(config["_pool"]).toBeNull();
-      await promise;
+      const spy = vi.spyOn(pool, "discardBang");
+      await config.discardPoolBang();
       expect(spy).toHaveBeenCalled();
       expect(config["_pool"]).toBeNull();
     });
@@ -173,9 +171,7 @@ describe("PoolConfig", () => {
 
     it("retains the pool when the synchronous discard fails", async () => {
       const pool = config.pool;
-      const spy = vi.spyOn(pool, "discardBangDraining").mockImplementation(() => {
-        throw new Error("discard failed");
-      });
+      const spy = vi.spyOn(pool, "discardBang").mockRejectedValue(new Error("discard failed"));
       await expect(config.discardPoolBang()).rejects.toThrow("discard failed");
       expect(config["_pool"]).not.toBeNull();
       spy.mockRestore();

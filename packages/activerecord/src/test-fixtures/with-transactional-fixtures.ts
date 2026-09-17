@@ -79,13 +79,13 @@ async function replaySchemaCacheDump(
  * @noRailsEquivalent CONVERGEABLE the eager schema warm Ruby gets free from lazy synchronous load_schema (model_schema.rb:587).
  */
 export function warmSchemaCacheBeforeFirstTest(
-  getAdapter: () => TransactionalFixturesAdapter,
+  getAdapter: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
 ): void {
   let warmed = false;
   beforeEach(async () => {
     if (warmed) return;
     warmed = true;
-    await eagerWarmSchemaCache(getAdapter());
+    await eagerWarmSchemaCache(await getAdapter());
   });
 }
 
@@ -122,7 +122,7 @@ export interface WithTransactionalFixturesOptions {
 
 /** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
 export function withTransactionalFixtures(
-  getAdapter: () => TransactionalFixturesAdapter,
+  getAdapter: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
   options: WithTransactionalFixturesOptions = {},
 ): void {
   const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction: usesTransactionNames = [] } =
@@ -131,7 +131,7 @@ export function withTransactionalFixtures(
   let _txnOpenedForTest = false;
 
   beforeEach(async (ctx: TaskContext) => {
-    const adapter = getAdapter();
+    const adapter = await getAdapter();
     if (usesTransactionNames.includes(ctx.task.name)) {
       _txnOpenedForTest = false;
       return;
@@ -161,8 +161,13 @@ export function withTransactionalFixtures(
         if (newPool) {
           if (fixtureConnectionPools !== null && !fixtureConnectionPools.includes(newPool)) {
             fixtureConnectionPools.push(newPool);
-            const connection = newPool.leaseConnectionSync();
-            pendingPins.push(connection.lock.synchronize(() => pinConnectionPool(newPool)));
+            pendingPins.push(
+              newPool
+                .leaseConnection()
+                .then((connection) =>
+                  connection.lock.synchronize(() => pinConnectionPool(newPool)),
+                ),
+            );
           }
         }
       }
@@ -182,7 +187,7 @@ export function withTransactionalFixtures(
       if (failed) throw failed.reason;
       return;
     }
-    const adapter = getAdapter();
+    const adapter = await getAdapter();
     if (fixtureConnectionPools !== null && pooledAdapterPool(adapter) !== null) {
       if (--fixtureScopeDepth === 0) {
         const pools = pinnedPools;
