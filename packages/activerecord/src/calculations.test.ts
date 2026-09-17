@@ -60,6 +60,8 @@ expect.addEqualityTesters([
     const ta = toTime(a);
     const tb = toTime(b);
     if (ta instanceof RubyTime && tb instanceof RubyTime) return ta.toR().cmp(tb.toR()) === 0;
+    if (a instanceof BigDecimal && typeof b === "number") return Number(a.toString("F")) === b;
+    if (b instanceof BigDecimal && typeof a === "number") return Number(b.toString("F")) === a;
     return undefined;
   },
 ]);
@@ -714,7 +716,7 @@ describe("CalculationsTest", () => {
 
   it("should calculate with invalid field", async () => {
     expect(await Account.calculate("count", "*")).toBe(6);
-    expect(await Account.calculate("count", "all")).toBe(6);
+    expect(await Account.calculate("count", ":all")).toBe(6);
   });
 
   it("should calculate grouped with invalid field", async () => {

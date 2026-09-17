@@ -823,6 +823,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("edges", { id: false }, (t) => {
     t.integer("source_id", { null: false });
     t.integer("sink_id", { null: false });
+    t.index(["source_id", "sink_id"], { unique: true, name: "unique_edge_index" });
   });
 
   await define("editorships", {}, (t) => {
