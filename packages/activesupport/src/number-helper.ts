@@ -11,11 +11,12 @@ export interface NumberToPhoneOptions {
   delimiter?: string;
   extension?: string | number;
   countryCode?: string | number;
+  pattern?: RegExp;
 }
 
 export interface NumberToCurrencyOptions {
   locale?: string;
-  precision?: number;
+  precision?: number | null;
   unit?: string;
   separator?: string;
   delimiter?: string;
@@ -26,7 +27,7 @@ export interface NumberToCurrencyOptions {
 
 export interface NumberToPercentageOptions {
   locale?: string;
-  precision?: number;
+  precision?: number | null;
   separator?: string;
   delimiter?: string;
   format?: string;
@@ -44,7 +45,7 @@ export interface NumberWithDelimiterOptions {
 
 export interface NumberToRoundedOptions {
   locale?: string;
-  precision?: number;
+  precision?: number | null;
   separator?: string;
   delimiter?: string;
   significant?: boolean;
@@ -54,7 +55,7 @@ export interface NumberToRoundedOptions {
 
 export interface NumberToHumanSizeOptions {
   locale?: string;
-  precision?: number;
+  precision?: number | null;
   separator?: string;
   delimiter?: string;
   significant?: boolean;
@@ -64,7 +65,7 @@ export interface NumberToHumanSizeOptions {
 
 export interface NumberToHumanOptions {
   locale?: string;
-  precision?: number;
+  precision?: number | null;
   separator?: string;
   delimiter?: string;
   significant?: boolean;

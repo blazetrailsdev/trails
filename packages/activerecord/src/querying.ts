@@ -408,7 +408,7 @@ export async function touchAll<T extends typeof Base>(
 
 export async function updateAll<T extends typeof Base>(
   this: T,
-  updates: Record<string, unknown>,
+  updates: Record<string, unknown> | string | [string, ...unknown[]],
 ): Promise<number> {
   if (this.abstractClass) {
     throw new Error(`Cannot call updateAll on abstract class ${this.name}`);

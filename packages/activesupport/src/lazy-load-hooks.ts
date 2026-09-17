@@ -1,6 +1,7 @@
-type Hook = (base: any) => void;
+type Hook = (this: any, base: any) => void;
 
 interface HookOptions {
+  yield?: boolean;
   runOnce?: boolean;
 }
 
@@ -57,7 +58,11 @@ function withExecutionControl(
 /** @internal */
 function executeHook(name: string, base: any, options: HookOptions, block: Hook): void {
   withExecutionControl(name, block, options.runOnce, () => {
-    block(base);
+    if (options.yield) {
+      block(base);
+    } else {
+      block.call(base, base);
+    }
   });
 }
 

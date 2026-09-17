@@ -1,95 +1,107 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { Notifications } from "../notifications.js";
-import { Event, Instrumenter } from "./instrumenter.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
+import { Instrumenter } from "./instrumenter.js";
+import { assert, assertEmpty, assertRaises } from "../testing/assertions.js";
 
-const buildNotifier = () => {
-  const finishes: Event[] = [];
-  return {
-    finishes,
-    publish(_name: string, event: Event) {
-      finishes.push(event);
-    },
-  };
-};
+class TestNotifier {
+  readonly starts: unknown[][] = [];
+  readonly finishes: unknown[][] = [];
+
+  start(...args: unknown[]): void {
+    this.starts.push(args);
+  }
+
+  finish(...args: unknown[]): void {
+    this.finishes.push(args);
+  }
+}
 
 describe("InstrumenterTest", () => {
-  afterEach(() => {
-    Notifications.unsubscribeAll();
+  let notifier: TestNotifier;
+  let instrumenter: Instrumenter;
+  let payload: Record<string, unknown>;
+
+  beforeEach(() => {
+    notifier = new TestNotifier();
+    instrumenter = new Instrumenter(notifier);
+    payload = { foo: {} };
   });
 
   it("instrument", () => {
-    const notifier = buildNotifier();
     let called = false;
-    new Instrumenter(notifier).instrument("foo", { foo: {} }, () => {
+    instrumenter.instrument("foo", payload, () => {
       called = true;
     });
-    expect(called).toBe(true);
+
+    assert(called);
   });
 
   it("instrument yields the payload for further modification", () => {
-    const notifier = buildNotifier();
-    const result = new Instrumenter(notifier).instrument("awesome", {}, (p) => (p.result = 1 + 1));
-    expect(result).toBe(2);
-    expect(notifier.finishes).toHaveLength(1);
-    expect(notifier.finishes[0].name).toBe("awesome");
-    expect(notifier.finishes[0].payload).toEqual({ result: 2 });
+    expect(instrumenter.instrument("awesome", {}, (p) => (p.result = 1 + 1))).toEqual(2);
+    expect(notifier.finishes.length).toEqual(1);
+    const [name, , payload] = notifier.finishes[0];
+    expect(name).toEqual("awesome");
+    expect(payload).toEqual({ result: 2 });
   });
 
   it("instrument works without a block", () => {
-    const notifier = buildNotifier();
-    new Instrumenter(notifier).instrument("no.block", { foo: {} });
-    expect(notifier.finishes).toHaveLength(1);
-    expect(notifier.finishes[0].name).toBe("no.block");
+    instrumenter.instrument("no.block", payload);
+    expect(notifier.finishes.length).toEqual(1);
+    expect(notifier.finishes[0][0]).toEqual("no.block");
   });
 
   it("start", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("start.test", (e) => events.push(e));
-    Notifications.instrument("start.test", { phase: "start" });
-    expect(events[0].payload.phase).toBe("start");
+    instrumenter.start("foo", payload);
+    expect(notifier.starts).toEqual([["foo", instrumenter.id, payload]]);
+    assertEmpty(notifier.finishes);
   });
 
   it("finish", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("finish.test", (e) => events.push(e));
-    Notifications.instrument("finish.test", {});
-    expect(typeof events[0].end).toBe("number");
+    instrumenter.finish("foo", payload);
+    expect(notifier.finishes).toEqual([["foo", instrumenter.id, payload]]);
+    assertEmpty(notifier.starts);
   });
 
   it("record", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("record.test", (e) => events.push(e));
-    Notifications.instrument("record.test", { data: "value" });
-    expect(events[0].payload.data).toBe("value");
+    let called = false;
+    const event = instrumenter.newEvent("foo", payload);
+    event.record(() => {
+      called = true;
+    });
+
+    assert(called);
   });
 
   it("record yields the payload for further modification", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("modify.test", (e) => events.push(e));
-    Notifications.instrument("modify.test", { original: true }, (payload) => {
-      payload.added = "later";
-    });
-    expect(events[0].payload.original).toBe(true);
-    expect(events[0].payload.added).toBe("later");
+    const event = instrumenter.newEvent("awesome");
+    event.record((p) => (p.result = 1 + 1));
+    expect(event.payload.result).toEqual(2);
+
+    expect(event.name).toEqual("awesome");
+    expect(event.payload).toEqual({ result: 2 });
+    expect(event.transactionId).toEqual(instrumenter.id);
+    expect(event.time).not.toBeNull();
+    expect(event.end).not.toBeNull();
   });
 
   it("record works without a block", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("no.block.test", (e) => events.push(e));
-    Notifications.instrument("no.block.test", { x: 1 });
-    expect(events).toHaveLength(1);
+    const event = instrumenter.newEvent("no.block", payload);
+    event.record();
+
+    expect(event.name).toEqual("no.block");
+    expect(event.payload).toEqual(payload);
+    expect(event.transactionId).toEqual(instrumenter.id);
+    expect(event.time).not.toBeNull();
+    expect(event.end).not.toBeNull();
   });
 
-  it("record with exception", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("crash", (e) => events.push(e));
-    expect(() =>
-      Notifications.instrument("crash", {}, () => {
-        throw new Error("Oopsies");
-      }),
-    ).toThrow("Oopsies");
-    expect(events).toHaveLength(1);
-    expect((events[0].payload.exception_object as Error).message).toBe("Oopsies");
-    expect(events[0].payload.exception).toEqual(["Error", "Oopsies"]);
+  it("record with exception", async () => {
+    const event = instrumenter.newEvent("crash", payload);
+    await assertRaises([RuntimeError], {}, () => {
+      event.record(() => {
+        throw new RuntimeError("Oopsies");
+      });
+    });
+    expect((event.payload.exception_object as Error).message).toEqual("Oopsies");
   });
 });

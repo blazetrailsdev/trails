@@ -4,7 +4,7 @@ import type { Deprecation } from "../deprecation.js";
 export function deprecateMethods(
   this: Deprecation,
   targetModule: Record<string, unknown>,
-  ...methodNames: Array<string | Record<string, string>>
+  ...methodNames: Array<string | Record<string, unknown>>
 ): Record<string, unknown> {
   const options = extractOptionsBang(methodNames as Array<string>);
   const names = methodNames as Array<string>;

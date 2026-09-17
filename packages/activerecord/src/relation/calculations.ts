@@ -1,7 +1,7 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
-import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
+import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
@@ -135,10 +135,22 @@ interface CalculationRelation {
   group(...args: unknown[]): CalculationRelation;
   leftOuterJoins(...args: unknown[]): CalculationRelation;
   pluck(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columns: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown[]>;
   pick(
-    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown>;
   ids(): Promise<unknown[]> | unknown[];
   count(columnName?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
@@ -170,29 +182,35 @@ interface CalculationRelation {
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
-export type SumBlock = (record: any) => number | bigint;
+export type SumBlock = (record: any) => number | bigint | string;
 
-function isCoerceNumericTypeName(name: string | undefined): boolean {
-  if (!name) return true;
-  return (
-    name === "integer" ||
-    name === "big_integer" ||
-    name === "decimal" ||
-    name === "float" ||
-    name === "unsigned_integer" ||
-    name === "boolean"
-  );
-}
+export type CountBlock = (record: any) => unknown;
 
 export async function count(
   this: CalculationRelation,
-  columnName?: string | Nodes.Node,
+  columnName?: string | Nodes.Node | null | CountBlock,
+  block?: CountBlock,
   ...rest: unknown[]
 ): Promise<number | Map<unknown, number>> {
-  if (rest.length > 0) {
-    throw new ArgumentError(`wrong number of arguments (given ${rest.length + 1}, expected 0..1)`);
+  if (rest.length > 0 || (block !== undefined && typeof block !== "function")) {
+    throw new ArgumentError(`wrong number of arguments (given ${rest.length + 2}, expected 0..1)`);
   }
-  return this.calculate("count", columnName as string) as Promise<number | Map<unknown, number>>;
+  if (typeof columnName === "function") {
+    block = columnName;
+    columnName = null;
+  }
+  if (block !== undefined) {
+    if (columnName != null) {
+      throw new ArgumentError("Column name argument is not supported when a block is passed.");
+    }
+
+    return (await this.toArray()).filter((record) => {
+      const result = block(record);
+      return result != null && result !== false;
+    }).length;
+  } else {
+    return this.calculate("count", columnName as string) as Promise<number | Map<unknown, number>>;
+  }
 }
 
 export function asyncCount(
@@ -244,12 +262,30 @@ export function asyncMaximum(
   return this.maximum(columnName);
 }
 
-function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
+function sumAdd(
+  memo: number | bigint | string,
+  value: number | bigint | string,
+): number | bigint | string {
+  if (typeof memo === "string") {
+    if (typeof value === "string") return memo + value;
+    throw new TypeError(
+      `no implicit conversion of ${
+        typeof value === "bigint" || Number.isInteger(value) ? "Integer" : "Float"
+      } into String`,
+    );
+  }
   if (typeof memo !== "number" && typeof memo !== "bigint") {
     throw new TypeError(
       `no implicit conversion of ${
         typeof value === "bigint" || Number.isInteger(value) ? "Integer" : "Float"
-      } into ${typeof memo === "string" ? "String" : (memo as object).constructor.name}`,
+      } into ${(memo as object).constructor.name}`,
+    );
+  }
+  if (typeof value === "string") {
+    throw new TypeError(
+      `String can't be coerced into ${
+        typeof memo === "bigint" || Number.isInteger(memo) ? "Integer" : "Float"
+      }`,
     );
   }
   if (typeof memo === typeof value) {
@@ -271,7 +307,9 @@ export async function sum(
   }
   if (block !== undefined) {
     const records = await this.toArray();
-    return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
+    return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint | string) as
+      | number
+      | bigint;
   }
   const sum = await this.calculate("sum", initialValueOrColumn as string);
   if (this.groupValues.length > 0) return sum as Map<unknown, number | bigint>;
@@ -332,7 +370,13 @@ export async function calculate(
 
 export async function pluck(
   this: CalculationRelation,
-  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<
+    | string
+    | Nodes.Attribute
+    | Nodes.NamedFunction
+    | Nodes.SqlLiteral
+    | Record<string, string | string[]>
+  >
 ): Promise<unknown[]> {
   if (this.isNullRelation()) return [];
 
@@ -345,74 +389,53 @@ export async function pluck(
     );
   }
 
-  return this.withConnection(async () => {
-    if (this.whereClause.isContradiction()) {
-      return await typeCastPluckValues.call(this, Result.empty(), columnNames);
-    }
-    const firstColumnName =
-      columnNames.length === 0
-        ? null
-        : typeof columnNames[0] === "string"
-          ? columnNames[0]
-          : "\0arel";
-    if (hasInclude(this as any, firstColumnName)) {
-      return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
-    }
+  const firstColumnName =
+    columnNames.length === 0
+      ? null
+      : typeof columnNames[0] === "string"
+        ? columnNames[0]
+        : "\0arel";
+  if (hasInclude(this as any, firstColumnName)) {
+    return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
+  }
 
-    this._model.disallowRawSqlBang(
-      this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
-    );
+  this._model.disallowRawSqlBang(
+    this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
+  );
+  const relation = this.spawn();
+  const columns = relation.arelColumns(columnNames);
+  relation.selectValues = columns as (string | Nodes.Node)[];
+  const result = await this.skipQueryCacheIfNecessary(() =>
+    this.whereClause.isContradiction()
+      ? Promise.resolve(Result.empty())
+      : this.model.withConnection((c) => c.selectAll(relation.arel(), `${this.model.name} Pluck`)),
+  );
 
-    const table = this.table;
-    const knownColumns = new Set(this._model.attributeNames());
-    const isKnownColumn = (name: string): boolean => knownColumns.has(name);
-    const columns = columnNames.map((c) => {
-      if (c instanceof Nodes.SqlLiteral) {
-        const v = c.value.trim();
-        return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
-      }
-      if (typeof c !== "string") return c;
-      if (hasTopLevelComma(c)) {
-        throw new ArgumentError(
-          `pluck does not allow comma-separated column lists in a single argument. ` +
-            `Pass each column as a separate argument: pluck("col1", "col2")`,
-        );
-      }
-      const isComplex =
-        c.includes(".") ||
-        c.includes("(") ||
-        c.includes('"') ||
-        c.includes("`") ||
-        c.includes("::") ||
-        /\s+AS\s+/i.test(c);
-      if (isComplex) return new Nodes.SqlLiteral(c);
-      return isKnownColumn(c) ? table.get(c) : new Nodes.SqlLiteral(c);
-    });
-    const rel = this.spawn();
-    delete rel._values.select;
-    rel.selectValues = columns as any;
-    const manager = rel.arel();
-
-    const result = await this.skipQueryCacheIfNecessary(() =>
-      this.whereClause.isContradiction()
-        ? Promise.resolve(Result.empty())
-        : this.model.withConnection((c) => c.selectAll(manager, `${this.model.name} Pluck`)),
-    );
-
-    return await typeCastPluckValues.call(this, result, columns);
-  });
+  return await typeCastPluckValues.call(this, result, columns);
 }
 
 export function asyncPluck(
   this: CalculationRelation,
-  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<
+    | string
+    | Nodes.Attribute
+    | Nodes.NamedFunction
+    | Nodes.SqlLiteral
+    | Record<string, string | string[]>
+  >
 ): Promise<unknown[]> {
   return this.pluck(...columnNames);
 }
 
 export async function pick(
   this: CalculationRelation,
-  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<
+    | string
+    | Nodes.Attribute
+    | Nodes.NamedFunction
+    | Nodes.SqlLiteral
+    | Record<string, string | string[]>
+  >
 ): Promise<unknown> {
   if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
     const records = await this.records();
@@ -429,7 +452,13 @@ export async function pick(
 
 export function asyncPick(
   this: CalculationRelation,
-  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<
+    | string
+    | Nodes.Attribute
+    | Nodes.NamedFunction
+    | Nodes.SqlLiteral
+    | Record<string, string | string[]>
+  >
 ): Promise<unknown> {
   return this.pick(...columnNames);
 }
@@ -493,7 +522,7 @@ export interface CalculationMethods {
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(block: SumBlock): Promise<number | bigint>;
-  sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
+  sum(initialValue: number | string, block: SumBlock): Promise<number | bigint>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
@@ -508,16 +537,40 @@ export interface CalculationMethods {
   asyncMinimum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
   asyncMaximum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
   pluck(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columns: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown[]>;
   asyncPluck(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columns: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown[]>;
   pick(
-    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown>;
   asyncPick(
-    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<
+      | string
+      | Nodes.Attribute
+      | Nodes.NamedFunction
+      | Nodes.SqlLiteral
+      | Record<string, string | string[]>
+    >
   ): Promise<unknown>;
   ids(): Promise<unknown[]> | unknown[];
   asyncIds(): Promise<unknown[]>;
@@ -564,35 +617,6 @@ export const Calculations = {
   ids: withDeferredDistinctPkPredicates(ids),
   asyncIds,
 } as const;
-
-/** @internal */
-function hasTopLevelComma(s: string): boolean {
-  let depth = 0;
-  let quote: '"' | "'" | "`" | null = null;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (quote) {
-      if (ch === "\\") {
-        i++;
-        continue;
-      }
-      if (ch === quote && s[i + 1] === quote) {
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      continue;
-    }
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    else if (ch === "," && depth === 0) return true;
-  }
-  return false;
-}
 
 /** @internal */
 export function aggregateColumn(
@@ -986,13 +1010,21 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
       if (type instanceof BigIntegerType) return type.deserialize(value ?? 0) ?? 0n;
       return Number(value ?? 0);
     case "average": {
-      if (value === null || value === undefined) return null;
-      const typeName = (type as { type?(): string } | null)?.type?.();
-      if (type != null && !isCoerceNumericTypeName(typeName)) {
-        const ct = type as { deserialize?(v: unknown): unknown };
-        if (typeof ct.deserialize === "function") return ct.deserialize(value);
+      switch ((type as { type?(): string } | null)?.type?.()) {
+        case "integer":
+        case "decimal":
+          return value == null
+            ? null
+            : value instanceof BigDecimal
+              ? value
+              : new BigDecimal(value as string | number | bigint);
+        default: {
+          if (value === null || value === undefined) return null;
+          const ct = type as { deserialize?(v: unknown): unknown } | null;
+          if (typeof ct?.deserialize === "function") return ct.deserialize(value);
+          return value;
+        }
       }
-      return Number(value);
     }
     default: {
       if (value === null || value === undefined) return null;

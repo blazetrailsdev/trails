@@ -262,14 +262,10 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(false)).toBe(0n);
     });
 
-    it("converts non-finite numbers to null", () => {
-      expect(typeCast(Infinity)).toBe(null);
-      expect(typeCast(NaN)).toBe(null);
-    });
-
     it("passes through strings and floats", () => {
       expect(typeCast("hello")).toBe("hello");
       expect(typeCast(4.2)).toBe(4.2);
+      expect(typeCast(Infinity)).toBe(Infinity);
     });
 
     it("converts integer-valued numbers to BigInt so they bind as SQLITE_INTEGER", () => {

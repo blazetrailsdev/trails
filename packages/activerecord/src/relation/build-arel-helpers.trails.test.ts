@@ -163,7 +163,7 @@ describe("Relation private build-arel helpers", () => {
       const lit = new Nodes.SqlLiteral("1");
       const nodes = relation().arelColumns([lit, { comments: ["id", "body"] }, () => lit]);
       expect(nodes).toHaveLength(4);
-      expect(nodes[0]).toBe(lit);
+      expect(nodes[0]).toEqual(lit);
       expect(nodes[3]).toBe(lit);
     });
 

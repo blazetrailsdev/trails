@@ -1,4 +1,4 @@
-import { ArgumentError, Process, SecureRandom } from "@blazetrails/ruby-compat";
+import { Process, rbObjRespondTo, SecureRandom } from "@blazetrails/ruby-compat";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -132,10 +132,9 @@ function _recordException(payload: EventPayload, e: unknown): void {
 }
 
 export interface InstrumenterNotifier {
-  publish?(name: string, event: Event): void;
   buildHandle?(name: string, id: unknown, payload: EventPayload): NotificationHandle;
-  start?(name: string, id: unknown, payload: EventPayload): void;
-  finish?(name: string, id: unknown, payload: EventPayload, listenersState?: unknown): void;
+  start?(name: string, id: unknown, payload: EventPayload): unknown;
+  finish?(name: string, id: unknown, payload: EventPayload, listenersState?: unknown): unknown;
 }
 
 export interface NotificationHandle {
@@ -144,12 +143,18 @@ export interface NotificationHandle {
 }
 
 export class Instrumenter {
-  private _notifier: InstrumenterNotifier;
   readonly id: string;
+  private _notifier: InstrumenterNotifier & {
+    buildHandle(name: string, id: unknown, payload: EventPayload): NotificationHandle;
+  };
 
   constructor(notifier: InstrumenterNotifier) {
-    this._notifier = notifier;
+    if (!rbObjRespondTo(notifier, "buildHandle")) {
+      notifier = new Wrapper(notifier);
+    }
+
     this.id = this.uniqueId();
+    this._notifier = notifier as Instrumenter["_notifier"];
   }
 
   instrument<T = void>(
@@ -186,17 +191,7 @@ export class Instrumenter {
   }
 
   buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
-    if (this._notifier.buildHandle) {
-      return this._notifier.buildHandle(name, this.id, payload);
-    }
-    return new Handle(
-      name,
-      payload,
-      this.id,
-      this._notifier as InstrumenterNotifier & {
-        publish(name: string, event: Event): void;
-      },
-    );
+    return this._notifier.buildHandle(name, this.id, payload);
   }
 
   newEvent(name: string, payload: EventPayload = {}): Event {
@@ -204,15 +199,15 @@ export class Instrumenter {
   }
 
   start(name: string, payload: EventPayload): void {
-    this._notifier.start?.(name, this.id, payload);
+    this._notifier.start!(name, this.id, payload);
   }
 
   finish(name: string, payload: EventPayload): void {
-    this._notifier.finish?.(name, this.id, payload);
+    this._notifier.finish!(name, this.id, payload);
   }
 
   finishWithState(listenersState: unknown, name: string, payload: EventPayload): void {
-    this._notifier.finish?.(name, this.id, payload, listenersState);
+    this._notifier.finish!(name, this.id, payload, listenersState);
   }
 
   private uniqueId(): string {
@@ -220,62 +215,47 @@ export class Instrumenter {
   }
 }
 
-export class Handle implements NotificationHandle {
-  private _state: "initialized" | "started" | "finished" = "initialized";
-  private _event: Event | null = null;
+export class LegacyHandle implements NotificationHandle {
+  private _notifier: InstrumenterNotifier;
+  private _name: string;
+  private _id: unknown;
+  private _payload: EventPayload;
+  private _listenerState: unknown;
 
-  constructor(
-    private _name: string,
-    private _payload: EventPayload,
-    private _transactionId: string,
-    private _notifier: { publish(name: string, event: Event): void },
-  ) {}
+  constructor(notifier: InstrumenterNotifier, name: string, id: unknown, payload: EventPayload) {
+    this._notifier = notifier;
+    this._name = name;
+    this._id = id;
+    this._payload = payload;
+  }
 
   start(): void {
-    if (this._state !== "initialized") {
-      throw new ArgumentError(`expected state to be "initialized" but was "${this._state}"`);
-    }
-    this._state = "started";
-    this._event = new Event(this._name, null, null, this._transactionId, this._payload);
-    this._event.startBang();
+    this._listenerState = this._notifier.start!(this._name, this._id, this._payload);
   }
 
   finish(): void {
-    if (this._state !== "started") {
-      throw new ArgumentError(`expected state to be "started" but was "${this._state}"`);
-    }
-    this._state = "finished";
-    if (this._event) {
-      this._event.payload = this._payload;
-      this._event.finishBang();
-      this._notifier.publish(this._event.name, this._event);
-    }
-  }
-}
-
-export class LegacyHandle {
-  private _event: Event;
-  private _notifier: { publish(name: string, event: Event): void };
-
-  constructor(event: Event, notifier: { publish(name: string, event: Event): void }) {
-    this._event = event;
-    this._notifier = notifier;
-  }
-
-  finish(): void {
-    this._event.finishBang();
-    this._notifier.publish(this._event.name, this._event);
+    this._notifier.finish!(this._name, this._id, this._payload, this._listenerState);
   }
 }
 
 export class Wrapper {
-  private _instrumenter: Instrumenter;
+  private _notifier: InstrumenterNotifier;
 
-  constructor(notifier: { publish(name: string, event: Event): void }) {
-    this._instrumenter = new Instrumenter(notifier);
+  constructor(notifier: InstrumenterNotifier) {
+    this._notifier = notifier;
   }
 
-  get instrumenter(): Instrumenter {
-    return this._instrumenter;
+  buildHandle(name: string, id: unknown, payload: EventPayload): LegacyHandle {
+    return new LegacyHandle(this._notifier, name, id, payload);
+  }
+
+  start(...args: [name: string, id: unknown, payload: EventPayload]): unknown {
+    return this._notifier.start!(...args);
+  }
+
+  finish(
+    ...args: [name: string, id: unknown, payload: EventPayload, listenersState?: unknown]
+  ): unknown {
+    return this._notifier.finish!(...args);
   }
 }

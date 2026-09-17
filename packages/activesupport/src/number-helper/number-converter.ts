@@ -2,6 +2,7 @@ import { Rational } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { SafeBuffer } from "../core-ext/string/output-safety.js";
 import { merge, mergeBang } from "../hash-utils.js";
 
 const RATIONAL_DEFAULT_PRECISION = 32;
@@ -98,12 +99,11 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   protected validBigdecimal(): BigDecimal | null {
     const number = this.number;
     if (number instanceof Rational) return new BigDecimal(number, RATIONAL_DEFAULT_PRECISION);
-    if (typeof number === "number" && !Number.isFinite(number)) return null;
     if (typeof number === "number" || typeof number === "bigint") {
       return new BigDecimal(number);
     }
-    if (typeof number === "string") {
-      return BIGDECIMAL_STRING.test(number) ? new BigDecimal(number.trim()) : null;
+    if (typeof number === "string" || number instanceof SafeBuffer) {
+      return BIGDECIMAL_STRING.test(String(number)) ? new BigDecimal(String(number).trim()) : null;
     }
     if (number instanceof BigDecimal) return number;
     const toD = (number as { toD?: () => unknown } | null | undefined)?.toD;
