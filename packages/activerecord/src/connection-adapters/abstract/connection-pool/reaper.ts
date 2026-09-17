@@ -94,8 +94,14 @@ export class Reaper {
               for (const ref of alive) {
                 const p = ref.deref();
                 if (p) {
-                  await p.reap?.();
-                  await p.flush?.();
+                  try {
+                    await p.reap?.();
+                    await p.flush?.();
+                  } catch (err) {
+                    console.warn(
+                      `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                  }
                 }
               }
 
