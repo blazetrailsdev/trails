@@ -230,3 +230,35 @@ export function renderWriteSummary(mark: AssertionMark, markPath: string): strin
       ),
   ].join("\n");
 }
+
+/**
+ * Read the freeze marker that suspends reseeding, or `null` when the mark is
+ * live. Its contents are the refusal's reason line, so the campaign that froze
+ * the mark names itself rather than being hard-coded here.
+ *
+ * The marker exists because `--write` is not scoped: `nextMark` rewrites EVERY
+ * package in the artifact, so one reflexive reseed during a convergence
+ * campaign both re-serializes the stories onto this file and tightens unrelated
+ * packages in a diff nobody reviewed.
+ */
+export async function loadFreeze(file: string): Promise<string | null> {
+  try {
+    return (await fs.readFile(file, "utf-8")).trim();
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+export function renderFrozen(reason: string, freezePath: string, markPath: string): string {
+  return [
+    "",
+    `assertion-mismatch ratchet: ${markPath} is FROZEN — refusing to reseed.`,
+    "",
+    ...reason.split("\n").map((line) => `  ${line}`),
+    "",
+    "Convergence still gates normally: the mark only shrinks, so a frozen mark sitting above",
+    "the measurement stays green and needs no write. Lower it in one pass when the campaign",
+    `closes, by deleting ${freezePath} in that same PR.`,
+  ].join("\n");
+}

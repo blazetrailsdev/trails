@@ -11,7 +11,7 @@ import {
 } from "./lint-assertion-mismatches.js";
 
 let dir: string;
-let paths: { artifact: string; mark: string };
+let paths: { artifact: string; mark: string; freeze: string };
 
 async function writeFixtures(
   artifact: Record<string, [number, number, number]>,
@@ -49,7 +49,11 @@ async function readMark(): Promise<Record<string, Counts>> {
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), "assertion-ratchet-"));
-  paths = { artifact: path.join(dir, "artifact.json"), mark: path.join(dir, "mark.json") };
+  paths = {
+    artifact: path.join(dir, "artifact.json"),
+    mark: path.join(dir, "mark.json"),
+    freeze: path.join(dir, "mark.freeze"),
+  };
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -95,6 +99,26 @@ describe("main", () => {
     await writeFixtures({ activerecord: [1, 1, 1] }, { activerecord: [1, 1, 1], arel: [0, 0, 0] });
     expect(await main(true, paths)).toBe(1);
     expect(await readMark()).toHaveProperty("arel");
+  });
+
+  it("refuses to reseed while the mark is frozen", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(true, paths)).toBe(1);
+    expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("Frozen for RFC 0132.");
+    expect(await readMark()).toEqual({ activerecord: { assertionCount: 10, kind: 20, value: 3 } });
+  });
+
+  it("still gates a frozen mark, whose slack reads as green", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(0);
+  });
+
+  it("still fails a frozen mark whose counters grew past it", async () => {
+    await writeFixtures({ activerecord: [10, 23, 3] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(1);
   });
 
   it("names the missing artifact rather than surfacing a bare ENOENT", async () => {

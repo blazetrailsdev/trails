@@ -319,6 +319,17 @@ Shrinkage is auto-acknowledged: `--write` (the `:reseed` script) lowers each
 counter to its current value and never raises one, so a run that grew a counter
 cannot buy headroom by reseeding.
 
+**A reseed is refused while `scripts/test-compare/assertion-mismatch-mark.freeze`
+exists**, and the marker's own text says which campaign froze the mark and which
+story lifts it. `--write` is not scoped — it rewrites every package in the
+artifact — so during a convergence campaign whose stories all land in one
+package, a single reflexive reseed both serializes those stories onto this file
+and tightens unrelated packages in a diff nobody asked for. Freezing costs
+nothing the gate was providing: the mark only shrinks, so one sitting above the
+measurement stays green, and the campaign lowers it in one pass at the end. What
+it does cost is protection of the ground already converged — the slack absorbs a
+regression silently — so a freeze is scoped to one campaign and deleted with it.
+
 **The stale-artifact trap**: the counts are read from
 `scripts/test-compare/output/convention-comparison.json` — no second extractor.
 Gating a file written before a sibling PR's tests landed reports movement that

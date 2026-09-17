@@ -10,6 +10,10 @@
  *   pnpm parity:test:assertions:reseed     # lower the mark after convergence
  *   pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
  *
+ * Reseeding is refused while assertion-mismatch-mark.freeze exists; see
+ * `loadFreeze` in assertion-ratchet.ts for why a convergence campaign wants the
+ * mark held still.
+ *
  * A plain run regenerates the artifact via `pnpm parity:test --json`: gating a
  * STALE convention-comparison.json reports movement that never happened, and
  * `--write` would commit that fiction as the new mark. Opt out with
@@ -26,10 +30,12 @@ import { fileURLToPath } from "url";
 import {
   type ComparisonArtifact,
   countsFromArtifact,
+  loadFreeze,
   loadMark,
   missingFromArtifact,
   nextMark,
   renderExceeded,
+  renderFrozen,
   renderMissing,
   renderUnmarked,
   renderWriteSummary,
@@ -41,6 +47,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const ARTIFACT_PATH = path.join(SCRIPT_DIR, "output", "convention-comparison.json");
 const MARK_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.json");
+const FREEZE_PATH = path.join(SCRIPT_DIR, "assertion-mismatch-mark.freeze");
 
 export const NO_REGEN_FLAG = "--no-regen";
 export const REGEN_SKIP_ENV = "TEST_COMPARE_SKIP_REGEN";
@@ -84,9 +91,14 @@ async function loadArtifact(file: string): Promise<ComparisonArtifact> {
 export interface Paths {
   artifact: string;
   mark: string;
+  freeze: string;
 }
 
-export const DEFAULT_PATHS: Paths = { artifact: ARTIFACT_PATH, mark: MARK_PATH };
+export const DEFAULT_PATHS: Paths = {
+  artifact: ARTIFACT_PATH,
+  mark: MARK_PATH,
+  freeze: FREEZE_PATH,
+};
 
 /**
  * Gate (or, under `write`, reseed) the mark against the artifact on disk.
@@ -95,9 +107,21 @@ export const DEFAULT_PATHS: Paths = { artifact: ARTIFACT_PATH, mark: MARK_PATH }
  * A marked package missing from the artifact means a partial-scope run, and
  * reseeding from one would drop that package's mark entirely — so both arms
  * bail on it before either touches the file.
+ *
+ * A freeze marker suspends the `write` arm only. The gate keeps running: a
+ * frozen mark is one carrying slack, which this ratchet reports as green.
  */
 export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promise<number> {
   const markRel = path.relative(ROOT_DIR, paths.mark);
+
+  if (write) {
+    const frozen = await loadFreeze(paths.freeze);
+    if (frozen !== null) {
+      console.error(renderFrozen(frozen, path.relative(ROOT_DIR, paths.freeze), markRel));
+      return 1;
+    }
+  }
+
   const current = countsFromArtifact(await loadArtifact(paths.artifact));
   const mark = await loadMark(paths.mark);
 
@@ -128,7 +152,10 @@ async function runAsScript(): Promise<void> {
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
-  if (shouldRegenerate(argv, process.env)) {
+  const write = argv.includes("--write");
+  // A frozen reseed is refused whatever the artifact says, so regenerating it
+  // first would spend a full `parity:test` on an answer already decided.
+  if (shouldRegenerate(argv, process.env) && !(write && (await loadFreeze(FREEZE_PATH)) !== null)) {
     console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
     try {
       await regenerateArtifact(process.env);
@@ -141,7 +168,7 @@ async function runAsScript(): Promise<void> {
     }
   }
   try {
-    process.exit(await main(argv.includes("--write")));
+    process.exit(await main(write));
   } catch (e) {
     console.error(`\nassertion-mismatch ratchet: ${(e as Error).message}\n`);
     process.exit(2);
