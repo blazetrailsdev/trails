@@ -1,6 +1,6 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
-import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { BigDecimal } from "@blazetrails/ruby-compat";
 import { merge, mergeBang } from "../hash-utils.js";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 

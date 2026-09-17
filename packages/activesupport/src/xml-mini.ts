@@ -1,6 +1,6 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
-import { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
+import { BigDecimal, toD } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { LoadError, StringIO } from "@blazetrails/ruby-compat";
 import { Temporal, Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";

@@ -1,7 +1,7 @@
 import { NumberConverter } from "./number-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
 import { NumberToDelimitedConverter } from "./number-to-delimited-converter.js";
-import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { BigDecimal } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
