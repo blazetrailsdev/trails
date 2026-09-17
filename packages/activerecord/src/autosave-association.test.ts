@@ -29,6 +29,9 @@ import { AuditLog, Developer } from "./test-helpers/models/developer.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Mouse } from "./test-helpers/models/mouse.js";
+import { Organization } from "./test-helpers/models/organization.js";
+import { Member } from "./test-helpers/models/member.js";
+import { MemberDetail } from "./test-helpers/models/member-detail.js";
 import { CakeDesigner } from "./test-helpers/models/cake-designer.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
@@ -50,7 +53,11 @@ import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 import { Category as CanonicalCategory } from "./test-helpers/models/category.js";
-import { Post as CanonicalPost, PostWithAfterCreateCallback } from "./test-helpers/models/post.js";
+import {
+  FirstPost,
+  Post as CanonicalPost,
+  PostWithAfterCreateCallback,
+} from "./test-helpers/models/post.js";
 import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js";
 import { Order as CanonicalOrder } from "./test-helpers/models/order.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
@@ -1723,169 +1730,131 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    setAssociationTarget(record, name, value);
-  }
   fixtures([]);
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalShip);
+    registerModel(ShipPart);
+    registerModel(Developer);
+    registerModel(CanonicalPost);
+    registerModel(CanonicalComment);
+    registerModel(Author);
   });
 
-  function makeModels() {
-    return { Pirate: CanonicalPirate, Ship: CanonicalShip };
-  }
+  let ship: any;
+  let pirate: any;
+
+  beforeEach(async () => {
+    ship = await CanonicalShip.create({ name: "Nights Dirty Lightning" });
+    pirate = await ship.createPirate({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+  });
 
   it("should still work without an associated model", async () => {
-    const { Ship } = makeModels();
-    const ship = await Ship.create({ name: "Pearl" });
-    ship.name = "The Vile Serpent";
+    await pirate.destroy();
+    (await ship.reload()).name = "The Vile Serpent";
     await ship.save();
-    const reloaded = await Ship.find(ship.id);
-    expect(reloaded.name).toBe("The Vile Serpent");
+    expect((await ship.reload()).name).toEqual("The Vile Serpent");
   });
 
   it("should automatically save the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Pearl" });
-    cacheAssoc(ship, "pirate", pirate);
+    (await ship.pirate).catchphrase = "Arr";
     await ship.save();
-    expect(pirate.isNewRecord()).toBe(false);
-    expect(ship.pirate_id).toBe(pirate.id);
+    expect((await (await ship.reload()).pirate).catchphrase).toEqual("Arr");
   });
 
   it("should automatically save bang the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.catchphrase = "Arr";
-    cacheAssoc(ship, "pirate", pirate);
+    (await ship.pirate).catchphrase = "Arr";
     await ship.saveBang();
-    const reloaded = await Pirate.find(pirate.id);
-    expect(reloaded.catchphrase).toBe("Arr");
+    expect((await (await ship.reload()).pirate).catchphrase).toEqual("Arr");
   });
 
   it("should automatically validate the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "" });
-    const ship = new Ship({ name: "Pearl" });
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(false);
+    (await ship.pirate).catchphrase = "";
+    assertPredicate(await ship.isInvalid(), (v) => v);
+    assertPredicate(ship.errors.get("pirate.catchphrase"), (e: string[]) => e.length > 0);
   });
 
   it("should merge errors on the associated model onto the parent even if it is not valid", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "" });
-    const ship = new Ship({ name: "Pearl" });
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(false);
-    const errors = (ship as any).errors;
-    expect(errors).toBeDefined();
+    ship.name = null;
+    (await ship.pirate).catchphrase = null;
+    assertPredicate(await ship.isInvalid(), (v) => v);
+    assertPredicate(ship.errors.get("name"), (e: string[]) => e.length > 0);
+    assertPredicate(ship.errors.get("pirate.catchphrase"), (e: string[]) => e.length > 0);
   });
 
   it("should still allow to bypass validations on the associated model", async () => {
-    class FlexPirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    registerModel("FlexPirate", FlexPirate);
-    class FlexShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    registerModel("FlexShip", FlexShip);
-    Associations.belongsTo.call(FlexShip, "flexPirate", {
-      autosave: true,
-      foreignKey: "pirate_id",
-    });
-    const pirate = new FlexPirate({ catchphrase: "" });
-    const ship = new FlexShip({ name: "NoValidation" });
-    cacheAssoc(ship, "flexPirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(true);
+    (await ship.pirate).catchphrase = "";
+    ship.name = "";
+    await ship.save({ validate: false });
+    expect([(await ship.reload()).name, (await ship.pirate).catchphrase]).toEqual(["", ""]);
   });
 
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.catchphrase = "";
-    cacheAssoc(ship, "pirate", pirate);
-    await expect(ship.saveBang()).rejects.toThrow(RecordInvalid);
+    (await ship.pirate).catchphrase = "";
+    await assertRaise([RecordInvalid], {}, () => ship.saveBang());
   });
-  it("should not save and return false if a callback cancelled saving", async () => {
-    class CcShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
 
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.beforeSave(function () {
-          kernelThrow(":abort");
-        });
-      }
-    }
-    registerModel("CcShip", CcShip);
-    const ship = new CcShip({ name: "Cancelled" });
-    const saved = await ship.save();
-    expect(saved).toBe(false);
-    expect(ship.isNewRecord()).toBe(true);
+  it("should not save and return false if a callback cancelled saving", async () => {
+    const ship = new CanonicalShip({ name: "The Vile Serpent" }) as any;
+    const pirate = ship.buildPirate({ catchphrase: "Arr" });
+    pirate.cancelSaveFromCallback = true;
+
+    await assertNoDifference(
+      async () => Number(await CanonicalShip.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await CanonicalPirate.count()),
+          null,
+          async () => {
+            assertNot(await ship.save());
+          },
+        );
+      },
+    );
   });
+
   it("should rollback any changes if an exception occurred while saving", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.catchphrase = "";
-    ship.name = "Changed";
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(false);
-    const reloaded = await Ship.find(ship.id);
-    expect(reloaded.name).toBe("Pearl");
+    const before = [(await ship.pirate).catchphrase, ship.name];
+
+    (await ship.pirate).catchphrase = "Arr";
+    ship.name = "The Vile Serpent";
+
+    const parent = await ship.pirate;
+    const save = parent.save.bind(parent);
+    parent.save = async (options?: any) => {
+      await save(options);
+      throw new Error("Oh noes!");
+    };
+
+    await assertRaise([Error], {}, async () => assertNot(await ship.save()));
+    expect([(await (await ship.pirate).reload()).catchphrase, (await ship.reload()).name]).toEqual(
+      before,
+    );
   });
 
   it("should not load the associated model", async () => {
-    const { Ship } = makeModels();
-    const ship = await Ship.create({ name: "NoLoad" });
-    const saved = await ship.save();
-    expect(saved).toBe(true);
+    await assertQueriesCount(3, false, async () => {
+      ship.name = "The Vile Serpent";
+      await ship.saveBang();
+    });
   });
 
   it("should save with non nullable foreign keys", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "FK", pirate_id: pirate.id });
-    cacheAssoc(ship, "pirate", pirate);
-    await ship.save();
-    expect(ship.pirate_id).toBe(pirate.id);
+    const parent = new CanonicalPost({ title: "foo", body: "..." }) as any;
+    const child = parent.comments.build({ body: "..." });
+    await child.saveBang();
+    expect((await (await child.reload()).post).equals(await parent.reload())).toBe(true);
   });
 
   it("should save if previously saved", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Saved", pirate_id: pirate.id });
-    pirate.catchphrase = "Ahoy";
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(true);
-    const reloaded = await Pirate.find(pirate.id!);
-    expect(reloaded.catchphrase).toBe("Ahoy");
+    const ship = (await CanonicalShip.create({
+      name: "Nights Dirty Lightning",
+      pirate: new CanonicalPirate({ catchphrase: "Arrrr" }),
+    })) as any;
+    await ship.createPirate({ catchphrase: "Savvy?" });
+    expect((await (await ship.reload()).pirate).catchphrase).toEqual("Savvy?");
   });
 });
 
@@ -3075,153 +3044,56 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   fixtures([]);
-  it("should not has one through model", async () => {
-    class HotOrg extends Base {
-      declare name: string | null;
 
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class HotMember extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("hotDetail", {
-          className: "HotDetail",
-          foreignKey: "developer_id",
-        });
-        this.hasOne("hotOrg", {
-          className: "HotOrg",
-          through: "hotDetail",
-          source: "hotOrg",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface HotMember {
-      get hotDetail(): HotDetail | null | Promise<HotDetail | null>;
-      set hotDetail(value: HotDetail | null);
-      get hotOrg(): Base | null | Promise<Base | null>;
-      set hotOrg(value: Base | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class HotDetail extends Base {
-      declare company_id: number | null;
-      declare developer_id: number | null;
-
-      static {
-        this._tableName = "contracts";
-        this.attribute("company_id", "integer");
-        this.attribute("developer_id", "integer");
-        this.belongsTo("hotOrg", {
-          className: "HotOrg",
-          foreignKey: "company_id",
-        });
-        this.belongsTo("hotMember", {
-          className: "HotMember",
-          foreignKey: "developer_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface HotDetail {
-      get hotOrg(): HotOrg | null | Promise<HotOrg | null>;
-      set hotOrg(value: HotOrg | null);
-      get hotMember(): HotMember | null | Promise<HotMember | null>;
-      set hotMember(value: HotMember | null);
-    }
-    registerModel("HotOrg", HotOrg);
-    registerModel("HotMember", HotMember);
-    registerModel("HotDetail", HotDetail);
-
-    const org = await HotOrg.create({ name: "Org" });
-    const member = await HotMember.create({ name: "M" });
-    await HotDetail.create({ company_id: org.id, developer_id: member.id });
-    cacheAssoc(member, "hotOrg", org);
-    org.name = "Modified";
-    const saved = await member.save();
-    expect(saved).toBe(true);
-    const reloadedOrg = await HotOrg.find(org.id);
-    expect(reloadedOrg.name).toBe("Org");
+  beforeAll(() => {
+    registerModel(Organization);
+    registerModel(Member);
+    registerModel(MemberDetail);
+    registerModel(Author);
+    registerModel(CanonicalPost);
+    registerModel(CanonicalComment);
+    registerModel(FirstPost);
   });
+
+  async function createMemberWithOrganization() {
+    const organization = await Organization.create();
+    const member = await Member.create();
+    await MemberDetail.create({ organization, member });
+
+    return member;
+  }
+
+  it("should not has one through model", async () => {
+    const member = (await createMemberWithOrganization()) as any;
+
+    const organization = await member.organization;
+    const save = organization.save.bind(organization);
+    organization.save = async (options?: any) => {
+      await save(options);
+      throw new Error("Oh noes!");
+    };
+    await assertNothingRaised(() => member.save());
+  });
+
+  async function createAuthorWithPostWithComment() {
+    await Author.createBang({ name: "David" });
+    const author = await Author.createBang({ name: "Sergiy" });
+    const post = await CanonicalPost.createBang({ author, title: "foo", body: "bar" });
+    await CanonicalComment.createBang({ post, body: "cool comment" });
+
+    return author;
+  }
+
   it("should not reversed has one through model", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class RevOrg extends Base {
-      declare name: string | null;
+    const author = (await createAuthorWithPostWithComment()) as any;
 
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.hasOne("revDetail", {
-          className: "RevDetail",
-          foreignKey: "company_id",
-        });
-        this.hasOne("revMember", {
-          className: "RevMember",
-          through: "revDetail",
-          source: "revMember",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface RevOrg {
-      get revDetail(): RevDetail | null | Promise<RevDetail | null>;
-      set revDetail(value: RevDetail | null);
-      get revMember(): Base | null | Promise<Base | null>;
-      set revMember(value: Base | null);
-    }
-    class RevMember extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class RevDetail extends Base {
-      declare company_id: number | null;
-      declare developer_id: number | null;
-
-      static {
-        this._tableName = "contracts";
-        this.attribute("company_id", "integer");
-        this.attribute("developer_id", "integer");
-        this.belongsTo("revOrg", {
-          className: "RevOrg",
-          foreignKey: "company_id",
-        });
-        this.belongsTo("revMember", {
-          className: "RevMember",
-          foreignKey: "developer_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface RevDetail {
-      get revOrg(): RevOrg | null | Promise<RevOrg | null>;
-      set revOrg(value: RevOrg | null);
-      get revMember(): RevMember | null | Promise<RevMember | null>;
-      set revMember(value: RevMember | null);
-    }
-    registerModel("RevOrg", RevOrg);
-    registerModel("RevMember", RevMember);
-    registerModel("RevDetail", RevDetail);
-
-    const org = await RevOrg.create({ name: "Org" });
-    const member = await RevMember.create({ name: "M" });
-    await RevDetail.create({ company_id: org.id, developer_id: member.id });
-    cacheAssoc(org, "revMember", member);
-    member.name = "Modified";
-    const saved = await org.save();
-    expect(saved).toBe(true);
-    const reloadedMember = await RevMember.find(member.id);
-    expect(reloadedMember.name).toBe("M");
+    const comment = await author.commentOnFirstPost;
+    const save = comment.save.bind(comment);
+    comment.save = async (options?: any) => {
+      await save(options);
+      throw new Error("Oh noes!");
+    };
+    await assertNothingRaised(() => author.save());
   });
 });
 
