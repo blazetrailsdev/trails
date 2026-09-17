@@ -1,3 +1,4 @@
+import { underscore } from "@blazetrails/activesupport";
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
 import { indexNestedAttributeErrors } from "../active-record.js";
 
@@ -41,7 +42,7 @@ export class NestedError extends ActiveModelNestedError {
       _association: association,
       innerError,
     });
-    const name = association.reflection.name;
+    const name = underscore(association.reflection.name);
     const isCollection =
       typeof association.isCollection === "function"
         ? association.isCollection()

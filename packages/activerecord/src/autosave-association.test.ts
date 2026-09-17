@@ -2,7 +2,7 @@ import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./act
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import { Base, registerModel, acceptsNestedAttributesFor, RecordInvalid } from "./index.js";
 import { Associations, collectionProxyFor as association } from "./associations.js";
@@ -29,6 +29,9 @@ import { AuditLog, Developer } from "./test-helpers/models/developer.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Mouse } from "./test-helpers/models/mouse.js";
+import { CakeDesigner } from "./test-helpers/models/cake-designer.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
+import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Molecule } from "./test-helpers/models/molecule.js";
 import { Electron } from "./test-helpers/models/electron.js";
@@ -65,7 +68,11 @@ import {
   assertNoDifference,
   assertNotPredicate,
   assertNothingRaised,
+  assertDifference,
+  assertRaise,
+  assertRaises,
   assertPredicate,
+  deepDup,
   getCallbackChains,
   isPresent,
 } from "@blazetrails/activesupport";
@@ -84,7 +91,7 @@ function cacheAssoc(record: Base, name: string, value: unknown) {
 fixtures([], { useTransactionalTests: false });
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: false });
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalShip);
@@ -92,284 +99,303 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     registerModel(CanonicalBird);
     registerModel(ShipPart);
     registerModel(CanonicalParrot);
+    registerModel(Treasure);
+    registerModel(PriceEstimate);
+    registerModel(CpkOrder);
+    registerModel(CpkBook);
   });
 
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    setAssociationTarget(record, name, value);
-  }
+  let pirate: any;
+  let ship: any;
 
-  function makePirateShip() {
-    return { Pirate: CanonicalPirate, Ship: CanonicalShip, Bird: CanonicalBird, Part: ShipPart };
-  }
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    ship = await pirate.createShip({ name: "Nights Dirty Lightning" });
+  });
+
+  afterEach(async () => {
+    await CanonicalBird.deleteAll();
+    await CanonicalParrot.deleteAll();
+    await ship.delete();
+    await pirate.delete();
+    await CpkBook.deleteAll();
+    await CpkOrder.deleteAll();
+  });
 
   it("a marked for destruction record should not be be marked after reload", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
-    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
-    cacheAssoc(pirate, "ship", ship);
-
     pirate.markForDestruction();
-    ship.markForDestruction();
+    (await pirate.ship).markForDestruction();
 
-    expect((await pirate.reload()).markedForDestruction()).toBe(false);
-    expect((await ship.reload()).markedForDestruction()).toBe(false);
+    assertNotPredicate(await pirate.reload(), (r: any) => r.markedForDestruction());
+    assertNotPredicate(await (await pirate.ship).reload(), (r: any) => r.markedForDestruction());
   });
 
   it("should destroy a child association as part of the save transaction if it was marked for destruction", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    ship.markForDestruction();
-    cacheAssoc(pirate, "ship", ship);
+    assertNotPredicate(await pirate.ship, (r: any) => r.markedForDestruction());
+
+    (await pirate.ship).markForDestruction();
+    const id = (await pirate.ship).id;
+
+    assertPredicate(await pirate.ship, (r: any) => r.markedForDestruction());
+    assert(await CanonicalShip.findBy({ id }));
+
     await pirate.save();
-    expect(ship.isDestroyed()).toBe(true);
+    expect(await (await pirate.reload()).ship).toBeNull();
+    expect(await CanonicalShip.findBy({ id })).toBeNull();
   });
 
   it("should skip validation on a child association if marked for destruction", async () => {
-    const { Ship, Part } = makePirateShip();
-    const ship = await Ship.create({ name: "Titanic" });
-    const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.name = "";
-    part.markForDestruction();
-    cacheAssoc(ship, "parts", [part]);
-    const saved = await ship.save();
-    expect(saved).toBe(true);
-    expect(part.isDestroyed()).toBe(true);
+    (await pirate.ship).name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+
+    (await pirate.ship).markForDestruction();
+    const isValid = vi.spyOn(await pirate.ship, "isValid");
+    await assertDifference(
+      async () => Number(await CanonicalShip.count()),
+      -1,
+      null,
+      async () => {
+        await pirate.saveBang();
+      },
+    );
+    expect(isValid).not.toHaveBeenCalled();
   });
 
   it("a child marked for destruction should not be destroyed twice", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.markForDestruction();
-    cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
-    expect(ship.isDestroyed()).toBe(true);
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    (await pirate.ship).markForDestruction();
+    assert(await pirate.save());
+    (await pirate.ship).destroy = () => {
+      throw new Error("Should not be called");
+    };
+    assert(await pirate.save());
   });
 
   it("should rollback destructions if an exception occurred while saving a child", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const origSave = ship.save.bind(ship);
-    (ship as any).save = async (opts?: any) => {
-      await origSave(opts);
-      await ship.destroy();
+    const child = await pirate.ship;
+    const save = child.save.bind(child);
+    child.save = async (options?: any) => {
+      await save(options);
+      await child.destroy();
       throw new Error("Oh noes!");
     };
-    ship.name = "Pearl Changed";
-    cacheAssoc(pirate, "ship", ship);
-    await expect(pirate.save()).rejects.toThrow("Oh noes!");
-    const reloaded = await Ship.find(ship.id);
-    expect(reloaded).toBeTruthy();
+
+    (await ship.pirate).catchphrase = "Changed Catchphrase";
+    ship.nameWillChange();
+
+    await assertRaise([Error], {}, async () => assertNot(await pirate.save()));
+    expect(await (await pirate.reload()).ship).not.toBeNull();
   });
 
   it("should save changed has one changed object if child is saved", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.name = "NewName";
-    cacheAssoc(pirate, "ship", ship);
-    expect(await pirate.save()).toBeTruthy();
-    const reloaded = await Ship.find(ship.id);
-    expect(reloaded.name).toBe("NewName");
+    (await pirate.ship).name = "NewName";
+    assert(await pirate.save());
+    expect((await (await pirate.ship).reload()).name).toEqual("NewName");
   });
 
   it("should not save changed has one unchanged object if child is saved", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    expect(ship.isDestroyed()).toBe(false);
+    const save = vi.spyOn(await pirate.ship, "save");
+    assert(await pirate.save());
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("should destroy a parent association as part of the save transaction if it was marked for destruction", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.markForDestruction();
-    cacheAssoc(ship, "pirate", pirate);
+    assertNotPredicate(await ship.pirate, (r: any) => r.markedForDestruction());
+
+    (await ship.pirate).markForDestruction();
+    const id = (await ship.pirate).id;
+
+    assertPredicate(await ship.pirate, (r: any) => r.markedForDestruction());
+    assert(await CanonicalPirate.findBy({ id }));
+
     await ship.save();
-    expect(pirate.isDestroyed()).toBe(true);
+    expect(await (await ship.reload()).pirate).toBeNull();
+    expect(await CanonicalPirate.findBy({ id })).toBeNull();
   });
 
   it("autosave cpk association should destroy parent association when marked for destruction", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Ahoy" });
-    const ship = await Ship.create({ name: "Queen Anne", pirate_id: pirate.id });
-    pirate.markForDestruction();
-    cacheAssoc(ship, "pirate", pirate);
-    await ship.save();
-    expect(pirate.isDestroyed()).toBe(true);
+    const book = new CpkBook({ title: "Book", id: [1, 2] }) as any;
+    await CpkOrder.createBang({ id: [3, 4], book });
+
+    (await book.order).markForDestruction();
+
+    assert(await book.save());
+    expect(await (await book.reload()).order).toBeNull();
+    expect(await CpkOrder.findBy({ id: 4, shop_id: 3 })).toBeNull();
   });
 
   it("should skip validation on a parent association if marked for destruction", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.markForDestruction();
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(true);
-    expect(pirate.isDestroyed()).toBe(true);
+    (await ship.pirate).catchphrase = "";
+    assertNotPredicate(await ship.isValid(), (v) => v);
+
+    (await ship.pirate).markForDestruction();
+    const isValid = vi.spyOn(await ship.pirate, "isValid");
+    await assertDifference(
+      async () => Number(await CanonicalPirate.count()),
+      -1,
+      null,
+      async () => {
+        await ship.saveBang();
+      },
+    );
+    expect(isValid).not.toHaveBeenCalled();
   });
 
   it("a parent marked for destruction should not be destroyed twice", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.markForDestruction();
-    cacheAssoc(ship, "pirate", pirate);
-    await ship.save();
-    expect(pirate.isDestroyed()).toBe(true);
-    cacheAssoc(ship, "pirate", pirate);
-    const saved = await ship.save();
-    expect(saved).toBe(true);
+    (await ship.pirate).markForDestruction();
+    assert(await ship.save());
+    Object.assign((await ship.pirate) ?? {}, {
+      destroy() {
+        throw new Error("Should not be called");
+      },
+    });
+    assert(await ship.save());
   });
 
   it("should rollback destructions if an exception occurred while saving a parent", async () => {
-    const { Pirate, Ship } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const origSave = pirate.save.bind(pirate);
-    (pirate as any).save = async (opts?: any) => {
-      await origSave(opts);
-      await pirate.destroy();
+    const parent = await ship.pirate;
+    const save = parent.save.bind(parent);
+    parent.save = async (options?: any) => {
+      await save(options);
+      await parent.destroy();
       throw new Error("Oh noes!");
     };
-    pirate.catchphrase = "Changed Catchphrase";
-    cacheAssoc(ship, "pirate", pirate);
-    await expect(ship.save()).rejects.toThrow("Oh noes!");
-    const reloaded = await Pirate.find(pirate.id);
-    expect(reloaded).toBeTruthy();
+
+    (await ship.pirate).catchphrase = "Changed Catchphrase";
+
+    await assertRaise([Error], {}, async () => assertNot(await ship.save()));
+    expect(await (await ship.reload()).pirate).not.toBeNull();
   });
 
   it("should save changed child objects if parent is saved", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    bird.name = "Squawk";
-    cacheAssoc(pirate, "birds", [bird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    const reloaded = await Bird.find(bird.id!);
-    expect(reloaded.name).toBe("Squawk");
+    pirate = await ship.createPirate({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    const parrot = await pirate.parrots.createBang({ name: "Posideons Killer" });
+    parrot.name = "NewName";
+    await ship.save();
+
+    expect((await parrot.reload()).name).toEqual("NewName");
   });
 
   it("should destroy has many as part of the save transaction if they were marked for destruction", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const b1 = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    const b2 = await Bird.create({ name: "Crackers", pirate_id: pirate.id });
-    b1.markForDestruction();
-    cacheAssoc(pirate, "birds", [b1, b2]);
+    for (let i = 0; i < 2; i++) await pirate.birds.createBang({ name: `birds_${i}` });
+
+    assertNot((await pirate.birds).some((b: any) => b.markedForDestruction()));
+
+    for (const bird of await pirate.birds) bird.markForDestruction();
+    const klass = (await pirate.birds.first()).constructor;
+    const ids = (await pirate.birds).map((b: any) => b.id);
+
+    assert((await pirate.birds).every((b: any) => b.markedForDestruction()));
+    for (const id of ids) assert(await klass.findBy({ id }));
+
     await pirate.save();
-    expect(b1.isDestroyed()).toBe(true);
-    expect(b2.isDestroyed()).toBe(false);
+    assertEmpty(await (await pirate.reload()).birds);
+    for (const id of ids) expect(await klass.findBy({ id })).toBeNull();
   });
 
   it("should not resave destroyed association", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    await bird.destroy();
-    cacheAssoc(pirate, "birds", [bird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    await pirate.birds.createBang({ name: "parrot" });
+    await (await pirate.birds.first()).destroy();
+    await pirate.saveBang();
+    assertEmpty(await (await pirate.reload()).birds);
   });
 
   it("should skip validation on has many if marked for destruction", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    bird.name = "";
-    bird.markForDestruction();
-    cacheAssoc(pirate, "birds", [bird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    expect(bird.isDestroyed()).toBe(true);
+    for (let i = 0; i < 2; i++) await pirate.birds.createBang({ name: `birds_${i}` });
+
+    for (const bird of await pirate.birds) bird.name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+
+    for (const bird of await pirate.birds) bird.markForDestruction();
+
+    const firstIsValid = vi.spyOn(await pirate.birds.first(), "isValid");
+    const lastIsValid = vi.spyOn(await pirate.birds.last(), "isValid");
+    await assertDifference(
+      async () => Number(await CanonicalBird.count()),
+      -2,
+      null,
+      async () => {
+        await pirate.saveBang();
+      },
+    );
+    expect(lastIsValid).not.toHaveBeenCalled();
+    expect(firstIsValid).not.toHaveBeenCalled();
   });
 
   it("should skip validation on has many if destroyed", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    await bird.destroy();
-    cacheAssoc(pirate, "birds", [bird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    await pirate.birds.createBang({ name: "birds_1" });
+
+    for (const bird of await pirate.birds) bird.name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+
+    for (const bird of await pirate.birds) await bird.destroy();
+    assertPredicate(await pirate.isValid(), (v) => v);
   });
 
   it("a child marked for destruction should not be destroyed twice while saving has many", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    bird.markForDestruction();
-    cacheAssoc(pirate, "birds", [bird]);
-    await pirate.save();
-    expect(bird.isDestroyed()).toBe(true);
-    cacheAssoc(pirate, "birds", [bird]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    await pirate.birds.createBang({ name: "birds_1" });
+
+    for (const bird of await pirate.birds) bird.markForDestruction();
+    assert(await pirate.save());
+
+    for (const bird of await pirate.birds) {
+      const destroy = vi.spyOn(bird, "destroy");
+      assert(await pirate.save());
+      expect(destroy).not.toHaveBeenCalled();
+    }
   });
 
   it("should rollback destructions if an exception occurred while saving has many", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const b1 = await Bird.create({ name: "birds_0", pirate_id: pirate.id });
-    const b2 = await Bird.create({ name: "birds_1", pirate_id: pirate.id });
-    b1.markForDestruction();
-    b2.markForDestruction();
-    const origDestroy = b2.destroy.bind(b2);
-    (b2 as any).destroy = async () => {
-      await origDestroy();
+    for (let i = 0; i < 2; i++) await pirate.birds.createBang({ name: `birds_${i}` });
+    const before = (await pirate.birds).map((c: any) => {
+      c.markForDestruction();
+      return c;
+    });
+
+    const last = before[before.length - 1];
+    const destroy = last.destroy.bind(last);
+    last.destroy = async (...args: unknown[]) => {
+      await destroy(...args);
       throw new Error("Oh noes!");
     };
-    cacheAssoc(pirate, "birds", [b1, b2]);
-    await expect(pirate.save()).rejects.toThrow("Oh noes!");
-    const remaining = await Bird.where({ pirate_id: pirate.id });
-    expect(remaining.length).toBe(2);
+
+    await assertRaise([Error], {}, async () => assertNot(await pirate.save()));
+    expect((await (await pirate.reload()).birds).map((b: any) => b.id)).toEqual(
+      before.map((b: any) => b.id),
+    );
   });
 
   it("when new record a child marked for destruction should not affect other records from saving", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const b1 = new Bird({ name: "Polly" });
-    b1.markForDestruction();
-    const b2 = new Bird({ name: "Crackers" });
-    cacheAssoc(pirate, "birds", [b1, b2]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    expect(b2.isNewRecord()).toBe(false);
+    pirate = ship.buildPirate({ catchphrase: "Arr' now I shall keep me eye on you matey!" });
+
+    for (let i = 0; i < 3; i++) pirate.birds.build({ name: `birds_${i}` });
+    (await pirate.birds)[1].markForDestruction();
+    await pirate.saveBang();
+
+    expect(await (await pirate.birds.reload()).length()).toEqual(2);
   });
 
   it("should save new record that has same value as existing record marked for destruction on field that has unique index", async () => {
-    const { Pirate, Bird } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const b1 = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    b1.markForDestruction();
-    const b2 = new Bird({ name: "Polly" });
-    cacheAssoc(pirate, "birds", [b1, b2]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    expect(b1.isDestroyed()).toBe(true);
-    expect(b2.isNewRecord()).toBe(false);
-  });
+    await (await CanonicalBird.leaseConnection()).addIndex("birds", "name", { unique: true });
+    try {
+      for (let i = 0; i < 3; i++) await pirate.birds.create({ name: `unique_birds_${i}` });
 
-  function makePirateParrot() {
-    return { Pirate: CanonicalPirate, Parrot: CanonicalParrot };
-  }
+      (await pirate.birds)[0].markForDestruction();
+      pirate.birds.build({ name: (await pirate.birds)[0].name });
+      await pirate.saveBang();
+
+      expect(await (await pirate.birds.reload()).length()).toEqual(3);
+    } finally {
+      await (await CanonicalBird.leaseConnection()).removeIndex("birds", { column: "name" });
+    }
+  });
 
   it("should run add callback methods for has many", async () => {
     const associationNameWithCallbacks = "birdsWithMethodCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" }) as any;
+    pirate[associationNameWithCallbacks].build({ name: "Crowe the One-Eyed" });
 
     const expected = ["before_adding_method_bird_<new>", "after_adding_method_bird_<new>"];
 
@@ -377,26 +403,28 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   it("should run remove callback methods for has many", async () => {
-    const assocName = "birdsWithMethodCallbacks";
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
-    child.markForDestruction();
-    const childId = child.id;
+    const associationNameWithCallbacks = "birdsWithMethodCallbacks";
+
+    await pirate[associationNameWithCallbacks].createBang({ name: "Crowe the One-Eyed" });
+    for (const child of await pirate[associationNameWithCallbacks]) child.markForDestruction();
+    const childId = (await pirate[associationNameWithCallbacks].first()).id;
 
     pirate.shipLog.splice(0);
     await pirate.save();
 
-    expect(pirate.shipLog).toEqual([
+    const expected = [
       `before_removing_method_bird_${childId}`,
       `after_removing_method_bird_${childId}`,
-    ]);
+    ];
+
+    expect(pirate.shipLog).toEqual(expected);
   });
 
   it("should run add callback procs for has many", async () => {
     const associationNameWithCallbacks = "birdsWithProcCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" }) as any;
+    pirate[associationNameWithCallbacks].build({ name: "Crowe the One-Eyed" });
 
     const expected = ["before_adding_proc_bird_<new>", "after_adding_proc_bird_<new>"];
 
@@ -404,153 +432,172 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   it("should run remove callback procs for has many", async () => {
-    const assocName = "birdsWithProcCallbacks";
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
-    child.markForDestruction();
-    const childId = child.id;
+    const associationNameWithCallbacks = "birdsWithProcCallbacks";
+
+    await pirate[associationNameWithCallbacks].createBang({ name: "Crowe the One-Eyed" });
+    for (const child of await pirate[associationNameWithCallbacks]) child.markForDestruction();
+    const childId = (await pirate[associationNameWithCallbacks].first()).id;
 
     pirate.shipLog.splice(0);
     await pirate.save();
 
-    expect(pirate.shipLog).toEqual([
+    const expected = [
       `before_removing_proc_bird_${childId}`,
       `after_removing_proc_bird_${childId}`,
-    ]);
+    ];
+
+    expect(pirate.shipLog).toEqual(expected);
   });
 
   it("should destroy habtm as part of the save transaction if they were marked for destruction", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const proxy = association(pirate, "parrots");
-    await proxy.create({ name: "parrots_0" });
-    await proxy.create({ name: "parrots_1" });
+    for (let i = 0; i < 2; i++) await pirate.parrots.createBang({ name: `parrots_${i}` });
 
-    const parrots = await proxy;
-    expect(parrots.some((p) => p.markedForDestruction())).toBe(false);
-    for (const p of parrots) p.markForDestruction();
+    assertNot((await pirate.parrots).some((p: any) => p.markedForDestruction()));
+    for (const parrot of await pirate.parrots) parrot.markForDestruction();
 
-    const before = Number(await Parrot.count());
-    await pirate.save();
-    expect(Number(await Parrot.count())).toBe(before);
+    await assertNoDifference(
+      async () => Number(await CanonicalParrot.count()),
+      null,
+      async () => {
+        await pirate.save();
+      },
+    );
 
-    const reloaded = await Pirate.find(pirate.id!);
-    expect((await association(reloaded, "parrots")).length).toBe(0);
+    assertEmpty(await (await pirate.reload()).parrots);
+
+    const joinRecords = await (
+      await CanonicalPirate.leaseConnection()
+    ).selectAll(`SELECT * FROM parrots_pirates WHERE pirate_id = ${pirate.id}`);
+    assertEmpty(joinRecords);
   });
 
   it("should skip validation on habtm if marked for destruction", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const proxy = association(pirate, "parrots");
-    await proxy.create({ name: "parrots_0" });
-    await proxy.create({ name: "parrots_1" });
+    for (let i = 0; i < 2; i++) await pirate.parrots.createBang({ name: `parrots_${i}` });
 
-    const parrots = await proxy;
-    for (const p of parrots) (p as InstanceType<typeof Parrot>).name = "";
-    expect(await pirate.isValid()).toBe(false);
+    for (const parrot of await pirate.parrots) parrot.name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
 
-    for (const p of parrots) p.markForDestruction();
+    for (const parrot of await pirate.parrots) parrot.markForDestruction();
 
-    const validatedIds: unknown[] = [];
-    for (const p of parrots) {
-      const origIsValid = p.isValid.bind(p);
-      (p as { isValid: (ctx?: unknown) => Promise<boolean> }).isValid = (ctx?: unknown) => {
-        validatedIds.push(p.id);
-        return origIsValid(ctx as never);
-      };
-    }
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    expect(validatedIds).toEqual([]);
+    const firstIsValid = vi.spyOn(await pirate.parrots.first(), "isValid");
+    const lastIsValid = vi.spyOn(await pirate.parrots.last(), "isValid");
+    await pirate.saveBang();
+    expect(lastIsValid).not.toHaveBeenCalled();
+    expect(firstIsValid).not.toHaveBeenCalled();
 
-    const reloaded = await Pirate.find(pirate.id!);
-    expect((await association(reloaded, "parrots")).length).toBe(0);
+    assertEmpty(await (await pirate.reload()).parrots);
   });
 
   it("should skip validation on habtm if destroyed", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
-    const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
+    await pirate.parrots.createBang({ name: "parrots_1" });
 
-    await parrot.destroy();
-    cacheAssoc(pirate, "parrots", [parrot]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    for (const parrot of await pirate.parrots) parrot.name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+
+    for (const parrot of await pirate.parrots) await parrot.destroy();
+    assertPredicate(await pirate.isValid(), (v) => v);
   });
+
   it("should be valid on habtm if persisted and unchanged", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const proxy = association(pirate, "parrots");
-    const p1 = await Parrot.create({ name: "Polly" });
-    await proxy.push(p1);
-    expect(await pirate.isValid()).toBe(true);
+    const parrot = await pirate.parrots.createBang({ name: "parrots_1" });
+    await parrot.updateColumn("name", "");
+    await parrot.reload();
+    assertNotPredicate(await parrot.isValid(), (v) => v);
+
+    const newPirate = new CanonicalPirate({ catchphrase: "Arr" }) as any;
+    await newPirate.parrots.replace(await pirate.parrots);
+    await newPirate.saveBang();
   });
+
   it("should be invalid on habtm when any record in the association chain is invalid and was changed", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
-    const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
-    parrot.name = "";
-    cacheAssoc(pirate, "parrots", [parrot]);
-    expect(await pirate.isValid()).toBe(false);
+    const treasure = await pirate.treasures.createBang({ name: "gold" });
+    const estimate = await treasure.priceEstimates.createBang({ price: 1 });
+    await estimate.updateColumns({ price: "not a number" });
+
+    assertNotPredicate(await estimate.isValid(), (v) => v);
+
+    const treasures = await pirate.treasures.eagerLoad("priceEstimates").toArray();
+    (await treasures[0].priceEstimates.first()).price = "not a price";
+    const newPirate = new CanonicalPirate({ catchphrase: "Arr", treasures });
+
+    await assertRaises([RecordInvalid], {}, () => newPirate.saveBang());
+    expect(newPirate.errors.fullMessages).toEqual(["Treasures is invalid"]);
   });
+
   it("should be invalid on habtm when any record in the association chain is invalid and was changed with autosave", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
-    const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
-    parrot.name = "";
-    cacheAssoc(pirate, "parrots", [parrot]);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
+    const superPirate = class extends CanonicalPirate {
+      static {
+        this.tableName = "pirates";
+        this.hasMany("greatTreasures", {
+          className: "Treasure",
+          foreignKey: "looter_id",
+          autosave: true,
+        });
+      }
+    };
+    Object.defineProperty(superPirate, "name", { value: "SuperPirate" });
+
+    pirate = await superPirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    const treasure = await pirate.greatTreasures.createBang({ name: "gold" });
+    const estimate = await treasure.priceEstimates.createBang({ price: 1 });
+    await estimate.updateColumns({ price: "not a number" });
+
+    assertNotPredicate(await estimate.isValid(), (v) => v);
+
+    const treasures = await pirate.greatTreasures.eagerLoad("priceEstimates").toArray();
+    (await treasures[0].priceEstimates.first()).price = "not a price";
+    const newPirate = new superPirate({ catchphrase: "Arr", greatTreasures: treasures });
+
+    await assertRaises([RecordInvalid], {}, () => newPirate.saveBang());
+    expect(newPirate.errors.fullMessages).toEqual([
+      "Great treasures price estimates price is not a number",
+    ]);
   });
+
   it("should be valid on habtm when any record in the association chain is invalid but was not changed", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
-    const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
-    cacheAssoc(pirate, "parrots", [parrot]);
-    expect(await pirate.isValid()).toBe(true);
+    const treasure = await pirate.treasures.createBang({ name: "gold" });
+    const estimate = await treasure.priceEstimates.createBang({ price: 1 });
+    await estimate.updateColumns({ price: "not a number" });
+
+    assertNotPredicate(await estimate.isValid(), (v) => v);
+
+    const treasures = await pirate.treasures.eagerLoad("priceEstimates").toArray();
+    const newPirate = new CanonicalPirate({ catchphrase: "Arr", treasures });
+
+    await assertNothingRaised(() => newPirate.saveBang());
   });
+
   it("a child marked for destruction should not be destroyed twice while saving habtm", async () => {
-    const { Pirate } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const proxy = association(pirate, "parrots");
-    await proxy.create({ name: "parrots_1" });
+    await pirate.parrots.createBang({ name: "parrots_1" });
 
-    for (const p of await proxy) p.markForDestruction();
-    expect(await pirate.save()).toBe(true);
+    for (const parrot of await pirate.parrots) parrot.markForDestruction();
+    assert(await pirate.save());
 
-    await assertNoQueries(false, async () => {
-      expect(await pirate.save()).toBe(true);
+    await CanonicalPirate.transaction(async () => {
+      await assertNoQueries(false, async () => {
+        assert(await pirate.save());
+      });
     });
   });
+
   it("should rollback destructions if an exception occurred while saving habtm", async () => {
-    const { Pirate } = makePirateParrot();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const proxy = association(pirate, "parrots");
-    await proxy.create({ name: "parrots_0" });
-    await proxy.create({ name: "parrots_1" });
+    for (let i = 0; i < 2; i++) await pirate.parrots.createBang({ name: `parrots_${i}` });
+    const before = (await pirate.parrots).map((c: any) => {
+      c.markForDestruction();
+      return c;
+    });
 
-    const before = (await proxy).map((p) => p.id).sort();
-    for (const p of await proxy) p.markForDestruction();
-
-    const inst = (pirate as any).association("parrots");
-    const origDestroy = inst.destroy.bind(inst);
-    inst.destroy = async (...args: unknown[]) => {
-      await origDestroy(...args);
+    const assoc = pirate.association("parrots");
+    const destroy = assoc.destroy.bind(assoc);
+    assoc.destroy = async (...args: unknown[]) => {
+      await destroy(...args);
       throw new Error("Oh noes!");
     };
-    await expect(pirate.save()).rejects.toThrow("Oh noes!");
 
-    const reloaded = await Pirate.find(pirate.id!);
-    const after = (await association(reloaded, "parrots")).map((p) => p.id).sort();
-    expect(after).toEqual(before);
+    await assertRaise([Error], {}, async () => assertNot(await pirate.save()));
+    expect((await (await pirate.reload()).parrots).map((p: any) => p.id)).toEqual(
+      before.map((p: any) => p.id),
+    );
   });
 
   it("should run add callback methods for habtm", async () => {
@@ -1214,351 +1261,213 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
-  fixtures([]);
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    setAssociationTarget(record, name, value);
-  }
+  const { chefs, cakeDesigners, drinkDesigners } = fixtures([
+    "chefs",
+    "cakeDesigners",
+    "drinkDesigners",
+  ]);
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalShip);
     registerModel(ShipPart);
     registerModel(ShipWithoutNestedAttributes);
+    registerModel(CanonicalParrot);
+    registerModel(Chef);
+    registerModel(CakeDesigner);
+    registerModel(DrinkDesigner);
+    registerModel(Developer);
   });
 
-  function makeModels() {
-    return { Pirate: CanonicalPirate, Ship: CanonicalShip };
-  }
+  let pirate: any;
+  let ship: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    ship = await pirate.createShip({ name: "Nights Dirty Lightning" });
+  });
 
   it("should still work without an associated model", async () => {
-    const { Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    pirate.catchphrase = "Arr";
+    await ship.destroy();
+    (await pirate.reload()).catchphrase = "Arr";
     await pirate.save();
-    const reloaded = await Pirate.find(pirate.id);
-    expect(reloaded.catchphrase).toBe("Arr");
+    expect((await pirate.reload()).catchphrase).toEqual("Arr");
   });
 
   it("should automatically save the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Black Pearl" });
-    cacheAssoc(pirate, "ship", ship);
+    (await pirate.ship).name = "The Vile Serpent";
     await pirate.save();
-    expect(ship.isNewRecord()).toBe(false);
-    expect(ship.pirate_id).toBe(pirate.id);
+    expect((await (await pirate.reload()).ship).name).toEqual("The Vile Serpent");
   });
 
   it("changed for autosave should handle cycles", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    ship.pirate = pirate;
+    await assertNoQueries(false, async () => {
+      await ship.saveBang();
+    });
+
+    const parrot = await pirate.parrots.create({ name: "some_name" });
+    parrot.name = "changed_name";
+    await assertQueriesCount(3, false, async () => {
+      await ship.saveBang();
+    });
+    await assertNoQueries(false, async () => {
+      await ship.saveBang();
+    });
   });
 
   it("should automatically save bang the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
-    ship.name = "The Vile Serpent";
-    cacheAssoc(pirate, "ship", ship);
+    (await pirate.ship).name = "The Vile Serpent";
     await pirate.saveBang();
-    const reloaded = await Ship.find(ship.id);
-    expect(reloaded.name).toBe("The Vile Serpent");
+    expect((await (await pirate.reload()).ship).name).toEqual("The Vile Serpent");
   });
 
   it("should automatically save bang the associated model if it sets the inverse record", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "Savvy?" });
-    const ship = new Ship({ name: "Black Pearl" });
-    (ship as any).pirate = pirate;
-    await pirate.save();
-    const reloaded = await Pirate.find(pirate.id!);
-    const reloadedShip = (await reloaded.association("ship").loadTarget()) as InstanceType<
-      typeof Ship
-    >;
-    expect(reloadedShip.name).toBe("Black Pearl");
+    const pirate = new CanonicalPirate({ catchphrase: "Savvy?" }) as any;
+    const ship = new CanonicalShip({ name: "Black Pearl" }) as any;
+    ship.pirate = pirate;
+    await pirate.saveBang();
+    expect((await (await pirate.reload()).ship).name).toEqual("Black Pearl");
   });
 
   it("should automatically validate the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" });
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
+    (await pirate.ship).name = "";
+    assertPredicate(await pirate.isInvalid(), (v) => v);
+    assertPredicate(pirate.errors.get("ship.name"), (e: string[]) => e.length > 0);
   });
 
   it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" });
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
-    const errors = (pirate as any).errors;
-    expect(errors).toBeDefined();
+    (await pirate.ship).name = null;
+    pirate.catchphrase = null;
+    assertPredicate(await pirate.isInvalid(), (v) => v);
+    assertPredicate(pirate.errors.get("ship.name"), (e: string[]) => e.length > 0);
+    assertPredicate(pirate.errors.get("catchphrase"), (e: string[]) => e.length > 0);
   });
 
   it("should not ignore different error messages on the same attribute", async () => {
-    class DualValidShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-        this.validates("name", { format: { with: /\w/ } });
-      }
+    const oldValidators = deepDup(CanonicalShip._validators);
+    const validateChain = getCallbackChains(CanonicalShip.prototype).get("validate")!;
+    const oldCallbacks = [...validateChain.entries];
+    try {
+      CanonicalShip.validatesFormatOf("name", { with: /\w/ });
+      (await pirate.ship).name = "";
+      pirate.catchphrase = null;
+      assertPredicate(await pirate.isInvalid(), (v) => v);
+      expect(pirate.errors.get("ship.name")).toEqual(["can't be blank", "is invalid"]);
+    } finally {
+      CanonicalShip._validators = oldValidators;
+      validateChain.clear();
+      validateChain.append(...oldCallbacks);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class DualPirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.hasOne("dualValidShip", { autosave: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface DualPirate {
-      get dualValidShip(): DualValidShip | null | Promise<DualValidShip | null>;
-      set dualValidShip(value: DualValidShip | null);
-    }
-    registerModel("DualPirate", DualPirate);
-    registerModel("DualValidShip", DualValidShip);
-    const pirate = await DualPirate.create({ catchphrase: "Yarr" });
-    const ship = new DualValidShip({ name: "" });
-    cacheAssoc(pirate, "dualValidShip", ship);
-    const valid = await pirate.isValid();
-    expect(valid).toBe(false);
-    const errMap = (pirate as any).errors.messages;
-    const msgs: string[] =
-      errMap.get("dualValidShip.name") ?? errMap.get("dual_valid_ship.name") ?? [];
-    expect(msgs).toContain("can't be blank");
-    expect(msgs).toContain("is invalid");
   });
 
   it("should still allow to bypass validations on the associated model", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
-    cacheAssoc(pirate, "ship", ship);
-
     pirate.catchphrase = "";
-    ship.name = "";
-    const saved = await pirate.save({ validate: false });
-    expect(saved).toBe(true);
-
-    expect((await Pirate.find(pirate.id)).catchphrase).toBe("");
-    expect((await Ship.find(ship.id)).name).toBe("");
+    (await pirate.ship).name = "";
+    await pirate.save({ validate: false });
+    expect([(await pirate.reload()).catchphrase, (await pirate.ship).name]).toEqual(["", ""]);
   });
 
   it("should allow to bypass validations on associated models at any depth", async () => {
-    class DeepPart extends Base {
-      declare name: string | null;
-      declare ship_id: number | null;
-
-      static {
-        this._tableName = "ship_parts";
-        this.attribute("name", "string");
-        this.attribute("ship_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class DeepShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-      declare deepParts: AssociationProxy<DeepPart>;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-        this.hasMany("deepParts", { autosave: true, foreignKey: "ship_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class DeepPirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.validates("catchphrase", { presence: true });
-        this.hasOne("deepShip", { autosave: true, foreignKey: "pirate_id" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface DeepPirate {
-      get deepShip(): DeepShip | null | Promise<DeepShip | null>;
-      set deepShip(value: DeepShip | null);
-    }
-    registerModel("DeepPirate", DeepPirate);
-    registerModel("DeepShip", DeepShip);
-    registerModel("DeepPart", DeepPart);
-
-    const pirate = await DeepPirate.create({ catchphrase: "Yarr" });
-    const ship = await DeepShip.create({ name: "Pearl", pirate_id: pirate.id });
-    const part1 = await DeepPart.create({ name: "part 0", ship_id: ship.id });
-    const part2 = await DeepPart.create({ name: "part 1", ship_id: ship.id });
+    for (let i = 0; i < 2; i++) await (await pirate.ship).parts.createBang({ name: `part ${i}` });
 
     pirate.catchphrase = "";
-    ship.name = "";
-    part1.name = "";
-    part2.name = "";
-    cacheAssoc(pirate, "deepShip", ship);
-    cacheAssoc(ship, "deepParts", [part1, part2]);
+    (await pirate.ship).name = "";
+    for (const part of await (await pirate.ship).parts) part.name = "";
+    await pirate.save({ validate: false });
 
-    const saved = await pirate.save({ validate: false });
-    expect(saved).toBe(true);
-    const reloadedPirate = await DeepPirate.find(pirate.id as number);
-    expect(reloadedPirate.catchphrase).toBe("");
-    const reloadedShip = await DeepShip.find(ship.id as number);
-    expect(reloadedShip.name).toBe("");
-    const reloadedPart1 = await DeepPart.find(part1.id as number);
-    const reloadedPart2 = await DeepPart.find(part2.id as number);
-    expect(reloadedPart1.name).toBe("");
-    expect(reloadedPart2.name).toBe("");
+    const values = [
+      (await pirate.reload()).catchphrase,
+      (await pirate.ship).name,
+      ...(await (await pirate.ship).parts).map((part: any) => part.name),
+    ];
+    expect(values).toEqual(["", "", "", ""]);
   });
+
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" });
-    cacheAssoc(pirate, "ship", ship);
-    await expect(pirate.saveBang()).rejects.toThrow(RecordInvalid);
+    (await pirate.ship).name = "";
+    await assertRaise([RecordInvalid], {}, () => pirate.saveBang());
   });
-  it("should not save and return false if a callback cancelled saving", async () => {
-    class CcPirate extends Base {
-      declare catchphrase: string | null;
 
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.beforeSave(function () {
-          kernelThrow(":abort");
-        });
-      }
-    }
-    registerModel("CcPirate", CcPirate);
-    const pirate = new CcPirate({ catchphrase: "Cancelled" });
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
-    expect(pirate.isNewRecord()).toBe(true);
+  it("should not save and return false if a callback cancelled saving", async () => {
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" }) as any;
+    const ship = await pirate.buildShip({ name: "The Vile Serpent" });
+    ship.cancelSaveFromCallback = true;
+
+    await assertNoDifference(
+      async () => Number(await CanonicalPirate.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await CanonicalShip.count()),
+          null,
+          async () => {
+            assertNot(await pirate.save());
+          },
+        );
+      },
+    );
   });
+
   it("should rollback any changes if an exception occurred while saving", async () => {
-    const { Pirate, Ship } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" });
-    pirate.catchphrase = "Changed";
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
-    const reloaded = await Pirate.find(pirate.id);
-    expect(reloaded.catchphrase).toBe("Yarr");
+    const before = [pirate.catchphrase, (await pirate.ship).name];
+
+    pirate.catchphrase = "Arr";
+    (await pirate.ship).name = "The Vile Serpent";
+
+    const child = await pirate.ship;
+    const save = child.save.bind(child);
+    child.save = async (options?: any) => {
+      await save(options);
+      throw new Error("Oh noes!");
+    };
+
+    await assertRaise([Error], {}, async () => assertNot(await pirate.save()));
+    expect([(await pirate.reload()).catchphrase, (await pirate.ship).name]).toEqual(before);
   });
 
   it("should not load the associated model", async () => {
-    const { Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    await assertQueriesCount(3, false, async () => {
+      pirate.catchphrase = "Arr";
+      await pirate.saveBang();
+    });
   });
 
   it("mark for destruction is ignored without autosave true", async () => {
     const ship = new ShipWithoutNestedAttributes({ name: "The Black Flag" });
-    const part = ship.parts.build();
-    part.markForDestruction();
+    ship.parts.build().markForDestruction();
 
-    expect(await ship.isValid()).toBe(false);
+    assertNotPredicate(await ship.isValid(), (v) => v);
   });
 
   it("recognises inverse polymorphic association changes with same foreign key", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class SwapChef extends Base {
-      declare employable_id: number | null;
-      declare employable_type: string | null;
+    const chefA = chefs("gordon_ramsay");
+    const chefB = chefs("marco_pierre_white");
 
-      static {
-        this._tableName = "chefs";
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-        this.belongsTo("employable", {
-          polymorphic: true,
-          inverseOf: "chef",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface SwapChef {
-      get employable(): Base | null | Promise<Base | null>;
-      set employable(value: Base | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class SwapCakeDesigner extends Base {
-      declare name: string | null;
+    const cakeDesignerA = cakeDesigners("flora") as any;
+    await cakeDesignerA.updateBang({ chef: chefA });
+    const cakeDesignerB = cakeDesigners("frosty") as any;
+    await cakeDesignerB.updateBang({ chef: chefB });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("chef", {
-          as: "employable",
-          autosave: true,
-          className: "SwapChef",
-          inverseOf: "employable",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface SwapCakeDesigner {
-      get chef(): SwapChef | null | Promise<SwapChef | null>;
-      set chef(value: SwapChef | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class SwapDrinkDesigner extends Base {
-      declare name: string | null;
+    const drinkDesignerA = drinkDesigners("turner") as any;
+    const drinkDesignerB = drinkDesigners("sparrow") as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("chef", {
-          as: "employable",
-          autosave: true,
-          className: "SwapChef",
-          inverseOf: "employable",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface SwapDrinkDesigner {
-      get chef(): SwapChef | null | Promise<SwapChef | null>;
-      set chef(value: SwapChef | null);
-    }
-    registerModel("SwapChef", SwapChef);
-    registerModel("SwapCakeDesigner", SwapCakeDesigner);
-    registerModel("SwapDrinkDesigner", SwapDrinkDesigner);
+    await swapChefs(cakeDesignerB, drinkDesignerB);
+    assertPredicate(await (await cakeDesignerB.reload()).chef, isPresent);
+    assertNotPredicate(await (await drinkDesignerB.reload()).chef, isPresent);
 
-    const cake = await SwapCakeDesigner.create({ name: "Cake" });
-    const drink = await SwapDrinkDesigner.create({ name: "Drink" });
-    const chef = new SwapChef({});
-    chef._writeAttribute("employable_type", "SwapCakeDesigner");
-    cacheAssoc(cake, "chef", chef);
-    await cake.save();
-    expect(chef._readAttribute("employable_type")).toBe("SwapCakeDesigner");
-    expect(chef._readAttribute("employable_id")).toBe(cake.id);
-
-    chef._writeAttribute("employable_type", "SwapDrinkDesigner");
-    cacheAssoc(drink, "chef", chef);
-    await drink.save();
-    expect(chef._readAttribute("employable_type")).toBe("SwapDrinkDesigner");
-    expect(chef._readAttribute("employable_id")).toBe(drink.id);
+    await swapChefs(cakeDesignerA, drinkDesignerA);
+    assertPredicate(await (await cakeDesignerA.reload()).chef, isPresent);
+    assertNotPredicate(await (await drinkDesignerA.reload()).chef, isPresent);
   });
+
+  async function swapChefs(cakeDesigner: any, drinkDesigner: any) {
+    await drinkDesigner.setChef(await cakeDesigner.chef);
+    await drinkDesigner.saveBang();
+    await cakeDesigner.saveBang();
+  }
 });
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
@@ -2050,8 +1959,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
     assertPredicate(await tuningPegValid.isValid(), (v) => v);
     assertNotPredicate(await guitar.isValid(), (v) => v);
-    expect(guitar.errors.get("tuningPegs[1].pitch")).toEqual(["is not a number"]);
-    expect(guitar.errors.get("tuningPegs.pitch")).not.toEqual(["is not a number"]);
+    expect(guitar.errors.get("tuning_pegs[1].pitch")).toEqual(["is not a number"]);
+    expect(guitar.errors.get("tuning_pegs.pitch")).not.toEqual(["is not a number"]);
   });
 
   function makeIndexedHasMany(opts: { indexErrors?: boolean } = {}) {
@@ -2112,10 +2021,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assertNotPredicate(await tuningPegInvalid.isValid(), (v) => v);
     assertPredicate(await tuningPegValid.isValid(), (v) => v);
     assertNotPredicate(await guitar.isValid(), (v) => v);
-    expect(guitar.errors.details.get("tuningPegs[1].pitch")).toEqual([
+    expect(guitar.errors.details.get("tuning_pegs[1].pitch")).toEqual([
       { error: ":not_a_number", value: null },
     ]);
-    expect(guitar.errors.details.get("tuningPegs.pitch") ?? []).toEqual([]);
+    expect(guitar.errors.details.get("tuning_pegs.pitch") ?? []).toEqual([]);
   });
   it("errors details with error on base should be indexed when passed as array", async () => {
     const reference = class extends Base {
