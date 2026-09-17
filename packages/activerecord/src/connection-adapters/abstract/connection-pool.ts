@@ -553,7 +553,9 @@ export class ConnectionPool implements ReapablePool {
     }
     let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     if (!conn) {
-      void this.reap().catch(() => {});
+      void this.reap().catch((err) => {
+        console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
       conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     }
     if (!conn) {

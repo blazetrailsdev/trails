@@ -97,8 +97,10 @@ export class Reaper {
                   try {
                     await p.reap?.();
                     await p.flush?.();
-                  } catch {
-                    /** @empty */
+                  } catch (err) {
+                    console.warn(
+                      `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
+                    );
                   }
                 }
               }
