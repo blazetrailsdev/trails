@@ -355,8 +355,8 @@ export class DatabaseTasks {
   static targetVersion(): number | null {
     const version = getEnv("VERSION");
     if (version === undefined || version === "") return null;
-    const match = version.match(/^\s*(-?\d+)/);
-    return match ? Number(match[1]) : 0;
+    const match = version.match(/^\s*(-?\d+(?:_\d+)*)/);
+    return match ? Number(match[1].replace(/_/g, "")) : 0;
   }
 
   static checkTargetVersion(): void {

@@ -2,12 +2,18 @@ import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import type { SchemaSource } from "./schema-dumper.js";
-import { adapterType } from "./test-adapter.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
+import { Current } from "./migration.js";
+import type { TableDefinition as PostgreSQLTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
+import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
@@ -20,6 +26,46 @@ import { ValueType } from "@blazetrails/activemodel";
 
 function schemaColumn(name: string, type: string): Column {
   return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }));
+}
+
+function assertNoLineUp(lines: string[], pattern: RegExp): void {
+  if (lines.length === 0) return expect(true).toBeTruthy();
+  const matches = lines.map((line) => line.match(pattern)).filter((match) => match != null);
+  if (matches.length === 0) return expect(true).toBeTruthy();
+  const lineMatches = lines
+    .map((line) => [line, line.match(pattern)] as const)
+    .filter(([, match]) => match != null);
+  expect(
+    lineMatches.every(([line, match]) => {
+      const start = match!.index!;
+      const before = line.slice(start - 2, start);
+      return before === ", " || before === "{ ";
+    }),
+  ).toBeTruthy();
+}
+
+function columnDefinitionLines(output: string): string[][] {
+  return [...output.matchAll(/^( *)createTable.*?\n([\s\S]*?)^\1\}\);$/gm)].map((m) =>
+    m[2].split(/\n/),
+  );
+}
+
+class CreateCatMigration extends Current {
+  override async up(): Promise<void> {
+    await this.createTable("cat_owners", {}, () => {});
+
+    await this.createTable("cats", {}, (t) => {
+      t.column("name", "string");
+      t.references("owner");
+      t.index(["name"]);
+      t.foreignKey("cat_owners", { column: "owner_id" });
+    });
+  }
+  override async down(): Promise<void> {
+    // eslint-disable-next-line blazetrails/require-table-teardown -- CreateCatMigration#down drops the two in order, the child first
+    await this.dropTable("cats");
+    await this.dropTable("cat_owners");
+  }
 }
 
 const PRIMARY_KEY_ADAPTER = {
@@ -49,6 +95,7 @@ describe("SchemaDumperTest", () => {
     const output = await standardDump();
     expect(output).toMatch(/createTable\("accounts"/);
     expect(output).toMatch(/createTable\("authors"/);
+    expect(output).not.toMatch(/(?<=, ) \(t\) => \{/);
     expect(output).not.toMatch(/createTable\("schema_migrations"/);
     expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
   });
@@ -69,32 +116,28 @@ describe("SchemaDumperTest", () => {
   });
 
   it("types no line up", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    const output = await standardDump();
-    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
-    for (const line of columnLines) {
-      expect(line).not.toMatch(/\bt\.\w+\s{2,}/);
+    for (const columnSet of columnDefinitionLines(await standardDump())) {
+      if (columnSet.length === 0) continue;
+
+      expect(columnSet.every((column) => !/\bt\.\w+\s{2,}/.test(column))).toBeTruthy();
     }
   });
   it("arguments no line up", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    const output = await standardDump();
-    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
-    for (const pattern of [/default: /, /limit: /, /null: /]) {
-      for (const line of columnLines.filter((l) => pattern.test(l))) {
-        const m = line.match(pattern)!;
-        const before = line.slice(m.index! - 2, m.index);
-        expect(before === "{ " || before === ", ").toBe(true);
-      }
+    for (const columnSet of columnDefinitionLines(await standardDump())) {
+      assertNoLineUp(columnSet, /default: /);
+      assertNoLineUp(columnSet, /limit: /);
+      assertNoLineUp(columnSet, /null: /);
     }
   });
 
   it("no dump errors", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
-    expect(output).not.toContain("# Could not dump table");
+    expect(output).not.toMatch(/# Could not dump table/);
   });
 
   it("schema dump includes not null columns", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump([/^[^r]/]);
-    expect(output).toContain("null: false");
+    expect(output).toMatch(/null: false/);
   });
 
   it("schema dump with string ignored table", async () => {
@@ -129,28 +172,23 @@ describe("SchemaDumperTest", () => {
 
   it("schema dump does not include limit for text field", async () => {
     const output = await dumpCanonicalTable("admin_users");
-    expect(output).toMatch(/t\.text\("params"\)/);
-    expect(output).not.toMatch(/text.*"params".*limit/);
+    expect(output).toMatch(/t\.text\("params"\);$/m);
   });
 
   it("schema dump does not include limit for binary field", async () => {
     const output = await dumpCanonicalTable("binaries");
-    expect(output).toMatch(/t\.binary\("data"\)/);
-    expect(output).not.toMatch(/binary.*"data".*limit/);
+    expect(output).toMatch(/t\.binary\("data"\);$/m);
   });
 
   it("schema dump does not include limit for float field", async () => {
     const output = await dumpCanonicalTable("numeric_data");
-    expect(output).toMatch(/t\.float\("temperature"\)/);
-    expect(output).not.toMatch(/float.*"temperature".*limit/);
+    expect(output).toMatch(/t\.float\("temperature"\);$/m);
   });
 
   it("schema dump aliased types", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
-    expect(output).toMatch(/t\.binary\("blob_data"\)/);
-    const decimalTail = adapterType === "mysql" ? ", { precision: 10 })" : ")";
-    expect(output).toContain(`t.decimal("numeric_number"${decimalTail}`);
-    expect(output).toContain(`t.decimal("decimal_number"${decimalTail}`);
+    expect(output).toMatch(/t\.binary\("blob_data"\);$/m);
+    expect(output).toMatch(/t\.decimal\("numeric_number"/);
   });
 
   it(
@@ -171,48 +209,87 @@ describe("SchemaDumperTest", () => {
 
   it("schema dumps index columns in right order", async () => {
     const output = await dumpCanonicalTable("companies");
-    const line = companyIndexLine(output, /company_index/);
-    const base = 't.index(["firm_id", "type", "rating"], { name: "company_index"';
-    const lengthPart = adapterType === "mysql" ? ", length: { type: 10 }" : "";
-    const orderPart = (await dumpsIndexSortOrder()) ? ', order: { rating: "desc" }' : "";
-    expect(line).toBe(`${base}${lengthPart}${orderPart} });`);
+    const indexDefinition = companyIndexLine(output, /company_index/);
+    let expectedDefinition: string;
+    if (adapterType === "mysql") {
+      if (await dumpsIndexSortOrder()) {
+        expectedDefinition =
+          't.index(["firm_id", "type", "rating"], { name: "company_index", length: { type: 10 }, order: { rating: "desc" } });';
+        expect(indexDefinition).toBe(expectedDefinition);
+      } else {
+        expectedDefinition =
+          't.index(["firm_id", "type", "rating"], { name: "company_index", length: { type: 10 } });';
+        expect(indexDefinition).toBe(expectedDefinition);
+      }
+    } else if (await dumpsIndexSortOrder()) {
+      expectedDefinition =
+        't.index(["firm_id", "type", "rating"], { name: "company_index", order: { rating: "desc" } });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    } else {
+      expectedDefinition = 't.index(["firm_id", "type", "rating"], { name: "company_index" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    }
   });
 
   it("schema dumps partial indices", async () => {
     const output = await dumpCanonicalTable("companies");
-    const line = companyIndexLine(output, /company_partial_index/);
-    const expected = adapterSupports("partial_index")
-      ? 't.index(["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
-      : 't.index(["firm_id", "type"], { name: "company_partial_index" });';
-    expect(line).toBe(expected);
+    const indexDefinition = companyIndexLine(output, /company_partial_index/);
+    let expectedDefinition: string;
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- Rails branches on supports_partial_index? / supports_index_sort_order?, not current_adapter?
+    if (adapterSupports("partial_index")) {
+      expectedDefinition =
+        't.index(["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    } else {
+      expectedDefinition = 't.index(["firm_id", "type"], { name: "company_partial_index" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    }
   });
 
   it("schema dumps nulls not distinct", async () => {
     const output = await dumpCanonicalTable("companies");
-    const line = companyIndexLine(output, /company_nulls_not_distinct/);
-    const expected = adapterSupports("nulls_not_distinct")
-      ? 't.index(["firm_id"], { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
-      : 't.index(["firm_id"], { name: "company_nulls_not_distinct" });';
-    expect(line).toBe(expected);
+    const indexDefinition = companyIndexLine(output, /company_nulls_not_distinct/);
+    let expectedDefinition: string;
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- Rails branches on supports_partial_index? / supports_index_sort_order?, not current_adapter?
+    if (adapterSupports("nulls_not_distinct")) {
+      expectedDefinition =
+        't.index(["firm_id"], { name: "company_nulls_not_distinct", nullsNotDistinct: true });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    } else {
+      expectedDefinition = 't.index(["firm_id"], { name: "company_nulls_not_distinct" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    }
   });
 
   it("schema dumps index sort order", async () => {
     const output = await dumpCanonicalTable("companies");
-    const line = companyIndexLine(output, /_name_and_rating/);
-    const expected = (await dumpsIndexSortOrder())
-      ? 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
-      : 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating" });';
-    expect(line).toBe(expected);
+    const indexDefinition = companyIndexLine(output, /_name_and_rating/);
+    let expectedDefinition: string;
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- Rails branches on supports_partial_index? / supports_index_sort_order?, not current_adapter?
+    if (await dumpsIndexSortOrder()) {
+      expectedDefinition =
+        't.index(["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    } else {
+      expectedDefinition =
+        't.index(["name", "rating"], { name: "index_companies_on_name_and_rating" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    }
   });
 
   it("schema dumps index length", async () => {
     const output = await dumpCanonicalTable("companies");
-    const line = companyIndexLine(output, /_name_and_description/);
-    const expected =
-      adapterType === "mysql"
-        ? 't.index(["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });'
-        : 't.index(["name", "description"], { name: "index_companies_on_name_and_description" });';
-    expect(line).toBe(expected);
+    const indexDefinition = companyIndexLine(output, /_name_and_description/);
+    let expectedDefinition: string;
+    if (adapterType === "mysql") {
+      expectedDefinition =
+        't.index(["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    } else {
+      expectedDefinition =
+        't.index(["name", "description"], { name: "index_companies_on_name_and_description" });';
+      expect(indexDefinition).toBe(expectedDefinition);
+    }
   });
 
   itIfSupports("expression_index", "schema dump expression indices", async () => {
@@ -223,8 +300,10 @@ describe("SchemaDumperTest", () => {
       expect(line).toMatch(/CASE.+lower\(\(name\)::text\).+END\) DESC"/i);
     } else if (adapterType === "mysql") {
       expect(line).toMatch(/CASE.+lower\(`name`\).+END\) DESC"/i);
-    } else {
+    } else if (adapterType === "sqlite") {
       expect(line).toMatch(/CASE.+lower\(name\).+END\) DESC"/i);
+    } else {
+      expect(false).toBeTruthy();
     }
   });
 
@@ -258,34 +337,39 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await standardDump([/^(?!integer_limits)/]);
+
       expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
 
-      const lowExpectations: RegExp[] =
-        adapterType === "postgres"
-          ? [
-              /c_int_1.*limit: 2/,
-              /c_int_2.*limit: 2/,
-              /"c_int_3"(?!.*limit)/,
-              /"c_int_4"(?!.*limit)/,
-            ]
-          : adapterType === "mysql"
-            ? [
-                /c_int_1.*limit: 1/,
-                /c_int_2.*limit: 2/,
-                /c_int_3.*limit: 3/,
-                /"c_int_4"(?!.*limit)/,
-              ]
-            : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
-      const highExpectations: RegExp[] =
-        adapterType === "sqlite"
-          ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
-          : [
-              /t\.bigint\("c_int_5"\)/,
-              /t\.bigint\("c_int_6"\)/,
-              /t\.bigint\("c_int_7"\)/,
-              /t\.bigint\("c_int_8"\)/,
-            ];
-      for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
+      if (adapterType === "postgres") {
+        expect(output).toMatch(/c_int_1.*limit: 2/);
+        expect(output).toMatch(/c_int_2.*limit: 2/);
+
+        expect(output).toMatch(/"c_int_3"(?!.*limit)/);
+        expect(output).toMatch(/"c_int_4"(?!.*limit)/);
+      } else if (adapterType === "mysql") {
+        expect(output).toMatch(/c_int_1.*limit: 1/);
+        expect(output).toMatch(/c_int_2.*limit: 2/);
+        expect(output).toMatch(/c_int_3.*limit: 3/);
+
+        expect(output).toMatch(/"c_int_4"(?!.*limit)/);
+      } else if (adapterType === "sqlite") {
+        expect(output).toMatch(/c_int_1.*limit: 1/);
+        expect(output).toMatch(/c_int_2.*limit: 2/);
+        expect(output).toMatch(/c_int_3.*limit: 3/);
+        expect(output).toMatch(/c_int_4.*limit: 4/);
+      }
+
+      if (adapterType === "sqlite") {
+        expect(output).toMatch(/c_int_5.*limit: 5/);
+        expect(output).toMatch(/c_int_6.*limit: 6/);
+        expect(output).toMatch(/c_int_7.*limit: 7/);
+        expect(output).toMatch(/c_int_8.*limit: 8/);
+      } else {
+        expect(output).toMatch(/t\.bigint\("c_int_5"\);$/m);
+        expect(output).toMatch(/t\.bigint\("c_int_6"\);$/m);
+        expect(output).toMatch(/t\.bigint\("c_int_7"\);$/m);
+        expect(output).toMatch(/t\.bigint\("c_int_8"\);$/m);
+      }
     },
   );
 
@@ -294,22 +378,23 @@ describe("SchemaDumperTest", () => {
       .split(/\n/)
       .filter((line) => /t\.checkConstraint.*products_price_check/.test(line))[0]
       .trim();
+    let expectedDefinition: string;
 
     if (adapterType === "mysql") {
-      expect(constraintDefinition).toMatch(
-        /^t\.checkConstraint\("`price` > `discounted_price`", \{ name: "products_price_check" \}\);$/,
-      );
+      expectedDefinition =
+        't.checkConstraint("`price` > `discounted_price`", { name: "products_price_check" });';
+      expect(constraintDefinition).toBe(expectedDefinition);
     } else {
-      expect(constraintDefinition).toMatch(
-        /^t\.checkConstraint\("price > discounted_price", \{ name: "products_price_check" \}\);$/,
-      );
+      expectedDefinition =
+        't.checkConstraint("price > discounted_price", { name: "products_price_check" });';
+      expect(constraintDefinition).toBe(expectedDefinition);
     }
   });
 });
 
 describe("SchemaDumperTest", () => {
   afterEach(() => {
-    SchemaDumper.ignoreTables = [];
+    delete (SchemaDumper as unknown as Record<string, unknown>)["ignoreTables"];
     SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
   });
 
@@ -353,19 +438,14 @@ describe("SchemaDumperTest", () => {
     await sm.createVersion("20240601120000");
     const output = (await TopLevelDumper.dump(adapter)).string();
     expect(output).toMatch(/export const defineParams = \{ version: 2024_06_01_120000 \};/);
-    expect(output).toContain("defineSchema");
   }, 60000);
 
-  it("schema dump with regexp ignored table", async () => {
-    const source = {
-      tables: async () => ["users", "temp_cache"],
-      columns: async () => [schemaColumn("name", "string")],
-      indexes: async () => [],
-    };
-    SchemaDumper.ignoreTables = [/^temp_/];
-    const output = (await SchemaDumper.dump(source as any)).string();
-    expect(output).toContain("users");
-    expect(output).not.toContain("temp_cache");
+  it("schema dump with regexp ignored table", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
+    const output = await dumpAllTableSchema([/^courses/], await ARUnit2Model.leaseConnection());
+    expect(output).not.toMatch(/createTable\("courses"/);
+    expect(output).toMatch(/createTable\("colleges"/);
+    expect(output).not.toMatch(/createTable\("schema_migrations"/);
+    expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
   });
 
   it(
@@ -386,56 +466,52 @@ describe("SchemaDumperTest", () => {
   );
 
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
-    const testAdapter = Base.connection;
-    await testAdapter.createTable("test_schema_exclusion", { id: false }, (t) => {
-      t.date("start_date");
-      t.date("end_date");
-    });
-    await (testAdapter as any).addExclusionConstraint(
-      "test_schema_exclusion",
-      "daterange(start_date, end_date) WITH &&",
-      { using: "gist", name: "test_schema_exclusion_date_overlap" },
+    const output = await dumpTableSchema(Base.connection, "test_exclusion_constraints");
+    const constraintDefinitions = output
+      .split(/\n/)
+      .filter((line) => /test_exclusion_constraints_.*_overlap/.test(line));
+
+    expect(constraintDefinitions.length).toBe(3);
+    expect(output).toMatch(
+      't.exclusionConstraint("daterange(start_date, end_date) WITH &&", { where: "(start_date IS NOT NULL) AND (end_date IS NOT NULL)", using: "gist", name: "test_exclusion_constraints_date_overlap" });',
     );
-    const output = await dumpTableSchema(testAdapter, "test_schema_exclusion");
-    expect(output).toContain(
-      't.exclusionConstraint("daterange(start_date, end_date) WITH &&", { using: "gist", name: "test_schema_exclusion_date_overlap" });',
+    expect(output).toMatch(
+      't.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", { where: "(valid_from IS NOT NULL) AND (valid_to IS NOT NULL)", using: "gist", deferrable: "immediate", name: "test_exclusion_constraints_valid_overlap" });',
+    );
+    expect(output).toMatch(
+      't.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", { where: "(transaction_from IS NOT NULL) AND (transaction_to IS NOT NULL)", using: "gist", deferrable: "deferred", name: "test_exclusion_constraints_transaction_overlap" });',
     );
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
-    const testAdapter = Base.connection;
-    await testAdapter.createTable("test_schema_unique", {}, (t) => {
-      t.integer("position_1");
-      t.integer("position_2");
-    });
-    await (testAdapter as any).addUniqueConstraint("test_schema_unique", ["position_1"], {
-      name: "test_schema_unique_position_1",
-    });
-    await (testAdapter as any).addUniqueConstraint("test_schema_unique", ["position_2"], {
-      nullsNotDistinct: true,
-      name: "test_schema_unique_position_2_nnd",
-    });
-    const output = await dumpTableSchema(testAdapter, "test_schema_unique");
-    expect(output).toContain(
-      't.uniqueConstraint(["position_1"], { name: "test_schema_unique_position_1" });',
+    const output = await dumpTableSchema(Base.connection, "test_unique_constraints");
+    const constraintDefinitions = output
+      .split(/\n/)
+      .filter((line) => /t\.uniqueConstraint/.test(line));
+
+    expect(constraintDefinitions.length).toBe(4);
+    expect(output).toMatch(
+      't.uniqueConstraint(["position_1"], { name: "test_unique_constraints_position_deferrable_false" });',
     );
-    expect(output).toContain(
-      't.uniqueConstraint(["position_2"], { nullsNotDistinct: true, name: "test_schema_unique_position_2_nnd" });',
+    expect(output).toMatch(
+      't.uniqueConstraint(["position_2"], { deferrable: "immediate", name: "test_unique_constraints_position_deferrable_immediate" });',
+    );
+    expect(output).toMatch(
+      't.uniqueConstraint(["position_3"], { deferrable: "deferred", name: "test_unique_constraints_position_deferrable_deferred" });',
+    );
+    expect(output).toMatch(
+      't.uniqueConstraint(["position_4"], { nullsNotDistinct: true, name: "test_unique_constraints_position_nulls_not_distinct" });',
     );
   });
   itIfSupports(
     "unique_constraints",
     "schema does not dump unique constraints as indexes",
     async () => {
-      const testAdapter = Base.connection;
-      await testAdapter.createTable("test_uc_no_idx", {}, (t) => {
-        t.integer("position");
-      });
-      await (testAdapter as any).addUniqueConstraint("test_uc_no_idx", ["position"], {
-        name: "test_uc_no_idx_position",
-      });
-      const output = await dumpTableSchema(testAdapter, "test_uc_no_idx");
-      expect(output).toContain("t.uniqueConstraint");
-      expect(output).not.toMatch(/t\.index\(.*test_uc_no_idx_position/);
+      const output = await dumpTableSchema(Base.connection, "test_unique_constraints");
+      const uniqueIndexDefinitions = output
+        .split(/\n/)
+        .filter((line) => /t\.index.*unique: true/.test(line));
+
+      expect(uniqueIndexDefinitions.length).toBe(0);
     },
   );
   it.skipIf(adapterType !== "mysql")(
@@ -481,10 +557,10 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       const output = await dumpTableSchema(Base.connection, "key_tests");
-      expect(output).toContain(
-        't.index(["awesome"], { name: "index_key_tests_on_awesome", type: "fulltext" })',
+      expect(output).toMatch(
+        /t\.index\(\["awesome"\], \{ name: "index_key_tests_on_awesome", type: "fulltext" \}\);$/m,
       );
-      expect(output).toContain('t.index(["pizza"], { name: "index_key_tests_on_pizza" })');
+      expect(output).toMatch(/t\.index\(\["pizza"\], \{ name: "index_key_tests_on_pizza" \}\);$/m);
     },
   );
 
@@ -544,13 +620,13 @@ describe("SchemaDumperTest", () => {
       try {
         (adapter as any).extensions = async () => ["hstore"];
         let output = await dumpTableSchema(adapter, "schema_dump_probe");
-        expect(output).toContain("These are extensions that must be enabled");
+        expect(output).toMatch("These are extensions that must be enabled");
         expect(output).toMatch(/enableExtension\("hstore"\)/);
 
         (adapter as any).extensions = async () => [];
         output = await dumpTableSchema(adapter, "schema_dump_probe");
-        expect(output).not.toContain("These are extensions that must be enabled");
-        expect(output).not.toContain("enableExtension");
+        expect(output).not.toMatch("These are extensions that must be enabled");
+        expect(output).not.toMatch(/enableExtension/);
       } finally {
         (adapter as any).extensions = original;
       }
@@ -566,10 +642,17 @@ describe("SchemaDumperTest", () => {
         t.integer("x");
       });
       try {
+        (adapter as any).extensions = async () => ["hstore", "uuid-ossp", "xml2"];
+        let output = await dumpTableSchema(adapter, "schema_dump_probe");
+        let enabledExtensions = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map(
+          (m) => m[1],
+        );
+        expect(enabledExtensions).toEqual(["hstore", "uuid-ossp", "xml2"]);
+
         (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
-        const output = await dumpTableSchema(adapter, "schema_dump_probe");
-        const enabled = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
-        expect(enabled).toEqual(["hstore", "uuid-ossp", "xml2"]);
+        output = await dumpTableSchema(adapter, "schema_dump_probe");
+        enabledExtensions = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
+        expect(enabledExtensions).toEqual(["hstore", "uuid-ossp", "xml2"]);
       } finally {
         (adapter as any).extensions = original;
       }
@@ -594,7 +677,8 @@ describe("SchemaDumperTest", () => {
       });
       try {
         const output = await dumpTableSchema(adapter, "schema_dump_probe");
-        expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
+        const expectedDefinition = 'createEnum("enum_with_comma", ["value1","value,2","value3"])';
+        expect(output).toContain(expectedDefinition);
       } finally {
         await (adapter as any).dropEnum("enum_with_comma", { ifExists: true });
       }
@@ -605,112 +689,115 @@ describe("SchemaDumperTest", () => {
     "foreign_keys",
     "foreign keys are dumped at the bottom to circumvent dependency issues",
     async () => {
-      const source = {
-        tables: async () => ["authors", "books"],
-        columns: async (t: string) =>
-          t === "authors"
-            ? [schemaColumn("id", "integer")]
-            : [schemaColumn("id", "integer"), schemaColumn("author_id", "integer")],
-        indexes: async () => [],
-        adapter: PRIMARY_KEY_ADAPTER,
-        foreignKeys: async (t: string) =>
-          t === "books"
-            ? [
-                new ForeignKeyDefinition("books", "authors", {
-                  column: "author_id",
-                  primaryKey: "id",
-                  name: "fk_books_author_id",
-                }),
-              ]
-            : [],
-      };
-      const output = (await SchemaDumper.dump(source as any)).string();
-      const authorsIdx = output.indexOf('createTable("authors"');
-      const booksIdx = output.indexOf('createTable("books"');
-      const fkIdx = output.indexOf("addForeignKey");
-      expect(authorsIdx).toBeGreaterThan(-1);
-      expect(booksIdx).toBeGreaterThan(-1);
-      expect(fkIdx).toBeGreaterThan(Math.max(authorsIdx, booksIdx));
-      expect(output).toContain('addForeignKey("books", "authors"');
+      const output = await dumpAllTableSchema([], Base.connection);
+      expect(output).toMatch(
+        /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
+      );
     },
+    FULL_DUMP_TIMEOUT_MS,
   );
   itIfSupports("foreign_keys", "do not dump foreign keys for ignored tables", async () => {
-    SchemaDumper.ignoreTables = ["books"];
-    const source = {
-      tables: async () => ["authors", "books"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-      foreignKeys: async (t: string) =>
-        t === "books"
-          ? [
-              new ForeignKeyDefinition("books", "authors", {
-                column: "author_id",
-                primaryKey: "id",
-                name: "fk_books_author_id",
-              }),
-            ]
-          : [],
-    };
-    const output = (await SchemaDumper.dump(source as any)).string();
-    expect(output).not.toContain("addForeignKey");
-    expect(output).not.toContain('"books"');
+    const output = await dumpTableSchema(Base.connection, "authors");
+    expect(
+      [...output.matchAll(/^\s*await ctx\.addForeignKey\("([^"]+)".+$/gm)].map((m) => m[1]),
+    ).toEqual(["authors"]);
   });
-  itIfSupports("foreign_keys", "do not dump foreign keys when bypassed by config", async () => {
-    const source = {
-      tables: async () => ["authors", "books"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-    };
-    const output = (await SchemaDumper.dump(source as any)).string();
-    expect(output).not.toContain("addForeignKey");
-  });
+  itIfSupports.skipIf(inMemoryDb())(
+    "foreign_keys",
+    "do not dump foreign keys when bypassed by config",
+    async () => {
+      const storage = await mkdtemp(join(tmpdir(), "trails-schema-dumper-"));
+      try {
+        await Base.establishConnection({
+          adapter: "sqlite3",
+          database: join(storage, "test.sqlite3"),
+          foreignKeys: false,
+        });
+
+        const output = await dumpAllTableSchema();
+        expect(output).not.toMatch(
+          /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
+        );
+      } finally {
+        await Base.establishConnection(ambientPoolConfiguration());
+        await rm(storage, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("schema dump with table name prefix and suffix", async () => {
-    const source = {
-      tables: async () => ["myapp_users_v1"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-    };
-    const output = (
-      await SchemaDumper.dump(source as any, new StringIO(), {
-        tableNamePrefix: "myapp_",
-        tableNameSuffix: "_v1",
-      })
-    ).string();
-    expect(output).toContain('"users"');
-    expect(output).not.toContain("myapp_users_v1");
+    const prefixWas = Base.tableNamePrefix;
+    const suffixWas = Base.tableNameSuffix;
+    Base.tableNamePrefix = "foo_";
+    Base.tableNameSuffix = "_bar";
+    const migration = new CreateCatMigration();
+    await migration.migrate("up");
+    try {
+      const output = await dumpTableSchema(Base.connection, "foo_cat_owners_bar", "foo_cats_bar");
+
+      expect(output).toMatch(/createTable\("cat_owners"/);
+      expect(output).toMatch(/createTable\("cats"/);
+      expect(output).toMatch(/t\.index\(\["name"\], \{ name: "index_foo_cats_bar_on_name" \}\)/);
+      expect(output).not.toMatch(/createTable\("foo_.+_bar"/);
+      expect(output).not.toMatch(/addIndex\("foo_.+_bar"/);
+      expect(output).not.toMatch(/createTable\("schema_migrations"/);
+      expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
+
+      if (adapterSupports("foreign_keys")) {
+        expect(output).toMatch(/addForeignKey\("cats", "cat_owners", \{ column: "owner_id" \}\)/);
+        expect(output).not.toMatch(/addForeignKey\("foo_.+_bar"/);
+        expect(output).not.toMatch(/addForeignKey\("[^"]+", "foo_.+_bar"/);
+      }
+    } finally {
+      await migration.migrate("down");
+      Base.tableNamePrefix = prefixWas;
+      Base.tableNameSuffix = suffixWas;
+    }
   });
 
   it("schema dump with table name prefix and suffix regexp escape", async () => {
-    const source = {
-      tables: async () => ["app.prefix_users"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-    };
-    const output = (
-      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "app.prefix_" })
-    ).string();
-    expect(output).toContain('"users"');
-    expect(output).not.toContain("app.prefix_users");
+    const prefixWas = Base.tableNamePrefix;
+    const suffixWas = Base.tableNameSuffix;
+    Base.tableNamePrefix = "foo$";
+    Base.tableNameSuffix = "$bar";
+    const migration = new CreateCatMigration();
+    await migration.migrate("up");
+    try {
+      const output = await dumpTableSchema(Base.connection, "foo$cat_owners$bar", "foo$cats$bar");
+
+      expect(output).toMatch(/createTable\("cat_owners"/);
+      expect(output).toMatch(/createTable\("cats"/);
+      expect(output).toMatch(/t\.index\(\["name"\], \{ name: "index_foo\$cats\$bar_on_name" \}\)/);
+      expect(output).not.toMatch(/createTable\("foo\$.+\$bar"/);
+      expect(output).not.toMatch(/addIndex\("foo\$.+\$bar"/);
+      expect(output).not.toMatch(/createTable\("schema_migrations"/);
+      expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
+
+      if (adapterSupports("foreign_keys")) {
+        expect(output).toMatch(/addForeignKey\("cats", "cat_owners", \{ column: "owner_id" \}\)/);
+        expect(output).not.toMatch(/addForeignKey\("foo\$.+\$bar"/);
+        expect(output).not.toMatch(/addForeignKey\("[^"]+", "foo\$.+\$bar"/);
+      }
+    } finally {
+      await migration.migrate("down");
+      Base.tableNamePrefix = prefixWas;
+      Base.tableNameSuffix = suffixWas;
+    }
   });
   it("schema dump with table name prefix and ignoring tables", async () => {
     const source = {
-      tables: async () => ["myapp_users", "myapp_posts"],
+      tables: async () => ["omg_cats", "omg_omg_cats"],
       columns: async (_t: string) => [schemaColumn("id", "integer")],
       indexes: async () => [],
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    SchemaDumper.ignoreTables = ["posts"];
+    SchemaDumper.ignoreTables = ["cats"];
     const output = (
-      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "myapp_" })
+      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "omg_" })
     ).string();
-    expect(output).toContain('"users"');
-    expect(output).not.toContain('"posts"');
-    expect(output).not.toContain("myapp_");
+
+    expect(output).toMatch(/createTable\("omg_cats"/);
+    expect(output).not.toMatch(/createTable\("cats"/);
   });
 
   it.skipIf(adapterType !== "postgres")(
@@ -718,13 +805,16 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       await Base.connection.createTable("timestamps", { force: true }, (t) => {
-        t.string("title");
-        t.timestamps();
+        t.datetime("this_should_remain_datetime");
+        t.timestamp("this_is_an_alias_of_datetime");
+        t.column("without_time_zone", "timestamp");
+        t.column("with_time_zone", "timestamptz");
       });
       const output = await dumpTableSchema(Base.connection, "timestamps");
-      expect(output).toContain("datetime");
-      expect(output).toContain("created_at");
-      expect(output).toContain("updated_at");
+      expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+      expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
     },
   );
 
@@ -735,27 +825,27 @@ describe("SchemaDumperTest", () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
         await Base.connection.createTable("timestamps", { force: true }, (t) => {
           t.datetime("this_should_remain_datetime");
-          (t as any).timestamptz("this_is_an_alias_of_datetime");
+          (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
           t.column("without_time_zone", "timestamp");
           t.column("with_time_zone", "timestamptz");
         });
         const output = await dumpTableSchema(Base.connection, "timestamps");
-        expect(output).toContain('t.datetime("this_should_remain_datetime"');
-        expect(output).toContain('t.datetime("this_is_an_alias_of_datetime"');
-        expect(output).toContain('t.timestamp("without_time_zone"');
-        expect(output).toContain('t.datetime("with_time_zone"');
+        expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+        expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+        expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
       });
     },
   );
   it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
     ctx.skip();
-    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
+    // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
   });
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -769,15 +859,15 @@ describe("SchemaDumperTest", () => {
       });
 
       let output = await dumpTableSchema(Base.connection, "timestamps");
-      expect(output).toContain('t.datetime("default_format"');
-      expect(output).toContain('t.datetime("without_time_zone"');
-      expect(output).toContain('t.timestamptz("with_time_zone"');
+      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
 
       await withPostgresqlDatetimeType("timestamptz", async () => {
         output = await dumpTableSchema(Base.connection, "timestamps");
-        expect(output).toContain('t.timestamp("default_format"');
-        expect(output).toContain('t.timestamp("without_time_zone"');
-        expect(output).toContain('t.datetime("with_time_zone"');
+        expect(output.includes('t.timestamp("default_format"')).toBeTruthy();
+        expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
       });
     },
   );
@@ -789,13 +879,13 @@ describe("SchemaDumperTest", () => {
         t.datetime("default_format");
         t.datetime("without_time_zone");
         t.timestamp("also_without_time_zone");
-        (t as any).timestamptz("with_time_zone");
+        (t as PostgreSQLTableDefinition).timestamptz("with_time_zone");
       });
       const output = await dumpTableSchema(Base.connection, "timestamps");
-      expect(output).toContain('t.datetime("default_format"');
-      expect(output).toContain('t.datetime("without_time_zone"');
-      expect(output).toContain('t.datetime("also_without_time_zone"');
-      expect(output).toContain('t.timestamptz("with_time_zone"');
+      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
     },
   );
 
@@ -803,13 +893,17 @@ describe("SchemaDumperTest", () => {
     "schema dump with correct timestamp types via add column",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await Base.connection.createTable("timestamps", { force: true }, (t) => {
-        t.string("title");
-      });
-      await Base.connection.addColumn("timestamps", "created_at", "datetime");
+      await Base.connection.createTable("timestamps", { force: true }, () => {});
+      await Base.connection.addColumn("timestamps", "default_format", "datetime");
+      await Base.connection.addColumn("timestamps", "without_time_zone", "datetime");
+      await Base.connection.addColumn("timestamps", "also_without_time_zone", "timestamp");
+      await Base.connection.addColumn("timestamps", "with_time_zone", "timestamptz");
+
       const output = await dumpTableSchema(Base.connection, "timestamps");
-      expect(output).toContain("datetime");
-      expect(output).toContain("created_at");
+      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
     },
   );
 
@@ -817,14 +911,14 @@ describe("SchemaDumperTest", () => {
     "schema dump with correct timestamp types via add column before rails 7",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility (Migration[6.1]).
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
     (ctx) => {
       ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
     },
   );
 
@@ -857,22 +951,34 @@ describe("SchemaDumperDefaultsTest", () => {
         t.string("string_with_default", { default: "Hello!" });
         t.date("date_with_default", { default: "2014-06-05" });
         t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
+        t.time("time_with_default", { default: "07:17:04" });
         t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
       });
       const output = await dumpTableSchema(Base.connection, "dump_defaults");
       expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
       expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
       expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
+      expect(output).toMatch(/time.*"time_with_default".*default:/);
       expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
     },
   );
 
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
     await adapter.createTable("dump_defaults", { force: true }, (t) => {
-      t.text("text_with_default", { default: "John" });
+      t.text("text_with_default", { default: "John' Doe" });
+      t.text("uuid", {
+        default: () => (adapterType === "postgres" ? "gen_random_uuid()" : "uuid()"),
+      });
     });
     const output = await dumpTableSchema(Base.connection, "dump_defaults");
-    expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
+
+    expect(output).toMatch(/text.*"text_with_default".*default: "John' Doe"/);
+
+    if (adapterType === "postgres") {
+      expect(output).toMatch(/text.*"uuid".*default: \(\) => "gen_random_uuid\(\)"/);
+    } else {
+      expect(output).toMatch(/text.*"uuid".*default: \(\) => "uuid\(\)"/);
+    }
   });
 
   it.skipIf(adapterType !== "postgres")(
@@ -905,8 +1011,5 @@ afterAll(async () => {
   await Base.connection.dropTable("dump_string_key_objects", o);
   await Base.connection.dropTable("infinity_defaults", o);
   await Base.connection.dropTable("schema_dump_probe", o);
-  await Base.connection.dropTable("test_schema_exclusion", o);
-  await Base.connection.dropTable("test_schema_unique", o);
-  await Base.connection.dropTable("test_uc_no_idx", o);
   await Base.connection.dropTable("timestamps", o);
 });

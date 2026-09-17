@@ -105,6 +105,9 @@ export const TEST_SCHEMA: Schema = {
       owned_essay_id: "string",
     },
     indexes: [{ columns: "author_address_id" }, { columns: "author_address_extra_id" }],
+    foreignKeys: [
+      { toTable: "author_addresses", column: "author_address_id", deferrable: "immediate" },
+    ],
   },
 
   author_favorites: {
