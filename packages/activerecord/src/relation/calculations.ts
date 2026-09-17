@@ -140,6 +140,7 @@ interface CalculationRelation {
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown[]>;
@@ -149,11 +150,15 @@ interface CalculationRelation {
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown>;
   ids(): Promise<unknown[]> | unknown[];
-  count(columnName?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  count(
+    columnName?: string | Nodes.Node | null | CountBlock,
+    block?: CountBlock,
+  ): Promise<number | Map<unknown, number>>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
@@ -229,7 +234,7 @@ export async function average(
 
 export function asyncAverage(
   this: CalculationRelation,
-  columnName: string,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.average(columnName);
 }
@@ -243,7 +248,7 @@ export async function minimum(
 
 export function asyncMinimum(
   this: CalculationRelation,
-  columnName: string,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.minimum(columnName);
 }
@@ -257,7 +262,7 @@ export async function maximum(
 
 export function asyncMaximum(
   this: CalculationRelation,
-  columnName: string,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.maximum(columnName);
 }
@@ -520,7 +525,10 @@ export interface CalculationMethods {
     column: string,
   ): Promise<unknown | null | Map<unknown, unknown>>;
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
-  count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  count(
+    column?: string | Nodes.Node | null | CountBlock,
+    block?: CountBlock,
+  ): Promise<number | Map<unknown, number>>;
   sum(block: SumBlock): Promise<number | bigint>;
   sum(initialValue: number | string, block: SumBlock): Promise<number | bigint>;
   sum(
@@ -533,15 +541,16 @@ export interface CalculationMethods {
   asyncSum(
     identityOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  asyncAverage(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMinimum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMaximum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncAverage(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncMinimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncMaximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   pluck(
     ...columns: Array<
       | string
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown[]>;
@@ -551,6 +560,7 @@ export interface CalculationMethods {
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown[]>;
@@ -560,6 +570,7 @@ export interface CalculationMethods {
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown>;
@@ -569,6 +580,7 @@ export interface CalculationMethods {
       | Nodes.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
+      | string[]
       | Record<string, string | string[]>
     >
   ): Promise<unknown>;

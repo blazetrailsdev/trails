@@ -142,7 +142,7 @@ describe("CalculationsTest", () => {
     );
     await assertAsyncEqual(
       new BigDecimal("53.0"),
-      Account.asyncAverage(Account.arelTable.get("credit_limit") as any),
+      Account.asyncAverage(Account.arelTable.get("credit_limit")),
     );
   });
 
@@ -199,7 +199,7 @@ describe("CalculationsTest", () => {
 
   it("should get maximum of arel attribute", async () => {
     expect(await Account.maximum(Account.arelTable.get("credit_limit"))).toEqual(60);
-    await assertAsyncEqual(60, Account.asyncMaximum(Account.arelTable.get("credit_limit") as any));
+    await assertAsyncEqual(60, Account.asyncMaximum(Account.arelTable.get("credit_limit")));
   });
 
   it("should get maximum of field with include", async () => {
@@ -226,7 +226,7 @@ describe("CalculationsTest", () => {
 
   it("should get minimum of arel attribute", async () => {
     expect(await Account.minimum(Account.arelTable.get("credit_limit"))).toEqual(50);
-    await assertAsyncEqual(50, Account.asyncMinimum(Account.arelTable.get("credit_limit") as any));
+    await assertAsyncEqual(50, Account.asyncMinimum(Account.arelTable.get("credit_limit")));
   });
 
   it("should group by field", async () => {
@@ -666,7 +666,7 @@ describe("CalculationsTest", () => {
 
   it("should return zero if sum conditions return nothing", async () => {
     expect(await Account.where("1 = 2").sum("credit_limit")).toEqual(0);
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     expect(await railsCore.companies.where("1 = 2").sum("id")).toEqual(0);
   });
 
@@ -772,7 +772,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should not overshadow enumerable sum", async () => {
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     const someCompanies = railsCore.companies.order("id");
 
     expect([1, 2, 3].reduce((sum, n) => sum + Math.abs(n), 0)).toEqual(6);
@@ -787,28 +787,28 @@ describe("CalculationsTest", () => {
   });
 
   it("should sum scoped field", async () => {
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     expect(await railsCore.companies.sum("id")).toBe(15);
   });
 
   it("should sum scoped field with from", async () => {
-    expect(await (Organization as any).clubs().count()).toEqual(await Club.count());
+    expect(await Organization.clubs().count()).toEqual(await Club.count());
   });
 
   it("should sum scoped field with conditions", async () => {
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     expect(await railsCore.companies.where("id > 7").sum("id")).toBe(8);
   });
 
   it("should group by scoped field", async () => {
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     const c = (await railsCore.companies.group("name").sum("id")) as Grouped;
     expect(c.get("Leetsoft")).toBe(7);
     expect(c.get("Jadedpixel")).toBe(8);
   });
 
   it("should group by summed field through association and having", async () => {
-    const railsCore = (await Company.find(companies("rails_core").id)) as any;
+    const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
     const c = (await railsCore.companies.group("name").having("sum(id) > 7").sum("id")) as Grouped;
     expect(c.get("Leetsoft")).toBeUndefined();
     expect(c.get("Jadedpixel")).toBe(8);
@@ -1004,7 +1004,7 @@ describe("CalculationsTest", () => {
   });
 
   it("count with block", async () => {
-    expect(await (Account as any).count((account: any) => account.credit_limit % 10 === 0)).toBe(4);
+    expect(await Account.count((account: Account) => account.credit_limit % 10 === 0)).toBe(4);
   });
 
   it("count with empty in", async () => {
@@ -1218,16 +1218,16 @@ describe("CalculationsTest", () => {
     await assertQueriesCount(1, false, async () => {
       await Topic.cache(async () => {
         const kind = Object(
-          (
-            (await (await relation.select("written_on").load()).first()) as any
-          ).readAttributeBeforeTypeCast("written_on"),
+          (await (await relation.select("written_on").load()).first())!.readAttributeBeforeTypeCast(
+            "written_on",
+          ),
         ).constructor;
         await relation.pluck("written_on");
         expect(
           Object(
-            (
-              (await (await relation.select("written_on").load()).first()) as any
-            ).readAttributeBeforeTypeCast("written_on"),
+            (await (
+              await relation.select("written_on").load()
+            ).first())!.readAttributeBeforeTypeCast("written_on"),
           ),
         ).toBeInstanceOf(kind);
       });
@@ -1241,7 +1241,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck in relation", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     const contract = await company.contracts.createBang();
     expect(await company.contracts.pluck("id")).toEqual([contract.id]);
   });
@@ -1265,23 +1265,23 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck if table included", async () => {
-    const c = (await Company.createBang({
+    const c = await Company.createBang({
       name: "test",
       contracts: [Contract.new({ developer_id: 7 })],
-    })) as any;
+    });
     expect(
       await Company.includes(":contracts")
-        .where({ "contracts.id": (await c.contracts.first()).id })
+        .where({ "contracts.id": (await c.contracts.first())!.id })
         .pluck("id"),
     ).toEqual([c.id]);
   });
 
   it("pluck not auto table name prefix if column joined", async () => {
-    const company = (await Company.createBang({
+    const company = await Company.createBang({
       name: "test",
       contracts: [Contract.new({ developer_id: 7 })],
-    })) as any;
-    const metadata = (await company.contracts.first()).metadata;
+    });
+    const metadata = (await company.contracts.first())!.metadata;
     expect(await Company.joins(":contracts").pluck("metadata")).toEqual([metadata]);
   });
 
@@ -1350,7 +1350,7 @@ describe("CalculationsTest", () => {
 
   it("pluck for a composite primary key", async () => {
     expect((await CpkBook.all().ids()).sort()).toEqual(
-      (await CpkBook.all().pluck(["author_id", "id"] as any)).sort(),
+      (await CpkBook.all().pluck(["author_id", "id"])).sort(),
     );
   });
 
@@ -1377,7 +1377,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids on relation", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     const contract = await company.contracts.createBang();
     expect(await company.contracts.ids()).toEqual([contract.id]);
   });
@@ -1414,17 +1414,17 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with join", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     await company.contracts.createBang();
     expect(
       await Company.joins(":contracts")
-        .where({ "contracts.id": (await company.contracts.first()).id })
+        .where({ "contracts.id": (await company.contracts.first())!.id })
         .ids(),
     ).toEqual([company.id]);
   });
 
   it("ids with polymorphic relation join", async () => {
-    const part = (await ShipPart.createBang({ name: "has trinket" })) as any;
+    const part = await ShipPart.createBang({ name: "has trinket" });
     await part.trinkets.createBang();
 
     expect(await ShipPart.joins(":trinkets").ids()).toEqual([part.id]);
@@ -1432,7 +1432,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with eager load", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     for (let i = 0; i < 5; i++) await company.contracts.createBang();
     expect((await Company.all().eagerLoad(":contracts").ids()).sort()).toEqual(
       (await Company.all()).map((c) => c.id).sort(),
@@ -1440,7 +1440,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with preload", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     for (let i = 0; i < 5; i++) await company.contracts.createBang();
     expect((await Company.all().preload(":contracts").ids()).sort()).toEqual(
       (await Company.all()).map((c) => c.id).sort(),
@@ -1448,7 +1448,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     for (let i = 0; i < 5; i++) await company.contracts.createBang();
     expect((await Company.all().includes(":contracts").ids()).sort()).toEqual(
       (await Company.all()).map((c) => c.id).sort(),
@@ -1467,7 +1467,7 @@ describe("CalculationsTest", () => {
 
   it("ids with includes and scope", async () => {
     const scopedIds = [1, 2];
-    const company = (await Company.where({ id: scopedIds }).first()) as any;
+    const company = (await Company.where({ id: scopedIds }).first())!;
     for (let i = 0; i < 5; i++) await company.contracts.createBang();
     expect((await Company.includes(":contracts").where({ id: scopedIds }).ids()).sort()).toEqual(
       (await Company.where({ id: scopedIds })).map((c) => c.id).sort(),
@@ -1475,20 +1475,20 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes and table scope", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     await company.contracts.createBang();
     expect(
       await Company.includes(":contracts")
-        .where({ "contracts.id": (await company.contracts.first()).id })
+        .where({ "contracts.id": (await company.contracts.first())!.id })
         .ids(),
     ).toEqual([company.id]);
   });
 
   it("ids on loaded relation with includes and table scope", async () => {
-    const company = (await Company.first()) as any;
+    const company = (await Company.first())!;
     await company.contracts.createBang();
     const loadedCompanies = await Company.includes(":contracts")
-      .where({ "contracts.id": (await company.contracts.first()).id })
+      .where({ "contracts.id": (await company.contracts.first())!.id })
       .load();
     await assertQueriesCount(0, false, async () => {
       expect(await loadedCompanies.ids()).toEqual([company.id]);
@@ -1715,7 +1715,7 @@ describe("CalculationsTest", () => {
   });
 
   it("calculation with polymorphic relation", async () => {
-    const part = (await ShipPart.createBang({ name: "has trinket" })) as any;
+    const part = await ShipPart.createBang({ name: "has trinket" });
     await part.trinkets.createBang();
 
     expect(await ShipPart.joins(":trinkets").sum("id")).toEqual(part.id);
@@ -1735,7 +1735,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck joined with polymorphic relation", async () => {
-    const part = (await ShipPart.createBang({ name: "has trinket" })) as any;
+    const part = await ShipPart.createBang({ name: "has trinket" });
     await part.trinkets.createBang();
 
     expect(await ShipPart.joins(":trinkets").pluck("id")).toEqual([part.id]);
@@ -1848,7 +1848,7 @@ describe("CalculationsTest", () => {
   });
 
   it("grouped calculation with polymorphic relation", async () => {
-    const part = (await ShipPart.createBang({ name: "has trinket" })) as any;
+    const part = await ShipPart.createBang({ name: "has trinket" });
     await part.trinkets.createBang();
 
     expect(await ShipPart.joins(":trinkets").group("ship_parts.name").sum("id")).toEqual(
@@ -1863,7 +1863,7 @@ describe("CalculationsTest", () => {
 
   it("should reference correct aliases while joining tables of has many through association", async () => {
     await assertNothingRaised(async () => {
-      const developer = (await Developer.createBang({ name: "developer" })) as any;
+      const developer = await Developer.createBang({ name: "developer" });
       await developer.ratings
         .includes({ comment: "post" })
         .where({ posts: { id: 1 } })
@@ -1890,10 +1890,10 @@ describe("CalculationsTest", () => {
     const params = new ProtectedParams({ credit_limit: "50" });
 
     await assertRaises([ForbiddenAttributesError], {}, async () => {
-      Account.group("id").having(params as any);
+      Account.group("id").having(params);
     });
 
-    const result = await Account.group("id").having(params.permitBang() as any);
+    const result = await Account.group("id").having(params.permitBang());
     expect(result[0].credit_limit).toEqual(50);
     expect(result[1].credit_limit).toEqual(50);
     expect(result[2].credit_limit).toEqual(50);
@@ -2060,7 +2060,7 @@ LIMIT 1
 
   it("count with block and column name raises an error", async () => {
     await assertRaises([ArgumentError], {}, async () => {
-      await (Account as any).count("firm_id", () => true);
+      await Account.count("firm_id", () => true);
     });
   });
 
