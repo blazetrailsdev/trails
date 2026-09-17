@@ -651,7 +651,9 @@ describe("HasOneThroughAssociationsTest", () => {
     });
     const newDetail = loaded[0];
     assertPredicate(newDetail.association("memberType"), (a: any) => a.isLoaded());
-    await assertNoQueries(false, () => readHasOne(newDetail, "memberType"));
+    await assertNoQueries(false, async () => {
+      await readHasOne(newDetail, "memberType");
+    });
   });
 
   it("save of record with loaded has one through", async () => {

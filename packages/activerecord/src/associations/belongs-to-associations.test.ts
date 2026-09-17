@@ -788,9 +788,13 @@ describe("BelongsToAssociationsTest", () => {
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
-    await assertQueriesCount(1, false, () => (odegyAccount as any).reloadFirm());
+    await assertQueriesCount(1, false, async () => {
+      await (odegyAccount as any).reloadFirm();
+    });
 
-    await assertNoQueries(false, () => odegyAccount.firm);
+    await assertNoQueries(false, async () => {
+      await odegyAccount.firm;
+    });
     expect((await odegyAccount.firm)!.name).toBe("ODEGY");
   });
 
@@ -826,8 +830,12 @@ describe("BelongsToAssociationsTest", () => {
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
-    await assertNoQueries(false, () => (odegyAccount as any).resetFirm());
-    await assertQueriesCount(1, false, () => odegyAccount.firm);
+    await assertNoQueries(false, async () => {
+      await (odegyAccount as any).resetFirm();
+    });
+    await assertQueriesCount(1, false, async () => {
+      await odegyAccount.firm;
+    });
     expect((await odegyAccount.firm)!.name).toBe("ODEGY");
   });
 
@@ -917,7 +925,7 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await Ship.create({ name: "Countless" });
 
     await assertNoDifference(
-      async () => (await ship.reload()).treasures_count,
+      async () => (await ship.reload()).treasures_count as number,
       "treasures_count should not be changed unless counter_cache is given on the relation",
       async () => {
         const treasure = Treasure.new({ name: "Gold", ship });
@@ -926,7 +934,7 @@ describe("BelongsToAssociationsTest", () => {
     );
 
     await assertNoDifference(
-      async () => (await ship.reload()).treasures_count,
+      async () => (await ship.reload()).treasures_count as number,
       "treasures_count should not be changed unless counter_cache is given on the relation",
       async () => {
         const treasure = await (ship as any).treasures.first();
@@ -1148,7 +1156,9 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(3, false, () => lineItem.touch());
+    await assertQueriesCount(3, false, async () => {
+      await lineItem.touch();
+    });
   });
 
   it("belongs to with touch on multiple records", async () => {
@@ -1192,28 +1202,36 @@ describe("BelongsToAssociationsTest", () => {
 
     (lineItem as any).invoice = null;
 
-    await assertQueriesCount(4, false, () => lineItem.touch());
+    await assertQueriesCount(4, false, async () => {
+      await lineItem.touch();
+    });
   });
 
   it("belongs to with touch option on update", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(4, false, () => lineItem.update({ amount: 10 }));
+    await assertQueriesCount(4, false, async () => {
+      await lineItem.update({ amount: 10 });
+    });
   });
 
   it("belongs to with touch option on empty update", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertNoQueries(false, () => lineItem.save());
+    await assertNoQueries(false, async () => {
+      await lineItem.save();
+    });
   });
 
   it("belongs to with touch option on destroy", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(4, false, () => lineItem.destroy());
+    await assertQueriesCount(4, false, async () => {
+      await lineItem.destroy();
+    });
   });
 
   it("belongs to with touch option on destroy with destroyed parent", async () => {
@@ -1221,7 +1239,9 @@ describe("BelongsToAssociationsTest", () => {
     const invoice = await Invoice.create({ lineItems: [lineItem] });
     await invoice.destroy();
 
-    await assertQueriesCount(3, false, () => lineItem.destroy());
+    await assertQueriesCount(3, false, async () => {
+      await lineItem.destroy();
+    });
   });
 
   it("belongs to with touch option on touch and reassigned parent", async () => {
@@ -1229,7 +1249,9 @@ describe("BelongsToAssociationsTest", () => {
     await Invoice.create({ lineItems: [lineItem] });
     (lineItem as any).invoice = await Invoice.create({});
 
-    await assertQueriesCount(5, false, () => lineItem.touch());
+    await assertQueriesCount(5, false, async () => {
+      await lineItem.touch();
+    });
   });
 
   it("belongs to counter after update", async () => {
@@ -1310,7 +1332,9 @@ describe("BelongsToAssociationsTest", () => {
       firmWithBasicId: await Firm.find(1),
     });
     (client as any).firm_id = (await Firm.create({ name: "Test firm" })).id;
-    await assertQueriesCount(3, false, () => client.saveBang());
+    await assertQueriesCount(3, false, async () => {
+      await client.saveBang();
+    });
   });
 
   it("field name same as foreign key", async () => {
