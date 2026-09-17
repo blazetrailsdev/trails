@@ -59,8 +59,19 @@ import {
   assertQueriesCount,
   assertNoQueries,
   assertQueriesMatch,
-  assertNoQueriesMatch,
 } from "../testing/query-assertions.js";
+import { captureSql } from "../testing/sql-capture.js";
+import {
+  assert,
+  assertNot,
+  assertPredicate,
+  assertNotPredicate,
+  assertRaises,
+  assertNothingRaised,
+  assertNoDifference,
+  assertNotEmpty,
+  isPresent,
+} from "@blazetrails/activesupport";
 
 async function readHasOne(owner: any, name: string): Promise<any> {
   return await owner.association(name).loadTarget();
@@ -200,9 +211,13 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one does not use order by", async () => {
-    await assertNoQueriesMatch(/order by/i, false, async () => {
+    const sqlLog = await captureSql(async () => {
       await readHasOne(companies("first_firm"), "account");
     });
+    assert(
+      sqlLog.every((sql) => !/order by/i.test(sql)),
+      `ORDER BY was used in the query: ${sqlLog}`,
+    );
   });
 
   it("has one cache nils", async () => {
@@ -213,18 +228,34 @@ describe("HasOneAssociationsTest", () => {
     await assertNoQueries(false, async () => {
       expect(await readHasOne(firm, "account")).toBeNull();
     });
+
+    const firms = await Firm.includes(":account");
+    await assertNoQueries(false, async () => {
+      for (const f of firms) await readHasOne(f, "account");
+    });
   });
 
   it("with select", async () => {
-    const firm = await Firm.find(1);
-    const account = await readHasOne(firm, "accountWithSelect");
-    expect(Object.keys(account.attributes).length).toBe(2);
+    expect(
+      Object.keys((await readHasOne(await Firm.find(1), "accountWithSelect")).attributes).length,
+    ).toBe(2);
+    expect(
+      Object.keys(
+        (await readHasOne(await Firm.includes(":accountWithSelect").find(1), "accountWithSelect"))
+          .attributes,
+      ).length,
+    ).toBe(2);
   });
 
   it("finding using primary key", async () => {
     const firm = companies("first_firm") as any;
-    const account = await readHasOne(firm, "account");
-    expect(account.id).toBe((await Account.findBy({ firm_id: firm.id }))!.id);
+    expect((await Account.findBy({ firm_id: firm.id }))!.id).toBe(
+      (await readHasOne(firm, "account")).id,
+    );
+    firm.firm_id = companies("rails_core").id;
+    expect((await readHasOne(firm, "accountUsingPrimaryKey")).id).toBe(
+      accounts("rails_core_account").id,
+    );
   });
 
   it("update with foreign and primary keys", async () => {
@@ -242,8 +273,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("proxy assignment", async () => {
     const company = companies("first_firm") as any;
-    const account = await readHasOne(company, "account");
-    await expect(company.setAccount(account)).resolves.toBeUndefined();
+    await assertNothingRaised(async () => company.setAccount(await readHasOne(company, "account")));
   });
 
   it("type mismatch", async () => {
@@ -295,8 +325,8 @@ describe("HasOneAssociationsTest", () => {
     const developer = await Developer.create({ name: "Someone" });
     const ship = await Ship.create({ name: "Planet Caravan", developer });
     await ship.destroy();
-    expect(ship.isPersisted()).toBe(false);
-    expect(developer.isPersisted()).toBe(false);
+    assertNotPredicate(ship, (r) => r.isPersisted());
+    assertNotPredicate(developer, (r) => r.isPersisted());
   });
 
   it("nullification on cpk association", async () => {
@@ -383,30 +413,34 @@ describe("HasOneAssociationsTest", () => {
 
   it("dependence with nil associate", async () => {
     const firm = new DependentFirm({ name: "nullify" });
-    await (firm as any).save();
-    await expect((firm as any).destroy()).resolves.toBeTruthy();
+    await (firm as any).saveBang();
+    await assertNothingRaised(() => (firm as any).destroy());
   });
 
   it("restrict with exception", async () => {
     const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
     await firm.createAccount({ credit_limit: 10 });
     expect(await readHasOne(firm, "account")).not.toBeNull();
-    await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
-    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
-    expect(await readHasOne(firm, "account")).not.toBeNull();
+
+    await assertRaises([DeleteRestrictionError], {}, () => firm.destroy());
+    assert(await RestrictedWithExceptionFirm.exists({ name: "restrict" }));
+    assertPredicate(await readHasOne(firm, "account"), isPresent);
   });
 
   it("restrict with error", async () => {
     const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
     await firm.createAccount({ credit_limit: 10 });
+
     expect(await readHasOne(firm, "account")).not.toBeNull();
+
     await firm.destroy();
-    expect(firm.errors.where("base").length).toBeGreaterThan(0);
+
+    assertNotEmpty(firm.errors);
     expect(firm.errors.messagesFor("base")[0]).toBe(
       "Cannot delete record because a dependent account exists",
     );
-    expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
-    expect(await readHasOne(firm, "account")).not.toBeNull();
+    assert(await RestrictedWithErrorFirm.exists({ name: "restrict" }));
+    assertPredicate(await readHasOne(firm, "account"), isPresent);
   });
 
   it("restrict with error with locale", async () => {
@@ -417,13 +451,15 @@ describe("HasOneAssociationsTest", () => {
       const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
       await firm.createAccount({ credit_limit: 10 });
       expect(await readHasOne(firm, "account")).not.toBeNull();
+
       await firm.destroy();
-      expect(firm.errors.where("base").length).toBeGreaterThan(0);
+
+      assertNotEmpty(firm.errors);
       expect(firm.errors.messagesFor("base")[0]).toBe(
         "Cannot delete record because a dependent firm account exists",
       );
-      expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
-      expect(await readHasOne(firm, "account")).not.toBeNull();
+      assert(await RestrictedWithErrorFirm.exists({ name: "restrict" }));
+      assertPredicate(await readHasOne(firm, "account"), isPresent);
     } finally {
       resetI18n();
     }
@@ -554,13 +590,10 @@ describe("HasOneAssociationsTest", () => {
 
   it("create when parent is new raises", async () => {
     const firm = new Firm();
-    let error: unknown;
-    try {
+    const error = await assertRaises([RecordNotSaved], {}, async () => {
       await (firm as any).createAccount();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    });
+
     expect((error as RecordNotSaved).message).toBe(
       "You cannot call create unless the parent is saved",
     );
@@ -715,7 +748,8 @@ describe("HasOneAssociationsTest", () => {
     const firm = (await Firm.find(1)) as any;
     const a = new Account({ credit_limit: 1000 });
     await firm.association("account").writer(a);
-    expect(a.isPersisted()).toBe(true);
+    assertPredicate(a, (r) => r.isPersisted());
+    expect((await readHasOne(firm, "account")).id).toBe(a.id);
     expect((await readHasOne(firm, "account")).id).toBe(a.id);
     await firm.association("account").reload();
     expect((await readHasOne(firm, "account")).id).toBe(a.id);
@@ -723,15 +757,17 @@ describe("HasOneAssociationsTest", () => {
 
   it("save still works after accessing nil has one", async () => {
     const jp = new Company({ name: "Jaded Pixel" });
-    expect(await readHasOne(jp, "dummyAccount")).toBeNull();
-    await expect((jp as any).save()).resolves.toBeTruthy();
+    await readHasOne(jp, "dummyAccount");
+
+    await assertNothingRaised(() => (jp as any).saveBang());
   });
 
   it("cant save readonly association", async () => {
     const firm = companies("first_firm") as any;
-    const readonlyAccount = await readHasOne(firm, "readonlyAccount");
-    await expect(readonlyAccount.saveBang()).rejects.toThrow(ReadOnlyRecord);
-    expect((await readHasOne(firm, "readonlyAccount")).isReadonly()).toBe(true);
+    await assertRaises([ReadOnlyRecord], {}, async () =>
+      (await readHasOne(firm, "readonlyAccount")).saveBang(),
+    );
+    assertPredicate(await readHasOne(firm, "readonlyAccount"), (r: any) => r.isReadonly());
   });
 
   it.skip("has one proxy should not respond to private methods", () => {
@@ -745,9 +781,18 @@ describe("HasOneAssociationsTest", () => {
   it("save of record with loaded has one", async () => {
     const firm = companies("first_firm") as any;
     expect(await readHasOne(firm, "account")).not.toBeNull();
-    await expect((await Firm.find(firm.id)).save()).resolves.toBeTruthy();
+
+    await assertNothingRaised(async () => {
+      await ((await Firm.find(firm.id)) as any).saveBang();
+      await ((await Firm.includes(":account").find(firm.id)) as any).saveBang();
+    });
+
     await (await readHasOne(firm, "account")).destroy();
-    await expect((await Firm.find(firm.id)).save()).resolves.toBeTruthy();
+
+    await assertNothingRaised(async () => {
+      await ((await Firm.find(firm.id)) as any).saveBang();
+      await ((await Firm.includes(":account").find(firm.id)) as any).saveBang();
+    });
   });
 
   it("build respects hash condition", async () => {
@@ -760,7 +805,7 @@ describe("HasOneAssociationsTest", () => {
   it("create respects hash condition", async () => {
     const firm = companies("first_firm") as any;
     const account = await firm.createAccountLimit500WithHashConditions();
-    expect(account.isPersisted()).toBe(true);
+    assertPredicate(account, (r: any) => r.isPersisted());
     expect(account.credit_limit).toBe(500);
   });
 
@@ -777,12 +822,12 @@ describe("HasOneAssociationsTest", () => {
 
     expect(origShip.equals(ships("black_pearl"))).toBe(true);
     const newShip = await pirate.createShip();
-    expect(newShip.equals(ships("black_pearl"))).toBe(false);
+    expect(newShip.equals(ships("black_pearl"))).not.toBe(true);
     expect((await readHasOne(pirate, "ship")).equals(newShip)).toBe(true);
-    expect(newShip.isNewRecord()).toBe(true);
-    expect(await newShip.isInvalid()).toBe(true);
+    assertPredicate(newShip, (r: any) => r.isNewRecord());
+    assert(await newShip.isInvalid());
     expect(origShip.pirate_id).toBeNull();
-    expect(origShip.isChanged).toBe(false);
+    assertNot(origShip.isChanged);
   });
 
   it("creation failure replaces existing with dependent option", async () => {
@@ -790,22 +835,19 @@ describe("HasOneAssociationsTest", () => {
     const origShip = await readHasOne(pirate, "dependentShip");
 
     const newShip = await pirate.createDependentShip();
-    expect(newShip.isNewRecord()).toBe(true);
-    expect(await newShip.isInvalid()).toBe(true);
-    expect(origShip.isDestroyed()).toBe(true);
+    assertPredicate(newShip, (r: any) => r.isNewRecord());
+    assert(await newShip.isInvalid());
+    assertPredicate(origShip, (r: any) => r.isDestroyed());
   });
 
   it("creation failure due to new record should raise error", async () => {
     const pirate = pirates("redbeard") as any;
     const newShip = new Ship();
 
-    let error: any;
-    try {
+    const error: any = await assertRaises([RecordNotSaved], {}, async () => {
       await pirate.association("ship").writer(newShip);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    });
+
     expect(error.message).toBe("Failed to save the new associated ship.");
     expect(error.record).toBe(newShip);
     expect(await readHasOne(pirate, "ship")).toBeNull();
@@ -817,14 +859,10 @@ describe("HasOneAssociationsTest", () => {
     const currentShip = await readHasOne(pirate, "ship");
     currentShip.name = null;
 
-    expect(await currentShip.isValid()).toBe(false);
-    let error: any;
-    try {
+    assertNot(await currentShip.isValid());
+    const error: any = await assertRaises([RecordNotSaved], {}, async () => {
       await pirate.association("ship").writer(ships("interceptor"));
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    });
 
     expect((await readHasOne(pirate, "ship")).equals(ships("black_pearl"))).toBe(true);
     expect((await readHasOne(pirate, "ship")).pirate_id).toBe(pirate.id);
@@ -839,13 +877,9 @@ describe("HasOneAssociationsTest", () => {
     const pirate = pirates("blackbeard") as any;
     const newShip = new Ship();
 
-    let error: any;
-    try {
+    const error: any = await assertRaises([RecordNotSaved], {}, async () => {
       await pirate.association("ship").writer(newShip);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    });
 
     expect(error.message).toBe("Failed to save the new associated ship.");
     expect(error.record).toBe(newShip);
@@ -945,7 +979,7 @@ describe("HasOneAssociationsTest", () => {
     await ship.save();
 
     ship.name = "new name";
-    expect(ship.isChanged).toBe(true);
+    assertPredicate(ship, (r: any) => r.isChanged);
     await assertQueriesCount(3, false, async () => {
       await (pirate as any).setShip(ship);
     });
@@ -1083,17 +1117,19 @@ describe("HasOneAssociationsTest", () => {
     let tenant = await User.create({});
     let room = await Room.create({ landlord, tenant });
     await (landlord as any).destroyBang();
-    expect((room as any).isDestroyed()).toBe(true);
-    expect((landlord as any).isDestroyed()).toBe(true);
-    expect((tenant as any).isDestroyed()).toBe(true);
+
+    assertPredicate(room, (r: any) => r.isDestroyed());
+    assertPredicate(landlord, (r: any) => r.isDestroyed());
+    assertPredicate(tenant, (r: any) => r.isDestroyed());
 
     landlord = await User.create({});
     tenant = await User.create({});
     room = await Room.create({ landlord, tenant });
     await (tenant as any).destroyBang();
-    expect((room as any).isDestroyed()).toBe(true);
-    expect((tenant as any).isDestroyed()).toBe(true);
-    expect((landlord as any).isDestroyed()).toBe(true);
+
+    assertPredicate(room, (r: any) => r.isDestroyed());
+    assertPredicate(tenant, (r: any) => r.isDestroyed());
+    assertPredicate(landlord, (r: any) => r.isDestroyed());
   });
 
   it("association enum works properly", async () => {
@@ -1116,11 +1152,9 @@ describe("HasOneAssociationsTest", () => {
     await author.setBook(book);
 
     const whereClause = { books: { subscriptions: { subscriber_id: null } } };
-    const relation = (SpecialAuthor as any)
-      .joins({ ":book": ":subscription" })
-      .where()
-      .not(whereClause);
-    expect(typeof relation.toSql()).toBe("string");
+    await assertNothingRaised(() => {
+      (SpecialAuthor as any).joins({ ":book": ":subscription" }).where().not(whereClause).toSql();
+    });
   });
 
   it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
@@ -1148,7 +1182,8 @@ describe("HasOneAssociationsTest", () => {
     const author = await DestroyByParentAuthor.create({ name: "Test" });
     const book = await (DestroyByParentBook as any).create({ author });
     await author.destroy();
-    expect(await DestroyByParentBook.findBy({ id: book.id })).toBeNull();
+
+    assertNot(await DestroyByParentBook.exists(book.id));
   });
 
   it("destroyed_by_association set in child destroy callback on replace", async () => {
@@ -1180,7 +1215,8 @@ describe("HasOneAssociationsTest", () => {
       await (DbaReplBook as any).create({}),
     );
     await author.save();
-    expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
+
+    assertNot(await DbaReplBook.exists(book.id));
   });
 
   it("dependency should halt parent destruction", async () => {
@@ -1205,39 +1241,38 @@ describe("HasOneAssociationsTest", () => {
     registerModel("DestroyableAuthor", DestroyableAuthor);
     const author = await DestroyableAuthor.create({ name: "Test" });
     await (UndestroyableBook as any).create({ author });
-    const authorCount = await DestroyableAuthor.count();
-    const bookCount = await UndestroyableBook.count();
-    expect(await author.destroy()).toBe(false);
-    expect(await DestroyableAuthor.count()).toBe(authorCount);
-    expect(await UndestroyableBook.count()).toBe(bookCount);
+    await assertNoDifference(
+      [
+        () => DestroyableAuthor.count() as Promise<number>,
+        () => UndestroyableBook.count() as Promise<number>,
+      ],
+      null,
+      async () => {
+        assertNot(await author.destroy());
+      },
+    );
   });
 
-  it("composite primary key malformed association class", () => {
+  it("composite primary key malformed association class", async () => {
     registerModel(CpkBook);
     const order = new CpkBrokenOrder();
-    let error: Error | undefined;
-    try {
+    const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
-    expect(error?.message).toBe(
+    });
+
+    expect(error.message).toBe(
       `Association CpkBrokenOrder#book primary key ["shop_id", "status"] doesn't match with foreign key broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });
 
-  it("composite primary key malformed association owner class", () => {
+  it("composite primary key malformed association owner class", async () => {
     registerModel(CpkNonCpkBook);
     const order = new CpkBrokenOrderWithNonCpkBooks();
-    let error: Error | undefined;
-    try {
+    const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
-    expect(error?.message).toBe(
+    });
+
+    expect(error.message).toBe(
       `Association CpkBrokenOrderWithNonCpkBooks#book primary key ["shop_id", "status"] doesn't match with foreign key broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });

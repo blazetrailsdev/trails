@@ -26,13 +26,13 @@
       "value": 33
     },
     "activerecord": {
-      "assertionCount": 1586,
-      "kind": 3256,
+      "assertionCount": 1531,
+      "kind": 3117,
       "value": 28
     },
     "activesupport": {
-      "assertionCount": 299,
-      "kind": 471,
+      "assertionCount": 296,
+      "kind": 458,
       "value": 27
     },
     "arel": {

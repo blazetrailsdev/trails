@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { ErrorReporter } from "./error-reporter.js";
 import { ErrorSubscriber } from "./error-reporter/test-helper.js";
 import { ExecutionContext } from "./execution-context.js";
+import {
+  assertDifference,
+  assertNoDifference,
+  assertRaises,
+  assertSame,
+} from "./testing/assertions.js";
 
 class FailingErrorSubscriber {
   static Error = class extends globalThis.Error {
@@ -222,20 +229,16 @@ describe("ErrorReporterTest", () => {
     expect((error as Error).stack).toBeTruthy();
   });
 
-  it("#unexpected re-raise errors in development and test", () => {
+  it("#unexpected re-raise errors in development and test", async () => {
     reporter.debugMode = true;
-    const error = new Error("Oops");
-    let raisedError: Error | undefined;
-    try {
+    const error = new RuntimeError("Oops");
+    const raisedError = await assertRaises([ErrorReporter.UnexpectedError], {}, () => {
       reporter.unexpected(error);
-    } catch (e) {
-      raisedError = e as Error;
-    }
-    expect(raisedError).toBeInstanceOf(ErrorReporter.UnexpectedError);
-    expect(raisedError!.message).toContain("Error: Oops");
-    expect(raisedError!.cause).not.toBeNull();
-    expect(raisedError!.cause).toBe(error);
-    expect(raisedError!.stack).toBe(error.stack);
+    });
+    expect(raisedError.message).toContain("RuntimeError: Oops");
+    expect(raisedError.cause).not.toBeNull();
+    assertSame(error, raisedError.cause);
+    expect(raisedError.stack!.split("\n")[1]).toContain(`${import.meta.url.split("/").pop()}`);
   });
 
   it("can have multiple subscribers", () => {
@@ -281,33 +284,61 @@ describe("ErrorReporterTest", () => {
     expect(subscriber.events[0][2]).toBe("error");
   });
 
-  it("report errors only once", () => {
-    reporter.report(error, { handled: false });
-    expect(subscriber.events.length).toBe(1);
+  it("report errors only once", async () => {
+    await assertDifference(
+      () => subscriber.events.length,
+      +1,
+      null,
+      () => {
+        reporter.report(error, { handled: false });
+      },
+    );
 
-    for (let i = 0; i < 3; i++) {
-      reporter.report(error, { handled: false });
-    }
-    expect(subscriber.events.length).toBe(1);
+    await assertNoDifference(
+      () => subscriber.events.length,
+      null,
+      () => {
+        for (let i = 0; i < 3; i++) {
+          reporter.report(error, { handled: false });
+        }
+      },
+    );
   });
 
-  it("causes can't be reported again either", () => {
+  it("causes can't be reported again either", async () => {
     const original = new Error("Original");
     const another = new Error("Another", { cause: original });
     error = new Error("Yet Another", { cause: another });
 
-    reporter.report(error, { handled: false });
-    expect(subscriber.events.length).toBe(1);
+    await assertDifference(
+      () => subscriber.events.length,
+      +1,
+      null,
+      () => {
+        reporter.report(error, { handled: false });
+      },
+    );
 
-    for (let i = 0; i < 3; i++) {
-      reporter.report(original, { handled: false });
-    }
-    expect(subscriber.events.length).toBe(1);
+    await assertNoDifference(
+      () => subscriber.events.length,
+      null,
+      () => {
+        for (let i = 0; i < 3; i++) {
+          reporter.report((error.cause as Error).cause as Error, { handled: false });
+        }
+      },
+    );
   });
 
-  it("can report frozen exceptions", () => {
-    reporter.report(Object.freeze(error), { handled: false });
-    expect(subscriber.events.length).toBe(1);
+  it("can report frozen exceptions", async () => {
+    await assertDifference(
+      () => subscriber.events.length,
+      +1,
+      null,
+      () => {
+        reporter.report(Object.freeze(error), { handled: false });
+      },
+    );
   });
 
   it("subscriber errors are re-raised if no logger is set", () => {

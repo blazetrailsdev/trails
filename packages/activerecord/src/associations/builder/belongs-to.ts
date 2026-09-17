@@ -212,8 +212,12 @@ export class BelongsTo extends SingularAssociation {
         await makeCallback("savedChanges")(record);
       });
     } else {
-      model.afterCreate(makeCallback("savedChanges"));
-      model.afterUpdate(makeCallback("savedChanges"));
+      model.afterCreate(makeCallback("savedChanges"), {
+        if: (record: any) => record.isSavedChanges(),
+      });
+      model.afterUpdate(makeCallback("savedChanges"), {
+        if: (record: any) => record.isSavedChanges(),
+      });
       model.afterDestroy(async (record: any) => {
         if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
           await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);

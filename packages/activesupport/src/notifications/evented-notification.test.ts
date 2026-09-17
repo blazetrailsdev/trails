@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Fanout, InstrumentationSubscriberError } from "./fanout.js";
+import { assertRaises } from "../testing/assertions.js";
+
+class BadListenerException extends Error {}
 
 class Listener {
   events: [string, string, unknown, Record<string, unknown>][] = [];
@@ -27,7 +30,7 @@ class ListenerWithTimedSupport extends Listener {
 
 class BadStartListener {
   start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
-    throw new Error("BadStartListener");
+    throw new BadListenerException();
   }
   finish(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
 }
@@ -35,7 +38,7 @@ class BadStartListener {
 class BadFinishListener {
   start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
   finish(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
-    throw new Error("BadFinishListener");
+    throw new BadListenerException();
   }
 }
 
@@ -49,7 +52,7 @@ describe("EventedTest", () => {
     notifier.finish("hi", 2, {});
     notifier.finish("hi", 1, {});
 
-    expect(listener.events).toHaveLength(4);
+    expect(listener.events.length).toEqual(4);
     expect(listener.events).toEqual([
       ["start", "hi", 1, {}],
       ["start", "hi", 2, {}],
@@ -63,7 +66,7 @@ describe("EventedTest", () => {
     const listener = new Listener();
     notifier.subscribe("hi", listener);
     notifier.start("world", 1, {});
-    expect(listener.events).toHaveLength(0);
+    expect(listener.events.length).toEqual(0);
   });
 
   it("listen to everything", () => {
@@ -75,7 +78,7 @@ describe("EventedTest", () => {
     notifier.finish("world", 1, {});
     notifier.finish("hello", 1, {});
 
-    expect(listener.events).toHaveLength(4);
+    expect(listener.events.length).toEqual(4);
     expect(listener.events).toEqual([
       ["start", "hello", 1, {}],
       ["start", "world", 1, {}],
@@ -84,20 +87,27 @@ describe("EventedTest", () => {
     ]);
   });
 
-  it("listen start multiple exception consistency", () => {
+  it("listen start multiple exception consistency", async () => {
     const notifier = new Fanout();
     const listener = new Listener();
     notifier.subscribe(null, new BadStartListener());
     notifier.subscribe(null, new BadStartListener());
     notifier.subscribe(null, listener);
 
-    expect(() => notifier.start("hello", 1, {})).toThrow(InstrumentationSubscriberError);
-    expect(() => notifier.start("world", 1, {})).toThrow(InstrumentationSubscriberError);
+    let error = await assertRaises([InstrumentationSubscriberError], {}, () =>
+      notifier.start("hello", 1, {}),
+    );
+    expect(error.cause).toBeInstanceOf(BadListenerException);
+
+    error = await assertRaises([InstrumentationSubscriberError], {}, () =>
+      notifier.start("world", 1, {}),
+    );
+    expect(error.cause).toBeInstanceOf(BadListenerException);
 
     notifier.finish("world", 1, {});
     notifier.finish("hello", 1, {});
 
-    expect(listener.events).toHaveLength(4);
+    expect(listener.events.length).toEqual(4);
     expect(listener.events).toEqual([
       ["start", "hello", 1, {}],
       ["start", "world", 1, {}],
@@ -106,7 +116,7 @@ describe("EventedTest", () => {
     ]);
   });
 
-  it("listen finish multiple exception consistency", () => {
+  it("listen finish multiple exception consistency", async () => {
     const notifier = new Fanout();
     const listener = new Listener();
     notifier.subscribe(null, new BadFinishListener());
@@ -129,25 +139,20 @@ describe("EventedTest", () => {
     notifier.start("hello", 1, {});
     notifier.start("world", 1, {});
 
-    let error: InstrumentationSubscriberError | null = null;
-    try {
-      notifier.finish("world", 1, {});
-    } catch (e) {
-      error = e as InstrumentationSubscriberError;
-    }
-    expect(error).toBeInstanceOf(InstrumentationSubscriberError);
-    expect(error!.exceptions).toHaveLength(5);
+    let error = (await assertRaises([InstrumentationSubscriberError], {}, () =>
+      notifier.finish("world", 1, {}),
+    )) as InstrumentationSubscriberError;
+    expect(error.exceptions.length).toEqual(5);
+    expect(error.cause).toBeInstanceOf(BadListenerException);
 
-    error = null;
-    try {
-      notifier.finish("hello", 1, {});
-    } catch (e) {
-      error = e as InstrumentationSubscriberError;
-    }
-    expect(error).toBeInstanceOf(InstrumentationSubscriberError);
-    expect(error!.exceptions).toHaveLength(5);
+    error = (await assertRaises([InstrumentationSubscriberError], {}, () =>
+      notifier.finish("hello", 1, {}),
+    )) as InstrumentationSubscriberError;
+    expect(error.exceptions.length).toEqual(5);
+    expect(error.cause).toBeInstanceOf(BadListenerException);
 
-    expect(listener.events).toHaveLength(4);
+    expect(listener.events.length).toEqual(4);
+
     expect(listener.events).toEqual([
       ["start", "hello", 1, {}],
       ["start", "world", 1, {}],

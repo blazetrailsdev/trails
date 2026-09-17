@@ -3,7 +3,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Notifications } from "./notifications.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import { Logger } from "./logger.js";
-import type { Event } from "./notifications/instrumenter.js";
+import { Event } from "./notifications/instrumenter.js";
+import { assertEmpty, assertNotEmpty } from "./testing/assertions.js";
+import { assertNotCalled } from "./testing/method-call-assertions.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = {
@@ -164,9 +166,7 @@ describe("SyncLogSubscriberTest", () => {
   it("event is an active support notifications event", () => {
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber");
-    expect(logSubscriber.event).toBeDefined();
-    expect(logSubscriber.event!.name).toBe("some_event.my_log_subscriber");
-    expect(logSubscriber.event!.duration).toBeDefined();
+    expect(logSubscriber.event).toBeInstanceOf(Event);
   });
 
   it("event attributes", () => {
@@ -187,9 +187,10 @@ describe("SyncLogSubscriberTest", () => {
 
   it("does not send the event if logger is nil", () => {
     LogSubscriber.logger = null;
-    MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
-    Notifications.instrument("some_event.my_log_subscriber");
-    expect(logSubscriber.event).toBeNull();
+    assertNotCalled(logSubscriber, "someEvent", null, () => {
+      MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
+      Notifications.instrument("some_event.my_log_subscriber");
+    });
   });
 
   it("does not fail with non namespaced events", () => {
@@ -230,14 +231,14 @@ describe("SyncLogSubscriberTest", () => {
     logger.level = Logger.INFO;
     MyLogSubscriber.subscribeLogLevel("debug_only", "debug");
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
-    expect(logger.logged("debug")).toEqual([]);
+    assertEmpty(logger.logged("debug"));
 
     Notifications.instrument("debug_only.my_log_subscriber");
-    expect(logger.logged("debug")).toEqual([]);
+    assertEmpty(logger.logged("debug"));
 
     logger.level = Logger.DEBUG;
     Notifications.instrument("debug_only.my_log_subscriber");
-    expect(logger.logged("debug").length).toBeGreaterThan(0);
+    assertNotEmpty(logger.logged("debug"));
   });
 
   it("subscribe log level with non numeric levels", () => {
@@ -247,13 +248,13 @@ describe("SyncLogSubscriberTest", () => {
     semanticLogger.level = Logger.INFO;
     MyLogSubscriber.subscribeLogLevel("debug_only", "debug");
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
-    expect(semanticLogger.logged("debug")).toEqual([]);
+    assertEmpty(semanticLogger.logged("debug"));
 
     Notifications.instrument("debug_only.my_log_subscriber");
-    expect(semanticLogger.logged("debug")).toEqual([]);
+    assertEmpty(semanticLogger.logged("debug"));
 
     semanticLogger.level = Logger.DEBUG;
     Notifications.instrument("debug_only.my_log_subscriber");
-    expect(semanticLogger.logged("debug").length).toBeGreaterThan(0);
+    assertNotEmpty(semanticLogger.logged("debug"));
   });
 });
