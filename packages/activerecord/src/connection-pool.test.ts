@@ -1,4 +1,5 @@
 import { it, expect, vi } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import { Visitors } from "@blazetrails/arel";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -206,8 +207,25 @@ it("reap and active", async () => {
   await pool.checkout();
   await pool.checkout();
   const count = pool.connections.length;
-  pool.reap();
+  await pool.reap();
   expect(pool.connections.length).toBe(count);
+  await pool.disconnect();
+});
+
+it("reap inactive", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  await new Thread(async () => {
+    await pool.checkout();
+    await pool.checkout();
+  }).value();
+
+  expect(pool.stat().busy).toBe(3);
+
+  await pool.reap();
+
+  expect(pool.stat().busy).toBe(1);
+  pool.checkin(conn);
   await pool.disconnect();
 });
 

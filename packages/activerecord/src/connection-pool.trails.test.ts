@@ -1096,7 +1096,7 @@ describe("execution context at Rails thread-spawn sites", () => {
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
     const seen = new Map<number, number[]>();
     const pools = [0.01, 0.02].map((frequency) => ({
-      reap: () => {
+      reap: async () => {
         const ids = seen.get(frequency) ?? [];
         ids.push(Thread.current().id);
         seen.set(frequency, ids);

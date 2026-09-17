@@ -1,7 +1,7 @@
 import { Thread } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
-  reap?(): void;
+  reap?(): Promise<void>;
   flush?(): Promise<void>;
   isDiscarded?(): boolean;
 }
@@ -85,7 +85,7 @@ export class Reaper {
             for (const ref of alive) {
               const p = ref.deref();
               if (p) {
-                p.reap?.();
+                void p.reap?.()?.catch(() => {});
                 void p.flush?.()?.catch(() => {});
               }
             }
