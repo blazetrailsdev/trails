@@ -18,8 +18,9 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Contract, NewContract } from "./test-helpers/models/contract.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Account } from "./test-helpers/models/account.js";
-import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
+import { FamousPirate, Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import {
+  FamousShip,
   Prisoner,
   Ship as CanonicalShip,
   ShipWithoutNestedAttributes,
@@ -28,6 +29,9 @@ import { AuditLog, Developer } from "./test-helpers/models/developer.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Mouse } from "./test-helpers/models/mouse.js";
+import { Translation } from "./test-helpers/models/translation.js";
+import { Attachment } from "./test-helpers/models/attachment.js";
+import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { Member } from "./test-helpers/models/member.js";
 import { MemberDetail } from "./test-helpers/models/member-detail.js";
@@ -78,6 +82,8 @@ import {
   assertRaise,
   assertRaises,
   assertPredicate,
+  assertRespondTo,
+  assertNotRespondTo,
   deepDup,
   getCallbackChains,
   humanize,
@@ -2475,228 +2481,38 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   fixtures([]);
 
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+  });
+
+  let pirate: any;
+
+  beforeEach(() => {
+    pirate = new CanonicalPirate();
+  });
+
   it("should generate validation methods for has_many associations", async () => {
-    class VmParent extends Base {
-      declare name: string | null;
-      declare vmChildren: AssociationProxy<VmChild>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("vmChildren", {
-          className: "VmChild",
-          foreignKey: "author_id",
-          validate: true,
-        });
-      }
-    }
-    class VmChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("VmParent", VmParent);
-    registerModel("VmChild", VmChild);
-    const parent = await VmParent.create({ name: "P" });
-    const child = new VmChild({ name: "" });
-    cacheAssoc(parent, "vmChildren", [child]);
-    expect(await parent.isValid()).toBe(false);
+    assertRespondTo(pirate, "validateAssociatedRecordsFor_birds");
   });
 
   it("should generate validation methods for has_one associations with :validate => true", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class VoParent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.hasOne("voChild", {
-          className: "VoChild",
-          foreignKey: "author_id",
-          validate: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface VoParent {
-      get voChild(): VoChild | null | Promise<VoChild | null>;
-      set voChild(value: VoChild | null);
-    }
-    class VoChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("VoParent", VoParent);
-    registerModel("VoChild", VoChild);
-    const parent = await VoParent.create({ name: "P" });
-    const child = new VoChild({ name: "" });
-    cacheAssoc(parent, "voChild", child);
-    expect(await parent.isValid()).toBe(false);
+    assertRespondTo(pirate, "validateAssociatedRecordsFor_ship");
   });
 
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class NvParent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.hasOne("nvChild", {
-          className: "NvChild",
-          foreignKey: "author_id",
-          validate: false,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface NvParent {
-      get nvChild(): NvChild | null | Promise<NvChild | null>;
-      set nvChild(value: NvChild | null);
-    }
-    class NvChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("NvParent", NvParent);
-    registerModel("NvChild", NvChild);
-    const parent = await NvParent.create({ name: "P" });
-    const child = new NvChild({ name: "" });
-    cacheAssoc(parent, "nvChild", child);
-    expect(await parent.isValid()).toBe(true);
+    assertNotRespondTo(pirate, "validateAssociatedRecordsFor_nonValidatedShip");
   });
 
   it("should generate validation methods for belongs_to associations with :validate => true", async () => {
-    class BvOwner extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class BvChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("bvOwner", {
-          className: "BvOwner",
-          foreignKey: "author_id",
-          validate: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface BvChild {
-      get bvOwner(): BvOwner | null | Promise<BvOwner | null>;
-      set bvOwner(value: BvOwner | null);
-    }
-    registerModel("BvOwner", BvOwner);
-    registerModel("BvChild", BvChild);
-    const child = await BvChild.create({ name: "ok" });
-    const owner = new BvOwner({ name: "" });
-    cacheAssoc(child, "bvOwner", owner);
-    expect(await child.isValid()).toBe(false);
+    assertRespondTo(pirate, "validateAssociatedRecordsFor_parrot");
   });
 
   it("should not generate validation methods for belongs_to associations without :validate => true", async () => {
-    class NbOwner extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class NbChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("nbOwner", {
-          className: "NbOwner",
-          foreignKey: "author_id",
-          validate: false,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface NbChild {
-      get nbOwner(): NbOwner | null | Promise<NbOwner | null>;
-      set nbOwner(value: NbOwner | null);
-    }
-    registerModel("NbOwner", NbOwner);
-    registerModel("NbChild", NbChild);
-    const child = await NbChild.create({ name: "ok" });
-    const owner = new NbOwner({ name: "" });
-    cacheAssoc(child, "nbOwner", owner);
-    expect(await child.isValid()).toBe(true);
+    assertNotRespondTo(pirate, "validateAssociatedRecordsFor_nonValidatedParrot");
   });
 
   it("should generate validation methods for HABTM associations with :validate => true", async () => {
-    class HvParent extends Base {
-      declare catchphrase: string | null;
-      declare hvTags: AssociationProxy<HvTag>;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.hasAndBelongsToMany("hvTags", {
-          className: "HvTag",
-          joinTable: "parrots_pirates",
-          foreignKey: "pirate_id",
-          associationForeignKey: "parrot_id",
-          validate: true,
-        });
-      }
-    }
-    class HvTag extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "parrots";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("HvParent", HvParent);
-    registerModel("HvTag", HvTag);
-    const parent = await HvParent.create({ catchphrase: "P" });
-    const tag = new HvTag({ name: "" });
-    cacheAssoc(parent, "hvTags", [tag]);
-    expect(await parent.isValid()).toBe(false);
+    assertRespondTo(pirate, "validateAssociatedRecordsFor_parrots");
   });
 });
 
@@ -2890,155 +2706,168 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  fixtures(["pirates", "ships"]);
-  it("should automatically validate associations", async () => {
-    class Item extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const item = new Item({ name: "" });
-    const valid = await item.isValid();
-    expect(valid).toBe(false);
-  });
-  it("validations still fire on unchanged association with custom validation context", async () => {
-    const { FamousPirate } = await import("./test-helpers/models/pirate.js");
-    const { FamousShip } = await import("./test-helpers/models/ship.js");
-    registerModel("FamousPirate", FamousPirate as never);
-    registerModel("FamousShip", FamousShip as never);
-
-    const pirate = (await FamousPirate.createBang({ catchphrase: "Avast Ye!" })) as any;
-    await pirate.famousShips.createBang({});
-
-    expect(await pirate.isValid()).toBe(true);
-    expect(await pirate.isValid("conference")).toBe(false);
-  });
-});
-
-describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   fixtures([]);
 
-  let AuthorM: typeof Base;
-  let BookM: typeof Base;
-  let PublishedBookM: typeof Base;
-
-  beforeAll(async () => {
-    AuthorM = (await import("./test-helpers/models/author.js")).Author as never;
-    const bookMod = await import("./test-helpers/models/book.js");
-    BookM = bookMod.Book as never;
-    PublishedBookM = bookMod.PublishedBook as never;
-    registerModel("Author", AuthorM);
-    registerModel("Book", BookM);
-    registerModel("PublishedBook", PublishedBookM);
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    registerModel(Author);
+    registerModel(Book);
+    registerModel(PublishedBook);
+    registerModel(FamousPirate);
+    registerModel(FamousShip);
   });
 
-  const buildAuthor = (): Base => {
-    const author = new AuthorM({ name: "DHH" });
-    (author as any).publishedBooks.build({ name: "Rework", isbn: "1234" });
-    (author as any).publishedBooks.build({ name: "Remote", isbn: "1234" });
-    return author;
-  };
+  let pirate: any;
+  let author: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    await pirate.birds.create({ name: "cookoo" });
+
+    author = new Author({ name: "DHH" });
+    author.publishedBooks.build({ name: "Rework", isbn: "1234" });
+    author.publishedBooks.build({ name: "Remote", isbn: "1234" });
+  });
+
+  it("should automatically validate associations", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    for (const bird of await pirate.birds) bird.name = "";
+
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+  });
 
   it("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", async () => {
-    const authorCountBefore = await AuthorM.count();
-    const bookCountBefore = await BookM.count();
-    const author = buildAuthor();
+    const authorCountBeforeSave = Number(await Author.count());
+    const bookCountBeforeSave = Number(await Book.count());
 
-    await expect(author.saveBang()).rejects.toMatchObject({
-      message: "Validation failed: Published books is invalid",
-    });
+    await assertNoDifference(
+      async () => Number(await Author.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await Book.count()),
+          null,
+          async () => {
+            const exception = await assertRaises([RecordInvalid], {}, () => author.saveBang());
 
-    expect(await AuthorM.count()).toBe(authorCountBefore);
-    expect(await BookM.count()).toBe(bookCountBefore);
+            expect(exception.message).toEqual("Validation failed: Published books is invalid");
+          },
+        );
+      },
+    );
+
+    expect(Number(await Author.count())).toEqual(authorCountBeforeSave);
+    expect(Number(await Book.count())).toEqual(bookCountBeforeSave);
   });
 
   it("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", async () => {
-    const authorCountBefore = await AuthorM.count();
-    const bookCountBefore = await BookM.count();
-    const author = buildAuthor();
+    const authorCountBeforeSave = Number(await Author.count());
+    const bookCountBeforeSave = Number(await Book.count());
 
-    const result = await author.save();
-    expect(result).toBe(false);
+    await assertNoDifference(
+      async () => Number(await Author.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await Book.count()),
+          null,
+          async () => {
+            await assertNothingRaised(async () => {
+              const result = await author.save();
 
-    expect(await AuthorM.count()).toBe(authorCountBefore);
-    expect(await BookM.count()).toBe(bookCountBefore);
-  });
-});
+              assertNot(result);
+            });
+          },
+        );
+      },
+    );
 
-describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
-  fixtures([]);
-  it("should automatically validate associations with :validate => true", async () => {
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const a = new Author({ name: "" });
-    const valid = await a.isValid();
-    expect(valid).toBe(false);
-  });
-
-  it("should not automatically validate associations without :validate => true", async () => {
-    class Item extends Base {
-      declare label: string | null;
-
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    const item = new Item({ label: "fine" });
-    const valid = await item.isValid();
-    expect(valid).toBe(true);
+    expect(Number(await Author.count())).toEqual(authorCountBeforeSave);
+    expect(Number(await Book.count())).toEqual(bookCountBeforeSave);
   });
 
   it("validations still fire on unchanged association with custom validation context", async () => {
-    class Post extends Base {
-      declare title: string | null;
+    const pirate = (await FamousPirate.createBang({ catchphrase: "Avast Ye!" })) as any;
+    await pirate.famousShips.createBang();
 
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, on: "create" });
-      }
-    }
-    const p = new Post({});
-    expect(await p.isValid("create")).toBe(false);
-    expect(await p.isValid("update")).toBe(true);
+    assertPredicate(await pirate.isValid(), (v) => v);
+    assertNot(await pirate.isValid("conference"));
   });
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
   fixtures([]);
-  it("should automatically validate associations with :validate => true", async () => {
-    class Profile extends Base {
-      declare bio: string | null;
 
-      static {
-        this.attribute("bio", "string");
-        this.validates("bio", { presence: true });
-      }
-    }
-    const p = new Profile({ bio: "" });
-    const valid = await p.isValid();
-    expect(valid).toBe(false);
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    registerModel(Developer);
+  });
+
+  let pirate: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    await pirate.createShip({ name: "titanic" });
+  });
+
+  it("should automatically validate associations with :validate => true", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    (await pirate.ship).name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
   });
 
   it("should not automatically add validate associations without :validate => true", async () => {
-    class Address extends Base {
-      declare street: string | null;
+    assertPredicate(await pirate.isValid(), (v) => v);
+    (await pirate.nonValidatedShip).name = "";
+    assertPredicate(await pirate.isValid(), (v) => v);
+  });
+});
 
-      static {
-        this.attribute("street", "string");
-      }
-    }
-    const a = new Address({ street: "123 Main" });
-    const valid = await a.isValid();
-    expect(valid).toBe(true);
+describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
+  fixtures([]);
+
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalParrot);
+    registerModel(CanonicalCompany);
+    registerModel(Firm);
+    registerModel(Account);
+  });
+
+  let pirate: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+  });
+
+  it("should automatically validate associations with :validate => true", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    pirate.parrot = new CanonicalParrot({ name: "" });
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+  });
+
+  it("should not automatically validate associations without :validate => true", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    pirate.nonValidatedParrot = new CanonicalParrot({ name: "" });
+    assertPredicate(await pirate.isValid(), (v) => v);
+  });
+
+  it("validations still fire on unchanged association with custom validation context", async () => {
+    const firmWithLowCredit = await Firm.createBang({
+      name: "Something",
+      account: new Account({ credit_limit: 50 }),
+    });
+
+    assertPredicate(await firmWithLowCredit.isValid(), (v) => v);
+    assertNot(await firmWithLowCredit.isValid("bankLoan"));
   });
 });
 
@@ -3099,30 +2928,32 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
 
 describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
   fixtures([]);
-  it("should automatically validate associations with :validate => true", async () => {
-    class Tag extends Base {
-      declare name: string | null;
 
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const t = new Tag({ name: "" });
-    const valid = await t.isValid();
-    expect(valid).toBe(false);
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalParrot);
   });
-  it("should not automatically validate associations without :validate => true", async () => {
-    class Label extends Base {
-      declare text: string | null;
 
-      static {
-        this.attribute("text", "string");
-      }
-    }
-    const l = new Label({ text: "fine" });
-    const valid = await l.isValid();
-    expect(valid).toBe(true);
+  let pirate: any;
+
+  beforeEach(async () => {
+    pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+  });
+
+  it("should automatically validate associations with :validate => true", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    await pirate.parrots.replace([new CanonicalParrot({ name: "popuga" })]);
+    for (const parrot of await pirate.parrots) parrot.name = "";
+    assertNotPredicate(await pirate.isValid(), (v) => v);
+  });
+
+  it("should not automatically validate associations without :validate => true", async () => {
+    assertPredicate(await pirate.isValid(), (v) => v);
+    await pirate.nonValidatedParrots.replace([new CanonicalParrot({ name: "popuga" })]);
+    for (const parrot of await pirate.nonValidatedParrots) parrot.name = "";
+    assertPredicate(await pirate.isValid(), (v) => v);
   });
 });
 
@@ -3181,43 +3012,22 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
   fixtures([]);
+
+  beforeAll(() => {
+    registerModel(Translation);
+    registerModel(Attachment);
+    registerModel(Author);
+  });
+
   it("should not raise error", async () => {
-    class BtOwner extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class BtRecord extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("btOwner", {
-          className: "BtOwner",
-          foreignKey: "author_id",
-          autosave: true,
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface BtRecord {
-      get btOwner(): BtOwner | null | Promise<BtOwner | null>;
-      set btOwner(value: BtOwner | null);
-    }
-    registerModel("BtOwner", BtOwner);
-    registerModel("BtRecord", BtRecord);
-    const owner = await BtOwner.create({ name: "Owner" });
-    const record = new BtRecord({ name: "V", author_id: owner.id });
-    cacheAssoc(record, "btOwner", owner);
-    const saved = await record.save();
-    expect(saved).toBe(true);
+    const translation = (await Translation.create({
+      locale: "fr",
+      key: "bread",
+      value: "Baguette \u{1F956}",
+    })) as any;
+    const author = await Author.create({ name: "Dorian Marié" });
+    translation.buildAttachment({ record: author });
+    await assertNothingRaised(() => translation.saveBang());
   });
 });
 
@@ -3227,12 +3037,12 @@ describe("TestAutosaveAssociationWithTouch", () => {
     registerModel(Invoice);
     registerModel(LineItem);
   });
+
   it("autosave with touch should not raise system stack error", async () => {
-    const invoice = await Invoice.create({});
-    await expect(invoice.lineItems.create({ amount: 10 })).resolves.not.toThrow();
+    const invoice = await Invoice.create();
+    await assertNothingRaised(() => invoice.lineItems.create({ amount: 10 }));
   });
 });
-
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
   fixtures([]);
 
