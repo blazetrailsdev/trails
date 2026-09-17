@@ -148,8 +148,9 @@ describe("StrictLoadingTest", () => {
 
     expect(developer!.projects.loaded).toBeFalsy();
 
-    const project = await developer!.projects.first();
-    await expect(Promise.resolve(project!.firm)).resolves.not.toThrow();
+    await expect(
+      loadSingularTarget((await developer!.projects.first())!, "firm"),
+    ).resolves.not.toThrow();
   });
 
   it("default mode is all", async () => {

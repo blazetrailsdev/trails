@@ -615,7 +615,7 @@ describe("DirtyTest", () => {
     let pirate = new Pirate();
     expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
-    await pirate.save();
+    await pirate.saveBang();
 
     expect(Object.keys(pirate.previousChanges).length).toEqual(4);
     expect(pirate.previousChanges["catchphrase"]).toEqual([null, "arrr"]);
@@ -646,7 +646,7 @@ describe("DirtyTest", () => {
 
     pirate = (await Pirate.findBy({ catchphrase: "arrr" }))!;
     pirate.catchphrase = "Me Maties!";
-    await pirate.save();
+    await pirate.saveBang();
 
     expect(Object.keys(pirate.previousChanges).length).toEqual(2);
     expect(pirate.previousChanges["catchphrase"]).toEqual(["arrr", "Me Maties!"]);

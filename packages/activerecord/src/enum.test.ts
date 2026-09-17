@@ -1,15 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
 import { assertRespondTo, assertRaises, assertEmpty } from "@blazetrails/activesupport";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
-
-const EXPECTED_NEGATIVE_SCOPE_WARNING =
-  "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
-  "while positive form 'sent' also exists.";
 
 describe("EnumTest", () => {
   const { books, authors } = fixtures(["books", "authors", "authorAddresses"]);
@@ -91,9 +86,7 @@ describe("EnumTest", () => {
     expect((await (Book as any).illustratorVisibilityVisible().first())?.id).toBe(book.id);
     expect((await (Book as any).mediumToRead().first())?.id).toBe(book.id);
     expect((await (Book as any).forgotten().first())?.id).toBe(books("ddd").id);
-    expect((await association(authors("david"), "unpublishedBooks").first())?.id).toBe(
-      books("rfr").id,
-    );
+    expect((await authors("david").unpublishedBooks.first())?.id).toBe(books("rfr").id);
   });
 
   it("find via negative scope", async () => {
@@ -490,7 +483,7 @@ describe("EnumTest", () => {
     expect(e.message).toMatch(/must not be empty\.$/);
 
     e = await assertRaises([ArgumentError], {}, () =>
-      defineStatusEnum([{ proposed: 1, written: 2 }]),
+      defineStatusEnum([{ proposed: 1, written: 2, published: 3 }]),
     );
     expect(e.message).toMatch(/must only contain symbols or strings\.$/);
 
@@ -655,12 +648,12 @@ describe("EnumTest", () => {
     let e = await assertRaises([TypeError], {}, () => {
       (Book as any).statuses["bad_enum"] = 40;
     });
-    expect(e.message).toMatch(/object is not extensible|read only|not extensible/);
+    expect(e.message).toMatch(/Cannot add property bad_enum, object is not extensible/);
 
     e = await assertRaises([TypeError], {}, () => {
       delete (Book as any).statuses["published"];
     });
-    expect(e.message).toMatch(/Cannot delete property/);
+    expect(e.message).toMatch(/Cannot delete property 'published'/);
   });
 
   it("declare multiple enums with prefix: true", () => {
@@ -1113,7 +1106,9 @@ describe("EnumTest", () => {
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const expectedMessage1 = EXPECTED_NEGATIVE_SCOPE_WARNING;
+    const expectedMessage1 =
+      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
+      "while positive form 'sent' also exists.";
     try {
       class K extends Base {
         static _tableName = "books";
@@ -1131,7 +1126,9 @@ describe("EnumTest", () => {
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const expectedMessage1 = EXPECTED_NEGATIVE_SCOPE_WARNING;
+    const expectedMessage1 =
+      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
+      "while positive form 'sent' also exists.";
     try {
       class K extends Base {
         static _tableName = "books";
@@ -1188,7 +1185,7 @@ describe("EnumTest", () => {
       }
     }
 
-    const error = await assertRaises([Error], {}, () =>
+    const error = await assertRaises([RuntimeError], {}, () =>
       (Klass as any).typeForAttribute("typeless_genre"),
     );
     expect(error.message).toMatch("Undeclared attribute type for enum 'typeless_genre' in Klass");

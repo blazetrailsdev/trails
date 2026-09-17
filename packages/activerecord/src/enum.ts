@@ -6,7 +6,7 @@ import {
   isBlank,
   pluralize,
 } from "@blazetrails/activesupport";
-import { ArgumentError, ValueType, defaultValue } from "@blazetrails/activemodel";
+import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
@@ -47,7 +47,7 @@ export function installEnumAttribute(
   }
   klass.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
     if (subtype === defaultValue()) {
-      throw new Error(
+      throw new RuntimeError(
         `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
           " backed by a database column or declared with an explicit type" +
           " via `attribute`.",
