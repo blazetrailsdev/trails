@@ -22,8 +22,8 @@ export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions
   private convertWithAreaCode(number: string): string {
     const defaultPattern = /(\d{1,3})(\d{3})(\d{4}$)/;
     number = number.replace(
-      globalPattern(this.regexpPattern(defaultPattern)),
-      `($1) $2${replacementLiteral(this.delimiter)}$3`,
+      new RegExp(this.regexpPattern(defaultPattern), "g"),
+      `($1) $2${this.delimiter.replace(/\$/g, "$$$$")}$3`,
     );
     return number;
   }
@@ -31,8 +31,8 @@ export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions
   private convertWithoutAreaCode(number: string): string {
     const defaultPattern = /(\d{0,3})(\d{3})(\d{4})$/;
     number = number.replace(
-      globalPattern(this.regexpPattern(defaultPattern)),
-      `$1${replacementLiteral(this.delimiter)}$2${replacementLiteral(this.delimiter)}$3`,
+      new RegExp(this.regexpPattern(defaultPattern), "g"),
+      `$1${this.delimiter.replace(/\$/g, "$$$$")}$2${this.delimiter.replace(/\$/g, "$$$$")}$3`,
     );
     if (this.isStartWithDelimiter(number)) number = number.slice(1);
     return number;
@@ -57,12 +57,4 @@ export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions
   private regexpPattern(defaultPattern: RegExp): RegExp {
     return fetch<RegExp>(this.opts as Record<string, unknown>, "pattern", defaultPattern);
   }
-}
-
-function globalPattern(pattern: RegExp): RegExp {
-  return pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
-}
-
-function replacementLiteral(s: string): string {
-  return s.replace(/\$/g, "$$$$");
 }
