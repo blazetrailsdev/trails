@@ -16,12 +16,15 @@ import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/ruby-com
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
+import {
+  MigrationContext,
+  NoEnvironmentInSchemaError,
+  ProtectedEnvironmentError,
+} from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
-import { MigrationContext } from "../migration.js";
 import { assertCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
