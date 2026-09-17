@@ -7,6 +7,7 @@ import {
   getAttrInternalNamingFormat,
   setAttrInternalNamingFormat,
 } from "../../module-ext.js";
+import { assert, assertNot } from "../../testing/assertions.js";
 
 describe("AttrInternalTest", () => {
   let savedFormat: string;
@@ -21,38 +22,40 @@ describe("AttrInternalTest", () => {
 
   it("reader", () => {
     class Target {}
-    attrInternalReader.call(Target.prototype, "foo");
     const instance = new Target() as any;
+    expect(() => attrInternalReader.call(Target.prototype, "foo")).not.toThrow();
 
-    expect(instance._foo).toBeUndefined();
+    assertNot("_foo" in instance);
     expect(() => {
       instance.foo = 1;
     }).toThrow();
 
     instance._foo = 1;
-    expect(instance.foo).toBe(1);
+    expect(() => expect(instance.foo).toEqual(1)).not.toThrow();
   });
 
   it("writer", () => {
     class Target {}
-    attrInternalWriter.call(Target.prototype, "foo");
     const instance = new Target() as any;
+    expect(() => attrInternalWriter.call(Target.prototype, "foo")).not.toThrow();
 
-    expect(instance._foo).toBeUndefined();
-    instance.foo = 1;
-    expect(instance._foo).toBe(1);
-    expect(instance.foo).toBeUndefined();
+    assertNot("_foo" in instance);
+    expect(() => expect((instance.foo = 1)).toEqual(1)).not.toThrow();
+
+    expect(instance._foo).toEqual(1);
+    expect(() => instance.foo()).toThrow(TypeError);
   });
 
   it("accessor", () => {
     class Target {}
-    attrInternalAccessor.call(Target.prototype, "foo");
     const instance = new Target() as any;
+    expect(() => attrInternalAccessor.call(Target.prototype, "foo")).not.toThrow();
 
-    expect(instance._foo).toBeUndefined();
-    instance.foo = 1;
-    expect(instance._foo).toBe(1);
-    expect(instance.foo).toBe(1);
+    assertNot("_foo" in instance);
+    expect(() => expect((instance.foo = 1)).toEqual(1)).not.toThrow();
+
+    expect(instance._foo).toEqual(1);
+    expect(() => expect(instance.foo).toEqual(1)).not.toThrow();
   });
 
   it("invalid naming format", () => {
@@ -63,16 +66,18 @@ describe("AttrInternalTest", () => {
   });
 
   it("naming format", () => {
-    setAttrInternalNamingFormat("abc%sdef");
+    expect(() => setAttrInternalNamingFormat("abc%sdef")).not.toThrow();
     class Target {}
     attrInternal.call(Target.prototype, "foo");
     const instance = new Target() as any;
 
-    expect(instance._foo).toBeUndefined();
-    expect(instance.abcfoodef).toBeUndefined();
-    instance.foo = 1;
-    expect(instance._foo).toBeUndefined();
-    expect(instance.abcfoodef).toBe(1);
+    assertNot("_foo" in instance);
+    assertNot("abcfoodef" in instance);
+    expect(() => {
+      instance.foo = 1;
+    }).not.toThrow();
+    assertNot("_foo" in instance);
+    assert("abcfoodef" in instance);
   });
 
   it("attrInternal is an alias of attrInternalAccessor", () => {

@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { DescendantsTracker } from "./descendants-tracker.js";
 
 describe("DescendantsTrackerTest", () => {
+  function assertEqualSets(expected: unknown[], actual: unknown[]): void {
+    expect(new Set(actual)).toEqual(new Set(expected));
+  }
+
   let Parent: abstract new (...args: unknown[]) => unknown;
   let Child1: abstract new (...args: unknown[]) => unknown;
   let Child2: abstract new (...args: unknown[]) => unknown;
@@ -22,30 +26,27 @@ describe("DescendantsTrackerTest", () => {
   });
 
   it(".descendants", () => {
-    const parentDescendants = DescendantsTracker.descendants(Parent);
-    expect(new Set(parentDescendants)).toEqual(new Set([Child1, Grandchild1, Grandchild2, Child2]));
+    assertEqualSets(
+      [Child1, Grandchild1, Grandchild2, Child2],
+      DescendantsTracker.descendants(Parent),
+    );
 
-    const child1Descendants = DescendantsTracker.descendants(Child1);
-    expect(new Set(child1Descendants)).toEqual(new Set([Grandchild1, Grandchild2]));
+    assertEqualSets([Grandchild1, Grandchild2], DescendantsTracker.descendants(Child1));
 
-    expect(DescendantsTracker.descendants(Child2)).toEqual([]);
+    assertEqualSets([], DescendantsTracker.descendants(Child2));
   });
 
   it(".subclasses", () => {
-    expect(new Set(DescendantsTracker.subclasses(Parent))).toEqual(new Set([Child1, Child2]));
-    expect(new Set(DescendantsTracker.subclasses(Child1))).toEqual(
-      new Set([Grandchild1, Grandchild2]),
-    );
-    expect(DescendantsTracker.subclasses(Child2)).toEqual([]);
+    assertEqualSets([Child1, Child2], DescendantsTracker.subclasses(Parent));
+    assertEqualSets([Grandchild1, Grandchild2], DescendantsTracker.subclasses(Child1));
+    assertEqualSets([], DescendantsTracker.subclasses(Child2));
   });
 
   it(".clear(classes) deletes the given classes only", () => {
     DescendantsTracker.clear([Child2, Grandchild1]);
 
-    const parentDescendants = DescendantsTracker.descendants(Parent);
-    expect(new Set(parentDescendants)).toEqual(new Set([Child1, Grandchild2]));
+    assertEqualSets([Child1, Grandchild2], DescendantsTracker.descendants(Parent));
 
-    const child1Descendants = DescendantsTracker.descendants(Child1);
-    expect(new Set(child1Descendants)).toEqual(new Set([Grandchild2]));
+    assertEqualSets([Grandchild2], DescendantsTracker.descendants(Child1));
   });
 });

@@ -1,118 +1,598 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
+import { DelegationError } from "../delegation.js";
 import { registerConstant, unregisterConstant } from "../inflector.js";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+  assertRaises,
+  assertRespondTo,
+  assertNotRespondTo,
+} from "../testing/assertions.js";
+
+class Somewhere {
+  name: string | undefined;
+
+  constructor(
+    public street?: string,
+    public city?: string,
+  ) {}
+
+  static country(block: () => unknown) {
+    return block();
+  }
+}
+registerConstant("Somewhere", Somewhere);
+
+class Someone {
+  static tableName() {
+    return "some_table";
+  }
+
+  constructor(
+    public name?: string | null,
+    public place?: any,
+  ) {}
+
+  get class() {
+    return this.constructor;
+  }
+
+  kwSend({ method }: { method: string }) {
+    return (this as any)[method];
+  }
+
+  // eslint-disable-next-line no-unused-private-class-members
+  #privateName() {
+    return "Private";
+  }
+}
+delegate.call(Someone.prototype, "street", "city", "toF", { to: "place" });
+delegate.call(Someone.prototype, "name=", { to: "place", prefix: true });
+delegate.call(Someone.prototype, "toUpperCase", { to: "place.city" });
+delegate.call(Someone.prototype, "tableName", { to: "class" });
+delegate.call(Someone.prototype, "tableName", { to: "class", prefix: true });
+delegate.call(Someone.prototype, "country", { to: Somewhere });
+delegate.call(Someone.prototype, "foo", { to: "place" });
+delegate.call(Someone.prototype, "bar", { to: "place", allowNil: true });
+
+class Invoice {
+  constructor(public client: any) {}
+}
+delegate.call(Invoice.prototype, "street", "city", "name", { to: "client", prefix: true });
+delegate.call(Invoice.prototype, "street", "city", "name", { to: "client", prefix: "customer" });
+
+class Project {
+  constructor(
+    public description?: any,
+    public person?: any,
+  ) {}
+}
+delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
+
+class Developer {
+  constructor(public client: any) {}
+}
+delegate.call(Developer.prototype, "name", { to: "client", prefix: undefined });
+
+class Tester {
+  constructor(public client?: any) {}
+
+  foo() {
+    return 1;
+  }
+}
+delegate.call(Tester.prototype, "name", { to: "client", prefix: false });
+
+class Event {
+  constructor(public case_: any) {}
+
+  get case() {
+    return this.case_;
+  }
+}
+delegate.call(Event.prototype, "foo", { to: "case" });
+
+class SideEffect {
+  ints = [1, 2, 3];
+
+  shift() {
+    return this.ints.shift();
+  }
+}
+delegate.call(SideEffect.prototype, "valueOf", { to: "shift", allowNil: true });
+delegate.call(SideEffect.prototype, "toString", { to: "shift" });
+
+class ExtraMissing {
+  get extraMissing() {
+    return 42;
+  }
+}
+
+class DecoratedTester extends ExtraMissing {
+  constructor(public client: any) {
+    super();
+  }
+
+  callName() {
+    return (this as any).name;
+  }
+}
+
+class ParameterSet {
+  "@params" = new Map([["foo", "bar"]]);
+}
+delegate.call(ParameterSet.prototype, "get", "set", { to: "@params" });
+
+class Name {
+  "@full_name": string;
+
+  constructor(first: string, last: string) {
+    this["@full_name"] = `${first} ${last}`;
+  }
+}
+delegate.call(Name.prototype, "toUpperCase", { to: "@full_name" });
+
+class ArityTester {
+  static zero() {}
+  static one(a: unknown) {}
+  static two(a: unknown, b: unknown) {}
+}
+registerConstant("ModuleTest::ArityTester", ArityTester);
+
+class ArityTesterModule {
+  static zero() {}
+}
+registerConstant("ModuleTest::ArityTesterModule", ArityTesterModule);
+
+class DecoratedReserved {
+  constructor(public case_: any) {}
+
+  get case() {
+    return this.case_;
+  }
+}
 
 describe("ModuleTest", () => {
+  let david: Someone & Record<string, any>;
+
+  beforeEach(() => {
+    david = new Someone("David", new Somewhere("Paulina", "Chicago")) as Someone &
+      Record<string, any>;
+  });
+
+  it("delegation to methods", () => {
+    expect(david.street()).toEqual("Paulina");
+    expect(david.city()).toEqual("Chicago");
+  });
+
+  it("delegation to assignment method", () => {
+    david.place_name = "Fred";
+    expect(david.place.name).toEqual("Fred");
+  });
+
   it("delegation to index get method", () => {
-    class Container {
-      data: Record<string, unknown> = { key: "value" };
-      get(key: string) {
-        return this.data[key];
-      }
-    }
-    class Wrapper {
-      container: Container;
-      constructor() {
-        this.container = new Container();
-      }
-    }
-    delegate.call(Wrapper.prototype, "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & { get(key: string): unknown };
-    expect(w.get("key")).toBe("value");
+    const params = new ParameterSet() as ParameterSet & Record<string, any>;
+    expect(params.get("foo")).toEqual("bar");
   });
 
   it("delegation to index set method", () => {
-    class Container {
-      data: Record<string, unknown> = {};
-      set(key: string, val: unknown) {
-        this.data[key] = val;
-      }
-      get(key: string) {
-        return this.data[key];
-      }
-    }
-    class Wrapper {
-      container: Container;
-      constructor() {
-        this.container = new Container();
-      }
-    }
-    delegate.call(Wrapper.prototype, "set", "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & {
-      set(k: string, v: unknown): void;
-      get(k: string): unknown;
-    };
-    w.set("x", 42);
-    expect(w.get("x")).toBe(42);
+    const params = new ParameterSet() as ParameterSet & Record<string, any>;
+    params.set("foo", "baz");
+    expect(params.get("foo")).toEqual("baz");
   });
 
-  it("delegation with allow nil and false value", () => {
-    class Settings {
-      enabled = false;
-    }
-    class App {
-      settings: Settings | null = new Settings();
-    }
-    delegate.call(App.prototype, "enabled", { to: "settings", allowNil: true });
-    const app = new App() as App & { enabled(): boolean | undefined };
-    expect(app.enabled()).toBe(false);
+  it("delegation down hierarchy", () => {
+    expect(david.toUpperCase()).toEqual("CHICAGO");
   });
 
-  it("delegation with allow nil and invalid value", () => {
-    class Target {
-      value: unknown = undefined;
-    }
-    class Host {
-      target: Target | null = new Target();
-    }
-    delegate.call(Host.prototype, "value", { to: "target", allowNil: true });
-    const h = new Host() as Host & { value(): unknown };
-    expect(h.value()).toBeUndefined();
-    h.target = null;
-    expect(h.value()).toBeUndefined();
+  it("delegation to instance variable", () => {
+    const david = new Name("David", "Hansson") as Name & Record<string, any>;
+    expect(david.toUpperCase()).toEqual("DAVID HANSSON");
+  });
+
+  it("delegation to class method", () => {
+    expect(david.tableName()).toEqual("some_table");
+    expect(david.class_tableName()).toEqual("some_table");
+  });
+
+  it("missing delegation target", async () => {
+    await assertRaise([ArgumentError], {}, () => delegate.call(Tester.prototype, "nowhere"));
+    await assertRaise([ArgumentError], {}, () =>
+      delegate.call(Tester.prototype, "noplace", { tos: "hollywood" } as any),
+    );
+  });
+
+  it("delegation target when prefix is true", async () => {
+    class Name {}
+    await assertNothingRaised(() =>
+      delegate.call(Name.prototype, "go", { to: "you", prefix: true }),
+    );
+    await assertNothingRaised(() =>
+      delegate.call(Name.prototype, "go", { to: "_you", prefix: true }),
+    );
+    await assertRaise([ArgumentError], {}, () =>
+      delegate.call(Name.prototype, "go", { to: "You", prefix: true }),
+    );
+    await assertRaise([ArgumentError], {}, () =>
+      delegate.call(Name.prototype, "go", { to: "@you", prefix: true }),
+    );
+  });
+
+  it("delegation prefix", () => {
+    const invoice = new Invoice(david) as Invoice & Record<string, any>;
+    expect(invoice.client_name()).toEqual("David");
+    expect(invoice.client_street()).toEqual("Paulina");
+    expect(invoice.client_city()).toEqual("Chicago");
+  });
+
+  it("delegation custom prefix", () => {
+    const invoice = new Invoice(david) as Invoice & Record<string, any>;
+    expect(invoice.customer_name()).toEqual("David");
+    expect(invoice.customer_street()).toEqual("Paulina");
+    expect(invoice.customer_city()).toEqual("Chicago");
+  });
+
+  it("delegation prefix with nil or false", () => {
+    expect((new Developer(david) as any).name()).toEqual("David");
+    expect((new Tester(david) as any).name()).toEqual("David");
+  });
+
+  it("delegation prefix with instance variable", async () => {
+    await assertRaise([ArgumentError], {}, () => {
+      class C {}
+      delegate.call(C.prototype, "name", "address", { to: "@client", prefix: true });
+    });
+  });
+
+  it("delegation with implicit block", async () => {
+    await assertNothingRaised(() => david.country(() => {}));
+  });
+
+  it("delegation with allow nil", () => {
+    const rails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
+    expect(rails.name()).toEqual("David");
+  });
+
+  it("delegation with allow nil and nil value", () => {
+    const rails = new Project("Rails") as Project & Record<string, any>;
+    expect(rails.name()).toBeUndefined();
+  });
+
+  it("delegation with allow nil and false value", async () => {
+    const project = new Project(false, false) as Project & Record<string, any>;
+    await assertRaise([NoMethodError], {}, () => project.name());
+  });
+
+  it("delegation with allow nil and invalid value", async () => {
+    const rails = new Project("Rails", 42) as Project & Record<string, any>;
+    await assertRaise([NoMethodError], {}, () => rails.name());
+  });
+
+  it("delegation with allow nil and nil value and prefix", () => {
+    delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
+    const rails = new Project("Rails") as Project & Record<string, any>;
+    expect(rails.person_name()).toBeUndefined();
+  });
+
+  it("delegation without allow nil and nil value", async () => {
+    const david = new Someone("David") as Someone & Record<string, any>;
+    await assertRaise([DelegationError], {}, () => david.street());
+  });
+
+  it("delegation to method that exists on nil", async () => {
+    const nilPerson = new Someone(null) as Someone & Record<string, any>;
+    await assertRaise([DelegationError], {}, () => nilPerson.toF());
   });
 
   it("delegation to method that exists on nil when allowing nil", () => {
-    class Greeter {
-      greet() {
-        return "hello";
-      }
+    delegate.call(Project.prototype, "toF", { to: "description", allowNil: true });
+    const nilProject = new Project(null) as Project & Record<string, any>;
+    expect(nilProject.toF()).toBeUndefined();
+  });
+
+  it("delegation does not raise error when removing singleton instance methods", async () => {
+    class Parent {
+      static parentMethod() {}
     }
-    class Host {
-      greeter: Greeter | null = null;
-    }
-    delegate.call(Host.prototype, "greet", { to: "greeter", allowNil: true });
-    const h = new Host() as Host & { greet(): unknown };
-    expect(h.greet()).toBeUndefined();
-    h.greeter = new Greeter();
-    expect(h.greet()).toBe("hello");
+
+    await assertNothingRaised(() => {
+      class C extends Parent {}
+      delegate.call(C, "parentMethod", { to: "superclass" });
+    });
+  });
+
+  it("delegation line number", async () => {
+    await assertNothingRaised(() => (Someone.prototype as any).foo);
   });
 
   it("delegate line with nil", () => {
-    class Name {
-      first = "Alice";
-    }
-    class Person {
-      name: Name | null = null;
-    }
-    delegate.call(Person.prototype, "first", { to: "name", allowNil: true });
-    const p = new Person() as Person & { first(): string | undefined };
-    expect(p.first()).toBeUndefined();
+    expect((new Someone("foo", null) as any).bar()).toBeUndefined();
   });
 
-  it("delegate missing to does not delegate to fake methods", () => {
-    class Real {
-      exists() {
+  it("delegation exception backtrace", () => {
+    const someone = new Someone("foo", "bar") as Someone & Record<string, any>;
+    try {
+      someone.foo();
+    } catch (e) {
+      const fileAndLine = "module.test.ts";
+      assert(
+        (e as Error).stack!.split("\n").some((a) => a.includes(fileAndLine)),
+        `[${(e as Error).stack}] did not include [${fileAndLine}]`,
+      );
+    }
+  });
+
+  it("delegation exception backtrace with allow nil", () => {
+    const someone = new Someone("foo", "bar") as Someone & Record<string, any>;
+    try {
+      someone.bar();
+    } catch (e) {
+      const fileAndLine = "module.test.ts";
+      assert(
+        (e as Error).stack!.split("\n").some((a) => a.includes(fileAndLine)),
+        `[${(e as Error).stack}] did not include [${fileAndLine}]`,
+      );
+    }
+  });
+
+  it("delegation invokes the target exactly once", () => {
+    const se = new SideEffect() as SideEffect & Record<string, any>;
+
+    expect(se.valueOf()).toEqual(1);
+    expect(se.ints).toEqual([2, 3]);
+
+    expect(se.toString()).toEqual("2");
+    expect(se.ints).toEqual([3]);
+  });
+
+  it("delegation doesnt mask nested no method error on nil receiver", () => {
+    class Product {
+      constructor(public name: string) {}
+      get manufacturer(): { name: string } {
+        return (null as unknown as { unknownMethod(): { name: string } }).unknownMethod();
+      }
+      get type(): { name: string } {
+        return (null as unknown as { typeName(): { name: string } }).typeName();
+      }
+    }
+    delegate.call(Product.prototype, "name", { to: "manufacturer", prefix: true });
+    delegate.call(Product.prototype, "name", { to: "type", prefix: true });
+    const product = new Product("Widget") as Product & {
+      manufacturer_name(): string;
+      type_name(): string;
+    };
+
+    expect(() => product.manufacturer_name()).toThrow(TypeError);
+
+    expect(() => product.type_name()).toThrow(TypeError);
+  });
+
+  it("delegation with method arguments", () => {
+    class Block {
+      isHello() {
         return true;
       }
     }
-    class Host {
-      real: Real = new Real();
+    class HasBlock {
+      constructor(public block: Block) {}
     }
-    delegate.call(Host.prototype, "exists", { to: "real" });
-    const h = new Host() as Host & Record<string, unknown>;
-    expect((h as any).exists()).toBe(true);
-    expect(typeof h.nonExistent).toBe("undefined");
+    delegate.call(HasBlock.prototype, "isHello", { to: "block" });
+    const hasBlock = new HasBlock(new Block()) as HasBlock & Record<string, any>;
+    assertPredicate(hasBlock, (b) => b.isHello());
+  });
+
+  it("delegate missing to with method", () => {
+    expect((delegateMissingTo(new DecoratedTester(david), "client") as any).name).toEqual("David");
+  });
+
+  it("delegate missing to calling on self", () => {
+    expect(delegateMissingTo(new DecoratedTester(david), "client").callName()).toEqual("David");
+  });
+
+  it("delegate missing to with reserved methods", () => {
+    expect(delegateMissingTo(new DecoratedReserved(david), "case").name).toEqual("David");
+  });
+
+  it("delegate missing to with keyword methods", () => {
+    expect(
+      delegateMissingTo(new DecoratedReserved(david), "case").kwSend({ method: "name" }),
+    ).toEqual("David");
+  });
+
+  it("delegate missing to does not delegate to private methods", async () => {
+    const e = await assertRaises([NoMethodError], {}, () =>
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).privateName(),
+    );
+
+    expect(e.message).toMatch(/undefined method [`']privateName' for/);
+  });
+
+  it("delegate missing to does not delegate to fake methods", async () => {
+    const e = await assertRaises([NoMethodError], {}, () =>
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).myFakeMethod(),
+    );
+
+    expect(e.message).toMatch(/undefined method [`']myFakeMethod' for/);
+  });
+
+  it("delegate missing to raises delegation error if target nil", async () => {
+    const e = await assertRaises(
+      [DelegationError],
+      {},
+      () => (delegateMissingTo(new DecoratedTester(null), "client") as any).name,
+    );
+
+    expect(e.message).toEqual("name delegated to client, but client is nil");
+  });
+
+  it("delegate missing to returns nil if allow nil and nil target", () => {
+    expect(
+      (delegateMissingTo(new DecoratedReserved(null), "case", { allowNil: true }) as any).name,
+    ).toBeUndefined();
+  });
+
+  it("delegate missing with allow nil when called on self", () => {
+    class DecoratedMissingAllowNil {
+      constructor(public case_: any) {}
+
+      get case() {
+        return this.case_;
+      }
+
+      callName() {
+        return (this as any).name;
+      }
+    }
+    expect(
+      (
+        delegateMissingTo(new DecoratedMissingAllowNil(null), "case", {
+          allowNil: true,
+        }) as any
+      ).callName(),
+    ).toBeUndefined();
+  });
+
+  it("delegate missing to affects respond to", () => {
+    const decorated = () => delegateMissingTo(new DecoratedTester(david), "client");
+    assertRespondTo(decorated(), "name");
+    assertNotRespondTo(decorated(), "privateName");
+    assertNotRespondTo(decorated(), "myFakeMethod");
+
+    assert("name" in decorated());
+    assertNot("privateName" in decorated());
+    assertNot("myFakeMethod" in decorated());
+  });
+
+  it("delegate missing to respects superclass missing", () => {
+    expect((delegateMissingTo(new DecoratedTester(david), "client") as any).extraMissing).toEqual(
+      42,
+    );
+
+    assertRespondTo(delegateMissingTo(new DecoratedTester(david), "client"), "extraMissing");
+  });
+
+  it("delegate missing to does not interfere with marshallization", () => {
+    class Maze {
+      cavern: any;
+      passages: any;
+    }
+    class Cavern {
+      constructor(public maze: Maze) {}
+
+      get target() {
+        return (this.maze.passages = "twisty");
+      }
+    }
+    const maze = new Maze();
+    maze.cavern = delegateMissingTo(new Cavern(new Maze()), "target");
+
+    const array = [maze, null];
+    const serializedArray = JSON.stringify(array);
+    const deserializedArray = JSON.parse(serializedArray);
+
+    expect(deserializedArray[1]).toBeNull();
+  });
+
+  it("delegate with case", () => {
+    const event = new Event(new Tester()) as Event & Record<string, any>;
+    expect(event.foo()).toEqual(1);
+  });
+
+  it("private delegate", () => {
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", "city", { to: "@place" });
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assert("street" in place);
+    assert("city" in place);
+  });
+
+  it("private delegate prefixed", () => {
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", "city", { to: "@place", prefix: "the" });
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assertNotRespondTo(place, "street");
+    assertNotRespondTo(place, "city");
+
+    assert("the_street" in place);
+    assert("the_city" in place);
+  });
+
+  it("private delegate with private option", () => {
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", "city", { to: "@place" });
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assert("street" in place);
+    assert("city" in place);
+  });
+
+  it("some public some private delegate with private option", () => {
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", { to: "@place" });
+    delegate.call(Location.prototype, "city", { to: "@place" });
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assertRespondTo(place, "street");
+    assert("city" in place);
+  });
+
+  it("private delegate prefixed with private option", () => {
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", "city", { to: "@place", prefix: "the" });
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assert("the_street" in place);
+    assert("the_city" in place);
+  });
+
+  it("delegate with private option returns names of delegate methods", () => {
+    class Location {}
+
+    expect(delegate.call(Location.prototype, "street", "city", { to: "@place" })).toEqual([
+      "street",
+      "city",
+    ]);
+
+    expect(
+      delegate.call(Location.prototype, "street", "city", { to: "@place", prefix: "the" }),
+    ).toEqual(["the_street", "the_city"]);
   });
 
   it("module nesting is empty", () => {
@@ -132,551 +612,52 @@ describe("ModuleTest", () => {
     }
   });
 
-  it("delegation to methods", () => {
-    class Place {
-      street = "Paulina";
-      city = "Chicago";
-    }
-    class Person {
-      constructor(public place: Place) {}
-    }
-    delegate.call(Person.prototype, "street", "city", { to: "place" });
-    const p = new Person(new Place()) as Person & { street(): string; city(): string };
-    expect(p.street()).toBe("Paulina");
-    expect(p.city()).toBe("Chicago");
-  });
-
-  it("delegation to assignment method", () => {
-    class Box {
-      private _color = "red";
-      get color() {
-        return this._color;
-      }
-      set color(v) {
-        this._color = v;
-      }
-    }
-    class Container {
-      box = new Box();
-    }
-    delegate.call(Container.prototype, "color", { to: "box" });
-    const c = new Container() as Container & { color(): string };
-    expect(c.color()).toBe("red");
-  });
-
-  it("delegation down hierarchy", () => {
-    class GrandParent {
-      greet() {
-        return "hello";
-      }
-    }
-    class Parent {
-      gp = new GrandParent();
-    }
-    class Child {
-      p = new Parent();
-    }
-    delegate.call(Parent.prototype, "greet", { to: "gp" });
-    const parent = new Parent() as Parent & { greet: () => string };
-    expect(parent.greet()).toBe("hello");
-  });
-
-  it("delegation to instance variable", () => {
-    class Owner {
-      name = "Owner";
-    }
-    class Thing {
-      owner = new Owner();
-    }
-    delegate.call(Thing.prototype, "name", { to: "owner" });
-    const t = new Thing() as Thing & { name(): string };
-    expect(t.name()).toBe("Owner");
-  });
-
-  it("delegation to class method", () => {
-    class Helper {
-      static version() {
-        return "1.0";
-      }
-    }
-    class Service {
-      helper = Helper;
-    }
-    const obj = new Service() as Service & { version?: () => string };
-    expect(typeof delegate).toBe("function");
-  });
-
-  it("missing delegation target", () => {
-    class Someone {
-      place: null | { street: string } = null;
-    }
-    delegate.call(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street(): string };
-    expect(() => s.street()).toThrow();
-  });
-
-  it("delegation target when prefix is true", () => {
-    class Client {
-      name = "David";
-    }
-    class Invoice {
-      client = new Client();
-    }
-    delegate.call(Invoice.prototype, "name", { to: "client", prefix: true });
-    const inv = new Invoice() as Invoice & { client_name(): string };
-    expect(inv.client_name()).toBe("David");
-  });
-
-  it("delegation prefix", () => {
-    class Client {
-      name = "David";
-    }
-    class Invoice {
-      client = new Client();
-    }
-    delegate.call(Invoice.prototype, "name", { to: "client", prefix: true });
-    const inv = new Invoice() as Invoice & { client_name(): string };
-    expect(inv.client_name()).toBe("David");
-  });
-
-  it("delegation custom prefix", () => {
-    class Client {
-      name = "David";
-    }
-    class Invoice {
-      client = new Client();
-    }
-    delegate.call(Invoice.prototype, "name", { to: "client", prefix: "customer" });
-    const inv = new Invoice() as Invoice & { customer_name(): string };
-    expect(inv.customer_name()).toBe("David");
-  });
-
-  it("delegation prefix with nil or false", () => {
-    class Place {
-      street = "Paulina";
-    }
-    class Person {
-      place = new Place();
-    }
-    delegate.call(Person.prototype, "street", { to: "place", prefix: false });
-    const p = new Person() as Person & { street(): string };
-    expect(p.street()).toBe("Paulina");
-  });
-
-  it("delegation prefix with instance variable", () => {
-    class Client {
-      name = "David";
-    }
-    class Invoice {
-      client = new Client();
-    }
-    delegate.call(Invoice.prototype, "name", { to: "client", prefix: "client" });
-    const inv = new Invoice() as Invoice & { client_name(): string };
-    expect(inv.client_name()).toBe("David");
-  });
-
-  it("delegation with implicit block", () => {
-    class Greeter {
-      greet(name: string) {
-        return `Hello ${name}`;
-      }
-    }
-    class Proxy {
-      greeter = new Greeter();
-    }
-    delegate.call(Proxy.prototype, "greet", { to: "greeter" });
-    const p = new Proxy() as Proxy & { greet: (name: string) => string };
-    expect(p.greet("World")).toBe("Hello World");
-  });
-
-  it("delegation with allow nil", () => {
-    class Project {
-      person: null | { name: string } = null;
-    }
-    delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
-    const proj = new Project() as Project & { name(): string | undefined };
-    expect(proj.name()).toBeUndefined();
-  });
-
-  it("delegation with allow nil and nil value", () => {
-    class Project {
-      person: null | { name: string } = null;
-    }
-    delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
-    const proj = new Project() as Project & { name(): string | undefined };
-    expect(proj.name()).toBeUndefined();
-  });
-
-  it("delegation with allow nil and nil value and prefix", () => {
-    class Project {
-      person: null | { name: string } = null;
-    }
-    delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
-    const proj = new Project() as Project & { person_name(): string | undefined };
-    expect(proj.person_name()).toBeUndefined();
-  });
-
-  it("delegation without allow nil and nil value", () => {
-    class Someone {
-      place: null | { street: string } = null;
-    }
-    delegate.call(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street(): string };
-    expect(() => s.street()).toThrow();
-  });
-
-  it("delegation to method that exists on nil", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate.call(Container.prototype, "toString", { to: "val" });
-    const c = new Container() as Container & { toString: () => string };
-    expect(() => c.toString()).toThrow();
-  });
-
-  it("delegation does not raise error when removing singleton instance methods", () => {
-    class Foo {}
-    expect(() => {
-      delegate.call(Foo.prototype, "bar", { to: "qux", allowNil: true });
-    }).not.toThrow();
-  });
-
-  it("delegation line number", () => {
-    class Foo {}
-    expect(() => delegate.call(Foo.prototype, "bar", { to: "baz", allowNil: true })).not.toThrow();
-  });
-
-  it("delegation exception backtrace", () => {
-    class Someone {
-      place: null = null;
-    }
-    delegate.call(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street(): string };
-    let err: Error | null = null;
-    try {
-      s.street();
-    } catch (e) {
-      err = e as Error;
-    }
-    expect(err).not.toBeNull();
-    expect(err!.message).toContain("nil");
-  });
-
-  it("delegation exception backtrace with allow nil", () => {
-    class Someone {
-      place: null = null;
-    }
-    delegate.call(Someone.prototype, "street", { to: "place", allowNil: true });
-    const s = new Someone() as Someone & { street(): string | undefined };
-    expect(() => s.street()).not.toThrow();
-  });
-
-  it("delegation invokes the target exactly once", () => {
-    let calls = 0;
-    class Counter {
-      get value() {
-        calls++;
-        return "v";
-      }
-    }
-    class Wrapper {
-      counter = new Counter();
-    }
-    delegate.call(Wrapper.prototype, "value", { to: "counter" });
-    const w = new Wrapper() as Wrapper & { value(): string };
-    w.value();
-    expect(calls).toBe(1);
-  });
-
-  it("delegation doesnt mask nested no method error on nil receiver", () => {
-    class Product {
-      constructor(public name: string) {}
-      get manufacturer(): { name: string } {
-        return (null as unknown as { unknownMethod(): { name: string } }).unknownMethod();
-      }
-      get type(): { name: string } {
-        return (null as unknown as { typeName(): { name: string } }).typeName();
-      }
-    }
-    delegate.call(Product.prototype, "name", { to: "manufacturer", prefix: true });
-    delegate.call(Product.prototype, "name", { to: "type", prefix: true });
-    const product = new Product("Widget") as Product & {
-      manufacturer_name(): string;
-      type_name(): string;
-    };
-    expect(() => product.manufacturer_name()).toThrow(TypeError);
-    expect(() => product.type_name()).toThrow(TypeError);
-  });
-
-  it("delegation with method arguments", () => {
-    class Greeter {
-      greet(name: string, greeting = "Hello") {
-        return `${greeting} ${name}`;
-      }
-    }
-    class Proxy {
-      greeter = new Greeter();
-    }
-    delegate.call(Proxy.prototype, "greet", { to: "greeter" });
-    const p = new Proxy() as Proxy & { greet: (name: string, g?: string) => string };
-    expect(p.greet("World", "Hi")).toBe("Hi World");
-  });
-
-  it("delegate missing to with method", () => {
-    class Foo {
-      bar() {
-        return "bar";
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    delegate.call(Proxy.prototype, "bar", { to: "foo" });
-    const p = new Proxy() as Proxy & { bar: () => string };
-    expect(p.bar()).toBe("bar");
-  });
-
-  it("delegate missing to calling on self", () => {
-    class Foo {
-      toString() {
-        return "Foo";
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    delegate.call(Proxy.prototype, "toString", { to: "foo" });
-    const p = new Proxy() as Proxy & { toString: () => string };
-    expect(p.toString()).toBe("Foo");
-  });
-
-  it("delegate missing to with reserved methods", () => {
-    class DecoratedReserved {
-      case: { name: string };
-
-      constructor(kase: { name: string }) {
-        this.case = kase;
-      }
-    }
-    const decorated = delegateMissingTo(
-      new DecoratedReserved({ name: "David" }),
-      "case",
-    ) as DecoratedReserved & { name: string };
-    expect(decorated.name).toBe("David");
-  });
-
-  it("delegate missing to with keyword methods", () => {
-    class Source {
-      for(x: number) {
-        return x * 2;
-      }
-    }
-    class Proxy {
-      source = new Source();
-    }
-    delegate.call(Proxy.prototype, "for", { to: "source" });
-    const p = new Proxy() as Proxy & { for: (x: number) => number };
-    expect(p.for(5)).toBe(10);
-  });
-
-  it("delegate missing to does not delegate to private methods", () => {
-    expect(typeof delegate).toBe("function");
-  });
-
-  it("delegate missing to raises delegation error if target nil", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate.call(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something(): unknown };
-    expect(() => c.something()).toThrow();
-  });
-
-  it("delegate missing to returns nil if allow nil and nil target", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate.call(Container.prototype, "something", { to: "val", allowNil: true });
-    const c = new Container() as Container & { something(): unknown };
-    expect(c.something()).toBeUndefined();
-  });
-
-  it("delegate missing with allow nil when called on self", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate.call(Container.prototype, "something", { to: "val", allowNil: true });
-    const c = new Container() as Container & { something(): unknown };
-    expect(c.something()).toBeUndefined();
-  });
-
-  it("delegate missing to affects respond to", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    delegate.call(Proxy.prototype, "bar", { to: "foo" });
-    const p = new Proxy() as Proxy & { bar: () => number };
-    expect(typeof (p as unknown as Record<string, unknown>)["bar"]).toBe("function");
-  });
-
-  it("delegate missing to respects superclass missing", () => {
-    class Base {
-      greet() {
-        return "base";
-      }
-    }
-    class Child extends Base {}
-    expect(new Child().greet()).toBe("base");
-  });
-
-  it("delegate missing to does not interfere with marshallization", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    delegate.call(Proxy.prototype, "bar", { to: "foo" });
-    const p = new Proxy() as Proxy & { bar: () => number };
-    expect(JSON.stringify(p)).toBeDefined();
-  });
-
-  it("delegate with case", () => {
-    class Reporter {
-      report() {
-        return "report";
-      }
-    }
-    class Handler {
-      reporter = new Reporter();
-    }
-    delegate.call(Handler.prototype, "report", { to: "reporter" });
-    const h = new Handler() as Handler & { report: () => string };
-    expect(h.report()).toBe("report");
-  });
-
-  it("private delegate", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    const names = delegate.call(Proxy.prototype, "bar", { to: "foo" });
-    expect(names).toEqual(["bar"]);
-  });
-
-  it("private delegate prefixed", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    const names = delegate.call(Proxy.prototype, "bar", { to: "foo", prefix: true });
-    expect(names).toEqual(["foo_bar"]);
-  });
-
-  it("private delegate with private option", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    const names = delegate.call(Proxy.prototype, "bar", { to: "foo" });
-    expect(names).toEqual(["bar"]);
-  });
-
-  it("some public some private delegate with private option", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-      baz() {
-        return 2;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    const names = delegate.call(Proxy.prototype, "bar", "baz", { to: "foo" });
-    expect(names).toEqual(["bar", "baz"]);
-  });
-
-  it("private delegate prefixed with private option", () => {
-    class Foo {
-      bar() {
-        return 1;
-      }
-    }
-    class Proxy {
-      foo = new Foo();
-    }
-    const names = delegate.call(Proxy.prototype, "bar", { to: "foo", prefix: true });
-    expect(names).toEqual(["foo_bar"]);
-  });
-
-  it("delegate with private option returns names of delegate methods", () => {
-    class Foo {}
-    const names = delegate.call(Foo.prototype, "bar", "baz", { to: "qux" });
-    expect(names).toEqual(["bar", "baz"]);
-  });
-
-  it("delegation unreacheable module", () => {
+  it("delegation unreacheable module", async () => {
     const anonymousClass = [class {}][0];
-
-    expect(() => {
+    let error = await assertRaises([ArgumentError], {}, () => {
       class C {}
       delegate.call(C.prototype, "something", { to: anonymousClass });
-    }).toThrow(/Can't delegate to anonymous class or module/);
+    });
+    expect(error.message).toContain("Can't delegate to anonymous class or module");
 
     Object.defineProperty(anonymousClass, "name", { value: "FakeName" });
-
-    expect(() => {
+    error = await assertRaises([ArgumentError], {}, () => {
       class C {}
       delegate.call(C.prototype, "something", { to: anonymousClass });
-    }).toThrow(/Can't delegate to detached class or module: FakeName/);
+    });
+    expect(error.message).toContain("Can't delegate to detached class or module: FakeName");
   });
 
-  it("delegation arity to module", () => {
-    class Module {
-      fn(a: string, b: number) {
-        return `${a}:${b}`;
-      }
-    }
-    class Proxy {
-      mod = new Module();
-    }
-    delegate.call(Proxy.prototype, "fn", { to: "mod" });
-    const p = new Proxy() as Proxy & { fn: (a: string, b: number) => string };
-    expect(p.fn("x", 1)).toBe("x:1");
+  it("delegation arity to module", async () => {
+    class C {}
+    delegate.call(C.prototype, "zero", "one", "two", { to: ArityTester });
+    expect((C.prototype as any).zero.length).toEqual(0);
+    expect((C.prototype as any).one.length).toEqual(1);
+    expect((C.prototype as any).two.length).toEqual(2);
+
+    class E {}
+    delegate.call(E.prototype, "zero", { to: ArityTesterModule });
+
+    expect((E.prototype as any).zero.length).toEqual(0);
+    await assertNothingRaised(() => (new E() as any).zero());
   });
 
-  it("delegation arity to self class", () => {
-    class Helper {
-      compute(x: number) {
-        return x * x;
-      }
-    }
-    class Service {
-      helper = new Helper();
-    }
-    delegate.call(Service.prototype, "compute", { to: "helper" });
-    const s = new Service() as Service & { compute: (x: number) => number };
-    expect(s.compute(4)).toBe(16);
+  it("delegation arity to self class", async () => {
+    class D extends ArityTester {}
+    delegate.call(D.prototype, "zero", "one", "two", { to: "class" });
+    Object.defineProperty(D.prototype, "class", {
+      get(this: object) {
+        return this.constructor;
+      },
+    });
+
+    expect((D.prototype as any).zero.length).toEqual(0);
+    expect((D.prototype as any).one.length).toEqual(1);
+    expect((D.prototype as any).two.length).toEqual(2);
+    await assertNothingRaised(() => {
+      (new D() as any).zero();
+      (new D() as any).one(1);
+      (new D() as any).two(1, 2);
+    });
   });
 });

@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { atomicWrite, probeStatIn } from "./file/atomic.js";
+import { assert, assertNot } from "../testing/assertions.js";
 
 describe("AtomicWriteTest", () => {
   let dir: string;
@@ -27,46 +36,50 @@ describe("AtomicWriteTest", () => {
     const contents = "Atomic Text";
     atomicWrite(fileName(), dir, (file) => {
       file.write(contents);
-      expect(existsSync(fileName())).toBe(false);
+      assertNot(existsSync(fileName()));
     });
-    expect(existsSync(fileName())).toBe(true);
-    expect(readFileSync(fileName(), "utf-8")).toBe(contents);
+    assert(existsSync(fileName()));
+    expect(readFileSync(fileName(), "utf-8")).toEqual(contents);
   });
 
   it("atomic write doesnt write when block raises", () => {
-    expect(() =>
+    try {
       atomicWrite(fileName(), undefined, (file) => {
         file.write("testing");
         throw new Error("something bad");
-      }),
-    ).toThrow("something bad");
-    expect(existsSync(fileName())).toBe(false);
+      });
+    } catch {
+      assertNot(existsSync(fileName()));
+    }
   });
 
   it("atomic write preserves file permissions", () => {
     const contents = "Atomic Text";
-    atomicWrite(fileName(), dir, (file) => file.write(contents));
+    writeFileSync(fileName(), contents);
     chmodSync(fileName(), 0o755);
-    expect(fileMode() & 0o777).toBe(0o755);
+    assert(existsSync(fileName()));
+    assert(existsSync(fileName()));
+    expect(fileMode()).toEqual(0o100755);
+    expect(readFileSync(fileName(), "utf-8")).toEqual(contents);
 
     atomicWrite(fileName(), dir, (file) => {
       file.write(contents);
-      expect(existsSync(fileName())).toBe(true);
+      assert(existsSync(fileName()));
     });
-    expect(existsSync(fileName())).toBe(true);
-    expect(fileMode() & 0o777).toBe(0o755);
-    expect(readFileSync(fileName(), "utf-8")).toBe(contents);
+    assert(existsSync(fileName()));
+    expect(fileMode()).toEqual(0o100755);
+    expect(readFileSync(fileName(), "utf-8")).toEqual(contents);
   });
 
   it("atomic write preserves default file permissions", () => {
     const contents = "Atomic Text";
     atomicWrite(fileName(), dir, (file) => {
       file.write(contents);
-      expect(existsSync(fileName())).toBe(false);
+      assertNot(existsSync(fileName()));
     });
-    expect(existsSync(fileName())).toBe(true);
-    expect(probeStatIn(dir)!.mode).toBe(fileMode());
-    expect(readFileSync(fileName(), "utf-8")).toBe(contents);
+    assert(existsSync(fileName()));
+    expect(fileMode()).toEqual(probeStatIn(dir)!.mode);
+    expect(readFileSync(fileName(), "utf-8")).toEqual(contents);
   });
 
   it("atomic write preserves file permissions same directory", () => {

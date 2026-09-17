@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { toDate, toDatetime, toTime } from "./string/conversions.js";
 import { ArgumentError, DateTime, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
+import { at, from, to, first, last, indent, indentBang, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
@@ -12,14 +12,42 @@ import {
   camelize as stringCamelize,
   pluralize as stringPluralize,
 } from "../core-ext/string/inflections.js";
-import { assert, assertNot, assertRaise } from "../testing/assertions.js";
-import { htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
+import {
+  assert,
+  assertNot,
+  assertNotPredicate,
+  assertNotSame,
+  assertPredicate,
+  assertRaise,
+  assertRaises,
+} from "../testing/assertions.js";
+import { inquiry } from "../string-inquirer.js";
+import {
+  CamelToUnderscore,
+  ClassNameToForeignKeyWithUnderscore,
+  ClassNameToForeignKeyWithoutUnderscore,
+  ClassNameToTableName,
+  MixtureToTitleCase,
+  MixtureToTitleCaseWithKeepIdSuffix,
+  SingularToPlural,
+  StringToParameterizePreserveCaseWithNoSeparator,
+  StringToParameterizePreserveCaseWithUnderscore,
+  StringToParameterizeWithNoSeparator,
+  StringToParameterizeWithUnderscore,
+  StringToParameterized,
+  StringToParameterizedPreserveCase,
+  UnderscoreToHuman,
+  UnderscoreToHumanWithKeepIdSuffix,
+  UnderscoreToHumanWithoutCapitalize,
+  UnderscoreToLowerCamel,
+  UnderscoresToDashes,
+} from "../inflector-test-cases.js";
+import { SafeBuffer, htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
+import { NoMethodError, Range } from "@blazetrails/ruby-compat";
 import { endsWith, startsWith } from "../core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
-  pluralize,
   singularize,
-  camelize,
   underscore,
   titleize,
   tableize,
@@ -42,70 +70,130 @@ import {
   downcaseFirst,
   upcaseFirst,
 } from "../index.js";
-import { StringInquirer } from "../string-inquirer.js";
 import { I18n } from "../i18n.js";
+import { toTimePreservesTimezone } from "../active-support.js";
+import { actsLikeString } from "./string/behavior.js";
 
 describe("StringAccessTest", () => {
   it("#at with Integer, returns a substring of one character at that position", () => {
-    expect(at("hello", 0)).toBe("h");
-    expect(at("hello", -1)).toBe("o");
-    expect(at("hello", 10)).toBeUndefined();
+    expect(at("hello", 0)).toEqual("h");
   });
+
   it("#at with Range, returns a substring containing characters at offsets", () => {
-    expect(at("hello", [1, 3])).toBe("ell");
-    expect(at("hello", [0, -1])).toBe("hello");
+    expect(at("hello", [-2, -1])).toEqual("lo");
   });
+
   it("#at with Regex, returns the matching portion of the string", () => {
-    expect(at("hello world", /\w+/)).toBe("hello");
-    expect(at("hello", /xyz/)).toBeUndefined();
+    expect(at("hello", /lo/)).toEqual("lo");
+    expect(at("hello", /nonexisting/)).toBeUndefined();
   });
+
   it("#from with positive Integer, returns substring from the given position to the end", () => {
-    expect(from("hello", 2)).toBe("llo");
+    expect(from("hello", 2)).toEqual("llo");
   });
+
   it("#from with negative Integer, position is counted from the end", () => {
-    expect(from("hello", -2)).toBe("lo");
+    expect(from("hello", -2)).toEqual("lo");
   });
+
   it("#to with positive Integer, substring from the beginning to the given position", () => {
-    expect(to("hello", 2)).toBe("hel");
+    expect(to("hello", 2)).toEqual("hel");
   });
+
   it("#to with negative Integer, position is counted from the end", () => {
-    expect(to("hello", -2)).toBe("hell");
+    expect(to("hello", -2)).toEqual("hell");
+    expect(to("hello", -5)).toEqual("h");
+    expect(to("hello", -7)).toEqual("");
   });
+
   it("#from and #to can be combined", () => {
-    expect(to(from("hello", 1), 3)).toBe("ello");
+    expect(to(from("hello", 0), -1)).toEqual("hello");
+    expect(to(from("hello", 1), -2)).toEqual("ell");
   });
+
   it("#first returns the first character", () => {
-    expect(first("hello")).toBe("h");
+    expect(first("hello")).toEqual("h");
+    expect(first("x")).toEqual("x");
   });
+
   it("#first with Integer, returns a substring from the beginning to position", () => {
-    expect(first("hello", 3)).toBe("hel");
+    expect(first("hello", 2)).toEqual("he");
+    expect(first("hello", 0)).toEqual("");
+    expect(first("hello", 10)).toEqual("hello");
+    expect(first("x", 4)).toEqual("x");
   });
+
   it("#first with Integer >= string length still returns a new string", () => {
-    expect(first("hello", 100)).toBe("hello");
+    const string = "hello";
+    const differentString = first(string, 5);
+    assertNotSame(Object(differentString), string);
   });
+
   it("#first with Integer returns a non-frozen string", () => {
-    expect(typeof first("hello", 2)).toBe("string");
+    const string = "he";
+    for (let limit = 0; limit <= string.length + 1; limit++) {
+      assertNot(Object.isFrozen(Object(first(string, limit))));
+    }
   });
+
   it("#first with negative Integer raises ArgumentError", () => {
     expect(() => first("hello", -1)).toThrow();
   });
+
   it("#last returns the last character", () => {
-    expect(last("hello")).toBe("o");
+    expect(last("hello")).toEqual("o");
+    expect(last("x")).toEqual("x");
   });
+
   it("#last with Integer, returns a substring from the end to position", () => {
-    expect(last("hello", 3)).toBe("llo");
+    expect(last("hello", 3)).toEqual("llo");
+    expect(last("hello", 10)).toEqual("hello");
+    expect(last("hello", 0)).toEqual("");
+    expect(last("x", 4)).toEqual("x");
   });
+
   it("#last with Integer >= string length still returns a new string", () => {
-    expect(last("hello", 100)).toBe("hello");
+    const string = "hello";
+    const differentString = last(string, 5);
+    assertNotSame(Object(differentString), string);
   });
+
   it("#last with Integer returns a non-frozen string", () => {
-    expect(typeof last("hello", 2)).toBe("string");
+    const string = "he";
+    for (let limit = 0; limit <= string.length + 1; limit++) {
+      assertNot(Object.isFrozen(Object(last(string, limit))));
+    }
   });
+
   it("#last with negative Integer raises ArgumentError", () => {
     expect(() => last("hello", -1)).toThrow();
   });
+
   it("access returns a real string", () => {
-    expect(typeof at("hello", 0)).toBe("string");
+    let hash: Record<string, boolean> = {};
+    hash["h"] = true;
+    hash[at("hello123", 0)!] = true;
+    expect(Object.keys(hash)).toEqual(["h"]);
+
+    hash = {};
+    hash["llo"] = true;
+    hash[from("hello", 2)] = true;
+    expect(Object.keys(hash)).toEqual(["llo"]);
+
+    hash = {};
+    hash["hel"] = true;
+    hash[to("hello", 2)] = true;
+    expect(Object.keys(hash)).toEqual(["hel"]);
+
+    hash = {};
+    hash["hello"] = true;
+    hash[last("123hello", 5)] = true;
+    expect(Object.keys(hash)).toEqual(["hello"]);
+
+    hash = {};
+    hash["hello"] = true;
+    hash[first("hello123", 5)] = true;
+    expect(Object.keys(hash)).toEqual(["hello"]);
   });
 });
 
@@ -158,17 +246,29 @@ describe("StringConversionsTest", () => {
     });
   });
 
-  it("timestamp string to time", () => {
-    expect(() => toTime("1604326192")).toThrow(ArgumentError);
-    expect(() => toTime("1604326192")).toThrow("argument out of range");
+  it("timestamp string to time", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () => toTime("1604326192"));
+
+    expect(exception.message).toEqual("argument out of range");
   });
 
   it("string to time utc offset", () => {
     withEnvTz("US/Eastern", () => {
-      expect(toTime("2005-02-27 23:50", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
-      expect(toTime("2005-02-27 23:50")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
-      expect(toTime("2005-02-27 22:50 -0100", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
-      expect(toTime("2005-02-27 22:50 -0100")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
+      const utcOffset = (time: Temporal.ZonedDateTime | Time | undefined) =>
+        time!.offsetNanoseconds / 1_000_000_000;
+      /* eslint-disable vitest/no-conditional-expect */
+      if (toTimePreservesTimezone()) {
+        expect(utcOffset(toTime("2005-02-27 23:50", "utc"))).toEqual(0);
+        expect(utcOffset(toTime("2005-02-27 23:50"))).toEqual(-18000);
+        expect(utcOffset(toTime("2005-02-27 22:50 -0100", "utc"))).toEqual(0);
+        expect(utcOffset(toTime("2005-02-27 22:50 -0100"))).toEqual(-3600);
+      } else {
+        expect(utcOffset(toTime("2005-02-27 23:50", "utc"))).toEqual(0);
+        expect(utcOffset(toTime("2005-02-27 23:50"))).toEqual(-18000);
+        expect(utcOffset(toTime("2005-02-27 22:50 -0100", "utc"))).toEqual(0);
+        expect(utcOffset(toTime("2005-02-27 22:50 -0100"))).toEqual(-18000);
+      }
+      /* eslint-enable vitest/no-conditional-expect */
     });
   });
 
@@ -390,25 +490,48 @@ describe("StringConversionsTest", () => {
 
 describe("StringIndentTest", () => {
   it("does not indent strings that only contain newlines (edge cases)", () => {
-    expect(indent("\n\n", 2)).toBe("\n\n");
+    for (const string of ["", "\n", "\n".repeat(7)]) {
+      const str = string;
+      expect(indentBang(str, 8)).toBeNull();
+      expect(indent(str, 8)).toEqual(str);
+      expect(indent(str, 1, "\t")).toEqual(str);
+    }
   });
+
   it("by default, indents with spaces if the existing indentation uses them", () => {
-    expect(indent("  foo\n  bar", 2)).toBe("    foo\n    bar");
+    expect(indent("foo\n  bar", 4)).toEqual("    foo\n      bar");
   });
+
   it("by default, indents with tabs if the existing indentation uses them", () => {
-    expect(indent("\tfoo", 1, "\t")).toBe("\t\tfoo");
+    expect(indent("foo\n\t\bar", 1)).toEqual("\tfoo\n\t\t\bar");
   });
+
   it("by default, indents with spaces as a fallback if there is no indentation", () => {
-    expect(indent("foo", 2)).toBe("  foo");
+    expect(indent("foo\nbar\nbaz", 3)).toEqual("   foo\n   bar\n   baz");
   });
+
   it("uses the indent char if passed", () => {
-    expect(indent("foo", 2, "-")).toBe("--foo");
+    expect(indent("  def some_method(x, y)\n    some_code\n  end\n", 4, ".")).toEqual(
+      "....  def some_method(x, y)\n....    some_code\n....  end\n",
+    );
+
+    expect(
+      indent(
+        "&nbsp;&nbsp;def some_method(x, y)\n&nbsp;&nbsp;&nbsp;&nbsp;some_code\n&nbsp;&nbsp;end\n",
+        2,
+        "&nbsp;",
+      ),
+    ).toEqual(
+      "&nbsp;&nbsp;&nbsp;&nbsp;def some_method(x, y)\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;some_code\n&nbsp;&nbsp;&nbsp;&nbsp;end\n",
+    );
   });
+
   it("does not indent blank lines by default", () => {
-    expect(indent("foo\n\nbar", 2)).toBe("  foo\n\n  bar");
+    expect(indent("foo\n\nbar", 1)).toEqual(" foo\n\n bar");
   });
+
   it("indents blank lines if told so", () => {
-    expect(indent("foo\n\nbar", 2, " ", true)).toBe("  foo\n  \n  bar");
+    expect(indent("foo\n\nbar", 1, null, true)).toEqual(" foo\n \n bar");
   });
 });
 
@@ -432,11 +555,7 @@ describe("CoreExtStringMultibyteTest", () => {
 
 describe("StringBehaviorTest", () => {
   it("acts like string", () => {
-    const s = htmlSafe("hello");
-    expect(s.toString()).toBe("hello");
-    expect(String(s)).toBe("hello");
-    expect(s.length).toBe(5);
-    expect(isHtmlSafe(s)).toBe(true);
+    assertPredicate("Bambi", actsLikeString);
   });
 });
 
@@ -458,103 +577,104 @@ describe("StringInflectionsTest", () => {
   });
 
   it("strip heredoc on an empty string", () => {
-    expect(stripHeredoc("")).toBe("");
+    expect(stripHeredoc("")).toEqual("");
   });
 
   it("strip heredoc on a frozen string", () => {
-    const str = "  hello\n  world";
-    const result = stripHeredoc(str);
-    expect(result).toBe("hello\nworld");
-    expect(str).toBe("  hello\n  world");
+    assertPredicate(stripHeredoc(""), Object.isFrozen);
   });
 
   it("strip heredoc on a string with no lines", () => {
-    expect(stripHeredoc("x")).toBe("x");
-    expect(stripHeredoc("    x")).toBe("x");
+    expect(stripHeredoc("x")).toEqual("x");
+    expect(stripHeredoc("    x")).toEqual("x");
   });
 
   it("strip heredoc on a heredoc with no margin", () => {
-    expect(stripHeredoc("foo\nbar")).toBe("foo\nbar");
-    expect(stripHeredoc("foo\n  bar")).toBe("foo\n  bar");
+    expect(stripHeredoc("foo\nbar")).toEqual("foo\nbar");
+    expect(stripHeredoc("foo\n  bar")).toEqual("foo\n  bar");
   });
 
   it("strip heredoc on a regular indented heredoc", () => {
-    const input = "      foo\n        bar\n      baz\n";
-    expect(stripHeredoc(input)).toBe("foo\n  bar\nbaz\n");
+    expect(stripHeredoc("      foo\n        bar\n      baz\n")).toEqual("foo\n  bar\nbaz\n");
   });
 
   it("strip heredoc on a regular indented heredoc with blank lines", () => {
-    const input = "      foo\n        bar\n\n      baz\n";
-    expect(stripHeredoc(input)).toBe("foo\n  bar\n\nbaz\n");
+    expect(stripHeredoc("      foo\n        bar\n\n      baz\n")).toEqual("foo\n  bar\n\nbaz\n");
   });
 
   it("pluralize", () => {
-    expect(pluralize("search")).toBe("searches");
-    expect(pluralize("switch")).toBe("switches");
-    expect(pluralize("fix")).toBe("fixes");
-    expect(pluralize("category")).toBe("categories");
-    expect(pluralize("plurals")).toBe("plurals");
+    for (const [singular, plural] of Object.entries(SingularToPlural)) {
+      expect(stringPluralize(singular)).toEqual(plural);
+    }
+
+    expect(stringPluralize("plurals")).toEqual("plurals");
+
+    expect(stringPluralize("blargle", 0)).toEqual("blargles");
+    expect(stringPluralize("blargle", 1)).toEqual("blargle");
+    expect(stringPluralize("blargle", 2)).toEqual("blargles");
   });
 
   it("pluralize with count = 1 still returns new string", () => {
-    expect(stringPluralize("count", 1)).toBe("count");
-    expect(pluralize("count")).toBe("counts");
+    const name = "Kuldeep";
+    assertNotSame(Object(stringPluralize(name, 1)), name);
   });
 
   it("singularize", () => {
-    expect(singularize("searches")).toBe("search");
-    expect(singularize("switches")).toBe("switch");
-    expect(singularize("fixes")).toBe("fix");
-    expect(singularize("categories")).toBe("category");
+    for (const [singular, plural] of Object.entries(SingularToPlural)) {
+      expect(singularize(plural)).toEqual(singular);
+    }
   });
 
   it("titleize", () => {
-    expect(titleize("active_record")).toBe("Active Record");
-    expect(titleize("ActiveRecord")).toBe("Active Record");
-    expect(titleize("action web service")).toBe("Action Web Service");
+    for (const [before, titleized] of Object.entries(MixtureToTitleCase)) {
+      expect(titleize(before)).toEqual(titleized);
+    }
   });
 
   it("titleize with keep id suffix", () => {
-    expect(titleize("artist_id", { keepIdSuffix: true })).toBe("Artist Id");
+    for (const [before, titleized] of Object.entries(MixtureToTitleCaseWithKeepIdSuffix)) {
+      expect(titleize(before, { keepIdSuffix: true })).toEqual(titleized);
+    }
   });
 
   it("downcase first", () => {
-    expect(downcaseFirst("Try again")).toBe("try again");
+    expect(downcaseFirst("Try again")).toEqual("try again");
   });
 
   it("downcase first with one char", () => {
-    expect(downcaseFirst("T")).toBe("t");
+    expect(downcaseFirst("T")).toEqual("t");
   });
 
   it("downcase first with empty string", () => {
-    expect(downcaseFirst("")).toBe("");
+    expect(downcaseFirst("")).toEqual("");
+    assertNotPredicate(Object(downcaseFirst("")), Object.isFrozen);
   });
 
   it("upcase first", () => {
-    expect(upcaseFirst("what a Lovely Day")).toBe("What a Lovely Day");
+    expect(upcaseFirst("what a Lovely Day")).toEqual("What a Lovely Day");
   });
 
   it("upcase first with one char", () => {
-    expect(upcaseFirst("w")).toBe("W");
+    expect(upcaseFirst("w")).toEqual("W");
   });
 
   it("upcase first with empty string", () => {
-    expect(upcaseFirst("")).toBe("");
+    expect(upcaseFirst("")).toEqual("");
+    assertNotPredicate(Object(upcaseFirst("")), Object.isFrozen);
   });
 
   it("camelize", () => {
-    expect(camelize("product")).toBe("Product");
-    expect(camelize("special_guest")).toBe("SpecialGuest");
-    expect(camelize("application_controller")).toBe("ApplicationController");
-    expect(camelize("area51_controller")).toBe("Area51Controller");
+    for (const [camel, underscored] of Object.entries(CamelToUnderscore)) {
+      expect(stringCamelize(underscored)).toEqual(camel);
+    }
   });
 
   it("camelize lower", () => {
-    expect(camelize("Capital", false)).toBe("capital");
+    expect(stringCamelize("Capital", "lower")).toEqual("capital");
   });
 
   it("camelize upper", () => {
-    expect(camelize("active_record", "upper")).toBe("ActiveRecord");
+    expect(stringCamelize("Capital", "upper")).toEqual("Capital");
   });
 
   it("camelize invalid option", async () => {
@@ -565,123 +685,127 @@ describe("StringInflectionsTest", () => {
   });
 
   it("dasherize", () => {
-    expect(dasherize("street")).toBe("street");
-    expect(dasherize("street_address")).toBe("street-address");
-    expect(dasherize("person_street_address")).toBe("person-street-address");
+    for (const [underscored, dasherized] of Object.entries(UnderscoresToDashes)) {
+      expect(dasherize(underscored)).toEqual(dasherized);
+    }
   });
 
   it("underscore", () => {
-    expect(underscore("HTMLTidy")).toBe("html_tidy");
-    expect(underscore("HTMLTidyGenerator")).toBe("html_tidy_generator");
+    for (const [camel, underscored] of Object.entries(CamelToUnderscore)) {
+      expect(underscore(camel)).toEqual(underscored);
+    }
+
+    expect(underscore("HTMLTidy")).toEqual("html_tidy");
+    expect(underscore("HTMLTidyGenerator")).toEqual("html_tidy_generator");
   });
 
   it("underscore to lower camel", () => {
-    expect(camelize("product", false)).toBe("product");
-    expect(camelize("special_guest", false)).toBe("specialGuest");
-    expect(camelize("application_controller", false)).toBe("applicationController");
-    expect(camelize("area51_controller", false)).toBe("area51Controller");
+    for (const [underscored, lowerCamel] of Object.entries(UnderscoreToLowerCamel)) {
+      expect(stringCamelize(underscored, "lower")).toEqual(lowerCamel);
+    }
   });
 
   it("demodulize", () => {
-    expect(demodulize("MyApplication::Billing::Account")).toBe("Account");
+    expect(demodulize("MyApplication::Billing::Account")).toEqual("Account");
   });
 
   it("deconstantize", () => {
-    expect(deconstantize("MyApplication::Billing::Account")).toBe("MyApplication::Billing");
+    expect(deconstantize("MyApplication::Billing::Account")).toEqual("MyApplication::Billing");
   });
 
   it("foreign key", () => {
-    expect(foreignKey("Person")).toBe("person_id");
-    expect(foreignKey("MyApplication::Billing::Account")).toBe("account_id");
-    expect(foreignKey("Person", false)).toBe("personid");
-    expect(foreignKey("MyApplication::Billing::Account", false)).toBe("accountid");
+    for (const [klass, foreignKeyName] of Object.entries(ClassNameToForeignKeyWithUnderscore)) {
+      expect(foreignKey(klass)).toEqual(foreignKeyName);
+    }
+
+    for (const [klass, foreignKeyName] of Object.entries(ClassNameToForeignKeyWithoutUnderscore)) {
+      expect(foreignKey(klass, false)).toEqual(foreignKeyName);
+    }
   });
 
   it("tableize", () => {
-    expect(tableize("PrimarySpokesman")).toBe("primary_spokesmen");
-    expect(tableize("NodeChild")).toBe("node_children");
+    for (const [className, tableName] of Object.entries(ClassNameToTableName)) {
+      expect(tableize(className)).toEqual(tableName);
+    }
   });
 
   it("classify", () => {
-    expect(classify("primary_spokesmen")).toBe("PrimarySpokesman");
-    expect(classify("node_children")).toBe("NodeChild");
+    for (const [className, tableName] of Object.entries(ClassNameToTableName)) {
+      expect(classify(tableName)).toEqual(className);
+    }
   });
 
   it("string parameterized normal", () => {
-    expect(parameterize("Random text with *(bad)* characters")).toBe(
-      "random-text-with-bad-characters",
-    );
-    expect(parameterize("Allow_Under_Scores")).toBe("allow_under_scores");
-    expect(parameterize("Trailing bad characters!@#")).toBe("trailing-bad-characters");
-    expect(parameterize("!@#Leading bad characters")).toBe("leading-bad-characters");
-    expect(parameterize("Squeeze   separators")).toBe("squeeze-separators");
-    expect(parameterize("Test with + sign")).toBe("test-with-sign");
-    expect(parameterize("café")).toBe("cafe");
-    expect(parameterize("Müller")).toBe("muller");
-    expect(parameterize("naïve")).toBe("naive");
+    for (const [normal, slugged] of Object.entries(StringToParameterized)) {
+      expect(parameterize(normal)).toEqual(slugged);
+    }
   });
 
   it("string parameterized normal preserve case", () => {
-    expect(parameterize("Donald E. Knuth", { preserveCase: true })).toBe("Donald-E-Knuth");
+    for (const [normal, slugged] of Object.entries(StringToParameterizedPreserveCase)) {
+      expect(parameterize(normal, { preserveCase: true })).toEqual(slugged);
+    }
   });
 
   it("string parameterized no separator", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "" })).toBe("donaldeknuth");
+    for (const [normal, slugged] of Object.entries(StringToParameterizeWithNoSeparator)) {
+      expect(parameterize(normal, { separator: "" })).toEqual(slugged);
+    }
   });
 
   it("string parameterized no separator preserve case", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "", preserveCase: true })).toBe(
-      "DonaldEKnuth",
-    );
+    for (const [normal, slugged] of Object.entries(
+      StringToParameterizePreserveCaseWithNoSeparator,
+    )) {
+      expect(parameterize(normal, { separator: "", preserveCase: true })).toEqual(slugged);
+    }
   });
 
   it("string parameterized underscore", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
-    expect(parameterize("Random text with *(bad)* characters", { separator: "_" })).toBe(
-      "random_text_with_bad_characters",
-    );
-    expect(parameterize("Trailing bad characters!@#", { separator: "_" })).toBe(
-      "trailing_bad_characters",
-    );
-    expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
+    for (const [normal, slugged] of Object.entries(StringToParameterizeWithUnderscore)) {
+      expect(parameterize(normal, { separator: "_" })).toEqual(slugged);
+    }
   });
 
   it("string parameterized underscore preserve case", () => {
-    expect(parameterize("Donald E. Knuth", { separator: "_", preserveCase: true })).toBe(
-      "Donald_E_Knuth",
-    );
+    for (const [normal, slugged] of Object.entries(
+      StringToParameterizePreserveCaseWithUnderscore,
+    )) {
+      expect(parameterize(normal, { separator: "_", preserveCase: true })).toEqual(slugged);
+    }
   });
 
   it("parameterize with locale", () => {
     const word = "Fünf autos";
     I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
-    expect(parameterize(word, { locale: "de" })).toBe("fuenf-autos");
+    expect(parameterize(word, { locale: "de" })).toEqual("fuenf-autos");
   });
 
   it("humanize", () => {
-    expect(humanize("employee_salary")).toBe("Employee salary");
-    expect(humanize("employee_id")).toBe("Employee");
-    expect(humanize("underground")).toBe("Underground");
-    expect(humanize("author_id")).toBe("Author");
+    for (const [underscored, human] of Object.entries(UnderscoreToHuman)) {
+      expect(humanize(underscored)).toEqual(human);
+    }
   });
 
   it("humanize without capitalize", () => {
-    expect(humanize("employee_salary", { capitalize: false })).toBe("employee salary");
-    expect(humanize("employee_id", { capitalize: false })).toBe("employee");
-    expect(humanize("underground", { capitalize: false })).toBe("underground");
+    for (const [underscored, human] of Object.entries(UnderscoreToHumanWithoutCapitalize)) {
+      expect(humanize(underscored, { capitalize: false })).toEqual(human);
+    }
   });
 
   it("humanize with keep id suffix", () => {
-    expect(humanize("artist_id", { keepIdSuffix: true })).toBe("Artist id");
+    for (const [underscored, human] of Object.entries(UnderscoreToHumanWithKeepIdSuffix)) {
+      expect(humanize(underscored, { keepIdSuffix: true })).toEqual(human);
+    }
   });
 
   it("humanize with html escape", () => {
-    expect(humanize("<b>foo</b>")).toBe("<b>foo</b>");
+    expect(humanize(htmlEscape("hello").toStr())).toEqual("Hello");
   });
 
   it("ord", () => {
-    expect("a".codePointAt(0)).toBe(97);
-    expect("abc".codePointAt(0)).toBe(97);
+    expect("a".codePointAt(0)).toEqual(97);
+    expect("abc".codePointAt(0)).toEqual(97);
   });
 
   it("starts ends with alias", () => {
@@ -696,106 +820,210 @@ describe("StringInflectionsTest", () => {
   });
 
   it("string squish", () => {
-    expect(squish("  foo   bar  \n  baz  ")).toBe("foo bar baz");
+    let original =
+      "\u205F\u3000 A string surrounded by various unicode spaces,\n      with tabs(\t\t), newlines(\n\n), unicode nextlines(\u0085\u0085) and many spaces(  ). \u00A0\u2007";
+
+    const expected =
+      "A string surrounded by various unicode spaces, " +
+      "with tabs( ), newlines( ), unicode nextlines( ) and many spaces( ).";
+
+    expect(squish(original)).toEqual(expected);
+    expect(original).not.toEqual(expected);
+
+    expect((original = squish(original))).toEqual(expected);
+    expect(original).toEqual(expected);
   });
 
   it("string inquiry", () => {
-    const env = new StringInquirer("production") as any;
-    expect(env["production?"]()).toBe(true);
-    expect(env["development?"]()).toBe(false);
+    assertPredicate(inquiry.call("production"), (s) => s["production?"]());
+    assertNotPredicate(inquiry.call("production"), (s) => s["development?"]());
   });
 
   it("truncate", () => {
-    expect(truncate("Hello World!", 12)).toBe("Hello World!");
-    expect(truncate("Hello World!!", 12)).toBe("Hello Wor...");
+    expect(truncate("Hello World!", 12)).toEqual("Hello World!");
+    expect(truncate("Hello World!!", 12)).toEqual("Hello Wor...");
   });
 
   it("truncate with omission and separator", () => {
-    expect(
-      truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: " " }),
-    ).toBe("Oh dear! Oh...");
-    expect(truncate("ab-ab-ab-ab-ab-ab-ab-rest", 20, { omission: "", separator: /-/ })).toBe(
-      "ab-ab-ab-ab-ab-ab-ab",
+    expect(truncate("Hello World!", 10, { omission: "[...]" })).toEqual("Hello[...]");
+    expect(truncate("Hello Big World!", 13, { omission: "[...]", separator: " " })).toEqual(
+      "Hello[...]",
+    );
+    expect(truncate("Hello Big World!", 14, { omission: "[...]", separator: " " })).toEqual(
+      "Hello Big[...]",
+    );
+    expect(truncate("Hello Big World!", 15, { omission: "[...]", separator: " " })).toEqual(
+      "Hello Big[...]",
     );
   });
 
   it("truncate with omission and regexp separator", () => {
-    expect(
-      truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: /\s/ }),
-    ).toBe("Oh dear! Oh...");
+    expect(truncate("Hello Big World!", 13, { omission: "[...]", separator: /\s/ })).toEqual(
+      "Hello[...]",
+    );
+    expect(truncate("Hello Big World!", 14, { omission: "[...]", separator: /\s/ })).toEqual(
+      "Hello Big[...]",
+    );
+    expect(truncate("Hello Big World!", 15, { omission: "[...]", separator: /\s/ })).toEqual(
+      "Hello Big[...]",
+    );
   });
 
   it("truncate returns frozen string", () => {
-    const result = truncate("Hello World!", 12);
-    expect(typeof result).toBe("string");
+    assertNot(Object.isFrozen(Object(truncate("Hello World!", 12))));
+    assertNot(Object.isFrozen(Object(truncate("Hello World!!", 12))));
   });
 
   it("truncate bytes", () => {
-    expect(truncateBytes("👍👍👍👍", 16)).toBe("👍👍👍👍");
-    expect(truncateBytes("👍👍👍👍", 15)).toBe("👍👍👍…");
+    const thumbs = "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}";
+    expect(truncateBytes(thumbs, 16)).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}");
+    expect(truncateBytes(thumbs, 16, { omission: null })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+    expect(truncateBytes(thumbs, 16, { omission: " " })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+    expect(truncateBytes(thumbs, 16, { omission: "\u{1F596}" })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+
+    expect(truncateBytes(thumbs, 15)).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}…");
+    expect(truncateBytes(thumbs, 15, { omission: null })).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}");
+    expect(truncateBytes(thumbs, 15, { omission: " " })).toEqual("\u{1F44D}\u{1F44D}\u{1F44D} ");
+    expect(truncateBytes(thumbs, 15, { omission: "\u{1F596}" })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F596}",
+    );
+
+    expect(truncateBytes(thumbs, 5)).toEqual("…");
+    expect(truncateBytes(thumbs, 5, { omission: null })).toEqual("\u{1F44D}");
+    expect(truncateBytes(thumbs, 5, { omission: " " })).toEqual("\u{1F44D} ");
+    expect(truncateBytes(thumbs, 5, { omission: "\u{1F596}" })).toEqual("\u{1F596}");
+
+    expect(truncateBytes(thumbs, 4)).toEqual("…");
+    expect(truncateBytes(thumbs, 4, { omission: null })).toEqual("\u{1F44D}");
+    expect(truncateBytes(thumbs, 4, { omission: " " })).toEqual(" ");
+    expect(truncateBytes(thumbs, 4, { omission: "\u{1F596}" })).toEqual("\u{1F596}");
+
+    expect(() => truncateBytes(thumbs, 3, { omission: "\u{1F596}" })).toThrow(ArgumentError);
   });
 
   it("truncate bytes preserves codepoints", () => {
-    expect(truncateBytes("👍👍👍👍", 15, { omission: null })).toBe("👍👍👍");
-    expect(truncateBytes("👍👍👍👍", 15, { omission: " " })).toBe("👍👍👍 ");
+    const thumbs = "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}";
+    expect(truncateBytes(thumbs, 16)).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}");
+    expect(truncateBytes(thumbs, 16, { omission: null })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+    expect(truncateBytes(thumbs, 16, { omission: " " })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+    expect(truncateBytes(thumbs, 16, { omission: "\u{1F596}" })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F44D}\u{1F44D}",
+    );
+
+    expect(truncateBytes(thumbs, 15)).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}…");
+    expect(truncateBytes(thumbs, 15, { omission: null })).toEqual("\u{1F44D}\u{1F44D}\u{1F44D}");
+    expect(truncateBytes(thumbs, 15, { omission: " " })).toEqual("\u{1F44D}\u{1F44D}\u{1F44D} ");
+    expect(truncateBytes(thumbs, 15, { omission: "\u{1F596}" })).toEqual(
+      "\u{1F44D}\u{1F44D}\u{1F596}",
+    );
+
+    expect(truncateBytes(thumbs, 5)).toEqual("…");
+    expect(truncateBytes(thumbs, 5, { omission: null })).toEqual("\u{1F44D}");
+    expect(truncateBytes(thumbs, 5, { omission: " " })).toEqual("\u{1F44D} ");
+    expect(truncateBytes(thumbs, 5, { omission: "\u{1F596}" })).toEqual("\u{1F596}");
+
+    expect(truncateBytes(thumbs, 4)).toEqual("…");
+    expect(truncateBytes(thumbs, 4, { omission: null })).toEqual("\u{1F44D}");
+    expect(truncateBytes(thumbs, 4, { omission: " " })).toEqual(" ");
+    expect(truncateBytes(thumbs, 4, { omission: "\u{1F596}" })).toEqual("\u{1F596}");
+
+    expect(() => truncateBytes(thumbs, 3, { omission: "\u{1F596}" })).toThrow(ArgumentError);
   });
 
   it("truncates bytes preserves grapheme clusters", () => {
-    expect(truncateBytes("👍👍👍👍", 15, { omission: "🖖" })).toBe("👍👍🖖");
+    const heart = "a ❤\uFE0F b";
+    expect(truncateBytes(heart, 2, { omission: null })).toEqual("a ");
+    expect(truncateBytes(heart, 3, { omission: null })).toEqual("a ");
+    expect(truncateBytes(heart, 7, { omission: null })).toEqual("a ");
+    expect(truncateBytes(heart, 8, { omission: null })).toEqual("a ❤\uFE0F");
+
+    const couple = "\u{1F469}\u200D❤\uFE0F\u200D\u{1F469}";
+    expect(truncateBytes(`a ${couple}`, 13, { omission: null })).toEqual("a ");
+    expect(truncateBytes(couple, 13, { omission: null })).toEqual("");
   });
 
   it("truncates bytes preserves encoding", () => {
-    const result = truncateBytes("こんにちは", 12);
-    expect(typeof result).toBe("string");
+    const original = "a".repeat(30);
+    expect(typeof truncateBytes(original, 15)).toBe("string");
   });
 
   it("truncate words", () => {
-    expect(truncateWords("Hello Big World!", 3)).toBe("Hello Big World!");
-    expect(truncateWords("Hello Big World!", 2)).toBe("Hello Big...");
+    expect(truncateWords("Hello Big World!", 3)).toEqual("Hello Big World!");
+    expect(truncateWords("Hello Big World!", 2)).toEqual("Hello Big...");
   });
 
   it("truncate words with omission", () => {
-    expect(truncateWords("Hello Big World!", 3, { omission: "[...]" })).toBe("Hello Big World!");
-    expect(truncateWords("Hello Big World!", 2, { omission: "[...]" })).toBe("Hello Big[...]");
+    expect(truncateWords("Hello Big World!", 3, { omission: "[...]" })).toEqual("Hello Big World!");
+    expect(truncateWords("Hello Big World!", 2, { omission: "[...]" })).toEqual("Hello Big[...]");
   });
 
   it("truncate words with separator", () => {
-    expect(truncateWords("Oh dear! Oh dear! I shall be late!", 4, { separator: "!" })).toBe(
-      "Oh dear! Oh dear! I shall be late!",
+    expect(truncateWords("Hello<br>Big<br>World!<br>", 3, { separator: "<br>" })).toEqual(
+      "Hello<br>Big<br>World!...",
+    );
+    expect(truncateWords("Hello<br>Big<br>World!", 3, { separator: "<br>" })).toEqual(
+      "Hello<br>Big<br>World!",
+    );
+    expect(truncateWords("Hello\n<br>Big<br>Wide<br>World!", 2, { separator: "<br>" })).toEqual(
+      "Hello\n<br>Big...",
     );
   });
 
   it("truncate words with separator and omission", () => {
     expect(
-      truncateWords("Oh dear! Oh dear! I shall be late!", 4, { separator: "!", omission: "..." }),
-    ).toBe("Oh dear! Oh dear! I shall be late!");
+      truncateWords("Hello<br>Big<br>World!<br>", 3, { omission: "[...]", separator: "<br>" }),
+    ).toEqual("Hello<br>Big<br>World![...]");
+    expect(
+      truncateWords("Hello<br>Big<br>World!", 3, { omission: "[...]", separator: "<br>" }),
+    ).toEqual("Hello<br>Big<br>World!");
   });
 
   it("truncate words with complex string", () => {
-    expect(truncateWords("Hello Big World", 2)).toBe("Hello Big...");
+    const started = Date.now();
+    const complexString =
+      "aa aa aaa aa aaa aaa aaa aa aaa aaa aaa aaa aaa aaa aaa aaa aaa aaa aaaa aaaaa aaaaa aaaaaa aa aa aa aaa aa  aaa aa aa aa aa a aaa aaa \n a aaa <<s";
+    expect(truncateWords(complexString, 80)).toEqual(complexString);
+    // eslint-disable-next-line vitest/no-conditional-in-test
+    if (Date.now() - started > 10_000) assert(false);
   });
 
   it("truncate multibyte", () => {
-    expect(truncate("日本語のテスト文字列", 6)).toBe("日本語...");
+    expect(truncate("아리랑 아리 아라리오", 10)).toEqual("아리랑 아리 ...");
   });
 
   it("truncate should not be html safe", () => {
-    const result = truncate("Hello", 3);
-    expect(isHtmlSafe(result)).toBe(false);
+    assertNotPredicate(truncate("Hello World!", 12), isHtmlSafe);
   });
 
   it("remove", () => {
-    expect(remove("Hello World", "Hello ")).toBe("World");
+    const original = "This is a good day to die";
+    expect(remove(original, " to die")).toEqual("This is a good day");
+    expect(remove(original, " to ", /die/)).toEqual("This is a good day");
+    expect(original).toEqual("This is a good day to die");
   });
 
   it("remove for multiple occurrences", () => {
-    expect(remove("Hello World Hello", "Hello")).toBe(" World ");
+    const original = "This is a good day to die to die";
+    expect(remove(original, " to die")).toEqual("This is a good day");
+    expect(original).toEqual("This is a good day to die to die");
   });
 
   it("remove!", () => {
-    const str = "Hello World";
-    const result = remove(str, "Hello ");
-    expect(result).toBe("World");
+    let original = "This is a very good day to die";
+    expect((original = remove(original, " very"))).toEqual("This is a good day to die");
+    expect(original).toEqual("This is a good day to die");
+    expect((original = remove(original, " to ", /die/))).toEqual("This is a good day");
+    expect(original).toEqual("This is a good day");
   });
 
   it("constantize", () => {
@@ -812,249 +1040,308 @@ describe("StringInflectionsTest", () => {
 });
 
 describe("OutputSafetyTest", () => {
+  let string: SafeBuffer;
+  let object: { toStr(): string };
+  let toSObject: { toString(): string };
+
+  beforeEach(() => {
+    string = new SafeBuffer("hello", false);
+    object = {
+      toStr() {
+        return "other";
+      },
+    };
+    toSObject = {
+      toString() {
+        return "to_s";
+      },
+    };
+  });
+
   it("A string is unsafe by default", () => {
-    expect(isHtmlSafe("hello")).toBe(false);
+    assertNotPredicate(string, isHtmlSafe);
   });
 
   it("A string can be marked safe", () => {
-    const safe = htmlSafe("hello");
-    expect(isHtmlSafe(safe)).toBe(true);
+    const safe = htmlSafe(string.toStr());
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Marking a string safe returns the string", () => {
-    const safe = htmlSafe("hello");
-    expect(safe.toString()).toBe("hello");
+    expect(htmlSafe(string.toStr()).toString()).toEqual(string.toString());
   });
 
   it("An integer is safe by default", () => {
-    expect(isHtmlSafe(42)).toBe(false);
+    assertPredicate(5, isHtmlSafe);
   });
 
   it("a float is safe by default", () => {
-    expect(isHtmlSafe(3.14)).toBe(false);
+    assertPredicate(5.7, isHtmlSafe);
   });
 
   it("An object is unsafe by default", () => {
-    expect(isHtmlSafe({})).toBe(false);
+    assertNotPredicate(object, isHtmlSafe);
   });
 
-  it("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {
-    const safe = htmlSafe("hello ");
-    const result = safe.concat(42 as unknown as string);
-    expect(result.toString()).toBe("hello 42");
+  it("Adding an object not responding to `#to_str` to a safe string is deprecated", async () => {
+    const safe = htmlSafe(string.toStr());
+    await assertRaises([NoMethodError], {}, () => safe.concat(toSObject));
   });
 
   it("Adding an object to a safe string returns a safe string", () => {
-    const safe = htmlSafe("hello ");
-    const result = safe.concat(htmlSafe("world"));
-    expect(isHtmlSafe(result)).toBe(true);
+    const safe = htmlSafe(string.toStr());
+    safe.concat(object);
+
+    expect(safe.toString()).toEqual("helloother");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Adding a safe string to another safe string returns a safe string", () => {
-    const a = htmlSafe("hello ");
-    const b = htmlSafe("world");
-    const result = a.concat(b);
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toBe("hello world");
+    const otherString = htmlSafe("other");
+    const safe = htmlSafe(string.toStr());
+    const combination = otherString.plus(safe);
+
+    expect(combination.toString()).toEqual("otherhello");
+    assertPredicate(combination, isHtmlSafe);
   });
 
   it("Adding an unsafe string to a safe string escapes it and returns a safe string", () => {
-    const safe = htmlSafe("prefix: ");
-    const result = safe.concat("<script>");
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).not.toContain("<script>");
-    expect(result.toString()).toContain("&lt;script&gt;");
+    const otherString = htmlSafe("other");
+    const combination = otherString.plus("<foo>");
+    const otherCombination = string.plus("<foo>");
+
+    expect(combination.toString()).toEqual("other&lt;foo&gt;");
+    expect(otherCombination.toString()).toEqual("hello<foo>");
+
+    assertPredicate(combination, isHtmlSafe);
+    assertNotPredicate(otherCombination, isHtmlSafe);
   });
 
   it("Prepending safe onto unsafe yields unsafe", () => {
-    const safe = htmlSafe("world");
-    const result = safe.toString() + "hello";
-    expect(isHtmlSafe(result)).toBe(false);
+    string.prepend(htmlSafe("other"));
+    assertNotPredicate(string, isHtmlSafe);
+    expect(string.toString()).toEqual("otherhello");
   });
 
   it("Prepending unsafe onto safe yields escaped safe", () => {
-    const safe = htmlSafe("world");
-    const escaped = htmlEscape("<unsafe>");
-    const result = htmlSafe(escaped.toString() + safe.toString());
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toContain("&lt;unsafe&gt;");
-    expect(result.toString()).toContain("world");
+    const other = htmlSafe("other");
+    other.prepend("<foo>");
+    assertPredicate(other, isHtmlSafe);
+    expect(other.toString()).toEqual("&lt;foo&gt;other");
   });
 
   it("Concatting safe onto unsafe yields unsafe", () => {
-    const unsafe = "hello ";
-    const safe = htmlSafe("world");
-    const result = unsafe + safe.toString();
-    expect(isHtmlSafe(result)).toBe(false);
+    const otherString = new SafeBuffer("other", false);
+
+    const safe = htmlSafe(string.toStr());
+    otherString.concat(safe);
+    assertNotPredicate(otherString, isHtmlSafe);
   });
 
   it("Concatting unsafe onto safe yields escaped safe", () => {
-    const safe = htmlSafe("safe ");
-    const result = safe.concat("<unsafe>");
-    expect(result.toString()).toContain("&lt;unsafe&gt;");
-    expect(isHtmlSafe(result)).toBe(true);
+    const otherString = htmlSafe("other");
+    const result = otherString.concat("<foo>");
+    expect(result.toString()).toEqual("other&lt;foo&gt;");
+    assertPredicate(result, isHtmlSafe);
   });
 
   it("Concatting safe onto safe yields safe", () => {
-    const a = htmlSafe("a");
-    const b = htmlSafe("b");
-    const result = a.concat(b);
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toBe("ab");
+    const otherString = htmlSafe("other");
+    const safe = htmlSafe(string.toStr());
+
+    otherString.concat(safe);
+    assertPredicate(otherString, isHtmlSafe);
   });
 
   it("Concatting safe onto unsafe with << yields unsafe", () => {
-    const unsafe = "hello ";
-    const safe = htmlSafe("world");
-    const result = unsafe + safe.toString();
-    expect(isHtmlSafe(result)).toBe(false);
+    const otherString = new SafeBuffer("other", false);
+    const safe = htmlSafe(string.toStr());
+
+    otherString.concat(safe);
+    assertNotPredicate(otherString, isHtmlSafe);
   });
 
   it("Concatting unsafe onto safe with << yields escaped safe", () => {
-    const safe = htmlSafe("safe ");
-    const result = safe.concat("<unsafe>");
-    expect(result.toString()).toContain("&lt;unsafe&gt;");
-    expect(isHtmlSafe(result)).toBe(true);
+    const otherString = htmlSafe("other");
+    const result = otherString.concat("<foo>");
+    expect(result.toString()).toEqual("other&lt;foo&gt;");
+    assertPredicate(result, isHtmlSafe);
   });
 
   it("Concatting safe onto safe with << yields safe", () => {
-    const a = htmlSafe("a");
-    const b = htmlSafe("b");
-    const result = a.concat(b);
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toBe("ab");
+    const otherString = htmlSafe("other");
+    const safe = htmlSafe(string.toStr());
+
+    otherString.concat(safe);
+    assertPredicate(otherString, isHtmlSafe);
   });
 
   it("Concatting safe onto unsafe with % yields unsafe", () => {
-    const safe = htmlSafe("world");
-    const result = `hello ${safe.toString()}`;
-    expect(isHtmlSafe(result)).toBe(false);
+    let otherString = "other%s";
+    const safe = htmlSafe(string.toStr());
+
+    otherString = otherString.replace("%s", safe.toStr());
+    assertNotPredicate(otherString, isHtmlSafe);
   });
 
   it("% method explicitly cast the argument to string", () => {
-    const safe = htmlSafe("hello %s");
-    const result = safe.format([42]);
-    expect(result.toString()).toBe("hello 42");
+    const otherString = "other%s";
+    expect(otherString.replace("%s", String(toSObject))).toEqual("otherto_s");
   });
 
   it("Concatting unsafe onto safe with % yields escaped safe", () => {
-    const safe = htmlSafe("hello %s");
-    const result = safe.format(["<b>world</b>"]);
-    expect(result.toString()).toBe("hello &lt;b&gt;world&lt;/b&gt;");
-    expect(isHtmlSafe(result)).toBe(true);
+    const otherString = htmlSafe("other%s");
+    const result = otherString.format("<foo>");
+
+    expect(result.toString()).toEqual("other&lt;foo&gt;");
+    assertPredicate(result, isHtmlSafe);
   });
 
   it("Concatting safe onto safe with % yields safe", () => {
-    const safe = htmlSafe("hello %s");
-    const result = safe.format([htmlSafe("<b>world</b>")]);
-    expect(result.toString()).toBe("hello <b>world</b>");
-    expect(isHtmlSafe(result)).toBe(true);
+    let otherString = htmlSafe("other%s");
+    const safe = htmlSafe(string.toStr());
+
+    otherString = otherString.format(safe);
+    assertPredicate(otherString, isHtmlSafe);
   });
 
   it("Concatting with % doesn't modify a string", () => {
-    const safe = htmlSafe("hello %s");
-    const original = safe.toString();
-    safe.format(["world"]);
-    expect(safe.toString()).toBe(original);
+    const otherString = ["<p>", "<b>", "<h1>"];
+    htmlSafe("%s %s %s").format(otherString);
+
+    expect(otherString).toEqual(["<p>", "<b>", "<h1>"]);
   });
 
   it("Concatting an integer to safe always yields safe", () => {
-    const safe = htmlSafe("count: ");
-    const result = safe.concat(htmlSafe("42"));
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toBe("count: 42");
+    let safe = htmlSafe(string.toStr());
+    safe = safe.concat(13);
+    expect(safe.toString()).toEqual(new SafeBuffer("hello", false).concat(13).toString());
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Inserting safe into safe yields safe", () => {
-    const safe = htmlSafe("hello");
-    const result = safe.concat(htmlSafe(" world"));
-    expect(isHtmlSafe(result)).toBe(true);
+    const safe = htmlSafe("foo");
+    safe.insert(0, htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>foo");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Inserting unsafe into safe yields escaped safe", () => {
-    const safe = htmlSafe("hello ");
-    const result = safe.concat("<b>world</b>");
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).toContain("&lt;b&gt;");
+    const safe = htmlSafe("foo");
+    safe.insert(0, "<b>");
+
+    expect(safe.toString()).toEqual("&lt;b&gt;foo");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Replacing safe with safe yields safe", () => {
-    const safe = htmlSafe("hello world");
-    const result = htmlSafe(safe.toString().replace("world", htmlSafe("universe").toString()));
-    expect(isHtmlSafe(result)).toBe(true);
+    const safe = htmlSafe("foo");
+    safe.replace(htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Replacing safe with unsafe yields escaped safe", () => {
-    const safe = htmlSafe("hello world");
-    const replacement = htmlEscape("<script>");
-    const result = htmlSafe(safe.toString().replace("world", replacement.toString()));
-    expect(isHtmlSafe(result)).toBe(true);
-    expect(result.toString()).not.toContain("<script>");
+    const safe = htmlSafe("foo");
+    safe.replace("<b>");
+
+    expect(safe.toString()).toEqual("&lt;b&gt;");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Replacing index of safe with safe yields safe", () => {
-    const safe = htmlSafe("012345");
-    safe.set(0, htmlSafe("a").toString());
-    expect(isHtmlSafe(safe)).toBe(true);
+    let safe = htmlSafe("foo");
+    safe.set(0, htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>oo");
+    assertPredicate(safe, isHtmlSafe);
+
+    safe = htmlSafe("foo");
+    safe.set(0, 2, htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>o");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Replacing index of safe with unsafe yields escaped safe", () => {
-    const safe = htmlSafe("012345");
-    safe.set(0, "<");
-    expect(safe.toString()).toContain("&lt;");
+    let safe = htmlSafe("foo");
+    safe.set(0, "<b>");
+
+    expect(safe.toString()).toEqual("&lt;b&gt;oo");
+    assertPredicate(safe, isHtmlSafe);
+
+    safe = htmlSafe("foo");
+    safe.set(1, 1, "<b>");
+
+    expect(safe.toString()).toEqual("f&lt;b&gt;o");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Bytesplicing safe into safe yields safe", () => {
-    const safe = htmlSafe("hello world");
-    const result = htmlSafe(
-      safe.toString().slice(0, 6) + htmlSafe("universe").toString() + safe.toString().slice(11),
-    );
-    expect(isHtmlSafe(result)).toBe(true);
+    let safe = htmlSafe("hello");
+    safe.bytesplice(0, 0, htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>hello");
+    assertPredicate(safe, isHtmlSafe);
+
+    safe = htmlSafe("hello");
+    safe.bytesplice(new Range(0, 1), htmlSafe("<b>"));
+
+    expect(safe.toString()).toEqual("<b>llo");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("Bytesplicing unsafe into safe yields escaped safe", () => {
-    const safe = htmlSafe("hello world");
-    const escaped = htmlEscape("<b>");
-    const result = htmlSafe(
-      safe.toString().slice(0, 6) + escaped.toString() + safe.toString().slice(11),
-    );
-    expect(isHtmlSafe(result)).toBe(true);
+    let safe = htmlSafe("hello");
+    safe.bytesplice(1, 0, "<b>");
+
+    expect(safe.toString()).toEqual("h&lt;b&gt;ello");
+    assertPredicate(safe, isHtmlSafe);
+
+    safe = htmlSafe("hello");
+    safe.bytesplice(new Range(1, 2), "<b>");
+
+    expect(safe.toString()).toEqual("h&lt;b&gt;lo");
+    assertPredicate(safe, isHtmlSafe);
   });
 
   it("call to_param returns a normal string", () => {
-    const safe = htmlSafe("hello");
-    expect(safe.toString()).toBe("hello");
-    expect(typeof safe.toString()).toBe("string");
+    const safe = htmlSafe(string.toStr());
+    assertPredicate(safe, isHtmlSafe);
+    assertNotPredicate(safe.toParam(), isHtmlSafe);
   });
 
   it("TSE::Util.html_escape should escape unsafe characters", () => {
-    const result = htmlEscape('<script>alert("xss")</script>');
-    expect(result.toString()).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
+    const str = "<>&\"'";
+    const expected = "&lt;&gt;&amp;&quot;&#39;";
+    expect(htmlEscape(str).toString()).toEqual(expected);
   });
 
   it("TSE::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
-    const result = htmlEscape("hello\uFFFDworld");
-    expect(result.toString()).toContain("hello");
-    expect(result.toString()).toContain("world");
+    const str = new TextDecoder().decode(new Uint8Array([0xa9, 0x20, 0x3c]));
+    const expected = "� &lt;";
+    expect(htmlEscape(str).toString()).toEqual(expected);
   });
 
   it("TSE::Util.html_escape should not escape safe strings", () => {
-    const safe = htmlSafe("<b>bold</b>");
-    const result = htmlEscape(safe);
-    expect(result.toString()).toBe("<b>bold</b>");
+    const str = htmlSafe("<b>hello</b>");
+    expect(htmlEscape(str)).toEqual(str);
   });
 
   it("TSE::Util.html_escape_once only escapes once", () => {
-    const result = htmlEscapeOnce("&lt;already escaped&gt;");
-    expect(result.toString()).toBe("&lt;already escaped&gt;");
-    const raw = htmlEscapeOnce("<raw>");
-    expect(raw.toString()).toBe("&lt;raw&gt;");
+    const str = "1 < 2 &amp; 3";
+    const escapedString = "1 &lt; 2 &amp; 3";
+
+    expect(htmlEscapeOnce(str).toString()).toEqual(escapedString);
+    expect(htmlEscapeOnce(escapedString).toString()).toEqual(escapedString);
   });
 
   it("TSE::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
-    const result = htmlEscapeOnce("hello\uFFFDworld");
-    expect(result.toString()).toContain("hello");
-    expect(result.toString()).toContain("world");
+    const str = new TextDecoder().decode(new Uint8Array([0xa9, 0x20, 0x3c]));
+    const expected = "� &lt;";
+    expect(htmlEscapeOnce(str).toString()).toEqual(expected);
   });
 
   it("TSE::Util.html_escape_once preserves numeric character references", () => {

@@ -1,37 +1,50 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { removePossibleMethod, removePossibleSingletonMethod } from "./remove-method.js";
+import { assert, assertNotRespondTo } from "../../testing/assertions.js";
 
 describe("RemoveMethodTest", () => {
-  it("remove method from an object", () => {
-    class Foo {
-      greet() {
-        return "hello";
+  let A: any;
+
+  beforeEach(() => {
+    A = class {
+      doSomething() {
+        return 1;
       }
-    }
-    const proto = Foo.prototype as unknown as Record<string, unknown>;
-    expect(typeof proto.greet).toBe("function");
-    delete proto.greet;
-    expect(proto.greet).toBeUndefined();
+
+      protected doSomethingProtected() {
+        return 1;
+      }
+
+      private doSomethingPrivate() {
+        return 1;
+      }
+
+      static doSomethingElse() {
+        return 2;
+      }
+    };
+  });
+
+  it("remove method from an object", () => {
+    removePossibleMethod.call(A, "doSomething");
+    assertNotRespondTo(new A(), "doSomething");
   });
 
   it("remove singleton method from an object", () => {
-    const obj = {
-      greet() {
-        return "hello";
-      },
-    } as Record<string, unknown>;
-    expect(typeof obj.greet).toBe("function");
-    delete obj.greet;
-    expect(obj.greet).toBeUndefined();
+    removePossibleSingletonMethod.call(A, "doSomethingElse");
+    assertNotRespondTo(A, "doSomethingElse");
   });
 
   it("redefine method in an object", () => {
-    const obj = {
-      greet() {
-        return "hello";
-      },
-    };
-    expect(obj.greet()).toBe("hello");
-    obj.greet = () => "world";
-    expect(obj.greet()).toBe("world");
+    A.prototype.doSomething = () => 100;
+    A.prototype.doSomethingProtected = () => 100;
+    A.prototype.doSomethingPrivate = () => 100;
+    expect(new A().doSomething()).toEqual(100);
+    expect(new A().doSomethingProtected()).toEqual(100);
+    expect(new A().doSomethingPrivate()).toEqual(100);
+
+    assert("doSomething" in A.prototype);
+    assert("doSomethingProtected" in A.prototype);
+    assert("doSomethingPrivate" in A.prototype);
   });
 });

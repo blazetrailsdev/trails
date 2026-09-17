@@ -1,124 +1,174 @@
-import { describe, it, expect } from "vitest";
-
-import { mattrAccessor } from "../../module-ext.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { NameError, Thread } from "@blazetrails/ruby-compat";
+import {
+  threadCattrReader,
+  threadCattrWriter,
+  threadMattrAccessor,
+  threadMattrReader,
+  threadMattrWriter,
+} from "./attribute-accessors-per-thread.js";
+import {
+  assertNotPredicate,
+  assertNotRespondTo,
+  assertPredicate,
+  assertRaises,
+  assertRespondTo,
+  assertSame,
+} from "../../testing/assertions.js";
 
 describe("ModuleAttributeAccessorPerThreadTest", () => {
+  let klass: any;
+  let subclass: any;
+  let object: any;
+
+  beforeEach(() => {
+    klass = class {};
+    threadMattrAccessor.call(klass, "foo");
+    threadMattrAccessor.call(klass, "bar", { instanceWriter: false });
+    threadMattrReader.call(klass, "shaq", { instanceReader: false });
+    threadMattrAccessor.call(klass, "camp", { instanceAccessor: false });
+
+    subclass = class extends klass {};
+
+    object = new klass();
+  });
+
   it("default value", () => {
-    class M {}
-    mattrAccessor.call(M, "attr", { default: "default_val" });
-    expect((M as unknown as Record<string, unknown>).attr).toBe("default_val");
+    threadMattrAccessor.call(klass, "baz", { default: "default_value" });
+
+    expect(klass.baz).toEqual("default_value");
   });
 
   it("default value is accessible from subclasses", () => {
-    class Parent {}
-    mattrAccessor.call(Parent, "shared", { default: 42 });
-    class Child extends Parent {}
-    expect((Parent as unknown as Record<string, unknown>).shared).toBe(42);
+    threadMattrAccessor.call(klass, "baz", { default: "default_value" });
+
+    expect(subclass.baz).toEqual("default_value");
+  });
+
+  it("default value is accessible from other threads", () => {
+    threadMattrAccessor.call(klass, "baz", { default: "default_value" });
+
+    new Thread(() => {
+      expect(klass.baz).toEqual("default_value");
+    }).join();
   });
 
   it("nonfrozen default value is duped and frozen", () => {
-    const defaultArr = [1, 2, 3];
-    class M {}
-    mattrAccessor.call(M, "list", { default: defaultArr });
-    const cls = M as unknown as Record<string, unknown>;
-    const val = cls.list;
-    expect(val).toEqual([1, 2, 3]);
+    const _default: unknown[] = [];
+    threadMattrAccessor.call(klass, "baz", { default: _default });
+
+    expect(klass.baz).toEqual(_default);
+    assertPredicate(klass.baz, Object.isFrozen);
+    assertNotPredicate(_default, Object.isFrozen);
   });
 
   it("frozen default value is not duped", () => {
-    const frozen = Object.freeze({ x: 1 });
-    class M {}
-    mattrAccessor.call(M, "conf", { default: frozen });
-    const cls = M as unknown as Record<string, unknown>;
-    expect(cls.conf).toEqual({ x: 1 });
+    const _default = Object.freeze([]);
+    threadMattrAccessor.call(klass, "baz", { default: _default });
+
+    assertSame(_default, klass.baz);
   });
 
   it("should use mattr default", () => {
-    class M {}
-    mattrAccessor.call(M, "count", { default: 0 });
-    expect((M as unknown as Record<string, unknown>).count).toBe(0);
+    new Thread(() => {
+      expect(klass.foo).toBeNull();
+      expect(object.foo).toBeNull();
+    }).join();
   });
 
   it("should set mattr value", () => {
-    class M {}
-    mattrAccessor.call(M, "name_val");
-    (M as unknown as Record<string, unknown>).name_val = "test";
-    expect((M as unknown as Record<string, unknown>).name_val).toBe("test");
+    new Thread(() => {
+      klass.foo = "test";
+      expect(klass.foo).toEqual("test");
+
+      klass.foo = "test2";
+      expect(klass.foo).toEqual("test2");
+    }).join();
   });
 
   it("should not create instance writer", () => {
-    class M {}
-    mattrAccessor.call(M, "x_rw", { instanceWriter: false, default: "val" });
-    const cls = M as unknown as Record<string, unknown>;
-    expect(cls.x_rw).toBe("val");
-    const inst = new M() as Record<string, unknown>;
-    expect(inst.x_rw).toBe("val");
+    new Thread(() => {
+      assertRespondTo(klass, "foo");
+      assertRespondTo(klass, "foo=");
+      assertRespondTo(object, "bar");
+      assertNotRespondTo(object, "bar=");
+    }).join();
   });
 
   it("should not create instance reader", () => {
-    class M {}
-    mattrAccessor.call(M, "y", { instanceReader: false });
-    const inst = new M() as Record<string, unknown>;
-    const cls = M as unknown as Record<string, unknown>;
-    cls.y = "class-val";
-    expect(cls.y).toBe("class-val");
+    new Thread(() => {
+      assertRespondTo(klass, "shaq");
+      assertNotRespondTo(object, "shaq");
+    }).join();
   });
 
   it("should not create instance accessors", () => {
-    class M {}
-    mattrAccessor.call(M, "z", { instanceAccessor: false });
-    const proto = M.prototype as Record<string, unknown>;
-    expect(Object.getOwnPropertyDescriptor(proto, "z")).toBeUndefined();
+    new Thread(() => {
+      assertRespondTo(klass, "camp");
+      assertNotRespondTo(object, "camp");
+      assertNotRespondTo(object, "camp=");
+    }).join();
   });
 
-  it("should raise name error if attribute name is invalid", () => {
-    class M {}
-    expect(() => mattrAccessor.call(M, "123invalid")).toThrow();
+  it("should raise name error if attribute name is invalid", async () => {
+    let exception = await assertRaises([NameError], {}, () =>
+      threadCattrReader.call(class {}, "1nvalid"),
+    );
+    expect(exception.message).toMatch("invalid attribute name: 1nvalid");
+
+    exception = await assertRaises([NameError], {}, () =>
+      threadCattrWriter.call(class {}, "1nvalid"),
+    );
+    expect(exception.message).toMatch("invalid attribute name: 1nvalid");
+
+    exception = await assertRaises([NameError], {}, () =>
+      threadMattrReader.call(class {}, "1valid_part"),
+    );
+    expect(exception.message).toMatch("invalid attribute name: 1valid_part");
+
+    exception = await assertRaises([NameError], {}, () =>
+      threadMattrWriter.call(class {}, "2valid_part"),
+    );
+    expect(exception.message).toMatch("invalid attribute name: 2valid_part");
   });
 
   it("should return same value by class or instance accessor", () => {
-    class M {}
-    mattrAccessor.call(M, "shared_val", { default: "hello" });
-    const inst = new M() as Record<string, unknown>;
-    const cls = M as unknown as Record<string, unknown>;
-    expect(inst.shared_val).toBe(cls.shared_val);
+    klass.foo = "fries";
+
+    expect(object.foo).toEqual(klass.foo);
   });
 
   it("should not affect superclass if subclass set value", () => {
-    class Parent {}
-    mattrAccessor.call(Parent, "attr_v");
-    const pCls = Parent as unknown as Record<string, unknown>;
-    pCls.attr_v = "parent";
-    expect(pCls.attr_v).toBe("parent");
+    klass.foo = "super";
+    expect(klass.foo).toEqual("super");
+    expect(subclass.foo).toBeNull();
+
+    subclass.foo = "sub";
+    expect(klass.foo).toEqual("super");
+    expect(subclass.foo).toEqual("sub");
   });
 
   it("superclass keeps default value when value set on subclass", () => {
-    class Base {}
-    mattrAccessor.call(Base, "setting", { default: "base" });
-    const b = Base as unknown as Record<string, unknown>;
-    expect(b.setting).toBe("base");
-    b.setting = "changed";
-    expect(b.setting).toBe("changed");
-    class Other {}
-    mattrAccessor.call(Other, "setting", { default: "base" });
-    expect((Other as unknown as Record<string, unknown>).setting).toBe("base");
+    threadMattrAccessor.call(klass, "baz", { default: "default_value" });
+    subclass.baz = "sub";
+
+    expect(klass.baz).toEqual("default_value");
+    expect(subclass.baz).toEqual("sub");
   });
 
   it("subclass keeps default value when value set on superclass", () => {
-    class Sup {}
-    mattrAccessor.call(Sup, "opt", { default: "default" });
-    (Sup as unknown as Record<string, unknown>).opt = "sup_changed";
-    class Sub extends Sup {}
-    mattrAccessor.call(Sub, "opt", { default: "default" });
-    expect((Sub as unknown as Record<string, unknown>).opt).toBe("default");
+    threadMattrAccessor.call(klass, "baz", { default: "default_value" });
+    klass.baz = "super";
+
+    expect(klass.baz).toEqual("super");
+    expect(subclass.baz).toEqual("default_value");
   });
 
   it("subclass can override default value without affecting superclass", () => {
-    class S {}
-    mattrAccessor.call(S, "color", { default: "red" });
-    class T extends S {}
-    mattrAccessor.call(T, "color", { default: "blue" });
-    expect((S as unknown as Record<string, unknown>).color).toBe("red");
-    expect((T as unknown as Record<string, unknown>).color).toBe("blue");
+    threadMattrAccessor.call(klass, "baz", { default: "super" });
+    threadMattrAccessor.call(subclass, "baz", { default: "sub" });
+
+    expect(klass.baz).toEqual("super");
+    expect(subclass.baz).toEqual("sub");
   });
 });
