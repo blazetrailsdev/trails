@@ -821,10 +821,8 @@ describe("InverseHasManyTests", () => {
 
   it("inverse instance should be set before initialize callbacks are run", async () => {
     (Interest as any).afterInitialize((interest: any) => {
-      if (!interest.isNewRecord()) {
-        if (!(interest.association("human").isLoaded() && interest.human != null)) {
-          throw new Error("inverse not set before after_initialize");
-        }
+      if (!(interest.association("human").isLoaded() && interest.human != null)) {
+        throw new Error("inverse not set before after_initialize");
       }
     });
     try {

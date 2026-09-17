@@ -416,8 +416,8 @@ describe("BelongsToAssociationsTest", () => {
     const model1 = new FirstModel({});
     const model2 = new SecondModel({});
 
-    assertPredicate(await model1.isValid(), (valid) => valid);
-    assertNotPredicate(await model2.isValid(), (valid) => valid);
+    assert(await model1.isValid());
+    assertNot(await model2.isValid());
   });
 
   it("optional relation", async () => {
@@ -437,7 +437,7 @@ describe("BelongsToAssociationsTest", () => {
         set company(value: Company | null);
       }
       const account = new TempModel({});
-      assertPredicate(await account.isValid(), (valid) => valid);
+      assert(await account.isValid());
     } finally {
       (Base as any).belongsToRequiredByDefault = prev;
     }
@@ -460,7 +460,7 @@ describe("BelongsToAssociationsTest", () => {
         set company(value: Company | null);
       }
       const account = new TempModel({});
-      assertNotPredicate(await account.isValid(), (valid) => valid);
+      assertNot(await account.isValid());
       expect((account as any).errors.details.get("company")).toEqual([{ error: ":blank" }]);
     } finally {
       (Base as any).belongsToRequiredByDefault = prev;
@@ -484,7 +484,7 @@ describe("BelongsToAssociationsTest", () => {
         set company(value: Company | null);
       }
       const account = new TempModel({});
-      assertNotPredicate(await account.isValid(), (valid) => valid);
+      assertNot(await account.isValid());
       expect((account as any).errors.details.get("company")).toEqual([{ error: ":blank" }]);
     } finally {
       (Base as any).belongsToRequiredByDefault = prev;

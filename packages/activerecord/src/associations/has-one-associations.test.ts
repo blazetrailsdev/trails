@@ -825,7 +825,7 @@ describe("HasOneAssociationsTest", () => {
     expect(newShip.equals(ships("black_pearl"))).not.toBe(true);
     expect((await readHasOne(pirate, "ship")).equals(newShip)).toBe(true);
     assertPredicate(newShip, (r: any) => r.isNewRecord());
-    assertPredicate(await newShip.isInvalid(), (invalid) => invalid);
+    assert(await newShip.isInvalid());
     expect(origShip.pirate_id).toBeNull();
     assertNot(origShip.isChanged);
   });
@@ -836,7 +836,7 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await pirate.createDependentShip();
     assertPredicate(newShip, (r: any) => r.isNewRecord());
-    assertPredicate(await newShip.isInvalid(), (invalid) => invalid);
+    assert(await newShip.isInvalid());
     assertPredicate(origShip, (r: any) => r.isDestroyed());
   });
 
@@ -859,7 +859,7 @@ describe("HasOneAssociationsTest", () => {
     const currentShip = await readHasOne(pirate, "ship");
     currentShip.name = null;
 
-    assertNotPredicate(await currentShip.isValid(), (valid) => valid);
+    assertNot(await currentShip.isValid());
     const error: any = await assertRaises([RecordNotSaved], {}, async () => {
       await pirate.association("ship").writer(ships("interceptor"));
     });
