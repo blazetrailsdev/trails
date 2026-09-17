@@ -11,7 +11,7 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { assertEmpty, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertEmpty, assertNothingRaised, assertRaises, getEnv } from "@blazetrails/activesupport";
 import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -566,16 +566,14 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
 
   it("creates development database without test database when skip test database", async () => {
-    const prev = process.env.SKIP_TEST_DATABASE;
-    process.env.SKIP_TEST_DATABASE = "true";
+    setEnv("SKIP_TEST_DATABASE", "true");
     try {
       DatabaseTasks.env = "development";
       await assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
         await DatabaseTasks.createCurrent("development");
       });
     } finally {
-      if (prev === undefined) delete process.env.SKIP_TEST_DATABASE;
-      else process.env.SKIP_TEST_DATABASE = prev;
+      setEnv("SKIP_TEST_DATABASE", undefined);
     }
   });
   it("establishes connection for the given environments", async () => {
@@ -1393,34 +1391,33 @@ describe("DatabaseTasksCollationTest", () => {
 describe("DatabaseTaskTargetVersionTest", () => {
   let originalVersion: string | undefined;
   beforeEach(() => {
-    originalVersion = process.env.VERSION;
+    originalVersion = getEnv("VERSION");
   });
   afterEach(() => {
-    if (originalVersion === undefined) delete process.env.VERSION;
-    else process.env.VERSION = originalVersion;
+    setEnv("VERSION", originalVersion);
   });
 
   it("target version returns nil if version does not exist", () => {
-    delete process.env.VERSION;
+    setEnv("VERSION", undefined);
     expect(DatabaseTasks.targetVersion()).toBeNull();
   });
 
   it("target version returns nil if version is empty", () => {
-    process.env.VERSION = "";
+    setEnv("VERSION", "");
     expect(DatabaseTasks.targetVersion()).toBeNull();
   });
 
   it("target version returns converted to integer env version if version exists", () => {
-    process.env.VERSION = "0";
+    setEnv("VERSION", "0");
     expect(DatabaseTasks.targetVersion()).toBe(0);
 
-    process.env.VERSION = "42";
+    setEnv("VERSION", "42");
     expect(DatabaseTasks.targetVersion()).toBe(42);
 
-    process.env.VERSION = "042";
+    setEnv("VERSION", "042");
     expect(DatabaseTasks.targetVersion()).toBe(42);
 
-    process.env.VERSION = "2000_01_01_000042";
+    setEnv("VERSION", "2000_01_01_000042");
     expect(DatabaseTasks.targetVersion()).toBe(20000101000042);
   });
 });
@@ -1428,69 +1425,68 @@ describe("DatabaseTaskTargetVersionTest", () => {
 describe("DatabaseTaskCheckTargetVersionTest", () => {
   let originalVersion: string | undefined;
   beforeEach(() => {
-    originalVersion = process.env.VERSION;
+    originalVersion = getEnv("VERSION");
   });
   afterEach(() => {
-    if (originalVersion === undefined) delete process.env.VERSION;
-    else process.env.VERSION = originalVersion;
+    setEnv("VERSION", originalVersion);
   });
 
   it("check target version does not raise error on empty version", () => {
-    process.env.VERSION = "";
+    setEnv("VERSION", "");
     expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
   });
 
   it("check target version does not raise error if version is not set", () => {
-    delete process.env.VERSION;
+    setEnv("VERSION", undefined);
     expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
   });
 
   it("check target version raises error on invalid version format", async () => {
     let e: Error;
 
-    process.env.VERSION = "unknown";
+    setEnv("VERSION", "unknown");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "0.1.11";
+    setEnv("VERSION", "0.1.11");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "1.1.11";
+    setEnv("VERSION", "1.1.11");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "0 ";
+    setEnv("VERSION", "0 ");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "1.";
+    setEnv("VERSION", "1.");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "1_";
+    setEnv("VERSION", "1_");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
-    process.env.VERSION = "1_name";
+    setEnv("VERSION", "1_name");
     e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
   });
 
   it("check target version does not raise error on valid version format", async () => {
-    process.env.VERSION = "0";
+    setEnv("VERSION", "0");
     await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    process.env.VERSION = "1";
+    setEnv("VERSION", "1");
     await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    process.env.VERSION = "001";
+    setEnv("VERSION", "001");
     await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    process.env.VERSION = "1_001";
+    setEnv("VERSION", "1_001");
     await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
 
-    process.env.VERSION = "001_name.ts";
+    setEnv("VERSION", "001_name.ts");
     await assertNothingRaised(() => DatabaseTasks.checkTargetVersion());
   });
 });
