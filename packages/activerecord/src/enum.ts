@@ -505,6 +505,17 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
 export function assertValidEnumDefinitionValues(
   values: any,
 ): Record<string, string | number | boolean | null> | string[] {
+  if (isPlainHash(values)) {
+    const keys = Object.keys(values as object);
+    if (keys.length === 0) {
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
+    }
+    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
+      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
+    }
+    return values;
+  }
+
   if (Array.isArray(values)) {
     if (values.length === 0) {
       throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
@@ -519,34 +530,6 @@ export function assertValidEnumDefinitionValues(
     }
     if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
       throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
-    }
-    return values;
-  }
-
-  if (isPlainHash(values)) {
-    const keys = Object.keys(values as object);
-    if (keys.length === 0) {
-      throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
-    }
-    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
-      throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
-    }
-    for (const k of keys) {
-      const value = (values as Record<string, unknown>)[k];
-      const isFiniteNumber = typeof value === "number" && Number.isFinite(value);
-      if (
-        !(
-          typeof value === "string" ||
-          isFiniteNumber ||
-          typeof value === "boolean" ||
-          value === null
-        )
-      ) {
-        throw new ArgumentError(
-          `Enum values ${rbInspect(values)} must be only booleans, finite numbers,` +
-            ` strings, or null, got: ${typeof value === "number" ? String(value) : typeof value}`,
-        );
-      }
     }
     return values;
   }

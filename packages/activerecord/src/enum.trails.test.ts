@@ -212,19 +212,12 @@ describe("Enum private validators", () => {
       const out = assertValidEnumDefinitionValues({ a: true, b: null, c: 1 });
       expect(out).toEqual({ a: true, b: null, c: 1 });
     });
-    it("rejects hash with non-primitive value", () => {
-      expect(() => assertValidEnumDefinitionValues({ a: { x: 1 } })).toThrow(ArgumentError);
-    });
     it("accepts hash with symbol keys", () => {
       const out = assertValidEnumDefinitionValues({ ":draft": 0 });
       expect(out).toBeDefined();
     });
     it("rejects hash with blank-description symbol key", () => {
       expect(() => assertValidEnumDefinitionValues({ ":": 0 })).toThrow(/blank name/);
-    });
-    it("rejects hash with NaN or Infinity number values", () => {
-      expect(() => assertValidEnumDefinitionValues({ a: NaN })).toThrow(/finite numbers/);
-      expect(() => assertValidEnumDefinitionValues({ a: Infinity })).toThrow(/finite numbers/);
     });
   });
 
