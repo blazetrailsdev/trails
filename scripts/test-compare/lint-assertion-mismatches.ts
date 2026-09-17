@@ -36,9 +36,11 @@ import {
   nextMark,
   renderExceeded,
   renderFrozen,
+  renderFrozenSlack,
   renderMissing,
   renderUnmarked,
   renderWriteSummary,
+  slack,
   violations,
   writeMark,
 } from "./assertion-ratchet.js";
@@ -105,6 +107,23 @@ async function loadArtifact(file: string): Promise<ComparisonArtifact> {
   return JSON.parse(text) as ComparisonArtifact;
 }
 
+/**
+ * The marker as the GATE arm reads it: a malformed or unreadable one costs the
+ * slack report and nothing else. The gate's answer does not depend on the
+ * marker, so letting a bad marker fail it would suspend the very protection the
+ * freeze is supposed to leave running.
+ */
+async function loadFreezeForReport(file: string): Promise<string | null> {
+  try {
+    return await loadFreeze(file);
+  } catch (e) {
+    console.error(
+      `assertion-mismatch ratchet: ignoring the freeze marker — ${(e as Error).message}`,
+    );
+    return null;
+  }
+}
+
 /** File pair the gate reads/writes; overridable so tests can drive `main`. */
 export interface Paths {
   artifact: string;
@@ -126,8 +145,11 @@ export const DEFAULT_PATHS: Paths = {
  * reseeding from one would drop that package's mark entirely — so both arms
  * bail on it before either touches the file.
  *
- * A freeze marker suspends the `write` arm only. The gate keeps running: a
- * frozen mark is one carrying slack, which this ratchet reports as green.
+ * A freeze marker suspends the `write` arm only, and is read STRICTLY there —
+ * a malformed one must not be mistaken for a live mark and reseeded over. The
+ * gate arm keeps running either way: a frozen mark is one carrying slack, which
+ * this ratchet reports as green. It reads the marker only to report that slack,
+ * so a marker that cannot be read costs the report and never the gate.
  */
 export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promise<number> {
   const markRel = path.relative(ROOT_DIR, paths.mark);
@@ -162,6 +184,14 @@ export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promis
   if (exceeded.length > 0 || unmarked.length > 0) return 1;
 
   console.log("assertion-mismatch ratchet: OK (no counter exceeds its high-water mark).");
+
+  const frozen = await loadFreezeForReport(paths.freeze);
+  if (frozen !== null) {
+    const entries = slack(current, mark);
+    if (entries.length > 0) {
+      console.log(renderFrozenSlack(entries, frozen, markRel));
+    }
+  }
   return 0;
 }
 
@@ -172,7 +202,8 @@ async function runAsScript(): Promise<void> {
   const argv = process.argv.slice(2);
   const write = argv.includes(WRITE_FLAG);
   try {
-    if (shouldRegenerateForRun(argv, process.env, (await loadFreeze(FREEZE_PATH)) !== null)) {
+    const frozen = write && (await loadFreeze(FREEZE_PATH)) !== null;
+    if (shouldRegenerateForRun(argv, process.env, frozen)) {
       console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
       try {
         await regenerateArtifact(process.env);

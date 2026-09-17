@@ -6,6 +6,8 @@ serializes the whole RFC on this file. The mark only shrinks, so leaving it
 untouched while the counters fall is green the whole way; the RFC's closing
 story `tighten-assertion-mark-after-0132` deletes this marker and reseeds once.
 
-Until then the ratchet is not guarding the ground already converged: the slack
-absorbs a regression in a matched test's assertions silently. Do not widen the
-scope of this freeze, and do not add a second campaign to it.
+Until then the ratchet is not ENFORCING on the ground already converged: a
+regression inside the accumulated slack does not fail the gate. It is not
+silent — every gate run prints the slack per package, and those numbers should
+only ever fall. Do not widen the scope of this freeze, and do not add a second
+campaign to it.

@@ -275,3 +275,55 @@ export function renderFrozen(reason: string, freezePath: string, markPath: strin
     `closes, by deleting ${freezePath} in that same PR.`,
   ].join("\n");
 }
+
+/** A counter sitting BELOW its mark, and by how much. */
+export interface Slack {
+  package: string;
+  counter: Counter;
+  current: number;
+  mark: number;
+}
+
+/**
+ * Every counter the mark is holding above the measurement.
+ *
+ * Slack is what a frozen mark accumulates as a campaign converges, and it is
+ * also exactly the room a regression can move in without failing the gate. The
+ * gate reports it so the protection the freeze suspends is visible in the run
+ * that is not enforcing it, rather than being inferable only by diffing two
+ * artifacts.
+ */
+export function slack(current: Record<string, Counts>, mark: AssertionMark): Slack[] {
+  const out: Slack[] = [];
+  for (const pkg of Object.keys(current).sort()) {
+    const prior = mark.packages[pkg];
+    if (!prior) continue;
+    for (const counter of COUNTERS) {
+      if (current[pkg][counter] < prior[counter]) {
+        out.push({ package: pkg, counter, current: current[pkg][counter], mark: prior[counter] });
+      }
+    }
+  }
+  return out;
+}
+
+export function renderFrozenSlack(entries: Slack[], reason: string, markPath: string): string {
+  const total = entries.reduce((sum, e) => sum + (e.mark - e.current), 0);
+  return [
+    "",
+    `assertion-mismatch ratchet: ${markPath} is FROZEN, and currently carries ${total} ` +
+      "counter(s) of slack:",
+    "",
+    ...entries.map(
+      (e) =>
+        `  ${e.package}  ${COUNTER_LABELS[e.counter]}: ${e.current} (mark ${e.mark}, ` +
+        `${e.mark - e.current} unguarded)`,
+    ),
+    "",
+    "A regression inside that slack does NOT fail this gate while the mark is frozen — the",
+    "numbers above are the protection currently suspended. Reviewers of a converging PR read",
+    "them; they should only ever fall.",
+    "",
+    ...reason.split("\n").map((line) => `  ${line}`),
+  ].join("\n");
+}

@@ -123,6 +123,29 @@ describe("main", () => {
     expect(await main(false, paths)).toBe(1);
   });
 
+  it("gates normally when the marker cannot be read, which the gate does not depend on", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "   \n");
+    expect(await main(false, paths)).toBe(0);
+  });
+
+  it("reports the slack a frozen mark is carrying, which is the suspended protection", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
+    expect(await main(false, paths)).toBe(0);
+    const out = vi.mocked(console.log).mock.calls.join("\n");
+    expect(out).toContain("assertion-count-mismatch: 4 (mark 10, 6 unguarded)");
+    expect(out).toContain("assertion-value-mismatch: 0 (mark 3, 3 unguarded)");
+    expect(out).not.toContain("assertion-kind-mismatch");
+    expect(out).toContain("Frozen for RFC 0132.");
+  });
+
+  it("reports no slack while the mark is live", async () => {
+    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
+    expect(await main(false, paths)).toBe(0);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
+  });
+
   it("names the missing artifact rather than surfacing a bare ENOENT", async () => {
     await writeFixtures({}, {});
     await fs.rm(paths.artifact);
