@@ -924,9 +924,15 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      await Base.connection.createTable("timestamps", { force: true }, (t) => {
+        t.string("title");
+      });
+      await Base.connection.addColumn("timestamps", "posted_at", "datetime");
+      const output = await dumpTableSchema(Base.connection, "timestamps");
+      expect(output).toContain("datetime");
+      expect(output).toContain("posted_at");
     },
   );
 });
