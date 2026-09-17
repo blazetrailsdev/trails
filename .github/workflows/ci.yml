@@ -958,10 +958,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
-    # postgres-tests job below for the rationale. This lane was the run's
-    # critical path at ~12m while the sharded PG/MariaDB lanes finished in
-    # 7-9m; its unsharded `packages/activerecord/` step alone was 604s against
-    # 403s/388s for PG's two legs.
+    # postgres-tests job below for the rationale. That story left this lane
+    # unsharded as "not on the critical path"; sharding the other two made it
+    # the critical path, so the exemption no longer holds. No service
+    # container to duplicate here, and the `needs` graph keys on the job id,
+    # so the `ci` aggregator still sees one merged result for both legs.
     strategy:
       fail-fast: false
       matrix:
