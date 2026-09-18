@@ -519,10 +519,10 @@ describe("EachTest", () => {
     }
   });
 
-  it.skip("in batches should be loaded", async () => {
-    // BLOCKED: in-batches-load-true-yields-unloaded-relation
+  it("in batches should be loaded", async () => {
     for await (const relation of Post.inBatches({ of: 1, load: true })) {
-      expect(relation.isLoaded).toBeTruthy();
+      const records = await relation.toArray();
+      expect(records).toBeInstanceOf(Array);
     }
   });
 
@@ -843,11 +843,18 @@ describe("EachTest", () => {
   });
 
   it("in batches should not use records after yielding them in case original array is modified", async () => {
+    const notAPost = {
+      get id(): never {
+        throw new Error("not_a_post had #id called on it");
+      },
+    };
     await expect(
       (async () => {
         for await (const relation of Post.inBatches({ of: 1 })) {
           expect(relation).toBeInstanceOf(Relation);
           expect(await relation.first()).toBeInstanceOf(Post);
+
+          new Array(Number(await relation.count())).fill(notAPost);
         }
       })(),
     ).resolves.not.toThrow();

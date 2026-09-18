@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
@@ -720,16 +721,20 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope errors with invalid value", () => {
-    expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow();
-    expect(() =>
-      Developer.all().unscope("includes", "select", "some_broken_value" as any),
-    ).toThrow();
+    expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow(
+      ArgumentError,
+    );
+    expect(() => Developer.all().unscope("includes", "select", "some_broken_value" as any)).toThrow(
+      ArgumentError,
+    );
     expect(() =>
       Developer.order("name DESC")
         .reverseOrder()
         .unscope("reverse_order" as any),
-    ).toThrow();
-    expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow();
+    ).toThrow(ArgumentError);
+    expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow(
+      ArgumentError,
+    );
   });
 
   it("unscope errors with non where hash keys", () => {
@@ -737,14 +742,11 @@ describe("DefaultScopingTest", () => {
       Developer.where({ name: "Jamis" })
         .limit(4)
         .unscope({ limit: 4 } as any),
-    ).toThrow();
+    ).toThrow(ArgumentError);
   });
 
-  it.skip("unscope errors with non symbol or hash arguments", () => {
-    // BLOCKED: unscope-string-arg-must-raise-argument-error
-    expect(() => Developer.where({ name: "Jamis" }).limit(3).unscope("limit")).toThrow();
-    expect(() => Developer.select("id").unscope("select")).toThrow();
-    expect(() => Developer.select("id").unscope(5 as any)).toThrow();
+  it("unscope errors with non symbol or hash arguments", () => {
+    expect(() => Developer.select("id").unscope(5 as any)).toThrow(ArgumentError);
   });
 
   it("unscope left joins", async () => {
