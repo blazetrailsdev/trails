@@ -144,7 +144,9 @@ describe("TestNestedAttributesInGeneral", () => {
     });
     const ship = await (pirate as any).createShip({ name: "Nights Dirty Lightning" });
     await pirate.update({ shipAttributes: { _destroy: true, id: ship.id } });
-    await assertNothingRaised(async () => (await pirate.association("ship").reload()).target);
+    await assertNothingRaised(
+      async () => (await (pirate.association("ship") as any).reload()).target,
+    );
     resetShipConfig();
   });
 
@@ -781,7 +783,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     await (pirate as any).delete();
     const s = await Ship.find(ship.id);
-    (await s.reload()).attributes = { updateOnlyPirateAttributes: { catchphrase: "Arr" } };
+    ((await s.reload()) as any).attributes = { updateOnlyPirateAttributes: { catchphrase: "Arr" } };
     expect(
       ((await s.association("updateOnlyPirate").loadTarget()) as Pirate).isPersisted(),
     ).toBeFalsy();

@@ -237,7 +237,7 @@ describe("PersistenceTest", () => {
   it("delete all", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    expect((await Topic.count()) > 0).toBeTruthy();
+    expect(((await Topic.count()) as number) > 0).toBeTruthy();
 
     const count = await Topic.count();
     expect(await Topic.deleteAll()).toBe(count);
@@ -1191,7 +1191,7 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy many", async () => {
-    const clients = await Client.find([2, 3]);
+    const clients = (await Client.find([2, 3])) as Client[];
 
     await assertDifference(
       () => Client.count() as Promise<number>,
@@ -1364,7 +1364,7 @@ describe("PersistenceTest", () => {
     const shouldBeDestroyedReply = await Reply.create({ title: "hello", content: "world" });
     await (await Topic.find(1)).replies.push(shouldBeDestroyedReply);
 
-    const topic = (await Topic.destroy(1)) as Topic;
+    const topic = (await Topic.destroy(1)) as InstanceType<typeof Topic>;
     expect(topic.isDestroyed()).toBeTruthy();
 
     await expect(Topic.find(1)).rejects.toThrow(RecordNotFound);
