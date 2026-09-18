@@ -353,7 +353,7 @@ export function assignNestedAttributesForCollectionAssociation(
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): Promise<void> | void {
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
-    throw new Error(
+    throw new ArgumentError(
       `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
     );
   }

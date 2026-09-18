@@ -854,21 +854,19 @@ function collectionAssociationTests(
 
   it("should define an attribute writer method for the association", async () => {
     const { pirate } = await buildSetup();
-    expect(
-      typeof (pirate as any)[
-        `set${associationName[0].toUpperCase()}${associationName.slice(1)}Attributes`
-      ],
-    ).toBe("function");
+    assertRespondTo(
+      pirate,
+      `set${associationName[0].toUpperCase()}${associationName.slice(1)}Attributes`,
+    );
   });
 
   it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
     const { pirate } = await buildSetup();
-    await expect(
-      (async () => {
-        await write(pirate, [{ peg_leg: true }]);
-        await pirate.save();
-      })(),
-    ).rejects.toThrow(new RegExp(`unknown attribute 'peg_leg' for ${childName}`));
+    const exception = await assertRaise([UnknownAttributeError], {}, async () => {
+      await write(pirate, [{ peg_leg: true }]);
+      await pirate.save();
+    });
+    expect(exception.message).toMatch(`unknown attribute 'peg_leg' for ${childName}.`);
   });
 
   it("should save only one association on create", async () => {
@@ -918,9 +916,9 @@ function collectionAssociationTests(
     const { pirate, child1 } = await buildSetup();
     await pirate.reload();
     await write(pirate, [{ id: child1.id, name: "Grace OMalley" }]);
-    expect(proxy(pirate).loaded).toBe(false);
+    expect(proxy(pirate).loaded).toBeFalsy();
     await pirate.save();
-    expect(proxy(pirate).loaded).toBe(false);
+    expect(proxy(pirate).loaded).toBeFalsy();
     expect((await childClass.find(child1.id)).name).toBe("Grace OMalley");
   });
 
@@ -956,9 +954,9 @@ function collectionAssociationTests(
     await pirate.reload();
     await write(pirate, [{ id: child1.id, _destroy: "1" }]);
     const target = await proxy(pirate).loadTarget();
-    expect(target.find((r: any) => String(r.id) === String(child1.id)).markedForDestruction()).toBe(
-      true,
-    );
+    expect(
+      target.find((r: any) => String(r.id) === String(child1.id)).markedForDestruction(),
+    ).toBeTruthy();
   });
 
   it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
@@ -977,7 +975,12 @@ function collectionAssociationTests(
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
     const { pirate } = await buildSetup();
     await proxy(pirate).load();
-    expect(() => write(pirate, [{ id: 1234567890 }])).toThrow(RecordNotFound);
+    const exception = await assertRaise([RecordNotFound], {}, () =>
+      write(pirate, [{ id: 1234567890 }]),
+    );
+    expect(exception.message).toBe(
+      `Couldn't find ${childName} with ID=1234567890 for Pirate with ID=${pirate.id}`,
+    );
   });
 
   it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
@@ -985,7 +988,12 @@ function collectionAssociationTests(
     const otherPirate = await Pirate.createBang({ catchphrase: "Ahoy!" });
     const otherChild = await proxy(otherPirate).createBang({ name: "Buccaneers Servant" });
     await proxy(pirate).load();
-    expect(() => write(pirate, [{ id: otherChild.id }])).toThrow(RecordNotFound);
+    const exception = await assertRaise([RecordNotFound], {}, () =>
+      write(pirate, [{ id: otherChild.id }]),
+    );
+    expect(exception.message).toBe(
+      `Couldn't find ${childName} with ID=${otherChild.id} for Pirate with ID=${pirate.id}`,
+    );
   });
 
   it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
@@ -1004,7 +1012,7 @@ function collectionAssociationTests(
 
   it("should not assign destroy key to a record", async () => {
     const { pirate } = await buildSetup();
-    expect(() => write(pirate, { foo: { _destroy: "0" } })).not.toThrow();
+    await assertNothingRaised(() => write(pirate, { foo: { _destroy: "0" } }));
   });
 
   it("should ignore new associated records with truthy destroy attribute", async () => {
@@ -1026,9 +1034,13 @@ function collectionAssociationTests(
     const { pirate, child1, child2 } = await buildSetup();
     const params = await alternateParams(child1, child2);
     params["baz"] = {};
-    const before = Number(await proxy(pirate).count());
-    (pirate as any).attributes = { [setter]: params };
-    expect(Number(await proxy(pirate).count())).toBe(before);
+    await assertNoDifference(
+      () => proxy(pirate).count() as Promise<number>,
+      null,
+      () => {
+        (pirate as any).attributes = { [setter]: params };
+      },
+    );
   });
 
   it("should sort the hash by the keys before building new associated models", async () => {
@@ -1045,9 +1057,11 @@ function collectionAssociationTests(
 
   it("should raise an argument error if something else than a hash is passed", async () => {
     const { pirate } = await buildSetup();
-    expect(() => write(pirate, {})).not.toThrow();
-    expect(() => write(pirate, "foo")).toThrow(
-      new RegExp(`Hash or Array expected for \`${associationName}\` attributes, got String`),
+    await assertNothingRaised(() => write(pirate, {}));
+    await assertNothingRaised(() => write(pirate, {}));
+    const exception = await assertRaise([ArgumentError], {}, () => write(pirate, "foo"));
+    expect(exception.message).toBe(
+      `Hash or Array expected for \`${associationName}\` attributes, got String`,
     );
   });
 
@@ -1064,10 +1078,15 @@ function collectionAssociationTests(
     const { pirate, child1, child2 } = await buildSetup();
     const params = await alternateParams(child1, child2);
     params["baz"] = { name: "Buccaneers Servant" };
-    const before = Number(await proxy(pirate).count());
-    await pirate.update({ [setter]: params } as any);
-    expect(Number(await proxy(pirate).count())).toBe(before + 1);
-    const reloaded = await Pirate.find(pirate.id);
+    await assertDifference(
+      () => proxy(pirate).count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await pirate.update({ [setter]: params } as any);
+      },
+    );
+    const reloaded = await pirate.reload();
     expect(new Set((await proxy(reloaded).toArray()).map((r: any) => r.name))).toEqual(
       new Set(["Grace OMalley", "Privateers Greed", "Buccaneers Servant"]),
     );
@@ -1083,9 +1102,12 @@ function collectionAssociationTests(
       const params = await alternateParams(child1, child2);
       params["baz"] = { id: record.id, _destroy: trueVariable };
       await write(pirate, params);
-      const before = Number(await proxy(pirate).count());
-      await pirate.save();
-      expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before - 1);
+      await assertDifference(
+        () => proxy(pirate).count() as Promise<number>,
+        -1,
+        null,
+        () => pirate.save(),
+      );
     }
   });
 
@@ -1094,9 +1116,11 @@ function collectionAssociationTests(
     for (const falseVariable of [null, "", "0", 0, "false", false]) {
       const params = await alternateParams(child1, child2);
       params["foo"]["_destroy"] = falseVariable;
-      const before = Number(await proxy(pirate).count());
-      await pirate.update({ [setter]: params } as any);
-      expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before);
+      await assertNoDifference(
+        () => proxy(pirate).count() as Promise<number>,
+        null,
+        () => pirate.update({ [setter]: params } as any),
+      );
     }
   });
 
@@ -1104,11 +1128,17 @@ function collectionAssociationTests(
     const { pirate, child1, child2 } = await buildSetup();
     const params = await alternateParams(child1, child2);
     params["baz"] = { id: child1.id, _destroy: true };
-    const before = Number(await proxy(pirate).count());
-    await write(pirate, params);
-    expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before);
-    await pirate.save();
-    expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before - 1);
+    await assertNoDifference(
+      () => proxy(pirate).count() as Promise<number>,
+      null,
+      () => write(pirate, params),
+    );
+    await assertDifference(
+      () => proxy(pirate).count() as Promise<number>,
+      -1,
+      null,
+      () => pirate.save(),
+    );
   });
 
   it("should automatically enable autosave on the association", () => {
@@ -1120,7 +1150,7 @@ function collectionAssociationTests(
     await (pirate as any).setAttributes({
       parrotsAttributes: { foo: { name: "Lovely Day" }, bar: { name: "Blown Away" } },
     });
-    await expect(pirate.saveBang()).resolves.toBeTruthy();
+    await assertNothingRaised(() => pirate.saveBang());
   });
 
   it("assigning nested attributes target", async () => {
