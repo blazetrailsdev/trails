@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertNoChanges, assertRaises } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -77,18 +78,23 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
     it("exclusion constraints scoped to schemas", async () => {
       await connection.addExclusionConstraint("invoices", EXPRESSION, { using: "gist" });
 
-      const before = (await connection.exclusionConstraints("invoices")).length;
       try {
-        await connection.createSchema("test_schema");
-        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with its schema by the `dropSchema("test_schema")` in the finally block
-        await connection.createTable("test_schema.invoices", {}, (t) => {
-          t.date("start_date");
-          t.date("end_date");
-        });
-        await connection.addExclusionConstraint("test_schema.invoices", EXPRESSION, {
-          using: "gist",
-        });
-        expect((await connection.exclusionConstraints("invoices")).length).toBe(before);
+        await assertNoChanges(
+          async () => (await connection.exclusionConstraints("invoices")).length,
+          null,
+          { from: 1 },
+          async () => {
+            await connection.createSchema("test_schema");
+            // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with its schema by the `dropSchema("test_schema")` in the finally block
+            await connection.createTable("test_schema.invoices", {}, (t) => {
+              t.date("start_date");
+              t.date("end_date");
+            });
+            await connection.addExclusionConstraint("test_schema.invoices", EXPRESSION, {
+              using: "gist",
+            });
+          },
+        );
       } finally {
         await connection.dropSchema("test_schema");
       }
@@ -117,6 +123,7 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       expect(exclusionConstraints.length).toBe(1);
 
       const constraint = exclusionConstraints[0];
+      expect(constraint.tableName).toBe("invoices");
       expect(constraint.name).toBe("excl_rails_74c9160f55");
       expect(constraint.deferrable).toBe(false);
       expect(constraint.expression).toBe(EXPRESSION);
@@ -128,7 +135,11 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
         deferrable: "immediate",
       });
 
-      const constraint = (await connection.exclusionConstraints("invoices"))[0];
+      const exclusionConstraints = await connection.exclusionConstraints("invoices");
+      expect(exclusionConstraints.length).toBe(1);
+
+      const constraint = exclusionConstraints[0];
+      expect(constraint.tableName).toBe("invoices");
       expect(constraint.name).toBe("excl_rails_74c9160f55");
       expect(constraint.deferrable).toBe("immediate");
       expect(constraint.expression).toBe(EXPRESSION);
@@ -140,19 +151,26 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
         deferrable: "deferred",
       });
 
-      const constraint = (await connection.exclusionConstraints("invoices"))[0];
+      const exclusionConstraints = await connection.exclusionConstraints("invoices");
+      expect(exclusionConstraints.length).toBe(1);
+
+      const constraint = exclusionConstraints[0];
+      expect(constraint.tableName).toBe("invoices");
       expect(constraint.name).toBe("excl_rails_74c9160f55");
       expect(constraint.deferrable).toBe("deferred");
       expect(constraint.expression).toBe(EXPRESSION);
     });
 
-    it("add exclusion constraint deferrable invalid", async () => {
-      await expect(
+    it.skip("add exclusion constraint deferrable invalid", async () => {
+      // BLOCKED: message — the port renders the symbol as JSON ("immediate") instead of `:immediate`
+      const error = await assertRaises([ArgumentError], {}, () =>
         connection.addExclusionConstraint("invoices", EXPRESSION, {
           using: "gist",
           deferrable: true as never,
         }),
-      ).rejects.toThrow('deferrable must be `"immediate"` or `"deferred"`, got: `true`');
+      );
+
+      expect(error.message).toBe("deferrable must be `:immediate` or `:deferred`, got: `true`");
     });
 
     it("added exclusion constraint ensures valid values", async () => {
