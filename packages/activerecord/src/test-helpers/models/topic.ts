@@ -146,6 +146,7 @@ export class Topic extends Base {
     this.afterSave((record: Topic) => {
       (record as any).afterSaveForTransaction();
     });
+    this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
     this.afterCreate((record: Topic) => {
       (record as any).afterCreateForTransaction();
     });
@@ -161,6 +162,8 @@ export class Topic extends Base {
   }
 
   afterTouchCalled = 0;
+
+  changeApprovedBeforeSave: boolean | null | undefined;
 
   static afterInitializeCalled: boolean | null = null;
 
@@ -219,6 +222,13 @@ export class Topic extends Base {
   private afterSaveForTransaction() {}
   /** @internal */
   private afterCreateForTransaction() {}
+
+  /** @internal */
+  private changeApprovedCallback() {
+    if (this.changeApprovedBeforeSave != null) {
+      this.writeAttribute("approved", this.changeApprovedBeforeSave);
+    }
+  }
 }
 
 export class DefaultRejectedTopic extends Topic {

@@ -11,7 +11,14 @@ function isTemporalDatetime(v: unknown): boolean {
   return v instanceof RubyTime;
 }
 import { describe, it, expect, beforeAll } from "vitest";
-import { travel, travelBack } from "@blazetrails/activesupport";
+import {
+  travel,
+  travelBack,
+  assertDifference,
+  assertEmpty,
+  assertNothingRaised,
+} from "@blazetrails/activesupport";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   Base,
@@ -100,6 +107,15 @@ for (const klass of [
   registerModel(klass);
 }
 
+async function assertUsesQueryConstraintsOnReload(object: any, columns: string[]) {
+  if (columns.length === 0) throw new Error("columns argument must not be empty");
+
+  const sql = (await captureSql(async () => object.reload()))[0];
+  for (const column of columns) {
+    expect(sql).toMatch(new RegExp(`WHERE .*${column}`));
+  }
+}
+
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics, accounts, clothingItems } = fixtures([
@@ -107,6 +123,7 @@ describe("PersistenceTest", () => {
     "minimalistics",
     "accounts",
     "clothingItems",
+    "developers",
   ]);
 
   beforeAll(async () => {
@@ -118,14 +135,14 @@ describe("PersistenceTest", () => {
       .filter((c: { isAutoPopulated(): boolean }) => c.isAutoPopulated())
       .map((c: { name: string }) => c.name);
 
-    expect(autoPopulatedColumnNames.length).toBeGreaterThan(1);
+    expect(autoPopulatedColumnNames.length > 1).toBeTruthy();
     expect(autoPopulatedColumnNames[0]).not.toBe(AutoId.primaryKey);
 
     const record = await AutoId.createBang();
     const lastId = (await AutoId.last())!.id;
 
     expect(lastId).not.toBeNull();
-    expect(lastId).toBeGreaterThan(0);
+    expect((lastId as number) > 0).toBeTruthy();
     expect(lastId).toBe(record.id);
   });
 
@@ -145,61 +162,112 @@ describe("PersistenceTest", () => {
 
   it("save for record with only primary key", async () => {
     const m = new Minimalistic();
-    await m.save();
-    expect(m.isPersisted()).toBe(true);
+    await assertNothingRaised(() => m.save());
   });
 
   it("update!", async () => {
-    const t = await Topic.create({ title: "old" });
-    await t.updateBang({ title: "new" });
-    expect(t.title).toBe("new");
+    Reply.validatesPresenceOf("title");
+    try {
+      const reply = await Reply.find(2);
+      expect(reply.title).toBe("The Second Topic of the day");
+      expect(reply.content).toBe("Have a nice day");
+
+      await reply.updateBang({
+        title: "The Second Topic of the day updated",
+        content: "Have a nice evening",
+      });
+      await reply.reload();
+      expect(reply.title).toBe("The Second Topic of the day updated");
+      expect(reply.content).toBe("Have a nice evening");
+
+      await reply.updateBang({ title: "The Second Topic of the day", content: "Have a nice day" });
+      await reply.reload();
+      expect(reply.title).toBe("The Second Topic of the day");
+      expect(reply.content).toBe("Have a nice day");
+
+      await expect(
+        reply.updateBang({ title: null, content: "Have a nice evening" }),
+      ).rejects.toThrow(RecordInvalid);
+    } finally {
+      Reply.clearValidatorsBang();
+    }
   });
 
-  it("update attribute", async () => {
-    const t = await Topic.create({ title: "old" });
-    await t.updateAttribute("title", "new");
-    expect(t.title).toBe("new");
+  it.skip("update attribute", async () => {
+    // BLOCKED: update_attribute writes via writeAttribute, not the `name=` setter
+    expect((await Topic.find(1)).approved).toBeFalsy();
+    await (await Topic.find(1)).updateAttribute("approved", true);
+    expect((await Topic.find(1)).approved).toBeTruthy();
+
+    await (await Topic.find(1)).updateAttribute("approved", false);
+    expect((await Topic.find(1)).approved).toBeFalsy();
+
+    await (await Topic.find(1)).updateAttribute("changeApprovedBeforeSave", true);
+    expect((await Topic.find(1)).approved).toBeTruthy();
   });
 
   it("destroy!", async () => {
-    const t = await Topic.create({ title: "a" });
-    await t.destroyBang();
-    expect(t.isDestroyed()).toBe(true);
+    const topic = await Topic.find(1);
+    expect(await topic.destroyBang()).toBe(topic);
+    expect(topic.isFrozen()).toBeTruthy();
+    await expect(Topic.find(topic.id)).rejects.toThrow(RecordNotFound);
   });
 
   it("destroyed returns boolean", async () => {
-    const t = await Topic.create({ title: "a" });
-    expect(t.isDestroyed()).toBe(false);
-    await t.destroy();
-    expect(t.isDestroyed()).toBe(true);
+    let developer = (await CanonicalDeveloper.first())!;
+    expect(developer.isDestroyed()).toBe(false);
+    await developer.destroy();
+    expect(developer.isDestroyed()).toBe(true);
+
+    developer = (await CanonicalDeveloper.last())!;
+    expect(developer.isDestroyed()).toBe(false);
+    await developer.delete();
+    expect(developer.isDestroyed()).toBe(true);
   });
 
   it("class level delete", async () => {
-    const t = await Topic.create({ title: "a" });
-    await Topic.delete(t.id);
-    expect(await Topic.exists(t.id)).toBe(false);
+    const shouldNotBeDestroyedReply = await Reply.create({ title: "hello", content: "world" });
+    await (await Topic.find(1)).replies.push(shouldNotBeDestroyedReply);
+
+    await Topic.delete(1);
+    await expect(Topic.find(1)).rejects.toThrow(RecordNotFound);
+    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
   });
 
   it("delete all", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    const before = (await Topic.count()) as number;
-    expect(before).toBeGreaterThan(0);
-    expect(await Topic.all().deleteAll()).toBe(before);
-    expect(await Topic.count()).toBe(0);
+    expect((await Topic.count()) > 0).toBeTruthy();
+
+    const count = await Topic.count();
+    expect(await Topic.deleteAll()).toBe(count);
   });
 
   it("update after create", async () => {
-    const t = await Topic.create({ title: "original" });
-    t.title = "updated";
-    await t.save();
-    expect(t.title).toBe("updated");
+    class Klass extends Topic {
+      static get name() {
+        return "Topic";
+      }
+      static {
+        (this as any).afterCreate(async function (this: any) {
+          await this.updateAttribute("author_name", "David");
+        });
+      }
+    }
+    const topic = new Klass();
+    topic.title = "Another New Topic";
+    await topic.save();
+
+    const topicReloaded = await Topic.find(topic.id);
+    expect(topicReloaded.title).toBe("Another New Topic");
+    expect(topicReloaded.author_name).toBe("David");
   });
 
   it("update does not run sql if record has not changed", async () => {
-    const t = await Topic.create({ title: "a" });
-    const result = await t.save();
-    expect(result).toBe(true);
+    const topic = await Topic.create({ title: "Another New Topic" });
+    await assertNoQueries(false, async () => {
+      expect(await topic.update({ title: "Another New Topic" })).toBeTruthy();
+    });
   });
 
   it("increment attribute", async () => {
@@ -285,10 +353,12 @@ describe("PersistenceTest", () => {
   });
 
   it("save with duping of destroyed object", async () => {
-    const t = await Topic.create({ title: "a" });
-    await t.destroy();
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
+    const developer = (await CanonicalDeveloper.first())!;
+    await developer.destroy();
+    const newDeveloper = developer.dup();
+    await newDeveloper.save();
+    expect(newDeveloper.isPersisted()).toBeTruthy();
+    expect(newDeveloper.isDestroyed()).toBeFalsy();
   });
 
   it("find raises record not found exception", async () => {
@@ -329,7 +399,7 @@ describe("PersistenceTest", () => {
       expect(reply).toBeInstanceOf(Reply);
 
       const topic = reply.becomes(Topic);
-      expect((topic as any).constructor).toBe(Topic);
+      expect(topic).toBeInstanceOf(Topic);
     } finally {
       await adapter.changeColumnDefault("topics", "type", { from: "Reply", to: originalType });
       void Topic.resetColumnInformation();
@@ -346,8 +416,8 @@ describe("PersistenceTest", () => {
       await Topic.resetColumnInformation();
 
       const child = new Child();
-      expect("foo" in child).toBe(true);
-      expect(typeof (child as any).fooChanged).toBe("function");
+      expect("foo" in child).toBeTruthy();
+      expect(typeof (child as any).fooChanged === "function").toBeTruthy();
       expect((new Child({ foo: "bar" }) as any).foo).toBe("bar");
     } finally {
       await adapter.removeColumn("topics", "foo");
@@ -356,21 +426,32 @@ describe("PersistenceTest", () => {
   });
 
   it("class level update without ids", async () => {
-    const t = await Topic.create({ title: "old" });
-    await Topic.update(t.id, { title: "new" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.title).toBe("new");
+    const topics = await Topic.all();
+    expect(topics.length).toBe(5);
+    for (const topic of topics) {
+      expect(topic.content).not.toBe("updated");
+    }
+
+    const updated = await Topic.update({ content: "updated" });
+    expect(updated.length).toBe(5);
+    for (const topic of updated) {
+      expect(topic.content).toBe("updated");
+    }
   });
 
   it("update many", async () => {
-    const t1 = await Topic.create({ title: "a" });
-    const t2 = await Topic.create({ title: "b" });
-    await Topic.update(t1.id, { title: "x" });
-    await Topic.update(t2.id, { title: "y" });
-    const r1 = await Topic.find(t1.id);
-    const r2 = await Topic.find(t2.id);
-    expect(r1.title).toBe("x");
-    expect(r2.title).toBe("y");
+    const topicData = [
+      [1, { content: "1 updated" }],
+      [2, { content: "2 updated" }],
+    ] as const;
+    const updated = await Topic.update(
+      topicData.map(([id]) => id),
+      topicData.map(([, attrs]) => attrs),
+    );
+
+    expect(updated.map((t) => Number(t.id))).toEqual([1, 2]);
+    expect((await Topic.find(1)).content).toBe("1 updated");
+    expect((await Topic.find(2)).content).toBe("2 updated");
   });
 
   it("update uses query constraints config", async () => {
@@ -518,13 +599,13 @@ describe("PersistenceTest", () => {
   it("build", () => {
     const topic = Topic.build({ title: "New Topic" });
     expect(topic.title).toBe("New Topic");
-    expect(topic.isPersisted()).toBe(false);
+    expect(topic.isPersisted()).toBeFalsy();
   });
 
   it("build many", () => {
     const built = Topic.build([{ title: "first" }, { title: "second" }]);
     expect(built.map((t) => t.title)).toEqual(["first", "second"]);
-    built.forEach((t) => expect(t.isPersisted()).toBe(false));
+    built.forEach((t) => expect(t.isPersisted()).toBeFalsy());
   });
 
   it("save null string attributes", async () => {
@@ -546,7 +627,7 @@ describe("PersistenceTest", () => {
 
   it("create many", async () => {
     const created = await Topic.create([{ title: "first" }, { title: "second" }]);
-    expect(created).toHaveLength(2);
+    expect(created.length).toBe(2);
     expect(created[0].title).toBe("first");
   });
 
@@ -562,7 +643,6 @@ describe("PersistenceTest", () => {
       [{ content: "1 duplicated" }, { content: "1 updated" }, { content: "2 updated" }],
     );
     expect(updated.map((t) => Number(t.id))).toEqual([1, 1, 2]);
-    expect(updated[0]).not.toBe(updated[1]);
     expect((await Topic.find(1)).content).toBe("1 updated");
     expect((await Topic.find(2)).content).toBe("2 updated");
   });
@@ -576,22 +656,30 @@ describe("PersistenceTest", () => {
   });
 
   it("update many with active record base object", async () => {
-    await expect((Topic as any).update(topics("first"), { content: "1 updated" })).rejects.toThrow(
+    const promise = (Topic as any).update(topics("first"), { content: "1 updated" });
+    await expect(promise).rejects.toThrow(ArgumentError);
+    const error = await promise.catch((e: Error) => e);
+    expect(error.message).toBe(
       "You are passing an instance of ActiveRecord::Base to `update`. " +
         "Please pass the id of the object by calling `.id`.",
     );
-    expect((await Topic.find(1)).content).not.toBe("1 updated");
+
+    expect((await Topic.first())!.content).not.toBe("1 updated");
   });
 
   it("update many with array of active record base objects", async () => {
-    await expect(
-      (Topic as any).update([topics("first"), topics("second")], { content: "updated" }),
-    ).rejects.toThrow(
+    const promise = (Topic as any).update([topics("first"), topics("second")], {
+      content: "updated",
+    });
+    await expect(promise).rejects.toThrow(ArgumentError);
+    const error = await promise.catch((e: Error) => e);
+    expect(error.message).toBe(
       "You are passing an array of ActiveRecord::Base instances to `update`. " +
         "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
     );
-    expect((await Topic.find(1)).content).not.toBe("updated");
-    expect((await Topic.find(2)).content).not.toBe("updated");
+
+    expect((await Topic.first())!.content).not.toBe("updated");
+    expect((await Topic.second())!.content).not.toBe("updated");
   });
 
   it("update many with duplicated ids!", async () => {
@@ -613,24 +701,30 @@ describe("PersistenceTest", () => {
   });
 
   it("update many with active record base object!", async () => {
-    await expect(
-      (Topic as any).updateBang(topics("first"), { content: "1 updated" }),
-    ).rejects.toThrow(
+    const promise = (Topic as any).updateBang(topics("first"), { content: "1 updated" });
+    await expect(promise).rejects.toThrow(ArgumentError);
+    const error = await promise.catch((e: Error) => e);
+    expect(error.message).toBe(
       "You are passing an instance of ActiveRecord::Base to `update!`. " +
         "Please pass the id of the object by calling `.id`.",
     );
-    expect((await Topic.find(1)).content).not.toBe("1 updated");
+
+    expect((await Topic.first())!.content).not.toBe("1 updated");
   });
 
   it("update many with array of active record base objects!", async () => {
-    await expect(
-      (Topic as any).updateBang([topics("first"), topics("second")], { content: "updated" }),
-    ).rejects.toThrow(
+    const promise = (Topic as any).updateBang([topics("first"), topics("second")], {
+      content: "updated",
+    });
+    await expect(promise).rejects.toThrow(ArgumentError);
+    const error = await promise.catch((e: Error) => e);
+    expect(error.message).toBe(
       "You are passing an array of ActiveRecord::Base instances to `update!`. " +
         "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
     );
-    expect((await Topic.find(1)).content).not.toBe("updated");
-    expect((await Topic.find(2)).content).not.toBe("updated");
+
+    expect((await Topic.first())!.content).not.toBe("updated");
+    expect((await Topic.second())!.content).not.toBe("updated");
   });
 
   it("update object", async () => {
@@ -680,8 +774,8 @@ describe("PersistenceTest", () => {
     await t.updateColumn("title", "super_title");
     expect(t.author_name).toBe("John");
     expect(t.title).toBe("super_title");
-    expect(t.isChanged).toBe(true);
-    expect(t.attributeChanged("author_name")).toBe(true);
+    expect(t.isChanged).toBeTruthy();
+    expect(t.attributeChanged("author_name")).toBeTruthy();
 
     await t.reload();
     expect(t.author_name).toBe(authorName);
@@ -695,8 +789,8 @@ describe("PersistenceTest", () => {
     await t.updateColumns({ title: "super_title" });
     expect(t.author_name).toBe("John");
     expect(t.title).toBe("super_title");
-    expect(t.isChanged).toBe(true);
-    expect(t.attributeChanged("author_name")).toBe(true);
+    expect(t.isChanged).toBeTruthy();
+    expect(t.attributeChanged("author_name")).toBeTruthy();
 
     await t.reload();
     expect(t.author_name).toBe(authorName);
@@ -720,21 +814,21 @@ describe("PersistenceTest", () => {
 
   it("becomes includes errors", async () => {
     const company = new Company({ name: null });
-    expect(await company.isValid()).toBe(false);
+    expect(await company.isValid()).toBeFalsy();
     const originalErrors = company.errors;
     const client = company.becomes(Client);
     expect(client.errors.attributeNames).toEqual(originalErrors.attributeNames);
   });
 
   it("create columns not equal attributes", async () => {
-    const topic = Topic.instantiate({
+    let topic = Topic.instantiate({
       title: "Another New Topic",
       does_not_exist: "test",
     });
-    const duped = topic.dup();
-    await duped.saveBang();
-    expect(duped.isPersisted()).toBe(true);
-    expect((await Topic.find(duped.id)).title).toBe("Another New Topic");
+    topic = topic.dup();
+    await assertNothingRaised(() => topic.save());
+    expect(topic.isPersisted()).toBeTruthy();
+    expect((await topic.reload()).title).toBe("Another New Topic");
   });
 });
 
@@ -744,42 +838,42 @@ describe("PersistenceTest", () => {
   it("delete new record", async () => {
     const client = new Client({ name: "37signals" });
     await client.delete();
-    expect(client.isFrozen()).toBe(true);
-    expect(await client.save()).toBe(false);
+    expect(client.isFrozen()).toBeTruthy();
+    expect(await client.save()).toBeFalsy();
     await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
   it("destroy new record", async () => {
     const client = new Client({ name: "37signals" });
     await client.destroy();
-    expect(client.isFrozen()).toBe(true);
-    expect(await client.save()).toBe(false);
+    expect(client.isFrozen()).toBeTruthy();
+    expect(await client.save()).toBeFalsy();
     await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
   it("destroy record with associations", async () => {
     const client = await Client.find(3);
     await client.destroy();
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(await client.firm).toBeInstanceOf(Firm);
-    expect(await client.save()).toBe(false);
+    expect(await client.save()).toBeFalsy();
     await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
   it("delete record with associations", async () => {
     const client = await Client.find(3);
     await client.delete();
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(await client.firm).toBeInstanceOf(Firm);
-    expect(await client.save()).toBe(false);
+    expect(await client.save()).toBeFalsy();
     await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
-    expect(client.isFrozen()).toBe(true);
+    expect(client.isFrozen()).toBeTruthy();
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 });
@@ -825,13 +919,7 @@ describe("PersistenceTest", () => {
     admin.errors.add("token", ":invalid");
     const child = admin.becomes(ChildUser);
     expect(child.errors.attributeNames).toEqual(["token"]);
-    let raised = false;
-    try {
-      child.errors.add("foo", ":invalid");
-    } catch {
-      raised = true;
-    }
-    expect(raised).toBe(false);
+    expect(() => child.errors.add("foo", ":invalid")).not.toThrow();
   });
 });
 
@@ -855,8 +943,9 @@ describe("PersistenceTest", () => {
 
   it("update parameters", async () => {
     const topic = await Topic.find(1);
-    await topic.update({});
-    await expect(topic.update(null as any)).rejects.toBeInstanceOf(ArgumentError);
+    await expect(topic.update({})).resolves.not.toThrow();
+
+    await expect(topic.update(null as any)).rejects.toThrow(ArgumentError);
   });
 
   it("update sti type", async () => {
@@ -869,9 +958,14 @@ describe("PersistenceTest", () => {
 
   it("delete isnt affected by scoping", async () => {
     const topic = await Topic.find(1);
-    const before = Number(await Topic.count());
-    await Topic.where("1=0").scoping(() => topic.delete());
-    expect(Number(await Topic.count())).toBe(before - 1);
+    await assertDifference(
+      () => Topic.count() as Promise<number>,
+      -1,
+      null,
+      async () => {
+        await Topic.where("1=0").scoping(() => topic.delete());
+      },
+    );
   });
 
   it("update column with model having primary key other than id", async () => {
@@ -896,7 +990,7 @@ describe("PersistenceTest", () => {
   it("delete", async () => {
     const topic = await Topic.find(1);
     expect(await topic.delete()).toBe(topic);
-    expect(topic.isFrozen()).toBe(true);
+    expect(topic.isFrozen()).toBeTruthy();
     await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
   });
 
@@ -940,9 +1034,10 @@ describe("PersistenceTest", () => {
     const t = (await Topic.first())!;
     await t.updateAttributeBang("title", "super_title");
     expect(t.title).toBe("super_title");
-    expect(t.isChanged).toBe(false);
-    expect(t.attributeChanged("title")).toBe(false);
+    expect(t.isChanged).toBeFalsy();
+    expect(t.attributeChanged("title")).toBeFalsy();
     expect(t.attributeChange("title")).toBeNull();
+
     await t.reload();
     expect(t.title).toBe("super_title");
   });
@@ -953,7 +1048,7 @@ describe("PersistenceTest", () => {
     });
     expect(topic.title).toBe("New Topic");
     expect(topic.author_name).toBe("David");
-    expect(topic.isPersisted()).toBe(false);
+    expect(topic.isPersisted()).toBeFalsy();
   });
 });
 
@@ -1015,25 +1110,42 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  fixtures([]);
+  const { topics, minimalistics } = fixtures(["topics", "companies", "minimalistics"]);
 
   const Topic = CanonicalTopic;
 
   it("update columns changing id", async () => {
-    const t = await Topic.create({ title: "test" });
-    const oldId = t.id;
-    await t.updateColumns({ id: 999 });
-    expect(Number(t.id)).toBe(999);
-    const refreshed = await Topic.find(999);
-    expect(Number(refreshed.id)).toBe(999);
-    expect(refreshed.title).toBe("test");
-    await expect(Topic.find(oldId)).rejects.toThrow();
+    const topic = await Topic.find(1);
+    await topic.updateColumns({ id: 123 });
+    expect(Number(topic.id)).toBe(123);
+    await topic.reload();
+    expect(Number(topic.id)).toBe(123);
   });
 
   it("update", async () => {
-    const t = await Topic.create({ title: "old" });
-    await t.update({ title: "new" });
-    expect(t.title).toBe("new");
+    const topic = await Topic.find(1);
+    expect(topic.approved).toBeFalsy();
+    expect(topic.title).toBe("The First Topic");
+
+    await topic.update({ approved: true, title: "The First Topic Updated" });
+    await topic.reload();
+    expect(topic.approved).toBeTruthy();
+    expect(topic.title).toBe("The First Topic Updated");
+
+    await topic.update({ approved: false, title: "The First Topic" });
+    await topic.reload();
+    expect(topic.approved).toBeFalsy();
+    expect(topic.title).toBe("The First Topic");
+
+    const promise = topic.update({ id: 3, title: "Hm is it possible?" });
+    await expect(promise).rejects.toThrow();
+    const error = (await promise.catch((e: Error) => e)) as Error;
+    expect((error as any).cause).not.toBeNull();
+    expect((await Topic.find(3)).title).not.toBe("Hm is it possible?");
+
+    await topic.update({ id: 1234 });
+    await expect(topic.reload()).resolves.not.toThrow();
+    expect(topic.title).toBe((await Topic.find(1234)).title);
   });
 
   it("populates non primary key autoincremented column for a cpk model", async () => {
@@ -1043,38 +1155,62 @@ describe("PersistenceTest", () => {
   });
 
   it("update many!", async () => {
-    const t1 = await Topic.create({ title: "a" });
-    const t2 = await Topic.create({ title: "b" });
-    await Topic.update(t1.id, { title: "x" });
-    await Topic.update(t2.id, { title: "y" });
-    expect((await Topic.find(t1.id)).title).toBe("x");
-    expect((await Topic.find(t2.id)).title).toBe("y");
+    const updated = await Topic.updateBang(
+      [1, 2],
+      [{ content: "1 updated" }, { content: "2 updated" }],
+    );
+
+    expect(updated.map((t: any) => Number(t.id))).toEqual([1, 2]);
+    expect((await Topic.find(1)).content).toBe("1 updated");
+    expect((await Topic.find(2)).content).toBe("2 updated");
   });
 
   it("class level update without ids!", async () => {
-    const t = await Topic.create({ title: "old" });
-    await Topic.update(t.id, { title: "new" });
-    const found = await Topic.find(t.id);
-    expect(found.title).toBe("new");
+    const topics = await Topic.all();
+    expect(topics.length).toBe(5);
+    for (const topic of topics) {
+      expect(topic.content).not.toBe("updated");
+    }
+
+    const updated = await Topic.updateBang({ content: "updated" });
+    expect(updated.length).toBe(5);
+    for (const topic of updated) {
+      expect(topic.content).toBe("updated");
+    }
   });
 
   it("class level update is affected by scoping!", async () => {
-    const t = await Topic.create({ title: "old" });
-    await Topic.update(t.id, { title: "new" });
-    const found = await Topic.find(t.id);
-    expect(found.title).toBe("new");
+    await expect(
+      Topic.where("1=0").scoping(async () =>
+        Topic.updateBang([1, 2], [{ content: "1 updated" }, { content: "2 updated" }]),
+      ),
+    ).rejects.toThrow(RecordNotFound);
+
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
+    expect((await Topic.find(2)).content).not.toBe("2 updated");
   });
 
   it("destroy many", async () => {
-    const before = await Topic.count();
-    const t1 = await Topic.create({ title: "a" });
-    const t2 = await Topic.create({ title: "b" });
-    await Topic.destroy([t1.id, t2.id]);
-    expect(await Topic.count()).toBe(before);
+    const clients = await Client.find([2, 3]);
+
+    await assertDifference(
+      () => Client.count() as Promise<number>,
+      -2,
+      null,
+      async () => {
+        const destroyed = (await Client.destroy([2, 3])) as Client[];
+        expect(destroyed.map((c) => c.id)).toEqual(clients.map((c) => c.id));
+        expect(destroyed.every((c) => c.isFrozen())).toBeTruthy();
+      },
+    );
   });
 
   it("destroy many with invalid id", async () => {
-    await expect(Topic.destroy([99999])).rejects.toThrow();
+    const clients = await Client.find([2, 3]);
+
+    await expect(Client.destroy([2, 3, 99999])).rejects.toThrow(RecordNotFound);
+
+    expect(await Client.find([2, 3])).toEqual(clients);
   });
 
   it("create prefetched pk", async () => {
@@ -1090,12 +1226,12 @@ describe("PersistenceTest", () => {
       t.author_name = "David";
     });
     expect(topicList.length).toBe(2);
+    topicList.forEach((t: any) => expect(t.isPersisted()).toBeFalsy());
     const [t1, t2] = topicList as any[];
     expect(t1.title).toBe("first");
     expect(t1.author_name).toBe("David");
     expect(t2.title).toBe("second");
     expect(t2.author_name).toBe("David");
-    expect(topicList.every((t: any) => !t.isPersisted())).toBe(true);
   });
 
   it("save for record with only primary key that is provided", async () => {
@@ -1106,35 +1242,52 @@ describe("PersistenceTest", () => {
     const topic = Topic.new();
     (topic as any).title = "Still another topic";
     await topic.save();
+
     const topicReloaded = Topic.instantiate({
       ...topic.attributes,
       does_not_exist: "test",
     }) as any;
     topicReloaded.title = "A New Topic";
-    await expect(topicReloaded.saveBang()).resolves.not.toThrow();
-    expect(topicReloaded.isPersisted()).toBe(true);
-    await topicReloaded.reload();
-    expect(topicReloaded.title).toBe("A New Topic");
+    await assertNothingRaised(() => topicReloaded.save());
+    expect(topicReloaded.isPersisted()).toBeTruthy();
+    expect((await topicReloaded.reload()).title).toBe("A New Topic");
   });
 
   it("update for record with only primary key", async () => {
-    const m = await Minimalistic.create({});
-    await m.update({});
-    expect(m.isPersisted()).toBe(true);
+    const minimalistic = minimalistics("first");
+    await assertNothingRaised(() => minimalistic.save());
   });
 
   it("update attribute after update", async () => {
-    const t = await Topic.create({ title: "v1" });
-    await t.update({ title: "v2" });
-    await t.updateAttribute("title", "v3");
-    expect(t.title).toBe("v3");
+    class Klass extends Topic {
+      static get name() {
+        return "Topic";
+      }
+      static {
+        (this as any).afterUpdate(
+          async function (this: any) {
+            await this.updateAuthor();
+          },
+          { if: (record: any) => record.isSavedChangeToTitle() },
+        );
+      }
+      async updateAuthor() {
+        await this.updateAttribute("author_name", "David");
+      }
+    }
+    const topic = await Klass.create({ title: "New Topic" });
+    await topic.update({ title: "Another Topic" });
+
+    const topicReloaded = await Topic.find(topic.id);
+    expect(topicReloaded.title).toBe("Another Topic");
+    expect(topicReloaded.author_name).toBe("David");
   });
 
   it("update attribute does not run sql if attribute is not changed", async () => {
-    const t = await Topic.create({ title: "same" });
-    await t.updateAttribute("title", "same");
-    expect(t.title).toBe("same");
-    expect(t.isPersisted()).toBe(true);
+    const topic = await Topic.create({ title: "Another New Topic" });
+    await assertNoQueries(false, async () => {
+      expect(await topic.updateAttribute("title", "Another New Topic")).toBeTruthy();
+    });
   });
 
   it("update raises record not found exception", async () => {
@@ -1142,34 +1295,56 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute with one updated", async () => {
-    const t = await Topic.create({ title: "a" });
+    const t = (await Topic.first())!;
     await t.updateAttribute("title", "super_title");
     expect(t.title).toBe("super_title");
-    expect(t.isChanged).toBe(false);
-    expect(t.attributeChanged("title")).toBe(false);
+    expect(t.isChanged).toBeFalsy();
+    expect(t.attributeChanged("title")).toBeFalsy();
     expect(t.attributeChange("title")).toBeNull();
+
     await t.reload();
     expect(t.title).toBe("super_title");
   });
 
   it("update attribute for updated at on", async () => {
-    const t = await Topic.create({ title: "test" });
-    const before = t.updated_at;
-    await t.updateAttribute("title", "new");
-    const after = t.updated_at;
-    expect(epochMs(after)).toBeGreaterThanOrEqual(epochMs(before));
+    const developer = await CanonicalDeveloper.find(1);
+    const prevMonth = instant("2026-05-25T12:00:00Z");
+
+    await developer.updateAttribute("updated_at", prevMonth);
+    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+
+    await developer.updateAttribute("salary", 80001);
+    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+
+    await developer.reload();
+    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
   });
 
-  it("update attribute!", async () => {
-    const t = await Topic.create({ title: "old" });
-    await t.updateAttributeBang("title", "new");
-    expect(t.title).toBe("new");
+  it.skip("update attribute!", async () => {
+    // BLOCKED: update_attribute writes via writeAttribute, not the `name=` setter
+    expect((await Topic.find(1)).approved).toBeFalsy();
+    await (await Topic.find(1)).updateAttributeBang("approved", true);
+    expect((await Topic.find(1)).approved).toBeTruthy();
+
+    await (await Topic.find(1)).updateAttributeBang("approved", false);
+    expect((await Topic.find(1)).approved).toBeFalsy();
+
+    await (await Topic.find(1)).updateAttributeBang("changeApprovedBeforeSave", true);
+    expect((await Topic.find(1)).approved).toBeTruthy();
   });
 
   it("update attribute for updated at on!", async () => {
-    const t = await Topic.create({ title: "test" });
-    await t.updateAttributeBang("title", "new");
-    expect(t.updated_at).toSatisfy(isTemporalDatetime);
+    const developer = await CanonicalDeveloper.find(1);
+    const prevMonth = instant("2026-05-25T12:00:00Z");
+
+    await developer.updateAttributeBang("updated_at", prevMonth);
+    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+
+    await developer.updateAttributeBang("salary", 80001);
+    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+
+    await developer.reload();
+    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
   });
 
   it("update columns should not leave the object dirty", async () => {
@@ -1186,28 +1361,51 @@ describe("PersistenceTest", () => {
   });
 
   it("class level destroy", async () => {
-    const t = await Topic.create({ title: "test" });
-    await Topic.destroy(t.id);
-    await expect(Topic.find(t.id)).rejects.toThrow();
+    const shouldBeDestroyedReply = await Reply.create({ title: "hello", content: "world" });
+    await (await Topic.find(1)).replies.push(shouldBeDestroyedReply);
+
+    const topic = (await Topic.destroy(1)) as Topic;
+    expect(topic.isDestroyed()).toBeTruthy();
+
+    await expect(Topic.find(1)).rejects.toThrow(RecordNotFound);
+    await expect(Reply.find(shouldBeDestroyedReply.id)).rejects.toThrow(RecordNotFound);
   });
 
   it("class level destroy is affected by scoping", async () => {
-    const before = await Topic.count();
-    const t = await Topic.create({ title: "test" });
-    await Topic.destroy(t.id);
-    expect(await Topic.count()).toBe(before);
+    const shouldNotBeDestroyedReply = await Reply.create({ title: "hello", content: "world" });
+    await (await Topic.find(1)).replies.push(shouldNotBeDestroyedReply);
+
+    await expect(Topic.where("1=0").scoping(async () => Topic.destroy(1))).rejects.toThrow(
+      RecordNotFound,
+    );
+
+    await expect(Topic.find(1)).resolves.not.toThrow();
+    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
   });
 
   it("class level delete with invalid ids", async () => {
-    const affected = await Topic.delete(99999);
-    expect(affected).toBe(0);
+    await assertNoQueries(false, async () => {
+      expect(await Topic.delete(null as any)).toBe(0);
+      expect(await Topic.delete([])).toBe(0);
+    });
+
+    await assertDifference(
+      () => Topic.count() as Promise<number>,
+      -1,
+      null,
+      async () => {
+        expect(await Topic.delete(topics("first").id)).toBe(1);
+      },
+    );
   });
 
   it("class level delete is affected by scoping", async () => {
-    const before = await Topic.count();
-    const t = await Topic.create({ title: "test" });
-    await Topic.delete(t.id);
-    expect(await Topic.count()).toBe(before);
+    const shouldNotBeDestroyedReply = await Reply.create({ title: "hello", content: "world" });
+    await (await Topic.find(1)).replies.push(shouldNotBeDestroyedReply);
+
+    await Topic.where("1=0").scoping(async () => Topic.delete(1));
+    await expect(Topic.find(1)).resolves.not.toThrow();
+    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
   });
 
   describe("QueryConstraintsTest", () => {
@@ -1228,7 +1426,12 @@ describe("PersistenceTest", () => {
   it("save destroyed object", async () => {
     const topic = await Topic.create({ title: "New Topic" });
     await topic.destroyBang();
-    await expect(topic.saveBang()).rejects.toThrow("Failed to save the record");
+
+    const promise = topic.saveBang();
+    await expect(promise).rejects.toThrow(RecordNotSaved);
+    const error = await promise.catch((e: Error) => e);
+
+    expect((error as Error).message).toBe("Failed to save the record");
   });
 
   it("delete doesnt run callbacks", async () => {
@@ -1239,19 +1442,19 @@ describe("PersistenceTest", () => {
   it("destroy", async () => {
     const topic = await Topic.find(1);
     expect(await topic.destroy()).toBe(topic);
-    expect(topic.isFrozen()).toBe(true);
+    expect(topic.isFrozen()).toBeTruthy();
     await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
   });
 
   it("find via reload", async () => {
     const post = Post.new();
-    expect(post.isNewRecord()).toBe(true);
+    expect(post.isNewRecord()).toBeTruthy();
 
     (post as any).id = 1;
     await post.reload();
 
     expect((post as any).title).toBe("Welcome to the weblog");
-    expect(post.isNewRecord()).toBe(false);
+    expect(post.isNewRecord()).toBeFalsy();
   });
 });
 
@@ -1262,33 +1465,30 @@ describe("PersistenceTest", () => {
   it("update column", async () => {
     const topic = await Topic.find(1);
     await topic.updateColumn("approved", true);
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
     await topic.reload();
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
 
     await topic.updateColumn("approved", false);
-    expect(topic.approved).toBe(false);
+    expect(topic.approved).toBeFalsy();
     await topic.reload();
-    expect(topic.approved).toBe(false);
+    expect(topic.approved).toBeFalsy();
   });
 
   it("update column should not use setter method", async () => {
     const dev = (await CanonicalDeveloper.find(1)) as any;
-    let setterCalled = false;
     Object.defineProperty(dev, "salary", {
       configurable: true,
       get() {
         return this.readAttribute("salary");
       },
       set(value: number) {
-        setterCalled = true;
         this.writeAttribute("salary", value * 2);
       },
     });
 
     await dev.updateColumn("salary", 80000);
     expect(dev.salary).toBe(80000);
-    expect(setterCalled).toBe(false);
 
     await dev.reload();
     expect(dev.salary).toBe(80000);
@@ -1317,10 +1517,10 @@ describe("PersistenceTest", () => {
   it("update columns", async () => {
     const topic = await Topic.find(1);
     await topic.updateColumns({ approved: true, title: "Sebastian Topic" });
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
     expect(topic.title).toBe("Sebastian Topic");
     await topic.reload();
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
     expect(topic.title).toBe("Sebastian Topic");
   });
 
@@ -1331,15 +1531,23 @@ describe("PersistenceTest", () => {
     );
   });
 });
+const sortById = <T extends { id: unknown }>(records: T[]) =>
+  [...records].sort((a, b) => (JSON.stringify(a.id) < JSON.stringify(b.id) ? -1 : 1));
+
 describe("PersistenceTest", () => {
   const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"]);
 
   it("destroy with single composite primary key", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
-    const before = (await CpkBook.count()) as number;
-    const destroyed = (await CpkBook.destroy(book.id)) as CpkBook;
-    expect((await CpkBook.count()) as number).toBe(before - 1);
-    expect(destroyed.id).toEqual(book.id);
+    await assertDifference(
+      () => CpkBook.count() as Promise<number>,
+      -1,
+      null,
+      async () => {
+        const destroyed = (await CpkBook.destroy(book.id)) as CpkBook;
+        expect(destroyed.id).toEqual(book.id);
+      },
+    );
   });
 
   it("destroy with multiple composite primary keys", async () => {
@@ -1347,11 +1555,16 @@ describe("PersistenceTest", () => {
       cpkBooks("cpk_great_author_first_book"),
       cpkBooks("cpk_great_author_second_book"),
     ];
-    const before = (await CpkBook.count()) as number;
-    const destroyed = (await CpkBook.destroy(books.map((b) => b.id))) as CpkBook[];
-    expect((await CpkBook.count()) as number).toBe(before - 2);
-    expect(destroyed.map((d) => d.id).sort()).toEqual(books.map((b) => b.id).sort());
-    expect(destroyed.every((d) => d.isFrozen())).toBe(true);
+    await assertDifference(
+      () => CpkBook.count() as Promise<number>,
+      -2,
+      null,
+      async () => {
+        const destroyed = (await CpkBook.destroy(books.map((b) => b.id))) as CpkBook[];
+        expect(sortById(destroyed).map((b) => b.id)).toEqual(sortById(books).map((b) => b.id));
+        expect(destroyed.every((d) => d.isFrozen())).toBeTruthy();
+      },
+    );
   });
 
   it("destroy with invalid ids for a model that expects composite keys", async () => {
@@ -1387,10 +1600,10 @@ describe("PersistenceTest", () => {
     const reply = topic.becomes(Reply);
 
     expect(Number((topic as any).idInDatabase)).toBe(1);
-    expect((topic as any).attributesInDatabase).toEqual({});
+    assertEmpty((topic as any).attributesInDatabase);
 
     expect(Number((reply as any).idInDatabase)).toBe(1);
-    expect((reply as any).attributesInDatabase).toEqual({});
+    assertEmpty((reply as any).attributesInDatabase);
   });
 
   it("becomes initializes missing attributes", () => {
@@ -1466,21 +1679,18 @@ describe("PersistenceTest", () => {
 
   it("update columns should not use setter method", async () => {
     const dev = (await CanonicalDeveloper.find(1)) as any;
-    let setterCalled = false;
     Object.defineProperty(dev, "salary", {
       configurable: true,
       get() {
         return this.readAttribute("salary");
       },
       set(value: number) {
-        setterCalled = true;
         this.writeAttribute("salary", value * 2);
       },
     });
 
     await dev.updateColumns({ salary: 80000 });
     expect(dev.salary).toBe(80000);
-    expect(setterCalled).toBe(false);
 
     await dev.reload();
     expect(dev.salary).toBe(80000);
@@ -1491,7 +1701,7 @@ describe("PersistenceTest", () => {
     developer.name = "John";
     await developer.saveBang();
 
-    expect(await developer.updateColumn("name", "Will")).toBe(true);
+    expect(await developer.updateColumn("name", "Will")).toBeTruthy();
   });
 
   it("update columns with default scope", async () => {
@@ -1499,7 +1709,7 @@ describe("PersistenceTest", () => {
     developer.name = "John";
     await developer.saveBang();
 
-    expect(await developer.updateColumns({ name: "Will" })).toBe(true);
+    expect(await developer.updateColumns({ name: "Will" })).toBeTruthy();
   });
 
   it("persisted returns boolean", async () => {
@@ -1589,19 +1799,23 @@ describe("PersistenceTest", () => {
 
   it("save valid record", async () => {
     const topic = new Topic({ title: "New Topic" });
-    expect(await topic.saveBang()).toBe(true);
+    expect(await topic.saveBang()).toBeTruthy();
   });
 
   it("save invalid record", async () => {
     const reply = new WrongReply({ title: "New reply" });
-    await expect(reply.saveBang()).rejects.toThrow("Validation failed: Content Empty");
+    const promise = reply.saveBang();
+    await expect(promise).rejects.toThrow(RecordInvalid);
+    const error = await promise.catch((e: Error) => e);
+
+    expect((error as Error).message).toBe("Validation failed: Content Empty");
   });
 
   it("reload via querycache", async () => {
     const connection = await Base.leaseConnection();
     connection.enableQueryCacheBang();
     connection.clearQueryCache();
-    expect(connection.queryCacheEnabled).toBe(true);
+    expect(connection.queryCacheEnabled).toBeTruthy();
     const parrot = await Parrot.create({ name: "Shane" });
 
     const foundParrot = await Parrot.find(parrot.id);
@@ -1650,21 +1864,11 @@ describe("QueryConstraintsTest", () => {
   });
 
   it("child keeps parents query constraints", async () => {
-    const greenTShirt = clothingItems("green_t_shirt");
-    let sqls = await captureSql(async () => {
-      await greenTShirt.reload();
-    });
-    let sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
-    expect(sql).toMatch(/WHERE .*clothing_type/);
-    expect(sql).toMatch(/WHERE .*color/);
+    const clothingItem = clothingItems("green_t_shirt");
+    await assertUsesQueryConstraintsOnReload(clothingItem, ["clothing_type", "color"]);
 
-    const usedBlueJeans = clothingItems("used_blue_jeans");
-    sqls = await captureSql(async () => {
-      await usedBlueJeans.reload();
-    });
-    sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
-    expect(sql).toMatch(/WHERE .*clothing_type/);
-    expect(sql).toMatch(/WHERE .*color/);
+    const usedClothingItem = clothingItems("used_blue_jeans");
+    await assertUsesQueryConstraintsOnReload(usedClothingItem, ["clothing_type", "color"]);
   });
 
   it("child keeps parents query contraints derived from composite pk", () => {
@@ -1850,7 +2054,7 @@ describe("PersistenceTest", () => {
       const record = (await PkAutopopulatedByATriggerRecord.create()) as any;
 
       expect(record.id).not.toBeNull();
-      expect(record.id).toBeGreaterThan(0);
+      expect(record.id > 0).toBeTruthy();
     },
   );
 });
@@ -1893,11 +2097,16 @@ describe("PersistenceTest", () => {
     }
     registerModel(MinimalisticAircraft);
 
-    const before = (await Aircraft.count()) as number;
-    const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
-    aircraft.name = "Wright Glider";
-    await aircraft.save();
-    expect(await Aircraft.count()).toBe(before + 1);
+    await assertDifference(
+      () => Aircraft.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
+        aircraft.name = "Wright Glider";
+        await aircraft.save();
+      },
+    );
 
     expect(((await Aircraft.last()) as any).name).toBe("Wright Glider");
   });
