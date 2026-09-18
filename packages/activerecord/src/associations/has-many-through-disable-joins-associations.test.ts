@@ -75,7 +75,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   };
 
   it.skip("counting on disable joins through", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2
+    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
     expect(await association(author, "noJoinsComments").count()).toEqual(
       await association(author, "comments").count(),
     );
@@ -88,7 +88,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("counting on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2
+    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
     expect(await association(author, "noJoinsCommentsWithForeignKey").count()).toEqual(
       await association(author, "commentsWithForeignKey").count(),
     );
@@ -101,7 +101,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("pluck on disable joins through", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2
+    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
     expect((await association(author, "noJoinsComments").pluck("id")).sort(sortIds)).toEqual(
       (await association(author, "comments").pluck("id")).sort(sortIds),
     );
@@ -114,7 +114,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("pluck on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2
+    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
     expect(
       (await association(author, "noJoinsCommentsWithForeignKey").pluck("id")).sort(sortIds),
     ).toEqual((await association(author, "commentsWithForeignKey").pluck("id")).sort(sortIds));
@@ -127,7 +127,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("fetching on disable joins through", async () => {
-    // BLOCKED: query count — first runs 0 queries where Rails runs 2
+    // BLOCKED: query count — first runs 0 queries where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-answers-from-loaded-target
     expect((await association(author, "noJoinsComments").first())!.id).toBe(
       (await association(author, "comments").first())!.id,
     );
@@ -140,7 +140,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("fetching on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — first runs 0 queries where Rails runs 2
+    // BLOCKED: query count — first runs 0 queries where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-answers-from-loaded-target
     expect((await association(author, "noJoinsCommentsWithForeignKey").first())!.id).toBe(
       (await association(author, "commentsWithForeignKey").first())!.id,
     );
@@ -200,14 +200,14 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("empty on disable joins through", async () => {
-    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0
+    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0 — filed as 0155-assertion-surfaced-port-bugs/through-all-on-empty-owner-runs-a-query
     const emptyAuthor = await Author.find(authors("bob").id);
     expect(await q(0, () => association(emptyAuthor, "comments").all())).toEqual([]);
     expect(await q(1, () => association(emptyAuthor, "noJoinsComments").all())).toEqual([]);
   });
 
   it.skip("empty on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0
+    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0 — filed as 0155-assertion-surfaced-port-bugs/through-all-on-empty-owner-runs-a-query
     const emptyAuthor = await Author.find(authors("bob").id);
     expect(await q(0, () => association(emptyAuthor, "commentsWithForeignKey").all())).toEqual([]);
     expect(
@@ -370,7 +370,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("first and scope in double join applies order in memory", async () => {
-    // BLOCKED: SQL shape — first emits ORDER BY where Rails orders in memory
+    // BLOCKED: SQL shape — first emits ORDER BY where Rails orders in memory — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-orders-in-sql-not-memory
     const disableJoinsSql = await captureSql(async () => {
       await association(author, "noJoinsMembers").unnamed().first();
     });
