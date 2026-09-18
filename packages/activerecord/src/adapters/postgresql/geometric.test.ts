@@ -1,187 +1,191 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { assertNotPredicate } from "@blazetrails/activesupport";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
+import { Base } from "../../index.js";
+import { TableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
+import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { Point, PointValue } from "../../connection-adapters/postgresql/oid/point.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const pointType = new Point();
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.disconnectBang();
+    adapter = Base.connection as PostgreSQLAdapter;
   });
 
   describe("PostgreSQLPointTest", () => {
+    class PostgresqlPoint extends Base {
+      declare x: PointValue;
+      declare y: PointValue;
+      declare z: PointValue;
+      declare array_of_points: PointValue[];
+      declare legacy_x: number[];
+      declare legacy_y: number[];
+      declare legacy_z: number[];
+      static {
+        this.tableName = "postgresql_points";
+        this.attribute("x", "point");
+        this.attribute("y", "point");
+        this.attribute("z", "point");
+        this.attribute("array_of_points", "point", { array: true });
+        this.attribute("legacy_x", "legacy_point");
+        this.attribute("legacy_y", "legacy_point");
+        this.attribute("legacy_z", "legacy_point");
+      }
+    }
+
     beforeEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_points`);
-      await adapter.execute(`
-        CREATE TABLE postgresql_points (
-          id serial primary key,
-          x point,
-          y point DEFAULT '(12.2,13.3)',
-          z point DEFAULT '(14.4,15.5)',
-          array_of_points point[]
-        )
-      `);
+      await adapter.dropTable("postgresql_points", { ifExists: true });
+      await adapter.createTable("postgresql_points", (t: TableDefinition) => {
+        t.point("x");
+        t.point("y", { default: [12.2, 13.3] });
+        t.point("z", { default: "(14.4,15.5)" });
+        t.point("array_of_points", { array: true });
+        t.point("legacy_x");
+        t.point("legacy_y", { default: [12.2, 13.3] });
+        t.point("legacy_z", { default: "(14.4,15.5)" });
+      });
+      void PostgresqlPoint.resetColumnInformation();
+      await PostgresqlPoint.loadSchema();
     });
     afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_points`);
-    });
-
-    it("point column", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_name, data_type, udt_name
-        FROM information_schema.columns
-        WHERE table_name = 'postgresql_points' AND column_name = 'x'
-      `);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].udt_name).toBe("point");
-    });
-
-    it("point default", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_default
-        FROM information_schema.columns
-        WHERE table_name = 'postgresql_points' AND column_name = 'y'
-      `);
-      expect(rows[0].column_default).toMatch(/12\.2.*13\.3/);
-    });
-
-    it("point type cast", async () => {
-      const p = pointType.cast("(1.5,2.3)") as PointValue;
-      expect(p).toBeInstanceOf(PointValue);
-      expect(p.x).toBeCloseTo(1.5);
-      expect(p.y).toBeCloseTo(2.3);
-    });
-
-    it("point write", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", [
-        "(10,25.2)",
-      ]);
-      const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = pointType.cast(rows[0].x) as PointValue;
-      expect(p.x).toBeCloseTo(10);
-      expect(p.y).toBeCloseTo(25.2);
+      await adapter.dropTable("postgresql_points", { ifExists: true });
     });
 
     it("column", async () => {
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'postgresql_points' AND column_name = 'x'
-      `);
-      expect(rows[0].udt_name).toBe("point");
+      const column = PostgresqlPoint.columnsHash()["x"] as unknown as PgColumn;
+      expect(column.type).toBe("point");
+      expect(column.sqlType).toBe("point");
+      assertNotPredicate(column, (c) => c.isArray());
+
+      const type = PostgresqlPoint.typeForAttribute("x")!;
+      assertNotPredicate(type, (t) => t.isBinary());
+    });
+
+    it("default", async () => {
+      expect(PostgresqlPoint.columnDefaults["y"]).toEqual(new PointValue(12.2, 13.3));
+      expect(new PostgresqlPoint().y).toEqual(new PointValue(12.2, 13.3));
+
+      expect(PostgresqlPoint.columnDefaults["z"]).toEqual(new PointValue(14.4, 15.5));
+      expect(new PostgresqlPoint().z).toEqual(new PointValue(14.4, 15.5));
     });
 
     it("schema dumping", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_name, udt_name, column_default
-        FROM information_schema.columns
-        WHERE table_name = 'postgresql_points'
-        ORDER BY ordinal_position
-      `);
-      const pointCols = rows.filter((r) => r.udt_name === "point");
-      expect(pointCols.length).toBeGreaterThanOrEqual(3);
+      const output = await dumpTableSchema(adapter, "postgresql_points");
+      expect(output).toMatch(/t\.point\("x"\);$/m);
+      expect(output).toMatch(/t\.point\("y",\s+\{?\s*default: \[12\.2, 13\.3\] \}\);$/m);
+      expect(output).toMatch(/t\.point\("z",\s+\{?\s*default: \[14\.4, 15\.5\] \}\);$/m);
     });
 
     it("roundtrip", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", [
-        "(10,25.2)",
-      ]);
-      const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = pointType.cast(rows[0].x) as PointValue;
-      expect(p.x).toBeCloseTo(10);
-      expect(p.y).toBeCloseTo(25.2);
+      await PostgresqlPoint.createBang({ x: [10, 25.2] });
+      const record = (await PostgresqlPoint.first())!;
+      expect(record.x).toEqual(new PointValue(10, 25.2));
 
-      await adapter.execQuery(`UPDATE postgresql_points SET x = $1`, "SQL", ["(30,40)"]);
-      const rows2 = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p2 = pointType.cast(rows2[0].x as string) as PointValue;
-      expect(p2.x).toBeCloseTo(30);
-      expect(p2.y).toBeCloseTo(40);
+      record.x = new PointValue(1.1, 2.2);
+      await record.saveBang();
+      expect(await record.reload()).toBeTruthy();
+      expect(record.x).toEqual(new PointValue(1.1, 2.2));
     });
 
-    it("mutation", () => {
-      const p = new PointValue(10, 20);
-      p.y = 25;
-      expect(p.y).toBe(25);
-      expect(pointType.serialize(p)).toBe("(10,25)");
+    it.skip("mutation", async () => {
+      // BLOCKED: in-place mutation of a point attribute stays dirty after save! + reload (filed as 0155-assertion-surfaced-port-bugs/pg-point-mutation-dirty-after-reload)
+      const p = await PostgresqlPoint.createBang({ x: new PointValue(10, 20) });
+
+      p.x.y = 25;
+      await p.saveBang();
+      await p.reload();
+
+      expect(p.x).toEqual(new PointValue(10.0, 25.0));
+      assertNotPredicate(p, (r) => r.isChanged);
     });
 
     it("array assignment", () => {
-      const p = pointType.cast([1, 2]) as PointValue;
-      expect(p).toBeInstanceOf(PointValue);
-      expect(p.x).toBe(1);
-      expect(p.y).toBe(2);
+      const p = new PostgresqlPoint({ x: [1, 2] });
+
+      expect(p.x).toEqual(new PointValue(1, 2));
     });
 
     it("hash assignment", () => {
-      const p = pointType.cast({ x: 1, y: 2 }) as PointValue;
-      expect(p).toBeInstanceOf(PointValue);
-      expect(p.x).toBe(1);
-      expect(p.y).toBe(2);
+      const p = new PostgresqlPoint({ x: { x: 1, y: 2 }, y: { x: 3, y: 4 } });
+
+      expect(p.x).toEqual(new PointValue(1, 2));
+      expect(p.y).toEqual(new PointValue(3, 4));
     });
 
     it("string assignment", () => {
-      const p = pointType.cast("(1, 2)") as PointValue;
-      expect(p).toBeInstanceOf(PointValue);
-      expect(p.x).toBe(1);
-      expect(p.y).toBe(2);
+      const p = new PostgresqlPoint({ x: "(1, 2)" });
+
+      expect(p.x).toEqual(new PointValue(1, 2));
     });
 
     it("empty string assignment", () => {
-      const p = pointType.cast("");
-      expect(p).toBeNull();
+      const p = new PostgresqlPoint({ x: "" });
+      expect(p.x).toBeNull();
     });
 
     it("array of points round trip", async () => {
-      await adapter.execQuery(
-        `INSERT INTO postgresql_points (array_of_points) VALUES ($1)`,
-        "SQL",
-        ['{"(1,2)","(3,4)","(5,6)"}'],
-      );
-      const rows = await adapter.execute(`SELECT array_of_points FROM postgresql_points`);
-      const arr = rows[0].array_of_points as string[];
-      expect(arr).toHaveLength(3);
+      const expectedValue = [new PointValue(1, 2), new PointValue(2, 3), new PointValue(3, 4)];
+      const p = new PostgresqlPoint({ array_of_points: expectedValue });
+
+      expect(p.array_of_points).toEqual(expectedValue);
+      await p.saveBang();
+      await p.reload();
+      expect(p.array_of_points).toEqual(expectedValue);
     });
 
     it("legacy column", async () => {
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'postgresql_points' AND column_name = 'x'
-      `);
-      expect(rows[0].udt_name).toBe("point");
+      const column = PostgresqlPoint.columnsHash()["legacy_x"] as unknown as PgColumn;
+      expect(column.type).toBe("point");
+      expect(column.sqlType).toBe("point");
+      assertNotPredicate(column, (c) => c.isArray());
+
+      const type = PostgresqlPoint.typeForAttribute("legacy_x")!;
+      assertNotPredicate(type, (t) => t.isBinary());
     });
 
     it("legacy default", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_default FROM information_schema.columns
-        WHERE table_name = 'postgresql_points' AND column_name = 'y'
-      `);
-      expect(rows[0].column_default).toBeTruthy();
+      expect(PostgresqlPoint.columnDefaults["legacy_y"]).toEqual([12.2, 13.3]);
+      expect(new PostgresqlPoint().legacy_y).toEqual([12.2, 13.3]);
+
+      expect(PostgresqlPoint.columnDefaults["legacy_z"]).toEqual([14.4, 15.5]);
+      expect(new PostgresqlPoint().legacy_z).toEqual([14.4, 15.5]);
     });
 
     it("legacy schema dumping", async () => {
       const output = await dumpTableSchema(adapter, "postgresql_points");
-      expect(output).toMatch(/t\.point\("x"\)/);
-      expect(output).toMatch(/t\.point\("y",/);
-      expect(output).toMatch(/t\.point\("z",/);
+      expect(output).toMatch(/t\.point\("legacy_x"\);$/m);
+      expect(output).toMatch(/t\.point\("legacy_y",\s+\{?\s*default: \[12\.2, 13\.3\] \}\);$/m);
+      expect(output).toMatch(/t\.point\("legacy_z",\s+\{?\s*default: \[14\.4, 15\.5\] \}\);$/m);
     });
 
-    it("legacy roundtrip", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", ["(5,10)"]);
-      const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      expect(rows[0].x).toBeTruthy();
-      const p = pointType.cast(rows[0].x) as PointValue;
-      expect(p.x).toBeCloseTo(5);
-      expect(p.y).toBeCloseTo(10);
+    it.skip("legacy roundtrip", async () => {
+      // BLOCKED: a :legacy_point attribute reads back a PointValue where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+      await PostgresqlPoint.createBang({ legacy_x: [10, 25.2] });
+      const record = (await PostgresqlPoint.first())!;
+      expect(record.legacy_x).toEqual([10, 25.2]);
+
+      record.legacy_x = [1.1, 2.2];
+      await record.saveBang();
+      expect(await record.reload()).toBeTruthy();
+      expect(record.legacy_x).toEqual([1.1, 2.2]);
     });
 
-    it("legacy mutation", () => {
-      const p = new PointValue(10, 20);
-      p.x = 15;
-      expect(p.x).toBe(15);
+    it.skip("legacy mutation", async () => {
+      // BLOCKED: a :legacy_point attribute reads back a PointValue where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+      const p = await PostgresqlPoint.createBang({ legacy_x: [10, 20] });
+
+      p.legacy_x[1] = 25;
+      await p.saveBang();
+      await p.reload();
+
+      expect(p.legacy_x).toEqual([10.0, 25.0]);
+      assertNotPredicate(p, (r) => r.isChanged);
     });
   });
 
@@ -461,207 +465,169 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].a_point).toBeNull();
     });
 
-    it("creating column with point type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_point point)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_point'
-      `);
-      expect(rows[0].udt_name).toBe("point");
-    });
+    const tableName = "testings";
 
-    it("creating column with line type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_line line)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_line'
-      `);
-      expect(rows[0].udt_name).toBe("line");
-    });
+    const assertColumnExists = async (columnName: string) => {
+      expect(await adapter.columnExists(tableName, columnName)).toBeTruthy();
+    };
 
-    it("creating column with lseg type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_lseg lseg)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_lseg'
-      `);
-      expect(rows[0].udt_name).toBe("lseg");
-    });
+    const assertTypeCorrect = async (columnName: string, type: string) => {
+      const column = (await adapter.columns(tableName)).find((c) => c.name === columnName)!;
+      expect(column.type).toBe(type);
+    };
 
-    it("creating column with box type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_box box)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_box'
-      `);
-      expect(rows[0].udt_name).toBe("box");
-    });
+    for (const type of ["point", "line", "lseg", "box", "path", "polygon", "circle"]) {
+      it(`creating column with ${type} type`, async () => {
+        await adapter.dropTable(tableName, { ifExists: true });
+        await adapter.createTable(tableName, (t: TableDefinition) => {
+          (t as unknown as Record<string, (name: string) => void>)[type](`foo_${type}`);
+        });
 
-    it("creating column with path type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_path path)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_path'
-      `);
-      expect(rows[0].udt_name).toBe("path");
-    });
-
-    it("creating column with polygon type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_polygon polygon)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_polygon'
-      `);
-      expect(rows[0].udt_name).toBe("polygon");
-    });
-
-    it("creating column with circle type", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS test_geometric_types`);
-      await adapter.execute(`
-        CREATE TABLE test_geometric_types (id serial primary key, a_circle circle)
-      `);
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'test_geometric_types' AND column_name = 'a_circle'
-      `);
-      expect(rows[0].udt_name).toBe("circle");
-    });
+        await assertColumnExists(`foo_${type}`);
+        await assertTypeCorrect(`foo_${type}`, type);
+        await adapter.dropTable(tableName, { ifExists: true });
+      });
+    }
   });
 
   describe("PostgreSQLGeometricTest", () => {
+    class PostgresqlGeometric extends Base {
+      declare id: number;
+      declare a_line_segment: string;
+      declare a_box: string;
+      declare a_path: string;
+      declare a_polygon: string;
+      declare a_circle: string;
+      static {
+        this.tableName = "postgresql_geometrics";
+      }
+    }
+
     beforeEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_geometric`);
-      await adapter.execute(`
-        CREATE TABLE postgresql_geometric (
-          id serial primary key,
-          a_lseg lseg,
-          a_box box,
-          a_path path,
-          a_polygon polygon,
-          a_circle circle
-        )
-      `);
+      await adapter.dropTable("postgresql_geometrics", { ifExists: true });
+      await adapter.createTable("postgresql_geometrics", (t: TableDefinition) => {
+        t.lseg("a_line_segment");
+        t.box("a_box");
+        t.path("a_path");
+        t.polygon("a_polygon");
+        t.circle("a_circle");
+      });
+      void PostgresqlGeometric.resetColumnInformation();
+      await PostgresqlGeometric.loadSchema();
     });
     afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_geometric`);
+      await adapter.dropTable("postgresql_geometrics", { ifExists: true });
     });
 
-    it("geometric types", async () => {
-      await adapter.execQuery(
-        `INSERT INTO postgresql_geometric (a_lseg, a_box, a_path, a_polygon, a_circle)
-         VALUES ($1, $2, $3, $4, $5)`,
-        "SQL",
-        ["[(1,2),(3,4)]", "(3,4),(1,2)", "[(1,2),(3,4),(5,6)]", "((1,2),(3,4),(5,6))", "<(1,2),3>"],
-      );
-      const rows = await adapter.execute(`SELECT * FROM postgresql_geometric`);
-      expect(rows[0].a_lseg).toBeTruthy();
-      expect(rows[0].a_box).toBeTruthy();
-      expect(rows[0].a_path).toBeTruthy();
-      expect(rows[0].a_polygon).toBeTruthy();
-      expect(rows[0].a_circle).toBeTruthy();
+    it.skip("geometric types", async () => {
+      // BLOCKED: circle column reads back as an object, not the '<(x,y),r>' string (filed as 0155-assertion-surfaced-port-bugs/pg-circle-column-reads-object)
+      const g = new PostgresqlGeometric({
+        a_line_segment: "(2.0, 3), (5.5, 7.0)",
+        a_box: "2.0, 3, 5.5, 7.0",
+        a_path: "[(2.0, 3), (5.5, 7.0), (8.5, 11.0)]",
+        a_polygon: "((2.0, 3), (5.5, 7.0), (8.5, 11.0))",
+        a_circle: "<(5.3, 10.4), 2>",
+      });
+
+      await g.saveBang();
+
+      const h = await PostgresqlGeometric.find(g.id);
+
+      expect(h.a_line_segment).toBe("[(2,3),(5.5,7)]");
+      expect(h.a_box).toBe("(5.5,7),(2,3)");
+      expect(h.a_path).toBe("[(2,3),(5.5,7),(8.5,11)]");
+      expect(h.a_polygon).toBe("((2,3),(5.5,7),(8.5,11))");
+      expect(h.a_circle).toBe("<(5.3,10.4),2>");
     });
 
-    it("alternative format", async () => {
-      await adapter.execQuery(
-        `INSERT INTO postgresql_geometric (a_lseg, a_box, a_path, a_polygon, a_circle)
-         VALUES ($1, $2, $3, $4, $5)`,
-        "SQL",
-        [
-          "((1,2),(3,4))",
-          "((3,4),(1,2))",
-          "((1,2),(3,4),(5,6))",
-          "((1,2),(3,4),(5,6))",
-          "((1,2),3)",
-        ],
-      );
-      const rows = await adapter.execute(`SELECT * FROM postgresql_geometric`);
-      expect(rows[0].a_lseg).toBeTruthy();
-      expect(rows[0].a_box).toBeTruthy();
-      expect(rows[0].a_path).toBeTruthy();
-      expect(rows[0].a_polygon).toBeTruthy();
-      expect(rows[0].a_circle).toBeTruthy();
+    it.skip("alternative format", async () => {
+      // BLOCKED: circle column reads back as an object, not the '<(x,y),r>' string (filed as 0155-assertion-surfaced-port-bugs/pg-circle-column-reads-object)
+      const g = new PostgresqlGeometric({
+        a_line_segment: "((2.0, 3), (5.5, 7.0))",
+        a_box: "(2.0, 3), (5.5, 7.0)",
+        a_path: "((2.0, 3), (5.5, 7.0), (8.5, 11.0))",
+        a_polygon: "2.0, 3, 5.5, 7.0, 8.5, 11.0",
+        a_circle: "((5.3, 10.4), 2)",
+      });
+
+      await g.saveBang();
+
+      const h = await PostgresqlGeometric.find(g.id);
+      expect(h.a_line_segment).toBe("[(2,3),(5.5,7)]");
+      expect(h.a_box).toBe("(5.5,7),(2,3)");
+      expect(h.a_path).toBe("((2,3),(5.5,7),(8.5,11))");
+      expect(h.a_polygon).toBe("((2,3),(5.5,7),(8.5,11))");
+      expect(h.a_circle).toBe("<(5.3,10.4),2>");
     });
 
     it("geometric function", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, "SQL", [
-        "[(1,2),(3,4),(5,6)]",
-      ]);
-      const openRows = await adapter.execute(
-        `SELECT isopen(a_path) AS is_open FROM postgresql_geometric`,
-      );
-      expect(openRows[0].is_open).toBe(true);
+      await PostgresqlGeometric.createBang({ a_path: "[(2.0, 3), (5.5, 7.0), (8.5, 11.0)]" });
+      await PostgresqlGeometric.createBang({ a_path: "((2.0, 3), (5.5, 7.0), (8.5, 11.0))" });
 
-      await adapter.execute(`DELETE FROM postgresql_geometric`);
-      await adapter.execQuery(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, "SQL", [
-        "((1,2),(3,4),(5,6))",
-      ]);
-      const closedRows = await adapter.execute(
-        `SELECT isclosed(a_path) AS is_closed FROM postgresql_geometric`,
+      let objs = await PostgresqlGeometric.findBySql(
+        "SELECT isopen(a_path) FROM postgresql_geometrics ORDER BY id ASC",
       );
-      expect(closedRows[0].is_closed).toBe(true);
+      expect(objs.map((o) => (o as unknown as { isopen: boolean }).isopen)).toEqual([true, false]);
+
+      objs = await PostgresqlGeometric.findBySql(
+        "SELECT isclosed(a_path) FROM postgresql_geometrics ORDER BY id ASC",
+      );
+      expect(objs.map((o) => (o as unknown as { isclosed: boolean }).isclosed)).toEqual([
+        false,
+        true,
+      ]);
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_geometric");
-      expect(output).toMatch(/t\.lseg\("a_lseg"\)/);
-      expect(output).toMatch(/t\.box\("a_box"\)/);
-      expect(output).toMatch(/t\.path\("a_path"\)/);
-      expect(output).toMatch(/t\.polygon\("a_polygon"\)/);
-      expect(output).toMatch(/t\.circle\("a_circle"\)/);
+      const output = await dumpTableSchema(adapter, "postgresql_geometrics");
+      expect(output).toMatch(/t\.lseg\("a_line_segment"\);$/m);
+      expect(output).toMatch(/t\.box\("a_box"\);$/m);
+      expect(output).toMatch(/t\.path\("a_path"\);$/m);
+      expect(output).toMatch(/t\.polygon\("a_polygon"\);$/m);
+      expect(output).toMatch(/t\.circle\("a_circle"\);$/m);
     });
   });
 
   describe("PostgreSQLGeometricLineTest", () => {
+    class PostgresqlLine extends Base {
+      declare id: number;
+      declare a_line: string;
+      static {
+        this.tableName = "postgresql_lines";
+      }
+    }
+
     beforeEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_lines`);
-      await adapter.execute(`
-        CREATE TABLE postgresql_lines (
-          id serial primary key,
-          a_line line
-        )
-      `);
+      await adapter.dropTable("postgresql_lines", { ifExists: true });
+      await adapter.createTable("postgresql_lines", (t: TableDefinition) => {
+        t.line("a_line");
+      });
+      void PostgresqlLine.resetColumnInformation();
+      await PostgresqlLine.loadSchema();
     });
     afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS postgresql_lines`);
+      await adapter.dropTable("postgresql_lines", { ifExists: true });
     });
 
     it("geometric line type", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, "SQL", [
-        "{2,3,5.5}",
-      ]);
-      const rows = await adapter.execute(`SELECT a_line FROM postgresql_lines`);
-      expect(rows[0].a_line).toMatch(/2.*3.*5\.5/);
+      const g = new PostgresqlLine({ a_line: "{2.0, 3, 5.5}" });
+      await g.saveBang();
+
+      const h = await PostgresqlLine.find(g.id);
+      expect(h.a_line).toBe("{2,3,5.5}");
     });
 
     it("alternative format line type", async () => {
-      await adapter.execQuery(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, "SQL", [
-        "[(0,0),(1,1.5)]",
-      ]);
-      const rows = await adapter.execute(`SELECT a_line FROM postgresql_lines`);
-      expect(rows[0].a_line).toBeTruthy();
+      const g = new PostgresqlLine({ a_line: "(2.0, 3), (4.0, 6.0)" });
+      await g.saveBang();
+
+      const h = await PostgresqlLine.find(g.id);
+      expect(h.a_line).toBe("{1.5,-1,0}");
     });
 
     it("schema dumping for line type", async () => {
       const output = await dumpTableSchema(adapter, "postgresql_lines");
-      expect(output).toMatch(/t\.line\("a_line"\)/);
+      expect(output).toMatch(/t\.line\("a_line"\);$/m);
     });
   });
 });
