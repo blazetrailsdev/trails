@@ -88,10 +88,7 @@ export class SchemaCreation {
     return this.conn.supportsUniqueConstraints();
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT
-   * @missingRailsCall split — PERMANENT
-   */
+  /** @missingRailsCall split — PERMANENT */
   async accept(o: object): Promise<string> {
     const klass = o.constructor as abstract new (...args: never[]) => object;
     let m = this.cache.get(klass);

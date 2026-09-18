@@ -36,6 +36,7 @@ import {
   NEGATED_ALIASES,
   partitionNegatedCalls,
   SIGNIFICANT_CALLS,
+  significantCallsForReceivers,
   dropWeakCalls,
   NO_JS_CALL_FORM,
   isDelegatingWrapper,
@@ -318,6 +319,37 @@ describe("significantMissingCalls", () => {
     ]) {
       expect(SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
+  });
+
+  it("significantCallsForReceivers drops a positional-array name only when EVERY site of THIS row proved array", () => {
+    const sig = significantCallsForReceivers({ first: ["array"], last: ["array", "expr"] });
+    // Every site proven array: dropped.
+    expect(sig.has("first")).toBe(false);
+    // One unproven site alongside a proven one: still flags — the row might
+    // be a real Relation query trigger at that site.
+    expect(sig.has("last")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
+    const sig = significantCallsForReceivers({});
+    expect(sig.has("first")).toBe(true);
+    expect(sig.has("any?")).toBe(true);
+    const noProof = significantCallsForReceivers(undefined);
+    expect(noProof.has("size")).toBe(true);
+  });
+
+  it("significantCallsForReceivers never touches a name outside the positional-array set", () => {
+    // Even a fully `array`-proven `fetch`/`merge` site must still flag — this
+    // mechanism is scoped to first/last/any?/size/empty? only, never widening
+    // into the call-alias names RECEIVER_KEYED_RUBY_COMPAT_EXPORTS already owns.
+    const sig = significantCallsForReceivers({ fetch: ["array"] });
+    expect(sig.has("fetch")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still respects the base predicate (super, NO_JS_CALL_FORM)", () => {
+    const sig = significantCallsForReceivers({ first: ["array"] });
+    expect(sig.has("super")).toBe(false);
+    expect(sig.has("to_s")).toBe(false);
   });
 
   it("drops inert-receiver call names", () => {

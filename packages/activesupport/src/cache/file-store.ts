@@ -197,10 +197,7 @@ export class FileStore extends Store implements CacheStore {
     return File.join(this.cachePath, dirFormatter(dir1), dirFormatter(dir2), ...fnamePaths);
   }
 
-  /**
-   * @missingRailsCall delete — PERMANENT
-   * @missingRailsCall last — PERMANENT
-   */
+  /** @missingRailsCall delete — PERMANENT */
   protected filePathKey(path: string): string {
     const sep = File.SEPARATOR;
     const fname = path.slice(this.cachePath.length).split(sep).slice(3).join("");

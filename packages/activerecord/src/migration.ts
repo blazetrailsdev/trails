@@ -1578,10 +1578,7 @@ export class MigrationContext<
     return [...byBasename.values()].sort();
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   protected parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "");
     const m = base.match(/^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/);

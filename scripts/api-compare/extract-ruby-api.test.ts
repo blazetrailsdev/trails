@@ -3126,6 +3126,77 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Kwargs#call"]).toEqual({ fetch: ["hash"] });
   });
+
+  it("proves array from a chain rooted in String#split (attribute_assignment.rb:64's shape)", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/chain_split.rb": `
+        class ChainSplit
+          def call(multiparameter_name)
+            multiparameter_name.split("(").first
+          end
+        end
+      `,
+    });
+    expect(c["ChainSplit#call"]).toEqual({ split: ["local"], first: ["array"] });
+  });
+
+  it("proves array from a chain rooted in String#scan, one hop, not through the second .first (attribute_assignment.rb:79's shape)", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/chain_scan.rb": `
+        class ChainScan
+          def call(multiparameter_name)
+            multiparameter_name.scan(/\\(([0-9]*).*\\)/).first.first
+          end
+        end
+      `,
+    });
+    // The INNER .first is called on `multiparameter_name.scan(...)` — one hop
+    // off `scan`, proven array. The OUTER .first is called on THAT .first
+    // call — a chain rooted in "first", which proves nothing — so it reads expr.
+    expect(c["ChainScan#call"]).toEqual({ scan: ["local"], first: ["array", "expr"] });
+  });
+
+  it("proves array from Hash#keys/#values chained off an already-proven Hash local, and not off an unproven one", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/chain_hash.rb": `
+        class ChainHash
+          def call(other = compute, shards: {})
+            shards.keys.first
+            shards.values.last
+            other.keys.first
+          end
+        end
+      `,
+    });
+    // .keys/.values are recorded by THEIR OWN receiver's kind (shards: hash,
+    // other: an unproven local). .first/.last are recorded by chain_receiver_kind
+    // resolving THEIR receiver (a keys/values call) — array when it's proven
+    // one hop off a Hash, expr when the inner receiver (`other`) isn't proven.
+    expect(c["ChainHash#call"]).toEqual({
+      keys: ["hash", "local"],
+      values: ["hash"],
+      first: ["array", "expr"],
+      last: ["array"],
+    });
+  });
+
+  it("does not chase Hash#keys/#values through ANOTHER chain hop (one hop only)", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/chain_deep.rb": `
+        class ChainDeep
+          def call(shards: {})
+            shards.keys.values.first
+          end
+        end
+      `,
+    });
+    // .keys is called on `shards` directly — proven `hash` (kwarg default).
+    // .values is called on `shards.keys` — one hop off THAT proven-hash local,
+    // so it's proven `array`. .first is called on `shards.keys.values` — its
+    // OWN receiver is a chain (`shards.keys`), not `shards` directly, so the
+    // one-hop rule stops there and it reads `expr`.
+    expect(c["ChainDeep#call"]).toEqual({ keys: ["hash"], values: ["array"], first: ["expr"] });
+  });
 });
 
 describe("Ruby extractor Struct.new members", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
