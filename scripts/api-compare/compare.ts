@@ -265,6 +265,39 @@ import {
 // tables are deliberately left alone and those rows go to the reason-text
 // route (per-row human review), not to a mechanism. See the matching note in
 // enumerable-idioms.ts.
+//
+// RE-CHECKED, 2026-09-18 (`receiver-typing-for-positional-array-idioms`):
+// RFC 0129 (`record-ruby-call-receiver-hints`, 2026-09-01) shipped exactly the
+// receiver-kind mechanism this note said didn't exist — `callReceivers`, a
+// per-call-site kind proven for a literal or a local Ripper proves is one. It
+// does not close this gap. Its own commit message reports the identical
+// finding for its own target population (`fetch`/`merge`): none of the rows
+// it wanted had a provable receiver — ivars, chained expressions, unproven
+// locals — the same shape blocking these five names.
+//
+// The activerecord+actionview population itself has since shrunk from the
+// 106 rows measured above to 8 (unrelated convergence work, not this
+// mechanism), which changes the economics but not the finding: of the 8,
+// `Errors#empty?` (`validations.rb`, `valid?`) is exactly the danger case this
+// note warns about — a real Rails object with its own `#empty?`, not an
+// Array — and would be a wrong credit if aliased. Two rows chain off a Hash
+// local RFC 0129 already proves (`shards.keys.first`,
+// `connection_handling.rb:96`) or off core Ruby methods with statically-known
+// Array returns (`String#split`/`String#scan`,
+// `attribute_assignment.rb:63,79`); crediting those needs a NEW kind of proof
+// — a call chain rooted in a known-safe method NAME — that is weaker than
+// every existing entry in `receiver_kind` (extract-ruby-api.rb): the others
+// are all proven by Ripper reading a literal or an assignment; this one would
+// be proven by trusting that `split`/`scan`/`keys` were not redefined
+// somewhere the extractor cannot see, which is a much smaller but real gap in
+// the "never a guess" discipline the whole `callReceivers` system is built on
+// (see extract-ruby-api.rb's `receiver_kind` doc comment). At a population of
+// 3 qualifying rows codebase-wide, that trade is not worth taking; the
+// remaining rows (this one, `sharded?`'s `shard_keys.any?`, `insert_all.rb`'s
+// `extract_types_from_columns_on`, `actionview/digestor.rb`'s
+// `children.any?`) all cross a method or constructor-default boundary RFC
+// 0129's local-literal proof does not reach either. Still no mechanism to
+// build here; still the reason-text route.
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee

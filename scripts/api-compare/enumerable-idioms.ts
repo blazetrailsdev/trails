@@ -28,6 +28,12 @@ import { rubyCompatAliases } from "../parity/ruby-compat.js";
  * zero of the 106 surviving activerecord rows for these names are inert, while
  * several are genuine Relation receivers whose `.first`/`.any?` runs a query.
  * Those rows are handed to the reason-text route instead.
+ *
+ * RE-CHECKED 2026-09-18 (`receiver-typing-for-positional-array-idioms`):
+ * RFC 0129's `callReceivers` receiver-kind proof (2026-09-01) does not close
+ * this — see the matching addendum on `NO_JS_CALL_FORM`'s comment in
+ * compare.ts for the full finding. Still no mechanism; still the reason-text
+ * route.
  */
 export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["any?", ["some"]],
