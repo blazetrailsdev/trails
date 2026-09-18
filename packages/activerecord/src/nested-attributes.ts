@@ -330,7 +330,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         if (typeof builder === "function") {
           (builder as (attrs: Record<string, unknown>) => unknown).call(record, assignable);
         } else {
-          throw new Error(
+          throw new ArgumentError(
             `Cannot build association \`${associationName}'. ` +
               `Are you trying to build a polymorphic one-to-one association?`,
           );
