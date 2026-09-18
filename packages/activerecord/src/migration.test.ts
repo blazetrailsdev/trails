@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { BigDecimal, Logger } from "@blazetrails/activesupport";
+import { BigDecimal, Logger, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
@@ -12,6 +12,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
+import { assertColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -556,9 +557,7 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate();
 
-    void Person.resetColumnInformation();
-    await loadSchemaFromAdapter.call(Person as any);
-    expect(Person.columnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
   });
 
   it("migration detection without schema migration table", async () => {
@@ -595,7 +594,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
-    expect(withMigrations.migrations.length).toBeGreaterThan(0);
+    expect(withMigrations.migrations.length > 0).toBeTruthy();
 
     const empty = new Migrator(
       "up",
@@ -603,7 +602,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
-    expect(empty.migrations.length).toBe(0);
+    expect(empty.migrations.length > 0).toBeFalsy();
   });
 
   it("migration version", async () => {
@@ -634,10 +633,11 @@ describe("MigrationTest", () => {
       await adapter.createTable("things", {}, (t) => {
         t.string("name");
       });
-      await adapter.createTable("things", { ifNotExists: true }, (t) => {
-        t.string("name");
+      await assertNothingRaised(async () => {
+        await adapter.createTable("things", { ifNotExists: true }, (t) => {
+          t.string("name");
+        });
       });
-      expect(await adapter.tableExists("things")).toBe(true);
     } finally {
       await adapter.dropTable("things", { ifExists: true });
     }
@@ -645,17 +645,28 @@ describe("MigrationTest", () => {
 
   it("create table raises for long table names", async () => {
     const adapter = Base.connection;
-    const longName = "a".repeat(65);
-    await expect(adapter.createTable(longName, {})).rejects.toThrow(/too long/);
+    const nameLimit = adapter.tableNameLength();
+    const longName = "a".repeat(nameLimit + 1);
+    const shortName = "a".repeat(nameLimit);
+    try {
+      const error = await assertRaises([ArgumentError], {}, () => adapter.createTable(longName));
+      expect(error.message).toBe(
+        `Table name '${longName}' is too long; the limit is ${nameLimit} characters`,
+      );
+
+      await adapter.createTable(shortName);
+      expect(await adapter.tableExists(shortName)).toBeTruthy();
+    } finally {
+      await adapter.dropTable(shortName, { ifExists: true });
+    }
   });
 
   it("create table with force and if not exists", async () => {
     const adapter = Base.connection;
-    await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
-      ArgumentError,
-    );
-    await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
-      /cannot be used simultaneously/i,
+    await assertRaises(
+      [ArgumentError],
+      { match: /Options `:force` and `:if_not_exists` cannot be used simultaneously/ },
+      () => adapter.createTable("things", { force: true, ifNotExists: true }),
     );
   });
 
@@ -667,10 +678,11 @@ describe("MigrationTest", () => {
         t.string("name");
       });
       await adapter.addIndex("things", "name");
-      await adapter.createTable("things", { ifNotExists: true }, (t) => {
-        t.string("name");
+      await assertNothingRaised(async () => {
+        await adapter.createTable("things", { ifNotExists: true }, (t) => {
+          t.string("name");
+        });
       });
-      expect(await adapter.tableExists("things")).toBe(true);
     } finally {
       await adapter.dropTable("things", { ifExists: true });
     }
