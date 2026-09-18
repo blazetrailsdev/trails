@@ -719,7 +719,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proxy = activeRecord.developers;
     assertNotPredicate(proxy, (r) => r.loaded);
     await assertQueriesCount(1, false, async () => {
-      assertIncludes(await proxy.isInclude(david));
+      await assertIncludes(proxy, david);
     });
     assertNotPredicate(proxy, (r) => r.loaded);
   });

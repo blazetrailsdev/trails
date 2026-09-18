@@ -564,7 +564,6 @@ export {
   assertEmpty,
   assertNotEmpty,
   assertIncludes,
-  assertNotIncludes,
   assertSame,
   assertNotSame,
   assertRaises,
