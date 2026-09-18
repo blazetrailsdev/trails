@@ -294,7 +294,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
     await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
     const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
-      new QueryAttribute(null, 1, new ValueType()),
+      new QueryAttribute("", 1, new ValueType()),
     ]);
 
     expect(result.rows.length).toEqual(1);
