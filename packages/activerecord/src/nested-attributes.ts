@@ -5,7 +5,7 @@ import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, isBlank } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
-import { BooleanType } from "@blazetrails/activemodel";
+import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {
   /** @noRailsEquivalent PERMANENT */
@@ -40,7 +40,9 @@ export function acceptsNestedAttributesFor(
 
   const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
   if (!reflection) {
-    throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
+    throw new ArgumentError(
+      `No association found for name \`${associationName}'. Has it been defined yet?`,
+    );
   }
 
   reflection.autosave = true;
@@ -270,7 +272,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   attributes: Record<string, unknown>,
 ): Promise<void> | void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
-    throw new Error(
+    throw new ArgumentError(
       `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
     );
   }
@@ -328,7 +330,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         if (typeof builder === "function") {
           (builder as (attrs: Record<string, unknown>) => unknown).call(record, assignable);
         } else {
-          throw new Error(
+          throw new ArgumentError(
             `Cannot build association \`${associationName}'. ` +
               `Are you trying to build a polymorphic one-to-one association?`,
           );
@@ -351,7 +353,7 @@ export function assignNestedAttributesForCollectionAssociation(
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): Promise<void> | void {
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
-    throw new Error(
+    throw new ArgumentError(
       `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
     );
   }

@@ -152,17 +152,29 @@ export class Topic extends Base {
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
+  }
+
+  changeApprovedBeforeSave: boolean | null | undefined;
+
+  static {
+    this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
+  }
+
+  static afterInitializeCalled: boolean | null = null;
+
+  static {
     this.afterInitialize(() => {
       Topic.afterInitializeCalled = true;
-    });
-    this.afterTouch(async (record: any) => {
-      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
     });
   }
 
   afterTouchCalled = 0;
 
-  static afterInitializeCalled: boolean | null = null;
+  static {
+    this.afterTouch(async (record: any) => {
+      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
+    });
+  }
 
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
     stats.count = (await this.count()) as number;
@@ -219,6 +231,13 @@ export class Topic extends Base {
   private afterSaveForTransaction() {}
   /** @internal */
   private afterCreateForTransaction() {}
+
+  /** @internal */
+  private changeApprovedCallback() {
+    if (this.changeApprovedBeforeSave != null) {
+      this.approved = this.changeApprovedBeforeSave;
+    }
+  }
 }
 
 export class DefaultRejectedTopic extends Topic {
