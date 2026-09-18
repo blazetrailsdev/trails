@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertDifference, assertEmpty, assertNoDifference } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
@@ -39,12 +40,17 @@ class DivergentPrimaryKeyBook extends Book {
 
 async function assertInsertAllReturningAlias(): Promise<void> {
   if (!supportsInsertReturning) return;
-  const before = (await Book.count()) as number;
-  const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
-    returning: ":title",
-  });
-  expect(result.columns).toContain("title");
-  expect(await Book.count()).toBe(before + 1);
+  await assertDifference(
+    () => Book.count() as Promise<number>,
+    1,
+    null,
+    async () => {
+      const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
+        returning: ":title",
+      });
+      expect(result.columns).toContain("title");
+    },
+  );
 }
 
 function getYear(val: unknown): number {
@@ -101,9 +107,14 @@ describe("InsertAllTest", () => {
   });
 
   it("insert!", async () => {
-    const before = (await Book.count()) as number;
-    await Book.insertBang({ name: "Rework", author_id: 1 });
-    expect(await Book.count()).toBe(before + 1);
+    await assertDifference(
+      () => Book.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await Book.insertBang({ name: "Rework", author_id: 1 });
+      },
+    );
   });
 
   itIfSupports(
@@ -121,26 +132,31 @@ describe("InsertAllTest", () => {
   );
 
   it("insert all", async () => {
-    const before = (await Book.count()) as number;
-    await Book.insertAllBang([
-      { name: "Rework", author_id: 1 },
-      { name: "Patterns of Enterprise Application Architecture", author_id: 1 },
-      { name: "Design of Everyday Things", author_id: 1 },
-      { name: "Practical Object-Oriented Design in Ruby", author_id: 1 },
-      { name: "Clean Code", author_id: 1 },
-      { name: "Ruby Under a Microscope", author_id: 1 },
-      { name: "The Principles of Product Development Flow", author_id: 1 },
-      { name: "Peopleware", author_id: 1 },
-      { name: "About Face", author_id: 1 },
-      { name: "Eloquent Ruby", author_id: 1 },
-    ]);
-    expect(await Book.count()).toBe(before + 10);
+    await assertDifference(
+      () => Book.count() as Promise<number>,
+      10,
+      null,
+      async () => {
+        await Book.insertAllBang([
+          { name: "Rework", author_id: 1 },
+          { name: "Patterns of Enterprise Application Architecture", author_id: 1 },
+          { name: "Design of Everyday Things", author_id: 1 },
+          { name: "Practical Object-Oriented Design in Ruby", author_id: 1 },
+          { name: "Clean Code", author_id: 1 },
+          { name: "Ruby Under a Microscope", author_id: 1 },
+          { name: "The Principles of Product Development Flow", author_id: 1 },
+          { name: "Peopleware", author_id: 1 },
+          { name: "About Face", author_id: 1 },
+          { name: "Eloquent Ruby", author_id: 1 },
+        ]);
+      },
+    );
   });
 
   itIfSupports("insert_on_duplicate_update", "insert all should handle empty arrays", async () => {
-    expect((await Book.insertAll([])).length).toBe(0);
-    expect((await Book.insertAllBang([])).length).toBe(0);
-    expect((await Book.upsertAll([])).length).toBe(0);
+    assertEmpty(await Book.insertAll([]));
+    assertEmpty(await Book.insertAllBang([]));
+    assertEmpty(await Book.upsertAll([]));
   });
 
   it("insert all raises on duplicate records", async () => {
@@ -197,9 +213,13 @@ describe("InsertAllTest", () => {
   });
 
   itIfSupports("insert_on_duplicate_skip", "insert all can skip duplicate records", async () => {
-    const before = (await Book.count()) as number;
-    await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
-    expect(await Book.count()).toBe(before);
+    await assertNoDifference(
+      () => Book.count() as Promise<number>,
+      null,
+      async () => {
+        await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
+      },
+    );
   });
 
   itIfSupports.skipIf(adapterType !== "mysql")(
@@ -358,11 +378,16 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_skip",
     "insert all and upsert all works with composite primary keys when unique by is not provided",
     async () => {
-      const before = (await Cart.count()) as number;
-      await Cart.insertAll([{ id: 1, shop_id: 1, title: "My cart" }]);
-      await Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart 2" }]);
-      await Cart.upsertAll([{ id: 3, shop_id: 2, title: "My other cart" }]);
-      expect(await Cart.count()).toBe(before + 3);
+      await assertDifference(
+        () => Cart.count() as Promise<number>,
+        3,
+        null,
+        async () => {
+          await Cart.insertAll([{ id: 1, shop_id: 1, title: "My cart" }]);
+          await Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart 2" }]);
+          await Cart.upsertAll([{ id: 3, shop_id: 2, title: "My other cart" }]);
+        },
+      );
     },
   );
 
@@ -370,7 +395,7 @@ describe("InsertAllTest", () => {
     const output = await captureLogOutput(async () => {
       await Book.insert({ name: "Rework", author_id: 1 });
     });
-    expect(output).toContain("Book Insert");
+    expect(output).toMatch("Book Insert");
   });
 
   itIfSupports(
@@ -383,7 +408,7 @@ describe("InsertAllTest", () => {
           { name: "Renote", author_id: 1 },
         ]);
       });
-      expect(output).toContain("Book Bulk Insert");
+      expect(output).toMatch("Book Bulk Insert");
     },
   );
 
@@ -406,9 +431,14 @@ describe("InsertAllTest", () => {
   );
 
   itIfSupports("insert_on_duplicate_update", "insert all and upsert all with sti", async () => {
-    const before = (await Category.count()) as number;
-    await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
-    expect(await Category.count()).toBe(before + 2);
+    await assertDifference(
+      () => Category.count() as Promise<number>,
+      2,
+      null,
+      async () => {
+        await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
+      },
+    );
 
     const [first, second] = (await Category.last(2)) as any[];
     expect(first.type).toBe("SpecialCategory");
@@ -433,7 +463,7 @@ describe("InsertAllTest", () => {
       const output = await captureLogOutput(async () => {
         await Book.upsert({ name: "Remote", author_id: 1 });
       });
-      expect(output).toContain("Book Upsert");
+      expect(output).toMatch("Book Upsert");
     },
   );
 
@@ -459,7 +489,7 @@ describe("InsertAllTest", () => {
           { name: "Renote", author_id: 1 },
         ]);
       });
-      expect(output).toContain("Book Bulk Upsert");
+      expect(output).toMatch("Book Bulk Upsert");
     },
   );
 
@@ -999,25 +1029,40 @@ describe("InsertAllTest", () => {
 
   it("insert all on relation", async () => {
     const author = await Author.create({ name: "Jimmy" });
-    const before = (await (author as any).books.count()) as number;
-    await (author as any).books.insertAllBang([{ name: "My little book", isbn: "1974522598" }]);
-    expect(await (author as any).books.count()).toBe(before + 1);
+    await assertDifference(
+      () => (author as any).books.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await (author as any).books.insertAllBang([{ name: "My little book", isbn: "1974522598" }]);
+      },
+    );
   });
 
   it("insert all on relation precedence", async () => {
     const author = await Author.create({ name: "Jimmy" });
     const secondAuthor = await Author.create({ name: "Bob" });
-    const before = (await (author as any).books.count()) as number;
-    await (author as any).books.insertAllBang([
-      { name: "My little book", isbn: "1974522598", author_id: (secondAuthor as any).id },
-    ]);
-    expect(await (author as any).books.count()).toBe(before + 1);
+    await assertDifference(
+      () => (author as any).books.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await (author as any).books.insertAllBang([
+          { name: "My little book", isbn: "1974522598", author_id: (secondAuthor as any).id },
+        ]);
+      },
+    );
   });
 
   it("insert all create with", async () => {
-    const before = (await Book.where({ format: "X" }).count()) as number;
-    await Book.createWith({ format: "X" }).insertAllBang([{ name: "A" }, { name: "B" }]);
-    expect(await Book.where({ format: "X" }).count()).toBe(before + 2);
+    await assertDifference(
+      () => Book.where({ format: "X" }).count() as Promise<number>,
+      2,
+      null,
+      async () => {
+        await Book.createWith({ format: "X" }).insertAllBang([{ name: "A" }, { name: "B" }]);
+      },
+    );
   });
 
   it("insert all has many through", async () => {
@@ -1029,25 +1074,40 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "upsert all on relation", async () => {
     const author = await Author.create({ name: "Jimmy" });
-    const before = (await (author as any).books.count()) as number;
-    await (author as any).books.upsertAll([{ name: "My little book", isbn: "1974522598" }]);
-    expect(await (author as any).books.count()).toBe(before + 1);
+    await assertDifference(
+      () => (author as any).books.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await (author as any).books.upsertAll([{ name: "My little book", isbn: "1974522598" }]);
+      },
+    );
   });
 
   itIfSupports("insert_on_duplicate_update", "upsert all on relation precedence", async () => {
     const author = await Author.create({ name: "Jimmy" });
     const secondAuthor = await Author.create({ name: "Bob" });
-    const before = (await (author as any).books.count()) as number;
-    await (author as any).books.upsertAll([
-      { name: "My little book", isbn: "1974522598", author_id: (secondAuthor as any).id },
-    ]);
-    expect(await (author as any).books.count()).toBe(before + 1);
+    await assertDifference(
+      () => (author as any).books.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await (author as any).books.upsertAll([
+          { name: "My little book", isbn: "1974522598", author_id: (secondAuthor as any).id },
+        ]);
+      },
+    );
   });
 
   itIfSupports("insert_on_duplicate_update", "upsert all create with", async () => {
-    const before = (await Book.where({ format: "X" }).count()) as number;
-    await Book.createWith({ format: "X" }).upsertAll([{ name: "A" }, { name: "B" }]);
-    expect(await Book.where({ format: "X" }).count()).toBe(before + 2);
+    await assertDifference(
+      () => Book.where({ format: "X" }).count() as Promise<number>,
+      2,
+      null,
+      async () => {
+        await Book.createWith({ format: "X" }).upsertAll([{ name: "A" }, { name: "B" }]);
+      },
+    );
   });
 
   itIfSupports("insert_on_duplicate_update", "upsert all has many through", async () => {
@@ -1124,15 +1184,11 @@ describe("InsertAllTest", () => {
     const databaseName = Book.connectionDbConfig().database;
     Book.tableName = `${databaseName}.books`;
 
-    let raised: unknown;
     try {
       await Book.loadSchema();
-      await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
-    } catch (e) {
-      raised = e;
+      await expect(Book.insertAllBang([{ name: "Rework", author_id: 1 }])).resolves.not.toThrow();
     } finally {
       Book.tableName = "books";
     }
-    expect(raised).toBeUndefined();
   });
 });
