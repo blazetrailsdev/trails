@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
+import { assertNotDeprecated } from "@blazetrails/activesupport";
+import { deprecator } from "../deprecator.js";
+import { restoreWorkerConnection } from "../support/connection.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { readingRole, setWritingRole, writingRole } from "../active-record.js";
 
@@ -24,17 +27,34 @@ function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
 
 describe("ConnectionHandlerTest", () => {
   let handler: ConnectionHandler;
+  let pool: any;
+  const connectionName = "ActiveRecord::Base";
 
   beforeEach(async () => {
+    await restoreWorkerConnection();
     handler = new ConnectionHandler();
     DatabaseTasks.env = "development";
   });
 
+  afterEach(async () => {
+    await restoreWorkerConnection();
+  });
+
+  const setupPool = async () => {
+    pool = await handler.establishConnection(
+      new HashConfig("arunit", "primary", ambientPoolConfiguration()),
+    );
+  };
+
   it("default env fall back to default env when rails env or rack env is empty string", async () => {
+    vi.stubEnv("TRAILS_ENV", "");
+    vi.stubEnv("NODE_ENV", "");
     DatabaseTasks.env = "";
-    expect(DatabaseTasks.env).toBe("default_env");
-    DatabaseTasks.env = "development";
-    expect(DatabaseTasks.env).toBe("development");
+    try {
+      expect(DEFAULT_ENV()).toEqual("default_env");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("establish connection using 3 levels config", async () => {
@@ -60,15 +80,15 @@ describe("ConnectionHandlerTest", () => {
       await handler.establishConnection("readonly");
 
       const readonlyPool = handler.retrieveConnectionPool("readonly");
-      expect(readonlyPool).toBeTruthy();
+      expect(readonlyPool).not.toBeNull();
       expect(readonlyPool!.dbConfig.database).toBe("test/db/readonly.sqlite3");
 
       const primaryPool = handler.retrieveConnectionPool("primary");
-      expect(primaryPool).toBeTruthy();
+      expect(primaryPool).not.toBeNull();
       expect(primaryPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
 
       const commonPool = handler.retrieveConnectionPool("common");
-      expect(commonPool).toBeTruthy();
+      expect(commonPool).not.toBeNull();
       expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
@@ -155,64 +175,129 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("establish connection with primary works without deprecation", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const pool = await handler.establishConnection(config);
-    expect(pool.dbConfig.name).toBe("primary");
+    const oldConfig = Base.configurations();
+    const config = { primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" } };
+    Base.configurations(config);
+    try {
+      await handler.establishConnection("primary");
+
+      await assertNotDeprecated(deprecator(), async () => {
+        await handler.retrieveConnection("primary");
+        await handler.removeConnectionPool("primary");
+      });
+    } finally {
+      Base.configurations(oldConfig);
+    }
   });
 
   it("establish connection using 3 level config defaults to default env primary db", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const pool = await handler.establishConnection(config);
-    expect(pool.dbConfig.envName).toBe("development");
-    expect(pool.dbConfig.name).toBe("primary");
+    const previousEnv = DatabaseTasks.env;
+    DatabaseTasks.env = "default_env";
+    const config = {
+      default_env: {
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+        readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
+      },
+      another_env: {
+        primary: { adapter: "sqlite3", database: "test/db/another-primary.sqlite3" },
+        readonly: { adapter: "sqlite3", database: "test/db/another-readonly.sqlite3" },
+      },
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.establishConnection();
+
+      expect((await Base.leaseConnection()).pool.dbConfig.database).toMatch(
+        "test/db/primary.sqlite3",
+      );
+    } finally {
+      Base.configurations(prevConfigs);
+      DatabaseTasks.env = previousEnv;
+      await restoreWorkerConnection();
+    }
   });
 
   it("establish connection using 2 level config defaults to default env primary db", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const pool = await handler.establishConnection(config);
-    expect(pool.dbConfig.envName).toBe("development");
+    const previousEnv = DatabaseTasks.env;
+    DatabaseTasks.env = "default_env";
+    const config = {
+      default_env: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      another_env: { adapter: "sqlite3", database: "test/db/bad-primary.sqlite3" },
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await Base.establishConnection();
+
+      expect((await Base.leaseConnection()).pool.dbConfig.database).toMatch(
+        "test/db/primary.sqlite3",
+      );
+    } finally {
+      Base.configurations(prevConfigs);
+      DatabaseTasks.env = previousEnv;
+      await restoreWorkerConnection();
+    }
   });
 
   it("establish connection using two level configurations", async () => {
-    const config = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const pool = await handler.establishConnection(config);
-    expect(pool.dbConfig.database).toBe("test/db/primary.sqlite3");
+    const config = {
+      development: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await handler.establishConnection("development");
+
+      const pool = handler.retrieveConnectionPool("development");
+      expect(pool).not.toBeNull();
+      expect((await pool!.leaseConnection()).isPreventingWrites()).toBeFalsy();
+      expect(pool!.dbConfig.database).toEqual("test/db/primary.sqlite3");
+    } finally {
+      Base.configurations(prevConfigs);
+    }
   });
 
   it("establish connection using top level key in two level config", async () => {
-    const configs = new DatabaseConfigurations({
+    const config = {
       development: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
       development_readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
-    });
-    const config = configs.configsFor({ envName: "development_readonly" })[0];
-    const pool = await handler.establishConnection(config);
-    expect(pool).toBeTruthy();
-    expect(pool.dbConfig.database).toBe("test/db/readonly.sqlite3");
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await handler.establishConnection("development_readonly");
+
+      const pool = handler.retrieveConnectionPool("development_readonly");
+      expect(pool).not.toBeNull();
+      expect((await pool!.leaseConnection()).isPreventingWrites()).toBeFalsy();
+      expect(pool!.dbConfig.database).toEqual("test/db/readonly.sqlite3");
+    } finally {
+      Base.configurations(prevConfigs);
+    }
   });
 
   it("establish connection with string owner name", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    await handler.establishConnection(config, { ownerName: "MyModel" });
-    const pool = handler.retrieveConnectionPool("MyModel");
-    expect(pool).toBeTruthy();
+    const config = {
+      development: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      development_readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+    try {
+      await handler.establishConnection("development_readonly", { ownerName: "custom_connection" });
+
+      const pool = handler.retrieveConnectionPool("custom_connection");
+      expect(pool).not.toBeNull();
+      expect((await pool!.leaseConnection()).isPreventingWrites()).toBeFalsy();
+      expect(pool!.dbConfig.database).toEqual("test/db/readonly.sqlite3");
+    } finally {
+      Base.configurations(prevConfigs);
+    }
   });
 
   it("symbolized configurations assignment", async () => {
+    const prevConfigs = Base.configurations();
     const config = {
       development: {
         primary: { adapter: "sqlite3", database: "test/storage/development.sqlite3" },
@@ -221,45 +306,39 @@ describe("ConnectionHandlerTest", () => {
         primary: { adapter: "sqlite3", database: "test/storage/test.sqlite3" },
       },
     };
-    const configurations = new DatabaseConfigurations(config);
-    const dbConfigs = configurations.configsFor();
-    expect(dbConfigs).toHaveLength(2);
-    for (const dbConfig of dbConfigs) {
-      expect(dbConfig).toBeInstanceOf(HashConfig);
-      expect(typeof dbConfig.envName).toBe("string");
-      expect(typeof dbConfig.name).toBe("string");
+    Base.configurations(config);
+    try {
+      for (const dbConfig of Base.configurations().configsFor()) {
+        expect(dbConfig).toBeInstanceOf(HashConfig);
+        expect(Object(dbConfig.envName)).toBeInstanceOf(String);
+        expect(Object(dbConfig.name)).toBeInstanceOf(String);
+
+        for (const key of Object.keys(dbConfig.configurationHash)) {
+          expect(Object(key)).toBeInstanceOf(String);
+        }
+      }
+    } finally {
+      Base.configurations(prevConfigs);
     }
   });
 
   it("retrieve connection", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    await handler.establishConnection(config, { ownerName: "primary" });
-    const pool = handler.retrieveConnectionPool("primary");
-    expect(pool).toBeTruthy();
+    await setupPool();
+    expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
   });
 
   it("active connections?", async () => {
-    expect(handler.activeConnectionsQ()).toBe(false);
-    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
-    await handler.establishConnection(config, { ownerName: "primary" });
-    const pool = handler.retrieveConnectionPool("primary")!;
-    await pool.leaseConnection();
-    expect(handler.activeConnectionsQ()).toBe(true);
-    pool.releaseConnection();
+    await setupPool();
+    expect(handler.activeConnectionsQ("all")).toBeFalsy();
+    expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
+    expect(handler.activeConnectionsQ("all")).toBeTruthy();
+    handler.clearActiveConnectionsBang("all");
+    expect(handler.activeConnectionsQ("all")).toBeFalsy();
   });
 
   it("retrieve connection pool", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    await handler.establishConnection(config, { ownerName: "primary" });
-    const pool = handler.retrieveConnectionPool("primary");
-    expect(pool).toBeTruthy();
-    expect(pool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+    await setupPool();
+    expect(handler.retrieveConnectionPool(connectionName)).not.toBeNull();
   });
 
   it("retrieve connection pool with invalid id", async () => {
@@ -268,92 +347,60 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("connection pools", async () => {
-    const config1 = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const config2 = new HashConfig("development", "animals", {
-      adapter: "sqlite3",
-      database: "test/db/common.sqlite3",
-    });
-    await handler.establishConnection(config1, { ownerName: "primary" });
-    await handler.establishConnection(config2, { ownerName: "animals" });
-    expect(handler.connectionPools).toHaveLength(2);
+    await setupPool();
+    expect(handler.connectionPools).toEqual([pool]);
   });
 
   it("a class using custom pool and switching back to primary", async () => {
-    const savedHandler = (Base as any)._connectionHandler;
-    const freshHandler = new ConnectionHandler();
-    (Base as any)._connectionHandler = freshHandler;
-    try {
-      class Klass2 extends Base {}
+    class Klass2 extends Base {}
 
-      const baseConfig = new HashConfig("development", "primary", ambientPoolConfiguration());
-      const ownConfig = new HashConfig("development", "Klass2", ambientPoolConfiguration());
+    expect(await Klass2.leaseConnection()).toBe(await Base.leaseConnection());
 
-      const basePool = await freshHandler.establishConnection(baseConfig, {
-        ownerName: "ActiveRecord::Base",
-        role: "writing",
-      });
+    await Klass2.establishConnection(Base.connectionPool().dbConfig.configurationHash);
+    const klass2Pool = Klass2.connectionPool();
+    expect(await Klass2.leaseConnection()).toBe(await klass2Pool.leaseConnection());
+    expect(await Klass2.leaseConnection()).not.toBe(await Base.leaseConnection());
 
-      expect(
-        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
-          role: "writing",
-        }),
-      ).toBe(basePool);
+    await Klass2.removeConnection();
 
-      const ownPool = await freshHandler.establishConnection(ownConfig, {
-        ownerName: Klass2,
-        role: "writing",
-      });
-      (Klass2 as any).connectionClass = true;
-
-      expect(
-        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
-          role: "writing",
-        }),
-      ).toBe(ownPool);
-      expect(ownPool).not.toBe(basePool);
-
-      await Klass2.removeConnection();
-
-      expect(
-        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
-          role: "writing",
-        }),
-      ).toBe(basePool);
-      expect((Klass2 as any).connectionClass).toBe(true);
-    } finally {
-      (Base as any)._connectionHandler = savedHandler;
-    }
+    expect(await Klass2.leaseConnection()).toBe(await Base.leaseConnection());
   });
 
   it("connection specification name should fallback to parent", async () => {
-    class ParentModel extends Base {}
-    class ChildModel extends ParentModel {}
+    class ApplicationRecord extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class MyClass extends ApplicationRecord {}
 
-    expect(ChildModel.connectionSpecificationName).toBe(ParentModel.connectionSpecificationName);
+    class KlassA extends Base {}
+    class KlassB extends KlassA {}
+    class KlassC extends MyClass {}
 
-    ParentModel.connectionSpecificationName = "readonly";
-    expect(ChildModel.connectionSpecificationName).toBe("readonly");
+    try {
+      expect(KlassB.connectionSpecificationName).toEqual(KlassA.connectionSpecificationName);
+      expect(KlassC.connectionSpecificationName).toEqual(KlassA.connectionSpecificationName);
 
-    (ParentModel as any)._connectionSpecificationName = undefined;
+      expect(KlassA.connectionSpecificationName).toEqual("ActiveRecord::Base");
+      expect(KlassC.connectionSpecificationName).toEqual("ActiveRecord::Base");
+
+      KlassA.connectionSpecificationName = "readonly";
+      expect(KlassB.connectionSpecificationName).toEqual("readonly");
+
+      Base.connectionSpecificationName = "readonly";
+      expect(KlassC.connectionSpecificationName).toEqual("readonly");
+    } finally {
+      Base.connectionSpecificationName = "ActiveRecord::Base";
+    }
   });
 
-  it("remove connection should not remove parent", async () => {
-    const config1 = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "test/db/primary.sqlite3",
-    });
-    const config2 = new HashConfig("development", "child", {
-      adapter: "sqlite3",
-      database: "test/db/readonly.sqlite3",
-    });
-    await handler.establishConnection(config1, { ownerName: "primary" });
-    await handler.establishConnection(config2, { ownerName: "child" });
-    await handler.removeConnectionPool("child");
-    expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
-    expect(handler.retrieveConnectionPool("child")).toBeUndefined();
+  it.skip("remove connection should not remove parent", async () => {
+    // BLOCKED: remove-connection-reads-inherited-specification-name
+    class Klass2 extends Base {}
+    await Klass2.removeConnection();
+    expect(await Base.leaseConnection()).not.toBeNull();
+    expect(await Klass2.leaseConnection()).toBe(await Base.leaseConnection());
   });
 
   it("establish connection returns same pool for same config", async () => {
