@@ -6,6 +6,7 @@ import {
   REJECT_ALL_BLANK_PROC,
   TooManyRecords,
 } from "./index.js";
+import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
@@ -24,6 +25,13 @@ import { Guitar } from "./test-helpers/models/guitar.js";
 import { TuningPeg } from "./test-helpers/models/tuning-peg.js";
 import { Entry } from "./test-helpers/models/entry.js";
 import { Message } from "./test-helpers/models/message.js";
+import {
+  assertDifference,
+  assertNoDifference,
+  assertEmpty,
+  assertRaise,
+  assertNothingRaised,
+} from "@blazetrails/activesupport";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
@@ -74,7 +82,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const options = Pirate.nestedAttributesOptions;
     expect(options.birdsWithRejectAllBlank.rejectIf).toBe(REJECT_ALL_BLANK_PROC);
     for (const name of ["parrots", "birds"]) {
-      expect(typeof options[name].rejectIf).toBe("function");
+      expect(options[name].rejectIf).toBeInstanceOf(Function);
     }
   });
 
@@ -86,7 +94,7 @@ describe("TestNestedAttributesInGeneral", () => {
       { name: "", color: "", _destroy: "0" },
     ]);
     await pirate.saveBang();
-    expect((await (pirate as any).birdsWithRejectAllBlank.toArray()).length).toBe(0);
+    assertEmpty(await (pirate as any).birdsWithRejectAllBlank.toArray());
   });
 
   it("should not build a new record if reject all blank returns false", async () => {
@@ -95,7 +103,7 @@ describe("TestNestedAttributesInGeneral", () => {
     });
     await (pirate as any).setBirdsWithRejectAllBlankAttributes([{ name: "", color: "" }]);
     await pirate.saveBang();
-    expect((await (pirate as any).birdsWithRejectAllBlank.toArray()).length).toBe(0);
+    assertEmpty(await (pirate as any).birdsWithRejectAllBlank.toArray());
   });
 
   it("should build a new record if reject all blank does not return false", async () => {
@@ -109,19 +117,23 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(birds[0].name).toBe("Tweetie");
   });
 
-  it("should raise an ArgumentError for non existing associations", () => {
-    expect(() => Pirate.acceptsNestedAttributesFor("honesty")).toThrow(/No association found/);
+  it("should raise an ArgumentError for non existing associations", async () => {
+    const exception = await assertRaise([ArgumentError], {}, () =>
+      Pirate.acceptsNestedAttributesFor("honesty"),
+    );
+    expect(exception.message).toBe(
+      "No association found for name `honesty'. Has it been defined yet?",
+    );
   });
 
   it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
     resetShipConfig();
-    await expect(
-      (async () => {
-        const pirate = new Pirate({ catchphrase: "Arr" });
-        await (pirate as any).setShipAttributes({ sail: true });
-        await pirate.save();
-      })(),
-    ).rejects.toThrow(/unknown attribute 'sail' for Ship/);
+    const exception = await assertRaise([UnknownAttributeError], {}, async () => {
+      const pirate = new Pirate({ catchphrase: "Arr" });
+      await (pirate as any).setShipAttributes({ sail: true });
+      await pirate.save();
+    });
+    expect(exception.message).toMatch("unknown attribute 'sail' for Ship.");
   });
 
   it("should disable allow destroy by default", async () => {
@@ -131,25 +143,26 @@ describe("TestNestedAttributesInGeneral", () => {
     });
     const ship = await (pirate as any).createShip({ name: "Nights Dirty Lightning" });
     await pirate.update({ shipAttributes: { _destroy: true, id: ship.id } });
-    const reloaded = await shipOf(await Pirate.find(pirate.id));
-    expect(reloaded).not.toBeNull();
+    await assertNothingRaised(async () => (await pirate.association("ship").reload()).target);
     resetShipConfig();
   });
 
   it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
     const ship = await Ship.createBang({ name: "Nights Dirty Lightning" });
-    expect(ship.markedForDestruction()).toBe(false);
+    expect(ship.markedForDestruction()).toBeFalsy();
     ship.markForDestruction();
-    expect(ship.markedForDestruction()).toBe(true);
+    expect(ship.markedForDestruction()).toBeTruthy();
   });
 
   it("reject if method without arguments", async () => {
     Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Black Pearl" });
-    const before = Number(await Ship.count());
-    await pirate.saveBang();
-    expect(Number(await Ship.count())).toBe(before);
+    await assertNoDifference(
+      () => Ship.count() as Promise<number>,
+      null,
+      () => pirate.saveBang(),
+    );
     resetShipConfig();
   });
 
@@ -164,14 +177,19 @@ describe("TestNestedAttributesInGeneral", () => {
 
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
-    let before = Number(await Ship.count());
-    await pirate.saveBang();
-    expect(Number(await Ship.count())).toBe(before);
+    await assertNoDifference(
+      () => Ship.count() as Promise<number>,
+      null,
+      () => pirate.saveBang(),
+    );
 
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
-    before = Number(await Ship.count());
-    await pirate.saveBang();
-    expect(Number(await Ship.count())).toBe(before + 1);
+    await assertDifference(
+      () => Ship.count() as Promise<number>,
+      1,
+      null,
+      () => pirate.saveBang(),
+    );
     resetShipConfig();
   });
 
@@ -210,9 +228,12 @@ describe("TestNestedAttributesInGeneral", () => {
     Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !a["name"] });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Hello Pearl" });
-    const before = Number(await Ship.count());
-    await pirate.saveBang();
-    expect(Number(await Ship.count())).toBe(before + 1);
+    await assertDifference(
+      () => Ship.count() as Promise<number>,
+      1,
+      null,
+      () => pirate.saveBang(),
+    );
     resetShipConfig();
   });
 
@@ -259,7 +280,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const interest = await (human as any).interests.create({ topic: "the ladies" });
     await human.update({ interestsAttributes: { _destroy: "1", id: interest.id } });
     await human.reload();
-    expect((await (human as any).interests.toArray()).length).toBe(0);
+    assertEmpty(await (human as any).interests.toArray());
   });
 
   it("reject if is not short circuited if allow destroy is false", async () => {

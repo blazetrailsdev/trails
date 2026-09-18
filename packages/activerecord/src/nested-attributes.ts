@@ -5,7 +5,7 @@ import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, isBlank } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
-import { BooleanType } from "@blazetrails/activemodel";
+import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {
   /** @noRailsEquivalent PERMANENT */
@@ -40,7 +40,9 @@ export function acceptsNestedAttributesFor(
 
   const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
   if (!reflection) {
-    throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
+    throw new ArgumentError(
+      `No association found for name \`${associationName}'. Has it been defined yet?`,
+    );
   }
 
   reflection.autosave = true;
