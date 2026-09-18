@@ -2341,10 +2341,10 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     name: Column,
   ): Promise<void> {
     if (adapterType === "postgres") {
-      expect((name as any).defaultFunction).toBe("gen_random_uuid()");
+      expect(name.defaultFunction).toBe("gen_random_uuid()");
       await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
     } else {
-      expect((name as any).defaultFunction).toBe("uuid()");
+      expect(name.defaultFunction).toBe("uuid()");
       await adapter.execute("INSERT INTO delete_me () VALUES ()");
     }
   }
