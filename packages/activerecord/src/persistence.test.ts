@@ -194,7 +194,7 @@ describe("PersistenceTest", () => {
   });
 
   it.skip("update attribute", async () => {
-    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the `name=` setter
+    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the name= setter (persistence.rb:530-536); filed as 0155-assertion-surfaced-port-bugs/update-attribute-uses-public-send-setter
     expect((await Topic.find(1)).approved).toBeFalsy();
     await (await Topic.find(1)).updateAttribute("approved", true);
     expect((await Topic.find(1)).approved).toBeTruthy();
@@ -1321,7 +1321,7 @@ describe("PersistenceTest", () => {
   });
 
   it.skip("update attribute!", async () => {
-    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the `name=` setter
+    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the name= setter (persistence.rb:530-536); filed as 0155-assertion-surfaced-port-bugs/update-attribute-uses-public-send-setter
     expect((await Topic.find(1)).approved).toBeFalsy();
     await (await Topic.find(1)).updateAttributeBang("approved", true);
     expect((await Topic.find(1)).approved).toBeTruthy();
