@@ -88,6 +88,7 @@ import {
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
 import { captureSql } from "../testing/sql-capture.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
@@ -3890,376 +3891,157 @@ describe("HasManyAssociationsTest", () => {
     expect(comments.length).toBe(1);
     expect((comments[0] as HcComment).body).toBe("hello");
   });
-  it("include checks if record exists if target not loaded", async () => {
-    class InclAuthor extends Base {
-      declare name: string | null;
+  describe("with companies fixtures for finders", () => {
+    const { companies: firms2, topics: topics2 } = fixtures([
+      "companies",
+      "accounts",
+      "authors",
+      "authorAddresses",
+      "topics",
+    ]);
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InclPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(InclAuthor, "inclPosts", {
-      className: "InclPost",
-      foreignKey: "author_id",
+    it("include uses array include after loaded", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.load();
+      const client = await firm.clients.first();
+      await assertNoQueries(false, async () => {
+        expect(firm.clients.loaded).toBeTruthy();
+        expect(await firm.clients.isInclude(client)).toBe(true);
+      });
     });
-    registerModel("InclAuthor", InclAuthor);
-    registerModel("InclPost", InclPost);
-    const author = await InclAuthor.create({ name: "Alice" });
-    const post = await InclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const proxy = association(author, "inclPosts");
-    expect(proxy.loaded).toBe(false);
-    expect(await proxy.isInclude(post as any)).toBe(true);
-    expect(proxy.loaded).toBe(false);
-  });
-  it("include returns false for non matching record to verify scoping", async () => {
-    class InclScopeAuthor extends Base {
-      declare name: string | null;
-      declare inclScopePosts: AssociationProxy<InclScopePost>;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("inclScopePosts", {
-          className: "InclScopePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class InclScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    it("include checks if record exists if target not loaded", async () => {
+      const firm = firms2("first_firm") as any;
+      const client = await firm.clients.first();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("InclScopeAuthor", InclScopeAuthor);
-    registerModel("InclScopePost", InclScopePost);
-    const author1 = await InclScopeAuthor.create({ name: "Alice" });
-    const author2 = await InclScopeAuthor.create({ name: "Bob" });
-    const post = await InclScopePost.create({ author_id: author2.id, title: "B", body: "body" });
-    const proxy = association(author1, "inclScopePosts");
-    expect(await proxy.isInclude(post as any)).toBe(false);
-  });
-  it("calling first nth or last on association should not load association", async () => {
-    class FnlAuthor extends Base {
-      declare fnl_posts: AssociationProxy<FnlPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fnl_posts", {
-          className: "FnlPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FnlPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FnlAuthor);
-    registerModel(FnlPost);
-    const author = await FnlAuthor.create({ name: "Alice" });
-    await FnlPost.create({ author_id: author.id, title: "A", body: "body" });
-    await FnlPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.fnl_posts;
-    expect(posts[0]).toBeDefined();
-    expect(posts[posts.length - 1]).toBeDefined();
-  });
-  it("calling first or last on loaded association should not fetch with query", async () => {
-    class FlLoadAuthor extends Base {
-      declare fl_load_posts: AssociationProxy<FlLoadPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fl_load_posts", {
-          className: "FlLoadPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FlLoadPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FlLoadAuthor);
-    registerModel(FlLoadPost);
-    const author = await FlLoadAuthor.create({ name: "Alice" });
-    await FlLoadPost.create({ author_id: author.id, title: "A", body: "body" });
-    await FlLoadPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.fl_load_posts;
-    expect(posts[0]).toBeDefined();
-    expect(posts[posts.length - 1]).toBeDefined();
-  });
-  it("calling first nth or last on existing record with build should load association", async () => {
-    class FnlBuildAuthor extends Base {
-      declare fnl_build_posts: AssociationProxy<FnlBuildPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fnl_build_posts", {
-          className: "FnlBuildPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FnlBuildPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FnlBuildAuthor);
-    registerModel(FnlBuildPost);
-    const author = await FnlBuildAuthor.create({ name: "Alice" });
-    await FnlBuildPost.create({ author_id: author.id, title: "A", body: "body" });
-    FnlBuildPost.new({ author_id: author.id, title: "B" });
-    const posts = await author.fnl_build_posts;
-    expect(posts[0]).toBeDefined();
-    expect(posts.length).toBe(1);
-  });
-  it("calling first nth or last on existing record with create should not load association", async () => {
-    class FnlCreateAuthor extends Base {
-      declare fnl_create_posts: AssociationProxy<FnlCreatePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fnl_create_posts", {
-          className: "FnlCreatePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FnlCreatePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FnlCreateAuthor);
-    registerModel(FnlCreatePost);
-    const author = await FnlCreateAuthor.create({ name: "Alice" });
-    await FnlCreatePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.fnl_create_posts;
-    expect(posts[0]).toBeDefined();
-    expect(posts.length).toBe(1);
-  });
-  it("calling first nth or last on new record should not run queries", async () => {
-    class FnlNewAuthor extends Base {
-      declare fnl_new_posts: AssociationProxy<FnlNewPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fnl_new_posts", {
-          className: "FnlNewPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FnlNewPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FnlNewAuthor);
-    registerModel(FnlNewPost);
-    const author = FnlNewAuthor.new({ name: "Unsaved" });
-    const posts = await author.fnl_new_posts;
-    expect(posts.length).toBe(0);
-  });
-  it("calling first or last with integer on association should not load association", async () => {
-    class FlIntAuthor extends Base {
-      declare fl_int_posts: AssociationProxy<FlIntPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("fl_int_posts", {
-          className: "FlIntPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FlIntPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FlIntAuthor);
-    registerModel(FlIntPost);
-    const author = await FlIntAuthor.create({ name: "Alice" });
-    await FlIntPost.create({ author_id: author.id, title: "A", body: "body" });
-    await FlIntPost.create({ author_id: author.id, title: "B", body: "body" });
-    await FlIntPost.create({ author_id: author.id, title: "C", body: "body" });
-    const posts = await author.fl_int_posts;
-    const firstTwo = posts.slice(0, 2);
-    expect(firstTwo.length).toBe(2);
-  });
-  it("calling many should count instead of loading association", async () => {
-    class ManyCountAuthor extends Base {
-      declare name: string | null;
-      declare manyCountPosts: AssociationProxy<ManyCountPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("manyCountPosts", {
-          className: "ManyCountPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ManyCountPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("ManyCountAuthor", ManyCountAuthor);
-    registerModel("ManyCountPost", ManyCountPost);
-    const author = await ManyCountAuthor.create({ name: "Alice" });
-    await ManyCountPost.create({ author_id: author.id, title: "A", body: "body" });
-    await ManyCountPost.create({ author_id: author.id, title: "B", body: "body" });
-    const proxy = association(author, "manyCountPosts");
-    expect(proxy.loaded).toBe(false);
-    expect(await proxy.isMany()).toBe(true);
-    expect(proxy.loaded).toBe(false);
-  });
-  it("calling many on loaded association should not use query", async () => {
-    class ManyLoadAuthor extends Base {
-      declare name: string | null;
-      declare manyLoadPosts: AssociationProxy<ManyLoadPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("manyLoadPosts", {
-          className: "ManyLoadPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ManyLoadPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("ManyLoadAuthor", ManyLoadAuthor);
-    registerModel("ManyLoadPost", ManyLoadPost);
-    const author = await ManyLoadAuthor.create({ name: "Alice" });
-    await ManyLoadPost.create({ author_id: author.id, title: "A", body: "body" });
-    await ManyLoadPost.create({ author_id: author.id, title: "B", body: "body" });
-    const proxy = association(author, "manyLoadPosts");
-    await proxy.load();
-    expect(proxy.loaded).toBe(true);
-    const sqlQueries: string[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (e: any) => {
-      if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
+      await firm.reload();
+      expect(firm.clients.loaded).toBeFalsy();
+      await assertQueriesCount(1, false, async () => {
+        expect(await firm.clients.isInclude(client)).toBe(true);
+      });
+      expect(firm.clients.loaded).toBeFalsy();
     });
-    try {
-      expect(await proxy.isMany()).toBe(true);
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(sqlQueries).toHaveLength(0);
-    expect(proxy.loaded).toBe(true);
-  });
-  it("subsequent calls to many should use query", async () => {
-    class ManySubAuthor extends Base {
-      declare name: string | null;
-      declare manySubPosts: AssociationProxy<ManySubPost>;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("manySubPosts", {
-          className: "ManySubPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ManySubPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    it("include returns false for non matching record to verify scoping", async () => {
+      const firm = firms2("first_firm") as any;
+      const client = await Client.createBang({ name: "Not Associated" });
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("ManySubAuthor", ManySubAuthor);
-    registerModel("ManySubPost", ManySubPost);
-    const author = await ManySubAuthor.create({ name: "Alice" });
-    await ManySubPost.create({ author_id: author.id, title: "A", body: "body" });
-    const proxy = association(author, "manySubPosts");
-    expect(await proxy.isMany()).toBe(false);
-    expect(proxy.loaded).toBe(false);
-    await ManySubPost.create({ author_id: author.id, title: "B", body: "body" });
-    expect(await proxy.isMany()).toBe(true);
+      expect(firm.clients.loaded).toBeFalsy();
+      expect(await firm.clients.isInclude(client)).toBe(false);
+    });
+
+    it("calling first nth or last on association should not load association", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.first();
+      await firm.clients.second();
+      await firm.clients.last();
+      expect(firm.clients.loaded).toBeFalsy();
+    });
+
+    it("calling first or last on loaded association should not fetch with query", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.load();
+      expect(firm.clients.loaded).toBeTruthy();
+
+      await assertNoQueries(false, async () => {
+        await firm.clients.first();
+        expect((await firm.clients.first(2)).length).toBe(2);
+        await firm.clients.last();
+        expect((await firm.clients.last(2)).length).toBe(2);
+      });
+    });
+
+    it("calling first nth or last on existing record with build should load association", async () => {
+      const firm = firms2("first_firm") as any;
+      firm.clients.build({ name: "Foo" });
+      expect(firm.clients.loaded).toBeFalsy();
+
+      await assertQueriesCount(1, false, async () => {
+        await firm.clients.first();
+        await firm.clients.second();
+        await firm.clients.last();
+      });
+
+      expect(firm.clients.loaded).toBeTruthy();
+
+      const author = (await HmAuthor.createBang({ name: "Carl" })) as any;
+      const third = topics2("third");
+      const fourth = (topics2("fourth") as any).becomes(HmTopic);
+
+      const newTopic = author.topicsWithoutType.build();
+      expect(author.topicsWithoutType.loaded).toBeFalsy();
+
+      await assertQueriesCount(1, false, async () => {
+        if (currentAdapter("Mysql2Adapter", "TrilogyAdapter", "SQLite3Adapter")) {
+          expect((await author.topicsWithoutType.first()).id).toBe(fourth.id);
+          expect((await author.topicsWithoutType.second()).id).toBe(third.id);
+        }
+        expect(await author.topicsWithoutType.last()).toBe(newTopic);
+      });
+
+      expect(author.topicsWithoutType.loaded).toBeTruthy();
+    });
+
+    it("calling first nth or last on existing record with create should not load association", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.create({ name: "Foo" });
+      expect(firm.clients.loaded).toBeFalsy();
+
+      await assertQueriesCount(3, false, async () => {
+        await firm.clients.first();
+        await firm.clients.second();
+        await firm.clients.last();
+      });
+
+      expect(firm.clients.loaded).toBeFalsy();
+    });
+
+    it("calling first nth or last on new record should not run queries", async () => {
+      const firm = HmFirm.new() as any;
+
+      await assertNoQueries(false, async () => {
+        await firm.clients.first();
+        await firm.clients.second();
+        await firm.clients.last();
+      });
+    });
+
+    it("calling first or last with integer on association should not load association", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.create({ name: "Foo" });
+      expect(firm.clients.loaded).toBeFalsy();
+
+      await assertQueriesCount(2, false, async () => {
+        await firm.clients.first(2);
+        await firm.clients.last(2);
+      });
+
+      expect(firm.clients.loaded).toBeFalsy();
+    });
+
+    it("calling many should count instead of loading association", async () => {
+      const firm = firms2("first_firm") as any;
+      await assertQueriesCount(1, false, async () => {
+        await firm.clients.isMany();
+      });
+      expect(firm.clients.loaded).toBeFalsy();
+    });
+
+    it("calling many on loaded association should not use query", async () => {
+      const firm = firms2("first_firm") as any;
+      await firm.clients.load();
+      await assertNoQueries(false, async () => {
+        expect(await firm.clients.isMany()).toBeTruthy();
+      });
+    });
+
+    it("subsequent calls to many should use query", async () => {
+      const firm = firms2("first_firm") as any;
+      await assertQueriesCount(2, false, async () => {
+        await firm.clients.isMany();
+        await firm.clients.isMany();
+      });
+    });
   });
   it("calling many should defer to collection if using a block", async () => {
     class ManyBlkAuthor extends Base {
