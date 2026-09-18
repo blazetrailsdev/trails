@@ -578,27 +578,27 @@ describe("FinderTest", () => {
   });
 
   it("find with proc parameter and block", async () => {
-    const all = await Topic.all();
-    const findOrIfnone = (title: string | null, message: string): InstanceType<typeof Topic> => {
-      const found = all.find((e) => (e as { title: string }).title === title);
-      if (found === undefined) throw new Error(message);
-      return found;
-    };
-
-    let exception: Error | undefined;
-    try {
-      findOrIfnone("non-existing-title", "should happen");
-    } catch (e) {
-      exception = e as Error;
-    }
+    const exception = await Topic.all()
+      .find(
+        () => {
+          throw new Error("should happen");
+        },
+        (e: unknown) => (e as { title: string }).title === "non-existing-title",
+      )
+      .catch((e: unknown) => e as Error);
     expect(() => {
-      throw exception;
+      throw exception as Error;
     }).toThrow();
-    expect(exception!.message).toBe("should happen");
+    expect((exception as Error).message).toBe("should happen");
 
-    expect(() => {
-      findOrIfnone(topics("first").title, "should not happen");
-    }).not.toThrow();
+    await expect(
+      Topic.all().find(
+        () => {
+          throw new Error("should not happen");
+        },
+        (e: unknown) => (e as { title: string }).title === topics("first").title,
+      ),
+    ).resolves.not.toThrow();
   });
 
   it("find with ids returning ordered", async () => {
@@ -1163,8 +1163,8 @@ describe("FinderTest", () => {
       });
 
       await assertQueriesCount(2, false, async () => {
-        await (Topic.all() as any).skipQueryCacheBang().exists();
-        await (Topic.all() as any).skipQueryCacheBang().exists();
+        await Topic.all().skipQueryCacheBang().exists();
+        await Topic.all().skipQueryCacheBang().exists();
       });
     });
   });
@@ -1177,8 +1177,8 @@ describe("FinderTest", () => {
       });
 
       await assertQueriesCount(2, false, async () => {
-        await (Topic.eagerLoad(":replies").limit(1) as any).skipQueryCacheBang().exists();
-        await (Topic.eagerLoad(":replies").limit(1) as any).skipQueryCacheBang().exists();
+        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().exists();
+        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().exists();
       });
     });
   });

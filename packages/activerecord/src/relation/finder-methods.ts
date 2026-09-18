@@ -92,6 +92,14 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 }
 
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
+  const block = args[args.length - 1];
+  if (typeof block === "function") {
+    const ifnone = args.length > 1 ? (args[0] as () => unknown) : undefined;
+    for (const record of await this.toArray()) {
+      if (await (block as (record: unknown) => unknown)(record)) return record;
+    }
+    return ifnone ? await ifnone() : null;
+  }
   return findWithIds.call(this, ...args);
 }
 
