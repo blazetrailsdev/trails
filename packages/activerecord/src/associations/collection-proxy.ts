@@ -274,12 +274,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    const created = (await this._association.create(
+    return (await this._association.create(
       attributes,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
-    this.resetScope();
-    return created;
   }
 
   async size(): Promise<number> {
@@ -484,12 +482,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    const created = (await this._association.createBang(
+    return (await this._association.createBang(
       attributes,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
-    this.resetScope();
-    return created;
   }
 
   async deleteAll(dependent?: string): Promise<number> {
@@ -553,10 +549,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._offsets = undefined;
     this._take = undefined;
     this._scope = undefined;
-    const base = this._association.owner._collectionProxies.get(this._assocName);
-    if (base && base !== (this as unknown as CollectionProxy)) {
-      (base as CollectionProxy)._scope = undefined;
-    }
     return this;
   }
 
