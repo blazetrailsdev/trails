@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal, Logger, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
-import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
+import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
@@ -428,9 +428,17 @@ describe("MigrationTest", () => {
     }
   });
 
-  it("internal metadata stores environment", () => {
-    expect(adapter).toBeDefined();
-    expect(typeof adapter.execute).toBe("function");
+  it("internal metadata stores environment", async () => {
+    const adapter = Base.connection;
+    const currentEnv = envName(adapter);
+    const migrator = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+    );
+
+    await migrator.migrate();
+    expect(await new InternalMetadata(adapter.pool).get("environment")).toBe(currentEnv);
   });
 
   it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
@@ -831,30 +839,32 @@ describe("MigrationTest", () => {
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
     const adapter = Base.connection;
-    const migrations: MigrationProxy[] = [
-      migrationProxy({
-        version: 100,
-        name: "Broken",
-        migration: () =>
-          anonymousMigration(
-            "Broken",
-            100,
-            async () => {
-              throw new Error("Something broke");
-            },
-            async () => {},
-          ),
-      }),
-    ];
+    await assertNoColumn(Person, "last_name");
+
     const migrator = new Migrator(
       "up",
-      migrations,
+      [
+        migrateProxy(100, async (m) => {
+          await m.addColumn("people", "last_name", "string");
+          throw new Error("Something broke");
+        }),
+      ],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
+      100,
     );
-    await expect(migrator.migrate()).rejects.toThrow("Something broke");
-    const versions = [...(await migrator.migrated())];
-    expect(versions).not.toContain(100);
+
+    const e = await assertRaises([Error], {}, () => migrator.migrate());
+
+    expect(e.message).toBe(
+      "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
+    );
+
+    await assertNoColumn(
+      Person,
+      "last_name",
+      "On error, the Migrator should revert schema changes but it did not.",
+    );
   });
 
   itIfSupports(
@@ -862,76 +872,67 @@ describe("MigrationTest", () => {
     "migrator one up with exception and rollback using run",
     async () => {
       const adapter = Base.connection;
-      const migrations: MigrationProxy[] = [
-        migrationProxy({
-          version: 100,
-          name: "Broken",
-          migration: () =>
-            anonymousMigration(
-              "Broken",
-              100,
-              async () => {
-                throw new Error("Something broke");
-              },
-              async () => {},
-            ),
-        }),
-      ];
+      await assertNoColumn(Person, "last_name");
+
       const migrator = new Migrator(
         "up",
-        migrations,
+        [
+          migrateProxy(100, async (m) => {
+            await m.addColumn("people", "last_name", "string");
+            throw new Error("Something broke");
+          }),
+        ],
         new SchemaMigration(adapter.pool),
         new InternalMetadata(adapter.pool),
+        100,
       );
-      await expect(migrator.migrate()).rejects.toThrow("Something broke");
-      const versions = [...(await migrator.migrated())];
-      expect(versions).not.toContain(100);
+
+      const e = await assertRaises([Error], {}, () => migrator.run());
+
+      expect(e.message).toBe(
+        "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
+      );
+
+      await assertNoColumn(
+        Person,
+        "last_name",
+        "On error, the Migrator should revert schema changes but it did not.",
+      );
     },
   );
 
   itIfSupports("ddl_transactions", "migration without transaction", async () => {
     const adapter = await freshAdapter();
-    let columnAdded = false;
+    await assertNoColumn(Person, "last_name");
 
     class MigWithoutTx extends Migration {
       static {
         this.disableDdlTransactionBang();
       }
       async up() {
-        await this.createTable("wtx_test", (t) => {
-          t.string("name");
-        });
-        columnAdded = true;
+        await this.addColumn("people", "last_name", "string");
         throw new Error("Something broke");
       }
-      async down() {
-        await this.dropTable("wtx_test");
-      }
+      async down() {}
     }
 
-    const proxy: MigrationProxy = migrationProxy({
-      version: 101,
-      name: "MigWithoutTx",
-      migration: () => new MigWithoutTx(),
-    });
     const migrator = new Migrator(
       "up",
-      [proxy],
+      [migrationProxy({ version: 101, name: "MigWithoutTx", migration: () => new MigWithoutTx() })],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
+      101,
     );
-    let err!: Error;
-    try {
-      await migrator.migrate();
-    } catch (e) {
-      err = e as Error;
-    }
-    expect(err).toBeInstanceOf(Error);
-    expect(columnAdded).toBe(true);
-    expect(err.message).toBe(
+    const e = await assertRaises([Error], {}, () => migrator.migrate());
+    expect(e.message).toBe(
       "An error has occurred, all later migrations canceled:\n\nSomething broke",
     );
-    await adapter.dropTable("wtx_test", { ifExists: true });
+
+    await assertColumn(
+      Person,
+      "last_name",
+      "without ddl transactions, the Migrator should not rollback on error but it did.",
+    );
   });
 
   it("migration that fails to load escapes the canceled message", async () => {
@@ -985,30 +986,24 @@ describe("MigrationTest", () => {
 
   it("internal metadata stores environment when migration fails", async () => {
     const adapter = Base.connection;
-    const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
+    await im.deleteAllEntries();
+    const currentEnv = envName(adapter);
 
-    class FailingMigration extends Migration {
-      async up(): Promise<void> {
-        throw new Error("migration failed");
-      }
-      async down(): Promise<void> {}
-    }
-    const proxy: MigrationProxy = migrationProxy({
-      version: 1,
-      name: "Failing",
-      migration: () => new FailingMigration(),
-    });
     const migrator = new Migrator(
       "up",
-      [proxy],
+      [
+        migrateProxy(101, async () => {
+          throw new Error("Something broke");
+        }),
+      ],
       new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
+      im,
+      101,
     );
-    await migrator.migrate().catch(() => {});
-    const env = await im.get("environment");
-    expect(env).toBe(envName(adapter));
+    await assertRaises([Error], {}, () => migrator.migrate());
+    expect(await im.get("environment")).toBe(currentEnv);
   });
 
   it("internal metadata stores environment when other data exists", async () => {
@@ -1050,8 +1045,8 @@ describe("MigrationTest", () => {
       useMetadataTable: false,
     });
 
-    expect(im.enabled).toBe(false);
-    expect(await im.tableExists()).toBe(false);
+    expect(im.enabled).toBeFalsy();
+    expect(await im.tableExists()).toBeFalsy();
 
     const proxy: MigrationProxy = migrationProxy({
       version: 1,
@@ -1067,8 +1062,8 @@ describe("MigrationTest", () => {
     try {
       await migrator.migrate();
 
-      const rows = (await adapter.selectAll(internalMetadataExistsSql(adapterType))).toArray();
-      expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
+      expect(await im.get("environment")).toBeFalsy();
+      expect(await im.tableExists()).toBeFalsy();
     } finally {
       pool.dbConfig = originalDbConfig;
       await im.createTable();
@@ -1090,76 +1085,85 @@ describe("MigrationTest", () => {
 
   it("updating an existing entry into internal metadata", async () => {
     const adapter = Base.connection;
-    const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
-    await im.set("foo", "bar");
-    await im.set("foo", "baz");
-    expect(await im.get("foo")).toBe("baz");
+    const selectUpdatedAt = async () =>
+      (await (im as any).selectEntry(adapter, "version"))["updated_at"];
+    try {
+      await im.set("version", "foo");
+      const updatedAt = await selectUpdatedAt();
+      expect(await im.get("version")).toBe("foo");
+
+      await im.set("version", "foo");
+      expect(await im.get("version")).toBe("foo");
+      expect(await selectUpdatedAt()).toEqual(updatedAt);
+
+      await im.set("version", "not_foo");
+      expect(await im.get("version")).toBe("not_foo");
+      expect(await selectUpdatedAt()).not.toEqual(updatedAt);
+    } finally {
+      await im.deleteAllEntries();
+    }
   });
 
   it("internal metadata create table wont be affected by schema cache", async () => {
-    const adapter = Base.connection;
-    const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter.pool);
+    const pool = Base.connection.pool;
+    const im = new InternalMetadata(pool);
+    await im.dropTable();
+    expect(await im.tableExists()).toBeFalsy();
 
-    await adapter.beginTransaction({ _lazy: false });
     try {
-      await im.createTable();
-      expect(await im.tableExists()).toBe(true);
-      await im.set("environment", "foo");
-      expect(await im.get("environment")).toBe("foo");
-      await adapter.commitTransaction();
-    } catch (e) {
-      await adapter.rollbackTransaction();
-      throw e;
-    }
+      await pool.withConnection(async (connection) => {
+        await connection.transaction(async () => {
+          await im.createTable();
+          expect(await im.tableExists()).toBeTruthy();
 
-    await adapter.beginTransaction({ _lazy: false });
-    try {
+          await im.set("version", "foo");
+          expect(await im.get("version")).toBe("foo");
+          throw new Rollback();
+        });
+
+        await connection.transaction(async () => {
+          await im.createTable();
+          expect(await im.tableExists()).toBeTruthy();
+
+          await im.set("version", "bar");
+          expect(await im.get("version")).toBe("bar");
+          throw new Rollback();
+        });
+      });
+    } finally {
       await im.createTable();
-      expect(await im.tableExists()).toBe(true);
-      await im.set("environment", "bar");
-      expect(await im.get("environment")).toBe("bar");
-      await adapter.commitTransaction();
-    } catch (e) {
-      await adapter.rollbackTransaction();
-      throw e;
     }
   });
 
   it("schema migration create table wont be affected by schema cache", async () => {
-    const adapter = Base.connection;
-    const sm = new SchemaMigration(adapter.pool);
+    const pool = Base.connection.pool;
+    const sm = new SchemaMigration(pool);
+    await sm.dropTable();
+    expect(await sm.tableExists()).toBeFalsy();
 
-    await adapter.beginTransaction({ _lazy: false });
     try {
+      await pool.withConnection(async (connection) => {
+        await connection.transaction(async () => {
+          await sm.createTable();
+          expect(await sm.tableExists()).toBeTruthy();
+
+          expect(await sm.createVersion("foo")).toBe("foo");
+          throw new Rollback();
+        });
+
+        await connection.transaction(async () => {
+          await sm.createTable();
+          expect(await sm.tableExists()).toBeTruthy();
+
+          expect(await sm.createVersion("bar")).toBe("bar");
+          throw new Rollback();
+        });
+      });
+    } finally {
       await sm.createTable();
-      expect(await sm.tableExists()).toBeTruthy();
-      expect(await sm.createVersion("foo")).toBe("foo");
-      await adapter.commitTransaction();
-    } catch (e) {
-      await adapter.rollbackTransaction();
-      throw e;
     }
-
-    const versionsAfterFirst = await sm.versions();
-    expect(versionsAfterFirst).toContain("foo");
-
-    await adapter.beginTransaction({ _lazy: false });
-    try {
-      await sm.createTable();
-      expect(await sm.tableExists()).toBeTruthy();
-      expect(await sm.createVersion("bar")).toBe("bar");
-      await adapter.commitTransaction();
-    } catch (e) {
-      await adapter.rollbackTransaction();
-      throw e;
-    }
-
-    const versionsAfterSecond = await sm.versions();
-    expect(versionsAfterSecond).toContain("foo");
-    expect(versionsAfterSecond).toContain("bar");
   });
 
   it("add drop table with prefix and suffix", async () => {
