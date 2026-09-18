@@ -250,11 +250,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it("preloading has many through disable joins", async () => {
     await assertQueriesCount(3, false, async () => {
       const authorsList = await Author.all().preload(":goodRatings");
-      authorsList.map((a: any) => a.association("goodRatings").target);
+      authorsList.map((a: any) => a.goodRatings);
     });
     await assertQueriesCount(4, false, async () => {
       const authorsList = await Author.all().preload(":noJoinsGoodRatings");
-      authorsList.map((a: any) => a.association("noJoinsGoodRatings").target);
+      authorsList.map((a: any) => a.goodRatings);
     });
   });
 

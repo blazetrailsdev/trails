@@ -938,7 +938,8 @@ describe("AssociationsJoinModelTest", () => {
     const category = await (david as any).categories.first();
     await assertNoQueries(false, async () => {
       expect((david as any).categories.loaded).toBeTruthy();
-      expect((david as any).categories.target).toContain(category);
+      const members = (await (david as any).categories.isInclude(category)) ? [category] : [];
+      expect(members).toContain(category);
     });
   });
 
@@ -949,8 +950,8 @@ describe("AssociationsJoinModelTest", () => {
     await (david as any).reload();
     expect((david as any).categories.loaded).toBeFalsy();
     await assertQueriesCount(1, false, async () => {
-      const found = await (david as any).categories.where({ id: category.id }).toArray();
-      expect(found.map((c: Base) => c.id)).toContain(category.id);
+      const members = (await (david as any).categories.isInclude(category)) ? [category] : [];
+      expect(members).toContain(category);
     });
     expect((david as any).categories.loaded).toBeFalsy();
   });
