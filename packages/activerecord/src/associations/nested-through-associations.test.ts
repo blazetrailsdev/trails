@@ -36,24 +36,20 @@ async function withAutomaticScopeInversing(
   reflections: any[],
   fn: () => Promise<void> | void,
 ): Promise<void> {
-  const saved = reflections.map((r) => ({
-    r,
-    prevAutoScope: r.klass.automaticScopeInversing,
-    prevNameCache: r._inverseNameCache,
-    prevOfCache: r._inverseOfCache,
-  }));
-  for (const { r } of saved) {
+  const old = reflections.map((r) => r.klass.automaticScopeInversing);
+
+  for (const r of reflections) {
     r.klass.automaticScopeInversing = true;
-    r._inverseNameCache = undefined;
-    r._inverseOfCache = undefined;
+    delete r._inverseNameCache;
+    delete r._inverseOfCache;
   }
   try {
     await fn();
   } finally {
-    for (const { r, prevAutoScope, prevNameCache, prevOfCache } of saved) {
-      r.klass.automaticScopeInversing = prevAutoScope;
-      r._inverseNameCache = prevNameCache;
-      r._inverseOfCache = prevOfCache;
+    for (const [i, r] of reflections.entries()) {
+      r.klass.automaticScopeInversing = old[i];
+      delete r._inverseNameCache;
+      delete r._inverseOfCache;
     }
   }
 }
@@ -67,22 +63,27 @@ async function assertIncludesAndJoinsEqual(
 
   let actual!: any[];
   await assertQueriesCount(1, false, async () => {
-    actual = uniqById(await query.joins(association).toArray());
+    actual = uniqRecords(await query.joins(association).toArray());
   });
-  expect(actual.map((r: any) => r.id)).toEqual(expected.map((r: any) => r.id));
+  expect(actual.map(recordKey)).toEqual(expected.map(recordKey));
 
   await assertQueriesCount(1, false, async () => {
-    actual = uniqById(await query.includes(association).toArray());
+    actual = uniqRecords(await query.includes(association).toArray());
   });
-  expect(actual.map((r: any) => r.id)).toEqual(expected.map((r: any) => r.id));
+  expect(actual.map(recordKey)).toEqual(expected.map(recordKey));
 }
 
-function uniqById(records: any[]): any[] {
-  const seen = new Set<unknown>();
+function recordKey(record: any): string {
+  return `${record.constructor.name}#${record.id}`;
+}
+
+function uniqRecords(records: any[]): any[] {
+  const seen = new Set<string>();
   const result: any[] = [];
   for (const record of records) {
-    if (!seen.has(record.id)) {
-      seen.add(record.id);
+    const key = recordKey(record);
+    if (!seen.has(key)) {
+      seen.add(key);
       result.push(record);
     }
   }
@@ -232,13 +233,13 @@ describe("NestedThroughAssociationsTest", () => {
       [author] = await Author.includes(":subscribers").order("authors.id").limit(1);
     });
     await assertNoQueries(false, async () => {
-      const preloaded = ((author.association("subscribers").target ?? []) as any[])
+      const preloaded = (await author.subscribers)
         .slice()
         .sort((a: any, b: any) => a.nick.localeCompare(b.nick));
       const expected = [luke, davidSub, davidSub]
         .slice()
         .sort((a: any, b: any) => a.nick.localeCompare(b.nick));
-      expect(preloaded.map((s) => s.nick)).toEqual(expected.map((s: any) => s.nick));
+      expect(preloaded.map(recordKey)).toEqual(expected.map(recordKey));
     });
   });
 
@@ -265,8 +266,8 @@ describe("NestedThroughAssociationsTest", () => {
     });
     const founding = memberTypes("founding");
     await assertNoQueries(false, async () => {
-      const preloaded = (member.association("nestedMemberTypes").target ?? []) as any[];
-      expect(preloaded.map((t) => t.id)).toEqual([founding.id]);
+      const preloaded = await member.nestedMemberTypes;
+      expect(preloaded.map(recordKey)).toEqual([founding].map(recordKey));
     });
   });
 
@@ -294,8 +295,8 @@ describe("NestedThroughAssociationsTest", () => {
     });
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
     await assertNoQueries(false, async () => {
-      const preloaded = (member.association("nestedSponsors").target ?? []) as any[];
-      expect(preloaded.map((s) => s.id)).toEqual([mustache.id]);
+      const preloaded = await member.nestedSponsors;
+      expect(preloaded.map(recordKey)).toEqual([mustache].map(recordKey));
     });
   });
 
@@ -329,12 +330,10 @@ describe("NestedThroughAssociationsTest", () => {
     const otherDetails = memberDetails("some_other_guy");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((member.association("organizationMemberDetails").target ?? []) as any[])
+      const preloaded = (await member.organizationMemberDetails)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((d) => d.id)).toEqual(
-        [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([grouchoDetails, otherDetails].map(recordKey));
     });
   });
 
@@ -374,12 +373,10 @@ describe("NestedThroughAssociationsTest", () => {
     const otherDetails = memberDetails("some_other_guy");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((member.association("organizationMemberDetails_2").target ?? []) as any[])
+      const preloaded = (await member.organizationMemberDetails_2)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((d) => d.id)).toEqual(
-        [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([grouchoDetails, otherDetails].map(recordKey));
     });
   });
 
@@ -419,12 +416,10 @@ describe("NestedThroughAssociationsTest", () => {
     const cooking = categories("cooking");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((author.association("postCategories").target ?? []) as any[])
+      const preloaded = (await author.postCategories)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((c) => c.id)).toEqual(
-        [general.id, cooking.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([general, cooking].map(recordKey));
     });
   });
 
@@ -458,12 +453,10 @@ describe("NestedThroughAssociationsTest", () => {
     const moreGreetings = comments("more_greetings");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((category.association("postComments").target ?? []) as any[])
+      const preloaded = (await category.postComments)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((c) => c.id)).toEqual(
-        [greetings.id, moreGreetings.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([greetings, moreGreetings].map(recordKey));
     });
   });
 
@@ -496,12 +489,10 @@ describe("NestedThroughAssociationsTest", () => {
     const moreGreetings = comments("more_greetings");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((author.association("categoryPostComments").target ?? []) as any[])
+      const preloaded = (await author.categoryPostComments)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((c) => c.id)).toEqual(
-        [greetings.id, moreGreetings.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([greetings, moreGreetings].map(recordKey));
     });
   });
 
@@ -532,8 +523,8 @@ describe("NestedThroughAssociationsTest", () => {
     const general = tags("general");
 
     await assertNoQueries(false, async () => {
-      const preloaded = (author.association("taggingTags").target ?? []) as any[];
-      expect(preloaded.map((t) => t.id)).toEqual([general.id, general.id]);
+      const preloaded = await author.taggingTags;
+      expect(preloaded.map(recordKey)).toEqual([general, general].map(recordKey));
     });
 
     const tagReflection = (Tagging as any).reflectOnAssociation("tag");
@@ -581,12 +572,10 @@ describe("NestedThroughAssociationsTest", () => {
     const thinkingGeneral = taggings("thinking_general");
 
     await assertNoQueries(false, async () => {
-      const preloaded = ((categorization.association("postTaggings").target ?? []) as any[])
+      const preloaded = (await categorization.postTaggings)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
-      expect(preloaded.map((t) => t.id)).toEqual(
-        [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => Number(a) - Number(b)),
-      );
+      expect(preloaded.map(recordKey)).toEqual([welcomeGeneral, thinkingGeneral].map(recordKey));
     });
   });
 
@@ -615,8 +604,8 @@ describe("NestedThroughAssociationsTest", () => {
     const founding = memberTypes("founding");
 
     await assertNoQueries(false, async () => {
-      const preloaded = member.association("nestedMemberType").target as any;
-      expect(preloaded?.id).toBe(founding.id);
+      const preloaded = await member.nestedMemberType;
+      expect(recordKey(preloaded)).toEqual(recordKey(founding));
     });
   });
 
@@ -661,8 +650,8 @@ describe("NestedThroughAssociationsTest", () => {
     const general = categories("general");
 
     await assertNoQueries(false, async () => {
-      const preloaded = member.association("clubCategory").target as any;
-      expect(preloaded?.id).toBe(general.id);
+      const preloaded = await member.clubCategory;
+      expect(recordKey(preloaded)).toEqual(recordKey(general));
     });
   });
 
@@ -837,8 +826,8 @@ describe("NestedThroughAssociationsTest", () => {
     const blue = tags("blue");
 
     await assertNoQueries(false, async () => {
-      const preloaded = (author.association("miscPostFirstBlueTags").target ?? []) as any[];
-      expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+      const preloaded = await author.miscPostFirstBlueTags;
+      expect(preloaded.map(recordKey)).toEqual([blue].map(recordKey));
     });
   });
 
