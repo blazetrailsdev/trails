@@ -48,7 +48,6 @@
   "packages/activerecord/src/associations/disable-joins-routing-widening.trails.test.ts::RwAuthor::hasOne::rwComment",
   "packages/activerecord/src/associations/disable-joins-routing-widening.trails.test.ts::RwComment::belongsTo::origin",
   "packages/activerecord/src/associations/has-many-associations.test.ts::Author::hasMany::posts",
-  "packages/activerecord/src/associations/has-many-associations.test.ts::InclAuthor::hasMany::inclPosts",
   "packages/activerecord/src/associations/has-many-associations.test.ts::InvKeyAuthor::hasMany::nonexistent_posts",
   "packages/activerecord/src/associations/has-one-associations.test.ts::CcThingOwner::hasOne::thing",
   "packages/activerecord/src/associations/has-one-associations.test.ts::DangerFirm::hasOne::<dynamic>",
