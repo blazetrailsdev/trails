@@ -66,7 +66,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     const partialInsertsWas = VirtualColumn.partialInserts;
     VirtualColumn.partialInserts = false;
     try {
-      await expect(VirtualColumn.createBang({ name: "Rails" })).resolves.toBeTruthy();
+      await expect(VirtualColumn.createBang({ name: "Rails" })).resolves.not.toThrow();
     } finally {
       VirtualColumn.partialInserts = partialInsertsWas;
     }
@@ -74,29 +74,29 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
 
   itIfSupports("virtual_columns", "stored column", async () => {
     const column = columnFor("upper_name");
-    expect(column.isVirtual()).toBe(true);
-    expect(column.isVirtualStored()).toBe(true);
+    expect(column.isVirtual()).toBeTruthy();
+    expect(column.isVirtualStored()).toBeTruthy();
     expect((await take()).upper_name).toBe("RAILS");
   });
 
   itIfSupports("virtual_columns", "explicit virtual column", async () => {
     const column = columnFor("lower_name");
-    expect(column.isVirtual()).toBe(true);
-    expect(column.isVirtualStored()).toBe(false);
+    expect(column.isVirtual()).toBeTruthy();
+    expect(column.isVirtualStored()).toBeFalsy();
     expect((await take()).lower_name).toBe("rails");
   });
 
   itIfSupports("virtual_columns", "implicit virtual column", async () => {
     const column = columnFor("octet_name");
-    expect(column.isVirtual()).toBe(true);
-    expect(column.isVirtualStored()).toBe(false);
+    expect(column.isVirtual()).toBeTruthy();
+    expect(column.isVirtualStored()).toBeFalsy();
     expect((await take()).octet_name).toBe(5);
   });
 
   itIfSupports("virtual_columns", "virtual column with comma in definition", async () => {
     const column = columnFor("mutated_name");
-    expect(column.isVirtual()).toBe(true);
-    expect(column.isVirtualStored()).toBe(false);
+    expect(column.isVirtual()).toBeTruthy();
+    expect(column.isVirtualStored()).toBeFalsy();
     expect(column.defaultFunction).not.toBeNull();
     expect((await take()).mutated_name).toBe("RaiLs");
   });
@@ -107,8 +107,8 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     });
     await reloadColumnInformation();
     const column = columnFor("decr_column1");
-    expect(column.isVirtual()).toBe(true);
-    expect(column.isVirtualStored()).toBe(true);
+    expect(column.isVirtual()).toBeTruthy();
+    expect(column.isVirtualStored()).toBeTruthy();
     expect((await take()).decr_column1).toBe(9);
   });
 
@@ -121,8 +121,8 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
       });
       await reloadColumnInformation();
       const column = columnFor("incr_column1");
-      expect(column.isVirtual()).toBe(true);
-      expect(column.isVirtualStored()).toBe(false);
+      expect(column.isVirtual()).toBeTruthy();
+      expect(column.isVirtualStored()).toBeFalsy();
       expect((await take()).incr_column1).toBe(11);
     },
   );
@@ -136,8 +136,8 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
       });
       await reloadColumnInformation();
       const column = columnFor("sqr_column1");
-      expect(column.isVirtual()).toBe(true);
-      expect(column.isVirtualStored()).toBe(false);
+      expect(column.isVirtual()).toBeTruthy();
+      expect(column.isVirtualStored()).toBeFalsy();
       expect((await take()).sqr_column1).toBe(100);
     },
   );

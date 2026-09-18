@@ -7,6 +7,8 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { type RawConfigurations } from "../database-configurations.js";
 import { currentRole, connectedToStack } from "../core.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { ConnectionNotDefined } from "../errors.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 async function withBaseConfigs(
   raw: RawConfigurations,
@@ -317,18 +319,32 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("connected to raises without a shard or role", async () => {
-    expect(() => Base.connectedTo({} as any, () => {})).toThrow(
-      /must provide a `shard` and\/or `role`/,
-    );
+    let error: any;
+    expect(() => {
+      try {
+        Base.connectedTo({} as any, () => {});
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+    expect(error.message).toEqual("must provide a `shard` and/or `role`.");
   });
 
   it("connects to raises with a shard and database key", async () => {
+    let error: any;
     await expect(
       Base.connectsTo({
         database: { writing: "arunit" },
-        shards: { s: { writing: "arunit" } },
-      } as any),
-    ).rejects.toThrow(/can only accept a `database` or `shards` argument/);
+        shards: { shard_one: { writing: "arunit" } },
+      } as any).catch((e) => {
+        error = e;
+        throw e;
+      }),
+    ).rejects.toThrow(ArgumentError);
+    expect(error.message).toEqual(
+      "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
+    );
   });
 
   it("retrieve connection pool with invalid shard", async () => {
@@ -344,20 +360,20 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
         let error: any;
-        try {
-          await Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
+        await expect(
+          Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
             Base.connectionPool();
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe(
+          }).catch((e) => {
+            error = e;
+            throw e;
+          }),
+        ).rejects.toThrow(ConnectionNotDefined);
+        expect(error.message).toEqual(
           "No database connection defined for 'foo' shard and 'reading' role.",
         );
-        expect(error.connectionName).toBe("ActiveRecord::Base");
-        expect(error.shard).toBe("foo");
-        expect(error.role).toBe("reading");
+        expect(error.connectionName).toEqual("ActiveRecord::Base");
+        expect(error.shard).toEqual("foo");
+        expect(error.role).toEqual("reading");
       },
       { defaultEnv: "default_env" },
     );
@@ -373,20 +389,20 @@ describe("ConnectionHandlersShardingDbTest", () => {
           },
         });
         let error: any;
-        try {
-          await Base.connectedTo({ role: "non_existent", shard: "shard_one" }, async () => {
+        await expect(
+          Base.connectedTo({ role: "non_existent", shard: "shard_one" }, async () => {
             Base.connectionPool();
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe(
+          }).catch((e) => {
+            error = e;
+            throw e;
+          }),
+        ).rejects.toThrow(ConnectionNotDefined);
+        expect(error.message).toEqual(
           "No database connection defined for 'shard_one' shard and 'non_existent' role.",
         );
-        expect(error.connectionName).toBe("ActiveRecord::Base");
-        expect(error.shard).toBe("shard_one");
-        expect(error.role).toBe("non_existent");
+        expect(error.connectionName).toEqual("ActiveRecord::Base");
+        expect(error.shard).toEqual("shard_one");
+        expect(error.role).toEqual("non_existent");
       },
       { defaultEnv: "default_env" },
     );
@@ -397,18 +413,18 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
         let error: any;
-        try {
-          await Base.connectedTo({ shard: "foo" }, async () => {
+        await expect(
+          Base.connectedTo({ shard: "foo" }, async () => {
             Base.connectionPool();
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe("No database connection defined for 'foo' shard.");
-        expect(error.connectionName).toBe("ActiveRecord::Base");
-        expect(error.shard).toBe("foo");
-        expect(error.role).toBe("writing");
+          }).catch((e) => {
+            error = e;
+            throw e;
+          }),
+        ).rejects.toThrow(ConnectionNotDefined);
+        expect(error.message).toEqual("No database connection defined for 'foo' shard.");
+        expect(error.connectionName).toEqual("ActiveRecord::Base");
+        expect(error.shard).toEqual("foo");
+        expect(error.role).toEqual("writing");
       },
       { defaultEnv: "default_env" },
     );

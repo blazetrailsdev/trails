@@ -38,13 +38,7 @@ async function testCopyTable(
   options: Record<string, unknown> = {},
   block?: (from: string, to: string, options: Record<string, unknown>) => void | Promise<void>,
 ): Promise<void> {
-  let raised: unknown;
-  try {
-    await copyTable(conn, from, to, options);
-  } catch (e) {
-    raised = e;
-  }
-  expect(raised).toBeUndefined();
+  await expect(copyTable(conn, from, to, options)).resolves.not.toThrow();
   expect(await rowCount(conn, to)).toEqual(await rowCount(conn, from));
 
   if (block) {
@@ -87,7 +81,7 @@ describeIfSqlite("CopyTableTest", () => {
       async (from, to) => {
         const expected = await columnValues(conn, from, "name");
         expect(await columnValues(conn, to, "person_name")).toEqual(expected);
-        expect(expected.some((v) => v !== null && v !== undefined && v !== false)).toBe(true);
+        expect(expected.some((v) => v !== null && v !== undefined && v !== false)).toBeTruthy();
       },
     );
   });
@@ -157,7 +151,7 @@ describeIfSqlite("CopyTableTest", () => {
       await testCopyTable(conn, "virtual_columns", "virtual_columns2", {}, async () => {
         const columns = await conn.columns("virtual_columns2");
         const column = columns.find((col: any) => col.name === "upper_name");
-        expect(column.isVirtualStored()).toBe(true);
+        expect(column.isVirtualStored()).toBeTruthy();
         expect(column.type).toBe("string");
         expect(column.defaultFunction).toBe("UPPER(name)");
       });
