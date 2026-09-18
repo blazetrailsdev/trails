@@ -428,6 +428,16 @@ function collectionSize(actual: unknown): number {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export function assertIncludes(included: boolean, message?: string): void {
+  assert(included, message ?? `Expected the collection to include the given object`);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function assertNotIncludes(included: boolean, message?: string): void {
+  assert(!included, message ?? `Expected the collection to not include the given object`);
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function assertSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
     Object.is(expected, actual),

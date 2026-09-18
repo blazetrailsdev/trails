@@ -10,6 +10,7 @@ import {
   assertNotPredicate,
   assertEmpty,
   assertNotEmpty,
+  assertIncludes,
   assertNoDifference,
   assertDifference,
   assertNothingRaised,
@@ -164,10 +165,6 @@ class Source extends Base {
       associationForeignKey: "sink_id",
     });
   }
-}
-
-function assertIncludes(value: unknown, message?: string): void {
-  assert(value, message ?? `Expected to include the given object`);
 }
 
 describe("HasAndBelongsToManyAssociationsTest", () => {
