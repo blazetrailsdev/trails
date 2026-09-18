@@ -11,6 +11,8 @@ import type {
   SyncSqliteConnection,
   SyncSqliteStatement,
 } from "../../sqlite-adapter.js";
+import { QueryAttribute } from "../../relation/query-attribute.js";
+import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
@@ -157,25 +159,30 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec insert", async () => {
-    const id = await adapter.insert(`INSERT INTO "items" ("name") VALUES ('test')`);
-    expect(id).toBe(1);
+    await createExampleTable();
+    const vals = [new QueryAttribute("number", 10, new ValueType())];
+    await adapter.execInsert("insert into ex (number) VALUES (?)", "SQL", vals);
+
+    const result = await adapter.execQuery("select number from ex where number = ?", "SQL", vals);
+
+    expect(result.rows.length).toEqual(1);
+    expect(result.rows[0][0]).toEqual(10);
   });
 
   it("exec insert with quote", async () => {
     await createExampleTable();
-    await adapter.execInsert(`insert into "ex" (number) VALUES (?)`, null, [10]);
-    const rows = (
-      await adapter.execQuery(`select number from "ex" where number = ?`, "SQL", [10])
-    ).toArray();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].number).toBe(10);
+    const vals = [new QueryAttribute("number", 10, new ValueType())];
+    await adapter.execInsert('insert into "ex" (number) VALUES (?)', "SQL", vals);
+
+    const result = await adapter.execQuery('select number from "ex" where number = ?', "SQL", vals);
+
+    expect(result.rows.length).toEqual(1);
+    expect(result.rows[0][0]).toEqual(10);
   });
 
   it("primary key returns nil for no pk", async () => {
-    await adapter.execute(`CREATE TABLE "no_pk" ("name" TEXT, "value" TEXT)`);
-    const cols = (await adapter.execute(`PRAGMA table_info("no_pk")`))!;
-    const pkCols = cols.filter((c: any) => c.pk > 0);
-    expect(pkCols).toHaveLength(0);
+    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
+    expect(await adapter.primaryKey("ex")).toBeNull();
   });
 
   it("connection no db", async () => {
@@ -269,27 +276,45 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec no binds", async () => {
-    const rows = (await adapter.execute(`SELECT 1 AS val`))!;
-    expect(rows[0].val).toBe(1);
+    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
+    let result = await adapter.execQuery("SELECT id, data FROM ex");
+    expect(result.rows.length).toEqual(0);
+    expect(result.columns.length).toEqual(2);
+    expect(result.columns).toEqual(["id", "data"]);
+
+    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+    result = await adapter.execQuery("SELECT id, data FROM ex");
+    expect(result.rows.length).toEqual(1);
+    expect(result.columns.length).toEqual(2);
+
+    expect(result.rows).toEqual([[1, "foo"]]);
   });
 
   it("exec query with binds", async () => {
-    await adapter.execute(`INSERT INTO "items" ("name", "price") VALUES ('widget', 10)`);
-    const rows = (await adapter.execute(`SELECT * FROM "items" WHERE "name" = 'widget'`))!;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].price).toBe(10);
+    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
+    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+    const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+      new QueryAttribute(null, 1, new ValueType()),
+    ]);
+
+    expect(result.rows.length).toEqual(1);
+    expect(result.columns.length).toEqual(2);
+
+    expect(result.rows).toEqual([[1, "foo"]]);
   });
 
   it("exec query typecasts bind vals", async () => {
-    await adapter.execInsert(`INSERT INTO "items" ("name", "price") VALUES (?, ?)`, null, [
-      "widget",
-      10,
+    await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
+    await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+
+    const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+      new QueryAttribute("id", "1-fuu", new IntegerType()),
     ]);
-    const rows = (
-      await adapter.execQuery(`SELECT * FROM "items" WHERE "name" = ?`, "SQL", ["widget"])
-    ).toArray();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].price).toBe(10);
+
+    expect(result.rows.length).toEqual(1);
+    expect(result.columns.length).toEqual(2);
+
+    expect(result.rows).toEqual([[1, "foo"]]);
   });
 
   it("quote binary column escapes it", async () => {
@@ -313,9 +338,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("execute", async () => {
-    await adapter.execute(`INSERT INTO "items" ("name") VALUES ('a')`);
-    const rows = (await adapter.execute(`SELECT * FROM "items"`))!;
-    expect(rows).toHaveLength(1);
+    await createExampleTable();
+    await adapter.execute("INSERT INTO ex (number) VALUES (10)");
+    const records = (await adapter.execute("SELECT * FROM ex"))!;
+    expect(records.length).toEqual(1);
+
+    const record = records[0];
+    expect(record["number"]).toEqual(10);
+    expect(record["id"]).toEqual(1);
   });
 
   it("insert logged", async () => {
