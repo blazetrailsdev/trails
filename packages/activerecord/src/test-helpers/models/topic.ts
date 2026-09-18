@@ -163,9 +163,9 @@ export class Topic extends Base {
 
   changeApprovedBeforeSave: boolean | null | undefined;
 
-  afterTouchCalled = 0;
-
   static afterInitializeCalled: boolean | null = null;
+
+  afterTouchCalled = 0;
 
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
     stats.count = (await this.count()) as number;
@@ -226,7 +226,7 @@ export class Topic extends Base {
   /** @internal */
   private changeApprovedCallback() {
     if (this.changeApprovedBeforeSave != null) {
-      (this as any).approved = this.changeApprovedBeforeSave;
+      this.approved = this.changeApprovedBeforeSave;
     }
   }
 }
