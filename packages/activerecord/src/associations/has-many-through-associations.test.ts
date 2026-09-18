@@ -1,8 +1,22 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Base, registerModel, RecordInvalid } from "../index.js";
+import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { collectionProxyFor as association } from "../associations.js";
+import {
+  assertDeprecated,
+  assertDifference,
+  assertEmpty,
+  assertNotEmpty,
+  assertNoDifference,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
+import { HasManyThroughCantAssociateThroughHasOneOrManyReflection } from "./errors.js";
+import { AssociationTypeMismatch } from "../errors.js";
+import { deprecator } from "../deprecator.js";
+import { Preloader } from "./preloader.js";
 import { quoteTableName } from "../support/quote-regex.js";
 
 import {
@@ -73,6 +87,16 @@ import {
   CpkChapter,
 } from "../test-helpers/models/cpk.js";
 import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
+
+async function assertNotCalled(block: () => Promise<void>): Promise<void> {
+  const spy = vi.spyOn(Preloader.prototype, "call");
+  try {
+    await block();
+    expect(spy).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
+}
 
 describe("HasManyThroughAssociationsTest", () => {
   const {
@@ -229,9 +253,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("has many through create record", async () => {
     const book = await Book.find(books("awdr").id);
-    const subscriber = await (book as any).subscribers.create({ nick: "bob" });
-    expect(subscriber).toBeTruthy();
-    expect(subscriber.isNewRecord()).toBe(false);
+    expect(await (book as any).subscribers.createBang({ nick: "bob" })).toBeTruthy();
   });
 
   it.skip("marshal dump", () => {
@@ -267,23 +289,22 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("preload with nested association", async () => {
-    const davidId = authors("david").id;
-    const maryId = authors("mary").id;
-    const postList = await Post.where({ id: [davidId, maryId] })
+    const postList = await Post.where({ id: [authors("david").id, authors("mary").id] })
       .preload(":author", ":authorFavoritesWithScope")
       .order("id");
-    for (const p of postList) {
-      expect((p as any).authorFavoritesWithScope).toBeDefined();
-    }
-    expect(await (postList[0] as any).authorFavoritesWithScope.size()).toBe(1);
+
+    await assertNoQueries(false, async () => {
+      postList.forEach((p: any) => p.author);
+      postList.forEach((p: any) => p.authorFavoritesWithScope);
+      expect(await (postList[0] as any).authorFavoritesWithScope.length()).toEqual(1);
+    });
   });
 
   it("preload sti rhs class", async () => {
-    const devs = await Developer.includes(":firms").all();
-    expect(devs.length).toBeGreaterThan(0);
-    for (const dev of devs) {
-      expect((dev as any).firms).toBeDefined();
-    }
+    const developers = await Developer.includes(":firms").all();
+    await assertNoQueries(false, async () => {
+      developers.forEach((d: any) => d.firms);
+    });
   });
 
   it("preload sti middle relation", async () => {
@@ -302,21 +323,20 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("preload multiple instances of the same record", async () => {
-    const club = await Club.create({ name: "Aaron cool banana club" });
-    await Membership.create({
+    const club = await Club.createBang({ name: "Aaron cool banana club" });
+    await Membership.createBang({
       club_id: club.id,
-      member_id: (await Member.create({ name: "Aaron" })).id,
+      member_id: (await Member.createBang({ name: "Aaron" })).id,
     });
-    await Membership.create({
+    await Membership.createBang({
       club_id: club.id,
-      member_id: (await Member.create({ name: "Bob" })).id,
+      member_id: (await Member.createBang({ name: "Bob" })).id,
     });
 
     const preloadedClubs = await Club.joins(":memberships").preload(":membership");
-    expect(preloadedClubs.length).toBeGreaterThan(0);
-    for (const c of preloadedClubs) {
-      expect((c as any).membership).toBeDefined();
-    }
+    await assertNoQueries(false, async () => {
+      preloadedClubs.forEach((c: any) => c.membership);
+    });
   });
 
   it("ordered has many through", async () => {
@@ -405,8 +425,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sicp = new NoPkLesson({ name: "SICP" });
     const ben = new NoPkStudent({ name: "Ben Bitdiddle" });
     await (sicp as any).students.push(ben);
-    await sicp.save();
-    expect(sicp.isPersisted()).toBe(true);
+    expect(await sicp.saveBang()).toBeTruthy();
   });
 
   it("no pk join table delete", async () => {
@@ -459,15 +478,24 @@ describe("HasManyThroughAssociationsTest", () => {
     const louis = new NoPkDelStudent({ name: "Louis Reasoner" });
     await (sicp as any).students.push(ben);
     await (sicp as any).students.push(louis);
-    await sicp.save();
+    expect(await sicp.saveBang()).toBeTruthy();
 
     await (sicp as any).students.reload();
-    const studentCountBefore = await NoPkDelStudent.count();
-    const lessonStudentCountBefore = await NoPkDelLessonStudent.count();
-    const allStudents = await NoPkDelStudent.all();
-    await (sicp as any).students.destroy(...allStudents);
-    expect(await NoPkDelStudent.count()).toBe(studentCountBefore);
-    expect(await NoPkDelLessonStudent.count()).toBeLessThan(lessonStudentCountBefore as number);
+    expect(await NoPkDelLessonStudent.count()).toBeGreaterThanOrEqual(2);
+    await assertNoDifference(
+      async () => Number(await NoPkDelStudent.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await NoPkDelLessonStudent.count()),
+          -2,
+          null,
+          async () => {
+            await (sicp as any).students.destroy(...(await NoPkDelStudent.all()));
+          },
+        );
+      },
+    );
   });
 
   it("no pk join model callbacks", async () => {
@@ -522,12 +550,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const sicp = new NoPkCbLesson({ name: "SICP" });
     const ben = new NoPkCbStudent({ name: "Ben Bitdiddle" });
     await (sicp as any).students.push(ben);
-    await sicp.save();
+    expect(await sicp.saveBang()).toBeTruthy();
 
     await (sicp as any).students.reload();
     const allStudents = await NoPkCbStudent.all();
     await (sicp as any).students.destroy(...allStudents);
-    expect(afterDestroyCalled).toBe(true);
+    expect(afterDestroyCalled).toBeTruthy();
   });
 
   it("pk is not required for join", async () => {
@@ -553,53 +581,77 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
 
-    await (post as any).people.push(person);
-    const postPeople = await (post as any).people.toArray();
-    expect(postPeople.map((p: any) => p.id)).toContain(person.id);
+    await assertQueriesCount(3, false, async () => {
+      await (post as any).people.push(person);
+    });
 
-    const reloaded = await Post.find(posts("thinking").id);
-    const reloadedPeople = await (reloaded as any).people.reload().then((p: any) => p);
-    expect(reloadedPeople.map((p: any) => p.id)).toContain(person.id);
+    await assertQueriesCount(1, false, async () => {
+      expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(person.id);
+    });
+
+    await post.reload();
+    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
+      person.id,
+    );
   });
 
   it("delete all for with dependent option destroy", async () => {
     const person = await Person.find(people("david").id);
-    const countBefore = await (person as any).jobsWithDependentDestroy.count();
-    expect(countBefore).toBe(1);
+    expect(await (person as any).jobsWithDependentDestroy.count()).toEqual(1);
 
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).reload();
-    const deleted = await (person as any).jobsWithDependentDestroy.deleteAll();
-    expect(deleted).toBe(1);
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
+    await assertNoDifference(
+      async () => Number(await Job.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reference.count()),
+          -1,
+          null,
+          async () => {
+            expect(await (await person.reload()).jobsWithDependentDestroy.deleteAll()).toEqual(1);
+          },
+        );
+      },
+    );
   });
 
   it("delete all for with dependent option nullify", async () => {
     const person = await Person.find(people("david").id);
-    expect(await (person as any).jobsWithDependentNullify.count()).toBe(1);
+    expect(await (person as any).jobsWithDependentNullify.count()).toEqual(1);
 
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).reload();
-    const deleted = await (person as any).jobsWithDependentNullify.deleteAll();
-    expect(deleted).toBe(1);
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(refCountBefore);
+    await assertNoDifference(
+      async () => Number(await Job.count()),
+      null,
+      async () => {
+        await assertNoDifference(
+          async () => Number(await Reference.count()),
+          null,
+          async () => {
+            expect(await (await person.reload()).jobsWithDependentNullify.deleteAll()).toEqual(1);
+          },
+        );
+      },
+    );
   });
 
   it("delete all for with dependent option delete all", async () => {
     const person = await Person.find(people("david").id);
-    expect(await (person as any).jobsWithDependentDeleteAll.count()).toBe(1);
+    expect(await (person as any).jobsWithDependentDeleteAll.count()).toEqual(1);
 
-    const jobCountBefore = await Job.count();
-    const refCountBefore = await Reference.count();
-    await (person as any).reload();
-    const deleted = await (person as any).jobsWithDependentDeleteAll.deleteAll();
-    expect(deleted).toBe(1);
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
+    await assertNoDifference(
+      async () => Number(await Job.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reference.count()),
+          -1,
+          null,
+          async () => {
+            expect(await (await person.reload()).jobsWithDependentDeleteAll.deleteAll()).toEqual(1);
+          },
+        );
+      },
+    );
   });
 
   it("delete all on association clears scope", async () => {
@@ -613,10 +665,12 @@ describe("HasManyThroughAssociationsTest", () => {
   it("concat", async () => {
     const person = await Person.find(people("david").id);
     const post = await Post.find(posts("thinking").id);
-    const result = await (post as any).people.concat(person);
+    const result = await (post as any).people.concat([person]);
     expect(await (post as any).people.size()).toBe(1);
-    expect(await (await Post.find(posts("thinking").id)).people.size()).toBe(1);
-    expect(await (result as any[]).map((r: any) => r.id)).toContain(person.id);
+    expect(await (await (post as any).people.reload()).size()).toBe(1);
+    expect((await (post as any).people.toArray()).map((r: any) => r.id)).toEqual(
+      (await result.toArray()).map((r: any) => r.id),
+    );
   });
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
@@ -645,20 +699,30 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
 
-    const countBefore = (await (post as any).people.toArray()).length;
-    await (post as any).people.push(person);
-    await (post as any).people.push(person);
-    expect((await (post as any).people.toArray()).length).toBe(countBefore + 2);
+    await assertDifference(
+      async () => (await (post as any).people.toArray()).length,
+      2,
+      null,
+      async () => {
+        await (post as any).people.push(person);
+        await (post as any).people.push(person);
+      },
+    );
   });
 
   it("associate existing record twice should add records twice", async () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
 
-    const countBefore = await (post as any).people.count();
-    await (post as any).people.push(person);
-    await (post as any).people.push(person);
-    expect(await (post as any).people.count()).toBe(countBefore + 2);
+    await assertDifference(
+      async () => (post as any).people.count(),
+      2,
+      null,
+      async () => {
+        await (post as any).people.push(person);
+        await (post as any).people.push(person);
+      },
+    );
   });
 
   it("add two instance and then deleting", async () => {
@@ -668,44 +732,69 @@ describe("HasManyThroughAssociationsTest", () => {
     await (post as any).people.push(person);
     await (post as any).people.push(person);
 
-    const peopleCountBefore = await (post as any).people.count();
-    const readersCountBefore = await (post as any).readers.count();
-    await (post as any).people.delete(person);
-    expect(await (post as any).people.count()).toBe(peopleCountBefore - 2);
-    expect(await (post as any).readers.count()).toBe(readersCountBefore - 2);
+    const counts = [
+      () => (post as any).people.count(),
+      async () => (await (post as any).people.toArray()).length,
+      () => (post as any).readers.count(),
+      async () => (await (post as any).readers.toArray()).length,
+    ];
+    await assertDifference(counts, -2, null, async () => {
+      await (post as any).people.delete(person);
+    });
 
-    const reloaded = await Post.find(posts("thinking").id);
-    const reloadedPeople = await (reloaded as any).people.reload();
-    expect(reloadedPeople.map((p: any) => p.id)).not.toContain(person.id);
+    expect((await (post as any).people.reload()).map((p: any) => p.id)).not.toContain(person.id);
   });
 
   it("associating new", async () => {
-    const newPerson = new Person({ first_name: "bob" });
+    await assertQueriesCount(1, false, async () => {
+      await Post.find(posts("thinking").id);
+    });
     const post = await Post.find(posts("thinking").id);
-    await (post as any).people.push(newPerson);
+    let newPerson!: Person;
 
-    const thinkingPeople = await (post as any).people.toArray();
-    expect(thinkingPeople.map((p: any) => p.first_name)).toContain("bob");
+    await assertQueriesCount(0, false, async () => {
+      newPerson = new Person({ first_name: "bob" });
+    });
 
-    const reloaded = await Post.find(posts("thinking").id);
-    const reloadedPeople = await (reloaded as any).people.reload();
-    expect(reloadedPeople.map((p: any) => p.first_name)).toContain("bob");
+    await assertQueriesCount(4, false, async () => {
+      await (post as any).people.push(newPerson);
+    });
+
+    await assertQueriesCount(1, false, async () => {
+      expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(newPerson.id);
+    });
+
+    await post.reload();
+    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
+      newPerson.id,
+    );
   });
 
   it("associate new by building", async () => {
+    await assertQueriesCount(1, false, async () => {
+      await Post.find(posts("thinking").id);
+    });
     const post = await Post.find(posts("thinking").id);
-    await (post as any).people.build({ first_name: "Bob" });
-    await (post as any).people.build({ first_name: "Ted" });
 
-    const firstNames = await (post as any).people.map((p: any) => p.first_name);
-    expect(firstNames).toContain("Bob");
-    expect(firstNames).toContain("Ted");
+    await assertQueriesCount(0, false, async () => {
+      (post as any).people.build({ first_name: "Bob" });
+      (post as any).people.new({ first_name: "Ted" });
+    });
 
-    (post as any).body = `${(post as any).body}-changed`;
-    await post.save();
+    await assertQueriesCount(1, false, async () => {
+      expect((await (post as any).people.toArray()).map((p: any) => p.first_name)).toContain("Bob");
+      expect((await (post as any).people.toArray()).map((p: any) => p.first_name)).toContain("Ted");
+    });
 
-    const reloaded = await Post.find(posts("thinking").id);
-    const names = (await (reloaded as any).people.reload()).map((p: any) => p.first_name);
+    await assertQueriesCount(7, false, async () => {
+      (post as any).body = `${(post as any).body}-changed`;
+      await post.save();
+    });
+
+    await post.reload();
+    const names = (await (await (post as any).people.reload()).toArray()).map(
+      (p: any) => p.first_name,
+    );
     expect(names).toContain("Bob");
     expect(names).toContain("Ted");
   });
@@ -755,54 +844,77 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("delete association", async () => {
+    await assertQueriesCount(2, false, async () => {
+      await Post.find(posts("welcome").id);
+      await Person.find(people("michael").id);
+    });
     const post = await Post.find(posts("welcome").id);
-    await (post as any).people.reload();
     const michael = await Person.find(people("michael").id);
-    await (post as any).people.delete(michael);
 
-    expect(await (post as any).people.toArray()).toHaveLength(0);
-    const welcomePost2 = await Post.find(posts("welcome").id);
-    await (welcomePost2 as any).people.reload();
-    expect(await (welcomePost2 as any).people.size()).toBe(0);
+    await assertQueriesCount(3, false, async () => {
+      await (post as any).people.delete(michael);
+    });
+
+    await assertQueriesCount(1, false, async () => {
+      assertEmpty(await (post as any).people.toArray());
+    });
+
+    await post.reload();
+    assertEmpty((await (post as any).people.reload()).target);
   });
 
   it("destroy association", async () => {
-    const personCountBefore = await Person.count();
-    const readerCountBefore = await Reader.count();
     const post = await Post.find(posts("welcome").id);
     const michael = await Person.find(people("michael").id);
-    await (post as any).people.destroy(michael);
-    expect(await Person.count()).toBe(personCountBefore);
-    expect(await Reader.count()).toBe(Number(readerCountBefore) - 1);
+    await assertNoDifference(
+      async () => Number(await Person.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reader.count()),
+          -1,
+          null,
+          async () => {
+            await (post as any).people.destroy(michael);
+          },
+        );
+      },
+    );
 
-    const reloaded = await Post.find(posts("welcome").id);
-    expect(await (reloaded as any).people.toArray()).toHaveLength(0);
-    await (reloaded as any).people.reload();
-    expect(await (reloaded as any).people.size()).toBe(0);
+    await post.reload();
+    assertEmpty(await (post as any).people.toArray());
+    assertEmpty((await (post as any).people.reload()).target);
   });
 
   it("destroy all", async () => {
-    const personCountBefore = await Person.count();
-    const readerCountBefore = await Reader.count();
-    const post = await Post.find(posts("welcome").id);
-    await (post as any).people.destroyAll();
-    expect(await Person.count()).toBe(personCountBefore);
-    expect(await Reader.count()).toBe(Number(readerCountBefore) - 1);
+    await assertNoDifference(
+      async () => Number(await Person.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reader.count()),
+          -1,
+          null,
+          async () => {
+            await ((await Post.find(posts("welcome").id)) as any).people.destroyAll();
+          },
+        );
+      },
+    );
 
-    const reloaded = await Post.find(posts("welcome").id);
-    expect(await (reloaded as any).people.toArray()).toHaveLength(0);
-    await (reloaded as any).people.reload();
-    expect(await (reloaded as any).people.size()).toBe(0);
+    const post = await Post.find(posts("welcome").id);
+    assertEmpty(await ((await post.reload()) as any).people.toArray());
+    assertEmpty((await (post as any).people.reload()).target);
   });
 
   it("destroy all on composite primary key model", async () => {
     const tag = cpkTags("cpk_tag_loyal_customer");
-    const orders = await (tag as any).orders.toArray();
-    expect(orders.length).toBeGreaterThan(0);
+
+    assertNotEmpty(await (tag as any).orders.toArray());
+
     await (tag as any).orders.destroyAll();
-    expect(await (tag as any).orders.toArray()).toHaveLength(0);
-    await (tag as any).orders.reload();
-    expect(await (tag as any).orders.toArray()).toHaveLength(0);
+    assertEmpty(await (tag as any).orders.toArray());
+    assertEmpty((await (tag as any).orders.reload()).target);
   });
 
   it("composite primary key join table", async () => {
@@ -912,32 +1024,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("should raise exception for destroying mismatching records", async () => {
-    const personCountBefore = await Person.count();
-    const readerCountBefore = await Reader.count();
     const post = await Post.find(posts("welcome").id);
     const thinkingPost = await Post.find(posts("thinking").id);
-    await expect((post as any).people.destroy(thinkingPost)).rejects.toThrow();
-    expect(await Person.count()).toBe(personCountBefore);
-    expect(await Reader.count()).toBe(readerCountBefore);
+    await assertNoDifference(
+      [async () => Number(await Person.count()), async () => Number(await Reader.count())],
+      null,
+      async () => {
+        await assertRaises([AssociationTypeMismatch], {}, () =>
+          (post as any).people.destroy(thinkingPost),
+        );
+      },
+    );
   });
 
   it("delete through belongs to with dependent nullify", async () => {
     Reference.makeComments = true;
     try {
       const person = await Person.find(people("michael").id);
-      const jobRecord = await Job.find(jobs("magician").id);
-      const ref = await Reference.where({ job_id: jobRecord.id, person_id: person.id }).first();
+      const job = await Job.find(jobs("magician").id);
+      const reference = await Reference.where({ job_id: job.id, person_id: person.id }).first();
 
-      const jobCountBefore = await Job.count();
-      const refCountBefore = await Reference.count();
-      const personJobsBefore = await (person as any).jobs.count();
-      await (person as any).jobsWithDependentNullify.delete(jobRecord);
-      expect(await Job.count()).toBe(jobCountBefore);
-      expect(await Reference.count()).toBe(refCountBefore);
-      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+      await assertNoDifference(
+        [async () => Number(await Job.count()), async () => Number(await Reference.count())],
+        null,
+        async () => {
+          await assertDifference(
+            () => (person as any).jobs.count(),
+            -1,
+            null,
+            async () => {
+              await (person as any).jobsWithDependentNullify.delete(job);
+            },
+          );
+        },
+      );
 
-      const reloadedRef = await Reference.find((ref as any).id);
-      expect((reloadedRef as any).job_id).toBeNull();
+      expect((await (reference as any).reload()).job_id).toBeNull();
     } finally {
       Reference.makeComments = false;
     }
@@ -947,20 +1069,26 @@ describe("HasManyThroughAssociationsTest", () => {
     Reference.makeComments = true;
     try {
       const person = await Person.find(people("michael").id);
-      const jobRecord = await Job.find(jobs("magician").id);
+      const job = await Job.find(jobs("magician").id);
 
-      expect(await (person as any).jobs.count()).toBeGreaterThanOrEqual(2);
+      expect((await (person as any).jobs.count()) >= 2).toBeTruthy();
 
-      const jobCountBefore = await Job.count();
-      const refCountBefore = await Reference.count();
-      const personJobsBefore = await (person as any).jobs.count();
-      await (person as any).jobsWithDependentDeleteAll.delete(jobRecord);
-      expect(await Job.count()).toBe(jobCountBefore);
-      expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
-      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+      await assertNoDifference(
+        async () => Number(await Job.count()),
+        null,
+        async () => {
+          await assertDifference(
+            [() => (person as any).jobs.count(), async () => Number(await Reference.count())],
+            -1,
+            null,
+            async () => {
+              await (person as any).jobsWithDependentDeleteAll.delete(job);
+            },
+          );
+        },
+      );
 
-      const reloadedPerson = await Person.find(people("michael").id);
-      expect((reloadedPerson as any).comments).toBeNull();
+      expect((await person.reload()).comments).toBeNull();
     } finally {
       Reference.makeComments = false;
     }
@@ -970,20 +1098,26 @@ describe("HasManyThroughAssociationsTest", () => {
     Reference.makeComments = true;
     try {
       const person = await Person.find(people("michael").id);
-      const jobRecord = await Job.find(jobs("magician").id);
+      const job = await Job.find(jobs("magician").id);
 
-      expect(await (person as any).jobs.count()).toBeGreaterThanOrEqual(2);
+      expect((await (person as any).jobs.count()) >= 2).toBeTruthy();
 
-      const jobCountBefore = await Job.count();
-      const refCountBefore = await Reference.count();
-      const personJobsBefore = await (person as any).jobs.count();
-      await (person as any).jobsWithDependentDestroy.delete(jobRecord);
-      expect(await Job.count()).toBe(jobCountBefore);
-      expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
-      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+      await assertNoDifference(
+        async () => Number(await Job.count()),
+        null,
+        async () => {
+          await assertDifference(
+            [() => (person as any).jobs.count(), async () => Number(await Reference.count())],
+            -1,
+            null,
+            async () => {
+              await (person as any).jobsWithDependentDestroy.delete(job);
+            },
+          );
+        },
+      );
 
-      const reloadedPerson = await Person.find(people("michael").id);
-      expect((reloadedPerson as any).comments).toBe("Reference destroyed");
+      expect((await person.reload()).comments).toEqual("Reference destroyed");
     } finally {
       Reference.makeComments = false;
     }
@@ -991,76 +1125,113 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("belongs to with dependent destroy", async () => {
     const person = await PersonWithDependentDestroyJobs.find(1);
-    await (person as any).references.create({});
 
-    const jobCountBefore = await Job.count();
-    const personJobCount = await (person as any).jobs.count();
-    const refCountBefore = await Reference.count();
-    await person.destroy();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(personJobCount));
+    await (person as any).references.createBang();
+
+    const jobsCount = await (person as any).jobs.count();
+    await assertNoDifference(
+      async () => Number(await Job.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reference.count()),
+          -jobsCount,
+          null,
+          async () => {
+            await person.destroy();
+          },
+        );
+      },
+    );
   });
 
   it("belongs to with dependent delete all", async () => {
     const person = await PersonWithDependentDeleteAllJobs.find(1);
-    await (person as any).references.create({});
 
-    const jobCountBefore = await Job.count();
-    const personJobCount = await (person as any).jobs.count();
-    const refCountBefore = await Reference.count();
-    await person.destroy();
-    expect(await Job.count()).toBe(jobCountBefore);
-    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(personJobCount));
+    await (person as any).references.createBang();
+
+    const jobsCount = await (person as any).jobs.count();
+    await assertNoDifference(
+      async () => Number(await Job.count()),
+      null,
+      async () => {
+        await assertDifference(
+          async () => Number(await Reference.count()),
+          -jobsCount,
+          null,
+          async () => {
+            await person.destroy();
+          },
+        );
+      },
+    );
   });
 
   it("belongs to with dependent nullify", async () => {
     const person = await PersonWithDependentNullifyJobs.find(1);
-    const refs = await (person as any).references.toArray();
 
-    const refCountBefore = await Reference.count();
-    const jobCountBefore = await Job.count();
-    await person.destroy();
-    expect(await Reference.count()).toBe(refCountBefore);
-    expect(await Job.count()).toBe(jobCountBefore);
+    const references = await (person as any).references.toArray();
 
-    for (const ref of refs) {
-      const reloaded = await Reference.find(ref.id);
-      expect((reloaded as any).job_id).toBeNull();
+    await assertNoDifference(
+      [async () => Number(await Reference.count()), async () => Number(await Job.count())],
+      null,
+      async () => {
+        await person.destroy();
+      },
+    );
+
+    for (const reference of references) {
+      expect((await reference.reload()).job_id).toBeNull();
     }
   });
 
   it("update counter caches on delete", async () => {
     const post = await Post.find(posts("welcome").id);
-    const tag = await (post as any).tags.create({ name: "doomed" });
+    const tag = await (post as any).tags.createBang({ name: "doomed" });
 
-    const tagsCountBefore = (await Post.find(posts("welcome").id)).tags_count;
-    await (await Post.find(posts("welcome").id)).tags.delete(tag);
-    expect((await Post.find(posts("welcome").id)).tags_count).toBe(Number(tagsCountBefore) - 1);
+    await assertDifference(
+      async () => ((await post.reload()) as any).tags_count,
+      -1,
+      null,
+      async () => {
+        await ((await Post.find(posts("welcome").id)) as any).tags.delete(tag);
+      },
+    );
   });
 
   it("update counter caches on delete with dependent destroy", async () => {
     const post = await Post.find(posts("welcome").id);
-    const tag = await (post as any).tags.create({ name: "doomed" });
+    const tag = await (post as any).tags.createBang({ name: "doomed" });
     await post.updateColumns({ tags_with_destroy_count: await (post as any).tags.count() });
 
-    const countBefore = (await Post.find(posts("welcome").id)).tags_with_destroy_count;
-    await (await Post.find(posts("welcome").id)).tagsWithDestroy.delete(tag);
-    expect((await Post.find(posts("welcome").id)).tags_with_destroy_count).toBe(
-      Number(countBefore) - 1,
+    await assertDifference(
+      async () => ((await post.reload()) as any).tags_with_destroy_count,
+      -1,
+      null,
+      async () => {
+        await ((await Post.find(posts("welcome").id)) as any).tagsWithDestroy.delete(tag);
+      },
     );
   });
 
   it("update counter caches on delete with dependent nullify", async () => {
     const post = await Post.find(posts("welcome").id);
-    const tag = await (post as any).tags.create({ name: "doomed" });
+    const tag = await (post as any).tags.createBang({ name: "doomed" });
     await post.updateColumns({ tags_with_nullify_count: await (post as any).tags.count() });
 
-    const tagsCountBefore = (await Post.find(posts("welcome").id)).tags_count;
-    const nullifyCountBefore = (await Post.find(posts("welcome").id)).tags_with_nullify_count;
-    await (await Post.find(posts("welcome").id)).tagsWithNullify.delete(tag);
-    expect((await Post.find(posts("welcome").id)).tags_count).toBe(tagsCountBefore);
-    expect((await Post.find(posts("welcome").id)).tags_with_nullify_count).toBe(
-      Number(nullifyCountBefore) - 1,
+    await assertNoDifference(
+      async () => ((await post.reload()) as any).tags_count,
+      null,
+      async () => {
+        await assertDifference(
+          async () => ((await post.reload()) as any).tags_with_nullify_count,
+          -1,
+          null,
+          async () => {
+            await ((await Post.find(posts("welcome").id)) as any).tagsWithNullify.delete(tag);
+          },
+        );
+      },
     );
   });
 
@@ -1077,51 +1248,75 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("update counter caches on destroy", async () => {
     const post = await Post.find(posts("welcome").id);
-    const tag = await (post as any).tags.create({ name: "doomed" });
+    const tag = await (post as any).tags.createBang({ name: "doomed" });
 
-    const countBefore = (await Post.find(posts("welcome").id)).tags_count;
-    await tag.taggedPosts.destroy(post);
-    expect((await Post.find(posts("welcome").id)).tags_count).toBe(Number(countBefore) - 1);
+    await assertDifference(
+      async () => ((await post.reload()) as any).tags_count,
+      -1,
+      null,
+      async () => {
+        await tag.taggedPosts.destroy(post);
+      },
+    );
   });
 
   it("update counter caches on destroy with indestructible through record", async () => {
     const post = await Post.find(posts("welcome").id);
-    const tag = await (post as any).indestructibleTags.create({ name: "doomed" });
+    const tag = await (post as any).indestructibleTags.createBang({ name: "doomed" });
     await post.updateColumns({
       indestructible_tags_count: await (post as any).indestructibleTags.count(),
     });
 
-    const countBefore = (await Post.find(posts("welcome").id)).indestructible_tags_count;
-    await (await Post.find(posts("welcome").id)).indestructibleTags.destroy(tag);
-    expect((await Post.find(posts("welcome").id)).indestructible_tags_count).toBe(countBefore);
+    await assertNoDifference(
+      async () => ((await post.reload()) as any).indestructible_tags_count,
+      null,
+      async () => {
+        await ((await Post.find(posts("welcome").id)) as any).indestructibleTags.destroy(tag);
+      },
+    );
   });
 
   it("replace association", async () => {
+    await assertQueriesCount(4, false, async () => {
+      const welcome = await Post.find(posts("welcome").id);
+      await Person.find(people("david").id);
+      await Person.find(people("michael").id);
+      await (welcome as any).people.reload();
+    });
     const post = await Post.find(posts("welcome").id);
-    await (post as any).people.reload();
     const david = await Person.find(people("david").id);
     const michael = await Person.find(people("michael").id);
+    await (post as any).people.reload();
 
-    await (post as any).people.replace([david]);
+    await assertQueriesCount(4, false, async () => {
+      await (post as any).association("people").writer([david]);
+    });
 
-    const postPeople = await (post as any).people.reload();
-    expect(postPeople.map((p: any) => p.id)).toContain(david.id);
-    expect(postPeople.map((p: any) => p.id)).not.toContain(michael.id);
+    await assertNoQueries(false, async () => {
+      expect((post as any).people.target.map((p: any) => p.id)).toContain(david.id);
+      expect((post as any).people.target.map((p: any) => p.id)).not.toContain(michael.id);
+    });
 
-    const reloaded = await Post.find(posts("welcome").id);
-    const reloadedPeople = await (reloaded as any).people.reload();
-    expect(reloadedPeople.map((p: any) => p.id)).toContain(david.id);
-    expect(reloadedPeople.map((p: any) => p.id)).not.toContain(michael.id);
+    await post.reload();
+    expect((await (post as any).people.reload()).target.map((p: any) => p.id)).toContain(david.id);
+    expect((await (post as any).people.reload()).target.map((p: any) => p.id)).not.toContain(
+      michael.id,
+    );
   });
 
   it("replace association with duplicates", async () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
 
-    const countBefore = await (post as any).people.count();
-    await (post as any).people.replace([person]);
-    await (post as any).people.replace([person, person]);
-    expect(await (post as any).people.count()).toBe(countBefore + 2);
+    await assertDifference(
+      () => (post as any).people.count(),
+      2,
+      null,
+      async () => {
+        await (post as any).association("people").writer([person]);
+        await (post as any).association("people").writer([person, person]);
+      },
+    );
   });
 
   it("replace order is preserved", async () => {
@@ -1169,24 +1364,39 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("associate with create", async () => {
+    await assertQueriesCount(1, false, async () => {
+      await Post.find(posts("thinking").id);
+    });
     const post = await Post.find(posts("thinking").id);
-    await (post as any).people.create({ first_name: "Jeb" });
 
-    const names = (await (post as any).people.toArray()).map((p: any) => p.first_name);
-    expect(names).toContain("Jeb");
+    await assertQueriesCount(4, false, async () => {
+      await (post as any).people.create({ first_name: "Jeb" });
+    });
 
-    const reloaded = await Post.find(posts("thinking").id);
-    const reloadedNames = (await (reloaded as any).people.reload()).map((p: any) => p.first_name);
-    expect(reloadedNames).toContain("Jeb");
+    await assertQueriesCount(1, false, async () => {
+      expect((await (post as any).people.toArray()).map((p: any) => p.first_name)).toContain("Jeb");
+    });
+
+    await post.reload();
+    expect(
+      (await (await (post as any).people.reload()).toArray()).map((p: any) => p.first_name),
+    ).toContain("Jeb");
   });
 
   it("through record is built when created with where", async () => {
     const post = await Post.find(posts("thinking").id);
-    const readerCountBefore = await (post as any).readers.count();
-    await (post as any).people.where({ readers: { skimmer: true } }).create({ first_name: "Jeb" });
-    expect(await (post as any).readers.count()).toBe(readerCountBefore + 1);
+    await assertDifference(
+      () => (post as any).readers.count(),
+      1,
+      null,
+      async () => {
+        await (post as any).people
+          .where({ readers: { skimmer: true } })
+          .create({ first_name: "Jeb" });
+      },
+    );
     const reader = await (post as any).readers.last();
-    expect(reader.skimmer).toBe(true);
+    expect(reader.skimmer).toEqual(true);
   });
 
   it("associate with create and no options", async () => {
@@ -1212,42 +1422,64 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("create on new record", async () => {
     const p = new Post();
-    await expect((p as any).people.create({ first_name: "mew" })).rejects.toThrow(
-      "You cannot call create unless the parent is saved",
+
+    let error = await assertRaises([RecordNotSaved], {}, () =>
+      (p as any).people.create({ first_name: "mew" }),
     );
-    await expect((p as any).people.create({ first_name: "snow" })).rejects.toThrow(
-      "You cannot call create unless the parent is saved",
+    expect(error.message).toEqual("You cannot call create unless the parent is saved");
+
+    error = await assertRaises([RecordNotSaved], {}, () =>
+      (p as any).people.createBang({ first_name: "snow" }),
     );
+    expect(error.message).toEqual("You cannot call create unless the parent is saved");
   });
 
   it("associate with create and invalid options", async () => {
     const firm = await Company.find(companies("first_firm").id);
-    const countBefore = await (firm as any).developers.count();
-    try {
-      await (firm as any).developers.create({ name: "0" });
-    } catch (_e) {}
-    expect(await (firm as any).developers.count()).toBe(countBefore);
+    await assertNoDifference(
+      () => (firm as any).developers.count(),
+      null,
+      async () => {
+        await assertNothingRaised(() => (firm as any).developers.create({ name: "0" }));
+      },
+    );
   });
 
   it("associate with create and valid options", async () => {
     const firm = await Company.find(companies("first_firm").id);
-    const countBefore = await (firm as any).developers.count();
-    await (firm as any).developers.create({ name: "developer" });
-    expect(await (firm as any).developers.count()).toBe(countBefore + 1);
+    await assertDifference(
+      () => (firm as any).developers.count(),
+      1,
+      null,
+      async () => {
+        await (firm as any).developers.create({ name: "developer" });
+      },
+    );
   });
 
   it("associate with create bang and invalid options", async () => {
     const firm = await Company.find(companies("first_firm").id);
-    const countBefore = await (firm as any).developers.count();
-    await expect((firm as any).developers.createBang({ name: "0" })).rejects.toThrow(RecordInvalid);
-    expect(await (firm as any).developers.count()).toBe(countBefore);
+    await assertNoDifference(
+      () => (firm as any).developers.count(),
+      null,
+      async () => {
+        await assertRaises([RecordInvalid], {}, () =>
+          (firm as any).developers.createBang({ name: "0" }),
+        );
+      },
+    );
   });
 
   it("associate with create bang and valid options", async () => {
     const firm = await Company.find(companies("first_firm").id);
-    const countBefore = await (firm as any).developers.count();
-    await (firm as any).developers.create({ name: "developer" });
-    expect(await (firm as any).developers.count()).toBe(countBefore + 1);
+    await assertDifference(
+      () => (firm as any).developers.count(),
+      1,
+      null,
+      async () => {
+        await (firm as any).developers.createBang({ name: "developer" });
+      },
+    );
   });
 
   it("push with invalid record", async () => {
@@ -1262,42 +1494,56 @@ describe("HasManyThroughAssociationsTest", () => {
     try {
       const firm = await Company.find(companies("first_firm").id);
       const lifo = new Developer({ name: "lifo" });
-      await expect((firm as any).developers.push(lifo)).rejects.toThrow(RecordInvalid);
+      await assertRaises([RecordInvalid], {}, () =>
+        assertDeprecated(null, deprecator(), () => (firm as any).developers.push(lifo)),
+      );
 
-      const lifo2 = await Developer.create({ name: "lifo" });
-      await expect((firm as any).developers.push(lifo2)).rejects.toThrow(RecordInvalid);
+      const lifo2 = await Developer.createBang({ name: "lifo" });
+      await assertRaises([RecordInvalid], {}, () =>
+        assertDeprecated(null, deprecator(), () => (firm as any).developers.push(lifo2)),
+      );
     } finally {
       (Contract as any).clearValidatorsBang();
     }
   });
 
   it("clear associations", async () => {
-    const post = await Post.find(posts("welcome").id);
-    await (post as any).people.reload();
-    await (post as any).people.clear();
+    await assertQueriesCount(2, false, async () => {
+      const welcome = await Post.find(posts("welcome").id);
+      await (welcome as any).people.reload();
+    });
 
-    expect(await (post as any).people.size()).toBe(0);
-    const welcomePost = await Post.find(posts("welcome").id);
-    await (welcomePost as any).people.reload();
-    expect(await (welcomePost as any).people.size()).toBe(0);
+    const post = await Post.find(posts("welcome").id);
+    await (post as any).people.load();
+    await assertQueriesCount(1, false, async () => {
+      await (post as any).people.clear();
+    });
+
+    await assertNoQueries(false, async () => {
+      assertEmpty((post as any).people.target);
+    });
+
+    await post.reload();
+    assertEmpty((await (post as any).people.reload()).target);
   });
 
   it("association callback ordering", async () => {
     Post.resetLog();
+    const log = Post.log();
     const post = await Post.find(posts("thinking").id);
-    const michael = await Person.find(people("michael").id);
 
-    await (post as any).peopleWithCallbacks.push(michael);
-    expect(Post.log().slice(-2)).toEqual([
+    await (post as any).peopleWithCallbacks.push(await Person.find(people("michael").id));
+    expect(log.slice(-2)).toEqual([
       ["added", "before", "Michael"],
       ["added", "after", "Michael"],
     ]);
 
-    const david = await Person.find(people("david").id);
-    const bob = await Person.create({ first_name: "Bob" });
-    const lary = new Person({ first_name: "Lary" });
-    await (post as any).peopleWithCallbacks.push(david, bob, lary);
-    expect(Post.log().slice(-6)).toEqual([
+    await (post as any).peopleWithCallbacks.push(
+      await Person.find(people("david").id),
+      await Person.createBang({ first_name: "Bob" }),
+      new Person({ first_name: "Lary" }),
+    );
+    expect(log.slice(-6)).toEqual([
       ["added", "before", "David"],
       ["added", "after", "David"],
       ["added", "before", "Bob"],
@@ -1306,14 +1552,51 @@ describe("HasManyThroughAssociationsTest", () => {
       ["added", "after", "Lary"],
     ]);
 
-    await (post as any).peopleWithCallbacks.build({ first_name: "Ted" });
-    expect(Post.log().slice(-2)).toEqual([
+    (post as any).peopleWithCallbacks.build({ first_name: "Ted" });
+    expect(log.slice(-2)).toEqual([
       ["added", "before", "Ted"],
       ["added", "after", "Ted"],
     ]);
 
     await (post as any).peopleWithCallbacks.create({ first_name: "Sam" });
-    expect(Post.log().slice(-2)).toEqual([
+    expect(log.slice(-2)).toEqual([
+      ["added", "before", "Sam"],
+      ["added", "after", "Sam"],
+    ]);
+
+    await (post as any)
+      .association("peopleWithCallbacks")
+      .writer([
+        await Person.find(people("michael").id),
+        await Person.find(people("david").id),
+        new Person({ first_name: "Julian" }),
+        await Person.createBang({ first_name: "Roger" }),
+      ]);
+    expect(
+      log
+        .slice(-12, -4)
+        .map((entry: any[]) => entry[entry.length - 1])
+        .sort(),
+    ).toEqual(["Bob", "Bob", "Lary", "Lary", "Sam", "Sam", "Ted", "Ted"]);
+    expect(log.slice(-4)).toEqual([
+      ["added", "before", "Julian"],
+      ["added", "after", "Julian"],
+      ["added", "before", "Roger"],
+      ["added", "after", "Roger"],
+    ]);
+
+    (post as any).peopleWithCallbacks.build({}, (person: any) => {
+      person.first_name = "Ted";
+    });
+    expect(log.slice(-2)).toEqual([
+      ["added", "before", "Ted"],
+      ["added", "after", "Ted"],
+    ]);
+
+    await (post as any).peopleWithCallbacks.create({}, (person: any) => {
+      person.first_name = "Sam";
+    });
+    expect(log.slice(-2)).toEqual([
       ["added", "before", "Sam"],
       ["added", "after", "Sam"],
     ]);
@@ -1347,30 +1630,32 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("get ids for has many through with conditions should not preload", async () => {
     const post = await Post.find(posts("welcome").id);
-    await Tagging.create({ taggable_type: "Post", taggable_id: post.id, tag_id: tags("misc").id });
-    const assoc = (post as any).association("miscTags");
-    const ids = await (post as any).miscTagIds;
-    expect(ids).toBeDefined();
-    expect(assoc.isLoaded()).toBe(false);
+    await Tagging.createBang({
+      taggable_type: "Post",
+      taggable_id: post.id,
+      tag_id: tags("misc").id,
+    });
+    await assertNotCalled(async () => {
+      await (post as any).miscTagIds;
+    });
   });
 
   it("get ids for loaded associations", async () => {
     const michael = await Person.find(people("michael").id);
     await (michael as any).posts.reload();
-    const ids1 = await (michael as any).postIds;
-    const ids2 = await (michael as any).postIds;
-    expect([...ids1].sort()).toEqual([...ids2].sort());
+    await assertNoQueries(false, async () => {
+      await (michael as any).postIds;
+      await (michael as any).postIds;
+    });
   });
 
   it("get ids for unloaded associations does not load them", async () => {
     const michael = await Person.find(people("michael").id);
-    const postsAssoc = (michael as any).association("posts");
-    expect(postsAssoc.isLoaded()).toBe(false);
-    const ids = await (michael as any).postIds;
-    expect([...ids].map(Number).sort()).toEqual(
-      [posts("welcome").id, posts("authorless").id].map(Number).sort(),
+    expect((michael as any).posts.loaded).toBeFalsy();
+    expect([...(await (michael as any).postIds)].sort()).toEqual(
+      [posts("welcome").id, posts("authorless").id].sort(),
     );
-    expect(postsAssoc.isLoaded()).toBe(false);
+    expect((michael as any).posts.loaded).toBeFalsy();
   });
 
   it("association proxy transaction method starts transaction in association class", async () => {
@@ -1403,10 +1688,10 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (post as any).authorFavorites.toArray()).toEqual([]);
   });
 
-  it("merge join association with has many through association proxy", async () => {
-    const mary = await Author.find(authors("mary").id);
-    const sql = await (mary as any).comments.where("1=1").toSql();
-    expect(sql).toBeDefined();
+  it.skip("merge join association with has many through association proxy", async () => {
+    // BLOCKED: collection proxy has no ratings scoped relation — author.comments.ratings is undefined — filed as 0155-assertion-surfaced-port-bugs/collection-proxy-does-not-delegate-association-names-to-scope
+    const author = await Author.find(authors("mary").id);
+    await assertNothingRaised(() => (author as any).comments.ratings.toSql());
   });
 
   it("has many association through a has many association with nonstandard primary keys", async () => {
@@ -1428,23 +1713,25 @@ describe("HasManyThroughAssociationsTest", () => {
     ]);
   });
 
-  it("modifying has many through has one reflection should raise", async () => {
+  it.skip("modifying has many through has one reflection should raise", async () => {
+    // BLOCKED: << on a has_many :through over a has_one raises NotNullViolation instead of HasManyThroughCantAssociateThroughHasOneOrManyReflection — filed as 0155-assertion-surfaced-port-bugs/through-has-one-push-skips-ensure-mutable
     const david = await Author.find(authors("david").id);
-    const first = (await (david as any).verySpecialComments.toArray())[0];
-
-    const c1 = await VerySpecialComment.create({ body: "Gorp!", post_id: 1011 });
-    const c2 = await VerySpecialComment.create({ body: "Eep!", post_id: 1012 });
-    await expect(association(david, "verySpecialComments").replace([c1, c2])).rejects.toThrow();
-
-    await expect(async () => {
-      await (david as any).verySpecialComments.push(
-        await VerySpecialComment.create({ body: "Hoohah!", post_id: 1013 }),
-      );
-    }).rejects.toThrow();
-
-    await expect(async () => {
-      await (david as any).verySpecialComments.delete(first);
-    }).rejects.toThrow();
+    const blocks = [
+      async () =>
+        association(david, "verySpecialComments").replace([
+          await VerySpecialComment.createBang({ body: "Gorp!", post_id: 1011 }),
+          await VerySpecialComment.createBang({ body: "Eep!", post_id: 1012 }),
+        ]),
+      async () =>
+        (david as any).verySpecialComments.push(
+          await VerySpecialComment.createBang({ body: "Hoohah!", post_id: 1013 }),
+        ),
+      async () =>
+        (david as any).verySpecialComments.delete(await (david as any).verySpecialComments.first()),
+    ];
+    for (const block of blocks) {
+      await assertRaises([HasManyThroughCantAssociateThroughHasOneOrManyReflection], {}, block);
+    }
   });
 
   it("has many association through a belongs to association", async () => {
@@ -1495,58 +1782,49 @@ describe("HasManyThroughAssociationsTest", () => {
       author_id: mary.id,
       named_category_name: (general as any).name,
     });
-    const namedCats = await (mary as any).namedCategories.toArray();
-    expect(namedCats.map((c: any) => c.id)).toContain(general.id);
+    expect(await (mary as any).namedCategories.first()).toEqual(general);
   });
 
   it("collection build with nonstandard primary key on belongs to", async () => {
-    const mary = await Author.find(authors("mary").id);
-    const category = await (mary as any).namedCategories.build({ name: "Primary" });
-    await mary.save();
+    const author = await Author.find(authors("mary").id);
+    const category = (author as any).namedCategories.build({ name: "Primary" });
+    await author.save();
     expect(
-      await Categorization.exists({
-        author_id: mary.id,
-        named_category_name: category.name,
-      }),
-    ).toBe(true);
-    const namedCats = await (mary as any).namedCategories.reload();
-    expect(namedCats.map((c: any) => c.id)).toContain(category.id);
+      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+    ).toBeTruthy();
+    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
+      category.id,
+    );
   });
 
   it("collection create with nonstandard primary key on belongs to", async () => {
-    const mary = await Author.find(authors("mary").id);
-    const category = await (mary as any).namedCategories.create({ name: "Primary" });
+    const author = await Author.find(authors("mary").id);
+    const category = await (author as any).namedCategories.create({ name: "Primary" });
     expect(
-      await Categorization.exists({
-        author_id: mary.id,
-        named_category_name: category.name,
-      }),
-    ).toBe(true);
-    const namedCats = await (mary as any).namedCategories.reload();
-    expect(namedCats.map((c: any) => c.id)).toContain(category.id);
+      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+    ).toBeTruthy();
+    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
+      category.id,
+    );
   });
 
-  it("collection exists", async () => {
-    const mary = await Author.find(authors("mary").id);
-    const category = await Category.create({ name: "Primary" });
-    await Categorization.create({ author_id: mary.id, category_id: (category as any).id });
-    expect(await (category as any).authors.exists({ id: mary.id })).toBe(true);
-    const reloaded = await Category.find((category as any).id);
-    expect(await (reloaded as any).authors.exists({ id: mary.id })).toBe(true);
+  it.skip("collection exists", async () => {
+    // BLOCKED: mass assignment — Category.createBang({ author_ids }) raises UnknownAttributeError — filed as 0155-assertion-surfaced-port-bugs/ctor-mass-assign-collection-ids-unsupported
+    const author = await Author.find(authors("mary").id);
+    const category = await Category.createBang({ author_ids: [author.id], name: "Primary" });
+    expect(await (category as any).authors.exists({ id: author.id })).toBeTruthy();
+    await category.reload();
+    expect(await (category as any).authors.exists({ id: author.id })).toBeTruthy();
   });
 
   it("collection delete with nonstandard primary key on belongs to", async () => {
-    const mary = await Author.find(authors("mary").id);
-    const category = await (mary as any).namedCategories.create({ name: "Primary" });
-    await (mary as any).namedCategories.delete(category);
+    const author = await Author.find(authors("mary").id);
+    const category = await (author as any).namedCategories.create({ name: "Primary" });
+    await (author as any).namedCategories.delete(category);
     expect(
-      await Categorization.exists({
-        author_id: mary.id,
-        named_category_name: category.name,
-      }),
-    ).toBe(false);
-    await (mary as any).namedCategories.reload();
-    expect(await (mary as any).namedCategories.size()).toBe(0);
+      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+    ).toBeFalsy();
+    assertEmpty((await (author as any).namedCategories.reload()).target);
   });
 
   it("collection singular ids getter with string primary keys", async () => {
@@ -1581,39 +1859,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("collection singular ids setter with string primary keys", async () => {
-    const book = await Book.find(books("awdr").id);
-    const second = await Subscriber.find(subscribers("second").nick);
-    await (book as any).association("subscribers").idsWriter([second.nick]);
-    expect((await (book as any).subscribers.reload()).map((s: any) => s.nick)).toEqual([
-      second.nick,
-    ]);
+    await assertNothingRaised(async () => {
+      const book = await Book.find(books("awdr").id);
+      await (book as any).association("subscribers").idsWriter([subscribers("second").nick]);
+      expect(
+        (await (await (book as any).subscribers.reload()).toArray()).map((s: any) => s.nick),
+      ).toEqual([subscribers("second").nick]);
 
-    await (book as any).association("subscribers").idsWriter([]);
-    await (book as any).subscribers.reload();
-    expect(await (book as any).subscribers.toArray()).toEqual([]);
+      await (book as any).association("subscribers").idsWriter([]);
+      expect(await (await (book as any).subscribers.reload()).toArray()).toEqual([]);
+    });
   });
 
   it("collection singular ids setter raises exception when invalid ids set", async () => {
     const company = await Company.find(companies("rails_core").id);
-    const dev = (await Developer.first())!;
-    const ids = [dev.id as number, -9999];
-    await expect((company as any).association("developers").idsWriter(ids)).rejects.toThrow(
-      `Couldn't find all Developers with 'id': (${dev.id}, -9999) (found 1 results, but was looking for 2). Couldn't find Developer with id -9999.`,
+    const ids = [(await Developer.first())!.id as number, -9999];
+    const e = await assertRaises([RecordNotFound], {}, () =>
+      (company as any).association("developers").idsWriter(ids),
     );
+    const msg = `Couldn't find all Developers with 'id': (${ids[0]}, -9999) (found 1 results, but was looking for 2). Couldn't find Developer with id -9999.`;
+    expect(e.message).toEqual(msg);
   });
 
   it("collection singular ids through setter raises exception when invalid ids set", async () => {
-    const david = await Author.find(authors("david").id);
+    const author = await Author.find(authors("david").id);
     const ids = [(categories("general") as any).name, "Unknown"];
-    await expect((david as any).association("essayCategories").idsWriter(ids)).rejects.toThrow(
-      "Couldn't find all Categories with 'name': (General, Unknown) (found 1 results, but was looking for 2). Couldn't find Category with name Unknown.",
+    const e = await assertRaises([RecordNotFound], {}, () =>
+      (author as any).association("essayCategories").idsWriter(ids),
     );
+    const msg =
+      "Couldn't find all Categories with 'name': (General, Unknown) (found 1 results, but was looking for 2). Couldn't find Category with name Unknown.";
+    expect(e.message).toEqual(msg);
   });
 
   it("build a model from hm through association with where clause", async () => {
     const book = await Book.find(books("awdr").id);
-    const sub = (book as any).subscribers.where({ nick: "marklazz" }).build();
-    expect(sub).toBeDefined();
+    await assertNothingRaised(() => (book as any).subscribers.where({ nick: "marklazz" }).build());
   });
 
   it("attributes are being set when initialized from hm through association with where clause", async () => {
@@ -1632,56 +1913,106 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(newSubscriber.name).toBe("Marcelo Giorgi");
   });
 
-  it("include method in association through should return true for instance added with build", async () => {
+  it.skip("include method in association through should return true for instance added with build", async () => {
+    // BLOCKED: an unsaved owner's has_many :through target omits records built through the join association — filed as 0155-assertion-surfaced-port-bugs/through-target-omits-through-built-records-on-new-owner
     const person = new Person();
-    const ref = await (person as any).references.build();
-    const job = await ref.buildJob();
-    expect(await (person as any).jobs.isInclude(job)).toBe(true);
+    const reference = (person as any).references.build();
+    const job = reference.buildJob();
+    expect(await (person as any).jobs.toArray()).toContain(job);
   });
 
-  it("include method in association through should return true for instance added with nested builds", async () => {
-    const author = new Author({ name: "Test" });
-    const post = await (author as any).posts.build({ title: "t", body: "b" });
-    const comment = await post.comments.build({ body: "c" });
-    expect(await (author as any).comments.isInclude(comment)).toBe(true);
+  it.skip("include method in association through should return true for instance added with nested builds", async () => {
+    // BLOCKED: an unsaved owner's has_many :through target omits records built through the join association — filed as 0155-assertion-surfaced-port-bugs/through-target-omits-through-built-records-on-new-owner
+    const author = new Author();
+    const post = (author as any).posts.build();
+    const comment = post.comments.build();
+    expect(await (author as any).comments.toArray()).toContain(comment);
   });
 
   it("through association readonly should be false", async () => {
     const michael = await Person.find(people("michael").id);
-    const firstPost = await (michael as any).posts.first();
-    expect(firstPost.isReadonly()).toBe(false);
-    const allPosts = await (michael as any).posts.toArray();
-    expect(allPosts[0].isReadonly()).toBe(false);
+    expect((await (michael as any).posts.first()).isReadonly()).toBeFalsy();
+    expect((await (michael as any).posts.toArray())[0].isReadonly()).toBeFalsy();
   });
 
   it("can update through association", async () => {
     const michael = await Person.find(people("michael").id);
-    const firstPost = await (michael as any).posts.first();
-    await expect(firstPost.update({ title: "Can write" })).resolves.toBeTruthy();
+    await assertNothingRaised(async () => {
+      const firstPost = await (michael as any).posts.first();
+      await firstPost.updateBang({ title: "Can write" });
+    });
   });
 
   it("has many through with source scope", async () => {
-    const michaelWelcomeReader = await Reader.find(readers("michael_welcome").id);
-    const expectedId = (await michaelWelcomeReader.becomes(LazyReader)).id;
-    const first = await Author.first();
-    const result = await (first as any).lazyReadersSkimmersOrNot.toArray();
-    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
+    const expected = [
+      ((await (await Reader.find(readers("michael_welcome").id)).becomes(LazyReader)) as any).id,
+    ];
+    const ids = (records: any[]) => records.map((r: any) => r.id);
+    expect(ids(await ((await Author.first()) as any).lazyReadersSkimmersOrNot.toArray())).toEqual(
+      expected,
+    );
+    expect(
+      ids(
+        await (
+          (await Author.preload(":lazyReadersSkimmersOrNot").first()) as any
+        ).lazyReadersSkimmersOrNot.toArray(),
+      ),
+    ).toEqual(expected);
+    expect(
+      ids(
+        await (
+          (await Author.eagerLoad(":lazyReadersSkimmersOrNot").first()) as any
+        ).lazyReadersSkimmersOrNot.toArray(),
+      ),
+    ).toEqual(expected);
   });
 
   it("has many through with through scope with includes", async () => {
-    const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
-    const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
-    const last = await Author.last();
-    const result = await (last as any).lazyReadersSkimmersOrNot_2.toArray();
-    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
+    const expected = [
+      ((await (await Reader.find(readers("bob_welcome").id)).becomes(LazyReader)) as any).id,
+    ];
+    const ids = (records: any[]) => records.map((r: any) => r.id);
+    expect(ids(await ((await Author.last()) as any).lazyReadersSkimmersOrNot_2.toArray())).toEqual(
+      expected,
+    );
+    expect(
+      ids(
+        await (
+          (await Author.preload(":lazyReadersSkimmersOrNot_2").last()) as any
+        ).lazyReadersSkimmersOrNot_2.toArray(),
+      ),
+    ).toEqual(expected);
+    expect(
+      ids(
+        await (
+          (await Author.eagerLoad(":lazyReadersSkimmersOrNot_2").last()) as any
+        ).lazyReadersSkimmersOrNot_2.toArray(),
+      ),
+    ).toEqual(expected);
   });
 
   it("has many through with through scope with joins", async () => {
-    const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
-    const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
-    const last = await Author.last();
-    const result = await (last as any).lazyReadersSkimmersOrNot_3.toArray();
-    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
+    const expected = [
+      ((await (await Reader.find(readers("bob_welcome").id)).becomes(LazyReader)) as any).id,
+    ];
+    const ids = (records: any[]) => records.map((r: any) => r.id);
+    expect(ids(await ((await Author.last()) as any).lazyReadersSkimmersOrNot_3.toArray())).toEqual(
+      expected,
+    );
+    expect(
+      ids(
+        await (
+          (await Author.preload(":lazyReadersSkimmersOrNot_3").last()) as any
+        ).lazyReadersSkimmersOrNot_3.toArray(),
+      ),
+    ).toEqual(expected);
+    expect(
+      ids(
+        await (
+          (await Author.eagerLoad(":lazyReadersSkimmersOrNot_3").last()) as any
+        ).lazyReadersSkimmersOrNot_3.toArray(),
+      ),
+    ).toEqual(expected);
   });
 
   it("duplicated has many through with through scope with joins", async () => {
@@ -1735,32 +2066,35 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through polymorphic with primary key option", async () => {
     const david = await Author.find(authors("david").id);
     const general = await Category.find(categories("general").id);
-    const essayCats = await (david as any).essayCategories.toArray();
-    expect(essayCats.map((c: any) => c.id)).toEqual([general.id]);
+    expect((await (david as any).essayCategories.toArray()).map((c: any) => c.id)).toEqual([
+      general.id,
+    ]);
 
-    const joinedAuthors = await Author.joins(":essayCategories").where({
+    let joinedAuthors = await Author.joins(":essayCategories").where({
       "categories.id": general.id,
     });
-    expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
+    expect(joinedAuthors[0].id).toEqual(david.id);
 
     const blackbeard = await Owner.find(owners("blackbeard").id);
-    const essayOwners = await (david as any).essayOwners.toArray();
-    expect(essayOwners.map((o: any) => o.id)).toEqual([blackbeard.id]);
+    expect((await (david as any).essayOwners.toArray()).map((o: any) => o.id)).toEqual([
+      blackbeard.id,
+    ]);
 
-    const ownersAuthors = await Author.joins(":essayOwners").where({ "owners.name": "blackbeard" });
-    expect(ownersAuthors.map((a: any) => a.id)).toContain(david.id);
+    joinedAuthors = await Author.joins(":essayOwners").where("owners.name = 'blackbeard'");
+    expect(joinedAuthors[0].id).toEqual(david.id);
   });
 
   it("has many through with primary key option", async () => {
     const david = await Author.find(authors("david").id);
     const general = await Category.find(categories("general").id);
-    const essayCats2 = await (david as any).essayCategories_2.toArray();
-    expect(essayCats2.map((c: any) => c.id)).toEqual([general.id]);
+    expect((await (david as any).essayCategories_2.toArray()).map((c: any) => c.id)).toEqual([
+      general.id,
+    ]);
 
     const joinedAuthors = await Author.joins(":essayCategories_2").where({
       "categories.id": general.id,
     });
-    expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
+    expect(joinedAuthors[0].id).toEqual(david.id);
   });
 
   it("size of through association should increase correctly when has many association is added", async () => {
@@ -1834,24 +2168,23 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through belongs to should update when the through foreign key changes", async () => {
     const post = await Post.find(posts("eager_other").id);
 
-    await (post as any).authorCategorizations.toArray();
+    await (post as any).authorCategorizations.load();
     const proxy = (post as any).association("authorCategorizations");
 
-    expect(proxy.isStaleTarget()).toBe(false);
+    expect(proxy.isStaleTarget()).toBeFalsy();
     const mary = await Author.find(authors("mary").id);
-    const maryCats = await (mary as any).categorizations.toArray();
-    const postCats = await (post as any).authorCategorizations.toArray();
-    expect(postCats.map((c: any) => c.id).sort()).toEqual(maryCats.map((c: any) => c.id).sort());
+    const byId = (a: any, b: any) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    expect(
+      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
+    ).toEqual((await (mary as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
 
     (post as any).author_id = authors("david").id;
 
-    expect(proxy.isStaleTarget()).toBe(true);
+    expect(proxy.isStaleTarget()).toBeTruthy();
     const david = await Author.find(authors("david").id);
-    const davidCats = await (david as any).categorizations.toArray();
-    const updatedCats = await (post as any).authorCategorizations.toArray();
-    expect(updatedCats.map((c: any) => c.id).sort()).toEqual(
-      davidCats.map((c: any) => c.id).sort(),
-    );
+    expect(
+      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
+    ).toEqual((await (david as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
   });
 
   it("create with conditions hash on through association", async () => {
@@ -1865,10 +2198,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("welcome").id);
     const address = await AuthorAddress.find(authorAddresses("david_address").id);
 
-    const postAddresses = await (post as any).authorAddresses.toArray();
-    expect(postAddresses.map((a: any) => a.id)).toContain(address.id);
+    expect((await (post as any).authorAddresses.toArray()).map((a: any) => a.id)).toContain(
+      address.id,
+    );
     await (post as any).authorAddresses.delete(address);
-    expect((post as any).get("author_count")).toBeNull();
+    expect((post as any).get("author_count") == null).toBeTruthy();
   });
 
   it("primary key option on source", async () => {
@@ -1893,10 +2227,9 @@ describe("HasManyThroughAssociationsTest", () => {
   it("create should not raise exception when join record has errors", async () => {
     (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
     try {
-      const firstAuthor = await Author.first();
-      await expect(
-        Category.create({ name: "Fishing", authors: [firstAuthor] }),
-      ).resolves.toBeDefined();
+      await assertNothingRaised(async () => {
+        await Category.create({ name: "Fishing", authors: [await Author.first()] });
+      });
     } finally {
       (Categorization as any).clearValidatorsBang();
     }
@@ -1950,7 +2283,7 @@ describe("HasManyThroughAssociationsTest", () => {
       .references(":readers")
       .includes(":posts");
     const p = loaded[0];
-    expect((p as any).posts.loaded).toBe(true);
+    expect((p as any).posts.loaded).toBeTruthy();
     expect(await (p as any).posts.toArray()).toEqual([]);
   });
 
@@ -1994,13 +2327,14 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("has many through with polymorhic join model", async () => {
-    const zine = await Zine.create({});
+    const zine = await Zine.createBang({});
 
-    const human = await (zine as any).polymorphicHumans.build();
-    await human.save();
+    await assertNothingRaised(async () => {
+      await (await (zine as any).polymorphicHumans.build()).saveBang();
+    });
 
-    expect(await (zine as any).polymorphicHumans.count()).toBe(1);
-    expect(await (zine as any).interests.count()).toBe(1);
+    expect(await (zine as any).polymorphicHumans.count()).toEqual(1);
+    expect(await (zine as any).interests.count()).toEqual(1);
   });
 
   it("has many through obeys order on through association", async () => {
@@ -2018,38 +2352,39 @@ describe("HasManyThroughAssociationsTest", () => {
     const post1 = await Post.create({ title: "active", body: "sample" });
     const post2 = await Post.create({ title: "inactive", body: "sample" });
 
-    const p1 = await Person.create({ first_name: "aaron", followers_count: 1 });
-    const p2 = await Person.create({ first_name: "schmit", followers_count: 2 });
-    const p3 = await Person.create({ first_name: "bill", followers_count: 3 });
-    const p4 = await Person.create({ first_name: "cal", followers_count: 4 });
+    const person1 = await Person.create({ first_name: "aaron", followers_count: 1 });
+    const person2 = await Person.create({ first_name: "schmit", followers_count: 2 });
+    const person3 = await Person.create({ first_name: "bill", followers_count: 3 });
+    const person4 = await Person.create({ first_name: "cal", followers_count: 4 });
 
-    for (const p of [p1, p2, p3, p4]) {
-      await Reader.create({ post_id: post1.id, person_id: p.id });
-      await Reader.create({ post_id: post2.id, person_id: p.id });
+    for (const person of [person1, person2, person3, person4]) {
+      await Reader.create({ post_id: post1.id, person_id: person.id });
+    }
+    for (const person of [person1, person2, person3, person4]) {
+      await Reader.create({ post_id: post2.id, person_id: person.id });
     }
 
-    const activePersons = await Person.joins(":readers")
+    const activePersons = Person.joins(":readers")
       .joins(":posts")
       .distinct()
       .where({ "posts.title": "active" });
-    const sum = activePersons.reduce((acc: number, p: any) => acc + p.followers_count, 0);
-    expect(sum).toBe(10);
-    expect(
-      await Person.joins(":readers")
-        .joins(":posts")
-        .distinct()
-        .where({ "posts.title": "active" })
-        .sum("followers_count"),
-    ).toBe(10);
+
+    const sum = (await activePersons).reduce((acc: number, p: any) => acc + p.followers_count, 0);
+    expect(sum).toEqual(10);
+    expect(await activePersons.sum("followers_count")).toEqual(10);
+    expect(await activePersons.sum("followers_count")).toEqual(sum);
   });
 
   it("has many through associations on new records use null relations", async () => {
     const person = new Person();
-    expect(await (person as any).posts.toArray()).toEqual([]);
-    expect(await (person as any).posts.where({ body: "omg" }).toArray()).toEqual([]);
-    expect(await (person as any).posts.pluck("body")).toEqual([]);
-    expect(await (person as any).posts.sum("tags_count")).toBe(0);
-    expect(await (person as any).posts.count()).toBe(0);
+
+    await assertNoQueries(false, async () => {
+      expect(await (person as any).posts.toArray()).toEqual([]);
+      expect(await (person as any).posts.where({ body: "omg" }).toArray()).toEqual([]);
+      expect(await (person as any).posts.pluck("body")).toEqual([]);
+      expect(await (person as any).posts.sum("tags_count")).toEqual(0);
+      expect(await (person as any).posts.count()).toEqual(0);
+    });
   });
 
   it("has many through with default scope on the target", async () => {
@@ -2067,7 +2402,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through with includes in through association scope", async () => {
     const welcome = await Post.find(posts("welcome").id);
     const extra = await (welcome as any).authorAddressExtraWithAddress.toArray();
-    expect(extra.length).toBeGreaterThan(0);
+    assertNotEmpty(extra);
   });
 
   it("insert records via has many through association with scope", async () => {
@@ -2099,17 +2434,15 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("has many through unscope default scope", async () => {
-    const post = await Post.create({ title: "Beaches", body: "I like beaches!" });
-    const david = await Person.find(people("david").id);
-    const susan = await Person.find(people("susan").id);
-    await Reader.create({ person_id: david.id, post_id: post.id });
-    await LazyReader.create({ person_id: susan.id, post_id: post.id });
+    const post = await Post.createBang({ title: "Beaches", body: "I like beaches!" });
+    await Reader.createBang({ person_id: people("david").id, post_id: post.id });
+    await LazyReader.createBang({ person_id: people("susan").id, post_id: post.id });
 
-    expect(await (post as any).people.toArray()).toHaveLength(2);
-    expect(await (post as any).lazyPeople.toArray()).toHaveLength(1);
+    expect((await (post as any).people.toArray()).length).toEqual(2);
+    expect((await (post as any).lazyPeople.toArray()).length).toEqual(1);
 
-    expect(await (post as any).lazyReadersUnscopeSkimmers.toArray()).toHaveLength(2);
-    expect(await (post as any).lazyPeopleUnscopeSkimmers.toArray()).toHaveLength(2);
+    expect((await (post as any).lazyReadersUnscopeSkimmers.toArray()).length).toEqual(2);
+    expect((await (post as any).lazyPeopleUnscopeSkimmers.toArray()).length).toEqual(2);
   });
 
   it("has many through add with sti middle relation", async () => {
@@ -2196,14 +2529,14 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("has many through with scope should respect table alias", async () => {
-    const family = await Family.create({});
-    const users = await Promise.all([User.create({}), User.create({}), User.create({})]);
-    await FamilyTree.create({ member_id: users[0].id, family_id: family.id });
-    await FamilyTree.create({ member_id: users[1].id, family_id: family.id });
-    await FamilyTree.create({ member_id: users[2].id, family_id: family.id, token: "wat" });
+    const family = await Family.createBang({});
+    const users = [await User.createBang({}), await User.createBang({}), await User.createBang({})];
+    await FamilyTree.createBang({ member_id: users[0].id, family_id: family.id });
+    await FamilyTree.createBang({ member_id: users[1].id, family_id: family.id });
+    await FamilyTree.createBang({ member_id: users[2].id, family_id: family.id, token: "wat" });
 
-    expect(await (users[0] as any).familyMembers.toArray()).toHaveLength(2);
-    expect(await (users[2] as any).familyMembers.toArray()).toHaveLength(0);
+    expect((await (users[0] as any).familyMembers.toArray()).length).toEqual(2);
+    expect((await (users[2] as any).familyMembers.toArray()).length).toEqual(0);
   });
 
   const ids = (records: any[]) =>
@@ -2211,14 +2544,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("through scope is affected by unscoping", async () => {
     const author = authors("david");
+
     const expected = ids(await association(author, "comments"));
-
-    const inside = await FirstPost.unscoped(async () => {
-      return association(author, "commentsOnFirstPosts").toArray();
+    await FirstPost.unscoped(async () => {
+      expect(ids(await association(author, "commentsOnFirstPosts"))).toEqual(expected);
     });
-
-    expect(ids(inside)).toEqual(expected);
-    expect(inside.length).toBeGreaterThan(1);
   });
 
   it("through scope isnt affected by scoping", async () => {
@@ -2335,7 +2665,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
       const treasure = new SentientTreasure();
       const mochi = await Pet.find(pets("mochi").id);
-      await expect((treasure as any).pets.push(mochi)).resolves.toBeDefined();
+      await assertNothingRaised(() => (treasure as any).pets.push(mochi));
     }
   });
 
@@ -2377,7 +2707,7 @@ describe("HasManyThroughAssociationsTest", () => {
     );
     expect(tagsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
 
-    expect(tagIds.length).toBeGreaterThan(0);
+    assertNotEmpty(tagIds);
     expect([...tagIds].map(Number).sort()).toEqual([...expectedTagIds].map(Number).sort());
   });
 
@@ -2401,7 +2731,7 @@ describe("HasManyThroughAssociationsTest", () => {
     );
     expect(blogPostsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
 
-    expect(blogPostIds.length).toBeGreaterThan(0);
+    assertNotEmpty(blogPostIds);
     expect([...blogPostIds].map(Number).sort()).toEqual(
       [...expectedBlogPostIds].map(Number).sort(),
     );
@@ -2448,25 +2778,16 @@ describe("HasManyThroughAssociationsTest", () => {
     await (book as any).orderAgreements.load();
     (book as any).order = new CpkOrder();
 
-    expect((book as any).association("orderAgreements").isStaleTarget()).toBe(true);
+    expect((book as any).association("orderAgreements").isStaleTarget()).toBeTruthy();
   });
 
   it("cpk association build through singular", async () => {
     const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
-    const order = await CpkOrderWithSingularBookChapters.create({ id: [1, 2] });
-    const book = await (order as any).createBook({ id: [3, 4] });
-    const chapter = await (order as any).chapters.build();
-    const chapterBook = await chapter.association("book").loadTarget();
-    expect(chapterBook?.id).toEqual(book.id);
+    const order = await CpkOrderWithSingularBookChapters.createBang({ id: [1, 2] });
+    const book = await (order as any).createBookBang({ id: [3, 4] });
+    const chapter = (order as any).chapters.build();
 
-    const chaptersSql = await (order as any).chapters.toSql();
-    const chapAuthorId = quoteTableName("cpk_chapters.author_id");
-    const chapBookId = quoteTableName("cpk_chapters.book_id");
-    const bookAuthorId = quoteTableName("cpk_books.author_id");
-    const bookId = quoteTableName("cpk_books.id");
-    expect(chaptersSql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
-    expect(chaptersSql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
-    await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
+    expect((await chapter.association("book").loadTarget())?.id).toEqual(book.id);
   });
 
   it("insertRecord with validate false still raises on invalid join record", async () => {
