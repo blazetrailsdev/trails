@@ -1041,22 +1041,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("text defaults in new schema when overriding domain", async () => {
-      expect(
-        (new Default() as any).text_col,
-        "Default of text column was not correctly parsed",
-      ).toEqual("some value");
+      expect(new Default().text_col, "Default of text column was not correctly parsed").toEqual(
+        "some value",
+      );
     });
 
     it("string defaults in new schema when overriding domain", async () => {
-      expect(
-        (new Default() as any).string_col,
-        "Default of string column was not correctly parsed",
-      ).toEqual("some value");
+      expect(new Default().string_col, "Default of string column was not correctly parsed").toEqual(
+        "some value",
+      );
     });
 
     it("decimal defaults in new schema when overriding domain", async () => {
       expect(
-        (new Default() as any).decimal_col,
+        new Default().decimal_col,
         "Default of decimal column was not correctly parsed",
       ).toEqual(new BigDecimal("3.14159265358979323846"));
     });
@@ -1065,10 +1063,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute("ALTER TABLE defaults ADD bpchar_col bpchar DEFAULT 'some value'");
       void Default.resetColumnInformation();
       await Default.loadSchema();
-      expect(
-        (new Default() as any).bpchar_col,
-        "Default of bpchar column was not correctly parsed",
-      ).toEqual("some value");
+      expect(new Default().bpchar_col, "Default of bpchar column was not correctly parsed").toEqual(
+        "some value",
+      );
     });
 
     it("text defaults after updating column default", async () => {
@@ -1078,7 +1075,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       void Default.resetColumnInformation();
       await Default.loadSchema();
       expect(
-        (new Default() as any).text_col,
+        new Default().text_col,
         "Default of text column was not correctly parsed after updating default using '::text' since postgreSQL will add parens to the default in db",
       ).toEqual("some text");
     });
@@ -1089,7 +1086,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       void Default.resetColumnInformation();
       await Default.loadSchema();
-      expect((new Default() as any).string_col).toEqual("foo'::bar");
+      expect(new Default().string_col).toEqual("foo'::bar");
     });
   });
 
