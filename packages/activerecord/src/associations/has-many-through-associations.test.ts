@@ -483,11 +483,11 @@ describe("HasManyThroughAssociationsTest", () => {
     await (sicp as any).students.reload();
     expect(await NoPkDelLessonStudent.count()).toBeGreaterThanOrEqual(2);
     await assertNoDifference(
-      () => NoPkDelStudent.count(),
+      async () => Number(await NoPkDelStudent.count()),
       null,
       async () => {
         await assertDifference(
-          () => NoPkDelLessonStudent.count(),
+          async () => Number(await NoPkDelLessonStudent.count()),
           -2,
           null,
           async () => {
@@ -600,11 +600,11 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (person as any).jobsWithDependentDestroy.count()).toEqual(1);
 
     await assertNoDifference(
-      () => Job.count(),
+      async () => Number(await Job.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reference.count(),
+          async () => Number(await Reference.count()),
           -1,
           null,
           async () => {
@@ -620,11 +620,11 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (person as any).jobsWithDependentNullify.count()).toEqual(1);
 
     await assertNoDifference(
-      () => Job.count(),
+      async () => Number(await Job.count()),
       null,
       async () => {
         await assertNoDifference(
-          () => Reference.count(),
+          async () => Number(await Reference.count()),
           null,
           async () => {
             expect(await (await person.reload()).jobsWithDependentNullify.deleteAll()).toEqual(1);
@@ -639,11 +639,11 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (person as any).jobsWithDependentDeleteAll.count()).toEqual(1);
 
     await assertNoDifference(
-      () => Job.count(),
+      async () => Number(await Job.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reference.count(),
+          async () => Number(await Reference.count()),
           -1,
           null,
           async () => {
@@ -867,11 +867,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("welcome").id);
     const michael = await Person.find(people("michael").id);
     await assertNoDifference(
-      () => Person.count(),
+      async () => Number(await Person.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reader.count(),
+          async () => Number(await Reader.count()),
           -1,
           null,
           async () => {
@@ -888,11 +888,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("destroy all", async () => {
     await assertNoDifference(
-      () => Person.count(),
+      async () => Number(await Person.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reader.count(),
+          async () => Number(await Reader.count()),
           -1,
           null,
           async () => {
@@ -1026,11 +1026,15 @@ describe("HasManyThroughAssociationsTest", () => {
   it("should raise exception for destroying mismatching records", async () => {
     const post = await Post.find(posts("welcome").id);
     const thinkingPost = await Post.find(posts("thinking").id);
-    await assertNoDifference([() => Person.count(), () => Reader.count()], null, async () => {
-      await assertRaises([AssociationTypeMismatch], {}, () =>
-        (post as any).people.destroy(thinkingPost),
-      );
-    });
+    await assertNoDifference(
+      [async () => Number(await Person.count()), async () => Number(await Reader.count())],
+      null,
+      async () => {
+        await assertRaises([AssociationTypeMismatch], {}, () =>
+          (post as any).people.destroy(thinkingPost),
+        );
+      },
+    );
   });
 
   it("delete through belongs to with dependent nullify", async () => {
@@ -1040,16 +1044,20 @@ describe("HasManyThroughAssociationsTest", () => {
       const job = await Job.find(jobs("magician").id);
       const reference = await Reference.where({ job_id: job.id, person_id: person.id }).first();
 
-      await assertNoDifference([() => Job.count(), () => Reference.count()], null, async () => {
-        await assertDifference(
-          () => (person as any).jobs.count(),
-          -1,
-          null,
-          async () => {
-            await (person as any).jobsWithDependentNullify.delete(job);
-          },
-        );
-      });
+      await assertNoDifference(
+        [async () => Number(await Job.count()), async () => Number(await Reference.count())],
+        null,
+        async () => {
+          await assertDifference(
+            () => (person as any).jobs.count(),
+            -1,
+            null,
+            async () => {
+              await (person as any).jobsWithDependentNullify.delete(job);
+            },
+          );
+        },
+      );
 
       expect((await (reference as any).reload()).job_id).toBeNull();
     } finally {
@@ -1066,11 +1074,11 @@ describe("HasManyThroughAssociationsTest", () => {
       expect((await (person as any).jobs.count()) >= 2).toBeTruthy();
 
       await assertNoDifference(
-        () => Job.count(),
+        async () => Number(await Job.count()),
         null,
         async () => {
           await assertDifference(
-            [() => (person as any).jobs.count(), () => Reference.count()],
+            [() => (person as any).jobs.count(), async () => Number(await Reference.count())],
             -1,
             null,
             async () => {
@@ -1095,11 +1103,11 @@ describe("HasManyThroughAssociationsTest", () => {
       expect((await (person as any).jobs.count()) >= 2).toBeTruthy();
 
       await assertNoDifference(
-        () => Job.count(),
+        async () => Number(await Job.count()),
         null,
         async () => {
           await assertDifference(
-            [() => (person as any).jobs.count(), () => Reference.count()],
+            [() => (person as any).jobs.count(), async () => Number(await Reference.count())],
             -1,
             null,
             async () => {
@@ -1122,11 +1130,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const jobsCount = await (person as any).jobs.count();
     await assertNoDifference(
-      () => Job.count(),
+      async () => Number(await Job.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reference.count(),
+          async () => Number(await Reference.count()),
           -jobsCount,
           null,
           async () => {
@@ -1144,11 +1152,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const jobsCount = await (person as any).jobs.count();
     await assertNoDifference(
-      () => Job.count(),
+      async () => Number(await Job.count()),
       null,
       async () => {
         await assertDifference(
-          () => Reference.count(),
+          async () => Number(await Reference.count()),
           -jobsCount,
           null,
           async () => {
@@ -1164,9 +1172,13 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const references = await (person as any).references.toArray();
 
-    await assertNoDifference([() => Reference.count(), () => Job.count()], null, async () => {
-      await person.destroy();
-    });
+    await assertNoDifference(
+      [async () => Number(await Reference.count()), async () => Number(await Job.count())],
+      null,
+      async () => {
+        await person.destroy();
+      },
+    );
 
     for (const reference of references) {
       expect((await reference.reload()).job_id).toBeNull();
