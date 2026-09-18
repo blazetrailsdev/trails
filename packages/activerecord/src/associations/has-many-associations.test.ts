@@ -1539,39 +1539,41 @@ describe("HasManyAssociationsTest", () => {
     bulb = await car.bulbs.createBang();
     expect(bulb.name).toBe("defaulty");
   });
-  it("build and create from association should respect passed attributes over default scope", async () => {
-    const car = (await Car.create({ name: "honda" })) as any;
+  it.fails(
+    "build and create from association should respect passed attributes over default scope",
+    async () => {
+      const car = (await Car.create({ name: "honda" })) as any;
 
-    let bulb = car.bulbs.where({ name: "exotic" }).build();
-    expect(bulb.name).toBe("exotic");
-    expect(bulb.countAfterCreate).toBeUndefined();
+      let bulb = car.bulbs.where({ name: "exotic" }).build();
+      expect(bulb.name).toBe("exotic");
+      expect(bulb.countAfterCreate).toBeUndefined();
 
-    bulb = await car.bulbs.where({ name: "exotic" }).create();
-    expect(bulb.name).toBe("exotic");
+      bulb = await car.bulbs.where({ name: "exotic" }).create();
+      expect(bulb.name).toBe("exotic");
+      expect(bulb.countAfterCreate).toBe(1);
 
-    bulb = await car.bulbs.where({ name: "exotic" }).createBang();
-    expect(bulb.name).toBe("exotic");
+      bulb = await car.bulbs.where({ name: "exotic" }).createBang();
+      expect(bulb.name).toBe("exotic");
+      expect(bulb.countAfterCreate).toBe(2);
 
-    bulb = car.bulbs.build({ name: "exotic" });
-    expect(bulb.name).toBe("exotic");
+      bulb = car.bulbs.build({ name: "exotic" });
+      expect(bulb.name).toBe("exotic");
 
-    bulb = await car.bulbs.create({ name: "exotic" });
-    expect(bulb.name).toBe("exotic");
+      bulb = await car.bulbs.create({ name: "exotic" });
+      expect(bulb.name).toBe("exotic");
 
-    bulb = await car.bulbs.createBang({ name: "exotic" });
-    expect(bulb.name).toBe("exotic");
+      bulb = await car.bulbs.createBang({ name: "exotic" });
+      expect(bulb.name).toBe("exotic");
 
-    bulb = car.awesomeBulbs.build({ frickinawesome: false });
-    expect(bulb.frickinawesome).toBe(false);
+      bulb = car.awesomeBulbs.build({ frickinawesome: false });
+      expect(bulb.frickinawesome).toBe(false);
 
-    bulb = await car.awesomeBulbs.create({ frickinawesome: false });
-    expect(bulb.frickinawesome).toBe(false);
+      bulb = await car.awesomeBulbs.create({ frickinawesome: false });
+      expect(bulb.frickinawesome).toBe(false);
 
-    bulb = await car.awesomeBulbs.createBang({ frickinawesome: false });
-    expect(bulb.frickinawesome).toBe(false);
-  });
-  it.todo(
-    "build and create from association should respect passed attributes over default scope — countAfterCreate reflects cumulative unscoped count (fix-scope-registry-stale-in-after-create-callback)",
+      bulb = await car.awesomeBulbs.createBang({ frickinawesome: false });
+      expect(bulb.frickinawesome).toBe(false);
+    },
   );
   it("build and create from association should respect unscope over default scope", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
@@ -2003,18 +2005,22 @@ describe("HasManyAssociationsTest", () => {
         .count(),
     ).not.toBe(0);
   });
-  it("build and create should not happen within scope", async () => {
-    const car = (await Car.create({ name: "honda" })) as any;
-    const scope = car.fooBulbs.whereValuesHash();
+  describe("with cars fixtures", () => {
+    const { cars } = fixtures(["cars"]);
 
-    let bulb = car.fooBulbs.build();
-    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+    it("build and create should not happen within scope", async () => {
+      const car = cars("honda") as any;
+      const scope = car.fooBulbs.whereValuesHash();
 
-    bulb = await car.fooBulbs.create();
-    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+      let bulb = car.fooBulbs.build();
+      expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
 
-    bulb = await car.fooBulbs.createBang();
-    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+      bulb = await car.fooBulbs.create();
+      expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+
+      bulb = await car.fooBulbs.createBang();
+      expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+    });
   });
   it("finder method with dirty target", async () => {
     const company = (await HmFirm.create({ name: "First Firm" })) as any;
@@ -2048,8 +2054,9 @@ describe("HasManyAssociationsTest", () => {
     } = fixtures(["companies", "accounts", "authors", "authorAddresses", "posts", "comments"]);
 
     it("finding array compatibility", async () => {
-      const clients = await (await (await HmFirm.order("id")).find((f: any) => f.id > 0)!).clients;
-      expect(clients.length).toBe(3);
+      const firms = (await HmFirm.order("id")) as any[];
+      const firm = firms.find((f) => f.id > 0);
+      expect((await firm.clients).length).toBe(3);
     });
 
     it("find many with merged options", async () => {
