@@ -72,7 +72,7 @@ function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
 }
 
-function checkValueOfE(valueOfE: unknown, typeRegistryKey: string): void {
+function checkValueOfE(valueOfE: unknown, typeRegistryKey: string | null): void {
   if (typeRegistryKey === "postgresql") {
     expect(valueOfE).toBeInstanceOf(BigDecimal);
     expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
@@ -83,6 +83,26 @@ function checkValueOfE(valueOfE: unknown, typeRegistryKey: string): void {
     expect(Object(valueOfE)).toBeInstanceOf(Number);
     expect(valueOfE).toBe(2);
   }
+}
+
+async function checkDefaultFunctionAndInsertRow(
+  adapter: DatabaseAdapter,
+  name: Column,
+): Promise<void> {
+  if (adapterType === "postgres") {
+    expect(name.defaultFunction).toBe("gen_random_uuid()");
+    await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
+  } else {
+    expect(name.defaultFunction).toBe("uuid()");
+    await adapter.execute("INSERT INTO delete_me () VALUES ()");
+  }
+}
+
+function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
+  if (adapterType !== "mysql" && adapterType !== "postgres") {
+    throw new Error(`need an expected query count for ${adapterType}`);
+  }
+  return counts[adapterType];
 }
 
 function stubNow(iso: string): () => void {
@@ -1261,7 +1281,7 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     try {
       await adapter.createTable("table_from_query_testings", {
-        as: Person.select("id").where({ id: 1 }),
+        as: Person.select("id").where({ id: 1 }).toSql(),
       });
 
       const columns = await adapter.columns("table_from_query_testings");
@@ -1328,7 +1348,9 @@ describe("MigrationTest", () => {
 
     const lockId = await migrator.generateMigratorAdvisoryLockId();
 
-    const currentDatabase = await adapter.currentDatabase();
+    const currentDatabase = await (
+      adapter as unknown as { currentDatabase(): Promise<string> }
+    ).currentDatabase();
     const salt = 2053462845n;
     const expectedId = BigInt(Zlib.crc32(currentDatabase)) * salt;
 
@@ -2215,7 +2237,7 @@ AND query LIKE '%${lockId}%'`;
           migrationsPath,
           async () => {
             const error = await assertRaises([InvalidMigrationTimestampError], {}, () =>
-              migrator.up(201801010101010000n),
+              migrator.up("201801010101010000"),
             );
             expect(error.message).toMatch(
               /Invalid timestamp 201801010101010000 for migration file: test_migration/,
@@ -2315,9 +2337,9 @@ AND query LIKE '%${lockId}%'`;
                 schemaMigration,
                 internalMetadata,
               );
-              await destMigrator.up(20231201101059n);
-              await destMigrator.up(20231201101060n);
-              await destMigrator.up(20231201101061n);
+              await destMigrator.up(20231201101059);
+              await destMigrator.up(20231201101060);
+              await destMigrator.up(20231201101061);
 
               expect(await destMigrator.currentVersion()).toBe(20231201101061);
               expect(await destMigrator.needsMigration()).toBeFalsy();
@@ -2336,26 +2358,6 @@ AND query LIKE '%${lockId}%'`;
 });
 
 describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
-  async function checkDefaultFunctionAndInsertRow(
-    adapter: DatabaseAdapter,
-    name: Column,
-  ): Promise<void> {
-    if (adapterType === "postgres") {
-      expect(name.defaultFunction).toBe("gen_random_uuid()");
-      await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
-    } else {
-      expect(name.defaultFunction).toBe("uuid()");
-      await adapter.execute("INSERT INTO delete_me () VALUES ()");
-    }
-  }
-
-  function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
-    if (adapterType !== "mysql" && adapterType !== "postgres") {
-      throw new Error(`need an expected query count for ${adapterType}`);
-    }
-    return counts[adapterType];
-  }
-
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
     adapter = await freshAdapter();
