@@ -5,10 +5,8 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { TableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import { Point, PointValue } from "../../connection-adapters/postgresql/oid/point.js";
+import { PointValue } from "../../connection-adapters/postgresql/oid/point.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
-
-const pointType = new Point();
 
 describeIfPg("PostgreSQLAdapter", () => {
   fixtures({}, { useTransactionalTests: false });
