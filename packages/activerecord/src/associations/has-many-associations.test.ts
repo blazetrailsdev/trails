@@ -2054,8 +2054,7 @@ describe("HasManyAssociationsTest", () => {
     } = fixtures(["companies", "accounts", "authors", "authorAddresses", "posts", "comments"]);
 
     it("finding array compatibility", async () => {
-      const firms = (await HmFirm.order("id")) as any[];
-      const firm = firms.find((f) => f.id > 0);
+      const firm = await HmFirm.order("id").find((f: any) => f.id > 0);
       expect((await firm.clients).length).toBe(3);
     });
 
