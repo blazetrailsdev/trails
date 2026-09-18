@@ -605,24 +605,44 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("acceptable uuid regex", () => {
-      expect(ACCEPTABLE_UUID.test("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(true);
-      expect(ACCEPTABLE_UUID.test("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(true);
-      expect(ACCEPTABLE_UUID.test("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(true);
-      expect(ACCEPTABLE_UUID.test("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(true);
-      expect(ACCEPTABLE_UUID.test("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(true);
+      [
+        "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11",
+        "{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}",
+        "a0eebc999c0b4ef8bb6d6bb9bd380a11",
+        "a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11",
+        "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
+        "{a0eebc99-9c0b-4ef8-fb6d-6bb9bd380a11}",
+      ].forEach((validUuid) => {
+        expect(Object(new Uuid().cast(validUuid))).toBeInstanceOf(String);
+      });
 
-      expect(ACCEPTABLE_UUID.test("")).toBe(false);
-      expect(ACCEPTABLE_UUID.test("hello")).toBe(false);
-      expect(ACCEPTABLE_UUID.test("zz0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
-      expect(ACCEPTABLE_UUID.test("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a1")).toBe(false);
+      [
+        ["A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"],
+        {},
+        0,
+        0.0,
+        true,
+        "Z0000C99-9C0B-4EF8-BB6D-6BB9BD380A11",
+        "a0eebc999r0b4ef8ab6d6bb9bd380a11",
+        "a0ee-bc99------4ef8-bb6d-6bb9-bd38-0a11",
+        "{a0eebc99-bb6d6bb9-bd380a11}",
+        "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11",
+        "a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
+      ].forEach((invalidUuid) => {
+        expect(new Uuid().cast(invalidUuid)).toBeNull();
+      });
     });
 
     it("uuid formats", () => {
-      const expected = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      expect(new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(expected);
-      expect(new Uuid().cast("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}")).toBe(expected);
-      expect(new Uuid().cast("a0eebc999c0b4ef8bb6d6bb9bd380a11")).toBe(expected);
-      expect(new Uuid().cast("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(expected);
+      [
+        "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11",
+        "{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}",
+        "a0eebc999c0b4ef8bb6d6bb9bd380a11",
+        "a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11",
+        "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
+      ].forEach((validUuid) => {
+        expect(new Uuid().cast(validUuid)).toEqual("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+      });
     });
 
     it("uniqueness validation ignores uuid", async () => {
