@@ -104,7 +104,11 @@ export async function find(this: FinderRelation, ...args: unknown[]): Promise<an
     for (const record of await this.toArray()) {
       if (await (block as (record: unknown) => unknown)(record)) return record;
     }
-    return ifnone == null ? null : await (ifnone as () => unknown)();
+    if (ifnone == null) return null;
+    if (typeof ifnone !== "function") {
+      throw new NoMethodError(`undefined method \`call' for ${rbInspect(ifnone)}`);
+    }
+    return await ifnone();
   }
   return findWithIds.call(this, ...args);
 }
