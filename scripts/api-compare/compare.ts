@@ -277,27 +277,42 @@ import {
 //
 // The activerecord+actionview population itself has since shrunk from the
 // 106 rows measured above to 8 (unrelated convergence work, not this
-// mechanism), which changes the economics but not the finding: of the 8,
-// `Errors#empty?` (`activerecord/validations.rb:72`, `valid?`) is exactly the
-// danger case this note warns about — a real Rails object with its own
-// `#empty?`, not an Array — and would be a wrong credit if aliased. Two rows
-// chain off a Hash local RFC 0129 already proves (`shards.keys.first`,
-// `connection_handling.rb:96`) or off core Ruby methods with statically-known
-// Array returns (`String#split`/`String#scan`,
-// `attribute_assignment.rb:64,79`); crediting those needs a NEW kind of proof
-// — a call chain rooted in a known-safe method NAME — that is weaker than
-// every existing entry in `receiver_kind` (extract-ruby-api.rb): the others
-// are all proven by Ripper reading a literal or an assignment; this one would
-// be proven by trusting that `split`/`scan`/`keys` were not redefined
-// somewhere the extractor cannot see, which is a much smaller but real gap in
-// the "never a guess" discipline the whole `callReceivers` system is built on
-// (see extract-ruby-api.rb's `receiver_kind` doc comment). At a population of
-// 3 qualifying rows codebase-wide, that trade is not worth taking; the
-// remaining rows (this one, `sharded?`'s `shard_keys.any?`, `insert_all.rb`'s
-// `extract_types_from_columns_on`, `actionview/digestor.rb`'s
-// `children.any?`) all cross a method or constructor-default boundary RFC
-// 0129's local-literal proof does not reach either. Still no mechanism to
-// build here; still the reason-text route.
+// mechanism) — hand-verified against vendor/rails, one by one, below. That
+// changes the economics but not the finding, against each candidate this
+// story's own re-check considered:
+//
+// (1) Method-chain root typing off a NAME, not a literal — `shards.keys.first`
+// (`connection_handling.rb:96`, `shards: {}` is a kwarg default RFC 0129
+// already proves `hash`; `Hash#keys` always returns Array) and
+// `String#split`/`String#scan` (`attribute_assignment.rb:64,79`, both always
+// Array). 3 rows qualify. Crediting them needs a NEW proof shape, weaker than
+// every existing `receiver_kind` case (extract-ruby-api.rb): the others are
+// proven by Ripper reading a literal or an assignment; this one would be
+// proven by trusting `split`/`scan`/`keys` were not redefined somewhere the
+// extractor cannot see — a real but small hole in the "never a guess"
+// discipline `callReceivers` is built on. At 3 rows codebase-wide, not worth
+// the trade.
+// (2) Per-class ivar typing — `actionview/digestor.rb:112`'s `children.any?`.
+// `@children` is assigned from a constructor PARAMETER
+// (`initialize(…, children = [])`), not a literal, so even a per-class scan
+// for literal ivar assignments doesn't reach it; proving it needs chaining
+// through the parameter's own default, which is candidate (1) again, one hop
+// further out.
+// (3) Bare self-calls typed via enclosing-class ancestry — the shape the
+// ORIGINAL 2026-08-08 audit counted 23 unreceived `any?` rows under. None
+// survive in the current 8: `sharded?`'s `shard_keys.any?`
+// (`connection_handling.rb:381`) and `insert_all.rb`'s
+// `extract_types_from_columns_on` (`(keys - columns.keys).first`) both have
+// an explicit receiver whose OWN type crosses a method boundary (a private
+// reader, an untyped kwarg) neither this nor RFC 0129's mechanism reaches.
+// This candidate has nothing left in the current population to build
+// against, independent of its feasibility.
+//
+// `Errors#empty?` (`activerecord/validations.rb:72`, `valid?`) is the eighth
+// row and is exactly the danger case this note warns about — a real Rails
+// object with its own `#empty?`, not an Array — and would be a wrong credit
+// under any of the three mechanisms above. Still no mechanism to build here;
+// still the reason-text route.
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
