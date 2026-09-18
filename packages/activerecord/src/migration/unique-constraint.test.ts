@@ -84,7 +84,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
         await assertNoChanges(
           async () => (await connection.uniqueConstraints("sections")).length,
           null,
-          { from: 1 },
+          {},
           async () => {
             await connection.createSchema("test_schema");
             // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with its schema by the `dropSchema("test_schema")` in the finally block
@@ -147,8 +147,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
       expect(constraint.deferrable).toBe("deferred");
     });
 
-    it.skip("add unique constraint with deferrable invalid", async () => {
-      // BLOCKED: message — the port renders the symbol as JSON ("immediate") instead of `:immediate`
+    it("add unique constraint with deferrable invalid", async () => {
       const error = await assertRaises([ArgumentError], {}, () =>
         connection.addUniqueConstraint("sections", ["position"], { deferrable: true as never }),
       );

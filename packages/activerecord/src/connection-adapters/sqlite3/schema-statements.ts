@@ -372,7 +372,7 @@ export function assertValidDeferrable(deferrable: unknown): void {
   )
     return;
   throw new ArgumentError(
-    `deferrable must be \`"immediate"\` or \`"deferred"\`, got: \`${JSON.stringify(deferrable)}\``,
+    `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${JSON.stringify(deferrable)}\``,
   );
 }
 
