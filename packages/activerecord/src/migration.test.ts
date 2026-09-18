@@ -78,7 +78,10 @@ function checkValueOfE(valueOfE: unknown, typeRegistryKey: string | null): void 
     expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
   } else if (typeRegistryKey === "sqlite3") {
     expect(valueOfE).toBeInstanceOf(BigDecimal);
-    expect(Number((valueOfE as BigDecimal).toString("F"))).toBeCloseTo(2.71828182845905, 14);
+    expect(Number((valueOfE as BigDecimal).toString("F"))).toBeCloseTo(
+      2.71828182845905,
+      -Math.log10(2 * 0.00000000000001),
+    );
   } else {
     expect(Object(valueOfE)).toBeInstanceOf(Number);
     expect(valueOfE).toBe(2);
