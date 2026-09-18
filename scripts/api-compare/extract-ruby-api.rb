@@ -2706,10 +2706,11 @@ class ApiExtractor
   # alone, so `options.fetch` (a Hash) and `cache.fetch`
   # (`ActiveSupport::Cache::Store`) are one call to every consumer; the kind is
   # what lets the ruby-compat table admit a row keyed `Hash#fetch` without
-  # crediting the Rails one. Only shapes Ripper PROVES are named for their
-  # class — a literal, or a local hash_typed_locals proved — and everything
+  # crediting the Rails one. Every shape but one is Ripper PROVING a class —
+  # a literal, a local hash_typed_locals proved, or a chain whose OWN return is
+  # fixed by a core method's contract (chain_receiver_kind) — and everything
   # else is recorded by shape (`local`, `ivar`, `const`, `expr`), never guessed
-  # at, so a row keyed `hash` can only ever match a Hash.
+  # at, so a row keyed `hash`/`array` can only ever match that class.
   def receiver_kind(recv)
     return self_receiver_kind if recv.nil?
     return "expr" unless recv.is_a?(Array)
@@ -2723,7 +2724,68 @@ class ApiExtractor
     when :@int, :@float then "numeric"
     when :var_ref then var_ref_receiver_kind(recv[1])
     when :const_path_ref, :top_const_ref then "const"
+    when :call, :method_add_arg then chain_receiver_kind(recv)
     else "expr"
+    end
+  end
+
+  # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
+  # what receiver_kind can prove about their OWN receiver — `String#split`,
+  # `String#scan` (`vendor/ruby/string.c`). Deliberately tiny and hand-picked:
+  # each name's return type is fixed by the method's contract, never by an
+  # argument or a subclass override in any file this extractor has seen.
+  CORE_ARRAY_RETURNING_CHAIN_METHODS = %w[split scan].freeze
+
+  # Hash core methods whose return is Array WHEN the receiver is already
+  # proven `hash` — `Hash#keys`, `Hash#values` (`vendor/ruby/hash.c`). Unlike
+  # {@link CORE_ARRAY_RETURNING_CHAIN_METHODS} these need their OWN receiver
+  # proven first: `x.keys` is `Hash#keys` only when `x` is.
+  HASH_TO_ARRAY_CHAIN_METHODS = %w[keys values].freeze
+
+  # `receiver_kind`'s ONE step of chain-root typing: `shards.keys.first`'s
+  # `.first` receiver is `shards.keys`, itself a `:call` node — Ripper proves
+  # no CLASS for a call's own return, so this is proof by method NAME instead
+  # of by a literal or a traced assignment, the one place in this file that is
+  # true. It is restricted to a small, audited set of Ruby core methods with a
+  # return type fixed by their contract (never a Rails method, never anything
+  # this extractor cannot see every definition of).
+  #
+  # `CORE_ARRAY_RETURNING_CHAIN_METHODS` needs nothing about the chain's OWN
+  # receiver — `String#split`/`#scan` return Array regardless — so chaining
+  # deeper under it (`x.split(",").split(".").first`) still proves `array` at
+  # every level; there is nothing further to disprove.
+  #
+  # `HASH_TO_ARRAY_CHAIN_METHODS` is different: `x.keys` is `Hash#keys` only
+  # when `x` IS a Hash, so it stacks on the EXISTING literal/local proof for
+  # the Hash case (`hash_receiver_kind_no_chain?`) rather than recursing back
+  # into `chain_receiver_kind` — `shards.keys` is proven `array` because
+  # `shards` is already proven `hash` (`hash_typed_locals`'s kwarg-default
+  # rule) DIRECTLY, not through another chain hop. One hop only:
+  # `shards.keys.values.first` does not chase `shards.keys`'s own kind back
+  # through this same function, so `.values`'s receiver reads `expr`.
+  def chain_receiver_kind(recv)
+    call_node = recv[0] == :method_add_arg ? recv[1] : recv
+    return "expr" unless call_node.is_a?(Array) && call_node[0] == :call
+
+    name = ident_name(call_node[3])
+    return "expr" if name.nil?
+    return "array" if CORE_ARRAY_RETURNING_CHAIN_METHODS.include?(name)
+    return "array" if HASH_TO_ARRAY_CHAIN_METHODS.include?(name) && hash_receiver_kind_no_chain?(call_node[1])
+
+    "expr"
+  end
+
+  # The Hash half of `receiver_kind`'s BASE cases only — a literal or a proven
+  # local/ivar/const — deliberately excluding `chain_receiver_kind` itself, so
+  # `HASH_TO_ARRAY_CHAIN_METHODS` cannot recurse into an unbounded chain of
+  # guesses; see the "one hop only" note above.
+  def hash_receiver_kind_no_chain?(recv)
+    return false unless recv.is_a?(Array)
+
+    case recv[0]
+    when :hash, :bare_assoc_hash then true
+    when :var_ref then var_ref_receiver_kind(recv[1]) == "hash"
+    else false
     end
   end
 

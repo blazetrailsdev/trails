@@ -941,10 +941,7 @@ function typeCasterFor(column: unknown): unknown {
   return tryCall(column as object, "typeCaster") ?? null;
 }
 
-/**
- * @internal
- * @missingRailsCall last — PERMANENT
- */
+/** @internal */
 export function typeFor(
   rel: CalculationRelation,
   field: string | Nodes.Node | number,

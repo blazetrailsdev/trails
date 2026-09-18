@@ -92,7 +92,6 @@ export class AliasTracker {
     return block(undefined);
   }
 
-  /** @missingRailsCall size — PERMANENT */
   static initialCountFor(connection: Quoting | undefined, name: string, tableJoins: any[]): number {
     const quotedName = connection ? connection.quoteTableName(name) : `"${name}"`;
     const quotedNameEscaped = quotedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

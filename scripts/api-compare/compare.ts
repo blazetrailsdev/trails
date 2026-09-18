@@ -265,6 +265,50 @@ import {
 // tables are deliberately left alone and those rows go to the reason-text
 // route (per-row human review), not to a mechanism. See the matching note in
 // enumerable-idioms.ts.
+//
+// RE-CHECKED, 2026-09-18 (`receiver-typing-for-positional-array-idioms`):
+// RFC 0129 shipped a receiver-kind mechanism this note said didn't exist —
+// `callReceivers`, a per-call-site kind proven for a literal or a local
+// Ripper proves is one. The population had also shrunk, independently, to 8
+// rows. Against the three candidates this re-check considered:
+//
+// (1) BUILT — method-chain root typing off a NAME, not a literal:
+// `shards.keys.first` (`connection_handling.rb:96`, off a kwarg-default Hash
+// RFC 0129 already proves) and `String#split`/`#scan`
+// (`attribute_assignment.rb:64,79`, unconditionally Array). See
+// `chain_receiver_kind` (extract-ruby-api.rb) and
+// {@link significantCallsForReceivers} below — a row-scoped exception that
+// drops a {@link POSITIONAL_ARRAY_ANALOGUES} name from significance only when
+// THIS body's own receiver-kind data proves every site `array`. It is a
+// weaker proof than every other `receiver_kind` case — Ripper proves a
+// literal or a traced assignment elsewhere; this trusts that
+// `split`/`scan`/`keys`/`values` were not redefined somewhere unseen — but it
+// cannot credit a real `Relation`/association receiver: `Relation` defines
+// none of those four names, and `Hash#keys`/`#values` only fire off a
+// receiver ALREADY proven a Hash literal or kwarg default. Converged 2 of
+// this population's rows plus 5 more it surfaced elsewhere
+// (`alias-tracker.ts#initialCountFor`, `schema-creation.ts#accept`,
+// `migration.ts#parseMigrationFilename`, `calculations.ts#typeFor`,
+// `activesupport/cache/file-store.ts#filePathKey` — hand-verified against
+// Rails source as split/scan chains, none a Relation receiver), each
+// previously carrying its own now-stale `@missingRailsCall` receipt.
+// (2) NOT BUILT — per-class ivar typing off a constructor-parameter default:
+// `actionview/digestor.rb:112`'s `children.any?`. `@children` comes from a
+// constructor PARAMETER (`children = []`), not a literal, so it needs (1)'s
+// mechanism chained one hop further, onto machinery (`hash_typed_ivars`,
+// Hash-only, blocked on `prove-hash-literal-ivars-in-ruby-compat-receiver-kinds`
+// for an unrelated reason) this story leaves alone rather than widen mid-flight.
+// (3) NOT BUILT, nothing to build against — bare self-calls typed via
+// enclosing-class ancestry, the shape the original audit counted 23 rows
+// under. None survive: `sharded?`'s `shard_keys.any?`
+// (`connection_handling.rb:381`) and `insert_all.rb`'s
+// `extract_types_from_columns_on` both have a receiver whose OWN type crosses
+// a method boundary neither this nor (1) reaches.
+//
+// `Errors#empty?` (`activerecord/validations.rb:72`, `valid?`) is exactly the
+// danger case this note warns about and stays flagged under every mechanism
+// above, by construction — never provably a Hash or a split/scan chain. The
+// unconverged rows still go to the reason-text route, not to a mechanism.
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
@@ -372,6 +416,47 @@ export function foldSkeletonTokens(
 export const SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super" && !NO_JS_CALL_FORM.has(value),
 };
+
+/**
+ * `first`/`last`/`any?`/`size`/`empty?`'s faithful ports are a
+ * property/index access, never a call — the same fact that keeps them OUT of
+ * {@link NO_JS_CALL_FORM} rather than in it, per that table's "DELIBERATELY
+ * NOT suppressed" comment: a global suppression would make a port that
+ * rewrites `relation.first` into indexing a preloaded array (dropping the
+ * query trigger) permanently invisible. This is the row-scoped exception RFC
+ * 0129's `callReceivers` makes possible: a name here is dropped from
+ * significance for ONE row only when `extract-ruby-api.rb`'s
+ * `chain_receiver_kind`/`hash_typed_locals` proved EVERY site of it, in THAT
+ * Ruby body, an `array` — never on a bare name-only match, and never for a
+ * row with no proof at all (an unproven row still flags, same as today). See
+ * the 2026-09-18 addendum below `NO_JS_CALL_FORM` for the population this
+ * closes.
+ */
+const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "empty?"]);
+
+/**
+ * {@link SIGNIFICANT_CALLS}, narrowed for ONE Ruby body's own receiver-kind
+ * data (RFC 0129) — built fresh per pair in the calls-parity check, never
+ * module-level, because `receivers` belongs to that one body. Mirrors the
+ * "admitted only where every site's kind is proven" discipline
+ * `RECEIVER_KEYED_RUBY_COMPAT_EXPORTS` reads in ruby-compat.ts, but for the
+ * property-form names {@link POSITIONAL_ARRAY_ANALOGUES} instead of a call
+ * alias. `SIGNIFICANT_CALLS` itself is untouched: every other caller and
+ * every existing test of its shape keeps working unmodified.
+ */
+export function significantCallsForReceivers(
+  receivers: Record<string, readonly string[]> | undefined,
+  base: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+): { has(value: string): boolean } {
+  return {
+    has: (value) => {
+      if (!base.has(value)) return false;
+      if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
+      const kinds = receivers?.[value];
+      return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
+    },
+  };
+}
 
 /**
  * Drop the extractor's inert-receiver call names (RFC 0083) from a Ruby
@@ -4134,7 +4219,7 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
-          callsSignificant,
+          significantCallsForReceivers(rubyOwned?.receivers, callsSignificant),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
