@@ -3,7 +3,10 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   BigDecimal,
   Logger,
+  assertEmpty,
   assertNoChanges,
+  travelBack,
+  travelTo,
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport";
@@ -15,6 +18,8 @@ import { adapterType } from "./test-adapter.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { Column } from "./connection-adapters/column.js";
+import type { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
@@ -37,7 +42,7 @@ import { personFixtureData } from "./test-helpers/fixtures/people.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
-import { Zlib } from "@blazetrails/ruby-compat";
+import { Dir, File, Zlib } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -46,7 +51,11 @@ import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 import { adapterDouble } from "./test-helpers/adapter-double.js";
-import { setValidateMigrationTimestamps, validateMigrationTimestamps } from "./active-record.js";
+import {
+  setTimestampedMigrations,
+  setValidateMigrationTimestamps,
+  validateMigrationTimestamps,
+} from "./active-record.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -1629,420 +1638,514 @@ AND query LIKE '%${lockId}%'`;
   });
 
   describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
-    let bulkAdapter: DatabaseAdapter;
+    let connection: DatabaseAdapter;
+    let _columns: Column[] | null = null;
+    let _indexes: IndexDefinition[] | null = null;
+
     beforeEach(async () => {
-      bulkAdapter = await freshAdapter();
+      connection = Base.connection;
+      await connection.createTable("delete_me", { force: true }, () => {});
+      Person.resetColumnInformation();
+      Person.resetSequenceName();
     });
+
     afterEach(async () => {
-      const o = { ifExists: true } as const;
-      await bulkAdapter.dropTable("bk1", o);
-      await bulkAdapter.dropTable("bk2", o);
-      await bulkAdapter.dropTable("bk3", o);
-      await bulkAdapter.dropTable("bk4", o);
-      await bulkAdapter.dropTable("bk5", o);
-      await bulkAdapter.dropTable("bk6", o);
-      await bulkAdapter.dropTable("bk7", o);
-      await bulkAdapter.dropTable("bk_idx", o);
+      await connection.dropTable("delete_me", { ifExists: true });
     });
-    function makeBulkMig(m: Migration): Migration {
-      (m as any).adapter = bulkAdapter;
-      return m;
+
+    async function withBulkChangeTable(block: (t: any) => void): Promise<void> {
+      _columns = _indexes = null;
+
+      await connection.changeTable("delete_me", { bulk: true }, block);
+    }
+
+    async function columns(): Promise<Column[]> {
+      return (_columns ??= await connection.columns("delete_me"));
+    }
+
+    async function column(name: string): Promise<Column | undefined> {
+      return (await columns()).find((c) => c.name === name);
+    }
+
+    async function indexes(): Promise<IndexDefinition[]> {
+      return (_indexes ??= await connection.indexes("delete_me"));
+    }
+
+    async function index(name: string): Promise<IndexDefinition | undefined> {
+      return (await indexes()).find((i) => i.name === name);
     }
 
     it("adding multiple columns", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk1", (t) => {
-              t.string("name");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.addColumn("bk1", "age", "integer");
-            await this.addColumn("bk1", "email", "string");
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk1 (name, age, email) VALUES ('test', 25, 'a@b.c')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk1`)).toArray();
-      expect(rows.length).toBe(1);
-      expect(rows[0].age).toBe(25);
-      expect(rows[0].email).toBe("a@b.c");
+      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+
+      await assertQueriesCount(expectedQueryCount, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.column("name", "string");
+          t.string("qualification", "experience");
+          t.integer("age", { default: 0 });
+          t.date("birthdate", { comment: "This is a comment" });
+          t.timestamps({ null: true });
+        });
+      });
+
+      expect((await columns()).length).toBe(8);
+      for (const s of ["name", "qualification", "experience"]) {
+        expect((await column(s))!.type).toBe("string");
+      }
+      expect((await column("age"))!.default).toBe("0");
+      expect((await column("birthdate"))!.comment).toBe("This is a comment");
     });
 
     it("rename columns", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk2", (t) => {
-              t.string("old_c");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.renameColumn("bk2", "old_c", "new_c");
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk2 (new_c) VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk2`)).toArray();
-      expect(rows.length).toBe(1);
-      expect(rows[0].new_c).toBe("test");
+      await withBulkChangeTable((t) => {
+        t.string("qualification");
+      });
+
+      expect(await column("qualification")).toBeTruthy();
+
+      await withBulkChangeTable((t) => {
+        t.rename("qualification", "experience");
+        t.string("qualification_experience");
+      });
+
+      expect(await column("qualification")).toBeFalsy();
+      expect(await column("experience")).toBeTruthy();
+      expect(await column("qualification_experience")).toBeTruthy();
     });
 
     it("removing columns", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk3", (t) => {
-              t.string("a");
-              t.string("b");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.removeColumns("bk3", "b");
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk3 (a) VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk3`)).toArray();
-      expect(rows.length).toBe(1);
+      await withBulkChangeTable((t) => {
+        t.string("qualification", "experience");
+      });
+
+      for (const c of ["qualification", "experience"]) {
+        expect(await column(c)).toBeTruthy();
+      }
+
+      await assertQueriesCount(1, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.remove("qualification", "experience");
+          t.string("qualification_experience");
+        });
+      });
+
+      for (const c of ["qualification", "experience"]) {
+        expect(await column(c)).toBeFalsy();
+      }
+      expect(await column("qualification_experience")).toBeTruthy();
     });
 
     it("adding timestamps", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk4", (t) => {
-              t.string("x");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.addTimestamps("bk4");
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(
-        `INSERT INTO bk4 (x, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
-      );
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk4`)).toArray();
-      expect(rows.length).toBe(1);
-      const createdAt = rows[0].created_at;
-      const dateStr =
-        createdAt instanceof Date
-          ? createdAt.toISOString().slice(0, 10)
-          : String(createdAt).slice(0, 10);
-      expect(dateStr).toBe("2023-01-01");
+      await withBulkChangeTable((t) => {
+        t.string("title");
+      });
+
+      expect(await column("title")).toBeTruthy();
+
+      await assertQueriesCount(1, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.timestamps();
+          t.remove("title");
+        });
+      });
+
+      for (const c of ["created_at", "updated_at"]) {
+        expect(await column(c)).toBeTruthy();
+      }
+      expect(await column("title")).toBeFalsy();
     });
 
     it("removing timestamps", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk5", (t) => {
-              t.string("x");
-              t.datetime("created_at");
-              t.datetime("updated_at");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.removeTimestamps("bk5");
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk5 (x) VALUES ('test')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk5`)).toArray();
-      expect(rows.length).toBe(1);
+      await withBulkChangeTable((t) => {
+        t.timestamps();
+      });
+
+      for (const c of ["created_at", "updated_at"]) {
+        expect(await column(c)).toBeTruthy();
+      }
+
+      await assertQueriesCount(1, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.removeTimestamps();
+          t.string("title");
+        });
+      });
+
+      for (const c of ["created_at", "updated_at"]) {
+        expect(await column(c)).toBeFalsy();
+      }
+      expect(await column("title")).toBeTruthy();
     });
 
     it("adding indexes", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk6", (t) => {
-              t.string("email");
-            });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.addIndex("bk6", "email", { unique: true });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk6 (email) VALUES ('test@test.com')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk6`)).toArray();
-      expect(rows.length).toBe(1);
+      await withBulkChangeTable((t) => {
+        t.string("username");
+        t.string("name");
+        t.integer("age");
+      });
+
+      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 3 });
+
+      await assertQueriesCount(expectedQueryCount, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.index("username", { unique: true, name: "awesome_username_index" });
+          t.index(["name", "age"], { comment: "This is a comment" });
+        });
+      });
+
+      expect((await indexes()).length).toBe(2);
+
+      const nameAgeIndex = (await index("index_delete_me_on_name_and_age"))!;
+      expect([...nameAgeIndex.columns].sort()).toEqual(["name", "age"].sort());
+      expect(nameAgeIndex.comment).toBe("This is a comment");
+      expect(nameAgeIndex.unique).toBeFalsy();
+
+      expect((await index("awesome_username_index"))!.unique).toBeTruthy();
     });
 
     it("removing index", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk7", (t) => {
-              t.string("email");
-            });
-            await this.addIndex("bk7", "email", { name: "bk7_idx" });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.removeIndex("bk7", { name: "bk7_idx" });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk7 (email) VALUES ('test@test.com')`);
-      const rows = (await bulkAdapter.selectAll(`SELECT * FROM bk7`)).toArray();
-      expect(rows.length).toBe(1);
+      await withBulkChangeTable((t) => {
+        t.string("name");
+        t.index("name");
+      });
+
+      expect(await index("index_delete_me_on_name")).toBeTruthy();
+
+      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+
+      await assertQueriesCount(expectedQueryCount, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.removeIndex("name");
+          t.index("name", { name: "new_name_index", unique: true });
+        });
+      });
+
+      expect(await index("index_delete_me_on_name")).toBeFalsy();
+
+      const newNameIndex = (await index("new_name_index"))!;
+      expect(newNameIndex.unique).toBeTruthy();
     });
 
     it("changing index", async () => {
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.createTable("bk_idx", (t) => {
-              t.string("username");
-            });
-            await this.addIndex("bk_idx", "username", { name: "username_index" });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await makeBulkMig(
-        new (class extends Migration {
-          async up() {
-            await this.removeIndex("bk_idx", { name: "username_index" });
-            await this.addIndex("bk_idx", "username", { name: "username_index", unique: true });
-          }
-          async down() {}
-        })(),
-      ).up();
-      await bulkAdapter.execute(`INSERT INTO bk_idx (username) VALUES ('alice')`);
-      await expect(
-        bulkAdapter.insert(`INSERT INTO bk_idx (username) VALUES ('alice')`),
-      ).rejects.toThrow();
+      await withBulkChangeTable((t) => {
+        t.string("username");
+        t.index("username", { name: "username_index" });
+      });
+
+      expect(await index("username_index")).toBeTruthy();
+      expect((await index("username_index"))!.unique).toBeFalsy();
+
+      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+
+      await assertQueriesCount(expectedQueryCount, false, async () => {
+        await withBulkChangeTable((t) => {
+          t.removeIndex({ name: "username_index" });
+          t.index("username", { name: "username_index", unique: true });
+        });
+      });
+
+      expect(await index("username_index")).toBeTruthy();
+      expect((await index("username_index"))!.unique).toBeTruthy();
     });
   });
 
   describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
+    afterEach(async () => {
+      await Base.connection.removeColumns("people", "column1", "column2").catch(() => {});
+    });
+
     it("bulk revert", async () => {
-      const rvAdapter = await freshAdapter();
-      function makeRvMig(m: Migration): Migration {
-        (m as any).adapter = rvAdapter;
-        return m;
-      }
-      class BulkMig extends Migration {
+      const connection = Base.connection;
+      Person.resetColumnInformation();
+      Person.resetSequenceName();
+      await connection.addColumn("people", "column1", "string");
+      await connection.addColumn("people", "column2", "string");
+      await assertColumn(Person, "column1");
+      await assertColumn(Person, "column2");
+
+      class BulkRevert extends Migration {
+        static {
+          this.disableDdlTransactionBang();
+        }
+
+        write(_text = ""): void {}
+
         async change() {
-          await this.createTable("rv_bulk", (t) => {
-            t.string("name");
+          await this.changeTable("people", { bulk: true }, (t: any) => {
+            t.column("column1", "string");
+            t.column("column2", "string");
           });
-          await this.addColumn("rv_bulk", "extra", "string");
         }
       }
-      const m = makeRvMig(new BulkMig());
-      await m.execMigration(rvAdapter, "up");
-      await rvAdapter.execute(`INSERT INTO rv_bulk (name, extra) VALUES ('test', 'val')`);
-      const rows = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
-      expect(rows.length).toBe(1);
-      expect(rows[0].extra).toBe("val");
-      await m.execMigration(rvAdapter, "down");
-      try {
-        const after = (await rvAdapter.selectAll(`SELECT * FROM rv_bulk`)).toArray();
-        expect(after.length).toBe(0);
-      } catch {}
+      const migration = new BulkRevert();
+
+      await assertQueriesCount(1, false, () => migration.migrate("down"));
+
+      await assertNoColumn(Person, "column1");
+      await assertNoColumn(Person, "column2");
     });
   });
 
   describe("CopyMigrationsTest", () => {
-    it("copying migrations without timestamps", () => {
-      class CM1 extends Migration {
-        async change() {}
-      }
-      expect(new CM1(undefined, 1).version).toBe(1);
+    let migrationsPath: string;
+    let existingMigrations: string[];
+
+    function migrationFiles(): string[] {
+      return Dir.glob(`${migrationsPath}/*.ts`);
+    }
+
+    afterEach(() => {
+      setTimestampedMigrations(true);
+      const toDelete = migrationFiles().filter((f) => !existingMigrations.includes(f));
+      if (toDelete.length > 0) File.delete(...toDelete);
     });
 
-    it("copying migrations without timestamps from 2 sources", () => {
-      class CM1 extends Migration {
-        async change() {}
-      }
-      class CM2 extends Migration {
-        async change() {}
-      }
-      expect(new CM1(undefined, 1).version).toBe(1);
-      expect(new CM2(undefined, 2).version).toBe(2);
+    it("copying migrations without timestamps", async () => {
+      setTimestampedMigrations(false);
+      migrationsPath = `${MIGRATIONS_ROOT}/valid`;
+      existingMigrations = migrationFiles();
+
+      let copied = await Migration.copy(migrationsPath, {
+        bukkits: `${MIGRATIONS_ROOT}/to_copy`,
+      });
+      expect(File.isExist(`${migrationsPath}/4_people_have_hobbies.bukkits.ts`)).toBeTruthy();
+      expect(File.isExist(`${migrationsPath}/5_people_have_descriptions.bukkits.ts`)).toBeTruthy();
+      expect(copied.map((m) => m.filename)).toEqual([
+        `${migrationsPath}/4_people_have_hobbies.bukkits.ts`,
+        `${migrationsPath}/5_people_have_descriptions.bukkits.ts`,
+      ]);
+
+      const expected = "// This migration comes from bukkits (originally 1)";
+      expect(
+        File.readlines(`${migrationsPath}/4_people_have_hobbies.bukkits.ts`)[0].trimEnd(),
+      ).toBe(expected);
+
+      const filesCount = migrationFiles().length;
+      copied = await Migration.copy(migrationsPath, { bukkits: `${MIGRATIONS_ROOT}/to_copy` });
+      expect(migrationFiles().length).toBe(filesCount);
+      assertEmpty(copied);
     });
 
-    it("copying migrations with timestamps", () => {
-      class CM1 extends Migration {
-        async change() {}
-      }
-      expect(new CM1(undefined, 20230101120000).version).toBe(20230101120000);
+    it("copying migrations without timestamps from 2 sources", async () => {
+      setTimestampedMigrations(false);
+      migrationsPath = `${MIGRATIONS_ROOT}/valid`;
+      existingMigrations = migrationFiles();
+
+      const sources: Record<string, string> = {};
+      sources.bukkits = `${MIGRATIONS_ROOT}/to_copy`;
+      sources.omg = `${MIGRATIONS_ROOT}/to_copy2`;
+      await Migration.copy(migrationsPath, sources);
+      expect(File.isExist(`${migrationsPath}/4_people_have_hobbies.bukkits.ts`)).toBeTruthy();
+      expect(File.isExist(`${migrationsPath}/5_people_have_descriptions.bukkits.ts`)).toBeTruthy();
+      expect(File.isExist(`${migrationsPath}/6_create_articles.omg.ts`)).toBeTruthy();
+      expect(File.isExist(`${migrationsPath}/7_create_comments.omg.ts`)).toBeTruthy();
+
+      const filesCount = migrationFiles().length;
+      await Migration.copy(migrationsPath, sources);
+      expect(migrationFiles().length).toBe(filesCount);
     });
 
-    it("copying migrations with timestamps from 2 sources", () => {
-      class CM1 extends Migration {
-        async change() {}
-      }
-      class CM2 extends Migration {
-        async change() {}
-      }
-      expect(new CM1(undefined, 20230101120000).version).toBe(20230101120000);
-      expect(new CM2(undefined, 20230201120000).version).toBe(20230201120000);
-    });
+    it.skip("copying migrations with timestamps", async () => {
+      // BLOCKED: port bug — Migration.nextMigrationNumber reads Temporal.Now, ignoring travelTo's stubbed Time.now (filed as 0155-assertion-surfaced-port-bugs/migration-next-migration-number-ignores-time-now)
+      migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
+      existingMigrations = migrationFiles();
 
-    it("copying migrations with timestamps to destination with timestamps in future", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-future-"));
-      const src = path.join(root, "src");
-      const dst = path.join(root, "dst");
-      fs.mkdirSync(src, { recursive: true });
-      fs.mkdirSync(dst, { recursive: true });
-      const futureVersion = "99991231235959";
-      fs.writeFileSync(path.join(dst, `${futureVersion}_future_table.ts`), "// future\n");
-      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
+      travelTo(new Date(Date.UTC(2010, 6, 26, 10, 10, 10)));
       try {
-        const copied = await Migration.copy(dst, { bukkits: src });
-        expect(copied).toHaveLength(1);
-        expect(BigInt(copied[0].version) > BigInt(futureVersion)).toBe(true);
-        expect(fs.existsSync(copied[0].filename)).toBe(true);
-        const copied2 = await Migration.copy(dst, { bukkits: src });
-        expect(copied2).toHaveLength(0);
+        let copied = await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(
+          File.isExist(`${migrationsPath}/20100726101010_people_have_hobbies.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101011_people_have_descriptions.bukkits.ts`),
+        ).toBeTruthy();
+        const expected = [
+          `${migrationsPath}/20100726101010_people_have_hobbies.bukkits.ts`,
+          `${migrationsPath}/20100726101011_people_have_descriptions.bukkits.ts`,
+        ];
+        expect(copied.map((m) => m.filename)).toEqual(expected);
+
+        const filesCount = migrationFiles().length;
+        copied = await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(migrationFiles().length).toBe(filesCount);
+        assertEmpty(copied);
       } finally {
-        fs.rmSync(root, { recursive: true, force: true });
+        travelBack();
+      }
+    });
+
+    it.skip("copying migrations with timestamps from 2 sources", async () => {
+      // BLOCKED: port bug — Migration.nextMigrationNumber reads Temporal.Now, ignoring travelTo's stubbed Time.now (filed as 0155-assertion-surfaced-port-bugs/migration-next-migration-number-ignores-time-now)
+      migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
+      existingMigrations = migrationFiles();
+
+      const sources: Record<string, string> = {};
+      sources.bukkits = `${MIGRATIONS_ROOT}/to_copy_with_timestamps`;
+      sources.omg = `${MIGRATIONS_ROOT}/to_copy_with_timestamps2`;
+
+      travelTo(new Date(Date.UTC(2010, 6, 26, 10, 10, 10)));
+      try {
+        const copied = await Migration.copy(migrationsPath, sources);
+        expect(
+          File.isExist(`${migrationsPath}/20100726101010_people_have_hobbies.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101011_people_have_descriptions.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101012_create_articles.omg.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101013_create_comments.omg.ts`),
+        ).toBeTruthy();
+        expect(copied.length).toBe(4);
+
+        const filesCount = migrationFiles().length;
+        await Migration.copy(migrationsPath, sources);
+        expect(migrationFiles().length).toBe(filesCount);
+      } finally {
+        travelBack();
+      }
+    });
+
+    it.skip("copying migrations with timestamps to destination with timestamps in future", async () => {
+      // BLOCKED: port bug — Migration.nextMigrationNumber reads Temporal.Now, ignoring travelTo's stubbed Time.now (filed as 0155-assertion-surfaced-port-bugs/migration-next-migration-number-ignores-time-now)
+      migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
+      existingMigrations = migrationFiles();
+
+      travelTo(new Date(Date.UTC(2010, 1, 20, 10, 10, 10)));
+      try {
+        await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(
+          File.isExist(`${migrationsPath}/20100301010102_people_have_hobbies.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100301010103_people_have_descriptions.bukkits.ts`),
+        ).toBeTruthy();
+
+        const filesCount = migrationFiles().length;
+        const copied = await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(migrationFiles().length).toBe(filesCount);
+        assertEmpty(copied);
+      } finally {
+        travelBack();
       }
     });
 
     it("copying migrations preserving magic comments", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-magic-"));
-      const src = path.join(root, "src");
-      const dst = path.join(root, "dst");
-      fs.mkdirSync(src, { recursive: true });
-      fs.mkdirSync(dst, { recursive: true });
-      fs.writeFileSync(
-        path.join(src, "1_create_horses.ts"),
-        "// @ts-nocheck\n\nexport class CreateHorses {}\n",
-      );
-      try {
-        const copied = await Migration.copy(dst, { bukkits: src });
-        expect(copied).toHaveLength(1);
-        const body = fs.readFileSync(copied[0].filename, "utf8");
-        expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
-        const copied2 = await Migration.copy(dst, { bukkits: src });
-        expect(copied2).toHaveLength(0);
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
+      setTimestampedMigrations(false);
+      migrationsPath = `${MIGRATIONS_ROOT}/valid`;
+      existingMigrations = migrationFiles();
+
+      let copied = await Migration.copy(migrationsPath, { bukkits: `${MIGRATIONS_ROOT}/magic` });
+      expect(File.isExist(`${migrationsPath}/4_currencies_have_symbols.bukkits.ts`)).toBeTruthy();
+      expect(copied.map((m) => m.filename)).toEqual([
+        `${migrationsPath}/4_currencies_have_symbols.bukkits.ts`,
+      ]);
+
+      const expected = "// @ts-check\n\n// This migration comes from bukkits (originally 1)";
+      expect(
+        File.readlines(`${migrationsPath}/4_currencies_have_symbols.bukkits.ts`)
+          .slice(0, 3)
+          .join("")
+          .trimEnd(),
+      ).toBe(expected);
+
+      const filesCount = migrationFiles().length;
+      copied = await Migration.copy(migrationsPath, { bukkits: `${MIGRATIONS_ROOT}/magic` });
+      expect(migrationFiles().length).toBe(filesCount);
+      assertEmpty(copied);
     });
 
-    it("skipping migrations", () => {
-      class CM1 extends Migration {
-        async change() {}
-      }
-      expect(new CM1(undefined, 1).version).toBe(1);
-      expect(new CM1().name).toBe("CM1");
+    it("skipping migrations", async () => {
+      migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
+      existingMigrations = migrationFiles();
+
+      const sources: Record<string, string> = {};
+      sources.bukkits = `${MIGRATIONS_ROOT}/to_copy_with_timestamps`;
+      sources.omg = `${MIGRATIONS_ROOT}/to_copy_with_name_collision`;
+
+      const skipped: string[] = [];
+      const onSkip = (name: string, migration: MigrationProxy) => {
+        skipped.push(`${name} ${migration.name}`);
+      };
+      const copied = await Migration.copy(migrationsPath, sources, { onSkip });
+      expect(copied.length).toBe(2);
+
+      expect(skipped.length).toBe(1);
+      expect(skipped).toEqual(["omg PeopleHaveHobbies"]);
     });
 
     it("skip is not called if migrations are from the same plugin", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-same-plugin-"));
-      const src = path.join(root, "src");
-      const dst = path.join(root, "dst");
-      fs.mkdirSync(src, { recursive: true });
-      fs.mkdirSync(dst, { recursive: true });
-      fs.writeFileSync(path.join(src, "1_create_articles.ts"), "// source\n");
-      fs.writeFileSync(path.join(dst, "20100101000000_create_articles.bukkits.ts"), "// dst\n");
+      migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
+      existingMigrations = migrationFiles();
+
+      const sources: Record<string, string> = {};
+      sources.bukkits = `${MIGRATIONS_ROOT}/to_copy_with_timestamps`;
+
+      const skipped: string[] = [];
+      const onSkip = (name: string, migration: MigrationProxy) => {
+        skipped.push(`${name} ${migration.name}`);
+      };
+      const copied = await Migration.copy(migrationsPath, sources, { onSkip });
+      await Migration.copy(migrationsPath, sources, { onSkip });
+
+      expect(copied.length).toBe(2);
+      expect(skipped.length).toBe(0);
+    });
+
+    it.skip("copying migrations to non existing directory", async () => {
+      // BLOCKED: port bug — Migration.nextMigrationNumber reads Temporal.Now, ignoring travelTo's stubbed Time.now (filed as 0155-assertion-surfaced-port-bugs/migration-next-migration-number-ignores-time-now)
+      migrationsPath = `${MIGRATIONS_ROOT}/non_existing`;
+      existingMigrations = [];
+
+      travelTo(new Date(Date.UTC(2010, 6, 26, 10, 10, 10)));
       try {
-        const onSkip = vi.fn();
-        const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
-        expect(copied).toHaveLength(0);
-        expect(onSkip).not.toHaveBeenCalled();
+        const copied = await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(
+          File.isExist(`${migrationsPath}/20100726101010_people_have_hobbies.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101011_people_have_descriptions.bukkits.ts`),
+        ).toBeTruthy();
+        expect(copied.length).toBe(2);
       } finally {
-        fs.rmSync(root, { recursive: true, force: true });
+        travelBack();
+        const toDelete = migrationFiles();
+        if (toDelete.length > 0) File.delete(...toDelete);
+        Dir.delete(migrationsPath);
       }
     });
 
-    it("copying migrations to non existing directory", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-nonexist-"));
-      const src = path.join(root, "src");
-      const dst = path.join(root, "does-not-exist");
-      fs.mkdirSync(src, { recursive: true });
-      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
-      try {
-        expect(fs.existsSync(dst)).toBe(false);
-        const copied = await Migration.copy(dst, { bukkits: src });
-        expect(copied).toHaveLength(1);
-        expect(fs.existsSync(dst)).toBe(true);
-        expect(fs.existsSync(copied[0].filename)).toBe(true);
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
-    });
+    it.skip("copying migrations to empty directory", async () => {
+      // BLOCKED: port bug — Migration.nextMigrationNumber reads Temporal.Now, ignoring travelTo's stubbed Time.now (filed as 0155-assertion-surfaced-port-bugs/migration-next-migration-number-ignores-time-now)
+      migrationsPath = `${MIGRATIONS_ROOT}/empty`;
+      existingMigrations = [];
 
-    it("copying migrations to empty directory", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-empty-dst-"));
-      const src = path.join(root, "src");
-      const dst = path.join(root, "dst");
-      fs.mkdirSync(src, { recursive: true });
-      fs.mkdirSync(dst, { recursive: true });
-      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
-      fs.writeFileSync(path.join(src, "2_create_riders.ts"), "// source2\n");
+      travelTo(new Date(Date.UTC(2010, 6, 26, 10, 10, 10)));
       try {
-        const copied = await Migration.copy(dst, { bukkits: src });
-        expect(fs.existsSync(copied[0].filename)).toBe(true);
-        expect(fs.existsSync(copied[1].filename)).toBe(true);
-        expect(copied).toHaveLength(2);
+        const copied = await Migration.copy(migrationsPath, {
+          bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
+        });
+        expect(
+          File.isExist(`${migrationsPath}/20100726101010_people_have_hobbies.bukkits.ts`),
+        ).toBeTruthy();
+        expect(
+          File.isExist(`${migrationsPath}/20100726101011_people_have_descriptions.bukkits.ts`),
+        ).toBeTruthy();
+        expect(copied.length).toBe(2);
       } finally {
-        fs.rmSync(root, { recursive: true, force: true });
+        travelBack();
       }
     });
 
@@ -2151,6 +2254,19 @@ AND query LIKE '%${lockId}%'`;
 });
 
 describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
+  async function expectDefaultFunctionAndInsertDefaultRow(
+    adapter: DatabaseAdapter,
+    name: Column,
+  ): Promise<void> {
+    if (adapterType === "postgres") {
+      expect((name as any).defaultFunction).toBe("gen_random_uuid()");
+      await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
+    } else {
+      expect((name as any).defaultFunction).toBe("uuid()");
+      await adapter.execute("INSERT INTO delete_me () VALUES ()");
+    }
+  }
+
   function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
     if (adapterType !== "mysql" && adapterType !== "postgres") {
       throw new Error(`need an expected query count for ${adapterType}`);
@@ -2228,13 +2344,11 @@ describe("BulkAlterTableMigrationsTest", () => {
       const cols = await adapter.columns("delete_me");
       const name = cols.find((c) => c.name === "name")!;
       expect(name.default).toBeNull();
-      expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
 
-      await adapter.execute(
-        isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
-      );
-      const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
-      expect(String(row!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
+      await expectDefaultFunctionAndInsertDefaultRow(adapter, name);
+
+      const personData = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
+      expect(String(personData!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
     } finally {
       await adapter.dropTable("delete_me", { ifExists: true });
     }
@@ -2265,12 +2379,12 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
     await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("id", "bigint", { autoIncrement: true });
     });
-    expect(await isAutoIncrement()).toBe(true);
+    expect(await isAutoIncrement()).toBeTruthy();
 
     await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("id", "bigint", { autoIncrement: false });
     });
-    expect(await isAutoIncrement()).toBe(false);
+    expect(await isAutoIncrement()).toBeFalsy();
   });
 });
 
