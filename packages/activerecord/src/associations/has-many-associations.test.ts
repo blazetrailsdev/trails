@@ -2039,50 +2039,89 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  it("finding array compatibility", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.posts;
-    expect(Array.isArray(posts)).toBe(true);
-    expect(posts.length).toBe(2);
-    const found = await HmAuthor.order("id").detect((a: any) => a.id > 0);
-    expect((found as any).id).toBe((await HmAuthor.order("id").first())!.id);
-  });
-  it("find many with merged options", async () => {
-    class MergedAuthor extends Base {
-      declare merged_posts: AssociationProxy<MergedPost>;
-      declare name: string | null;
+  describe("with authors/posts fixtures", () => {
+    const {
+      companies: firms,
+      authors,
+      posts,
+    } = fixtures(["companies", "accounts", "authors", "authorAddresses", "posts", "comments"]);
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("merged_posts", {
-          className: "MergedPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class MergedPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    it("finding array compatibility", async () => {
+      const clients = await (await (await HmFirm.order("id")).find((f: any) => f.id > 0)!).clients;
+      expect(clients.length).toBe(3);
+    });
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
+    it("find many with merged options", async () => {
+      const firm = firms("first_firm") as any;
+      expect(await firm.limitedClients.size()).toBe(1);
+      expect((await firm.limitedClients.toArray()).length).toBe(1);
+      expect((await firm.limitedClients.limit(null).toArray()).length).toBe(3);
+    });
+
+    it("dynamic find should respect association order", async () => {
+      const firstFirm = firms("first_firm") as any;
+      expect((await firstFirm.clientsSortedDesc.where("type = 'Client'").first()).id).toBe(
+        firms("another_first_firm_client").id,
+      );
+      expect((await firstFirm.clientsSortedDesc.findBy({ type: "Client" })).id).toBe(
+        firms("another_first_firm_client").id,
+      );
+    });
+
+    it("taking", async () => {
+      await posts("other_by_bob").destroy();
+      const bob = authors("bob") as any;
+      expect((await bob.posts.take()).id).toBe(posts("misc_by_bob").id);
+      expect((await bob.posts.takeBang()).id).toBe(posts("misc_by_bob").id);
+      await bob.posts.toArray();
+      expect((await bob.posts.take()).id).toBe(posts("misc_by_bob").id);
+      expect((await bob.posts.takeBang()).id).toBe(posts("misc_by_bob").id);
+    });
+
+    it("taking not found", async () => {
+      const bob = authors("bob") as any;
+      await bob.posts.deleteAll();
+      await expect(bob.posts.takeBang()).rejects.toThrow(RecordNotFound);
+      await bob.posts.toArray();
+      await expect(bob.posts.takeBang()).rejects.toThrow(RecordNotFound);
+    });
+
+    it("taking with a number", async () => {
+      class TakingNumberAuthor extends HmAuthor {
+        static {
+          this.hasMany("posts", (q: any) => q.order("id"), { foreignKey: "author_id" });
+        }
       }
-    }
-    registerModel(MergedAuthor);
-    registerModel(MergedPost);
-    const author = await MergedAuthor.create({ name: "Alice" });
-    const p1 = await MergedPost.create({ author_id: author.id, title: "A", body: "body" });
-    const p2 = await MergedPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.merged_posts;
-    expect(posts.length).toBe(2);
-    const ids = posts.map((p: any) => p.id);
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
+      registerModel(TakingNumberAuthor);
+
+      const idsOf = (records: any[]) => records.map((r: any) => r.id);
+      const bob = (await TakingNumberAuthor.find(authors("bob").id!)) as any;
+      const newPost = bob.posts.build();
+      expect(bob.posts.loaded).toBeFalsy();
+      expect(idsOf(await bob.posts.take(1))).toEqual([posts("misc_by_bob").id]);
+      expect(idsOf(await bob.posts.take(2))).toEqual([
+        posts("misc_by_bob").id,
+        posts("other_by_bob").id,
+      ]);
+      expect(idsOf(await bob.posts.take(3))).toEqual([
+        posts("misc_by_bob").id,
+        posts("other_by_bob").id,
+        newPost.id,
+      ]);
+
+      await bob.posts.load();
+      expect(bob.posts.loaded).toBeTruthy();
+      expect(idsOf(await bob.posts.take(1))).toEqual([posts("misc_by_bob").id]);
+      expect(idsOf(await bob.posts.take(2))).toEqual([
+        posts("misc_by_bob").id,
+        posts("other_by_bob").id,
+      ]);
+      expect(idsOf(await bob.posts.take(3))).toEqual([
+        posts("misc_by_bob").id,
+        posts("other_by_bob").id,
+        newPost.id,
+      ]);
+    });
   });
   it("find should append to association order", async () => {
     class AppOrdAuthor extends Base {
