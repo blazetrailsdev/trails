@@ -158,17 +158,23 @@ export class Topic extends Base {
 
   static {
     this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
-    this.afterInitialize(() => {
-      Topic.afterInitializeCalled = true;
-    });
-    this.afterTouch(async (record: any) => {
-      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
-    });
   }
 
   static afterInitializeCalled: boolean | null = null;
 
+  static {
+    this.afterInitialize(() => {
+      Topic.afterInitializeCalled = true;
+    });
+  }
+
   afterTouchCalled = 0;
+
+  static {
+    this.afterTouch(async (record: any) => {
+      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
+    });
+  }
 
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
     stats.count = (await this.count()) as number;
