@@ -775,7 +775,7 @@ export class TableDefinition {
   readonly checkConstraints: CheckConstraintDefinition[] = [];
   readonly temporary: boolean;
   readonly ifNotExists: boolean;
-  readonly as?: string;
+  readonly as?: string | { toSql(): string };
   readonly options?: string;
   readonly comment?: string;
   private _primaryKeys?: PrimaryKeyDefinition;
@@ -787,7 +787,7 @@ export class TableDefinition {
     tdOptions: {
       temporary?: boolean;
       ifNotExists?: boolean;
-      as?: string;
+      as?: string | { toSql(): string };
       options?: string;
       comment?: string;
       charset?: string;

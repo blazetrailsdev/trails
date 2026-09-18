@@ -223,7 +223,7 @@ export interface AbstractAdapter {
           charset?: string;
           collation?: string;
           temporary?: boolean;
-          as?: string;
+          as?: string | { toSql(): string };
           autoIncrement?: boolean;
           limit?: number;
           precision?: number;
