@@ -29,25 +29,30 @@ describe("Reaper", () => {
     vi.useRealTimers();
   });
 
-  it("keeps ticking after a reap() failure, logging it instead of raising it unhandled (interim shape, story reaper-tick-rescue-scope-too-broad)", async () => {
+  it("logs an unrescued reap() failure and stops ticking that frequency, matching a Rails reaper thread dying", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      let attempt = 0;
-      const flaky: ReapablePool = {
+      let attempts = 0;
+      const flakyPool: ReapablePool = {
         reap: async () => {
-          attempt++;
-          if (attempt === 1) throw new Error("boom");
+          attempts++;
+          if (attempts === 1) throw new Error("boom");
         },
         isDiscarded: () => false,
       };
-      new Reaper(flaky, FREQUENCY).run();
+      new Reaper(flakyPool, FREQUENCY).run();
+      expect(reaperInternals()._timers.has(FREQUENCY)).toBe(true);
 
       await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
-      expect(attempt).toBe(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("boom"));
+      expect(reaperInternals()._timers.has(FREQUENCY)).toBe(false);
+
+      new Reaper(flakyPool, FREQUENCY).run();
+      expect(reaperInternals()._timers.has(FREQUENCY)).toBe(true);
 
       await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
-      expect(attempt).toBe(2);
+      expect(attempts).toBe(2);
+      expect(reaperInternals()._timers.has(FREQUENCY)).toBe(true);
     } finally {
       warn.mockRestore();
     }

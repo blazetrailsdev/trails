@@ -69,7 +69,7 @@ export class Reaper {
       () =>
         new Promise<void>((running) => {
           tick = () => {
-            void (async () => {
+            (async () => {
               const refs = Reaper._pools.get(frequency);
               if (!refs) {
                 Reaper._stopTimer(frequency);
@@ -94,19 +94,18 @@ export class Reaper {
               for (const ref of alive) {
                 const p = ref.deref();
                 if (p) {
-                  try {
-                    await p.reap?.();
-                    await p.flush?.();
-                  } catch (err) {
-                    console.warn(
-                      `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
-                    );
-                  }
+                  await p.reap?.();
+                  await p.flush?.();
                 }
               }
 
               scheduleNext();
-            })();
+            })().catch((err: unknown) => {
+              Reaper._timers.delete(frequency);
+              console.warn(
+                `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
           };
           scheduleNext();
         }),
