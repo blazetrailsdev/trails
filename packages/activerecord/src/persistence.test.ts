@@ -1560,8 +1560,10 @@ describe("PersistenceTest", () => {
         const destroyed = (await CpkBook.destroy(books.map((b) => b.id))) as CpkBook[];
         const byId = (a: CpkBook, b: CpkBook) =>
           JSON.stringify(a.id).localeCompare(JSON.stringify(b.id));
-        expect([...destroyed].sort(byId).map((b) => b.id)).toEqual(
-          [...books].sort(byId).map((b) => b.id),
+        expect([...destroyed].sort(byId)).toEqual(
+          [...books].sort(byId).map((book) => ({
+            asymmetricMatch: (other: CpkBook) => other.equals(book),
+          })),
         );
         expect(destroyed.every((d) => d.isFrozen())).toBeTruthy();
       },
