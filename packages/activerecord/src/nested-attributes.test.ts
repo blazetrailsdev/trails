@@ -1202,15 +1202,25 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
     expect(Interest.reflectOnAssociation("human")?.options.inverseOf).toBe("interests");
     await repairValidations(Interest, async () => {
       (Interest as any).validates("human", { presence: true });
-      const beforeH = Number(await Human.count());
-      const beforeI = Number(await Interest.count());
-      const human = await Human.createBang({
-        name: "John",
-        interestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
-      });
-      expect(Number(await Human.count()) - beforeH).toBe(1);
-      expect(Number(await Interest.count()) - beforeI).toBe(2);
-      expect(Number(await (human as any).interests.count())).toBe(2);
+      await assertDifference(
+        () => Human.count() as Promise<number>,
+        1,
+        null,
+        async () => {
+          await assertDifference(
+            () => Interest.count() as Promise<number>,
+            2,
+            null,
+            async () => {
+              const human = await Human.createBang({
+                name: "John",
+                interestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+              });
+              expect(Number(await (human as any).interests.count())).toBe(2);
+            },
+          );
+        },
+      );
     });
   });
 
@@ -1220,10 +1230,10 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
       (Interest as any).validates("zine_id", { numericality: true });
       const human = await Human.create({ name: "John" });
       const interest = await (human as any).interests.create({ topic: "bar", zine_id: 0 });
-      expect(await interest.save()).toBe(true);
-      expect(await human.update({ interestsAttributes: { id: interest.id, zine_id: "foo" } })).toBe(
-        false,
-      );
+      expect(await interest.save()).toBeTruthy();
+      expect(
+        await human.update({ interestsAttributes: { id: interest.id, zine_id: "foo" } }),
+      ).toBeFalsy();
     });
   });
 });
@@ -1246,9 +1256,12 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
   it("limit with less records", async () => {
     const pirate = await makePirate();
     await (pirate as any).setAttributes({ parrotsAttributes: { foo: { name: "Big Big Love" } } });
-    const before = Number(await Parrot.count());
-    await pirate.saveBang();
-    expect(Number(await Parrot.count())).toBe(before + 1);
+    await assertDifference(
+      () => Parrot.count() as Promise<number>,
+      1,
+      null,
+      () => pirate.saveBang(),
+    );
   });
 
   it("limit with number exact records", async () => {
@@ -1259,9 +1272,12 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
         bar: { name: "Blown Away" },
       },
     });
-    const before = Number(await Parrot.count());
-    await pirate.saveBang();
-    expect(Number(await Parrot.count())).toBe(before + 2);
+    await assertDifference(
+      () => Parrot.count() as Promise<number>,
+      2,
+      null,
+      () => pirate.saveBang(),
+    );
   });
 
   it("limit with exceeding records", async () => {
@@ -1384,9 +1400,12 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         ],
       },
     });
-    const before = Number(await part.trinkets.count());
-    await pirate.save();
-    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before - 1);
+    await assertDifference(
+      () => part.trinkets.count() as Promise<number>,
+      -1,
+      null,
+      () => pirate.save(),
+    );
   });
 
   it("when great-grandchild added via attributes, saving parent should create great-grandchild", async () => {
@@ -1397,9 +1416,12 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         partsAttributes: [{ id: part.id, trinketsAttributes: [{ name: "created" }] }],
       },
     });
-    const before = Number(await part.trinkets.count());
-    await pirate.save();
-    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before + 1);
+    await assertDifference(
+      () => part.trinkets.count() as Promise<number>,
+      1,
+      null,
+      () => pirate.save(),
+    );
   });
 
   it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
@@ -1438,6 +1460,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     expect((ship.association("parts") as any).target.length).toBe(1);
     const parts = await (ship as any).parts.toArray();
     expect(parts[0].name).toBe("Mast");
+    await assertNoDifference(
+      () => parts[0].association("trinkets").target.length as number,
+      null,
+      () => parts[0].association("trinkets").target.length,
+    );
     expect((await parts[0].trinkets.toArray())[0].name).toBe("Ruby");
     await ship.save();
     expect((await (await (ship as any).parts.toArray())[0].trinkets.toArray())[0].name).toBe(
@@ -1466,9 +1493,12 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     await (ship as any).setAttributes({
       partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, _destroy: true }] }],
     });
-    const before = Number(await part.trinkets.count());
-    await ship.save();
-    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before - 1);
+    await assertDifference(
+      () => part.trinkets.count() as Promise<number>,
+      -1,
+      null,
+      () => ship.save(),
+    );
   });
 
   it("when grandchild added via attributes, saving parent should create grandchild", async () => {
@@ -1476,9 +1506,12 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     await (ship as any).setAttributes({
       partsAttributes: [{ id: part.id, trinketsAttributes: [{ name: "created" }] }],
     });
-    const before = Number(await part.trinkets.count());
-    await ship.save();
-    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before + 1);
+    await assertDifference(
+      () => part.trinkets.count() as Promise<number>,
+      1,
+      null,
+      () => ship.save(),
+    );
   });
 
   it("circular references do not perform unnecessary queries", async () => {
@@ -1492,7 +1525,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
   it("nested singular associations are validated", async () => {
     const part = new ShipPart({ name: "Stern", shipAttributes: { name: null } });
-    expect(await part.isValid()).toBe(false);
+    expect(await part.isValid()).toBeFalsy();
     expect((part as any).errors.fullMessages).toEqual(["Ship name can't be blank"]);
   });
 
@@ -1529,16 +1562,16 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     const guitar = await IndexedGuitar.createBang({});
     await (guitar as any).tuningPegs.createBang({ pitch: 1 });
     const peg2 = await (guitar as any).tuningPegs.createBang({ pitch: 2 });
-    expect(await guitar.isValid()).toBe(true);
+    expect(await guitar.isValid()).toBeTruthy();
     await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
-    expect(await guitar.isValid()).toBe(false);
+    expect(await guitar.isValid()).toBeFalsy();
     expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[0].pitch"]);
   });
 
   it("index unaffected by reject_if", async () => {
     const guitar = await IndexedGuitar.createBang({});
     await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
-    expect(await guitar.isValid()).toBe(false);
+    expect(await guitar.isValid()).toBeFalsy();
     expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuning_pegs[1].pitch"]);
   });
 });
