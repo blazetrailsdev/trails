@@ -194,7 +194,7 @@ describe("PersistenceTest", () => {
   });
 
   it.skip("update attribute", async () => {
-    // BLOCKED: update_attribute writes via writeAttribute, not the `name=` setter
+    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the `name=` setter
     expect((await Topic.find(1)).approved).toBeFalsy();
     await (await Topic.find(1)).updateAttribute("approved", true);
     expect((await Topic.find(1)).approved).toBeTruthy();
@@ -231,7 +231,7 @@ describe("PersistenceTest", () => {
 
     await Topic.delete(1);
     await expect(Topic.find(1)).rejects.toThrow(RecordNotFound);
-    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
+    await assertNothingRaised(() => Reply.find(shouldNotBeDestroyedReply.id));
   });
 
   it("delete all", async () => {
@@ -1321,7 +1321,7 @@ describe("PersistenceTest", () => {
   });
 
   it.skip("update attribute!", async () => {
-    // BLOCKED: update_attribute writes via writeAttribute, not the `name=` setter
+    // BLOCKED: port bug — update_attribute writes via writeAttribute, not the `name=` setter
     expect((await Topic.find(1)).approved).toBeFalsy();
     await (await Topic.find(1)).updateAttributeBang("approved", true);
     expect((await Topic.find(1)).approved).toBeTruthy();
@@ -1379,8 +1379,8 @@ describe("PersistenceTest", () => {
       RecordNotFound,
     );
 
-    await expect(Topic.find(1)).resolves.not.toThrow();
-    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
+    await assertNothingRaised(() => Topic.find(1));
+    await assertNothingRaised(() => Reply.find(shouldNotBeDestroyedReply.id));
   });
 
   it("class level delete with invalid ids", async () => {
@@ -1404,8 +1404,8 @@ describe("PersistenceTest", () => {
     await (await Topic.find(1)).replies.push(shouldNotBeDestroyedReply);
 
     await Topic.where("1=0").scoping(async () => Topic.delete(1));
-    await expect(Topic.find(1)).resolves.not.toThrow();
-    await expect(Reply.find(shouldNotBeDestroyedReply.id)).resolves.not.toThrow();
+    await assertNothingRaised(() => Topic.find(1));
+    await assertNothingRaised(() => Reply.find(shouldNotBeDestroyedReply.id));
   });
 
   describe("QueryConstraintsTest", () => {
@@ -1531,9 +1531,6 @@ describe("PersistenceTest", () => {
     );
   });
 });
-const sortById = <T extends { id: unknown }>(records: T[]) =>
-  [...records].sort((a, b) => (JSON.stringify(a.id) < JSON.stringify(b.id) ? -1 : 1));
-
 describe("PersistenceTest", () => {
   const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"]);
 
@@ -1561,7 +1558,11 @@ describe("PersistenceTest", () => {
       null,
       async () => {
         const destroyed = (await CpkBook.destroy(books.map((b) => b.id))) as CpkBook[];
-        expect(sortById(destroyed).map((b) => b.id)).toEqual(sortById(books).map((b) => b.id));
+        const byId = (a: CpkBook, b: CpkBook) =>
+          JSON.stringify(a.id).localeCompare(JSON.stringify(b.id));
+        expect([...destroyed].sort(byId).map((b) => b.id)).toEqual(
+          [...books].sort(byId).map((b) => b.id),
+        );
         expect(destroyed.every((d) => d.isFrozen())).toBeTruthy();
       },
     );
