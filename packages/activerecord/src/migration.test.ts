@@ -98,13 +98,6 @@ async function checkDefaultFunctionAndInsertRow(
   }
 }
 
-function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
-  if (adapterType !== "mysql" && adapterType !== "postgres") {
-    throw new Error(`need an expected query count for ${adapterType}`);
-  }
-  return counts[adapterType];
-}
-
 function stubNow(iso: string): () => void {
   const spy = vi.spyOn(Temporal.Now, "instant").mockReturnValue(Temporal.Instant.from(iso));
   return () => spy.mockRestore();
@@ -1281,7 +1274,7 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     try {
       await adapter.createTable("table_from_query_testings", {
-        as: Person.select("id").where({ id: 1 }).toSql(),
+        as: Person.select("id").where({ id: 1 }),
       });
 
       const columns = await adapter.columns("table_from_query_testings");
@@ -1676,7 +1669,7 @@ AND query LIKE '%${lockId}%'`;
     }
 
     it("adding multiple columns", async () => {
-      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+      const expectedQueryCount = ({ mysql: 1, postgres: 2 } as Record<string, number>)[adapterType];
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
         await withBulkChangeTable((t) => {
@@ -1784,7 +1777,7 @@ AND query LIKE '%${lockId}%'`;
         t.integer("age");
       });
 
-      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 3 });
+      const expectedQueryCount = ({ mysql: 1, postgres: 3 } as Record<string, number>)[adapterType];
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
         await withBulkChangeTable((t) => {
@@ -1811,7 +1804,7 @@ AND query LIKE '%${lockId}%'`;
 
       expect(await index("index_delete_me_on_name")).toBeTruthy();
 
-      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+      const expectedQueryCount = ({ mysql: 1, postgres: 2 } as Record<string, number>)[adapterType];
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
         await withBulkChangeTable((t) => {
@@ -1835,7 +1828,7 @@ AND query LIKE '%${lockId}%'`;
       expect(await index("username_index")).toBeTruthy();
       expect((await index("username_index"))!.unique).toBeFalsy();
 
-      const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 1, postgres: 2 });
+      const expectedQueryCount = ({ mysql: 1, postgres: 2 } as Record<string, number>)[adapterType];
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
         await withBulkChangeTable((t) => {
@@ -2376,7 +2369,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 2 });
+    const expectedQueryCount = ({ mysql: 3, postgres: 2 } as Record<string, number>)[adapterType];
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
@@ -2401,7 +2394,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 4 });
+    const expectedQueryCount = ({ mysql: 7, postgres: 4 } as Record<string, number>)[adapterType];
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });

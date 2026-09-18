@@ -77,7 +77,7 @@ export type JoinTableOptions = {
   options?: string;
   comment?: string;
   temporary?: boolean;
-  as?: string;
+  as?: string | { toSql(): string };
 };
 
 export interface ValidateConstraintStatements {
@@ -204,7 +204,7 @@ export class SchemaStatements {
           charset?: string;
           collation?: string;
           temporary?: boolean;
-          as?: string;
+          as?: string | { toSql(): string };
           autoIncrement?: boolean;
           limit?: number;
           precision?: number;
@@ -223,7 +223,7 @@ export class SchemaStatements {
       charset?: string;
       collation?: string;
       temporary?: boolean;
-      as?: string;
+      as?: string | { toSql(): string };
       autoIncrement?: boolean;
       limit?: number;
       precision?: number;
