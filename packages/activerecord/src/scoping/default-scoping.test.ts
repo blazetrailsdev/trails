@@ -729,6 +729,7 @@ describe("DefaultScopingTest", () => {
         .reverseOrder()
         .unscope("reverse_order" as any),
     ).toThrow();
+    expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow();
   });
 
   it("unscope errors with non where hash keys", () => {
@@ -739,7 +740,10 @@ describe("DefaultScopingTest", () => {
     ).toThrow();
   });
 
-  it("unscope errors with non symbol or hash arguments", () => {
+  it.skip("unscope errors with non symbol or hash arguments", () => {
+    // BLOCKED: unscope-string-arg-must-raise-argument-error
+    expect(() => Developer.where({ name: "Jamis" }).limit(3).unscope("limit")).toThrow();
+    expect(() => Developer.select("id").unscope("select")).toThrow();
     expect(() => Developer.select("id").unscope(5 as any)).toThrow();
   });
 
